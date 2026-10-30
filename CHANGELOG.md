@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.69.6** (build 2026-10-30). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.70.0** (build 2026-10-30). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.70.0 | GAS-CP-R60-004 | 2026-10-30 | Balance import as a cut-over: the imported sheet is the truth "as of" a date (Settings › HR › Import balances › Balances as of) — the entitlement, carry-over and taken days of the sheet are fixed (🔓) and only requests and board entries after that date count, so leave records imported for the same year are no longer added on top (negative balances). Earlier records stay in the history and on the board. | `install/migrate_cp_r60_004_counted_from.sql` |
 | 1.69.6 | GAS-CP-R60-006 | 2026-10-30 | Settings › Portal accounts is fast again: the manager and customer lists of every row are filled only when a drop-down is opened (one copy of each list on the page instead of one per account), and the row drop-downs use the plain browser list — the Add account form keeps the type-to-search lists. | — |
 | 1.69.4 | GAS-CP-R60-005 | 2026-10-30 | HR › People: an "➕ Account" button next to every person without a portal account (administrators) opens Settings › Portal accounts in a new window with the name, Staff role and discipline pre-filled; on creation the employee card is linked to the new account automatically. | — |
 | 1.69.3 | GAS-CP-R60-003 | 2026-10-30 | Per page (25 / 50 / 100) is remembered for the session on Projects, Vessels and the log: expanding a project, sorting, an action or Back no longer drops it back to 25. | — |

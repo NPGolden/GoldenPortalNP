@@ -1,8 +1,8 @@
 {
     "name": "Golden A/S Customer Portal",
-    "version": "1.69.6",
+    "version": "1.70.0",
     "build": "2026-10-30",
-    "generated_at": "2026-10-30T18:34:03+00:00",
+    "generated_at": "2026-10-30T18:41:50+00:00",
     "count": 543,
     "files": {
         ".htaccess": {
@@ -10,8 +10,8 @@
             "size": 181
         },
         "CHANGELOG.md": {
-            "sha256": "14203b54987801a1dae7e62b98b49aab072d8fb77a204154cb7941dbaa1750ff",
-            "size": 65520
+            "sha256": "ea65ff9ef1985362db28a01377f744d150bac175993fe871dc6b4f9923308063",
+            "size": 66027
         },
         "README.md": {
             "sha256": "2db8ea64aa86bcb4790bb1f848f60413eba56228453dc6b4c9f582463f908b50",
@@ -762,8 +762,8 @@
             "size": 38450
         },
         "customer/app/version.php": {
-            "sha256": "8f65d1411615374f1b49f79b3e85afc9833fa9af26e726e91a74c9986fd5648c",
-            "size": 90306
+            "sha256": "40f3f1f9d4a7e567daa2c91c647831233124fc1482abed4aef608ff3167976e2",
+            "size": 90975
         },
         "customer/app/vh.php": {
             "sha256": "e48f7d44763f6ac11691f44d3be783d532dc2788a159710b6bd796808936ac76",
@@ -806,8 +806,8 @@
             "size": 4713
         },
         "customer/install/cp_selfcheck.php": {
-            "sha256": "44a3a1b64289733a765f3122a333996fe8ffbe5d719a091c76d2d761ad8645bd",
-            "size": 29065
+            "sha256": "49266f5b81e63f1f4cd99e76259198cbbda326a7a1a8b3d3acf192224b26694e",
+            "size": 29317
         },
         "customer/install/migrate_cp_r10_approvals_invoicing.sql": {
             "sha256": "d9f0affe01937019e43d9f76e389f28d3e0aa89190ef17896fec56a80b237933",
@@ -1442,8 +1442,8 @@
             "size": 28553
         },
         "customer/views/_manual_golden.php": {
-            "sha256": "a5ded00589e03dac93694cf72b7378a5203b907cf66b5e0dd00ece77874c10fb",
-            "size": 135857
+            "sha256": "89b8331e4f6c4cffb8f25b9f5f9b104c209bf13fe44a61565b027f8b84dbd041",
+            "size": 136196
         },
         "customer/views/_manual_pm.php": {
             "sha256": "27201eec567edf42495ca8e0d243c10a0654ae5d23b1905d3f34473d8b6690bf",
@@ -1526,7 +1526,7 @@
             "size": 5326
         },
         "customer/views/admin_hr.php": {
-            "sha256": "696673f60681e534c6bb19ec1808b8b55f689bb001e96b14eaab17198821b4f2",
+            "sha256": "6be91a39dd288ad7ac720458828e3f221aab95667c0ff4f6f32d111510bdb780",
             "size": 40331
         },
         "customer/views/admin_issue_cats.php": {

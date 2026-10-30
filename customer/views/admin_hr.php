@@ -73,7 +73,7 @@ layout_head(t('hr.settings'), 'admin_hr');
   <div class="card-head"><h2>⇪ <?= tt('hr.people_import') ?></h2><a class="btn btn--ghost btn--sm" href="<?= url('hr_people_template') ?>">⬇ <?= tt('hr.people_template') ?></a></div>
   <p class="hint"><?= tt('hr.people_import_hint') ?></p>
   <form method="post" action="<?= url('admin_hr', ['tab' => 'people']) ?>" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hr_people_upload">
-    <div class="grid grid-3"><div class="field"><label><?= tt('hr.import_file') ?></label><input type="file" name="file" accept=".xlsx" required></div><div class="field"><label><?= tt('hr.import_asof') ?></label><input type="date" name="asof" value="<?= date('Y-m-d') ?>" title="<?= tt('hr.import_asof_hint') ?>"><p class="hint"><?= tt('hr.import_asof_hint') ?></p></div><div class="field" style="display:flex;align-items:flex-end;"><button class="btn btn--gold btn--sm" type="submit"><?= tt('hr.import_read') ?></button></div></div>
+    <div class="grid grid-3"><div class="field"><label><?= tt('hr.import_file') ?></label><input type="file" name="file" accept=".xlsx" required></div><div class="field" style="display:flex;align-items:flex-end;"><button class="btn btn--gold btn--sm" type="submit"><?= tt('hr.import_read') ?></button></div></div>
   </form>
   <?php $pi = $_SESSION['hr_people_import'] ?? null; if (!empty($_GET['imp']) && $pi): ?>
   <h3 style="margin-top:16px;"><?= e(t('hr.people_preview', ['n' => count($pi)])) ?></h3>
@@ -111,7 +111,7 @@ layout_head(t('hr.settings'), 'admin_hr');
   <h2>⇪ <?= tt('hr.import') ?></h2>
   <p class="hint"><?= tt('hr.import_hint') ?></p>
   <form method="post" action="<?= url('admin_hr', ['tab' => 'import']) ?>" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hr_import_upload">
-    <div class="grid grid-4"><div class="field"><label><?= tt('hr.import_file') ?></label><input type="file" name="file" accept=".xlsx" required></div><div class="field"><label><?= tt('hr.year') ?></label><select name="year" data-nosearch><?php foreach (array_unique(array_merge(hr_years(), [$year])) as $yy): ?><option value="<?= $yy ?>"<?= $sel($yy, $year) ?>><?= $yy ?></option><?php endforeach; ?></select></div><div class="field" style="display:flex;align-items:flex-end;"><button class="btn btn--gold btn--sm" type="submit"><?= tt('hr.import_read') ?></button></div></div>
+    <div class="grid grid-4"><div class="field"><label><?= tt('hr.import_file') ?></label><input type="file" name="file" accept=".xlsx" required></div><div class="field"><label><?= tt('hr.year') ?></label><select name="year" data-nosearch><?php foreach (array_unique(array_merge(hr_years(), [$year])) as $yy): ?><option value="<?= $yy ?>"<?= $sel($yy, $year) ?>><?= $yy ?></option><?php endforeach; ?></select></div><div class="field"><label><?= tt('hr.import_asof') ?></label><input type="date" name="asof" value="<?= date('Y-m-d') ?>" title="<?= tt('hr.import_asof_hint') ?>"><p class="hint"><?= tt('hr.import_asof_hint') ?></p></div><div class="field" style="display:flex;align-items:flex-end;"><button class="btn btn--gold btn--sm" type="submit"><?= tt('hr.import_read') ?></button></div></div>
   </form>
   <?php if ($st && $st['rows']): ?>
   <h3 style="margin-top:16px;"><?= e(t('hr.import_match', ['n' => count($st['rows']), 'y' => (int)$st['year']])) ?></h3>
