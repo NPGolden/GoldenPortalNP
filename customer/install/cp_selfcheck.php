@@ -181,6 +181,8 @@ $r55 = (bool)$pdo->query("SHOW TABLES LIKE 'hr_audit'")->fetch() && (bool)$pdo->
 printf("%s R55 migration (leave engine, change log)  %s\n", $r55 ? '[ OK ]' : '[WARN]', $r55 ? '' : '— run install/migrate_cp_r55_entitlement_engine.sql');
 $r55b = (bool)$pdo->query("SHOW COLUMNS FROM hr_people LIKE 'jurisdiction'")->fetch();
 printf("%s R55-002 migration (rule sets, type allowances, contractors)  %s\n", $r55b ? '[ OK ]' : '[WARN]', $r55b ? '' : '— run install/migrate_cp_r55_002_rules_types.sql');
+$r59 = (bool)$pdo->query("SHOW TABLES LIKE 'cp_requests'")->fetch();
+printf("%s R59-001 migration (portal requests)  %s\n", $r59 ? '[ OK ]' : '[WARN]', $r59 ? '' : '— run install/migrate_cp_r59_change_requests.sql');
 $r57 = (bool)$pdo->query("SHOW COLUMNS FROM projects LIKE 'activated_at'")->fetch() && (bool)$pdo->query("SHOW COLUMNS FROM subprojects LIKE 'activated_at'")->fetch();
 printf("%s R57-001 migration (quoted projects)  %s\n", $r57 ? '[ OK ]' : '[WARN]', $r57 ? '' : '— run install/migrate_cp_r57_project_quoted.sql');
 $r55c = (bool)$pdo->query("SHOW TABLES LIKE 'hr_person_types'")->fetch() && (bool)$pdo->query("SHOW COLUMNS FROM hr_people LIKE 'gender'")->fetch();

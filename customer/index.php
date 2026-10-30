@@ -63,6 +63,7 @@ require __DIR__ . '/app/iv.php';
 require __DIR__ . '/app/ar.php';
 require __DIR__ . '/app/rp.php';
 require __DIR__ . '/app/kb.php';
+require __DIR__ . '/app/cr.php';                                                                                   // R59-001
 require __DIR__ . '/app/lic.php';
 date_default_timezone_set(tz_app());                                                     // R46-002: "today" and every date() in the company's zone
 require __DIR__ . '/app/td.php';
@@ -214,6 +215,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'kb_accept': { $qid = (int)($_POST['id'] ?? 0); kb_accept($qid, (int)($_POST['answer_id'] ?? 0)); redirect('kb_q', ['id' => $qid, '_r' => uniqid()]); }
             case 'kb_vote': { $aid = (int)($_POST['id'] ?? 0); kb_vote($aid); $qid = (int) scalar('SELECT question_id FROM kb_answers WHERE id = ?', [$aid]); redirect('kb_q', ['id' => $qid, '_r' => uniqid()]); }
             case 'kb_delete_q': { kb_delete_question((int)($_POST['id'] ?? 0)); flash('good', t('kb.deleted_q')); redirect('kb', ['_r' => uniqid()]); }
+            case 'cr_create': { $rid = cr_create(); flash('good', t('cr.posted')); redirect('request', ['id' => $rid, '_r' => uniqid()]); }
+            case 'cr_comment': { $rid = (int)($_POST['id'] ?? 0); cr_comment($rid); flash('good', t('cr.commented')); redirect('request', ['id' => $rid, '_r' => uniqid()]); }
+            case 'cr_vote': { $rid = (int)($_POST['id'] ?? 0); cr_vote($rid); redirect('request', ['id' => $rid, '_r' => uniqid()]); }
+            case 'cr_decide': { $rid = (int)($_POST['id'] ?? 0); cr_decide($rid); flash('good', t('cr.saved')); redirect('request', ['id' => $rid, '_r' => uniqid()]); }
+            case 'cr_delete': { cr_delete((int)($_POST['id'] ?? 0)); flash('good', t('cr.deleted')); redirect('requests', ['_r' => uniqid()]); }
+            case 'cr_dev': { require_cp_admin(); cp_setting_set('cr_dev_user_id', (string)(int)($_POST['user_id'] ?? 0)); flash('good', t('cr.saved')); redirect('admin_users', ['_r' => uniqid()]); }
             case 'kb_delete_a': { $qid = kb_delete_answer((int)($_POST['id'] ?? 0)); flash('good', t('kb.deleted_a')); redirect('kb_q', ['id' => $qid, '_r' => uniqid()]); }
             case 'support_status': {                                  // staff: close / re-open a customer's request
                 require_staff();
@@ -334,6 +341,7 @@ if ($page === 'plan_items') {                                                   
 }
 if ($page === 'customers_export') { ex_customers($_GET); }
 if ($page === 'kbfile') { kb_stream_file((int)($_GET['id'] ?? 0)); }
+if ($page === 'crfile') { cr_stream_file((int)($_GET['id'] ?? 0)); }                                                    // R59-001
 if ($page === 'nf_open') { require_login(); nf_open((int)($_GET['id'] ?? 0)); }
 
 if (in_array($page, ['offers', 'offer', 'offer_edit', 'admin_offer_statuses'], true) && function_exists('of_visible')) { require_login(); of_require(); }   // R31-006
@@ -347,7 +355,7 @@ if ($page === 'vessel' && function_exists('vm_has') && vm_has() && ($mi = scalar
 $views = ['login','twofa','dashboard','vessels','projects','documents','reports','cyber','support','account',
           'subproject','drawings','overlay','weekly','monthly','report_sp',
           'project_new','subproject_new','project_edit','subproject_edit','vessel_new','vessel_edit','import',
-          'admin_numbering','admin_offer_classes','proformas','proforma','cashflow','report_cf','eng_requests','admin_engineering','admin_ai','admin_hr','hr_person','hr_dashboard','my_leave','hr_requests','production','production_order','production_edit','admin_systems','admin_users','admin_roles','admin_log','settings','approvals','approval','timesheets','timesheet','timesheet_edit','manhours','report_ts','admin_disciplines','admin_about','tickets','ticket','ticket_edit','vessel','report_vessel','offers','offer','offer_edit','weekly_vessel','report_weekly','fsr','fsr_edit','fsr_list','isr','isr_edit','isr_list','jo','jo_edit','jo_list','joborders','contacts','contact','contact_edit','companies','admin_offer_statuses','notifications','admin_customers','manual','kb','kb_q','license','tasks','task_edit','admin_task_kinds','admin_file_kinds','admin_calendars','admin_branches','planning','equipment','equipment_view','equipment_edit','fd_import','admin_issue_cats','admin_vessel_merge','rs','rs_edit','wf','vessel_decks','admin_email_templates','admin_rate_cards','admin_offer_texts','cost_control','work','myworks','workload','acc_register','acc_reports','acc_report','fsr_ext','kpis','risks','admin_kpis','report_kpi','sales','report_sales','admin_sales'];
+          'admin_numbering','admin_offer_classes','proformas','proforma','cashflow','report_cf','eng_requests','admin_engineering','admin_ai','admin_hr','hr_person','hr_dashboard','my_leave','hr_requests','production','production_order','production_edit','admin_systems','admin_users','admin_roles','admin_log','settings','approvals','approval','timesheets','timesheet','timesheet_edit','manhours','report_ts','admin_disciplines','admin_about','tickets','ticket','ticket_edit','vessel','report_vessel','offers','offer','offer_edit','weekly_vessel','report_weekly','fsr','fsr_edit','fsr_list','isr','isr_edit','isr_list','jo','jo_edit','jo_list','joborders','contacts','contact','contact_edit','companies','admin_offer_statuses','notifications','admin_customers','manual','kb','kb_q','requests','request','license','tasks','task_edit','admin_task_kinds','admin_file_kinds','admin_calendars','admin_branches','planning','equipment','equipment_view','equipment_edit','fd_import','admin_issue_cats','admin_vessel_merge','rs','rs_edit','wf','vessel_decks','admin_email_templates','admin_rate_cards','admin_offer_texts','cost_control','work','myworks','workload','acc_register','acc_reports','acc_report','fsr_ext','kpis','risks','admin_kpis','report_kpi','sales','report_sales','admin_sales'];
 $view  = in_array($page, $views, true) ? $page : '404';
 if (in_array($view, ['subproject_new', 'project_edit', 'subproject_edit'], true)) $view = 'project_new';   // one file, four modes
 if (in_array($view, ['vessel_new', 'vessel_edit'], true)) $view = 'vessel_form';

@@ -123,6 +123,7 @@ function gear_svg(): string {
 function layout_head(string $title, string $active = ''): void {
     $u = current_user();
     if ($active === 'kb_q') $active = 'kb';
+    if ($active === 'request' || $active === 'requests') $active = 'support';
     if ($active === 'task_edit') $active = 'tasks';
     if ($u && function_exists('nf_sweep')) nf_sweep();                 // R18-002: derive new notifications (throttled)
     ?><!doctype html>

@@ -27,6 +27,7 @@ layout_head(t('su.title'), 'support');
   <a class="mn-card" href="<?= url('manual', ['for' => 'customer']) ?>"><span class="mn-ico">📘</span><b><?= tt('mn.card_customer') ?></b><span><?= tt('mn.card_customer_sub') ?></span></a>
   <?php if (is_staff()): ?><a class="mn-card" href="<?= url('manual', ['for' => 'golden']) ?>"><span class="mn-ico">📗</span><b><?= tt('mn.card_golden') ?></b><span><?= tt('mn.card_golden_sub') ?></span></a><a class="mn-card" href="<?= url('manual', ['for' => 'pm']) ?>"><span class="mn-ico">📙</span><b><?= tt('mn.card_pm') ?></b><span><?= tt('mn.card_pm_sub') ?></span></a><?php endif; ?>
 </div>
+<?= function_exists('cr_support_card') ? cr_support_card() : '' ?>
 <?= kb_support_card() ?>
 <div class="cols su-cols">
   <div class="card card--tight">

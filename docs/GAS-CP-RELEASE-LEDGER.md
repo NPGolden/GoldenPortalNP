@@ -33,7 +33,9 @@ The mobile line jumped to **R57** while the main line is at **R50**. To keep one
 - **R55-004** — gender, leave types per person, carry-over per person, status summary (`migrate_cp_r55_004_gender_types.sql`, check `r55c`) — **v1.65.0**.
 - **R55-005** — HR dashboard, former employees in the leave import (no SQL) — **v1.66.0**.
 - **R57-001** — projects active through their offers, status Quoted (`migrate_cp_r57_project_quoted.sql`, check `r57`) — **v1.67.0**.
-- Portal versions continue **1.67.0 (R57-001)**; whoever packages last sets `CP_VERSION` and adds the `cp_patches` entries in that order.
+- **R58-001** — release updater + GitHub deploy workflow (no SQL) — **v1.67.1**; **R57-002** — teams and budgets editable by every PM — **v1.67.2**; **R57-003** — ticket comments internal by default — **v1.67.3**.
+- **R59-001** — portal change requests (`migrate_cp_r59_change_requests.sql`, check `r59`) — **v1.68.0**.
+- Portal versions continue **1.68.0 (R59-001)**; deploys now run from GitHub (`NPGolden/GoldenPortalNP`, Actions › Deploy) — the updater applies pending migrations itself; whoever packages last sets `CP_VERSION` and adds the `cp_patches` entries in that order.
 
 ## 3. Migration order for the live database (phpMyAdmin, `goldensas_portal` selected)
 
@@ -42,7 +44,7 @@ Applied on the live database up to R50 (`migrate_cp_r50_assistant.sql`); R53 nee
 1. `migrate_cp_r51_hr_role-goldensas_portal.sql` — `staff_roles.scope`, HR role, then the HR tables (leave types, entitlements, `plan_entries.reason`) from the HR session's final file.
 2. `migrate_cp_r52_mobile_engineer-goldensas_portal.sql` (the renamed R57 file) — `mob_devices`, `mob_refresh_tokens`, `mob_push_queue`, `sync_ops`, settings. It depends on R49 (`session_epoch`) and R50 (`ai_log`, `can_ai`) — both already applied.
 3. R53 — no SQL.
-4. `migrate_cp_r54_hr_requests-goldensas_portal.sql` then `migrate_cp_r54_002_hr_names-goldensas_portal.sql` then `migrate_cp_r56_employee_card-goldensas_portal.sql` then `migrate_cp_r56_002_hr_unify-goldensas_portal.sql` then `migrate_cp_r56_003_history_only-goldensas_portal.sql` then `migrate_cp_r55_entitlement_engine-goldensas_portal.sql` then `migrate_cp_r55_002_rules_types-goldensas_portal.sql` then `migrate_cp_r55_004_gender_types-goldensas_portal.sql` then `migrate_cp_r57_project_quoted-goldensas_portal.sql` (projects: status Quoted) — departments, people (seeded from staff accounts), name map, leave-type columns + new types, `hr_requests`, entitlement columns, `plan_entries.request_id`. After it: Settings › HR › People (departments' heads, technical flags, hiring dates), Leave types (accountant validates), Import balances (2026 Excel), then give the non-project staff a role scoped Employee.
+4. `migrate_cp_r54_hr_requests-goldensas_portal.sql` then `migrate_cp_r54_002_hr_names-goldensas_portal.sql` then `migrate_cp_r56_employee_card-goldensas_portal.sql` then `migrate_cp_r56_002_hr_unify-goldensas_portal.sql` then `migrate_cp_r56_003_history_only-goldensas_portal.sql` then `migrate_cp_r55_entitlement_engine-goldensas_portal.sql` then `migrate_cp_r55_002_rules_types-goldensas_portal.sql` then `migrate_cp_r55_004_gender_types-goldensas_portal.sql` then `migrate_cp_r57_project_quoted-goldensas_portal.sql` (projects: status Quoted) then `migrate_cp_r59_change_requests-goldensas_portal.sql` (portal requests) — departments, people (seeded from staff accounts), name map, leave-type columns + new types, `hr_requests`, entitlement columns, `plan_entries.request_id`. After it: Settings › HR › People (departments' heads, technical flags, hiring dates), Leave types (accountant validates), Import balances (2026 Excel), then give the non-project staff a role scoped Employee.
 
 Rule: every migration keeps the `USE goldensas_portal;` copy in the delivery, is idempotent where possible (`IF NOT EXISTS`, `INSERT IGNORE`), and the About page check (`cp_patches[].check`) tells you if one was skipped.
 

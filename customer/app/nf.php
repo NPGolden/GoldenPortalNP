@@ -32,7 +32,7 @@ function nf_groups(): array {
     return ['fleet' => t('nav.g_fleet'), 'work' => t('nav.g_work'), 'commercial' => t('nav.g_commercial'), 'library' => t('nav.g_library')];
 }
 const NF_GROUP_OF = ['tk' => 'work', 'wf' => 'work', 'jo' => 'work', 'fsr' => 'work', 'isr' => 'work', 'ts' => 'work', 'of' => 'commercial', 'oa' => 'commercial', 'ctn' => 'commercial',
-                     'cls' => 'fleet', 'drw' => 'fleet', 'spn' => 'fleet', 'spc' => 'fleet', 'doc' => 'library', 'td' => 'work', 'lic' => 'library', 'mt' => 'work', 'bg' => 'fleet', 'wp' => 'work', 'sec' => 'library', 'acc' => 'commercial', 'pd' => 'work', 'pi' => 'commercial', 'eng' => 'work', 'hrq' => 'work', 'hrm' => 'work'];
+                     'cls' => 'fleet', 'drw' => 'fleet', 'spn' => 'fleet', 'spc' => 'fleet', 'doc' => 'library', 'td' => 'work', 'lic' => 'library', 'mt' => 'work', 'bg' => 'fleet', 'wp' => 'work', 'sec' => 'library', 'acc' => 'commercial', 'pd' => 'work', 'pi' => 'commercial', 'eng' => 'work', 'hrq' => 'work', 'hrm' => 'work', 'crq' => 'library'];
 
 /* ------------------------------------------------------------ sweep */
 
@@ -369,7 +369,7 @@ function nf_label(array $r): string {
 function nf_source_label(string $kind): string {
     $src = explode(':', $kind, 2)[0];
     $map = ['tk' => 'nav.tickets', 'jo' => 'nav.joborders', 'fsr' => 'nav.reports', 'isr' => 'isr.plural', 'ts' => 'nav.timesheets', 'of' => 'nav.offers', 'oa' => 'nav.approvals', 'ctn' => 'nav.contacts',
-            'cls' => 'tab.class', 'drw' => 'tab.drawings', 'spn' => 'tab.weekly', 'spc' => 'tab.comments', 'doc' => 'nav.docs', 'td' => 'td.title', 'lic' => 'lic.title', 'mt' => 'mt.src', 'bg' => 'bg.tab', 'wp' => 'wp.title', 'sec' => 'au.title', 'acc' => 'acc.title', 'pd' => 'pd.title', 'pi' => 'pi.title', 'eng' => 'eng.title', 'hrq' => 'hr.requests', 'hrm' => 'hr.msg_title'];
+            'cls' => 'tab.class', 'drw' => 'tab.drawings', 'spn' => 'tab.weekly', 'spc' => 'tab.comments', 'doc' => 'nav.docs', 'td' => 'td.title', 'lic' => 'lic.title', 'mt' => 'mt.src', 'bg' => 'bg.tab', 'wp' => 'wp.title', 'sec' => 'au.title', 'acc' => 'acc.title', 'pd' => 'pd.title', 'pi' => 'pi.title', 'eng' => 'eng.title', 'hrq' => 'hr.requests', 'hrm' => 'hr.msg_title', 'crq' => 'cr.title'];
     $k = $map[$src] ?? ''; $s = $k ? t($k) : ''; return $s !== $k ? $s : '';
 }
 /** Amounts in offer notes stay hidden from roles without financial visibility. */
