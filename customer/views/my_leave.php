@@ -28,9 +28,10 @@ layout_head(t('hr.my_leave'), 'my_leave');
   <p class="hint"><?= tt('hr.periods_open_hint') ?></p>
   <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('hr.period') ?></th><th><?= tt('hr.type') ?></th><th><?= tt('hr.dates') ?></th><th><?= tt('hr.period_places') ?></th><th><?= tt('hr.your_dates') ?></th><th></th></tr></thead><tbody>
   <?php foreach ($myPeriods as $lp): ?><tr>
-    <td><b><?= e($lp['name']) ?></b><?= $lp['note'] ? '<br><span class="hint">' . e($lp['note']) . '</span>' : '' ?></td><td><?= e($lp['code']) ?> <span class="hint"><?= e($lp['tname']) ?></span></td>
+    <td><b><?= e($lp['name']) ?></b><?= !empty($lp['mandatory']) ? ' ' . pill('bad', '🔒 ' . t('hr.period_mandatory_s')) : '' ?><?= $lp['note'] ? '<br><span class="hint">' . e($lp['note']) . '</span>' : '' ?></td><td><?= e($lp['code']) ?> <span class="hint"><?= e($lp['tname']) ?></span></td>
     <td><?= e(fmt_date($lp['date_from'])) ?> – <?= e(fmt_date($lp['date_to'])) ?></td><td class="hint"><?= (int)$lp['n_approved'] ?><?= $lp['max_people'] ? ' / ' . (int)$lp['max_people'] : '' ?></td>
     <?php if ($lp['joined']): ?><td colspan="2"><?= hr_status_pill($lp['joined']['status']) ?> <span class="hint"><?= e(fmt_date($lp['joined']['date_from'])) ?> – <?= e(fmt_date($lp['joined']['date_to'])) ?></span></td>
+    <?php elseif (!empty($lp['mandatory'])): ?><td colspan="2"><span class="hint"><?= tt('hr.period_mandatory_my') ?></span></td>
     <?php elseif ($lp['full']): ?><td colspan="2"><?= pill('mute', t('hr.period_full_s')) ?></td>
     <?php else: ?><form method="post" action="<?= url('my_leave') ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hr_period_join"><input type="hidden" name="period_id" value="<?= (int)$lp['id'] ?>">
       <td><div style="display:flex;gap:4px;align-items:center;"><input type="date" name="date_from" value="<?= e($lp['date_from']) ?>" min="<?= e($lp['date_from']) ?>" max="<?= e($lp['date_to']) ?>" style="width:150px;"> – <input type="date" name="date_to" value="<?= e($lp['date_to']) ?>" min="<?= e($lp['date_from']) ?>" max="<?= e($lp['date_to']) ?>" style="width:150px;"></div></td>
@@ -64,6 +65,45 @@ layout_head(t('hr.my_leave'), 'my_leave');
   </tbody></table></div>
   <?php endif; ?>
 </div>
+<?php if (function_exists('hr_tr_has') && hr_tr_has()): $opp = hr_trainings_for($p); $myTr = hr_person_trainings((int)$p['id']); $myEv = array_values(array_filter(hr_evaluations((int)$p['id']), fn($e) => $e['status'] !== 'draft')); $fh2 = fn($v) => $v === null ? '—' : rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.'); ?>
+<div class="card" id="hr-training">
+  <h2>🎓 <?= tt('hr.tr_opportunities') ?></h2>
+  <p class="hint"><?= tt('hr.tr_opportunities_hint') ?></p>
+  <?php if (!$opp): ?><div class="empty"><?= tt('hr.tr_no_open') ?></div><?php else: ?>
+  <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('hr.tr_title') ?></th><th><?= tt('hr.tr_kind') ?></th><th><?= tt('hr.dates') ?></th><th><?= tt('hr.tr_deadline') ?></th><th><?= tt('hr.tr_members') ?></th><th></th></tr></thead><tbody>
+  <?php foreach ($opp as $tr): ?><tr>
+    <td><b><?= e($tr['title']) ?></b><?= $tr['certificate'] ? ' 🏅' : '' ?><?= $tr['provider'] ? '<br><span class="hint">' . e($tr['provider']) . ($tr['location'] ? ' · ' . e($tr['location']) : '') . '</span>' : '' ?><?= $tr['description'] ? '<details><summary class="hint">' . tt('hr.tr_description') . '</summary><p class="hint" style="white-space:pre-wrap;margin:4px 0 0;">' . e($tr['description']) . '</p></details>' : '' ?></td>
+    <td><?= hr_tr_kind_pill($tr['kind']) ?></td><td class="hint"><?= $tr['date_from'] ? e(fmt_date($tr['date_from'])) . ($tr['date_to'] && $tr['date_to'] !== $tr['date_from'] ? ' – ' . e(fmt_date($tr['date_to'])) : '') : tt('hr.tr_tba') ?><?= $tr['hours'] !== null ? '<br>' . e($fh2($tr['hours'])) . ' h' : '' ?></td>
+    <td class="hint"><?= $tr['deadline'] ? e(fmt_date($tr['deadline'])) : '—' ?></td><td class="hint"><?= (int)$tr['n_in'] ?><?= $tr['capacity'] ? ' / ' . (int)$tr['capacity'] : '' ?></td>
+    <?php if ($tr['mine']): ?><td><?= hr_trm_pill($tr['mine']['status']) ?></td>
+    <?php elseif ($tr['full']): ?><td><?= pill('mute', t('hr.tr_full_s')) ?></td>
+    <?php elseif ($tr['late']): ?><td><?= pill('mute', t('hr.tr_late_s')) ?></td>
+    <?php else: ?><td class="row-actions"><form method="post" action="<?= url('my_leave') ?>" data-lock style="display:flex;gap:4px;align-items:center;"><?= csrf_field() ?><input type="hidden" name="action" value="hr_tr_apply"><input type="hidden" name="id" value="<?= (int)$tr['id'] ?>"><input name="note" maxlength="300" placeholder="<?= tt('hr.notes') ?>" style="width:140px;"><button class="btn btn--gold btn--sm" type="submit">✋ <?= tt('hr.tr_apply') ?></button></form></td><?php endif; ?>
+  </tr><?php endforeach; ?></tbody></table></div>
+  <?php endif; ?>
+  <h3 style="margin-top:14px;"><?= tt('hr.tr_my') ?></h3>
+  <?php if (!$myTr): ?><p class="hint">—</p><?php else: ?>
+  <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('hr.tr_title') ?></th><th><?= tt('hr.tr_kind') ?></th><th><?= tt('hr.dates') ?></th><th><?= tt('hr.tr_hours') ?></th><th><?= tt('th.status') ?></th><th><?= tt('hr.tr_score') ?></th><th><?= tt('hr.tr_certificate') ?></th></tr></thead><tbody>
+  <?php foreach ($myTr as $m): ?><tr><td><b><?= e($m['title']) ?></b><?= $m['provider'] ? '<br><span class="hint">' . e($m['provider']) . '</span>' : '' ?></td><td><?= hr_tr_kind_pill($m['kind']) ?></td><td class="hint"><?= $m['date_from'] ? e(fmt_date($m['date_from'])) : '—' ?></td><td class="num"><?= e($fh2($m['hours'])) ?></td><td><?= hr_trm_pill($m['status']) ?></td><td><?= e((string)($m['score'] ?: '—')) ?></td><td class="hint"><?= $m['cert_no'] ? e($m['cert_no']) : '' ?><?= $m['cert_expiry'] ? ' · ' . tt('hr.tr_until') . ' ' . e(fmt_date($m['cert_expiry'])) : '' ?><?= $m['cert_doc_id'] ? ' <a href="' . url('hr_pdoc', ['id' => (int)$m['cert_doc_id']]) . '" target="_blank">📎 ' . e((string)$m['doc_name']) . '</a>' : '' ?><?= !$m['cert_no'] && !$m['cert_doc_id'] ? '—' : '' ?></td></tr><?php endforeach; ?>
+  </tbody></table></div>
+  <?php endif; ?>
+</div>
+<?php if ($myEv): ?>
+<div class="card" id="hr-eval">
+  <h2>📈 <?= tt('hr.ev_my') ?></h2>
+  <p class="hint"><?= tt('hr.ev_my_hint') ?></p>
+  <?php foreach ($myEv as $e): $sc = json_decode((string)$e['scores'], true) ?: []; ?>
+  <details<?= $e['status'] === 'final' ? ' open' : '' ?> style="margin-bottom:8px;"><summary><b><?= (int)$e['year'] ?></b> · <?= tt('hr.ev_overall') ?> <b><?= e($fh2($e['overall'])) ?></b> / 5 · <?= pill($e['status'] === 'acknowledged' ? 'green' : 'gold', t('hr.es_' . $e['status'])) ?> <span class="hint">· <?= e((string)$e['evaluator']) ?> · <?= e(fmt_date($e['eval_date'])) ?></span></summary>
+    <div class="grid grid-2" style="margin-top:8px;">
+      <div><table class="tbl"><?php foreach (HR_EVAL_CRITERIA as $c): ?><tr><td><?= e(t('hr.ec_' . $c)) ?></td><td class="num"><?= isset($sc[$c]) ? str_repeat('★', (int)$sc[$c]) . '<span class="hint">' . str_repeat('☆', 5 - (int)$sc[$c]) . '</span>' : '—' ?></td></tr><?php endforeach; ?></table></div>
+      <div><?php foreach (['strengths', 'improvements', 'goals', 'training_needs', 'comments'] as $k): if ($e[$k]): ?><p><b><?= e(t('hr.ev_' . $k)) ?></b><br><span style="white-space:pre-wrap;"><?= e($e[$k]) ?></span></p><?php endif; endforeach; ?></div>
+    </div>
+    <?php if ($e['status'] === 'final'): ?><form method="post" action="<?= url('my_leave') ?>" data-lock style="margin-top:8px;"><?= csrf_field() ?><input type="hidden" name="action" value="hr_ev_ack"><input type="hidden" name="year" value="<?= (int)$e['year'] ?>"><div class="field"><label><?= tt('hr.ev_employee_comment') ?></label><textarea data-mt name="employee_comment" rows="2" maxlength="4000"></textarea></div><div class="btn-row"><button class="btn btn--gold btn--sm" type="submit">✓ <?= tt('hr.ev_ack') ?></button></div></form>
+    <?php elseif ($e['employee_comment']): ?><p class="hint" style="margin-top:6px;"><b><?= tt('hr.ev_employee_comment') ?>:</b> <?= e($e['employee_comment']) ?></p><?php endif; ?>
+  </details>
+  <?php endforeach; ?>
+</div>
+<?php endif; endif; ?>
 <?php if (function_exists('hr_msg_has') && hr_msg_has()) echo hr_messages_card((int)$p['id'], false); ?>
 <script nonce="<?= csp_nonce() ?>">(function(){var s=document.getElementById('hr_type'),f=s.closest('form');if(!s)return;var L=<?= json_encode(['day' => t('hr.hint_day'), 'hour' => t('hr.hint_hour'), 'hr' => t('hr.hint_hr'), 'mgr' => t('hr.hint_mgr')], JSON_UNESCAPED_UNICODE) ?>;function ui(){var o=s.options[s.selectedIndex];if(!o)return;var h=o.dataset.unit==='hour';f.querySelectorAll('.hr-day').forEach(function(x){x.style.display=h?'none':'';});f.querySelectorAll('.hr-hour').forEach(function(x){x.style.display=h?'':'none';});document.getElementById('hr_reason_req').style.display=o.dataset.reason==='1'?'':'none';document.getElementById('hr_doc_req').style.display=o.dataset.doc==='1'?'':'none';document.getElementById('hr_type_hint').textContent=(h?L.hour:L.day)+' · '+(o.dataset.hr==='1'?L.hr:L.mgr);}s.addEventListener('change',ui);ui();})();</script>
 <?php layout_foot(); ?>

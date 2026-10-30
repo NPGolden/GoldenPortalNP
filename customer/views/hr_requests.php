@@ -66,4 +66,21 @@ layout_head(t('hr.requests'), 'hr_requests');
 </div>
 <script nonce="<?= csp_nonce() ?>">(function(){var s=document.getElementById('hr_type');if(!s)return;var f=s.closest('form');function ui(){var o=s.options[s.selectedIndex],h=o&&o.dataset.unit==='hour';f.querySelectorAll('.hr-day').forEach(function(x){x.style.display=h?'none':'';});f.querySelectorAll('.hr-hour').forEach(function(x){x.style.display=h?'':'none';});}s.addEventListener('change',ui);ui();})();</script>
 <?php endif; ?>
+<?php if (function_exists('hr_tr_has') && hr_tr_has() && !$pp): $trq = hr_training_queue(); $team = $isHr ? [] : hr_team_of($me); ?>
+<div class="card" id="hr-tr-queue">
+  <h2>🎓 <?= tt('hr.tr_queue') ?> <?= $trq ? pill('gold', (string) count($trq)) : '' ?></h2>
+  <p class="hint"><?= tt('hr.tr_queue_hint') ?></p>
+  <?php if (!$trq): ?><p class="hint">—</p><?php else: ?>
+  <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('hr.person') ?></th><th><?= tt('hr.tr_title') ?></th><th><?= tt('hr.dates') ?></th><th><?= tt('hr.notes') ?></th><th></th></tr></thead><tbody>
+  <?php foreach ($trq as $m): ?><tr><td><b><?= e($m['name_en']) ?></b><br><span class="hint"><?= e(fmt_datetime($m['applied_at'])) ?></span></td><td><?= $isHr ? '<a href="' . url('hr_training', ['id' => (int)$m['training_id']]) . '">' . e($m['title']) . '</a>' : e($m['title']) ?> <?= hr_tr_kind_pill($m['kind']) ?></td><td class="hint"><?= $m['date_from'] ? e(fmt_date($m['date_from'])) : tt('hr.tr_tba') ?></td><td class="hint"><?= e((string)$m['note']) ?></td>
+    <td class="row-actions"><form method="post" action="<?= url('hr_requests') ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hr_trm_save"><input type="hidden" name="mid" value="<?= (int)$m['id'] ?>"><input type="hidden" name="back" value="queue"><input type="hidden" name="note" value="<?= e((string)$m['note']) ?>"><button class="btn btn--gold btn--sm" type="submit" name="status" value="approved">✓ <?= tt('hr.approve') ?></button> <button class="btn btn--ghost btn--sm" type="submit" name="status" value="rejected">✗ <?= tt('hr.reject') ?></button></form></td></tr><?php endforeach; ?>
+  </tbody></table></div>
+  <?php endif; ?>
+  <?php if ($team): ?>
+  <h3 style="margin-top:14px;">📈 <?= tt('hr.ev_team') ?></h3>
+  <p class="hint"><?= tt('hr.ev_team_hint') ?></p>
+  <ul style="columns:2;"><?php foreach ($team as $tp): $last = hr_evaluations((int)$tp['id'])[0] ?? null; ?><li><a href="<?= url('hr_eval', ['pid' => (int)$tp['id']]) ?>"><?= e($tp['name_en']) ?></a> <span class="hint">· <?= $last ? (int)$last['year'] . ' · ' . e((string)$last['overall']) . ' · ' . e(t('hr.es_' . $last['status'])) : tt('hr.ev_none') ?></span></li><?php endforeach; ?></ul>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
 <?php layout_foot(); ?>

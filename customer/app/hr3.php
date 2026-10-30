@@ -9,7 +9,7 @@ declare(strict_types=1);
 const HR_CONTRACTS = ['indefinite', 'fixed', 'rotation', 'seasonal', 'probation', 'apprentice', 'internship', 'project', 'other'];
 const HR_MARITAL = ['single', 'married', 'divorced', 'widowed', 'partnership'];
 const HR_END_REASONS = ['resignation', 'dismissal', 'contract_end', 'retirement', 'mutual', 'other'];
-const HR_DOC_KINDS = ['contract', 'hire', 'termination', 'ergani', 'id', 'certificate', 'other'];
+const HR_DOC_KINDS = ['contract', 'hire', 'termination', 'ergani', 'id', 'certificate', 'training', 'evaluation', 'other'];
 const HR_DOC_MIME = ['application/pdf' => 'pdf', 'image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx', 'application/msword' => 'doc', 'application/zip' => 'docx'];
 
 function hr3_has(): bool { static $h = null; if ($h === null) { try { $h = hr2_has() && (bool) scalar("SHOW TABLES LIKE 'hr_employments'") && (bool) scalar("SHOW COLUMNS FROM hr_people LIKE 'left_date'"); } catch (Throwable $e) { $h = false; } } return $h; }

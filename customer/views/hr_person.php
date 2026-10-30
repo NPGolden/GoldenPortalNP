@@ -32,9 +32,9 @@ layout_head($p['name_en'] . ' — ' . t('hr.card'), 'admin_hr');
   </div>
 </div>
 <?php endif; ?>
-<?php $tab = (string)($_GET['tab'] ?? 'data'); if (!in_array($tab, ['data', 'emp', 'req', 'msg', 'docs', 'ent', 'types', 'log'], true)) $tab = 'data'; $T = fn($k, $lbl) => '<a class="tab' . ($tab === $k ? ' is-on' : '') . '" href="' . url('hr_person', ['id' => $pid, 'tab' => $k]) . '">' . $lbl . '</a>';
+<?php $tab = (string)($_GET['tab'] ?? 'data'); if (!in_array($tab, ['data', 'emp', 'req', 'msg', 'docs', 'ent', 'types', 'train', 'eval', 'log'], true)) $tab = 'data'; $T = fn($k, $lbl) => '<a class="tab' . ($tab === $k ? ' is-on' : '') . '" href="' . url('hr_person', ['id' => $pid, 'tab' => $k]) . '">' . $lbl . '</a>';
 $pend = count(array_filter(hr_requests_for('hr', 0), fn($r) => (int)$r['person_id'] === $pid && in_array($r['status'], ['pending_mgr', 'pending_hr'], true))); $um = function_exists('hr_msg_has') && hr_msg_has() ? hr_messages_unread($pid) : 0; ?>
-<nav class="tabs" style="margin-bottom:12px;"><?= $T('data', '🪪 ' . t('hr.tab_data')) . $T('emp', '📑 ' . t('hr.employments')) . $T('req', '✅ ' . t('hr.requests') . ($pend ? ' <b>' . $pend . '</b>' : '')) . $T('msg', '💬 ' . t('hr.msg_title') . ($um ? ' <b>' . $um . '</b>' : '')) . $T('docs', '📎 ' . t('hr.documents') . ' (' . count($docs) . ')') . (function_exists('hr4_has') && hr4_has() ? $T('ent', '🗓 ' . t('hr.entitlements')) . (function_exists('hr5_has') && hr5_has() ? $T('types', '🏷 ' . t('hr.types')) : '') . $T('log', '🕘 ' . t('hr.changes')) : '') ?></nav>
+<nav class="tabs" style="margin-bottom:12px;"><?= $T('data', '🪪 ' . t('hr.tab_data')) . $T('emp', '📑 ' . t('hr.employments')) . $T('req', '✅ ' . t('hr.requests') . ($pend ? ' <b>' . $pend . '</b>' : '')) . $T('msg', '💬 ' . t('hr.msg_title') . ($um ? ' <b>' . $um . '</b>' : '')) . $T('docs', '📎 ' . t('hr.documents') . ' (' . count($docs) . ')') . (function_exists('hr4_has') && hr4_has() ? $T('ent', '🗓 ' . t('hr.entitlements')) . (function_exists('hr5_has') && hr5_has() ? $T('types', '🏷 ' . t('hr.types')) : '') . (function_exists('hr_tr_has') && hr_tr_has() ? $T('train', '🎓 ' . t('hr.training')) . $T('eval', '📈 ' . t('hr.evaluations')) : '') . $T('log', '🕘 ' . t('hr.changes')) : '') ?></nav>
 
 <?php if ($tab === 'data' || $tab === 'emp'): ?>
 <div class="cols">
@@ -76,6 +76,26 @@ $pend = count(array_filter(hr_requests_for('hr', 0), fn($r) => (int)$r['person_i
       <div class="field"><label><?= tt('hr.bank') ?></label><input name="bank" maxlength="80" value="<?= e($p['bank'] ?? '') ?>" autocomplete="off"></div>
       <div class="field" style="grid-column: span 2;"><label><?= tt('hr.emergency_name') ?></label><input name="emergency_name" maxlength="120" value="<?= e($p['emergency_name'] ?? '') ?>" autocomplete="off"></div>
       <div class="field"><label><?= tt('hr.emergency_phone') ?></label><input name="emergency_phone" maxlength="40" value="<?= e($p['emergency_phone'] ?? '') ?>" autocomplete="off"></div>
+      <?php if (function_exists('hr8_has') && hr8_has()): $tx = fn(string $k, int $max, string $extra = '') => '<input name="' . $k . '" maxlength="' . $max . '" value="' . e((string)($p[$k] ?? '')) . '" autocomplete="off"' . $extra . '>'; ?>
+      <div class="field"><label><?= tt('hr.father_name') ?></label><?= $tx('father_name', 80) ?></div>
+      <div class="field"><label><?= tt('hr.mother_name') ?></label><?= $tx('mother_name', 80) ?></div>
+      <div class="field"><label><?= tt('hr.spouse_name') ?></label><?= $tx('spouse_name', 80) ?></div>
+      <div class="field"><label><?= tt('hr.nationality') ?></label><?= $tx('nationality', 60) ?></div>
+      <div class="field"><label><?= tt('hr.birth_place') ?></label><?= $tx('birth_place', 80) ?></div>
+      <div class="field"><label><?= tt('hr.passport_no') ?></label><?= $tx('passport_no', 30) ?></div>
+      <div class="field"><label><?= tt('hr.blood_group') ?></label><?= $tx('blood_group', 5, ' style="width:90px;"') ?></div>
+      <div class="field"><label><?= tt('hr.education') ?></label><?= $tx('education', 120) ?></div>
+      <div class="field"><label><?= tt('hr.experience_level') ?></label><?= $tx('experience_level', 40) ?></div>
+      <div class="field"><label><?= tt('hr.transport') ?></label><?= $tx('transport', 60) ?></div>
+      <div class="field"><label><?= tt('hr.phone_work') ?></label><?= $tx('phone_work', 40) ?></div>
+      <div class="field"><label><?= tt('hr.extension') ?></label><?= $tx('extension', 10, ' style="width:90px;"') ?></div>
+      <div class="field"><label><?= tt('hr.postcode') ?></label><?= $tx('postcode', 12, ' style="width:110px;"') ?></div>
+      <div class="field"><label><?= tt('hr.city') ?></label><?= $tx('city', 80) ?></div>
+      <div class="field"><label><?= tt('hr.country_res') ?></label><?= $tx('country', 60) ?></div>
+      <div class="field"><label><?= tt('hr.gross_salary') ?></label><input name="gross_salary" type="number" step="0.01" min="0" value="<?= e((string)($p['gross_salary'] ?? '')) ?>" autocomplete="off"></div>
+      <div class="field"><label><?= tt('hr.oaed_benefit') ?></label><?= $tx('oaed_benefit', 40) ?></div>
+      <div class="field"><label><?= tt('hr.payroll_code') ?></label><?= $tx('payroll_code', 12, ' style="width:110px;"') ?></div>
+      <?php endif; ?>
       <?php endif; ?>
       <div class="field" style="grid-column:1 / -1;display:flex;gap:16px;flex-wrap:wrap;"><label class="chk"><input type="checkbox" name="is_technical" value="1"<?= $p['is_technical'] ? ' checked' : '' ?>> <?= tt('hr.technical_lbl') ?></label><label class="chk"><input type="checkbox" name="is_active" value="1"<?= $p['is_active'] ? ' checked' : '' ?>> <?= tt('hr.active_lbl') ?></label><?php if (function_exists('hr_jurisdiction')): ?><label class="chk"><input type="checkbox" name="single_parent" value="1"<?= !empty($p['single_parent']) ? ' checked' : '' ?>> <?= tt('hr.single_parent') ?></label><label class="chk"><input type="checkbox" name="disability_care" value="1"<?= !empty($p['disability_care']) ? ' checked' : '' ?>> <?= tt('hr.disability_care') ?></label><?php endif; ?></div>
     </div>
@@ -204,6 +224,31 @@ $pend = count(array_filter(hr_requests_for('hr', 0), fn($r) => (int)$r['person_i
 </div>
 <?php endif; ?>
 
+<?php if ($tab === 'train' && function_exists('hr_tr_has') && hr_tr_has()): $myTr = hr_person_trainings($pid); $part = hr_participation($pid); $fh = fn($v) => $v === null ? '—' : rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.'); ?>
+<div class="kpi kpi--4" style="margin-bottom:14px;">
+  <span class="stat navy"><b><?= (int)$part['trainings'] ?></b><span class="s"><?= tt('hr.tr_attended') ?></span></span>
+  <span class="stat"><b><?= e($fh($part['hours'])) ?></b><span class="s"><?= tt('hr.tr_hours') ?></span></span>
+  <span class="stat gold"><b><?= (int)$part['certificates'] ?></b><span class="s"><?= tt('hr.tr_certificates') ?></span></span>
+  <span class="stat green"><b><?= (int)$part['evaluations'] ?></b><span class="s"><?= tt('hr.evaluations') ?></span></span>
+</div>
+<div class="card">
+  <h2>🎓 <?= tt('hr.tr_record') ?></h2>
+  <p class="hint"><?= tt('hr.tr_record_hint') ?> <a href="<?= url('hr_training') ?>"><?= tt('hr.training') ?> ›</a></p>
+  <?php if (!$myTr): ?><div class="empty"><?= tt('hr.tr_none') ?></div><?php else: ?>
+  <?php foreach ($myTr as $m): ?><form id="cf<?= (int)$m['id'] ?>" method="post" action="<?= url('hr_person', ['id' => $pid, 'tab' => 'train']) ?>" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hr_trm_save"><input type="hidden" name="mid" value="<?= (int)$m['id'] ?>"><input type="hidden" name="pid" value="<?= $pid ?>"><input type="hidden" name="back" value="card"></form><?php endforeach; ?>
+  <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('hr.tr_title') ?></th><th><?= tt('hr.tr_kind') ?></th><th><?= tt('hr.dates') ?></th><th><?= tt('hr.tr_hours') ?></th><th><?= tt('th.status') ?></th><th><?= tt('hr.tr_score') ?></th><th><?= tt('hr.tr_certificate') ?></th><th></th></tr></thead><tbody>
+  <?php foreach ($myTr as $m): $fid = 'cf' . (int)$m['id']; ?><tr>
+    <td><a href="<?= url('hr_training', ['id' => (int)$m['training_id']]) ?>"><b><?= e($m['title']) ?></b></a><?= $m['provider'] ? '<br><span class="hint">' . e($m['provider']) . '</span>' : '' ?></td><td><?= hr_tr_kind_pill($m['kind']) ?></td>
+    <td class="hint"><?= $m['date_from'] ? e(fmt_date($m['date_from'])) . ($m['date_to'] && $m['date_to'] !== $m['date_from'] ? ' – ' . e(fmt_date($m['date_to'])) : '') : '—' ?></td><td class="num"><?= e($fh($m['hours'])) ?></td>
+    <td><select form="<?= $fid ?>" name="status" data-nosearch style="min-width:120px;"><?php foreach (HR_TRM_STATUS as $s): ?><option value="<?= $s ?>"<?= $m['status'] === $s ? ' selected' : '' ?>><?= e(t('hr.tm_' . $s)) ?></option><?php endforeach; ?></select></td>
+    <td><input form="<?= $fid ?>" name="score" value="<?= e((string)$m['score']) ?>" maxlength="20" style="width:80px;"></td>
+    <td><?php if ($m['certificate']): ?><div style="display:grid;gap:4px;"><input form="<?= $fid ?>" name="cert_no" value="<?= e((string)$m['cert_no']) ?>" maxlength="60" placeholder="<?= tt('hr.tr_cert_no') ?>" style="width:140px;"><div style="display:flex;gap:4px;"><input form="<?= $fid ?>" type="date" name="cert_issued" value="<?= e((string)$m['cert_issued']) ?>" title="<?= tt('hr.tr_cert_issued') ?>" style="width:135px;"><input form="<?= $fid ?>" type="date" name="cert_expiry" value="<?= e((string)$m['cert_expiry']) ?>" title="<?= tt('hr.tr_cert_expiry') ?>" style="width:135px;"></div><input form="<?= $fid ?>" type="file" name="doc[]" accept=".pdf,.jpg,.jpeg,.png"><?= $m['cert_doc_id'] ? '<a class="hint" href="' . url('hr_pdoc', ['id' => (int)$m['cert_doc_id']]) . '" target="_blank">📎 ' . e((string)$m['doc_name']) . '</a>' : '' ?></div><?php else: ?><span class="hint">—</span><?php endif; ?></td>
+    <td class="row-actions"><input form="<?= $fid ?>" type="hidden" name="note" value="<?= e((string)$m['note']) ?>"><button class="btn btn--ghost btn--sm" type="submit" form="<?= $fid ?>"><?= tt('btn.save') ?></button></td>
+  </tr><?php endforeach; ?></tbody></table></div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+<?php if ($tab === 'eval' && function_exists('hr_tr_has') && hr_tr_has()): $evUrl = fn(int $y) => url('hr_person', ['id' => $pid, 'tab' => 'eval', 'year' => $y]); require __DIR__ . '/_hr_eval.php'; endif; ?>
 <?php if ($tab === 'log' && function_exists('hr4_has') && hr4_has()): $log = hr_audit_list($pid); ?>
 <div class="card" id="hr-log">
   <h2>🕘 <?= tt('hr.changes') ?></h2>

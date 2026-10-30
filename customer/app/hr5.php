@@ -49,9 +49,9 @@ function hr_period_save_from_post(): int {
     $ids = $target === 'all' ? null : implode(',', array_unique(array_filter(array_map('intval', (array)($_POST[$target === 'disciplines' ? 'discipline_ids' : 'person_ids'] ?? [])))));
     if ($target !== 'all' && !$ids) throw new RuntimeException(t('hr.period_need_target'));
     $note = mb_substr(trim((string)($_POST['note'] ?? '')), 0, 300) ?: null; $me = (int)(current_user()['id'] ?? 0);
-    $max = (int)($_POST['max_people'] ?? 0) ?: null; $status = in_array($_POST['status'] ?? '', ['open', 'closed'], true) ? $_POST['status'] : 'open';
-    if ($id) { if (scalar('SELECT status FROM hr_leave_periods WHERE id = ?', [$id]) === 'applied') throw new RuntimeException(t('hr.period_applied_lock')); q('UPDATE hr_leave_periods SET name = ?, type_id = ?, date_from = ?, date_to = ?, target = ?, target_ids = ?, note = ?, max_people = ?, status = ? WHERE id = ?', [$name, $tid, $from, $to, $target, $ids, $note, $max, $status, $id]); return $id; }
-    q('INSERT INTO hr_leave_periods (name, type_id, date_from, date_to, target, target_ids, note, max_people, status, created_by) VALUES (?,?,?,?,?,?,?,?,?,?)', [$name, $tid, $from, $to, $target, $ids, $note, $max, $status, $me]); return (int) db()->lastInsertId();
+    $max = (int)($_POST['max_people'] ?? 0) ?: null; $status = in_array($_POST['status'] ?? '', ['open', 'closed'], true) ? $_POST['status'] : 'open'; $mand = (int)!empty($_POST['mandatory']);
+    if ($id) { if (scalar('SELECT status FROM hr_leave_periods WHERE id = ?', [$id]) === 'applied') throw new RuntimeException(t('hr.period_applied_lock')); q('UPDATE hr_leave_periods SET name = ?, type_id = ?, date_from = ?, date_to = ?, target = ?, target_ids = ?, note = ?, max_people = ?, status = ?, mandatory = ? WHERE id = ?', [$name, $tid, $from, $to, $target, $ids, $note, $max, $status, $mand, $id]); return $id; }
+    q('INSERT INTO hr_leave_periods (name, type_id, date_from, date_to, target, target_ids, note, max_people, status, mandatory, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?)', [$name, $tid, $from, $to, $target, $ids, $note, $max, $status, $mand, $me]); return (int) db()->lastInsertId();
 }
 /** Apply: one HR-approved request per person (working days only, skipping people who already have a request overlapping the period for the same type); written to the board. */
 function hr_period_apply(int $id): array {
@@ -82,7 +82,8 @@ function hr_period_members(int $id): array { return hr_lv_has() ? all('SELECT r.
 /** Open periods a given person may join (target matches, dates in the future, not yet joined). */
 function hr_periods_for(array $p): array {
     if (!hr_lv_has()) return []; $out = [];
-    foreach (all("SELECT lp.*, t.code, t.name AS tname FROM hr_leave_periods lp JOIN hr_leave_types t ON t.id = lp.type_id WHERE lp.status = 'open' AND lp.date_to >= CURDATE() ORDER BY lp.date_from") as $lp) {
+    foreach (all("SELECT lp.*, t.code, t.name AS tname FROM hr_leave_periods lp JOIN hr_leave_types t ON t.id = lp.type_id WHERE lp.status IN ('open','applied') AND lp.date_to >= CURDATE() ORDER BY lp.date_from") as $lp) {
+        if ($lp['status'] === 'applied' && empty($lp['mandatory'])) continue;                                          // assigned ordinary periods are not shown as joinable
         $ids = array_map('intval', array_filter(explode(',', (string)($lp['target_ids'] ?? ''))));
         if ($lp['target'] === 'disciplines' && !in_array((int)($p['department_id'] ?? 0), $ids, true)) continue;
         if ($lp['target'] === 'people' && !in_array((int)$p['id'], $ids, true)) continue;
