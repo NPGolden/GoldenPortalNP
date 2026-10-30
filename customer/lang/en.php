@@ -5655,4 +5655,7 @@ Best regards,
 'hr.ev_mgr_lede' => 'Annual evaluation of one of your people — draft until you set it final; the employee then reads and acknowledges it.',
 'hr.imp_kept_rest' => 'field skipped: {f}; the rest of the card was updated.',
 'nav.g_hr' => 'HR',
+'hr.period_recount' => 'Recount days',
+'hr.period_recount_hint' => 'Recalculate the days of every assigned leave of this period without weekends and public holidays and rewrite the board.',
+'hr.period_recounted' => '{n} leave records recounted; weekends and holidays are not charged.',
 ];

@@ -77,6 +77,16 @@ function hr_period_undo(int $id): int {
     foreach (all('SELECT id FROM hr_requests WHERE period_id = ? AND created_by <> COALESCE(user_id, 0)', [$id]) as $r) { q('DELETE FROM plan_entries WHERE request_id = ?', [(int)$r['id']]); q('DELETE FROM hr_requests WHERE id = ?', [(int)$r['id']]); $n++; }
     q("UPDATE hr_leave_periods SET status = 'closed', applied_n = 0, applied_at = NULL WHERE id = ?", [$id]); return $n;
 }
+/** R62-003: recount the days of every request of a period (after the weekend / holiday fix) and rewrite their board entries. */
+function hr_period_recount(int $id): int {
+    if (!hr_can() || !hr_lv_has()) throw new RuntimeException(t('err.noaccess')); $n = 0;
+    foreach (all('SELECT r.id, r.person_id, r.date_from, r.date_to, r.days, t.unit FROM hr_requests r JOIN hr_leave_types t ON t.id = r.type_id WHERE r.period_id = ? AND r.status <> "rejected"', [$id]) as $r) {
+        if ($r['unit'] !== 'day') continue; $p = hr_person((int)$r['person_id']); if (!$p) continue; $days = (float) hr_working_days($p, $r['date_from'], $r['date_to']);
+        if (abs($days - (float)$r['days']) > 0.001) { q('UPDATE hr_requests SET days = ? WHERE id = ?', [$days, (int)$r['id']]); $n++; }
+        hr_request_to_board((int)$r['id']);
+    }
+    return $n;
+}
 /** Participants of a period: the requests that carry its id (pending with the manager, approved, rejected). */
 function hr_period_members(int $id): array { return hr_lv_has() ? all('SELECT r.id, r.person_id, r.date_from, r.date_to, r.days, r.status, p.name_en, p.department_id FROM hr_requests r JOIN hr_people p ON p.id = r.person_id WHERE r.period_id = ? ORDER BY r.status, p.name_en', [$id]) : []; }
 /** Open periods a given person may join (target matches, dates in the future, not yet joined). */

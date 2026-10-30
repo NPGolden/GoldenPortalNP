@@ -50,7 +50,8 @@ function wc_user_calendar(int $uid): string {
 function wc_holiday(string $code, string $date): ?string {
     static $c = [];
     $y = substr($date, 0, 4);
-    if (!isset($c[$code][$y])) { $c[$code][$y] = []; foreach (all('SELECT hdate, name FROM work_holidays WHERE calendar_code = ? AND YEAR(hdate) = ?', [$code, (int)$y]) as $r) $c[$code][$y][$r['hdate']] = $r['name']; }
+    if (!isset($c[$code][$y])) { $c[$code][$y] = []; foreach (all('SELECT hdate, name FROM work_holidays WHERE calendar_code = ? AND YEAR(hdate) = ?', [$code, (int)$y]) as $r) $c[$code][$y][$r['hdate']] = $r['name'];
+        if (!$c[$code][$y]) { $cal = wc_calendars()[$code] ?? null; $c[$code][$y] = wc_standard((string)($cal['country'] ?? $code), (int)$y); } }   // R62-003: a year nobody generated yet falls back to the country's public holidays
     return $c[$code][$y][$date] ?? null;
 }
 /** What a date is in a calendar: ['workday' => bool, 'normal' => float hours, 'off_type' => overtime|holiday, 'holiday' => name|null, 'rule' => row]. */
@@ -58,7 +59,7 @@ function wc_day(string $code, string $date): array {
     $dow = (int) date('N', strtotime($date)); $rule = wc_hours($code)[$dow] ?? null;
     $hol = wc_holiday($code, $date);
     if ($hol !== null) return ['workday' => false, 'normal' => 0.0, 'off_type' => 'holiday', 'holiday' => $hol, 'rule' => $rule];
-    if (!$rule) return ['workday' => true, 'normal' => 8.0, 'off_type' => 'overtime', 'holiday' => null, 'rule' => null];
+    if (!$rule) return ['workday' => $dow < 6, 'normal' => $dow < 6 ? 8.0 : 0.0, 'off_type' => 'overtime', 'holiday' => null, 'rule' => null];   // R62-003: a calendar without weekday rules still has its weekend off
     return ['workday' => (bool)$rule['is_workday'], 'normal' => (float)$rule['normal_hours'], 'off_type' => $rule['off_type'], 'holiday' => null, 'rule' => $rule];
 }
 function wc_day_label(string $code, string $date): string {

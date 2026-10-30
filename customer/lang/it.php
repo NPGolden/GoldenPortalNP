@@ -5655,4 +5655,7 @@ Cordiali saluti,
 'hr.ev_mgr_lede' => 'Valutazione annuale di un tuo collaboratore — bozza finché non la rendi definitiva; poi il dipendente la legge e la conferma.',
 'hr.imp_kept_rest' => 'campo saltato: {f}; il resto della scheda è stato aggiornato.',
 'nav.g_hr' => 'Risorse umane',
+'hr.period_recount' => 'Ricalcola i giorni',
+'hr.period_recount_hint' => 'Ricalcola i giorni di ogni ferie di questo periodo senza fine settimana e festività e riscrive il planning.',
+'hr.period_recounted' => '{n} ferie ricalcolate; fine settimana e festività non vengono addebitati.',
 ];
