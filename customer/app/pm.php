@@ -163,7 +163,9 @@ function page_list(array $rows, string $slug, array $keep = [], string $param = 
 
 /** Per-page selection (25 / 50 / 100) from the request. */
 function per_page(): int {
-    $per = (int)($_GET['per'] ?? 25);
+    // R60-003: the choice is remembered for the session, so links that do not carry ?per= (expand, sort, actions, Back) keep it
+    if (isset($_GET['per'])) { $per = (int)$_GET['per']; if (in_array($per, [25, 50, 100], true)) { $_SESSION['per_page'] = $per; return $per; } }
+    $per = (int)($_SESSION['per_page'] ?? 25);
     return in_array($per, [25, 50, 100], true) ? $per : 25;
 }
 

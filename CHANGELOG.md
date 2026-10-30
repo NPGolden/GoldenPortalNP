@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.69.2** (build 2026-10-30). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.69.3** (build 2026-10-30). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.69.3 | GAS-CP-R60-003 | 2026-10-30 | Per page (25 / 50 / 100) is remembered for the session on Projects, Vessels and the log: expanding a project, sorting, an action or Back no longer drops it back to 25. | — |
 | 1.69.2 | GAS-CP-R60-002 | 2026-10-30 | Planning: engineers are picked from a drop-down (type to search) or a whole discipline from a second drop-down; the selection shows as removable chips — no long checklist when the staff list is big. | — |
 | 1.69.0 | GAS-CP-R60-001 | 2026-10-30 | Maternity and paternity leave are granted once per birth, in the birth year (from the children's birth years on the card), and never carry over; days already taken for the same birth at a previous employer are entered on the card › Leave types ("taken elsewhere" + birth year) and the portal grants the remainder. Release of contract: every termination opens an off-boarding checklist on the card (notice, ΕΡΓΑΝΗ Ε5/Ε6 or UNILAV, final settlement / TFR, leave pay-out, certificate, company property, accounts, handover, projects re-assigned, exit interview, file) — who ticked what and when is logged, open procedures appear on the HR dashboard. | `install/migrate_cp_r60_birth_offboarding.sql` |
 | 1.68.3 | GAS-CP-R59-004 | 2026-10-30 | Planning: one assignment can cover several engineers at once — tick the people (or click a discipline name to take the whole team) and save; every ticked person gets the same days, project / sub-project, car and note, and joins the sub-project team. Clear the days works on all ticked people as well. | — |

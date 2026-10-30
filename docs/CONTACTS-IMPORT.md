@@ -832,3 +832,6 @@ Migration `migrate_cp_r60_birth_offboarding.sql` (after R59-001): `hr_person_typ
 
 ## 138. v1.69.2 — Planning: drop-down selection with chips (GAS-CP-R60-002)
 No SQL. Replaces the R59-004 checklist: `#pl_add_user` (searchable select with optgroups per discipline), `#pl_add_disc` (adds every member of the discipline), `#pl_people` chips with hidden `user_id[]`, board click = `plSet(user)`. Lang ×5 (4 keys; 5337). CSS `.pl-chips/.pl-chipx`. Manual updated.
+
+## 139. v1.69.3 — Per page remembered (GAS-CP-R60-003)
+No SQL. `per_page()` stores a valid `?per=` in `$_SESSION['per_page']` and falls back to it when the URL carries none (projects, vessels, admin log). **Security / performance:** none.
