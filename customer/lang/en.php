@@ -5412,4 +5412,9 @@ Best regards,
 'hr.off_projects' => 'Open projects, tickets, tasks and planning entries re-assigned',
 'hr.off_exit_interview' => 'Exit interview held',
 'hr.off_file' => 'Personal file completed and archived (documents attached to the card)',
+// ---- GAS-CP-R60-002 · planning: drop-down selection of engineers / disciplines
+'pl.add_engineer' => '— add an engineer —',
+'pl.discipline' => 'Whole discipline',
+'pl.add_discipline' => '— add a whole discipline —',
+'pl.selected_people' => 'Selected',
 ];

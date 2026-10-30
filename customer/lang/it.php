@@ -5412,4 +5412,9 @@ Cordiali saluti,
 'hr.off_projects' => 'Progetti, ticket, attività e pianificazione aperti riassegnati',
 'hr.off_exit_interview' => 'Colloquio di uscita svolto',
 'hr.off_file' => 'Fascicolo personale completato e archiviato (documenti allegati alla scheda)',
+// ---- GAS-CP-R60-002 · planning: drop-down selection of engineers / disciplines
+'pl.add_engineer' => '— aggiungi un tecnico —',
+'pl.discipline' => 'Intera disciplina',
+'pl.add_discipline' => '— aggiungi un\'intera disciplina —',
+'pl.selected_people' => 'Selezionati',
 ];

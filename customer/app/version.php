@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.69.1';
+const CP_VERSION = '1.69.2';
 const CP_BUILD   = '2026-10-30';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R60-002', 'version' => '1.69.2', 'date' => '2026-10-30', 'title' => 'Planning: engineers are picked from a drop-down (type to search) or a whole discipline from a second drop-down; the selection shows as removable chips — no long checklist when the staff list is big.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R60-001', 'version' => '1.69.0', 'date' => '2026-10-30', 'title' => 'Maternity and paternity leave are granted once per birth, in the birth year (from the children\'s birth years on the card), and never carry over; days already taken for the same birth at a previous employer are entered on the card › Leave types ("taken elsewhere" + birth year) and the portal grants the remainder. Release of contract: every termination opens an off-boarding checklist on the card (notice, ΕΡΓΑΝΗ Ε5/Ε6 or UNILAV, final settlement / TFR, leave pay-out, certificate, company property, accounts, handover, projects re-assigned, exit interview, file) — who ticked what and when is logged, open procedures appear on the HR dashboard.', 'db' => 'install/migrate_cp_r60_birth_offboarding.sql', 'check' => 'r60'],
         ['ref' => 'GAS-CP-R59-004', 'version' => '1.68.3', 'date' => '2026-10-30', 'title' => 'Planning: one assignment can cover several engineers at once — tick the people (or click a discipline name to take the whole team) and save; every ticked person gets the same days, project / sub-project, car and note, and joins the sub-project team. Clear the days works on all ticked people as well.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R59-003', 'version' => '1.68.2', 'date' => '2026-10-30', 'title' => 'File integrity: repository-only files (DEPLOY.md, docs/, .github) are no longer listed in the shipped manifest, so Settings › About shows 0 differences after a GitHub deploy.', 'db' => null, 'check' => null],

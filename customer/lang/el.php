@@ -5412,4 +5412,9 @@ GAS-MSB-2026-002',
 'hr.off_projects' => 'Ανάθεση αλλού ανοικτών έργων, tickets, εργασιών και προγραμματισμού',
 'hr.off_exit_interview' => 'Συνέντευξη αποχώρησης',
 'hr.off_file' => 'Προσωπικός φάκελος συμπληρωμένος και αρχειοθετημένος (έγγραφα στην καρτέλα)',
+// ---- GAS-CP-R60-002 · planning: drop-down selection of engineers / disciplines
+'pl.add_engineer' => '— προσθήκη μηχανικού —',
+'pl.discipline' => 'Ολόκληρη ειδικότητα',
+'pl.add_discipline' => '— προσθήκη ολόκληρης ειδικότητας —',
+'pl.selected_people' => 'Επιλεγμένοι',
 ];

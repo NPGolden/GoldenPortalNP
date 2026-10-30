@@ -94,10 +94,13 @@ layout_head($title, 'planning');
   <form method="post" action="<?= url('planning', $keep) ?>" data-lock id="plform">
     <?= csrf_field() ?><input type="hidden" name="action" value="pl_assign">
     <div class="grid grid-3">
-      <div class="field" style="grid-column: span 3;"><label><?= tt('ts.engineer') ?> <span class="hint" style="display:inline;"><?= tt('pl.multi_hint') ?></span></label>
-        <?php $plPeople = pl_people(); $byDisc = []; foreach ($plPeople as $p) $byDisc[$p['discipline'] ?: '—'][] = $p; ?>
-        <div class="pl-people" id="pl_people"><?php foreach ($byDisc as $dn => $pp): ?><div class="pl-disc"><span class="pl-disc-h"><button type="button" class="linkbtn js-pl-disc" title="<?= tt('pl.pick_discipline') ?>"><?= e($dn) ?></button></span><?php foreach ($pp as $p): ?><label class="pl-person"><input type="checkbox" name="user_id[]" value="<?= (int)$p['id'] ?>"<?= $edit && $edit['user'] === (int)$p['id'] ? ' checked' : '' ?>> <?= e($p['full_name']) ?></label><?php endforeach; ?></div><?php endforeach; ?></div>
-        <p class="hint" style="margin:4px 0 0;"><span id="pl_count">0</span> <?= tt('pl.selected') ?> · <button type="button" class="linkbtn" id="pl_none"><?= tt('btn.clear') ?></button></p></div>
+      <?php $plPeople = pl_people(); $byDisc = []; foreach ($plPeople as $p) $byDisc[$p['discipline'] ?: '—'][] = $p; ?>
+      <div class="field"><label><?= tt('ts.engineer') ?></label>
+        <select id="pl_add_user"><option value=""><?= tt('pl.add_engineer') ?></option><?php foreach ($byDisc as $dn => $pp): ?><optgroup label="<?= e($dn) ?>"><?php foreach ($pp as $p): ?><option value="<?= (int)$p['id'] ?>" data-disc="<?= e($dn) ?>"><?= e($p['full_name']) ?></option><?php endforeach; ?></optgroup><?php endforeach; ?></select></div>
+      <div class="field"><label><?= tt('pl.discipline') ?></label>
+        <select id="pl_add_disc" data-nosearch><option value=""><?= tt('pl.add_discipline') ?></option><?php foreach ($byDisc as $dn => $pp): ?><option value="<?= e($dn) ?>"><?= e($dn) ?> (<?= count($pp) ?>)</option><?php endforeach; ?></select></div>
+      <div class="field"><label><?= tt('pl.selected_people') ?> <span class="hint" id="pl_count">0</span> · <button type="button" class="linkbtn" id="pl_none"><?= tt('btn.clear') ?></button></label>
+        <div class="pl-chips" id="pl_people" data-names='<?= e(json_encode(array_column($plPeople, 'full_name', 'id'), JSON_UNESCAPED_UNICODE)) ?>'><?php if ($edit && $edit['user']): $en = array_column($plPeople, 'full_name', 'id'); ?><span class="pl-chipx" data-id="<?= (int)$edit['user'] ?>"><input type="hidden" name="user_id[]" value="<?= (int)$edit['user'] ?>"><?= e($en[(int)$edit['user']] ?? '') ?> <button type="button" class="pl-x" aria-label="remove">✕</button></span><?php endif; ?></div></div>
       <div class="field"><label><?= tt('pl.from') ?></label><input type="date" name="from" id="pl_from" required value="<?= e($edit['date'] ?? max($from, $today)) ?>"></div>
       <div class="field"><label><?= tt('pl.to') ?></label><input type="date" name="to" id="pl_to" value="<?= e($edit['date'] ?? '') ?>"><p class="hint"><?= tt('pl.to_hint') ?></p></div>
       <div class="field"><label><?= tt('pl.kind') ?></label><select name="kind" id="pl_kind"><?php foreach ($kinds as $k => $l): if (function_exists('hr_only') && hr_only() && $k === 'work') continue; ?><option value="<?= $k ?>"><?= e($l) ?></option><?php endforeach; ?></select></div>
@@ -188,17 +191,21 @@ layout_head($title, 'planning');
     sub.addEventListener('change', function () { var o = sub.options[sub.selectedIndex]; if (sub.value) proj.value = o.dataset.project; loadItems(openBox, proj.value, sub.value, <?= json_encode(t('pl.open_items')) ?>); });
     proj.addEventListener('change', function () { if (!sub.value) loadItems(openBox, proj.value, 0, <?= json_encode(t('pl.open_items')) ?>); });
     // a click on an empty cell or on the "+" next to the name pre-fills the editor
-    function plCount() { var n = document.querySelectorAll('#pl_people input:checked').length; var el = document.getElementById('pl_count'); if (el) el.textContent = n; }
-    document.getElementById('pl_people').addEventListener('change', plCount);
-    document.querySelectorAll('.js-pl-disc').forEach(function (b) { b.addEventListener('click', function () { var boxes = b.closest('.pl-disc').querySelectorAll('input'); var all = Array.prototype.every.call(boxes, function (c) { return c.checked; }); boxes.forEach(function (c) { c.checked = !all; }); plCount(); }); });
-    document.getElementById('pl_none').addEventListener('click', function () { document.querySelectorAll('#pl_people input').forEach(function (c) { c.checked = false; }); plCount(); });
+    var plBox = document.getElementById('pl_people'), plNames = JSON.parse(plBox.dataset.names || '{}');
+    function plCount() { var el = document.getElementById('pl_count'); if (el) el.textContent = plBox.querySelectorAll('.pl-chipx').length; }
+    function plAdd(id) { id = String(id); if (!id || plBox.querySelector('.pl-chipx[data-id="' + id + '"]')) return; var c = document.createElement('span'); c.className = 'pl-chipx'; c.dataset.id = id; c.innerHTML = '<input type="hidden" name="user_id[]" value="' + id + '">' + (plNames[id] || id).replace(/</g, '&lt;') + ' <button type="button" class="pl-x" aria-label="remove">✕</button>'; plBox.appendChild(c); plCount(); }
+    function plSet(id) { plBox.innerHTML = ''; plAdd(id); }
+    plBox.addEventListener('click', function (e) { var x = e.target.closest('.pl-x'); if (x) { x.closest('.pl-chipx').remove(); plCount(); } });
+    document.getElementById('pl_add_user').addEventListener('change', function () { if (!this.value) return; plAdd(this.value); this.value = ''; this.dispatchEvent(new Event('change')); });
+    document.getElementById('pl_add_disc').addEventListener('change', function () { var d = this.value; if (!d) return; document.querySelectorAll('#pl_add_user option[data-disc]').forEach(function (o) { if (o.dataset.disc === d) plAdd(o.value); }); this.value = ''; this.dispatchEvent(new Event('change')); });
+    document.getElementById('pl_none').addEventListener('click', function () { plBox.innerHTML = ''; plCount(); });
     plCount();
     board.addEventListener('click', function (e) {
       var chip = e.target.closest('.pl-chip');
       if (chip) { e.preventDefault(); if (one) { one.style.display = ''; document.getElementById('pl-one-id').value = chip.dataset.id; document.getElementById('pl-one-title').textContent = chip.title; loadItems(document.getElementById('pl-one-items'), chip.dataset.project, chip.dataset.sub, <?= json_encode(t('pl.open_items')) ?>); one.scrollIntoView({ behavior: 'smooth', block: 'start' }); } return; }
       var cell = e.target.closest('.pl-cell[data-user]'), plus = e.target.closest('.pl-clear');
       var t = cell || plus; if (!t) return; e.preventDefault();
-      document.querySelectorAll('#pl_people input').forEach(function (c) { c.checked = c.value === String(t.dataset.user); }); plCount();
+      plSet(t.dataset.user);
       if (cell) { document.getElementById('pl_from').value = cell.dataset.date; document.getElementById('pl_to').value = cell.dataset.date; }
       document.getElementById('pleditor').scrollIntoView({ behavior: 'smooth', block: 'start' }); document.getElementById('pl_kind').focus();
     });

@@ -5398,4 +5398,9 @@ GAS-MSB-2026-002',
 'hr.off_projects' => 'Відкриті проєкти, тікети, завдання та планування перепризначено',
 'hr.off_exit_interview' => 'Проведено вихідне інтерв\'ю',
 'hr.off_file' => 'Особову справу завершено й заархівовано (документи додано до картки)',
+// ---- GAS-CP-R60-002 · planning: drop-down selection of engineers / disciplines
+'pl.add_engineer' => '— додати інженера —',
+'pl.discipline' => 'Уся спеціальність',
+'pl.add_discipline' => '— додати всю спеціальність —',
+'pl.selected_people' => 'Вибрано',
 ];
