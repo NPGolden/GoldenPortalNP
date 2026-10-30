@@ -70,15 +70,17 @@ layout_head(t('au.title'), 'admin_users');
   </form>
 </div>
 
-<details class="card card--details"<?= $total === 0 ? ' open' : '' ?>>
+<?php $pf = ['new' => !empty($_GET['new']), 'name' => mb_substr(trim((string)($_GET['full_name'] ?? '')), 0, 120), 'email' => mb_substr(trim((string)($_GET['email'] ?? '')), 0, 190), 'role' => in_array($_GET['role'] ?? '', ['customer', 'staff', 'admin'], true) ? $_GET['role'] : 'customer', 'disc' => (int)($_GET['discipline_id'] ?? 0), 'hr_pid' => (int)($_GET['hr_pid'] ?? 0)];   // R60-005: pre-filled from the HR people list ?>
+<details class="card card--details" id="au-add"<?= $total === 0 || $pf['new'] ? ' open' : '' ?>>
   <summary><h2><?= tt('au.add') ?></h2></summary>
+  <?php if ($pf['hr_pid']): ?><p class="hint" style="margin:0 0 8px;">🪪 <?= e(t('au.from_hr', ['n' => $pf['name']])) ?></p><?php endif; ?>
   <form method="post" action="<?= url('admin_users') ?>" data-lock>
-    <?= csrf_field() ?><input type="hidden" name="action" value="cu_save">
+    <?= csrf_field() ?><input type="hidden" name="action" value="cu_save"><?php if ($pf['hr_pid']): ?><input type="hidden" name="hr_pid" value="<?= $pf['hr_pid'] ?>"><?php endif; ?>
     <div class="grid grid-3">
-      <div class="field"><label><?= tt('au.name') ?></label><input name="full_name" required maxlength="120"></div>
-      <div class="field"><label><?= tt('au.email') ?></label><input name="email" type="email" required maxlength="190"></div>
+      <div class="field"><label><?= tt('au.name') ?></label><input name="full_name" required maxlength="120" value="<?= e($pf['name']) ?>"></div>
+      <div class="field"><label><?= tt('au.email') ?></label><input name="email" type="email" required maxlength="190" value="<?= e($pf['email']) ?>"<?= $pf['new'] && $pf['email'] === '' ? ' autofocus' : '' ?>></div>
       <div class="field"><label><?= tt('au.role') ?></label>
-        <select name="role" class="js-access"><option value="customer"><?= tt('role.customer') ?></option><option value="staff"><?= tt('role.staff') ?></option><option value="admin"><?= tt('role.admin') ?></option></select></div>
+        <select name="role" class="js-access"><option value="customer"<?= $pf['role'] === 'customer' ? ' selected' : '' ?>><?= tt('role.customer') ?></option><option value="staff"<?= $pf['role'] === 'staff' ? ' selected' : '' ?>><?= tt('role.staff') ?></option><option value="admin"<?= $pf['role'] === 'admin' ? ' selected' : '' ?>><?= tt('role.admin') ?></option></select></div>
       <div class="field"><label><?= tt('rp.customer') ?></label>
         <select name="customer_id"><option value=""><?= tt('au.nocustomer') ?></option><?php foreach ($customers as $c): ?><option value="<?= $c['id'] ?>"><?= e($c['name']) ?></option><?php endforeach; ?></select>
         <p class="hint"><?= tt('au.customer_hint') ?></p></div>
@@ -87,7 +89,7 @@ layout_head(t('au.title'), 'admin_users');
         <p class="hint"><?= tt('au.golden_hint') ?></p></div>
       <?php if ($discs): ?>
       <div class="field"><label><?= tt('disc.one') ?></label>
-        <select name="discipline_id"><option value=""><?= tt('sys.none') ?></option><?php foreach ($discs as $d): if (!$d['is_active']) continue; ?><option value="<?= $d['id'] ?>"><?= e($d['name'] . ($d['manager_name'] ? ' · ' . $d['manager_name'] : '')) ?></option><?php endforeach; ?></select>
+        <select name="discipline_id"><option value=""><?= tt('sys.none') ?></option><?php foreach ($discs as $d): if (!$d['is_active']) continue; ?><option value="<?= $d['id'] ?>"<?= (int)$d['id'] === $pf['disc'] ? ' selected' : '' ?>><?= e($d['name'] . ($d['manager_name'] ? ' · ' . $d['manager_name'] : '')) ?></option><?php endforeach; ?></select>
         <p class="hint"><?= tt('au.disc_hint') ?></p></div>
       <div class="field"><label><?= tt('au.manager') ?></label>
         <select name="manager_user_id"><option value=""><?= tt('au.manager_default') ?></option><?php foreach ($people as $pp): ?><option value="<?= $pp['id'] ?>"><?= e($pp['full_name']) ?></option><?php endforeach; ?></select>

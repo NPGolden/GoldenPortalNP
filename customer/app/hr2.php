@@ -79,19 +79,21 @@ function hr_working_days(array $p, string $from, string $to): int {
     return $n;
 }
 /** Balance of one person / type / year in the type's unit: entitled, carry, opening, taken (approved), pending, available (null for non-counting types). */
+function hr_cut_has(): bool { static $c = null; if ($c === null) { try { $c = (bool) scalar("SHOW COLUMNS FROM hr_entitlements LIKE 'counted_from'"); } catch (Throwable $e) { $c = false; } } return $c; }   // R60-004
 function hr_counted_sql(): string { static $c = null; if ($c === null) { try { $c = (bool) scalar("SHOW COLUMNS FROM hr_requests LIKE 'counted'") ? ' AND counted = 1' : ''; } catch (Throwable $e) { $c = ''; } } return $c; }   // R56-003
 function hr_balance(array $p, int $tid, int $year): array {
     $t = hr_type($tid); $pid = (int)$p['id']; $uid = (int)($p['user_id'] ?? 0);
     $e = one('SELECT * FROM hr_entitlements WHERE year = ? AND type_id = ? AND (person_id = ? OR (user_id = ? AND ? > 0)) ORDER BY person_id IS NULL LIMIT 1', [$year, $tid, $pid, $uid, $uid]);
     $ent = (float)($e['days'] ?? 0); $carry = (float)($e['carry'] ?? 0); $open = (float)($e['opening_taken'] ?? 0); $mode = $e ? 'manual' : 'none'; $st = null;
+    $cf = !empty($e['counted_from']) ? (string)$e['counted_from'] : null; $cfR = $cf ? " AND date_from > '" . $cf . "'" : ''; $cfP = $cf ? " AND plan_date > '" . $cf . "'" : '';   // R60-004: records up to the cut-over date are inside opening_taken
     if (function_exists('hr4_has') && hr4_has() && $t && ($t['rule_key'] ?? '') !== '' && !(function_exists('hr_is_contractor') && hr_is_contractor($p))) { [$ent, $mode, $st] = hr_entitlement_effective($p, $tid, $year); }   // R55-001/002: the engine unless HR fixed the value
-    $taken = (float) scalar("SELECT COALESCE(SUM(days),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND status = 'approved'" . hr_counted_sql(), [$pid, $tid, $year]);
-    $pend = (float) scalar("SELECT COALESCE(SUM(days),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND status IN ('pending_mgr','pending_hr')" . hr_counted_sql(), [$pid, $tid, $year]);
-    if ($t && $t['unit'] === 'hour') { $taken = (float) scalar("SELECT COALESCE(SUM(hours),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND status = 'approved'" . hr_counted_sql(), [$pid, $tid, $year]); $pend = (float) scalar("SELECT COALESCE(SUM(hours),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND status IN ('pending_mgr','pending_hr')" . hr_counted_sql(), [$pid, $tid, $year]); }
+    $taken = (float) scalar("SELECT COALESCE(SUM(days),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND status = 'approved'" . hr_counted_sql() . $cfR, [$pid, $tid, $year]);
+    $pend = (float) scalar("SELECT COALESCE(SUM(days),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND status IN ('pending_mgr','pending_hr')" . hr_counted_sql() . $cfR, [$pid, $tid, $year]);
+    if ($t && $t['unit'] === 'hour') { $taken = (float) scalar("SELECT COALESCE(SUM(hours),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND status = 'approved'" . hr_counted_sql() . $cfR, [$pid, $tid, $year]); $pend = (float) scalar("SELECT COALESCE(SUM(hours),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND status IN ('pending_mgr','pending_hr')" . hr_counted_sql(), [$pid, $tid, $year]); }
     // board entries written outside the request flow (HR typed them on the board) count as taken for day types
-    if ($uid && (!$t || $t['unit'] === 'day')) $taken += (float) scalar('SELECT COUNT(DISTINCT plan_date) FROM plan_entries WHERE user_id = ? AND leave_type_id = ? AND YEAR(plan_date) = ? AND request_id IS NULL', [$uid, $tid, $year]);
+    if ($uid && (!$t || $t['unit'] === 'day')) $taken += (float) scalar('SELECT COUNT(DISTINCT plan_date) FROM plan_entries WHERE user_id = ? AND leave_type_id = ? AND YEAR(plan_date) = ? AND request_id IS NULL' . $cfP, [$uid, $tid, $year]);
     // annual leave also carries the hours of annual-consuming hour types (8 h = 1 day)
-    if ($t && $t['rule_key'] === 'annual') { foreach (hr_types() as $x) if ($x['consumes_annual'] && $x['unit'] === 'hour') { $taken += (float) scalar("SELECT COALESCE(SUM(hours),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND status = 'approved'" . hr_counted_sql(), [$pid, (int)$x['id'], $year]) / HR_HOURS_PER_DAY; $pend += (float) scalar("SELECT COALESCE(SUM(hours),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND status IN ('pending_mgr','pending_hr')", [$pid, (int)$x['id'], $year]) / HR_HOURS_PER_DAY; } }
+    if ($t && $t['rule_key'] === 'annual') { foreach (hr_types() as $x) if ($x['consumes_annual'] && $x['unit'] === 'hour') { $taken += (float) scalar("SELECT COALESCE(SUM(hours),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND status = 'approved'" . hr_counted_sql() . $cfR, [$pid, (int)$x['id'], $year]) / HR_HOURS_PER_DAY; $pend += (float) scalar("SELECT COALESCE(SUM(hours),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND status IN ('pending_mgr','pending_hr')", [$pid, (int)$x['id'], $year]) / HR_HOURS_PER_DAY; } }
     $cap = $t && $t['max_year'] !== null ? (float)$t['max_year'] : null; $counts = $t && ($t['counts'] || $cap !== null);
     if (function_exists('hr_is_contractor') && hr_is_contractor($p)) { $counts = false; $cap = null; }   // R55-002: contractors — agreed by the manager, no balances
     $total = $cap !== null && $ent <= 0 && $mode === 'none' ? $cap : $ent + $carry;
@@ -234,7 +236,8 @@ function hr_import_parse(string $path): array {
     return $out;
 }
 /** Apply confirmed matches: map[name_el] = person_id | 'new' | '' (skip); writes the annual-leave entitlement of the year. */
-function hr_import_apply(array $rows, array $map, int $year): array {
+function hr_import_apply(array $rows, array $map, int $year, string $asof = ''): array {
+    $cut = function_exists('hr_cut_has') && hr_cut_has() && preg_match('/^\d{4}-\d{2}-\d{2}$/', $asof) ? $asof : null;   // R60-004: cut-over date
     if (!hr_can()) throw new RuntimeException(t('err.noaccess')); $ann = hr_annual_type_id(); if (!$ann) throw new RuntimeException(t('err.notfound'));
     $n = 0; $created = 0; $me = (int)(current_user()['id'] ?? 0); db()->beginTransaction();
     try {
@@ -246,7 +249,9 @@ function hr_import_apply(array $rows, array $map, int $year): array {
         q('INSERT INTO hr_name_map (name_el, person_id) VALUES (?,?) ON DUPLICATE KEY UPDATE person_id = VALUES(person_id)', [$r['name_el'], $pid]);
         $p = hr_person($pid); $uid = (int)($p['user_id'] ?? 0) ?: null;
         q('DELETE FROM hr_entitlements WHERE year = ? AND type_id = ? AND (person_id = ? OR (user_id = ? AND ? > 0))', [$year, $ann, $pid, $uid, $uid ?? 0]);
-        q('INSERT INTO hr_entitlements (user_id, person_id, year, type_id, days, carry, opening_taken, override_note, updated_by) VALUES (?,?,?,?,?,?,?,?,?)', [$uid, $pid, $year, $ann, (float)($r['entitled'] ?? 0), (float)($r['carry'] ?? 0), (float)($r['used'] ?? 0), 'Excel ' . date('Y-m-d'), $me]); $n++;
+        if ($cut) q('INSERT INTO hr_entitlements (user_id, person_id, year, type_id, days, carry, opening_taken, counted_from, auto, override_note, updated_by) VALUES (?,?,?,?,?,?,?,?,0,?,?)', [$uid, $pid, $year, $ann, (float)($r['entitled'] ?? 0), (float)($r['carry'] ?? 0), (float)($r['used'] ?? 0), $cut, t('hr.import_asof_note', ['d' => fmt_date($cut)]), $me]);
+        else q('INSERT INTO hr_entitlements (user_id, person_id, year, type_id, days, carry, opening_taken, override_note, updated_by) VALUES (?,?,?,?,?,?,?,?,?)', [$uid, $pid, $year, $ann, (float)($r['entitled'] ?? 0), (float)($r['carry'] ?? 0), (float)($r['used'] ?? 0), 'Excel ' . date('Y-m-d'), $me]);
+        if (function_exists('hr_audit')) hr_audit($pid, 'entitlement', 'ANN ' . $year, null, ($r['entitled'] ?? 0) . ' · carry ' . ($r['carry'] ?? 0) . ' · taken ' . ($r['used'] ?? 0) . ($cut ? ' · ' . t('hr.counted_from') . ' ' . fmt_date($cut) : ''), t('hr.import_balances')); $n++;
     }
     db()->commit(); } catch (Throwable $e) { db()->rollBack(); throw $e; }
     return ['written' => $n, 'created' => $created];

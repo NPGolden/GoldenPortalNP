@@ -835,3 +835,6 @@ No SQL. Replaces the R59-004 checklist: `#pl_add_user` (searchable select with o
 
 ## 139. v1.69.3 — Per page remembered (GAS-CP-R60-003)
 No SQL. `per_page()` stores a valid `?per=` in `$_SESSION['per_page']` and falls back to it when the URL carries none (projects, vessels, admin log). **Security / performance:** none.
+
+## 140. v1.69.4 — Create a portal account from the HR people list (GAS-CP-R60-005)
+No SQL. `views/admin_hr.php`: "➕ Account" (cp_admin, people without `user_id`) → `?p=admin_users&new=1&hr_pid=&full_name=&role=staff&discipline_id=#au-add` in a new window. `views/admin_users.php`: `$pf` prefill (name, email, role, discipline), details open, hidden `hr_pid`, hint. `pm_actions.php cu_save`: when `hr_pid` is given and the role is not customer → `UPDATE hr_people SET user_id = new WHERE id = ? AND user_id IS NULL`, audit, redirect to the card. Lang ×5 (4 keys). Manual (Golden › HR). **Security review:** creation still requires an administrator (`require_cp_admin`); the pre-filled values are only form defaults, the link happens only if the card has no account yet. **Performance:** none.

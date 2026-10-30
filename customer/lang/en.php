@@ -5417,4 +5417,15 @@ Best regards,
 'pl.discipline' => 'Whole discipline',
 'pl.add_discipline' => '— add a whole discipline —',
 'pl.selected_people' => 'Selected',
+// ---- GAS-CP-R60-004 · balance import as cut-over
+'hr.import_asof' => 'Balances as of',
+'hr.import_asof_hint' => 'The sheet is the truth up to this date: the imported values are fixed (🔓) and only requests and board entries after it count.',
+'hr.import_asof_note' => 'Balance import as of {d}',
+'hr.counted_from' => 'counted from',
+'hr.import_balances' => 'Import balances',
+// ---- GAS-CP-R60-005 · create a portal account from the HR people list
+'hr.create_account' => 'Account',
+'hr.create_account_hint' => 'Create a portal account for this person (opens Settings › Portal accounts in a new window, pre-filled; the card is linked automatically)',
+'au.from_hr' => 'New account for {n} from the HR register — enter the e-mail and a password; the employee card will be linked to it.',
+'au.linked_hr' => 'linked to the employee card',
 ];

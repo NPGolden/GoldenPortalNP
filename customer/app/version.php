@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.69.3';
+const CP_VERSION = '1.69.4';
 const CP_BUILD   = '2026-10-30';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R60-005', 'version' => '1.69.4', 'date' => '2026-10-30', 'title' => 'HR › People: an "➕ Account" button next to every person without a portal account (administrators) opens Settings › Portal accounts in a new window with the name, Staff role and discipline pre-filled; on creation the employee card is linked to the new account automatically.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R60-003', 'version' => '1.69.3', 'date' => '2026-10-30', 'title' => 'Per page (25 / 50 / 100) is remembered for the session on Projects, Vessels and the log: expanding a project, sorting, an action or Back no longer drops it back to 25.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R60-002', 'version' => '1.69.2', 'date' => '2026-10-30', 'title' => 'Planning: engineers are picked from a drop-down (type to search) or a whole discipline from a second drop-down; the selection shows as removable chips — no long checklist when the staff list is big.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R60-001', 'version' => '1.69.0', 'date' => '2026-10-30', 'title' => 'Maternity and paternity leave are granted once per birth, in the birth year (from the children\'s birth years on the card), and never carry over; days already taken for the same birth at a previous employer are entered on the card › Leave types ("taken elsewhere" + birth year) and the portal grants the remainder. Release of contract: every termination opens an off-boarding checklist on the card (notice, ΕΡΓΑΝΗ Ε5/Ε6 or UNILAV, final settlement / TFR, leave pay-out, certificate, company property, accounts, handover, projects re-assigned, exit interview, file) — who ticked what and when is logged, open procedures appear on the HR dashboard.', 'db' => 'install/migrate_cp_r60_birth_offboarding.sql', 'check' => 'r60'],

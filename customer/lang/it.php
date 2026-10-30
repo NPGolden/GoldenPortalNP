@@ -5417,4 +5417,15 @@ Cordiali saluti,
 'pl.discipline' => 'Intera disciplina',
 'pl.add_discipline' => '— aggiungi un\'intera disciplina —',
 'pl.selected_people' => 'Selezionati',
+// ---- GAS-CP-R60-004 · balance import as cut-over
+'hr.import_asof' => 'Saldi al',
+'hr.import_asof_hint' => 'Il foglio fa fede fino a questa data: i valori importati sono fissati (🔓) e contano solo richieste e voci del tabellone successive.',
+'hr.import_asof_note' => 'Importazione saldi al {d}',
+'hr.counted_from' => 'conteggiato dal',
+'hr.import_balances' => 'Importa saldi',
+// ---- GAS-CP-R60-005 · create a portal account from the HR people list
+'hr.create_account' => 'Account',
+'hr.create_account_hint' => 'Crea un account del portale per questa persona (apre Impostazioni › Account in una nuova finestra, precompilato; la scheda viene collegata automaticamente)',
+'au.from_hr' => 'Nuovo account per {n} dal registro HR — inserisci e-mail e password; la scheda dipendente verrà collegata.',
+'au.linked_hr' => 'collegato alla scheda dipendente',
 ];
