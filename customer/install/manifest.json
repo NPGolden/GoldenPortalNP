@@ -1,21 +1,17 @@
 {
     "name": "Golden A/S Customer Portal",
-    "version": "1.68.1",
+    "version": "1.68.2",
     "build": "2026-10-30",
-    "generated_at": "2026-10-30T11:25:15+00:00",
-    "count": 544,
+    "generated_at": "2026-10-30T12:28:38+00:00",
+    "count": 541,
     "files": {
         ".htaccess": {
             "sha256": "1bf5deb26fd95b271e85398d6ceba8a7389b3918d9ebe946e627ffa06a69f423",
             "size": 181
         },
         "CHANGELOG.md": {
-            "sha256": "c175fd8637ab43b0779ff805546aab6706ccf3ad1aa27c659c67a475d849f607",
-            "size": 63045
-        },
-        "DEPLOY.md": {
-            "sha256": "5fff3ea95a1f1c89e0a05034aad7021557fc88b719c3c60fbd75e75f8b01557e",
-            "size": 2629
+            "sha256": "a9f55101a91c9ef43282455db9614eadb6010ec1ee0fe8117526673b0c9685fa",
+            "size": 63271
         },
         "README.md": {
             "sha256": "2db8ea64aa86bcb4790bb1f848f60413eba56228453dc6b4c9f582463f908b50",
@@ -766,8 +762,8 @@
             "size": 38450
         },
         "customer/app/version.php": {
-            "sha256": "90ee45881db82561e0320f7a67592ebeb55a1230dbaed65b045d07ad8d1db942",
-            "size": 87146
+            "sha256": "7cec1aa66b828507995199ea559efd4e4919e4c4de52eaa5322c185e79367833",
+            "size": 87452
         },
         "customer/app/vh.php": {
             "sha256": "e48f7d44763f6ac11691f44d3be783d532dc2788a159710b6bd796808936ac76",
@@ -1932,14 +1928,6 @@
         "customer/views/workload.php": {
             "sha256": "166ee087411263e03ba775bc3f74f5f1104291b67598e13e4d077100931004ae",
             "size": 5695
-        },
-        "docs/CONTACTS-IMPORT.md": {
-            "sha256": "c41869abfa9c8a46bd87483c623b1be1b91a55dd3db1b0a8b5563e34c7c046c1",
-            "size": 245042
-        },
-        "docs/GAS-CP-RELEASE-LEDGER.md": {
-            "sha256": "a93a5332166f210a97bfbd5bcb69528d3eb3b4b2d7b469e56fa8530eb71b800b",
-            "size": 10758
         },
         "employee/.htaccess": {
             "sha256": "5e8963c763f79af442578cec13f9a0840375f45d2b5a07665f5131262d90c5c6",

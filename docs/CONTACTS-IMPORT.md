@@ -820,3 +820,6 @@ Migration `migrate_cp_r59_change_requests.sql` (after R57-001): `cp_requests` (k
 
 ## 134. v1.68.1 — PDF header cells wrap (GAS-CP-R59-002)
 No SQL. `PdfWriter::kvHeight($w, $valueX, $value, $minH, $lh, $size)` and `kvCell($x, $y, $w, $valueX, $label, $value, $o)` — value wrapped to `w − valueX − 2`, height `max(minH, lh·lines + (minH − lh))`, option `h` fixes the height (two cells per row use `max(kvHeight(left), kvHeight(right))`), `labelW`+`fill` draw the grey label band, first baseline unchanged from the old single-line cells. Replaced the hand-drawn kv loops in `ob.php` (offer, also dropped the 110-char cut), `wk.php` (weekly vessel), `acc.php`, `vh.php`, `bg.php`, `ts.php`, and the `$cell` closures + row loops in `fsr.php` (SF-GLD-014) and `isr.php` (SF-GLD-020). `eq.php` and `pi.php` already wrapped. Checked by rendering ISR, FSR and offer PDFs with a 90-character customer name and a two-line subject. **Security review:** none (rendering only). **Performance:** one extra wrap() per header cell.
+
+## 135. v1.68.2 — Manifest excludes repository-only files (GAS-CP-R59-003)
+No SQL. `tools/build-manifest.php` skips `docs/`, `.github/`, `DEPLOY.md`, `.gitignore` (the deploy zip and `update.php` never ship them), so the About page's file-integrity check no longer reports them missing. **Security / performance:** none.
