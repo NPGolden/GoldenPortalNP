@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.73.4';
+const CP_VERSION = '1.73.5';
 const CP_BUILD   = '2026-10-30';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R62-006', 'version' => '1.73.5', 'date' => '2026-10-30', 'title' => 'Dark mode: navy text (planning board headers and day numbers, discipline group rows, tab titles, section headings, pill labels) turns light on the dark background; planning board name and header columns get a solid dark background.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R62-005', 'version' => '1.73.4', 'date' => '2026-10-30', 'title' => 'Dashboard › Fleet & activity: vessels worked on this year and in the last 30 days, new vessels of the year, active vessels; the ten most active colleagues of the year and of the last 30 days (records created across the portal, with the breakdown on hover and the timesheet hours).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R62-004', 'version' => '1.73.3', 'date' => '2026-10-30', 'title' => 'Celebrations: staff dashboard shows birthdays and Greek Orthodox name days of colleagues for the next 14 days (no ages); the HR dashboard shows 30 days with the age and a link to the card. Name days include the movable feasts (Easter, St George, St Thomas, Ψυχοσάββατο …).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R62-003', 'version' => '1.73.2', 'date' => '2026-10-30', 'title' => 'Leave days never include weekends and public holidays: a work calendar without weekday rules now has Saturday / Sunday off, and a year whose holidays were not generated falls back to the country\'s public holidays (Greek Orthodox Easter included). HR › Leaves › leave periods: "Recount days" fixes already assigned periods and rewrites the board.', 'db' => null, 'check' => null],
