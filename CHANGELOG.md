@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.69.5** (build 2026-10-30). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.69.6** (build 2026-10-30). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.69.6 | GAS-CP-R60-006 | 2026-10-30 | Settings › Portal accounts is fast again: the manager and customer lists of every row are filled only when a drop-down is opened (one copy of each list on the page instead of one per account), and the row drop-downs use the plain browser list — the Add account form keeps the type-to-search lists. | — |
 | 1.69.4 | GAS-CP-R60-005 | 2026-10-30 | HR › People: an "➕ Account" button next to every person without a portal account (administrators) opens Settings › Portal accounts in a new window with the name, Staff role and discipline pre-filled; on creation the employee card is linked to the new account automatically. | — |
 | 1.69.3 | GAS-CP-R60-003 | 2026-10-30 | Per page (25 / 50 / 100) is remembered for the session on Projects, Vessels and the log: expanding a project, sorting, an action or Back no longer drops it back to 25. | — |
 | 1.69.2 | GAS-CP-R60-002 | 2026-10-30 | Planning: engineers are picked from a drop-down (type to search) or a whole discipline from a second drop-down; the selection shows as removable chips — no long checklist when the staff list is big. | — |

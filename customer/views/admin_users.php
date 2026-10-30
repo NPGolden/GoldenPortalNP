@@ -31,7 +31,7 @@ $counts = one("SELECT COUNT(*) n, SUM(role='customer') nc, SUM(role='staff') ns,
 $qs = array_filter($f, fn($v) => $v !== ''); if ($page > 1) $qs['page'] = $page;
 $pageUrl = fn(int $n) => url('admin_users', array_merge($qs, ['page' => $n]));
 $discs  = ts_has() ? disciplines(false) : [];
-$people = staff_users();
+$people = staff_users(); $peopleById = array_column($people, 'full_name', 'id'); $customersById = array_column($customers, 'name', 'id');   // R60-006: the long lists are rendered once (JSON) and filled into a row's select on first use
 $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : '';
 $accessPill = fn(string $r) => pill($r === 'admin' ? 'gold' : ($r === 'staff' ? 'green' : 'mute'), t('role.' . $r));
 layout_head(t('au.title'), 'admin_users');
@@ -113,14 +113,14 @@ layout_head(t('au.title'), 'admin_users');
       <tr>
         <td><div style="display:flex;align-items:center;gap:8px;"><?= avatar_html((int)$x['id'], (string)$x['full_name'], 28) ?><input form="<?= $f ?>" name="full_name" value="<?= e($x['full_name']) ?>" maxlength="120" required></div><span class="hint"><?= e($x['email']) ?></span></td>
         <td><?php if ($isMe): ?><?= $accessPill($x['role']) ?><input form="<?= $f ?>" type="hidden" name="role" value="admin"><?php else: ?>
-            <select form="<?= $f ?>" name="role"><?php foreach (['customer', 'staff', 'admin'] as $r): ?><option value="<?= $r ?>"<?= $sel($r, $x['role']) ?>><?= e(t('role.' . $r)) ?></option><?php endforeach; ?></select><?php endif; ?></td>
-        <td><select form="<?= $f ?>" name="customer_id"><option value=""><?= tt('au.nocustomer') ?></option><?php foreach ($customers as $c): ?><option value="<?= $c['id'] ?>"<?= $sel($c['id'], $x['customer_id']) ?>><?= e($c['name']) ?></option><?php endforeach; ?></select></td>
-        <td><select form="<?= $f ?>" name="staff_role_id"><option value=""><?= tt('au.none_role') ?></option><?php foreach ($roles as $r): ?><option value="<?= $r['id'] ?>"<?= $sel($r['id'], $x['staff_role_id']) ?>><?= e($r['name']) ?></option><?php endforeach; ?>
+            <select form="<?= $f ?>" name="role" data-nosearch><?php foreach (['customer', 'staff', 'admin'] as $r): ?><option value="<?= $r ?>"<?= $sel($r, $x['role']) ?>><?= e(t('role.' . $r)) ?></option><?php endforeach; ?></select><?php endif; ?></td>
+        <td><select form="<?= $f ?>" name="customer_id" data-nosearch data-lazy="customers" data-empty="<?= tt('au.nocustomer') ?>"><?php $cv = (int)($x['customer_id'] ?? 0); ?><option value="<?= $cv ?: '' ?>"><?= $cv ? e($customersById[$cv] ?? '') : tt('au.nocustomer') ?></option></select></td>
+        <td><select form="<?= $f ?>" name="staff_role_id" data-nosearch><option value=""><?= tt('au.none_role') ?></option><?php foreach ($roles as $r): ?><option value="<?= $r['id'] ?>"<?= $sel($r['id'], $x['staff_role_id']) ?>><?= e($r['name']) ?></option><?php endforeach; ?>
             <?php if ($x['staff_role_id'] && !array_filter($roles, fn($r) => (int)$r['id'] === (int)$x['staff_role_id'])): ?><option value="<?= (int)$x['staff_role_id'] ?>" selected><?= e($x['role_name']) ?> (<?= tt('sys.retired') ?>)</option><?php endif; ?></select></td>
         <?php if ($discs): ?><td>
           <?php if ($x['role'] === 'customer'): ?><span class="hint">—</span><?php else: ?>
           <select form="<?= $f ?>" name="discipline_id" style="margin-bottom:4px;"><option value=""><?= tt('sys.none') ?></option><?php foreach ($discs as $d): if (!$d['is_active'] && (int)$d['id'] !== (int)$x['discipline_id']) continue; ?><option value="<?= $d['id'] ?>"<?= $sel($d['id'], $x['discipline_id']) ?>><?= e($d['name']) ?></option><?php endforeach; ?></select>
-          <select form="<?= $f ?>" name="manager_user_id"><option value=""><?= tt('au.manager_default') ?></option><?php foreach ($people as $pp): if ((int)$pp['id'] === (int)$x['id']) continue; ?><option value="<?= $pp['id'] ?>"<?= $sel($pp['id'], $x['manager_user_id']) ?>><?= e($pp['full_name']) ?></option><?php endforeach; ?></select>
+          <select form="<?= $f ?>" name="manager_user_id" data-nosearch data-lazy="people" data-self="<?= (int)$x['id'] ?>" data-empty="<?= tt('au.manager_default') ?>"><?php $mv = (int)($x['manager_user_id'] ?? 0); $mn = $mv ? ($peopleById[$mv] ?? '') : ''; ?><option value="<?= $mv ?: '' ?>"><?= $mv ? e($mn) : tt('au.manager_default') ?></option></select>
           <?php if (function_exists('wc_has') && wc_has()): ?><select form="<?= $f ?>" name="work_calendar" style="margin-top:4px;" title="<?= tt('wc.one') ?>"><?php foreach (wc_calendars(true) as $wcode => $wrow): ?><option value="<?= e($wcode) ?>"<?= $sel($wcode, $x['work_calendar'] ?? 'GR') ?>>🕒 <?= e($wrow['code'] . ' · ' . $wrow['name']) ?></option><?php endforeach; ?></select><?php endif; ?>
           <?php if (br_has() && br_multi()): ?><select form="<?= $f ?>" name="branch_id" style="margin-top:4px;" title="<?= tt('br.home') ?>"><?= br_options((int)($x['branch_id'] ?? 0) ?: null, '🏢 ' . t('br.default_opt', ['b' => br_default()['code']])) ?></select>
           <label class="chk" style="margin-top:4px;font-size:12px;" title="<?= tt('br.scope_hint') ?>"><input form="<?= $f ?>" type="checkbox" name="branch_scope" value="1"<?= !empty($x['branch_scope']) ? ' checked' : '' ?>> <?= tt('br.scope') ?></label><?php endif; ?>
@@ -167,4 +167,16 @@ layout_head(t('au.title'), 'admin_users');
     <form method="post" action="<?= url('admin_users', $qs) ?>" id="rst<?= (int)$x['id'] ?>" data-confirm="<?= e(t('au.twofa_reset_confirm', ['name' => $x['full_name']])) ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('au.twofa_reset') ?>" data-confirm-cancel="<?= tt('btn.cancel') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="cu_twofa_reset"><input type="hidden" name="id" value="<?= (int)$x['id'] ?>"></form>
   <?php endforeach; ?>
 </div>
+<script type="application/json" id="au-opt-people"><?= json_encode(array_map(fn($pp) => [(int)$pp['id'], (string)$pp['full_name']], $people), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
+<script type="application/json" id="au-opt-customers"><?= json_encode(array_map(fn($c) => [(int)$c['id'], (string)$c['name']], $customers), JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
+<script nonce="<?= csp_nonce() ?>">
+(function () {   // R60-006: fill the long row lists (manager, customer) only when a select is first opened
+  var lists = {}; function opts(k) { if (!lists[k]) { var el = document.getElementById('au-opt-' + k); lists[k] = el ? JSON.parse(el.textContent) : []; } return lists[k]; }
+  function fill(sel) { if (sel.dataset.filled) return; sel.dataset.filled = '1'; var cur = sel.value, self = sel.dataset.self || ''; var frag = document.createDocumentFragment();
+    var o0 = document.createElement('option'); o0.value = ''; o0.textContent = sel.dataset.empty || '—'; frag.appendChild(o0);
+    opts(sel.dataset.lazy).forEach(function (p) { if (String(p[0]) === self) return; var o = document.createElement('option'); o.value = p[0]; o.textContent = p[1]; if (String(p[0]) === cur) o.selected = true; frag.appendChild(o); });
+    sel.innerHTML = ''; sel.appendChild(frag); if (cur !== '') sel.value = cur; }
+  document.querySelectorAll('select[data-lazy]').forEach(function (sel) { ['mousedown', 'focus', 'keydown', 'touchstart'].forEach(function (ev) { sel.addEventListener(ev, function () { fill(sel); }, { passive: true }); }); });
+})();
+</script>
 <?php layout_foot(); ?>

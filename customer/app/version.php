@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.69.5';
+const CP_VERSION = '1.69.6';
 const CP_BUILD   = '2026-10-30';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R60-006', 'version' => '1.69.6', 'date' => '2026-10-30', 'title' => 'Settings › Portal accounts is fast again: the manager and customer lists of every row are filled only when a drop-down is opened (one copy of each list on the page instead of one per account), and the row drop-downs use the plain browser list — the Add account form keeps the type-to-search lists.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R60-005', 'version' => '1.69.4', 'date' => '2026-10-30', 'title' => 'HR › People: an "➕ Account" button next to every person without a portal account (administrators) opens Settings › Portal accounts in a new window with the name, Staff role and discipline pre-filled; on creation the employee card is linked to the new account automatically.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R60-003', 'version' => '1.69.3', 'date' => '2026-10-30', 'title' => 'Per page (25 / 50 / 100) is remembered for the session on Projects, Vessels and the log: expanding a project, sorting, an action or Back no longer drops it back to 25.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R60-002', 'version' => '1.69.2', 'date' => '2026-10-30', 'title' => 'Planning: engineers are picked from a drop-down (type to search) or a whole discipline from a second drop-down; the selection shows as removable chips — no long checklist when the staff list is big.', 'db' => null, 'check' => null],
