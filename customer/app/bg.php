@@ -24,6 +24,7 @@ function bg_can_edit(array $sp): bool {
     if (is_cp_admin()) return true;
     $u = current_user(); $pm = (int) scalar('SELECT pm_user_id FROM projects WHERE id = ?', [(int)$sp['project_id']]);
     if ($pm && $pm === (int)$u['id']) return true;
+    if (function_exists('pm_is_pm') && pm_is_pm((int)$u['id'])) return true;                                           // R57-002: every PM
     try { $role = scalar('SELECT r.name FROM staff_roles r JOIN customer_users cu ON cu.staff_role_id = r.id WHERE cu.id = ?', [(int)$u['id']]); if ($role && preg_match('/manager|director|ceo|sales/i', (string)$role)) return true; } catch (Throwable $e) {}
     return false;
 }

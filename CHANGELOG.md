@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.67.1** (build 2026-10-30). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.67.2** (build 2026-10-30). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.67.2 | GAS-CP-R57-002 | 2026-10-30 | Every project manager (PM of at least one project, or a Project Manager role) may edit the team and the budgets — hours per discipline and engineering sections — of every sub-project, not only of the projects he is in charge of, so work is not held up when the responsible PM is away. | — |
 | 1.67.1 | GAS-CP-R58-001 | 2026-10-30 | Release updater and GitHub deploy: install/update.php applies a release zip from customer/storage/updates/ (token in app/config.php › update.token, manifest sha256 check, file + database backup to storage/backups/, extraction, pending migrations in order, self-check, JSON report, log); .github/workflows/deploy.yml builds, lints, uploads and calls it on every version tag; DEPLOY.md. | — |
 | 1.67.0 | GAS-CP-R57-001 | 2026-10-30 | Projects become active through their offers: new status "Quoted" (offer stage) for projects and sub-projects — a project / sub-project is created quoted and turns Active by itself when one of its offers is approved (approved → in progress → to be invoiced); it goes back to Quoted if the approval is reverted. On hold / Completed stay manual; vessel general projects stay active. "Active since" on the project row, event on the offer, Quoted in the Projects filter, KPI and export filters, Excel project import. | `install/migrate_cp_r57_project_quoted.sql` |
 | 1.66.0 | GAS-CP-R55-005 | 2026-10-29 | HR dashboard (landing page of HR accounts): away today and this week, pending requests, contracts expiring within 90 days, unread messages, headcount and annual-leave totals, annual leave per person sorted by days available with other types taken; leave import can create former employees as left persons (history only). | — |

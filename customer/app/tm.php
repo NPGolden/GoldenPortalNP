@@ -22,10 +22,11 @@ function tm_members_full(int $subId): array {
     if (!tm_has()) return [];
     return all("SELECT cu.id, cu.full_name, d.name AS discipline, t.added_at FROM sp_team t JOIN customer_users cu ON cu.id = t.user_id LEFT JOIN disciplines d ON d.id = cu.discipline_id WHERE t.subproject_id = ? AND cu.is_active = 1 ORDER BY d.sort_order, d.name, cu.full_name", [$subId]);
 }
-/** May this user edit the team of a sub-project? Administrators and the project manager of its project. */
+/** May this user edit the team of a sub-project? Administrators and every project manager (R57-002: not only the PM in charge). */
 function tm_can_edit(int $subId, ?array $u = null): bool {
     $u = $u ?? current_user(); if (!$u || !is_staff()) return false;
     if (is_cp_admin()) return true;
+    if (function_exists('pm_is_pm') && pm_is_pm((int)$u['id'])) return true;
     return (int) scalar('SELECT p.pm_user_id FROM subprojects s JOIN projects p ON p.id = s.project_id WHERE s.id = ?', [$subId]) === (int)$u['id'];
 }
 function tm_save(int $subId, array $userIds): void {

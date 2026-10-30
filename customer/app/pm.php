@@ -64,6 +64,15 @@ function split_project_code(string $code): array {
     return [$main !== '' ? $main : $code, $sub];
 }
 
+/** R57-002: is this staff member a project manager at all — PM of at least one project, or a staff role named "Project Manager"?
+ *  Every PM may edit teams and budgets of every project, not only his own, so work is not held up by one person. */
+function pm_is_pm(?int $uid = null): bool {
+    static $c = [];
+    $uid = $uid ?? (int)(current_user()['id'] ?? 0); if (!$uid || !is_staff()) return false;
+    if (!isset($c[$uid])) $c[$uid] = (bool) scalar("SELECT (SELECT COUNT(*) FROM projects WHERE pm_user_id = ?) + (SELECT COUNT(*) FROM customer_users cu JOIN staff_roles r ON r.id = cu.staff_role_id WHERE cu.id = ? AND LOWER(r.name) LIKE '%project manager%')", [$uid, $uid]);
+    return $c[$uid];
+}
+
 /** Load the tree the current person may see: main projects with their
  *  sub-projects (ordered), each sub carrying its 7 stage percentages. */
 function project_tree(?int $onlyProject = null): array {

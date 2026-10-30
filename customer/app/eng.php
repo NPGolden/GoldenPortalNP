@@ -63,6 +63,7 @@ function eng_budget_hours(int $sid): ?array {
 function eng_can_edit(array $sp, bool $budget = false): bool {
     if (!is_staff() || !eng_has()) return false; if (is_cp_admin() || eng_is_management()) return true;
     $me = (int)(current_user()['id'] ?? 0); if ($me && (int)($sp['pm_user_id'] ?? scalar('SELECT pm_user_id FROM projects WHERE id = ?', [(int)$sp['project_id']])) === $me) return true;
+    if (function_exists('pm_is_pm') && pm_is_pm($me)) return true;                                                     // R57-002: every PM, budgets included
     if (function_exists('wp_can_manage') && wp_can_manage((int)$sp['project_id'])) return true;
     try { if ($me && scalar('SELECT COUNT(*) FROM eng_budgets WHERE subproject_id = ? AND lead_user_id = ?', [(int)$sp['id'], $me])) return true; } catch (Throwable $e) {}   // section lead
     if ($budget) return false;
