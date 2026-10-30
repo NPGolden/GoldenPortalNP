@@ -1,0 +1,19 @@
+-- GAS-CP-R55-002 · Status-based allowances for every statutory leave type (children, school attendance, parental, carer, marriage,
+-- maternity, paternity, single parent, child illness, study, employer-paid sick), Greek and Italian rule sets per person (jurisdiction),
+-- external contractors (invoice) whose leaves are agreed by their manager only. Run after migrate_cp_r55_entitlement_engine.sql.
+ALTER TABLE hr_people
+  ADD COLUMN jurisdiction VARCHAR(2) NOT NULL DEFAULT 'GR',        -- GR | IT : which rule set applies
+  ADD COLUMN employment_kind VARCHAR(12) NOT NULL DEFAULT 'employee', -- employee | contractor (external, invoices)
+  ADD COLUMN single_parent TINYINT(1) NOT NULL DEFAULT 0,
+  ADD COLUMN disability_care TINYINT(1) NOT NULL DEFAULT 0;         -- cares for a relative with a disability (IT: permessi 104)
+UPDATE hr_leave_types SET rule_key = 'study' WHERE code = 'STUDY' AND rule_key IS NULL;
+UPDATE hr_leave_types SET counts = 1 WHERE code IN ('CAR','FMJ','MAR','PAT','PAR','SICK');   -- the engine now gives them a yearly allowance
+INSERT IGNORE INTO hr_leave_types (code, name, kind, counts, needs_reason, builtin, sort_order, unit, hr_only, needs_doc, paid, consumes_annual, max_year, rule_key, name_el, name_it, name_bg, name_uk) VALUES
+  ('MAT',  'Maternity leave',          'parental', 1, 0, 0, 36, 'day', 1, 1, 1, 0, NULL, 'maternity',     'Άδεια μητρότητας',                 'Congedo di maternità',             'Отпуск по майчинство',             'Відпустка у зв''язку з вагітністю та пологами'),
+  ('MONO', 'Single-parent leave',      'leave',    1, 1, 0, 48, 'day', 0, 0, 1, 0, NULL, 'single_parent', 'Άδεια μονογονεϊκής οικογένειας',   'Permesso genitore singolo',        'Отпуск за самотен родител',        'Відпустка для одинокого батька/матері'),
+  ('CHS',  'Child illness',            'leave',    1, 1, 0, 49, 'day', 0, 1, 0, 0, NULL, 'child_illness', 'Άδεια ασθένειας τέκνου',           'Malattia del figlio',              'Отпуск при болест на дете',        'Відпустка через хворобу дитини'),
+  ('ROL',  'Paid hours (ROL / ex-fest.)', 'leave', 1, 0, 0, 82, 'hour', 0, 0, 1, 0, NULL, 'rol_hours',    'Ώρες αδείας (ROL)',                'Permessi retribuiti (ROL / ex-festività)', 'Платени часове (ROL)',     'Оплачувані години (ROL)'),
+  ('L104', 'Disability-care leave (L.104)', 'leave', 1, 1, 0, 83, 'day', 1, 1, 1, 0, NULL, 'law104',     'Άδεια φροντίδας ΑμεΑ (L.104)',     'Permessi L. 104/92',               'Отпуск за грижа за лице с увреждане (L.104)', 'Відпустка по догляду (L.104)');
+INSERT IGNORE INTO cp_settings (k, v) VALUES ('hr_rules_IT', '{"y1_5":20,"y2_5":20,"y3_5":20,"y1_6":26,"y2_6":26,"y3_6":26,"senior_same":99,"senior_total":99,"senior_5":20,"senior_6":26,"long_total":99,"long_5":20,"long_6":26,"carry_max":30,"round":0.5,"sch_days":0,"sch_age_min":0,"sch_age_max":0,"par_days_child":220,"par_age":12,"car_days":3,"fmj_days":0,"mar_days":15,"mar_days_6":15,"pat_days":10,"mat_days":150,"study_days":20,"mono_days":0,"mono_days_3":0,"chs_days":5,"chs_days_2":5,"chs_days_3":5,"chs_age":8,"sick_short":180,"sick_long":180,"sick_service":12,"rol_hours":104,"law104_days":36}');
+-- Greek defaults with the type rules (full value — run this migration once; later edits are made in Settings › HR › Leave rules)
+UPDATE cp_settings SET v = '{"y1_5":20,"y2_5":21,"y3_5":22,"y1_6":24,"y2_6":25,"y3_6":26,"senior_same":10,"senior_total":12,"senior_5":25,"senior_6":30,"long_total":25,"long_5":26,"long_6":31,"carry_max":5,"round":0.5,"sch_days":4,"sch_age_min":4,"sch_age_max":16,"par_days_child":88,"par_age":8,"car_days":5,"fmj_days":2,"mar_days":5,"mar_days_6":6,"pat_days":14,"mat_days":119,"study_days":30,"mono_days":6,"mono_days_3":8,"chs_days":6,"chs_days_2":8,"chs_days_3":14,"chs_age":16,"sick_short":13,"sick_long":26,"sick_service":12,"rol_hours":0,"law104_days":0}' WHERE k = 'hr_rules';

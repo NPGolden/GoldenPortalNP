@@ -1,0 +1,93 @@
+# Golden A/S Customer Portal — release deploy to GoDaddy (cPanel) via the portal's own updater.   GAS-CP-R58-001
+#
+#   Trigger: push of a tag  v1.67.0  (or Run workflow by hand with a tag name).
+#   Steps:   build manifest → zip the release (config.php and storage never included) → upload the zip to
+#            customer/storage/updates/ over SFTP or FTPS → call install/update.php (dry run, then real) → report.
+#   Secrets (GitHub › Settings › Secrets and variables › Actions):
+#     DEPLOY_HOST      goldensas.com (or the cPanel host name)
+#     DEPLOY_PROTOCOL  sftp | ftps                       (sftp needs cPanel › SSH Access; ftps = explicit TLS, port 21)
+#     DEPLOY_USER      the dedicated deploy account        (never the personal np@ account)
+#     DEPLOY_PASSWORD  its password                        (or DEPLOY_SSH_KEY for sftp with a key pair)
+#     DEPLOY_PATH      path of public_html as the deploy account sees it, e.g.  /public_html  or  /
+#     UPDATE_TOKEN     the value of app/config.php › update.token on the server (32+ characters)
+#     PORTAL_URL       https://goldensas.com/customer   (variable, not secret)
+name: Deploy to goldensas.com
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Tag or branch to deploy (e.g. v1.67.0)'
+        required: true
+        default: 'main'
+      dry:
+        description: 'Dry run only (verify, no change on the server)'
+        type: boolean
+        default: false
+concurrency: { group: deploy-live, cancel-in-progress: false }
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production          # add a required reviewer on this environment to approve every deploy by hand
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: "${{ github.event.inputs.ref || github.ref }}" }
+      - uses: shivammathur/setup-php@v2
+        with: { php-version: '8.3', extensions: zip, mbstring }
+      - name: Lint every PHP file
+        run: |
+          set -e; n=0
+          while IFS= read -r f; do php -l "$f" >/dev/null || exit 1; n=$((n+1)); done < <(find . -name '*.php' -not -path './.git/*' -not -path './node_modules/*')
+          echo "lint ok: $n files"
+      - name: Language files — equal key counts
+        run: |
+          set -e; for l in en el it bg uk; do php -r "echo count(require 'customer/lang/$l.php'), PHP_EOL;"; done | sort -u | tee /tmp/counts
+          [ "$(wc -l < /tmp/counts)" = "1" ] || { echo "language key counts differ"; exit 1; }
+      - name: Build manifest and release zip
+        id: build
+        run: |
+          set -e; php tools/build-manifest.php >/dev/null; php tools/build-manifest.php
+          V=$(php -r 'require "customer/app/version.php"; echo CP_VERSION;'); echo "version=$V" >> "$GITHUB_OUTPUT"
+          Z="goldensas-portal-$V-${GITHUB_SHA::7}.zip"; echo "zip=$Z" >> "$GITHUB_OUTPUT"
+          zip -qr "$Z" . -x "docs/*" "DEPLOY.md" ".gitignore" "customer/app/config.php" "customer/storage/*" "customer/tools/*" "tools/*" "*/sessions/*" "*.log" "node_modules/*" ".git/*" ".github/*" "*/.DS_Store"
+          unzip -l "$Z" | grep -q "config.php" && { echo "config.php inside the zip — abort"; exit 1; } || true
+          ls -la "$Z"
+      - name: Upload the zip to customer/storage/updates/
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PROTO: ${{ secrets.DEPLOY_PROTOCOL }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          PASS: ${{ secrets.DEPLOY_PASSWORD }}
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DPATH: ${{ secrets.DEPLOY_PATH }}
+          Z: ${{ steps.build.outputs.zip }}
+        run: |
+          set -e; DEST="${DPATH%/}/customer/storage/updates/"
+          if [ "$PROTO" = "sftp" ]; then
+            if [ -n "$KEY" ]; then echo "$KEY" > /tmp/key; chmod 600 /tmp/key; curl -sS --fail -T "$Z" "sftp://$HOST$DEST" -u "$USER:" --key /tmp/key --pubkey "" -k; rm -f /tmp/key
+            else curl -sS --fail -T "$Z" "sftp://$HOST$DEST" -u "$USER:$PASS" -k; fi
+          else
+            curl -sS --fail --ssl-reqd -T "$Z" "ftp://$HOST$DEST" -u "$USER:$PASS" --ftp-create-dirs
+          fi
+          echo "uploaded $Z"
+      - name: Dry run on the server
+        env: { URL: "${{ vars.PORTAL_URL }}", TOKEN: "${{ secrets.UPDATE_TOKEN }}", Z: "${{ steps.build.outputs.zip }}" }
+        run: |
+          set -e; curl -sS --fail -X POST -H "X-Update-Token: $TOKEN" -A "GAS-deploy/1.0" -d "zip=$Z" -d "dry=1" "$URL/install/update.php" | tee /tmp/dry.json
+          python3 -c "import json; r=json.load(open('/tmp/dry.json')); assert r['ok'], r"
+      - name: Apply the release
+        if: ${{ github.event.inputs.dry != 'true' }}
+        env: { URL: "${{ vars.PORTAL_URL }}", TOKEN: "${{ secrets.UPDATE_TOKEN }}", Z: "${{ steps.build.outputs.zip }}" }
+        run: |
+          set -e; curl -sS --fail -X POST -H "X-Update-Token: $TOKEN" -A "GAS-deploy/1.0" -d "zip=$Z" "$URL/install/update.php" | tee /tmp/apply.json
+          python3 - <<'PY'
+          import json; r=json.load(open('/tmp/apply.json'))
+          print("\n".join(f"{s['step']:<12} {s['state']}" + (f"  {s.get('lines')}" if s.get('lines') else '') for s in r['steps']))
+          print(f"portal {r['from']} -> {r['to']}  backup in {[s for s in r['steps'] if s['step']=='backup'][0].get('folder')}")
+          assert r['ok'], 'self-check reported FAIL — see lines above'
+          PY
+      - name: Summary
+        if: always()
+        run: |
+          { echo "## Deploy ${{ steps.build.outputs.version }}"; echo; echo '```json'; cat /tmp/apply.json 2>/dev/null || cat /tmp/dry.json 2>/dev/null; echo '```'; } >> "$GITHUB_STEP_SUMMARY"

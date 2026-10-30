@@ -1,0 +1,42 @@
+<?php
+/** POST /sync — batched, idempotent operations from the device outbox (sync_ops keeps the result per uuid). */
+declare(strict_types=1);
+function sync_ops(array $u, array $b): void {
+    $ops = $b['ops'] ?? []; if (!is_array($ops) || count($ops) > 200) throw new ApiException(422, 'ops: array of max 200');
+    $results = [];
+    foreach ($ops as $op) {
+        $uuid = (string)($op['id'] ?? ''); $kind = (string)($op['kind'] ?? ''); $p = (array)($op['payload'] ?? []);
+        if (!preg_match('/^[0-9a-f-]{36}$/', $uuid)) { $results[] = ['uuid' => $uuid, 'status' => 'rejected', 'error' => 'bad uuid']; continue; }
+        if ($seen = one('SELECT status, result_id, result_no FROM sync_ops WHERE uuid = ?', [$uuid])) { $results[] = ['uuid' => $uuid, 'status' => $seen['status'], 'id' => $seen['result_id'], 'number' => $seen['result_no']]; continue; }
+        $res = null;
+        try {
+            switch ($kind) {
+                case 'assignment_accept': $res = ['id' => Portal::acceptAssignment($u, $p)]; break;
+                case 'ticket_accept':     $res = ['id' => Portal::acceptTicket($u, $p)]; break;
+                case 'ticket_note':       $res = ['id' => Portal::ticketNote($u, $uuid, $p)]; break;
+                case 'fsr':               $res = Portal::createFsr($u, $uuid, $p); break;
+                case 'inspection':        $res = Portal::createIsr($u, $uuid, $p); break;
+                case 'timesheet':         $res = Portal::bookHours($u, $uuid, $p); break;
+                case 'timesheet_submit':  $res = Portal::submitWeek($u, $p); break;
+                case 'extra_hours':       $res = Portal::extraHours($u, $uuid, $p); break;
+                case 'note':              $res = Portal::note($u, $uuid, $p); break;
+                case 'equipment_correction': $res = Portal::equipmentCorrection($u, $uuid, $p); break;
+                case 'approve': case 'reject': case 'issue': throw new ApiException(403, 'Approvals are portal-only');   // CS-03
+                default: throw new ApiException(422, 'Unknown operation kind');
+            }
+            if (isset($res['status'])) { $res['record_status'] = $res['status']; unset($res['status']); }   // 'status' is the sync result; the record's own status travels as record_status
+            q('INSERT INTO sync_ops (uuid, device_id, user_id, kind, status, result_id, result_no, server_ts) VALUES (?,?,?,?,?,?,?,NOW())', [$uuid, $u['device_id'], (int)$u['id'], $kind, 'accepted', (string)($res['id'] ?? ''), $res['number'] ?? null]);
+            $results[] = ['uuid' => $uuid, 'status' => 'accepted'] + $res;
+        } catch (ApiException $e) {
+            $st = $e->status === 409 ? 'conflict' : ($e->status === 423 ? 'locked' : 'rejected');
+            q('INSERT INTO sync_ops (uuid, device_id, user_id, kind, status, error, server_ts) VALUES (?,?,?,?,?,?,NOW()) ON DUPLICATE KEY UPDATE status = VALUES(status), error = VALUES(error)', [$uuid, $u['device_id'], (int)$u['id'], $kind, $st, mb_substr($e->getMessage(), 0, 255)]);
+            $results[] = ['uuid' => $uuid, 'status' => $st, 'code' => $e->status, 'error' => $e->getMessage()] + $e->extra;
+        } catch (Throwable $e) {
+            q('INSERT INTO sync_ops (uuid, device_id, user_id, kind, status, error, server_ts) VALUES (?,?,?,?,?,?,NOW()) ON DUPLICATE KEY UPDATE status = VALUES(status), error = VALUES(error)', [$uuid, $u['device_id'], (int)$u['id'], $kind, 'rejected', mb_substr($e->getMessage(), 0, 255)]);
+            error_log('[api/v1 sync] ' . $e->getMessage() . ' @ ' . $e->getFile() . ':' . $e->getLine());
+            $results[] = ['uuid' => $uuid, 'status' => 'rejected', 'code' => 500, 'error' => 'Server error' . (cfg('app.debug') ? ': ' . $e->getMessage() : '')];
+        }
+        $_POST = [];
+    }
+    Response::json(['results' => $results]);
+}

@@ -1,0 +1,14 @@
+# Golden A/S Customer Portal — never commit server secrets, uploads or build leftovers
+customer/app/config.php
+employee/app/config.php
+customer/storage/
+employee/storage/
+employee/uploads/
+*.log
+*.bak
+*.tmp
+.DS_Store
+Thumbs.db
+node_modules/
+goldensas-portal-*.zip
+*.zip

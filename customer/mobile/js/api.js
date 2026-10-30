@@ -1,0 +1,156 @@
+/* Golden A/S Service app — API client for the portal module /customer/api/v1 (JWT access + rotating refresh)
+ * and a MOCK mode (built-in sample data in the same shape the portal returns) for the demo and the UI tests.
+ * Mock mode: localStorage gas.mock = "1", or ?mock=1 on the URL. */
+window.API = (() => {
+  const VERSION = "0.5.0";
+  const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
+  let MOCK = false;
+  try { MOCK = localStorage.getItem("gas.mock") === "1" || /[?&]mock=1/.test(location.search); if (/[?&]mock=1/.test(location.search)) localStorage.setItem("gas.mock", "1"); } catch (e) {}
+  const tok = { get access() { try { return sessionStorage.getItem("gas.at"); } catch (e) { return null; } }, set access(v) { try { v ? sessionStorage.setItem("gas.at", v) : sessionStorage.removeItem("gas.at"); } catch (e) {} },
+    get refresh() { try { return localStorage.getItem("gas.rt"); } catch (e) { return null; } }, set refresh(v) { try { v ? localStorage.setItem("gas.rt", v) : localStorage.removeItem("gas.rt"); } catch (e) {} } };
+  // Capacitor builds move the refresh token to Keychain / Keystore (capacitor/native-bridge.js)
+
+  async function raw(method, path, body, isForm) {
+    const h = { "X-App": "engineer", "X-App-Version": VERSION, "X-Lang": I18N.get(), "Cache-Control": "no-store" };
+    if (tok.access) h.Authorization = `Bearer ${tok.access}`;
+    if (!isForm) h["Content-Type"] = "application/json";
+    const res = await fetch(`${BASE}${path}`, { method, headers: h, body: isForm ? body : (body ? JSON.stringify(body) : undefined), cache: "no-store" });
+    if (res.status === 204) return {};
+    let data = {}; try { data = await res.json(); } catch (e) {}
+    if (!res.ok) { const err = new Error(data.error || `HTTP ${res.status}`); err.status = res.status; err.data = data; throw err; }
+    return data;
+  }
+  async function call(method, path, body, isForm) {
+    if (MOCK) return mock(method, path, body);
+    try { return await raw(method, path, body, isForm); }
+    catch (e) {
+      if (e.status === 401 && tok.refresh && !path.startsWith("/auth/")) { const r = await raw("POST", "/auth/refresh", { refresh_token: tok.refresh }); tok.access = r.access_token; tok.refresh = r.refresh_token; return raw(method, path, body, isForm); }
+      throw e;
+    }
+  }
+  const deviceInfo = () => ({ platform: (window.Capacitor && Capacitor.getPlatform && Capacitor.getPlatform()) || "web", ua: navigator.userAgent.slice(0, 120), app_version: VERSION, device_id: deviceId() });
+  function deviceId() { try { let d = localStorage.getItem("gas.device"); if (!d) { d = DB.uuid(); localStorage.setItem("gas.device", d); } return d; } catch (e) { return "web"; } }
+
+  const api = {
+    VERSION, get mock() { return MOCK; }, setMock(v) { MOCK = !!v; try { localStorage.setItem("gas.mock", v ? "1" : "0"); } catch (e) {} },
+    get signedIn() { return !!(tok.refresh || (MOCK && mockState.user)); },
+    async login(email, password, totp) { const r = await call("POST", "/auth/login", { email, password, totp: totp || undefined, device: deviceInfo() }); tok.access = r.access_token; tok.refresh = r.refresh_token; return r; },
+    async logout() { try { await call("POST", "/auth/logout", {}); } catch (e) {} tok.access = null; tok.refresh = null; },
+    me: () => call("GET", "/me"), tickets: () => call("GET", "/tickets"), assignments: () => call("GET", "/assignments"), projects: () => call("GET", "/projects"), vessels: () => call("GET", "/vessels"),
+    equipment: () => call("GET", "/equipment"), budgets: () => call("GET", "/budgets"), master: () => call("GET", "/master"), documents: () => call("GET", "/documents"), status: () => call("GET", "/accounting/status"),
+    fsrList: () => call("GET", "/fsr"), timesheets: () => call("GET", "/timesheets"), notes: () => call("GET", "/notes"),
+    sync: (ops) => call("POST", "/sync", { ops }),
+    photo: (recordId, blob, name, task, caption) => { const f = new FormData(); f.append("record_id", recordId); f.append("task", String(task || 1)); if (caption) f.append("caption", caption); f.append("photo", blob, name || "photo.jpg"); return call("POST", "/files/photo", f, true); },
+    pushToken: (token, service) => call("POST", "/devices/push-token", { token, service }),
+    assist: (body) => call("POST", "/assist", body),
+    documentUrl: (id) => `${BASE}/documents/${id}`,
+    async fetchDocument(id) { const go = () => fetch(`${BASE}/documents/${id}`, { headers: { Authorization: `Bearer ${tok.access}`, "X-App": "engineer", "X-App-Version": VERSION }, cache: "no-store" }); let r = await go(); if (r.status === 401 && tok.refresh) { const x = await raw("POST", "/auth/refresh", { refresh_token: tok.refresh }); tok.access = x.access_token; tok.refresh = x.refresh_token; r = await go(); } if (!r.ok) { const e = new Error(`HTTP ${r.status}`); e.status = r.status; throw e; } return r; },
+  };
+
+  // ------------------------------------------------------------------ MOCK portal (same shapes as customer/api/v1)
+  const today = new Date().toISOString().slice(0, 10);
+  const d = (n) => { const x = new Date(); x.setDate(x.getDate() + n); return x.toISOString().slice(0, 10); };
+  const mockState = { user: null, nFsr: 0, nIsr: 0, nTs: 0 };
+  const M = {
+    me: { id: 7, name: "Dimitris Papadakis", email: "engineer@goldenas.com.gr", role: "staff", discipline: "Electrical", discipline_id: 1, section_id: 1, home_branch: "GR", branch_scope: ["GR", "GIT"], languages: ["en", "el", "it", "uk", "bg"], min_app_version: "0.5.0", ai: true, team_restricted: true, calendar: "GR" },
+    vessels: [{ id: 1, name: "M/Y AURORA", yard: "Heesen, Oss", customer: "AURORA YACHTING LTD", customer_id: 1 }, { id: 2, name: "M/Y NOURAH", yard: "Perama", customer: "NOURAH MARINE SA", customer_id: 2 }, { id: 3, name: "M/Y VENTO", yard: "Viareggio", customer: "VENTO DI MARE SRL", customer_id: 3 }],
+    projects: [
+      { id: 1, code: "PRJ.100324", name: "M/Y AURORA refit", vessel_id: 1, vessel: "M/Y AURORA", customer: "AURORA YACHTING LTD", branch: "GR", pm: "Konstantinos Nikolaou", subprojects: [{ id: 11, code: "Y.01", name: "AMS upgrade", stage: "commissioning" }, { id: 12, code: "Y.02", name: "Bridge consoles", stage: "installation" }, { id: 13, code: "Y.03", name: "Shore power", stage: "fat" }] },
+      { id: 2, code: "PRJ.100402", name: "M/Y NOURAH service", vessel_id: 2, vessel: "M/Y NOURAH", customer: "NOURAH MARINE SA", branch: "GR", pm: "Konstantinos Nikolaou", subprojects: [{ id: 21, code: "Y.01", name: "Bridge dimmers", stage: "engineering" }] },
+      { id: 3, code: "PRJ.100410", name: "M/Y VENTO navigation refit", vessel_id: 3, vessel: "M/Y VENTO", customer: "VENTO DI MARE SRL", branch: "GIT", pm: "Marco Rossi", subprojects: [{ id: 31, code: "Y.01", name: "NAVCOM", stage: "procurement" }] },
+    ],
+    assignments: [
+      { id: "TK412", kind: "ticket", ref: "TK-2026-0412", ref_id: 412, title: "AMS spurious alarms — ER", project_id: 1, subproject_id: null, vessel_id: 1, vessel: "M/Y AURORA", date: today, status: "new", by: "PM" },
+      { id: "WP1", kind: "work", ref: "PRJ.100324 Y.02 W01", ref_id: 1, title: "Bridge console installation week 44", project_id: 1, subproject_id: 12, vessel_id: 1, vessel: "M/Y AURORA", date: d(1), status: "new", by: "Konstantinos Nikolaou", planned_hours: 24 },
+      { id: "TK398", kind: "ticket", ref: "TK-2026-0398", ref_id: 398, title: "Bridge dimmer replacement", project_id: null, subproject_id: null, vessel_id: 2, vessel: "M/Y NOURAH", date: d(-2), status: "accepted", by: "PM" },
+    ],
+    tickets: [
+      { id: 412, ticket_no: "TK-2026-0412", vessel_id: 1, vessel: "M/Y AURORA", customer: "AURORA YACHTING LTD", system: "ALARM AND MONITORING SYSTEM", system_id: 11, title: "AMS spurious alarms — ER", description: "Spurious bilge high-level alarms on AMS page 3 every ~40 min. No water found.", category: "fault", priority: "high", status: "open", due: null, reported_by: "Chief Engineer", reported_at: d(-2), assigned_to: 7, project_id: 1, subproject_id: null, legacy: null,
+        history: [{ at: d(-2), text: "Chief Engineer — created" }, { at: d(-1), text: "Konstantinos Nikolaou — assigned: Dimitris Papadakis" }], open_issues: ["Float switch FS-BLG-03 intermittent"], fsrs: [] },
+      { id: 409, ticket_no: "TK-2026-0409", vessel_id: 1, vessel: "M/Y AURORA", customer: "AURORA YACHTING LTD", system: "SHORE CONNECTION", system_id: 5, title: "Shore power breaker interlock", description: "Interlock trips when converter synchronises.", category: "fault", priority: "normal", status: "in_progress", due: null, reported_by: "ETO", reported_at: d(-5), assigned_to: 7, project_id: 1, subproject_id: 13, legacy: null, history: [{ at: d(-5), text: "ETO — created" }, { at: d(-4), text: "Dimitris Papadakis — accepted: Sub-project Y.03" }], open_issues: [], fsrs: [] },
+      { id: 398, ticket_no: "TK-2026-0398", vessel_id: 2, vessel: "M/Y NOURAH", customer: "NOURAH MARINE SA", system: "LIGHTING DISTRIBUTION SYSTEM", system_id: 12, title: "Bridge dimmer replacement", description: "Dimmer channel 4 dead. Service call, no project.", category: "service", priority: "low", status: "in_progress", due: null, reported_by: "Captain", reported_at: d(-9), assigned_to: 7, project_id: null, subproject_id: null, legacy: "Freshdesk #4471", history: [{ at: d(-9), text: "Captain — created" }, { at: d(-8), text: "Service desk — waiting parts" }], open_issues: [], fsrs: [] },
+      { id: 391, ticket_no: "TK-2026-0391", vessel_id: 1, vessel: "M/Y AURORA", customer: "AURORA YACHTING LTD", system: "NAVIGATION LIGHTS", system_id: 15, title: "Navigation light panel test", category: "service", priority: "low", status: "closed", due: null, reported_by: "Chief Engineer", reported_at: d(-12), assigned_to: 7, project_id: 1, subproject_id: 12, legacy: null, description: "Annual test.", history: [{ at: d(-12), text: "created" }, { at: d(-3), text: "closed — FSR 20261024DP1130" }], open_issues: [], fsrs: ["20261024DP1130 (accepted)"] },
+      { id: 415, ticket_no: "TK-2026-0415", vessel_id: 3, vessel: "M/Y VENTO", customer: "VENTO DI MARE SRL", system: "RADAR", system_id: 20, title: "Radar display flicker", category: "fault", priority: "normal", status: "open", due: null, reported_by: "Captain", reported_at: d(-1), assigned_to: null, project_id: 3, subproject_id: null, legacy: null, description: "Starboard radar display flickers at start-up.", history: [{ at: d(-1), text: "created" }], open_issues: [], fsrs: [] },
+    ],
+    equipment: [
+      { id: 1, vessel_id: 1, tag: "S C-K4N11234", serial: "S C-K4N11234", system: "S7-1500", kind: "plc", maker: "Siemens", model: "CPU 1515-2 PN", location: "ER control room +AMS1", installed: "2019-03-01", warranty: "expired", status: "ok", last_service: d(-140), history: [d(-140) + " — maintenance: Annual check, diagnostics buffer cleared"], docs: [] },
+      { id: 2, vessel_id: 1, tag: "2A1C4455", serial: "2A1C4455", system: "ACS880", kind: "shore_converter", maker: "ABB", model: "Shore converter 250 kVA", location: "Aft deck technical space", installed: "2024-11-01", warranty: "2026-11-30", status: "ok", last_service: null, history: [], docs: [] },
+      { id: 3, vessel_id: 2, tag: "P88-2210", serial: "P88-2210", system: "DIM-8", kind: "lighting", maker: "Palagi", model: "Dimmer 8ch", location: "Bridge console port", installed: "2021-06-01", warranty: "expired", status: "ok", last_service: null, history: [], docs: [] },
+      { id: 4, vessel_id: 3, tag: "F2228-0917", serial: "F2228-0917", system: "FAR-2228", kind: "radar", maker: "Furuno", model: "FAR-2228 X-band", location: "Bridge, starboard", installed: "2018-02-01", warranty: "expired", status: "ok", last_service: null, history: [], docs: [] },
+    ],
+    budgets: [{ subproject_id: 12, sections: [{ id: 1, code: "ELE", name: "Electrical", budget: 200, booked: 184, extra: 0 }, { id: 2, code: "AUT", name: "Automation", budget: 120, booked: 96, extra: 0 }, { id: 4, code: "UIX", name: "UI/UX", budget: 40, booked: 42, extra: 2 }] }, { subproject_id: 11, sections: [{ id: 2, code: "AUT", name: "Automation", budget: 320, booked: 298, extra: 0 }] }, { subproject_id: 13, sections: [{ id: 1, code: "ELE", name: "Electrical", budget: 60, booked: 12, extra: 0 }] }],
+    master: { specialties: ["Service Engineer", "Automation Engineer", "Electrical Engineer", "Electrician", "Navigation Engineer", "Commissioning Engineer", "Project Manager", "Technician", "Supervisor"], time_types: ["WT", "TT", "NC"], part_types: ["W", "G", "I"], max_lines: 3, max_parts: 3, max_photos: 9,
+      sections: [{ id: 1, code: "ELE", name: "Electrical" }, { id: 2, code: "AUT", name: "Automation" }, { id: 3, code: "MEC", name: "Mechanical" }, { id: 4, code: "UIX", name: "UI/UX" }, { id: 5, code: "IT", name: "IT" }],
+      engineers: [{ id: 7, name: "Dimitris Papadakis", discipline: "Electrical" }, { id: 8, name: "Giorgos Antoniou", discipline: "Electrical" }, { id: 9, name: "Marco Rossi", discipline: "Automation" }, { id: 2, name: "Konstantinos Nikolaou", discipline: "Electrical" }],
+      stages: ["engineering", "procurement", "production", "fat", "installation", "sathat", "commissioning"], calendars: { GR: { name: "Greece", start: "08:00", end: "17:00", holidays: ["2026-10-28", "2026-12-25", "2026-12-26"] }, IT: { name: "Italy", start: "08:00", end: "17:00", holidays: ["2026-11-01", "2026-12-08", "2026-12-25"] } },
+      activities: ["engineering", "site"], reasons: ["misjudgement", "miscalculation"], isr_risk_levels: ["none", "low", "medium", "high", "critical"], ticket_statuses: ["open", "in_progress", "waiting_customer", "resolved", "closed"],
+      isr_systems: [{ id: 11, name: "ALARM AND MONITORING SYSTEM", abbr: "AMS" }, { id: 1, name: "MAIN SWITCHBOARD", abbr: "MSB" }, { id: 2, name: "EMERGENCY SWITCHBOARD", abbr: "EMSB" }, { id: 5, name: "SHORE CONNECTION", abbr: "SHC" }, { id: 12, name: "LIGHTING DISTRIBUTION SYSTEM", abbr: "LDS" }, { id: 15, name: "NAVIGATION LIGHTS", abbr: "NAVL" }, { id: 0, name: "Navigation lighting", abbr: null }, { id: 0, name: "Bow thruster", abbr: null }, { id: 0, name: "Other", abbr: null }],
+      isr_bank: { "alarm and monitoring system": ["Alarm list reviewed — nuisance alarms present?", "Redundant power supplies tested?", "Alarm test: bilge, fire, engine shutdown?", "Battery backup test performed?"], "main switchboard": ["Thermal check of bus bars?", "Breaker protection settings verified?", "Insulation resistance measured?", "Labelling as per drawings?"], "shore connection": ["Interlock with generators tested?", "Cable and plug condition?", "Earth continuity verified?"], "navigation lighting": ["Lamp failure alarm tested?", "Spare lamps on board?", "Sectors and visibility per COLREG?"], "lighting distribution system": ["Dimmer channels measured?", "Emergency lighting test?"] } },
+    documents: [{ id: 101, project_id: 1, subproject_id: 12, name: "DRW-100324-E-012_R2 — GA ER cabinets", category: "drawing", size: "2.1 MB", mime: "application/pdf" }, { id: 102, project_id: 1, subproject_id: 11, name: "FAT-100324-Y01_R0 — AMS FAT report", category: "fat", size: "3.8 MB", mime: "application/pdf" }, { id: 103, project_id: 1, subproject_id: 12, name: "20261024DP1130_R1 — FSR-20261024DP1130-R1.pdf", category: "fsr_doc", size: "0.4 MB", mime: "application/pdf" }],
+    status: [{ date: d(-7), subproject_id: 12, source: "ts", doc_no: "TS-2026-DP-003", status: "invoiced" }, { date: d(-6), subproject_id: 12, source: "ts", doc_no: "TS-2026-DP-003", status: "invoiced" }, { date: d(-4), subproject_id: 12, source: "fsr", doc_no: "20261024DP1130", status: "reported" }],
+    timesheets: [
+      { id: "TS3-1", ts_id: 3, ts_no: "TS-2026-DP-003", date: d(-7), project_id: 1, subproject_id: 12, hour_type: "normal", hours: 8, activity: "site", description: "Console mounting", auto_type: 0, approval: "invoiced", invoicing: "invoiced", period: "" },
+      { id: "TS3-2", ts_id: 3, ts_no: "TS-2026-DP-003", date: d(-6), project_id: 1, subproject_id: 12, hour_type: "normal", hours: 8, activity: "site", description: "Cabling", auto_type: 0, approval: "invoiced", invoicing: "invoiced", period: "" },
+      { id: "TS3-3", ts_id: 3, ts_no: "TS-2026-DP-003", date: d(-6), project_id: 1, subproject_id: 12, hour_type: "overtime", hours: 2, activity: "site", description: "Cabling", auto_type: 1, approval: "invoiced", invoicing: "invoiced", period: "" },
+      { id: "TS4-1", ts_id: 4, ts_no: "TS-2026-DP-004", date: d(-2), project_id: 1, subproject_id: 12, hour_type: "normal", hours: 7.5, activity: "engineering", description: "Panel termination", auto_type: 0, approval: "submitted", invoicing: "none", period: "" },
+      { id: "TS4-2", ts_id: 4, ts_no: "TS-2026-DP-004", date: d(-1), project_id: 1, subproject_id: 13, hour_type: "normal", hours: 4, activity: "site", description: "Shore power interlock check", auto_type: 0, approval: "submitted", invoicing: "none", period: "" },
+    ],
+    fsr: [
+      { id: "F1", portal_id: 1, kind: "service", number: "20261024DP1130", rev: "R1", form: "SF-GLD-014", type: "internal", status: "accepted", date: d(-4), project_id: 1, subproject_id: 12, ticket_id: 391, vessel: "M/Y AURORA", customer: "AURORA YACHTING LTD", location: "Oss (NL)", pic: "J. van der Berg", pic_position: "Chief Engineer", pic_mobile: "+31 6 1234 5678", pic_email: "ce@aurora-yacht.com",
+        tasks: [{ seq: 1, description: "Navigation light panel annual test — all circuits tested, lamp failure alarm verified.", parts: [{ name: "Lamp 24V 25W BAY15d ×2", type: "I" }], issues: ["Spare lamp stock below minimum (2 pcs)"], times: [{ engineer: "Dimitris Papadakis", specialty: "Service Engineer", start: "08:00", end: "12:00", type: "WT", hours: 4 }, { engineer: "Giorgos Antoniou", specialty: "Service Engineer", start: "08:00", end: "12:00", type: "WT", hours: 4 }] },
+          { seq: 2, description: "Bridge console cable re-termination — terminals X4:1-12 re-terminated and tested.", parts: [{ name: "Ferrules 1.5 mm² ×12", type: "G" }], issues: [], times: [{ engineer: "Dimitris Papadakis", specialty: "Service Engineer", start: "13:00", end: "16:00", type: "WT", hours: 3 }, { engineer: "Dimitris Papadakis", specialty: "Service Engineer", start: "16:00", end: "17:00", type: "TT", hours: 1 }] }],
+        summary: { rows: [{ engineer: "Dimitris Papadakis", specialty: "Service Engineer", wt: 7, tt: 1, nc: 0, total: 8 }, { engineer: "Giorgos Antoniou", specialty: "Service Engineer", wt: 4, tt: 0, nc: 0, total: 4 }], wt: 11, tt: 1, nc: 0, total: 12 },
+        submitted_by: "Dimitris Papadakis", submitted_at: d(-4) + " 16:40:00", accepted_by: "J. van der Berg", accepted_at: d(-3) + " 09:12:00", accepted_ip: "77.83.12.4", acceptance: "portal", invoicing: "sent", pdf_file_id: 103, photos: 2 },
+      { id: "I1", portal_id: 1, kind: "inspection", number: "ISR-20261018-DP-01", rev: "R1", form: "SF-GLD-020", type: "internal", status: "issued", date: d(-10), project_id: 2, subproject_id: 21, vessel: "M/Y NOURAH", customer: "NOURAH MARINE SA", location: "Perama", pic: "Capt. A. Georgiou", subject: "Pre-departure navigation inspection", class_flag: "RINA / Malta", builder_year: "Benetti 2015", hull_no: "BY-122",
+        objective: "Verify navigation lighting and bridge dimmers before departure.", findings: "Dimmer channel 4 dead; navigation lights OK.", risks: "Loss of bridge lighting at night.", performed_name: "Dimitris Papadakis",
+        items: [{ system_id: 15, system_name: "NAVIGATION LIGHTS", condition_found: "All lamps OK, panel alarm tested", checklist: [{ q: "Lamp failure alarm tested?", a: "Yes" }, { q: "Spare lamps on board?", a: "2 pcs" }], class_regs: "COLREG Annex I", risk_level: "low", risk_analysis: "Spare stock low", actions: "Order 4 spare lamps" }, { system_id: 12, system_name: "LIGHTING DISTRIBUTION SYSTEM", condition_found: "Dimmer DIM-8 channel 4 dead", checklist: [{ q: "Dimmer channels measured?", a: "Ch 4: 0 V" }], class_regs: "", risk_level: "medium", risk_analysis: "Bridge console lighting partially lost", actions: "Replace dimmer module" }],
+        submitted_at: d(-10) + " 13:20:00", checked_by: "Konstantinos Nikolaou", issued_at: d(-9) + " 18:02:00", pdf_file_id: null },
+    ],
+    notes: [{ id: "N1", date: d(-1), subproject_id: 12, visibility: "external", text: "Port console mounted, cable trays 60 %. Awaiting yard for penetration P-114.", photos: 4 }],
+  };
+  function mock(method, path, body) {
+    const p = path.split("?")[0]; const delay = (v) => new Promise((r) => setTimeout(() => r(JSON.parse(JSON.stringify(v))), 120));
+    if (p === "/auth/login") { if (!body.email || !body.password) { const e = new Error("Invalid credentials"); e.status = 401; throw e; } mockState.user = M.me; return delay({ access_token: "mock", refresh_token: "mock-refresh", user: M.me }); }
+    if (p === "/auth/logout") { mockState.user = null; return delay({}); }
+    if (p === "/auth/refresh") return delay({ access_token: "mock", refresh_token: "mock-refresh" });
+    const lists = { "/me": M.me, "/tickets": { items: M.tickets }, "/assignments": { items: M.assignments }, "/projects": { items: M.projects }, "/vessels": { items: M.vessels }, "/equipment": { items: M.equipment }, "/budgets": { items: M.budgets }, "/master": M.master, "/documents": { items: M.documents }, "/accounting/status": { items: M.status }, "/fsr": { items: M.fsr }, "/timesheets": { items: M.timesheets }, "/notes": { items: M.notes } };
+    if (lists[p]) return delay(lists[p]);
+    if (p === "/files/photo") return delay({ file_id: Math.floor(Math.random() * 9000) + 1000 });
+    if (p === "/devices/push-token") return delay({});
+    if (p === "/assist") { const f = (body.fields || []).map((x) => `${x.label || x.name}: ${x.value || "—"}`).join("; "); const txt = (body.prompt || "").trim();
+      const map = { write: `Task description (house style): ${txt.replace(/^improve:?\s*/i, "").replace(/^./, (c) => c.toUpperCase())}. Checked terminations and function after the work; system left in normal operation; customer informed.`,
+        translate: `(translation to English) ${txt}`, ask: `From the form (${body.page}): ${f.slice(0, 160) || "no fields"}. Answer: ${txt.slice(0, 80)} — in the live portal this comes from Claude.`, fill: "" };
+      const out = { text: map[body.kind] || map.ask, tokens: 150 }; if (body.kind === "fill") { out.fields = { wk_desc: `From photo / notes: ${txt}`, location: "Oss (NL)" }; out.notes = "demo fill"; out.text = JSON.stringify(out.fields); } return delay(out); }
+    if (p === "/sync") {
+      const results = body.ops.map((op) => { const pl = op.payload || {}; const now = new Date(); const hhmm = String(now.getHours()).padStart(2, "0") + String(now.getMinutes()).padStart(2, "0");
+        switch (op.kind) {
+          case "assignment_accept": { const a = M.assignments.find((x) => x.id === pl.assignment_id); if (a) { a.status = "accepted"; a.subproject_id = pl.subproject_id || a.subproject_id; } const t = M.tickets.find((x) => x.id === pl.ref_id); if (t && pl.kind === "ticket") { t.status = "in_progress"; t.subproject_id = pl.subproject_id || null; t.history.push({ at: today, text: `Dimitris Papadakis — accepted: ${pl.subproject_id ? "Sub-project " + ((M.projects.flatMap((q) => q.subprojects).find((s) => s.id === pl.subproject_id) || {}).code || pl.subproject_id) : "Service call — no project"}` }); } return { uuid: op.id, status: "accepted", id: pl.assignment_id }; }
+          case "ticket_accept": { const t = M.tickets.find((x) => x.id === pl.ticket_id); if (t) { t.status = "in_progress"; t.subproject_id = pl.subproject_id || null; t.history.push({ at: today, text: "Dimitris Papadakis — accepted" }); } return { uuid: op.id, status: "accepted", id: "TK" + pl.ticket_id }; }
+          case "ticket_note": { const t = M.tickets.find((x) => x.id === pl.ticket_id); if (t) t.history.push({ at: today, text: `Dimitris Papadakis (${pl.visibility || "internal"}): ${pl.text}` }); return { uuid: op.id, status: "accepted", id: "TC" + (++mockState.nTs) }; }
+          case "fsr": { if (!(pl.tasks || []).length) return { uuid: op.id, status: "rejected", code: 422, error: "At least one task" }; const number = `${(pl.date || today).replace(/-/g, "")}DP${hhmm}`; const id = "F" + (++mockState.nFsr + 10);
+            const rows = {}; (pl.tasks || []).forEach((tk) => (tk.times || []).forEach((l) => { const e = M.master.engineers.find((x) => x.id === l.engineer_id); const name = e ? e.name : l.engineer; const k = name + "|" + l.specialty; rows[k] = rows[k] || { engineer: name, specialty: l.specialty, wt: 0, tt: 0, nc: 0, total: 0 }; const [h1, m1] = l.start.split(":").map(Number), [h2, m2] = l.end.split(":").map(Number); const h = Math.max(0, (h2 * 60 + m2 - h1 * 60 - m1) / 60); rows[k][l.type === "TT" ? "tt" : l.type === "NC" ? "nc" : "wt"] += h; rows[k].total += h; l.hours = h; l.engineer = name; }));
+            const sum = Object.values(rows); const onsite = pl.acceptance === "onsite" && pl.signature_png;
+            M.fsr.unshift({ ...pl, id, portal_id: +id.slice(1), kind: "service", number, rev: "R1", form: "SF-GLD-014", status: onsite ? "accepted" : "submitted", summary: { rows: sum, wt: sum.reduce((a, r) => a + r.wt, 0), tt: sum.reduce((a, r) => a + r.tt, 0), nc: sum.reduce((a, r) => a + r.nc, 0), total: sum.reduce((a, r) => a + r.total, 0) }, submitted_by: M.me.name, submitted_at: today + " " + hhmm.slice(0, 2) + ":" + hhmm.slice(2) + ":00", accepted_by: onsite ? `${pl.signer}, ${pl.signer_role} (signed on site)` : "", accepted_at: onsite ? today : "", accepted_ip: "", acceptance: onsite ? "onsite" : "portal", invoicing: "none", photos: 0 });
+            const t = M.tickets.find((x) => x.id === pl.ticket_id); if (t) { t.history.push({ at: today, text: `Dimitris Papadakis — fsr linked: ${number}` }); t.fsrs.push(`${number} (${onsite ? "accepted" : "submitted"})`); (pl.tasks || []).forEach((tk) => (tk.issues || []).forEach((i) => t.open_issues.push(i))); }
+            return { uuid: op.id, status: "accepted", id, number, record_status: onsite ? "accepted" : "submitted" }; }
+          case "inspection": { if (!(pl.items || []).length) return { uuid: op.id, status: "rejected", code: 422, error: "At least one inspected system" }; const number = `ISR-${(pl.date || today).replace(/-/g, "")}-DP-${String(++mockState.nIsr + 1).padStart(2, "0")}`; const id = "I" + (mockState.nIsr + 10);
+            M.fsr.unshift({ ...pl, id, portal_id: +id.slice(1), kind: "inspection", number, rev: "R0", form: "SF-GLD-020", type: "internal", status: "checking", performed_name: M.me.name, submitted_at: today, checked_by: "", issued_at: "", pdf_file_id: null }); return { uuid: op.id, status: "accepted", id, number }; }
+          case "timesheet": { const b = M.budgets.find((x) => x.subproject_id === pl.subproject_id); const s = b && b.sections.find((x) => x.id === M.me.section_id); const h = +(pl.normal || 0) + +(pl.overtime || 0) + +(pl.holiday || 0);
+            if (pl.activity === "engineering" && s && s.booked + h > s.budget + s.extra) return { uuid: op.id, status: "conflict", code: 409, error: `Engineering hours blocked: ${s.name} budget ${s.budget} h, booked ${s.booked} h, requested ${h} h — request extra hours first` };
+            const hol = (M.master.calendars.GR.holidays || []).includes(pl.date); const tsNo = "TS-2026-DP-00" + (5 + mockState.nTs); const id = "TS" + (5 + mockState.nTs); let reclass = 0;
+            const lines = []; if (hol) { lines.push({ hour_type: "holiday", hours: h }); reclass = h; } else { lines.push({ hour_type: "normal", hours: Math.min(8, +(pl.normal || 0)) }); if (+(pl.normal || 0) > 8) { lines.push({ hour_type: "overtime", hours: +(pl.normal || 0) - 8 }); reclass += +(pl.normal || 0) - 8; } if (+(pl.overtime || 0)) lines.push({ hour_type: "overtime", hours: +pl.overtime }); }
+            if (+(pl.travel || 0)) lines.push({ hour_type: "normal", hours: +pl.travel, travel: true });
+            lines.forEach((l, i) => M.timesheets.push({ id: `${id}-${i}`, ts_id: 5 + mockState.nTs, ts_no: tsNo, date: pl.date, project_id: pl.project_id, subproject_id: pl.subproject_id, hour_type: l.hour_type, hours: l.hours, activity: pl.activity || "site", description: (l.travel ? "Travel — " : "") + (pl.note || ""), auto_type: l.hour_type !== "normal" && !hol ? 1 : 0, approval: "draft", invoicing: "none", period: "" }));
+            if (s && pl.activity === "engineering") s.booked += h; return { uuid: op.id, status: "accepted", id, ts_no: tsNo, reclassified: reclass, record_status: "draft" }; }
+          case "timesheet_submit": { M.timesheets.filter((t) => "TS" + t.ts_id === pl.id || t.ts_id === pl.ts_id).forEach((t) => { t.approval = "submitted"; }); return { uuid: op.id, status: "accepted", id: pl.id }; }
+          case "extra_hours": return { uuid: op.id, status: "accepted", id: "ER" + (++mockState.nTs) };
+          case "note": { M.notes.unshift({ id: "N" + (++mockState.nTs + 10), ...pl, photos: 0 }); return { uuid: op.id, status: "accepted", id: M.notes[0].id, project_id: pl.project_id, subproject_id: pl.subproject_id }; }
+          case "equipment_correction": return { uuid: op.id, status: "accepted", id: "EH" + (++mockState.nTs) };
+          default: return { uuid: op.id, status: "rejected", error: "unknown kind" };
+        } });
+      return delay({ results });
+    }
+    const e = new Error("Not found"); e.status = 404; throw e;
+  }
+  return api;
+})();
