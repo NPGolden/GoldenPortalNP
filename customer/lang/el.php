@@ -5381,4 +5381,10 @@ GAS-MSB-2026-002',
 'cr.nf_decision' => '{no} · {s}',
 'cr.dev_setting' => 'Αιτήματα portal — Developer',
 'cr.dev_setting_hint' => 'Το άτομο που δέχεται, απορρίπτει και υλοποιεί τα αιτήματα portal (οι διαχειριστές μπορούν πάντα να ενεργούν στη θέση του).',
+// ---- GAS-CP-R59-004 · planning: several engineers per assignment
+'pl.multi_hint' => 'επιλέξτε έναν ή περισσότερους — κλικ στο όνομα ειδικότητας για όλη την ομάδα',
+'pl.pick_discipline' => 'Επιλογή / καθαρισμός όλης της ειδικότητας',
+'pl.selected' => 'επιλεγμένοι',
+'pl.need_people' => 'Επιλέξτε τουλάχιστον έναν μηχανικό.',
+'pl.people' => 'μηχανικοί',
 ];

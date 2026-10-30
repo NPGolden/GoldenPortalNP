@@ -5381,4 +5381,10 @@ Best regards,
 'cr.nf_decision' => '{no} · {s}',
 'cr.dev_setting' => 'Portal requests — Developer',
 'cr.dev_setting_hint' => 'The person who accepts, rejects and releases portal requests (administrators may always act in his place).',
+// ---- GAS-CP-R59-004 · planning: several engineers per assignment
+'pl.multi_hint' => 'tick one or more — click a discipline name to take the whole team',
+'pl.pick_discipline' => 'Select / clear the whole discipline',
+'pl.selected' => 'selected',
+'pl.need_people' => 'Tick at least one engineer.',
+'pl.people' => 'engineers',
 ];

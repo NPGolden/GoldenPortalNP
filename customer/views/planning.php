@@ -94,7 +94,10 @@ layout_head($title, 'planning');
   <form method="post" action="<?= url('planning', $keep) ?>" data-lock id="plform">
     <?= csrf_field() ?><input type="hidden" name="action" value="pl_assign">
     <div class="grid grid-3">
-      <div class="field"><label><?= tt('ts.engineer') ?></label><select name="user_id" id="pl_user" required><?php foreach (pl_people() as $p): ?><option value="<?= (int)$p['id'] ?>"<?= $edit && $edit['user'] === (int)$p['id'] ? ' selected' : '' ?>><?= e($p['full_name']) ?><?= $p['discipline'] ? ' · ' . e($p['discipline']) : '' ?></option><?php endforeach; ?></select></div>
+      <div class="field" style="grid-column: span 3;"><label><?= tt('ts.engineer') ?> <span class="hint" style="display:inline;"><?= tt('pl.multi_hint') ?></span></label>
+        <?php $plPeople = pl_people(); $byDisc = []; foreach ($plPeople as $p) $byDisc[$p['discipline'] ?: '—'][] = $p; ?>
+        <div class="pl-people" id="pl_people"><?php foreach ($byDisc as $dn => $pp): ?><div class="pl-disc"><span class="pl-disc-h"><button type="button" class="linkbtn js-pl-disc" title="<?= tt('pl.pick_discipline') ?>"><?= e($dn) ?></button></span><?php foreach ($pp as $p): ?><label class="pl-person"><input type="checkbox" name="user_id[]" value="<?= (int)$p['id'] ?>"<?= $edit && $edit['user'] === (int)$p['id'] ? ' checked' : '' ?>> <?= e($p['full_name']) ?></label><?php endforeach; ?></div><?php endforeach; ?></div>
+        <p class="hint" style="margin:4px 0 0;"><span id="pl_count">0</span> <?= tt('pl.selected') ?> · <button type="button" class="linkbtn" id="pl_none"><?= tt('btn.clear') ?></button></p></div>
       <div class="field"><label><?= tt('pl.from') ?></label><input type="date" name="from" id="pl_from" required value="<?= e($edit['date'] ?? max($from, $today)) ?>"></div>
       <div class="field"><label><?= tt('pl.to') ?></label><input type="date" name="to" id="pl_to" value="<?= e($edit['date'] ?? '') ?>"><p class="hint"><?= tt('pl.to_hint') ?></p></div>
       <div class="field"><label><?= tt('pl.kind') ?></label><select name="kind" id="pl_kind"><?php foreach ($kinds as $k => $l): if (function_exists('hr_only') && hr_only() && $k === 'work') continue; ?><option value="<?= $k ?>"><?= e($l) ?></option><?php endforeach; ?></select></div>
@@ -185,12 +188,17 @@ layout_head($title, 'planning');
     sub.addEventListener('change', function () { var o = sub.options[sub.selectedIndex]; if (sub.value) proj.value = o.dataset.project; loadItems(openBox, proj.value, sub.value, <?= json_encode(t('pl.open_items')) ?>); });
     proj.addEventListener('change', function () { if (!sub.value) loadItems(openBox, proj.value, 0, <?= json_encode(t('pl.open_items')) ?>); });
     // a click on an empty cell or on the "+" next to the name pre-fills the editor
+    function plCount() { var n = document.querySelectorAll('#pl_people input:checked').length; var el = document.getElementById('pl_count'); if (el) el.textContent = n; }
+    document.getElementById('pl_people').addEventListener('change', plCount);
+    document.querySelectorAll('.js-pl-disc').forEach(function (b) { b.addEventListener('click', function () { var boxes = b.closest('.pl-disc').querySelectorAll('input'); var all = Array.prototype.every.call(boxes, function (c) { return c.checked; }); boxes.forEach(function (c) { c.checked = !all; }); plCount(); }); });
+    document.getElementById('pl_none').addEventListener('click', function () { document.querySelectorAll('#pl_people input').forEach(function (c) { c.checked = false; }); plCount(); });
+    plCount();
     board.addEventListener('click', function (e) {
       var chip = e.target.closest('.pl-chip');
       if (chip) { e.preventDefault(); if (one) { one.style.display = ''; document.getElementById('pl-one-id').value = chip.dataset.id; document.getElementById('pl-one-title').textContent = chip.title; loadItems(document.getElementById('pl-one-items'), chip.dataset.project, chip.dataset.sub, <?= json_encode(t('pl.open_items')) ?>); one.scrollIntoView({ behavior: 'smooth', block: 'start' }); } return; }
       var cell = e.target.closest('.pl-cell[data-user]'), plus = e.target.closest('.pl-clear');
       var t = cell || plus; if (!t) return; e.preventDefault();
-      document.getElementById('pl_user').value = t.dataset.user;
+      document.querySelectorAll('#pl_people input').forEach(function (c) { c.checked = c.value === String(t.dataset.user); }); plCount();
       if (cell) { document.getElementById('pl_from').value = cell.dataset.date; document.getElementById('pl_to').value = cell.dataset.date; }
       document.getElementById('pleditor').scrollIntoView({ behavior: 'smooth', block: 'start' }); document.getElementById('pl_kind').focus();
     });

@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.68.2** (build 2026-10-30). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.68.3** (build 2026-10-30). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.68.3 | GAS-CP-R59-004 | 2026-10-30 | Planning: one assignment can cover several engineers at once — tick the people (or click a discipline name to take the whole team) and save; every ticked person gets the same days, project / sub-project, car and note, and joins the sub-project team. Clear the days works on all ticked people as well. | — |
 | 1.68.2 | GAS-CP-R59-003 | 2026-10-30 | File integrity: repository-only files (DEPLOY.md, docs/, .github) are no longer listed in the shipped manifest, so Settings › About shows 0 differences after a GitHub deploy. | — |
 | 1.68.1 | GAS-CP-R59-002 | 2026-10-30 | PDF report headers wrap long values: customer, subject, project and vessel fields in the Inspection report, Field service report, offers, weekly vessel report, vessel technical history, accounting report, budget report and timesheet PDFs grow over as many lines as the text needs instead of running outside the box (two-column headers keep both cells of a row the same height). | — |
 | 1.68.0 | GAS-CP-R59-001 | 2026-10-30 | Portal requests (Support › Requests, Golden A/S staff): bug reports, improvements and feature proposals with screenshots, "me too" votes and comments; the Developer (Settings › Users › Portal requests — Developer, Nikos Polykandriotis) accepts or rejects with a cause, moves them to In development and Released with the revision reference and version; the proposer is notified at every step; full history with filters and a Contributors scoreboard of the people whose proposals were accepted and released. | `install/migrate_cp_r59_change_requests.sql` |

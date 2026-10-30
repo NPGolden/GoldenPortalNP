@@ -1750,3 +1750,12 @@ html[data-theme="dark"] .ai-panel { background: #0F2238; } html[data-theme="dark
 .hr-thread{display:flex;flex-direction:column;gap:8px;margin:0 0 12px}.hr-m{max-width:80%;padding:8px 12px;border-radius:12px;background:#F1F4F8;border:1px solid var(--line,#d9dee7);font-size:13px}.hr-m.is-hr{align-self:flex-end;background:#FFF7E0;border-color:#E9D28F}.hr-m-head{font-size:12px;margin-bottom:3px}.hr-m-body{white-space:pre-wrap}
 /* R55-003 · HR people filters */
 .hr-filters{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 10px}.hr-filters select,.hr-filters input{font-size:13px;padding:5px 8px}
+
+/* R59-004: planning — several engineers per assignment */
+.pl-people { display: flex; flex-wrap: wrap; gap: 8px 18px; max-height: 190px; overflow: auto; padding: 8px 10px; border: 1px solid var(--cp-line, #d9dee5); border-radius: 8px; background: var(--cp-surface, #fff); }
+.pl-disc { display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; padding: 2px 0; }
+.pl-disc-h { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--cp-navy, #0B1E2D); margin-right: 4px; }
+.pl-disc-h .linkbtn { font: inherit; color: inherit; }
+.pl-person { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; white-space: nowrap; cursor: pointer; }
+.pl-person input[type="checkbox"] { width: 15px; height: 15px; min-height: 0; margin: 0 2px 0 0; padding: 0; flex: none; accent-color: var(--cp-gold, #C89B3C); }
+.pl-disc { flex-basis: 100%; }

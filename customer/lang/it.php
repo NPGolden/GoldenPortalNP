@@ -5381,4 +5381,10 @@ Cordiali saluti,
 'cr.nf_decision' => '{no} · {s}',
 'cr.dev_setting' => 'Richieste portale — Developer',
 'cr.dev_setting_hint' => 'La persona che accetta, respinge e rilascia le richieste del portale (gli amministratori possono sempre agire al suo posto).',
+// ---- GAS-CP-R59-004 · planning: several engineers per assignment
+'pl.multi_hint' => 'spunta uno o più — clic sul nome della disciplina per tutta la squadra',
+'pl.pick_discipline' => 'Seleziona / deseleziona tutta la disciplina',
+'pl.selected' => 'selezionati',
+'pl.need_people' => 'Spunta almeno un tecnico.',
+'pl.people' => 'tecnici',
 ];

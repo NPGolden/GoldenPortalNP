@@ -823,3 +823,6 @@ No SQL. `PdfWriter::kvHeight($w, $valueX, $value, $minH, $lh, $size)` and `kvCel
 
 ## 135. v1.68.2 — Manifest excludes repository-only files (GAS-CP-R59-003)
 No SQL. `tools/build-manifest.php` skips `docs/`, `.github/`, `DEPLOY.md`, `.gitignore` (the deploy zip and `update.php` never ship them), so the About page's file-integrity check no longer reports them missing. **Security / performance:** none.
+
+## 136. v1.68.3 — Planning: several engineers per assignment (GAS-CP-R59-004)
+No SQL. `views/planning.php`: the `user_id` select became a `.pl-people` checklist (`user_id[]`) grouped by discipline, discipline-name button toggles the group, counter + Clear, board click pre-selects one person; `pm_actions.php` `pl_assign` loops `pl_assign()` per ticked user (error `pl.need_people` when none), `pl_clear` likewise; CSS `.pl-people/.pl-disc/.pl-person`. Lang ×5 (5 keys; 5309). Manual (Golden › Projects). **Security review:** ids validated per user inside `pl_assign` as before. **Performance:** n × the previous inserts.
