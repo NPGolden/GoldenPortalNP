@@ -76,14 +76,16 @@ jobs:
       - name: Dry run on the server
         env: { URL: "${{ vars.PORTAL_URL }}", TOKEN: "${{ secrets.UPDATE_TOKEN }}", Z: "${{ steps.build.outputs.zip }}", ORIGIN: "${{ secrets.ORIGIN_IP }}" }
         run: |
-          set -e; H=$(echo "$URL" | sed -E 's#^https?://([^/]+).*#\1#'); R=(); [ -n "$ORIGIN" ] && R=(--resolve "$H:443:$ORIGIN")
+          set -e; H=$(echo "$URL" | sed -E 's#^https?://([^/]+).*#\1#'); R=(); O=$(echo "$ORIGIN" | tr -d '[:space:]' | sed -E 's#^[a-z]+://##; s#[/:].*$##')
+          if [ -n "$O" ]; then echo "$O" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || O=$(getent ahostsv4 "$O" | awk 'NR==1{print $1}'); [ -n "$O" ] || { echo "ORIGIN_IP cannot be resolved"; exit 1; }; R=(--resolve "$H:443:$O"); echo "origin: $O"; fi
           curl -sS --fail "${R[@]}" -X POST -H "X-Update-Token: $TOKEN" -A "GAS-deploy/1.0" -d "zip=$Z" -d "dry=1" "$URL/install/update.php" | tee /tmp/dry.json
           python3 -c "import json; r=json.load(open('/tmp/dry.json')); assert r['ok'], r"
       - name: Apply the release
         if: ${{ github.event.inputs.dry != 'true' }}
         env: { URL: "${{ vars.PORTAL_URL }}", TOKEN: "${{ secrets.UPDATE_TOKEN }}", Z: "${{ steps.build.outputs.zip }}", ORIGIN: "${{ secrets.ORIGIN_IP }}" }
         run: |
-          set -e; H=$(echo "$URL" | sed -E 's#^https?://([^/]+).*#\1#'); R=(); [ -n "$ORIGIN" ] && R=(--resolve "$H:443:$ORIGIN")
+          set -e; H=$(echo "$URL" | sed -E 's#^https?://([^/]+).*#\1#'); R=(); O=$(echo "$ORIGIN" | tr -d '[:space:]' | sed -E 's#^[a-z]+://##; s#[/:].*$##')
+          if [ -n "$O" ]; then echo "$O" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || O=$(getent ahostsv4 "$O" | awk 'NR==1{print $1}'); [ -n "$O" ] || { echo "ORIGIN_IP cannot be resolved"; exit 1; }; R=(--resolve "$H:443:$O"); echo "origin: $O"; fi
           curl -sS --fail "${R[@]}" -X POST -H "X-Update-Token: $TOKEN" -A "GAS-deploy/1.0" -d "zip=$Z" "$URL/install/update.php" | tee /tmp/apply.json
           python3 - <<'PY'
           import json; r=json.load(open('/tmp/apply.json'))
