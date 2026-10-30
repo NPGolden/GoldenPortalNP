@@ -15,7 +15,7 @@ const HR_KINDS = ['leave', 'sick', 'parental', 'strike', 'other'];
 function hr_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'hr_leave_types'") && (bool) scalar("SHOW COLUMNS FROM plan_entries LIKE 'leave_type_id'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Administrators and HR-scoped accounts manage leave types, entitlements and see the report. */
 function hr_has_names(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM hr_leave_types LIKE 'name_uk'"); } catch (Throwable $e) { $h = false; } } return $h; }
-function hr_can(): bool { return hr_has() && is_staff() && (is_cp_admin() || (function_exists('hr_only') && hr_only())); }
+function hr_can(): bool { return hr_has() && is_staff() && (is_cp_admin() || (function_exists('hr_only') && hr_only()) || (function_exists('hr_owner') && hr_owner())); }
 function hr_types(bool $activeOnly = true): array { static $c = []; $k = (int)$activeOnly; if (!isset($c[$k])) { $c[$k] = []; if (hr_has()) foreach (all('SELECT * FROM hr_leave_types' . ($activeOnly ? ' WHERE is_active = 1' : '') . ' ORDER BY is_active DESC, sort_order, name') as $t) { $t['name_en'] = $t['name']; $t['name'] = hr_type_name($t); $c[$k][(int)$t['id']] = $t; } } return $c[$k]; }
 /** The type's name in the current portal language (R54-002: name_el / name_it / name_bg / name_uk columns), English when not translated. */
 function hr_type_name(array $t, ?string $lc = null): string { $lc = $lc ?: (function_exists('locale') ? locale() : 'en'); $v = $lc !== 'en' ? trim((string)($t['name_' . $lc] ?? '')) : ''; return $v !== '' ? $v : (string)($t['name_en'] ?? $t['name']); }

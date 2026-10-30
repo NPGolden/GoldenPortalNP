@@ -84,9 +84,15 @@ function current_user(): ?array {
 }
 
 /* ---------------------------------------------------------- HR scope (R51-001) */
-const HR_PAGES = ['planning', 'planning_export', 'admin_hr', 'hr_export', 'plan_items', 'hr_requests', 'my_leave', 'hr_doc', 'account', 'manual', 'notifications', 'nf_open', 'kb', 'kb_q', 'kbfile', 'avatar', 'logout', 'login', 'twofa', 'ping', 'relock', '404', 'hr_people_template', 'hr_person', 'hr_pdoc', 'hr_dashboard'];
-const HR_ACTIONS = ['pl_assign', 'pl_clear', 'pl_delete', 'pl_import', 'hr_type_save', 'hr_ent_save', 'hr_ent_copy', 'hr_req_new', 'hr_req_cancel', 'hr_req_decide', 'hr_person_save', 'hr_import_upload', 'hr_import_apply', 'hr_people_upload', 'hr_people_apply', 'hr_leave_upload', 'hr_leave_apply', 'hr_emp_event', 'hr_msg_send', 'hr_rules_save', 'hr_carry_transfer', 'hr_person_types_save', 'hr_off_save', 'hr_ent_override', 'hr_ent_rollover', 'hr_import_batch_delete', 'hr_emp_delete', 'hr_doc_upload', 'hr_doc_delete', 'account_save', 'account_revoke', 'twofa_begin', 'twofa_confirm', 'twofa_off', 'theme_save', 'avatar_save', 'avatar_remove', 'logout', 'nf_seen', 'nf_seen_all', 'kb_ask', 'kb_answer', 'flt_reset'];
+const HR_PAGES = ['hr_leaves', 'planning', 'planning_export', 'admin_hr', 'hr_export', 'plan_items', 'hr_requests', 'my_leave', 'hr_doc', 'account', 'manual', 'notifications', 'nf_open', 'kb', 'kb_q', 'kbfile', 'avatar', 'logout', 'login', 'twofa', 'ping', 'relock', '404', 'hr_people_template', 'hr_person', 'hr_pdoc', 'hr_dashboard'];
+const HR_ACTIONS = ['pl_assign', 'pl_clear', 'pl_delete', 'pl_import', 'hr_type_save', 'hr_ent_save', 'hr_ent_copy', 'hr_req_new', 'hr_req_cancel', 'hr_req_decide', 'hr_person_save', 'hr_import_upload', 'hr_import_apply', 'hr_people_upload', 'hr_people_apply', 'hr_leave_upload', 'hr_leave_apply', 'hr_emp_event', 'hr_msg_send', 'hr_rules_save', 'hr_carry_transfer',  'hr_person_types_save', 'hr_off_save', 'hr_period_join', 'hr_period_save', 'hr_period_apply', 'hr_period_undo', 'hr_period_delete', 'hr_leaves_ask', 'hr_ent_override', 'hr_ent_rollover', 'hr_import_batch_delete', 'hr_emp_delete', 'hr_doc_upload', 'hr_doc_delete', 'account_save', 'account_revoke', 'twofa_begin', 'twofa_confirm', 'twofa_off', 'theme_save', 'avatar_save', 'avatar_remove', 'logout', 'nf_seen', 'nf_seen_all', 'kb_ask', 'kb_answer', 'flt_reset'];
 /** A staff account whose Golden A/S role is scoped "Planning only" (HR): sees the Planning board and its own account, nothing else. Administrators are never HR-only. */
+/** R61-001: the Owner scope — full portal plus every HR page and record, without administrator rights. */
+function hr_owner(): bool {
+    static $v = null; if ($v !== null) return $v; $u = current_user();
+    if (!$u || !is_staff() || empty($u['staff_role_id'])) return $v = false;
+    try { return $v = (string) scalar('SELECT scope FROM staff_roles WHERE id = ?', [(int)$u['staff_role_id']]) === 'owner'; } catch (Throwable $e) { return $v = false; }
+}
 function hr_only(): bool {
     static $v = null; if ($v !== null) return $v; $u = current_user();
     if (!$u || !is_staff() || is_cp_admin() || empty($u['staff_role_id'])) return $v = false;

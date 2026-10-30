@@ -13,7 +13,7 @@ function hr2_has(): bool { static $h = null; if ($h === null) { try { $h = hr_ha
 /** Employee scope: a staff role with scope "employee" sees My leave and the account only. */
 function emp_only(): bool { static $v = null; if ($v !== null) return $v; $u = current_user(); if (!$u || !is_staff() || is_cp_admin() || empty($u['staff_role_id'])) return $v = false; try { return $v = (string) scalar('SELECT scope FROM staff_roles WHERE id = ?', [(int)$u['staff_role_id']]) === 'employee'; } catch (Throwable $e) { return $v = false; } }
 const EMP_PAGES = ['my_leave', 'hr_doc', 'planning', 'hr_pdoc', 'account', 'manual', 'notifications', 'nf_open', 'kb', 'kb_q', 'kbfile', 'avatar', 'logout', 'login', 'twofa', 'ping', 'relock', '404'];
-const EMP_ACTIONS = ['hr_req_new', 'hr_req_cancel', 'hr_msg_send', 'account_save', 'account_revoke', 'twofa_begin', 'twofa_confirm', 'twofa_off', 'theme_save', 'avatar_save', 'avatar_remove', 'logout', 'nf_seen', 'nf_seen_all', 'kb_ask', 'kb_answer', 'flt_reset'];
+const EMP_ACTIONS = ['hr_req_new', 'hr_req_cancel', 'hr_period_join', 'hr_msg_send', 'account_save', 'account_revoke', 'twofa_begin', 'twofa_confirm', 'twofa_off', 'theme_save', 'avatar_save', 'avatar_remove', 'logout', 'nf_seen', 'nf_seen_all', 'kb_ask', 'kb_answer', 'flt_reset'];
 function emp_gate(string $page): void { if (emp_only() && !in_array($page, EMP_PAGES, true)) { flash('warn', t('hr.emp_only')); redirect('my_leave'); } }
 
 /* ------------------------------------------------------------ registry */
@@ -87,7 +87,7 @@ function hr_manager_of(array $p): ?int {
     if (!empty($p['head_user_id'])) return (int)$p['head_user_id'];
     return null;
 }
-function hr_hr_user_ids(): array { try { return array_map('intval', array_column(all("SELECT cu.id FROM customer_users cu JOIN staff_roles r ON r.id = cu.staff_role_id WHERE r.scope = 'hr' AND cu.is_active = 1 UNION SELECT id FROM customer_users WHERE role = 'admin' AND is_active = 1"), 'id')); } catch (Throwable $e) { return []; } }
+function hr_hr_user_ids(): array { try { return array_map('intval', array_column(all("SELECT cu.id FROM customer_users cu JOIN staff_roles r ON r.id = cu.staff_role_id WHERE r.scope IN ('hr', 'owner') AND cu.is_active = 1 UNION SELECT id FROM customer_users WHERE role = 'admin' AND is_active = 1"), 'id')); } catch (Throwable $e) { return []; } }
 /** Is the current user a manager of anyone (discipline manager or department head)? */
 function hr_is_manager(): bool { static $v = null; if ($v === null) { $me = (int)(current_user()['id'] ?? 0); $v = $me > 0 && is_staff() && hr2_has() && ((bool) scalar('SELECT COUNT(*) FROM disciplines WHERE manager_user_id = ?', [$me]) || (bool) scalar('SELECT COUNT(*) FROM customer_users WHERE manager_user_id = ? AND is_active = 1', [$me])); } return $v; }
 
@@ -174,7 +174,7 @@ function hr_request_decide(int $id, bool $approve, string $note): void {
     $me = (int)$u['id']; $note = mb_substr(trim($note), 0, 300) ?: null;
     if ($r['status'] === 'pending_mgr') {
         if (!((int)$r['manager_user_id'] === $me || hr_can())) throw new RuntimeException(t('err.noaccess'));
-        $contractor = function_exists('hr_is_contractor') && hr_is_contractor(hr_person((int)$r['person_id']) ?? []);   // R55-002: the manager's word is final for external contractors
+        $contractor = (function_exists('hr_is_contractor') && hr_is_contractor(hr_person((int)$r['person_id']) ?? [])) || !empty($r['period_id']);   // R55-002: the manager's word is final for external contractors; R61-001: and for joining a leave period
         q('UPDATE hr_requests SET status = ?, manager_user_id = COALESCE(manager_user_id, ?), manager_at = NOW(), manager_note = ? WHERE id = ?', [$approve ? ($contractor ? 'approved' : 'pending_hr') : 'rejected', $me, $note, $id]);
         if ($approve && $contractor) hr_request_to_board($id);
         hr_notify($id, $approve ? ($contractor ? 'approved' : 'mgr_ok') : 'rejected'); return;

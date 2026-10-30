@@ -1764,3 +1764,6 @@ html[data-theme="dark"] .ai-panel { background: #0F2238; } html[data-theme="dark
 .pl-chipx { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px 2px 9px; border-radius: 14px; background: var(--cp-navy, #0B1E2D); color: #fff; font-size: 12.5px; white-space: nowrap; }
 .pl-chipx .pl-x { background: none; border: 0; color: #fff; opacity: .75; cursor: pointer; font-size: 11px; padding: 0 2px; }
 .pl-chipx .pl-x:hover { opacity: 1; }
+/* R61-001: HR › Leaves matrix — pending chips */
+.pl-chip.pl-p { background: #C89B3C; color: #fff; }
+.pl-matrix th.is-we, .pl-matrix td.is-we { background: #f3f4f6; }

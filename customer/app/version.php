@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.71.0';
+const CP_VERSION = '1.72.0';
 const CP_BUILD   = '2026-10-30';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R61-001', 'version' => '1.72.0', 'date' => '2026-10-30', 'title' => 'Owner role (scope "Owner": full portal plus every HR page and record without administrator rights). HR › Leaves: who is away over any period for the whole company or one discipline (day matrix, totals per type), leave periods / groups HR publishes per year for the company, disciplines or named people — staff join from My leave with their own dates inside the period, the manager approves and the leave is assigned automatically; HR can also assign a period to everyone at once and undo it; optional cap on participants. Assistant question box on the Leaves page (answers from the period shown).', 'db' => 'install/migrate_cp_r61_owner_leaves.sql', 'check' => 'r61'],
         ['ref' => 'GAS-CP-R60-007', 'version' => '1.71.0', 'date' => '2026-10-30', 'title' => 'Personal data on the employee card (HR and administrators only): personal e-mail, mobile and home phone, home address, date of birth, AMKA, VAT number (ΑΦΜ) and tax office, ID / passport number, IBAN and bank, emergency contact — validated (AMKA 11 digits, ΑΦΜ 9 digits, IBAN check digits), masked in the change log, and importable / exportable through the people Excel template.', 'db' => 'install/migrate_cp_r60_007_personal_data.sql', 'check' => 'r60c'],
         ['ref' => 'GAS-CP-R60-004', 'version' => '1.70.0', 'date' => '2026-10-30', 'title' => 'Balance import as a cut-over: the imported sheet is the truth "as of" a date (Settings › HR › Import balances › Balances as of) — the entitlement, carry-over and taken days of the sheet are fixed (🔓) and only requests and board entries after that date count, so leave records imported for the same year are no longer added on top (negative balances). Earlier records stay in the history and on the board.', 'db' => 'install/migrate_cp_r60_004_counted_from.sql', 'check' => 'r60b'],
         ['ref' => 'GAS-CP-R60-006', 'version' => '1.69.6', 'date' => '2026-10-30', 'title' => 'Settings › Portal accounts is fast again: the manager and customer lists of every row are filled only when a drop-down is opened (one copy of each list on the page instead of one per account), and the row drop-downs use the plain browser list — the Add account form keeps the type-to-search lists.', 'db' => null, 'check' => null],
@@ -235,6 +236,7 @@ function cp_migration_state(): array {
         'r48' => $has("SHOW TABLES LIKE 'eng_section_disciplines'") && $has("SHOW COLUMNS FROM sp_budget_hours LIKE 'section_id'"),
         'r49' => $has("SHOW COLUMNS FROM customer_users LIKE 'session_epoch'"),
         'r50' => $has("SHOW TABLES LIKE 'ai_log'") && $has("SHOW COLUMNS FROM customer_users LIKE 'can_ai'"),
+        'r61' => $has("SHOW TABLES LIKE 'hr_leave_periods'") && $has("SHOW COLUMNS FROM hr_requests LIKE 'period_id'"),
         'r60c' => $has("SHOW COLUMNS FROM hr_people LIKE 'iban'"),
         'r60b' => $has("SHOW COLUMNS FROM hr_entitlements LIKE 'counted_from'"),
         'r60' => $has("SHOW TABLES LIKE 'hr_offboarding'") && $has("SHOW COLUMNS FROM hr_person_types LIKE 'used_before'"),

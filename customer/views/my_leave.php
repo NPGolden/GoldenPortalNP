@@ -22,6 +22,22 @@ layout_head(t('hr.my_leave'), 'my_leave');
   <?php endif; ?>
   <p class="hint" style="margin:8px 0 0;"><?= e(t('hr.my_lede2', ['m' => $mgrName ?: t('hr.no_manager')])) ?></p>
 </div>
+<?php if (function_exists('hr_lv_has') && hr_lv_has() && ($myPeriods = hr_periods_for($p))): ?>
+<div class="card" id="hr-periods">
+  <h2>🏝 <?= tt('hr.periods_open') ?></h2>
+  <p class="hint"><?= tt('hr.periods_open_hint') ?></p>
+  <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('hr.period') ?></th><th><?= tt('hr.type') ?></th><th><?= tt('hr.dates') ?></th><th><?= tt('hr.period_places') ?></th><th><?= tt('hr.your_dates') ?></th><th></th></tr></thead><tbody>
+  <?php foreach ($myPeriods as $lp): ?><tr>
+    <td><b><?= e($lp['name']) ?></b><?= $lp['note'] ? '<br><span class="hint">' . e($lp['note']) . '</span>' : '' ?></td><td><?= e($lp['code']) ?> <span class="hint"><?= e($lp['tname']) ?></span></td>
+    <td><?= e(fmt_date($lp['date_from'])) ?> – <?= e(fmt_date($lp['date_to'])) ?></td><td class="hint"><?= (int)$lp['n_approved'] ?><?= $lp['max_people'] ? ' / ' . (int)$lp['max_people'] : '' ?></td>
+    <?php if ($lp['joined']): ?><td colspan="2"><?= hr_status_pill($lp['joined']['status']) ?> <span class="hint"><?= e(fmt_date($lp['joined']['date_from'])) ?> – <?= e(fmt_date($lp['joined']['date_to'])) ?></span></td>
+    <?php elseif ($lp['full']): ?><td colspan="2"><?= pill('mute', t('hr.period_full_s')) ?></td>
+    <?php else: ?><form method="post" action="<?= url('my_leave') ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hr_period_join"><input type="hidden" name="period_id" value="<?= (int)$lp['id'] ?>">
+      <td><div style="display:flex;gap:4px;align-items:center;"><input type="date" name="date_from" value="<?= e($lp['date_from']) ?>" min="<?= e($lp['date_from']) ?>" max="<?= e($lp['date_to']) ?>" style="width:150px;"> – <input type="date" name="date_to" value="<?= e($lp['date_to']) ?>" min="<?= e($lp['date_from']) ?>" max="<?= e($lp['date_to']) ?>" style="width:150px;"></div></td>
+      <td class="row-actions"><button class="btn btn--gold btn--sm" type="submit">✓ <?= tt('hr.period_join') ?></button></td></form><?php endif; ?>
+  </tr><?php endforeach; ?></tbody></table></div>
+</div>
+<?php endif; ?>
 <div class="card" id="req-new">
   <h2>+ <?= tt('hr.new_request') ?></h2>
   <form method="post" action="<?= url('my_leave') ?>" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hr_req_new">
