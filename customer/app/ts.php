@@ -380,7 +380,7 @@ function ts_render_pdf(array $d): string {
     $header(); $footer(); $pdf->setFont('R', 9);
     // scope block
     $kv = [[t('rp.ts_scope'), $d['scope_label']], [t('ts.period'), $d['period_label']], [t('mh.count_status'), $d['status_label']], [t('rp.issued'), date('d.m.Y H:i') . ' · ' . (current_user()['full_name'] ?? '')]];
-    foreach ($kv as [$k, $v]) { $pdf->setColor($line); $pdf->rect($L, $y, $W, 6); $pdf->setColor($navy); $pdf->setFont('B', 8); $pdf->text($L + 2, $y + 4.1, $k); $pdf->setColor($ink); $pdf->setFont('R', 8.5); $pdf->text($L + 45, $y + 4.1, $v); $y += 6; }
+    foreach ($kv as [$k, $v]) $y += $pdf->kvCell($L, $y, $W, 45, $k, $v, ['minH' => 6, 'line' => $line, 'navy' => $navy, 'ink' => $ink]);   // R59-002: wraps
     $y += 4;
     // summary tiles
     $tiles = [[t('ts.normal'), $f($d['total']['normal']), $navy], [t('ts.overtime'), $f($d['total']['overtime']), $gold], [t('ts.holiday'), $f($d['total']['holiday']), $red], [t('ts.total'), $f($d['total']['total']), $green]];

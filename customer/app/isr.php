@@ -237,10 +237,10 @@ function isr_render_pdf(array $r): string {
         foreach (preg_split('/\r?\n/', $t) as $ln) { $lines = $pdf->wrap($ln === '' ? ' ' : $ln, $W - 2); foreach ($lines as $wl) { $need(5); $pdf->text($L + 1, $y + 3.2, $wl); $y += 4.1; } }
         $y += 1.5;
     };
-    $cell = function (float $x, float $yy, float $w, float $h, string $label, string $value) use ($pdf, $navy, $ink, $line) { $pdf->setColor($line); $pdf->setLineWidth(0.25); $pdf->rect($x, $yy, $w, $h); $pdf->setColor($navy); $pdf->setFont('B', 7.5); $pdf->text($x + 1.8, $yy + $h / 2 + 1.1, $label); $pdf->setColor($ink); $pdf->setFont('R', 8.5); $pdf->text($x + 34, $yy + $h / 2 + 1.2, $value, 'L', $w - 36); };
+    $cell = function (float $x, float $yy, float $w, float $h, string $label, string $value) use ($pdf, $navy, $ink, $line) { $pdf->kvCell($x, $yy, $w, 34, $label, $value, ['h' => $h, 'labelSize' => 7.5, 'line' => $line, 'navy' => $navy, 'ink' => $ink]); };   // R59-002: wraps
     $header(); $footer();
     $half = $W / 2; $rh = 7.0;
-    foreach (isr_cover_rows($r) as $row) { $cell($L, $y, $half, $rh, $row[0], $row[1]); $cell($L + $half, $y, $half, $rh, $row[2], $row[3]); $y += $rh; }
+    foreach (isr_cover_rows($r) as $row) { $h = max($pdf->kvHeight($half, 34, $row[1], $rh), $pdf->kvHeight($half, 34, $row[3], $rh)); $cell($L, $y, $half, $h, $row[0], $row[1]); $cell($L + $half, $y, $half, $h, $row[2], $row[3]); $y += $h; }
     $y += 4;
     $h2('Document subject and objective:'); $para((string)$r['objective']);
     $h2('Main findings and recommendations:'); $para((string)$r['findings']);

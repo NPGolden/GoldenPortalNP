@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.68.0';
+const CP_VERSION = '1.68.1';
 const CP_BUILD   = '2026-10-30';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R59-002', 'version' => '1.68.1', 'date' => '2026-10-30', 'title' => 'PDF report headers wrap long values: customer, subject, project and vessel fields in the Inspection report, Field service report, offers, weekly vessel report, vessel technical history, accounting report, budget report and timesheet PDFs grow over as many lines as the text needs instead of running outside the box (two-column headers keep both cells of a row the same height).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R59-001', 'version' => '1.68.0', 'date' => '2026-10-30', 'title' => 'Portal requests (Support › Requests, Golden A/S staff): bug reports, improvements and feature proposals with screenshots, "me too" votes and comments; the Developer (Settings › Users › Portal requests — Developer, Nikos Polykandriotis) accepts or rejects with a cause, moves them to In development and Released with the revision reference and version; the proposer is notified at every step; full history with filters and a Contributors scoreboard of the people whose proposals were accepted and released.', 'db' => 'install/migrate_cp_r59_change_requests.sql', 'check' => 'r59'],
         ['ref' => 'GAS-CP-R57-003', 'version' => '1.67.3', 'date' => '2026-10-30', 'title' => 'Ticket comments by Golden A/S staff are internal by default; a comment reaches the customer only when "Send to the customer (external)" is ticked — no more internal remarks sent to owners by mistake. Same default in the Service Engineer app API.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R57-002', 'version' => '1.67.2', 'date' => '2026-10-30', 'title' => 'Every project manager (PM of at least one project, or a Project Manager role) may edit the team and the budgets — hours per discipline and engineering sections — of every sub-project, not only of the projects he is in charge of, so work is not held up when the responsible PM is away.', 'db' => null, 'check' => null],

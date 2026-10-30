@@ -445,7 +445,7 @@ function acc_render_pdf(array $R): string {
     $kv = [[t('acc.doc_no'), $docNo], [t('v.one'), (string)($R['vessel'] ?: '—')], [t('pr.one'), $R['project_code'] ? trim($R['project_code'] . ' ' . $R['project_name']) : '—'], [t('sp.one'), $R['sub_code'] ? trim($R['sub_code'] . ' ' . $R['sub_name']) : '—'], [t('rp.customer'), (string)($R['customer_name'] ?: '—')],
            [t('acc.period'), ($R['period_start'] ? fmt_date($R['period_start']) : '…') . ' – ' . ($R['period_end'] ? fmt_date($R['period_end']) : '…')], [t('acc.zone'), t('acc.z_' . $R['zone'])], [t('acc.prepared_by'), (string)$R['created_name'] . ' · ' . fmt_date(substr((string)$R['created_at'], 0, 10))], [t('th.status'), t('acc.rs_' . $R['status'])],
            [t('acc.total_hours'), acc_h((float)$R['total_hours']) . ' h'], [t('acc.total_net'), $m((float)$R['total_net']) . ' ' . $cur . ((float)$R['header_discount_pct'] > 0 ? ' (' . t('acc.header_discount') . ' ' . acc_h((float)$R['header_discount_pct']) . ' %)' : '')]];
-    foreach ($kv as [$k, $v]) { $pdf->setColor($line); $pdf->setLineWidth(0.25); $pdf->rect($L, $y, $W, 6.5); $pdf->setColor($head); $pdf->rect($L, $y, 44, 6.5, 'F'); $pdf->setColor($navy); $pdf->setFont('B', 8); $pdf->text($L + 2, $y + 4.5, $k); $pdf->setColor($ink); $pdf->setFont('R', 8.5); $pdf->text($L + 47, $y + 4.5, $v); $y += 6.5; }
+    foreach ($kv as [$k, $v]) $y += $pdf->kvCell($L, $y, $W, 47, $k, $v, ['minH' => 6.5, 'labelW' => 44, 'fill' => $head, 'line' => $line, 'navy' => $navy, 'ink' => $ink]);   // R59-002: wraps
     $y += 4;
     $h1('1. ' . t('acc.sec_summary'));
     $rows = []; $tot = ['normal' => 0.0, 'overtime' => 0.0, 'holiday' => 0.0, 'travel' => 0.0, 'hours' => 0.0, 'value' => 0.0];

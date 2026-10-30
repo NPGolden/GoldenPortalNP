@@ -105,7 +105,7 @@ function vh_render_pdf(array $h): string {
     $header(); $footer();
     $kv = [[t('v.one'), $v['name'] . ($v['imo'] ? ' · IMO ' . $v['imo'] : '')], [t('v.customer'), (string)($v['customer_name'] ?: '—')], [t('v.yard'), (string)($v['yard'] ?: '—')],
            [t('rp.issued'), date('d.m.Y H:i') . ' · ' . (current_user()['full_name'] ?? '')], [t('vh.scope'), (!empty($h['only_project']) ? t('pr.one') . ' ' . ($h['only_project']['project_code'] ?: $h['only_project']['name']) . ' · ' : t('vh.all_projects') . ' · ') . t(is_staff() ? 'vh.scope_internal' : 'vh.scope_external')]];
-    foreach ($kv as [$k, $val]) { $pdf->setColor($line); $pdf->rect($L, $y, $W, 6); $pdf->setColor($navy); $pdf->setFont('B', 8); $pdf->text($L + 2, $y + 4.1, $k); $pdf->setColor($ink); $pdf->setFont('R', 8.5); $pdf->text($L + 45, $y + 4.1, $val); $y += 6; }
+    foreach ($kv as [$k, $val]) $y += $pdf->kvCell($L, $y, $W, 45, $k, $val, ['minH' => 6, 'line' => $line, 'navy' => $navy, 'ink' => $ink]);   // R59-002: wraps
     $y += 4;
     $s = $h['stats'];
     $tiles = [[t('vh.k_projects'), $s['projects'] . ' / ' . $s['subs'], $navy], [t('vh.k_disciplines'), (string)$s['disciplines'], $gold], [t('vh.k_technicians'), (string)$s['technicians'], $green],

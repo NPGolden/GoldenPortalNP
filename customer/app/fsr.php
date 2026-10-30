@@ -286,10 +286,8 @@ function fsr_render_pdf(array $r): string {
     };
     $newPage = function () use ($pdf, $header, $footer) { $pdf->addPage(); $header(); $footer(); };
     $need = function (float $h) use (&$y, $newPage) { if ($y + $h > 272) $newPage(); };
-    $cell = function (float $x, float $yy, float $w, float $h, string $label, string $value) use ($pdf, $navy, $ink, $line) {
-        $pdf->setColor($line); $pdf->setLineWidth(0.25); $pdf->rect($x, $yy, $w, $h);
-        $pdf->setColor($navy); $pdf->setFont('B', 7.5); $pdf->text($x + 1.8, $yy + $h / 2 + 1.1, $label);
-        $pdf->setColor($ink); $pdf->setFont('R', 8.5); $pdf->text($x + 38, $yy + $h / 2 + 1.2, $value);
+    $cell = function (float $x, float $yy, float $w, float $h, string $label, string $value) use ($pdf, $navy, $ink, $line) {   // R59-002: the value wraps; $h is the row height agreed for both cells
+        $pdf->kvCell($x, $yy, $w, 38, $label, $value, ['h' => $h, 'labelSize' => 7.5, 'line' => $line, 'navy' => $navy, 'ink' => $ink]);
     };
     $hrow = function (float $x, float $yy, array $cols, float $h = 5.5) use ($pdf, $navy, $line, $head) {
         $pdf->setColor($head); $pdf->rect($x, $yy, array_sum(array_column($cols, 1)), $h, 'F');
@@ -310,7 +308,7 @@ function fsr_render_pdf(array $r): string {
              ['Vessel / Πλοίο:', (string)$r['vessel_name'], 'Mobile / Κινητό:', (string)$r['pic_mobile']],
              ['Location / Θέση:', (string)$r['location'], 'Email:', (string)$r['pic_email']]];
     $half = $W / 2; $rh = 7.0;
-    foreach ($rows as $row) { $cell($L, $y, $half, $rh, $row[0], $row[1]); $cell($L + $half, $y, $half, $rh, $row[2], $row[3]); $y += $rh; }
+    foreach ($rows as $row) { $h = max($pdf->kvHeight($half, 38, $row[1], $rh), $pdf->kvHeight($half, 38, $row[3], $rh)); $cell($L, $y, $half, $h, $row[0], $row[1]); $cell($L + $half, $y, $half, $h, $row[2], $row[3]); $y += $h; }
     $y += 5;
 
     /* ---- hours summary per engineer and discipline */

@@ -268,7 +268,7 @@ function bg_render_pdf(int $pid): string {
     $m = fn(float $v) => number_format($v, 0, ',', '.'); $sg = fn(float $v) => ($v >= 0 ? '+ ' : '− ') . number_format(abs($v), 0, ',', '.');
     $header(); $footer();
     $kv = [[t('pr.one'), trim(($p['project_code'] ?: '') . ' ' . $p['name'])], [t('v.one'), (string)($p['vessel'] ?: '—')], [t('rp.customer'), (string)($p['customer_name'] ?? '')], [t('bg.offer_value'), $m($P['offer_value']) . ' EUR'], [t('bg.result_to_date'), $sg($P['result']) . ' EUR'], [t('bg.forecast_result'), $sg($P['forecast_result']) . ' EUR (' . t('bg.budgeted') . ' ' . $sg($P['budget_result']) . ')']];
-    foreach ($kv as [$k, $v]) { $pdf->setColor($line); $pdf->setLineWidth(0.25); $pdf->rect($L, $y, $W, 7); $pdf->setColor($head); $pdf->rect($L, $y, 44, 7, 'F'); $pdf->setColor($navy); $pdf->setFont('B', 8); $pdf->text($L + 2, $y + 4.8, $k); $pdf->setColor($ink); $pdf->setFont('R', 8.5); $pdf->text($L + 47, $y + 4.8, $v); $y += 7; }
+    foreach ($kv as [$k, $v]) $y += $pdf->kvCell($L, $y, $W, 47, $k, $v, ['labelW' => 44, 'fill' => $head, 'line' => $line, 'navy' => $navy, 'ink' => $ink]);   // R59-002: wraps
     $y += 4;
     $h1('1. ' . t('bg.sec_subs'));
     $rows = []; foreach ($P['subs'] as $C) $rows[] = ['tone' => $C['tone'], 'v' => [trim(($C['sub']['code'] ?: '') . ' ' . $C['sub']['name']), $C['progress'] . ' %', bg_h($C['actual_h']) . ' / ' . bg_h($C['budget_h']), $C['budget_h'] > 0 ? $C['hours_pct'] . ' %' : '—', $m($C['parts_committed']) . ' / ' . $m($C['parts_budget']), $C['parts_budget'] > 0 ? $C['parts_pct'] . ' %' : '—', $m($C['offer_value']), $sg($C['result']), $sg($C['forecast_result']), implode(', ', array_map('bg_flag_label', $C['flags']))]];

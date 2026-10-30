@@ -317,7 +317,7 @@ function wk_render_pdf(array $W): string {
     $kv = [[t('v.one'), $v['name'] . ($v['imo'] ? ' · IMO ' . $v['imo'] : '')], [t('v.customer'), (string)($v['customer_name'] ?: '—')], [t('wk.week'), $W['iso'] . ' · ' . fmt_date($W['week_start']) . ' – ' . fmt_date($W['week_end'])],
            [t('vh.scope'), ($W['only_project'] ? t('pr.one') . ' ' . ($W['only_project']['project_code'] ?: $W['only_project']['name']) : t('vh.all_projects') . ' (' . count($W['projects']) . ')') . ' · ' . t($W['staff'] ? 'vh.scope_internal' : 'vh.scope_external')],
            [t('rp.issued'), date('d.m.Y H:i') . ' · ' . (current_user()['full_name'] ?? '')]];
-    foreach ($kv as [$k, $val]) { $pdf->setColor($line); $pdf->rect($L, $y, $Wd, 6); $pdf->setColor($navy); $pdf->setFont('B', 8); $pdf->text($L + 2, $y + 4.1, $k); $pdf->setColor($ink); $pdf->setFont('R', 8.5); $pdf->text($L + 45, $y + 4.1, $val); $y += 6; }
+    foreach ($kv as [$k, $val]) $y += $pdf->kvCell($L, $y, $Wd, 45, $k, $val, ['minH' => 6, 'line' => $line, 'navy' => $navy, 'ink' => $ink]);   // R59-002: wraps
     $y += 3;
     // headline tiles: overall progress now vs last week, open offers, pending approvals, open tickets
     $ov = 0; $ob = 0; $np = max(1, count($W['projects'])); $pend = 0; $pendAmt = 0.0; $oaP = 0; $tkOpen = 0; $flags = 0;

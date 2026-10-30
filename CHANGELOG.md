@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.68.0** (build 2026-10-30). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.68.1** (build 2026-10-30). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.68.1 | GAS-CP-R59-002 | 2026-10-30 | PDF report headers wrap long values: customer, subject, project and vessel fields in the Inspection report, Field service report, offers, weekly vessel report, vessel technical history, accounting report, budget report and timesheet PDFs grow over as many lines as the text needs instead of running outside the box (two-column headers keep both cells of a row the same height). | — |
 | 1.68.0 | GAS-CP-R59-001 | 2026-10-30 | Portal requests (Support › Requests, Golden A/S staff): bug reports, improvements and feature proposals with screenshots, "me too" votes and comments; the Developer (Settings › Users › Portal requests — Developer, Nikos Polykandriotis) accepts or rejects with a cause, moves them to In development and Released with the revision reference and version; the proposer is notified at every step; full history with filters and a Contributors scoreboard of the people whose proposals were accepted and released. | `install/migrate_cp_r59_change_requests.sql` |
 | 1.67.3 | GAS-CP-R57-003 | 2026-10-30 | Ticket comments by Golden A/S staff are internal by default; a comment reaches the customer only when "Send to the customer (external)" is ticked — no more internal remarks sent to owners by mistake. Same default in the Service Engineer app API. | — |
 | 1.67.2 | GAS-CP-R57-002 | 2026-10-30 | Every project manager (PM of at least one project, or a Project Manager role) may edit the team and the budgets — hours per discipline and engineering sections — of every sub-project, not only of the projects he is in charge of, so work is not held up when the responsible PM is away. | — |

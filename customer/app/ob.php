@@ -218,7 +218,7 @@ function ob_render_pdf(array $o): string {
     $kv = [[$T('of.no'), $o['offer_no'] . ' · ' . $rev], [$T('of.title_f'), (string)$o['title']], [$T('rp.customer'), (string)($o['customer_name'] ?? '')], [$T('v.one'), (string)($o['vessel'] ?: '—')],
            [$T('pr.one'), $o['vars']['{project}'] ?: '—'], [$T('th.date'), $o['vars']['{date}']], [$T('of.valid_until'), $o['vars']['{valid_until}']], [$T('ob.prepared_by'), $o['vars']['{user}'] . ' · ' . $o['vars']['{branch}']]];
     if (!empty($o['ticket_no'])) $kv[] = [$T('tk.one'), (string)$o['ticket_no']];
-    foreach ($kv as [$k, $v]) { $need(8); $pdf->setColor($line); $pdf->setLineWidth(0.25); $pdf->rect($L, $y, $W, 7); $pdf->setColor($head); $pdf->rect($L, $y, 44, 7, 'F'); $pdf->setColor($navy); $pdf->setFont('B', 8); $pdf->text($L + 2, $y + 4.8, $k); $pdf->setColor($ink); $pdf->setFont('R', 8.5); $pdf->text($L + 47, $y + 4.8, mb_substr($v, 0, 110)); $y += 7; }
+    foreach ($kv as [$k, $v]) { $need($pdf->kvHeight($W, 47, $v) + 1); $y += $pdf->kvCell($L, $y, $W, 47, $k, $v, ['labelW' => 44, 'fill' => $head, 'line' => $line, 'navy' => $navy, 'ink' => $ink]); }   // R59-002: wraps
     foreach ($bd['lines'] ?? [] as $i => $ln) { if ($i === 0) $y += 2; $pdf->setFont('R', 7); $pdf->setColor('#6a7179'); $pdf->text($R, $y + 3, $ln, 'R'); $y += 3.2; }
     $y += 4;
     $n = 0; $before = ['intro', 'scope']; $after = ['exclusions', 'validity', 'payment', 'terms', 'closing'];

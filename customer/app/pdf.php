@@ -166,6 +166,24 @@ final class PdfWriter {
         return $lh * count($lines);
     }
     public function paragraphHeight(float $w, string $s, float $lh = 4.2): float { return $lh * count($this->wrap($s, $w)); }
+    /** R59-002: height a label/value cell needs so the value wraps instead of overflowing (min $minH). $valueX = offset of the value column from the cell's left edge. */
+    public function kvHeight(float $w, float $valueX, string $value, float $minH = 7.0, float $lh = 4.0, float $size = 8.5): float {
+        $this->setFont('R', $size); $n = max(1, count($this->wrap($value === '' ? ' ' : $value, $w - $valueX - 2)));
+        return max($minH, $lh * $n + ($minH - $lh));
+    }
+    /** R59-002: bordered label/value cell: the value is wrapped to the cell width over as many lines as it needs; returns the height drawn.
+     *  $o: h (fixed height), minH, lh, labelW (grey band width, 0 = none), fill (band colour), labelSize, valueSize, line (border colour), navy (label colour), ink (value colour). */
+    public function kvCell(float $x, float $y, float $w, float $valueX, string $label, string $value, array $o = []): float {
+        $minH = (float)($o['minH'] ?? 7.0); $lh = (float)($o['lh'] ?? 4.0); $vs = (float)($o['valueSize'] ?? 8.5); $ls = (float)($o['labelSize'] ?? 8.0);
+        $h = isset($o['h']) ? (float)$o['h'] : $this->kvHeight($w, $valueX, $value, $minH, $lh, $vs); $lines = $this->wrap($value === '' ? ' ' : $value, $w - $valueX - 2);   // 'h' = row height fixed by the caller (two cells side by side)
+        $this->setColor($o['line'] ?? '#9AA5B1'); $this->setLineWidth(0.25); $this->rect($x, $y, $w, $h);
+        if (!empty($o['labelW']) && !empty($o['fill'])) { $this->setColor($o['fill']); $this->rect($x, $y, (float)$o['labelW'], $h, 'F'); $this->setColor($o['line'] ?? '#9AA5B1'); $this->rect($x, $y, $w, $h); }
+        $base = $y + ($minH - $lh) / 2 + $lh * 0.78;                      // first baseline — same place as the old single-line cells
+        $this->setColor($o['navy'] ?? '#0B1E2D'); $this->setFont('B', $ls); $this->text($x + 2, $base, $label);
+        $this->setColor($o['ink'] ?? '#1F2937'); $this->setFont('R', $vs);
+        foreach ($lines as $i => $ln) $this->text($x + $valueX, $base + $lh * $i, $ln);
+        return $h;
+    }
 
     /** Place a JPEG/PNG image (file path or raw bytes) fitted into w×h, centred. */
     public function image(string $src, float $x, float $y, float $w, float $h): bool {
