@@ -10,6 +10,8 @@
 #     DEPLOY_PASSWORD  its password                        (or DEPLOY_SSH_KEY for sftp with a key pair)
 #     DEPLOY_PATH      path of public_html as the deploy account sees it, e.g.  /public_html  or  /
 #     UPDATE_TOKEN     the value of app/config.php › update.token on the server (32+ characters)
+#     ORIGIN_IP        optional: the GoDaddy server IP — when set, the calls to update.php go straight to the server
+#                      (curl --resolve, host name and certificate stay goldensas.com) instead of through the Sucuri firewall
 #     PORTAL_URL       https://goldensas.com/customer   (variable, not secret)
 name: Deploy to goldensas.com
 on:
@@ -72,15 +74,17 @@ jobs:
           fi
           echo "uploaded $Z"
       - name: Dry run on the server
-        env: { URL: "${{ vars.PORTAL_URL }}", TOKEN: "${{ secrets.UPDATE_TOKEN }}", Z: "${{ steps.build.outputs.zip }}" }
+        env: { URL: "${{ vars.PORTAL_URL }}", TOKEN: "${{ secrets.UPDATE_TOKEN }}", Z: "${{ steps.build.outputs.zip }}", ORIGIN: "${{ secrets.ORIGIN_IP }}" }
         run: |
-          set -e; curl -sS --fail -X POST -H "X-Update-Token: $TOKEN" -A "GAS-deploy/1.0" -d "zip=$Z" -d "dry=1" "$URL/install/update.php" | tee /tmp/dry.json
+          set -e; H=$(echo "$URL" | sed -E 's#^https?://([^/]+).*#\1#'); R=(); [ -n "$ORIGIN" ] && R=(--resolve "$H:443:$ORIGIN")
+          curl -sS --fail "${R[@]}" -X POST -H "X-Update-Token: $TOKEN" -A "GAS-deploy/1.0" -d "zip=$Z" -d "dry=1" "$URL/install/update.php" | tee /tmp/dry.json
           python3 -c "import json; r=json.load(open('/tmp/dry.json')); assert r['ok'], r"
       - name: Apply the release
         if: ${{ github.event.inputs.dry != 'true' }}
-        env: { URL: "${{ vars.PORTAL_URL }}", TOKEN: "${{ secrets.UPDATE_TOKEN }}", Z: "${{ steps.build.outputs.zip }}" }
+        env: { URL: "${{ vars.PORTAL_URL }}", TOKEN: "${{ secrets.UPDATE_TOKEN }}", Z: "${{ steps.build.outputs.zip }}", ORIGIN: "${{ secrets.ORIGIN_IP }}" }
         run: |
-          set -e; curl -sS --fail -X POST -H "X-Update-Token: $TOKEN" -A "GAS-deploy/1.0" -d "zip=$Z" "$URL/install/update.php" | tee /tmp/apply.json
+          set -e; H=$(echo "$URL" | sed -E 's#^https?://([^/]+).*#\1#'); R=(); [ -n "$ORIGIN" ] && R=(--resolve "$H:443:$ORIGIN")
+          curl -sS --fail "${R[@]}" -X POST -H "X-Update-Token: $TOKEN" -A "GAS-deploy/1.0" -d "zip=$Z" "$URL/install/update.php" | tee /tmp/apply.json
           python3 - <<'PY'
           import json; r=json.load(open('/tmp/apply.json'))
           print("\n".join(f"{s['step']:<12} {s['state']}" + (f"  {s.get('lines')}" if s.get('lines') else '') for s in r['steps']))
