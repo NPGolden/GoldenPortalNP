@@ -42,6 +42,7 @@ require __DIR__ . '/app/hr4.php';   // R55-001
 require __DIR__ . '/app/hr5.php';   // R61-001
 require __DIR__ . '/app/hr6.php';   // R62-001
 require __DIR__ . '/app/cel.php';   // R62-004 celebrations
+require __DIR__ . '/app/act.php';   // R62-005 fleet & activity
 require __DIR__ . '/app/mt.php';
 require __DIR__ . '/app/bg.php';
 require __DIR__ . '/app/wp.php';
