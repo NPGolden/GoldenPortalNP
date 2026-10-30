@@ -219,7 +219,7 @@ function tk_comment(int $id, string $body, ?int $parent, string $vis = 'external
     $u = current_user(); $body = mb_substr(trim($body), 0, 8000);
     if ($body === '') throw new RuntimeException(t('oa.comment_req'));
     if ($parent && !scalar('SELECT COUNT(*) FROM ticket_comments WHERE id = ? AND ticket_id = ?', [$parent, $id])) $parent = null;
-    $vis = is_staff() && $vis === 'internal' ? 'internal' : 'external';
+    $vis = is_staff() ? ($vis === 'external' ? 'external' : 'internal') : 'external';                             // R57-003: staff comments are internal unless explicitly sent to the customer
     q('INSERT INTO ticket_comments (ticket_id, parent_id, user_id, author, side, visibility, body, ip) VALUES (?,?,?,?,?,?,?,?)',
       [$id, $parent, (int)$u['id'], $u['full_name'], is_staff() ? 'golden' : 'customer', $vis, $body, tk_ip()]);
     $cid = (int) db()->lastInsertId();

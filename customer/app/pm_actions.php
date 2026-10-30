@@ -272,7 +272,7 @@ function pm_handle_action(string $action, string $page): bool {
             require_login();
             $id = (int)$_POST['id'];
             if (!tk_load($id)) throw new RuntimeException(t('err.notfound'));
-            $cid = tk_comment($id, (string)($_POST['body'] ?? ''), (int)($_POST['parent_id'] ?? 0) ?: null, (string)($_POST['visibility'] ?? 'external'));
+            $cid = tk_comment($id, (string)($_POST['body'] ?? ''), (int)($_POST['parent_id'] ?? 0) ?: null, (string)($_POST['visibility'] ?? 'internal'));
             tk_store_uploads($id, $cid);
             if (function_exists('mt_notify')) mt_notify((string)($_POST['body'] ?? ''), (string)(scalar('SELECT ticket_no FROM tickets WHERE id = ?', [$id]) ?: ('#' . $id)), url('ticket', ['id' => $id]) . '#comments', 'tk:' . $id . ':c' . $cid);
             flash('good', t('oa.commented'));

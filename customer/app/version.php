@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.67.2';
+const CP_VERSION = '1.67.3';
 const CP_BUILD   = '2026-10-30';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R57-003', 'version' => '1.67.3', 'date' => '2026-10-30', 'title' => 'Ticket comments by Golden A/S staff are internal by default; a comment reaches the customer only when "Send to the customer (external)" is ticked — no more internal remarks sent to owners by mistake. Same default in the Service Engineer app API.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R57-002', 'version' => '1.67.2', 'date' => '2026-10-30', 'title' => 'Every project manager (PM of at least one project, or a Project Manager role) may edit the team and the budgets — hours per discipline and engineering sections — of every sub-project, not only of the projects he is in charge of, so work is not held up when the responsible PM is away.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R58-001', 'version' => '1.67.1', 'date' => '2026-10-30', 'title' => 'Release updater and GitHub deploy: install/update.php applies a release zip from customer/storage/updates/ (token in app/config.php › update.token, manifest sha256 check, file + database backup to storage/backups/, extraction, pending migrations in order, self-check, JSON report, log); .github/workflows/deploy.yml builds, lints, uploads and calls it on every version tag; DEPLOY.md.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R57-001', 'version' => '1.67.0', 'date' => '2026-10-30', 'title' => 'Projects become active through their offers: new status "Quoted" (offer stage) for projects and sub-projects — a project / sub-project is created quoted and turns Active by itself when one of its offers is approved (approved → in progress → to be invoiced); it goes back to Quoted if the approval is reverted. On hold / Completed stay manual; vessel general projects stay active. "Active since" on the project row, event on the offer, Quoted in the Projects filter, KPI and export filters, Excel project import.', 'db' => 'install/migrate_cp_r57_project_quoted.sql', 'check' => 'r57'],

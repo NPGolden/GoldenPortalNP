@@ -5289,4 +5289,8 @@ Cordiali saluti,
 'pr.active_since' => 'Attivo dal {d} (offerta approvata)',
 'of.ev_project_active' => 'Progetto reso attivo da questa offerta',
 'pr.status_rule' => 'Un progetto e ogni sotto-progetto restano "In offerta" finché una loro offerta non viene approvata; poi diventano Attivi da soli. In pausa e Completato si impostano a mano.',
+// ---- GAS-CP-R57-003 · ticket comments internal by default
+'tk.send_customer' => 'Invia al cliente (esterno)',
+'tk.ext_hint' => 'Senza spunta il commento resta interno — visibile solo al personale Golden A/S',
+'tk.default_internal' => 'Interno se non spuntato',
 ];

@@ -5289,4 +5289,8 @@ Best regards,
 'pr.active_since' => 'Active since {d} (approved offer)',
 'of.ev_project_active' => 'Project set active by this offer',
 'pr.status_rule' => 'A project and each sub-project are "Quoted" until one of their offers is approved; they then become Active by themselves. On hold and Completed are set by hand.',
+// ---- GAS-CP-R57-003 · ticket comments internal by default
+'tk.send_customer' => 'Send to the customer (external)',
+'tk.ext_hint' => 'Unticked, the comment stays internal — visible to Golden A/S staff only',
+'tk.default_internal' => 'Internal unless ticked',
 ];

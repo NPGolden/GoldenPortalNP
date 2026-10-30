@@ -175,7 +175,7 @@ layout_head($t['ticket_no'] . ' · ' . $t['title'], 'tickets');
       <div class="field"><label><?= tt('tk.attachments') ?></label><input type="file" name="files[]" multiple></div>
       <div class="btn-row" style="align-items:center;">
         <button class="btn btn--ghost" type="submit"><?= tt('oa.post') ?></button>
-        <?php if ($staff): ?><label class="check" style="margin:0;"><input type="checkbox" name="visibility" value="internal"> <?= tt('tk.internal_note') ?></label><?php endif; ?>
+        <?php if ($staff): ?><label class="check" style="margin:0;" title="<?= tt('tk.ext_hint') ?>"><input type="checkbox" name="visibility" value="external"> <?= tt('tk.send_customer') ?></label> <span class="hint"><?= tt('tk.default_internal') ?></span><?php endif; ?>
       </div>
     </form>
   </div>
