@@ -5654,4 +5654,5 @@ Best regards,
 'hr.ev_team_hint' => 'Open a person to write or update the annual evaluation; HR sees the same on the employee card.',
 'hr.ev_mgr_lede' => 'Annual evaluation of one of your people — draft until you set it final; the employee then reads and acknowledges it.',
 'hr.imp_kept_rest' => 'field skipped: {f}; the rest of the card was updated.',
+'nav.g_hr' => 'HR',
 ];

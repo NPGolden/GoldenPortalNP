@@ -31,11 +31,15 @@ function nav_groups(): array {
     if ($staff && function_exists('eng_is_management') && eng_has() && (eng_is_management() || eng_is_pm())) $g[2]['items'][] = ['eng_requests', t('eng.requests'), '📐'];   // R47-001 / R48-001
     if (function_exists('kb_has') && kb_has()) $g[4]['items'][] = ['kb', t('kb.title'), '💬'];
     if ($staff && function_exists('td_has') && td_has()) $g[2]['items'][] = ['tasks', t('td.title'), '📅'];
-    if ($staff && function_exists('hr2_has') && hr2_has() && hr_person_of_user((int)(current_user()['id'] ?? 0))) $g[2]['items'][] = ['my_leave', t('hr.my_leave'), '🏖'];   // R54-001
-    if ($staff && function_exists('hr2_has') && hr2_has() && (hr_can() || hr_is_manager())) $g[2]['items'][] = ['hr_requests', t('hr.requests'), '📝'];   // R54-001
-    if ($staff && function_exists('hr_lv_has') && hr_lv_has() && hr_can()) $g[2]['items'][] = ['hr_leaves', t('hr.leaves'), '🏖'];                      // R61-001
-    if ($staff && function_exists('hr_tr_has') && hr_tr_has() && hr_can()) $g[2]['items'][] = ['hr_training', t('hr.training'), '🎓'];                  // R62-001
-    if ($staff && !$admin && function_exists('hr_owner') && hr_owner()) { $g[2]['items'][] = ['hr_dashboard', t('hr.dashboard'), '📊']; $g[2]['items'][] = ['admin_hr', t('hr.settings'), '🗂']; }   // R61-001: Owner without administrator rights
+    // R62-002: HR is its own group in the left column, between Work and Commercial
+    $hr = ['key' => 'hr', 'label' => t('nav.g_hr'), 'items' => []];
+    if ($staff && function_exists('hr2_has') && hr2_has() && hr_can()) $hr['items'][] = ['hr_dashboard', t('hr.dashboard'), '📊'];
+    if ($staff && function_exists('hr2_has') && hr2_has() && hr_person_of_user((int)(current_user()['id'] ?? 0))) $hr['items'][] = ['my_leave', t('hr.my_leave'), '🏖'];   // R54-001
+    if ($staff && function_exists('hr2_has') && hr2_has() && (hr_can() || hr_is_manager())) $hr['items'][] = ['hr_requests', t('hr.requests'), '📝'];   // R54-001
+    if ($staff && function_exists('hr_lv_has') && hr_lv_has() && hr_can()) $hr['items'][] = ['hr_leaves', t('hr.leaves'), '🏖'];                      // R61-001
+    if ($staff && function_exists('hr_tr_has') && hr_tr_has() && hr_can()) $hr['items'][] = ['hr_training', t('hr.training'), '🎓'];                  // R62-001
+    if ($staff && function_exists('hr_can') && hr_can()) $hr['items'][] = ['admin_hr', t('hr.settings'), '🗂'];                                        // R61-001: Owner / HR / admin
+    if ($hr['items']) array_splice($g, 3, 0, [$hr]);
     if ($staff && function_exists('hr_only') && hr_only()) $g = [['key' => 'top', 'label' => '', 'items' => [['hr_dashboard', t('hr.dashboard'), '📊'], ['planning', t('pl.title'), '🗓'], ['hr_requests', t('hr.requests'), '📝'], ['hr_leaves', t('hr.leaves'), '🏖'], ['hr_training', t('hr.training'), '🎓'], ['admin_hr', t('hr.settings'), '🗂']]]];   // R51-001 / R55-005 / R61-001: HR sees the board and its settings only
     if ($staff && function_exists('emp_only') && emp_only()) $g = [['key' => 'top', 'label' => '', 'items' => [['planning', t('hr.my_program'), '🗓'], ['my_leave', t('hr.my_leave'), '🏖']]]];   // R54-001 / R56-002: employee scope
     return $g;

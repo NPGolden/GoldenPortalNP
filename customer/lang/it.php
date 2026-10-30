@@ -5654,4 +5654,5 @@ Cordiali saluti,
 'hr.ev_team_hint' => 'Apri una persona per scrivere o aggiornare la valutazione annuale; HR vede lo stesso nella scheda del dipendente.',
 'hr.ev_mgr_lede' => 'Valutazione annuale di un tuo collaboratore — bozza finché non la rendi definitiva; poi il dipendente la legge e la conferma.',
 'hr.imp_kept_rest' => 'campo saltato: {f}; il resto della scheda è stato aggiornato.',
+'nav.g_hr' => 'Risorse umane',
 ];
