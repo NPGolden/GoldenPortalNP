@@ -30,6 +30,8 @@ function hr_rules_save_from_post(): void {
 }
 function hr_is_contractor(?array $p): bool { return ($p['employment_kind'] ?? 'employee') === 'contractor'; }
 /** Children of the person aged between $min and $max (inclusive) on 31/12 of the year, from the birth years on the card; falls back to the count when no years are given. */
+/** Children born in $year according to the birth years on the card (maternity / paternity are granted per birth). */
+function hr_births_in(array $p, int $year): int { $n = 0; foreach (preg_split('/[^0-9]+/', (string)($p['children_years'] ?? '')) as $y) if ((int)$y === $year) $n++; return $n; }
 function hr_children_aged(array $p, int $year, int $min, int $max): int { $ys = array_values(array_filter(array_map('intval', preg_split('/[^0-9]+/', (string)($p['children_years'] ?? ''))))); if (!$ys) return $min <= 0 && $max >= 0 ? (int)($p['children'] ?? 0) : ((int)($p['children'] ?? 0) > 0 && $max >= 18 ? (int)$p['children'] : 0); $n = 0; foreach ($ys as $y) { $age = $year - $y; if ($age >= $min && $age <= $max) $n++; } return $n; }
 
 /* ------------------------------------------------------------ the engine */
@@ -68,8 +70,12 @@ function hr_statutory_type(array $p, array $t, int $year): ?array {
         case 'carer':         $d = (float)$r['car_days']; break;
         case 'force_majeure': $d = (float)$r['fmj_days']; break;
         case 'marriage':      $d = $six ? (float)$r['mar_days_6'] : (float)$r['mar_days']; break;
-        case 'paternity':     $d = (($p['gender'] ?? '') === 'f') ? 0 : (float)$r['pat_days']; break;
-        case 'maternity':     $d = (($p['gender'] ?? '') === 'm') ? 0 : (float)$r['mat_days']; break;
+        case 'paternity': case 'maternity':                                                                              // R60-001: once per birth, in the birth year; minus what was taken at a previous employer for that birth
+            $n = hr_births_in($p, $year); $v['n'] = $n; $per = $rk === 'paternity' ? (float)$r['pat_days'] : (float)$r['mat_days'];
+            $d = (($rk === 'paternity' && ($p['gender'] ?? '') === 'f') || ($rk === 'maternity' && ($p['gender'] ?? '') === 'm')) ? 0 : $n * $per;
+            $o = function_exists('hr_person_type_overrides') ? (hr_person_type_overrides((int)$p['id'])[(int)$t['id']] ?? null) : null;
+            if ($o && $o['used_before'] !== null && (int)$o['used_year'] === $year) { $v['used'] = (float)$o['used_before']; $d = max(0.0, $d - (float)$o['used_before']); $basis = $rk . '_used'; }
+            break;
         case 'study':         $d = (float)$r['study_days']; break;
         case 'sick':          $v['svc'] = $svc; $d = $svc >= (int)$r['sick_service'] ? (float)$r['sick_long'] : (float)$r['sick_short']; $basis = $svc >= (int)$r['sick_service'] ? 'sick_long' : 'sick_short'; break;
         case 'rol_hours':     $d = (float)$r['rol_hours']; break;
@@ -109,7 +115,7 @@ function hr_entitlements_rollover(int $year): int {
     }
     return $n;
 }
-function hr_basis_text(?array $st): string { if (!$st) return ''; $v = $st['vars']; if (!in_array(preg_replace('/_pr$/', '', $st['basis']), ['y1', 'y2', 'y3', 'senior', 'long'], true)) return t('hr.basis_' . $st['basis'], ['n' => $v['n'] ?? '', 'k' => $v['kids'] ?? '', 's' => isset($v['svc']) && function_exists('hr_fmt_months') ? hr_fmt_months((int)$v['svc']) : '']); $m = fn(int $x) => function_exists('hr_fmt_months') ? hr_fmt_months($x) : $x . ' m'; return t('hr.basis_' . preg_replace('/_pr$/', '', $st['basis']), ['full' => $v['full'] ?? '', 'd' => $v['days'] ?? '', 'c' => $m((int)($v['company'] ?? 0)), 'p' => $m((int)($v['prior'] ?? 0)), 't' => $m((int)($v['total'] ?? 0))]) . (str_ends_with($st['basis'], '_pr') ? ' · ' . t('hr.basis_prorata') : ''); }
+function hr_basis_text(?array $st): string { if (!$st) return ''; $v = $st['vars']; if (!in_array(preg_replace('/_pr$/', '', $st['basis']), ['y1', 'y2', 'y3', 'senior', 'long'], true)) return t('hr.basis_' . $st['basis'], ['n' => $v['n'] ?? '', 'u' => $v['used'] ?? '', 'k' => $v['kids'] ?? '', 's' => isset($v['svc']) && function_exists('hr_fmt_months') ? hr_fmt_months((int)$v['svc']) : '']); $m = fn(int $x) => function_exists('hr_fmt_months') ? hr_fmt_months($x) : $x . ' m'; return t('hr.basis_' . preg_replace('/_pr$/', '', $st['basis']), ['full' => $v['full'] ?? '', 'd' => $v['days'] ?? '', 'c' => $m((int)($v['company'] ?? 0)), 'p' => $m((int)($v['prior'] ?? 0)), 't' => $m((int)($v['total'] ?? 0))]) . (str_ends_with($st['basis'], '_pr') ? ' · ' . t('hr.basis_prorata') : ''); }
 
 /* ------------------------------------------------------------ change log */
 function hr_audit(int $pid, string $kind, ?string $field = null, ?string $old = null, ?string $new = null, ?string $note = null): void {
@@ -145,6 +151,7 @@ function hr_type_default_enabled(array $p, array $t): bool {
     if (hr_is_contractor($p) && in_array($rk, ['annual', 'sick', 'maternity', 'paternity', 'parental', 'school_hours', 'child_illness', 'single_parent', 'carer', 'force_majeure', 'marriage', 'study', 'rol_hours', 'law104'], true)) return false;
     return true;
 }
+function hr6_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM hr_person_types LIKE 'used_before'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function hr_person_type_overrides(int $pid): array { static $c = []; if (!isset($c[$pid])) { $c[$pid] = []; if (hr5_has()) foreach (all('SELECT * FROM hr_person_types WHERE person_id = ?', [$pid]) as $r) $c[$pid][(int)$r['type_id']] = $r; } return $c[$pid]; }
 /** Is this type available to the person? Card switch wins, else the default. */
 function hr_type_enabled(array $p, array $t): bool { if (!hr5_has()) return true; $o = hr_person_type_overrides((int)$p['id'])[(int)$t['id']] ?? null; return $o ? (bool)$o['enabled'] : hr_type_default_enabled($p, $t); }
@@ -155,9 +162,15 @@ function hr_person_types_save_from_post(): void {
     if (!hr_can() || !hr5_has()) throw new RuntimeException(t('err.noaccess')); $pid = (int)($_POST['pid'] ?? 0); $p = hr_person($pid); if (!$p) throw new RuntimeException(t('err.notfound')); $me = (int)(current_user()['id'] ?? 0);
     foreach (hr_types(false) as $tid => $t) {
         $want = !empty($_POST['en'][$tid]); $note = mb_substr(trim((string)($_POST['note'][$tid] ?? '')), 0, 200) ?: null; $was = hr_type_enabled($p, $t); $def = hr_type_default_enabled($p, $t);
-        if ($want === $def && $note === null) q('DELETE FROM hr_person_types WHERE person_id = ? AND type_id = ?', [$pid, $tid]);
+        $birth = in_array((string)($t['rule_key'] ?? ''), ['maternity', 'paternity'], true) && hr6_has();
+        $ub = $birth && trim((string)($_POST['used_before'][$tid] ?? '')) !== '' ? max(0.0, min(999.0, (float) str_replace(',', '.', (string)$_POST['used_before'][$tid]))) : null;
+        $uy = $birth && $ub !== null ? (int)($_POST['used_year'][$tid] ?? 0) ?: null : null; if ($ub !== null && !$uy) throw new RuntimeException(t('hr.need_used_year'));
+        $old = hr_person_type_overrides($pid)[$tid] ?? null;
+        if ($want === $def && $note === null && $ub === null) q('DELETE FROM hr_person_types WHERE person_id = ? AND type_id = ?', [$pid, $tid]);
+        elseif (hr6_has()) q('INSERT INTO hr_person_types (person_id, type_id, enabled, note, used_before, used_year, updated_by) VALUES (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE enabled = VALUES(enabled), note = VALUES(note), used_before = VALUES(used_before), used_year = VALUES(used_year), updated_by = VALUES(updated_by)', [$pid, $tid, (int)$want, $note, $ub, $uy, $me]);
         else q('INSERT INTO hr_person_types (person_id, type_id, enabled, note, updated_by) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE enabled = VALUES(enabled), note = VALUES(note), updated_by = VALUES(updated_by)', [$pid, $tid, (int)$want, $note, $me]);
         if ($want !== $was) hr_audit($pid, 'card', 'type ' . $t['code'], $was ? 'on' : 'off', $want ? 'on' : 'off', $note);
+        if ($birth && ((float)($old['used_before'] ?? -1) !== (float)($ub ?? -1) || (int)($old['used_year'] ?? 0) !== (int)($uy ?? 0))) hr_audit($pid, 'card', 'type ' . $t['code'] . ' ' . t('hr.used_before'), $old && $old['used_before'] !== null ? $old['used_before'] . ' (' . $old['used_year'] . ')' : null, $ub !== null ? $ub . ' (' . $uy . ')' : null, $note);
     }
 }
 

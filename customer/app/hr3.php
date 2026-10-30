@@ -59,6 +59,7 @@ function hr_employment_event_from_post(int $pid): int {
             q('UPDATE hr_employments SET date_to = ?, reason = ? WHERE id = ?', [$date, $reason, (int)$open['id']]);
             q('UPDATE hr_people SET left_date = ?, is_active = 0, contract_end = NULL WHERE id = ?', [$date, $pid]);
             if (!empty($p['user_id'])) q('UPDATE customer_users SET is_active = 0 WHERE id = ? AND role = ?', [(int)$p['user_id'], 'staff']);   // the portal account closes with the employment (administrators are never touched)
+            hr_off_open($pid, $id);                                                                                      // R60-001: release-of-contract procedure
         } else throw new RuntimeException(t('err.notfound'));
         hr_docs_store_from_files($pid, $id, (string)($_POST['doc_kind'] ?? ($ev === 'end' ? 'termination' : 'contract')), $note);
         db()->commit();
@@ -146,4 +147,36 @@ function hr_messages_card(int $pid, bool $hrSide): string {
     if (!$msgs) $h .= '<p class="hint">' . tt('hr.msg_none') . '</p>'; else { $h .= '<div class="hr-thread">'; foreach ($msgs as $m) $h .= '<div class="hr-m' . ($m['from_hr'] ? ' is-hr' : '') . '"><div class="hr-m-head"><b>' . e($m['from_name'] ?? ($m['from_hr'] ? 'HR' : '')) . '</b>' . ($m['from_hr'] ? ' <span class="hint">HR</span>' : '') . ' <span class="hint">' . e(fmt_datetime($m['created_at'])) . ($m['seen_at'] ? ' · ✔ ' . tt('hr.msg_seen') : '') . '</span></div><div class="hr-m-body">' . nl2br(e($m['body'])) . '</div></div>'; $h .= '</div>'; }
     $h .= '<form method="post" action="' . ($hrSide ? url('hr_person', ['id' => $pid]) : url('my_leave')) . '#hr-msg" data-lock>' . csrf_field() . '<input type="hidden" name="action" value="hr_msg_send"><input type="hidden" name="person_id" value="' . $pid . '"><div class="field"><textarea name="body" rows="3" maxlength="2000" required data-plain placeholder="' . tt('hr.msg_ph') . '"></textarea></div><div class="btn-row"><button class="btn btn--gold btn--sm" type="submit">' . tt('hr.msg_send') . '</button></div></form></div>';
     return $h;
+}
+
+/* ------------------------------------------------------------ release of a contract — off-boarding procedure (GAS-CP-R60-001) */
+/** Checklist items per jurisdiction; the key is the language key suffix hr.off_<key>. */
+const HR_OFFBOARD_GR = ['notice', 'ergani', 'settlement', 'leave_payout', 'certificate', 'property', 'accounts', 'handover', 'projects', 'exit_interview', 'file'];
+const HR_OFFBOARD_IT = ['notice', 'unilav', 'tfr', 'leave_payout', 'cu', 'property', 'accounts', 'handover', 'projects', 'exit_interview', 'file'];
+function hr_off_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'hr_offboarding'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function hr_off_items(array $p): array { return (function_exists('hr_jurisdiction') ? hr_jurisdiction($p) : 'GR') === 'IT' ? HR_OFFBOARD_IT : HR_OFFBOARD_GR; }
+/** Open the procedure for an "end" event: one row per item of the person's jurisdiction. */
+function hr_off_open(int $pid, int $empId): void {
+    if (!hr_off_has()) return; $p = hr_person($pid); if (!$p) return;
+    foreach (hr_off_items($p) as $i => $k) q('INSERT IGNORE INTO hr_offboarding (person_id, employment_id, item_key, sort_order) VALUES (?,?,?,?)', [$pid, $empId, $k, $i]);
+}
+function hr_off_list(int $empId): array { return hr_off_has() ? all('SELECT o.*, cu.full_name AS by_name FROM hr_offboarding o LEFT JOIN customer_users cu ON cu.id = o.done_by WHERE o.employment_id = ? ORDER BY o.sort_order', [$empId]) : []; }
+function hr_off_progress(int $empId): array { $rows = hr_off_list($empId); $d = count(array_filter($rows, fn($r) => $r['done'])); return ['done' => $d, 'total' => count($rows), 'complete' => $rows && $d === count($rows)]; }
+/** HR ticks / unticks items; a note per item; when the last item is done the release is logged on the card. */
+function hr_off_save_from_post(int $pid): void {
+    if (!hr_can() || !hr_off_has()) throw new RuntimeException(t('err.noaccess')); $empId = (int)($_POST['employment_id'] ?? 0); $me = (int)(current_user()['id'] ?? 0);
+    if (!scalar('SELECT COUNT(*) FROM hr_employments WHERE id = ? AND person_id = ? AND kind = ?', [$empId, $pid, 'end'])) throw new RuntimeException(t('err.notfound'));
+    $before = hr_off_progress($empId);
+    foreach (hr_off_list($empId) as $r) {
+        $done = !empty($_POST['done'][$r['item_key']]); $note = mb_substr(trim((string)($_POST['onote'][$r['item_key']] ?? '')), 0, 300) ?: null;
+        if ($done !== (bool)$r['done']) { q('UPDATE hr_offboarding SET done = ?, done_by = ?, done_at = ?, note = ? WHERE id = ?', [(int)$done, $done ? $me : null, $done ? date('Y-m-d H:i:s') : null, $note, (int)$r['id']]); if (function_exists('hr_audit')) hr_audit($pid, 'employment', t('hr.off_title') . ' · ' . t('hr.off_' . $r['item_key']), $r['done'] ? '✔' : '—', $done ? '✔' : '—', $note); }
+        elseif ($note !== $r['note']) q('UPDATE hr_offboarding SET note = ? WHERE id = ?', [$note, (int)$r['id']]);
+    }
+    $after = hr_off_progress($empId);
+    if ($after['complete'] && !$before['complete'] && function_exists('hr_audit')) hr_audit($pid, 'employment', t('hr.off_title'), null, t('hr.off_released'), null);
+}
+/** Open procedures across the company (HR dashboard). */
+function hr_off_pending(): array {
+    if (!hr_off_has()) return [];
+    return all("SELECT p.id, p.name_en, e.id AS employment_id, e.date_from AS end_date, e.reason, SUM(o.done) AS done, COUNT(*) AS total FROM hr_offboarding o JOIN hr_employments e ON e.id = o.employment_id JOIN hr_people p ON p.id = o.person_id GROUP BY p.id, p.name_en, e.id, e.date_from, e.reason HAVING done < total ORDER BY e.date_from DESC");
 }
