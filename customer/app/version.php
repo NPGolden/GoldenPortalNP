@@ -13,7 +13,7 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.69.0';
+const CP_VERSION = '1.69.1';
 const CP_BUILD   = '2026-10-30';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
