@@ -61,6 +61,22 @@ $pend = count(array_filter(hr_requests_for('hr', 0), fn($r) => (int)$r['person_i
       <div class="field"><label><?= tt('hr.children') ?></label><div style="display:flex;gap:6px;"><input type="number" name="children" min="0" max="12" value="<?= (int)$p['children'] ?>" style="width:70px;"><input name="children_years" maxlength="60" value="<?= e($p['children_years'] ?? '') ?>" placeholder="2015, 2019"></div></div>
       <div class="field"><label><?= tt('hr.manager') ?></label><input value="<?= $mgr ? e((string) scalar('SELECT full_name FROM customer_users WHERE id = ?', [$mgr])) : '—' ?>" readonly><p class="hint"><?= tt('hr.manager_hint') ?></p></div>
       <div class="field" style="grid-column:1 / -1;"><label><?= tt('hr.notes') ?></label><input name="notes" maxlength="500" value="<?= e($p['notes'] ?? '') ?>"></div>
+      <?php if (function_exists('hr7_has') && hr7_has()): ?><input type="hidden" name="personal" value="1">
+      <div style="grid-column:1 / -1;margin-top:6px;"><h3 class="ac-h" style="margin:0 0 2px;">🔒 <?= tt('hr.personal') ?></h3><p class="hint" style="margin:0;"><?= tt('hr.personal_hint') ?></p></div>
+      <div class="field"><label><?= tt('hr.personal_email') ?></label><input name="personal_email" type="email" maxlength="190" value="<?= e($p['personal_email'] ?? '') ?>" autocomplete="off"></div>
+      <div class="field"><label><?= tt('hr.phone_mobile') ?></label><input name="phone_mobile" maxlength="40" value="<?= e($p['phone_mobile'] ?? '') ?>" autocomplete="off"></div>
+      <div class="field"><label><?= tt('hr.phone_home') ?></label><input name="phone_home" maxlength="40" value="<?= e($p['phone_home'] ?? '') ?>" autocomplete="off"></div>
+      <div class="field" style="grid-column: span 2;"><label><?= tt('hr.address') ?></label><input name="address" maxlength="200" value="<?= e($p['address'] ?? '') ?>" autocomplete="off"></div>
+      <div class="field"><label><?= tt('hr.birth_date') ?></label><input type="date" name="birth_date" value="<?= e($p['birth_date'] ?? '') ?>"></div>
+      <div class="field"><label><?= tt('hr.amka') ?></label><input name="amka" maxlength="11" inputmode="numeric" value="<?= e($p['amka'] ?? '') ?>" autocomplete="off"></div>
+      <div class="field"><label><?= tt('hr.afm') ?></label><input name="afm" maxlength="9" inputmode="numeric" value="<?= e($p['afm'] ?? '') ?>" autocomplete="off"></div>
+      <div class="field"><label><?= tt('hr.doy') ?></label><input name="doy" maxlength="80" value="<?= e($p['doy'] ?? '') ?>" autocomplete="off"></div>
+      <div class="field"><label><?= tt('hr.id_number') ?></label><input name="id_number" maxlength="30" value="<?= e($p['id_number'] ?? '') ?>" autocomplete="off"></div>
+      <div class="field" style="grid-column: span 2;"><label><?= tt('hr.iban') ?></label><input name="iban" maxlength="34" value="<?= e($p['iban'] ?? '') ?>" autocomplete="off" style="font-family:ui-monospace,monospace;"></div>
+      <div class="field"><label><?= tt('hr.bank') ?></label><input name="bank" maxlength="80" value="<?= e($p['bank'] ?? '') ?>" autocomplete="off"></div>
+      <div class="field" style="grid-column: span 2;"><label><?= tt('hr.emergency_name') ?></label><input name="emergency_name" maxlength="120" value="<?= e($p['emergency_name'] ?? '') ?>" autocomplete="off"></div>
+      <div class="field"><label><?= tt('hr.emergency_phone') ?></label><input name="emergency_phone" maxlength="40" value="<?= e($p['emergency_phone'] ?? '') ?>" autocomplete="off"></div>
+      <?php endif; ?>
       <div class="field" style="grid-column:1 / -1;display:flex;gap:16px;flex-wrap:wrap;"><label class="chk"><input type="checkbox" name="is_technical" value="1"<?= $p['is_technical'] ? ' checked' : '' ?>> <?= tt('hr.technical_lbl') ?></label><label class="chk"><input type="checkbox" name="is_active" value="1"<?= $p['is_active'] ? ' checked' : '' ?>> <?= tt('hr.active_lbl') ?></label><?php if (function_exists('hr_jurisdiction')): ?><label class="chk"><input type="checkbox" name="single_parent" value="1"<?= !empty($p['single_parent']) ? ' checked' : '' ?>> <?= tt('hr.single_parent') ?></label><label class="chk"><input type="checkbox" name="disability_care" value="1"<?= !empty($p['disability_care']) ? ' checked' : '' ?>> <?= tt('hr.disability_care') ?></label><?php endif; ?></div>
     </div>
     <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit"><?= tt('btn.save') ?></button></div>
