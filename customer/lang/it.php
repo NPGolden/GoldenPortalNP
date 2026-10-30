@@ -5658,4 +5658,11 @@ Cordiali saluti,
 'hr.period_recount' => 'Ricalcola i giorni',
 'hr.period_recount_hint' => 'Ricalcola i giorni di ogni ferie di questo periodo senza fine settimana e festività e riscrive il planning.',
 'hr.period_recounted' => '{n} ferie ricalcolate; fine settimana e festività non vengono addebitati.',
+// ---- GAS-CP-R62-004 · celebrations
+'cel.title' => 'Ricorrenze',
+'cel.next_days' => 'prossimi {n} giorni',
+'cel.today' => 'oggi',
+'cel.tomorrow' => 'domani',
+'cel.birthday' => 'compleanno',
+'cel.nameday' => 'onomastico',
 ];

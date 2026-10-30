@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.73.2';
+const CP_VERSION = '1.73.3';
 const CP_BUILD   = '2026-10-30';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R62-004', 'version' => '1.73.3', 'date' => '2026-10-30', 'title' => 'Celebrations: staff dashboard shows birthdays and Greek Orthodox name days of colleagues for the next 14 days (no ages); the HR dashboard shows 30 days with the age and a link to the card. Name days include the movable feasts (Easter, St George, St Thomas, Ψυχοσάββατο …).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R62-003', 'version' => '1.73.2', 'date' => '2026-10-30', 'title' => 'Leave days never include weekends and public holidays: a work calendar without weekday rules now has Saturday / Sunday off, and a year whose holidays were not generated falls back to the country\'s public holidays (Greek Orthodox Easter included). HR › Leaves › leave periods: "Recount days" fixes already assigned periods and rewrites the board.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R62-002', 'version' => '1.73.1', 'date' => '2026-10-30', 'title' => 'HR is its own group in the left menu (HR dashboard, My leave, HR requests, Leaves, Training, HR settings) between Work and Commercial — Work keeps tickets, work orders, reports, timesheets, planning, tasks.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R62-001', 'version' => '1.73.0', 'date' => '2026-10-30', 'title' => 'Employee card carries the full payroll record (father\'s / mother\'s / spouse name, nationality, birth place, passport, blood group, education, grade, transport, work phone and extension, postcode, city, country, gross salary, ΟΑΕΔ benefit, payroll code — masked where sensitive, importable from the people Excel). Mandatory company-closure leave periods (HR assigns to everybody; staff cannot opt out). HR › Training: introductory, internal and external trainings published by HR with target, places and apply-by date; staff apply from My leave, manager or HR approves; attendance, result and certificate (number, validity, scan) kept on the card › Training; expiring certificates on the HR dashboard. Annual evaluations (8 criteria 1–5, overall, strengths, improvements, goals, training needs; draft → final → acknowledged by the employee with comment) with evolution chart and participation summary on the card › Evaluations.', 'db' => 'install/migrate_cp_r62_training_eval.sql', 'check' => 'r62'],

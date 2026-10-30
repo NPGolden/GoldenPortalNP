@@ -5658,4 +5658,11 @@ Best regards,
 'hr.period_recount' => 'Recount days',
 'hr.period_recount_hint' => 'Recalculate the days of every assigned leave of this period without weekends and public holidays and rewrite the board.',
 'hr.period_recounted' => '{n} leave records recounted; weekends and holidays are not charged.',
+// ---- GAS-CP-R62-004 · celebrations
+'cel.title' => 'Celebrations',
+'cel.next_days' => 'next {n} days',
+'cel.today' => 'today',
+'cel.tomorrow' => 'tomorrow',
+'cel.birthday' => 'birthday',
+'cel.nameday' => 'name day',
 ];
