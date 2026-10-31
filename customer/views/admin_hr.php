@@ -77,6 +77,7 @@ layout_head(t('hr.settings'), 'admin_hr');
   </form>
   <?php $pi = $_SESSION['hr_people_import'] ?? null; if (!empty($_GET['imp']) && $pi): ?>
   <h3 style="margin-top:16px;"><?= e(t('hr.people_preview', ['n' => count($pi)])) ?></h3>
+  <?php if (function_exists('hr_personal_can') && !hr_personal_can() && array_filter($pi, fn($r) => !empty($r['personal']))): ?><div class="flash flash--warn"><?= tt('hr.imp_personal_skip') ?></div><?php endif; ?>
   <form method="post" action="<?= url('admin_hr', ['tab' => 'people']) ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hr_people_apply">
     <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('hr.name_en') ?></th><th><?= tt('hr.name_el') ?></th><th><?= tt('hr.account') ?></th><th><?= tt('hr.department') ?></th><th><?= tt('hr.hire_date') ?></th><th class="num"><?= tt('hr.prior_months') ?></th><th><?= tt('hr.action') ?></th></tr></thead><tbody>
     <?php foreach ($pi as $i => $r): $mp = $r['match'] ? hr_person((int)$r['match']) : null; ?><tr><td><b><?= e($r['name_en']) ?></b><?= $r['is_technical'] ? ' ' . pill('blue', t('hr.technical')) : '' ?><?= $r['warn'] ? '<br><span class="hint bad">' . e(implode(' · ', $r['warn'])) . '</span>' : '' ?></td><td class="hint"><?= e($r['name_el'] ?? '') ?></td><td class="hint"><?= $r['user_id'] ? '✔ ' . e($r['email']) : e($r['email'] ?? '—') ?></td><td><?= e($r['department']) ?></td><td><?= $r['hire_date'] ? e(fmt_date($r['hire_date'])) : '—' ?></td><td class="num"><?= (int)$r['prior_months'] ?></td>

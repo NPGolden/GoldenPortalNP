@@ -5899,4 +5899,5 @@ Best regards,
 'hr.tg_ai_ph' => 'e.g. focus on service response time and certifications · align with the 2027 Lürssen projects …',
 'hr.tg_ai_proposals' => '{n} proposals — add or edit',
 'hr.tg_ai_add' => 'Add',
+'hr.imp_personal_skip' => 'This file carries personal / payroll columns, but your account is not HR or Owner: those columns will be ignored and the rest of each row imported. Sign in with an HR or Owner account to import them.',
 ];
