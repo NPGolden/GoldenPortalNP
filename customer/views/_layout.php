@@ -38,9 +38,10 @@ function nav_groups(): array {
     if ($staff && function_exists('hr2_has') && hr2_has() && (hr_can() || hr_is_manager())) $hr['items'][] = ['hr_requests', t('hr.requests'), '📝'];   // R54-001
     if ($staff && function_exists('hr_lv_has') && hr_lv_has() && hr_can()) $hr['items'][] = ['hr_leaves', t('hr.leaves'), '🏖'];                      // R61-001
     if ($staff && function_exists('hr_tr_has') && hr_tr_has() && hr_can()) $hr['items'][] = ['hr_training', t('hr.training'), '🎓'];                  // R62-001
+    if ($staff && function_exists('hr_targets_has') && hr_targets_has() && (hr_can() || (function_exists('hr_is_manager') && hr_is_manager()))) $hr['items'][] = ['hr_targets', t('hr.targets'), '🎯'];   // R64-001
     if ($staff && function_exists('hr_can') && hr_can()) $hr['items'][] = ['admin_hr', t('hr.settings'), '🗂'];                                        // R61-001: Owner / HR / admin
     if ($hr['items']) array_splice($g, 3, 0, [$hr]);
-    if ($staff && function_exists('hr_only') && hr_only()) $g = [['key' => 'top', 'label' => '', 'items' => [['hr_dashboard', t('hr.dashboard'), '📊'], ['community', t('soc.title'), '🤝'], ['planning', t('pl.title'), '🗓'], ['hr_requests', t('hr.requests'), '📝'], ['hr_leaves', t('hr.leaves'), '🏖'], ['hr_training', t('hr.training'), '🎓'], ['admin_hr', t('hr.settings'), '🗂']]]];   // R51-001 / R55-005 / R61-001: HR sees the board and its settings only
+    if ($staff && function_exists('hr_only') && hr_only()) $g = [['key' => 'top', 'label' => '', 'items' => [['hr_dashboard', t('hr.dashboard'), '📊'], ['community', t('soc.title'), '🤝'], ['planning', t('pl.title'), '🗓'], ['hr_requests', t('hr.requests'), '📝'], ['hr_leaves', t('hr.leaves'), '🏖'], ['hr_training', t('hr.training'), '🎓'], ['hr_targets', t('hr.targets'), '🎯'], ['admin_hr', t('hr.settings'), '🗂']]]];   // R51-001 / R55-005 / R61-001: HR sees the board and its settings only
     if ($staff && function_exists('emp_only') && emp_only()) $g = [['key' => 'top', 'label' => '', 'items' => [['planning', t('hr.my_program'), '🗓'], ['my_leave', t('hr.my_leave'), '🏖'], ['community', t('soc.title'), '🤝']]]];   // R54-001 / R56-002: employee scope
     return $g;
 }
@@ -156,8 +157,9 @@ function layout_head(string $title, string $active = ''): void {
   </a>
   <div class="spacer"></div>
   <?php if (function_exists('is_staff') && is_staff()): $on = online_users(); ?>
-    <a class="online" href="<?= is_cp_admin() ? url('admin_log') : '#' ?>" title="<?= e(implode(', ', array_map(fn($o) => $o['full_name'] . ($o['customer_name'] ? ' (' . $o['customer_name'] . ')' : ''), $on))) ?>">
-      <i></i><?= e(t('nav.online', ['n' => count($on)])) ?></a>
+    <details class="online-dd"><summary class="online" title="<?= tt('nav.online_who') ?>"><i></i><?= e(t('nav.online', ['n' => count($on)])) ?> ▾</summary>
+      <div class="online-pop"><?php $od = function_exists('online_detail') ? online_detail() : $on; foreach ($od as $o): ?><div class="online-row"><?= avatar_html((int)$o['id'], (string)$o['full_name'], 20, 'ava--inline') ?> <span><b><?= e($o['full_name']) ?></b><?= $o['customer_name'] ? ' <span class="hint">· ' . e($o['customer_name']) . '</span>' : '' ?><br><span class="hint"><?= isset($o['uptime']) && $o['uptime'] !== null ? tt('nav.online_for') . ' ' . e(fmt_uptime((int)$o['uptime'])) : '' ?></span></span></div><?php endforeach; ?><a class="hint" href="<?= url('account') ?>#online" style="display:block;margin-top:6px;"><?= tt('nav.online_more') ?> ›</a></div>
+    </details>
   <?php endif; ?>
   <a class="who" href="<?= url('account') ?>" title="<?= tt('nav.myaccount') ?>">
     <?= avatar_html((int)($u['id'] ?? 0), (string)($u['full_name'] ?? ''), 32, 'avatar') ?>

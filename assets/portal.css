@@ -1775,3 +1775,9 @@ html[data-theme="dark"] .pl-board th.pl-day span, html[data-theme="dark"] .pl-bo
 html[data-theme="dark"] .pl-board tr.pl-group td { color: var(--gold-text); background: #13293D; }
 html[data-theme="dark"] .pl-board th.pl-name, html[data-theme="dark"] .pl-board td.pl-name { background: #0F2436; color: var(--ink); }
 html[data-theme="dark"] .pl-board td, html[data-theme="dark"] .pl-board .num { color: var(--ink); }
+/* R64-001 · who is online drop-down */
+.online-dd { position: relative; } .online-dd > summary { list-style: none; cursor: pointer; } .online-dd > summary::-webkit-details-marker { display: none; }
+.online-pop { position: absolute; right: 0; top: calc(100% + 6px); min-width: 260px; max-height: 60vh; overflow: auto; background: var(--card, #fff); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); padding: 8px 10px; z-index: 60; font-size: 12.5px; }
+html[data-theme="dark"] .online-pop { background: #0F2436; }
+.online-row { display: flex; gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--line-soft); } .online-row:last-of-type { border-bottom: 0; }
+

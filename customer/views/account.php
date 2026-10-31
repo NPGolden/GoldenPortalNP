@@ -104,4 +104,13 @@ if ($has2fa): ?>
   <form method="post" action="<?= url('account') ?>" data-lock data-confirm="<?= tt('sec.my_revoke_confirm') ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('sec.my_revoke') ?>" data-confirm-cancel="<?= tt('btn.cancel') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="account_revoke"><button class="btn btn--ghost btn--danger-ghost" type="submit"><?= tt('sec.my_revoke') ?></button></form>
 </div>
 <?php endif; ?>
+<?php if (is_staff() && function_exists('online_detail')): $od = online_detail(); ?>
+<div class="card" style="max-width:560px;" id="online">
+  <h2>🟢 <?= tt('nav.online_who') ?> <span class="hint" style="display:inline;margin-left:6px;"><?= count($od) ?></span></h2>
+  <p class="hint"><?= tt('nav.online_hint') ?></p>
+  <?php if (!$od): ?><p class="hint">—</p><?php else: ?><table class="tbl"><thead><tr><th><?= tt('hr.person') ?></th><th><?= tt('nav.online_since') ?></th><th><?= tt('nav.online_uptime') ?></th><th><?= tt('nav.online_seen') ?></th></tr></thead><tbody>
+  <?php foreach ($od as $o): ?><tr><td><?= avatar_html((int)$o['id'], (string)$o['full_name'], 20, 'ava--inline') ?> <?= e($o['full_name']) ?><?= $o['customer_name'] ? ' <span class="hint">· ' . e($o['customer_name']) . '</span>' : '' ?></td><td class="hint"><?= $o['since'] ? e(fmt_datetime($o['since'])) : '—' ?></td><td><b><?= e(fmt_uptime($o['uptime'] ?? null)) ?></b></td><td class="hint"><?= e(fmt_datetime($o['last_seen_at'])) ?></td></tr><?php endforeach; ?>
+  </tbody></table><?php endif; ?>
+</div>
+<?php endif; ?>
 <?php layout_foot(); ?>

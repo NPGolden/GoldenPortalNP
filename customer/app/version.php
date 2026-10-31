@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.74.1';
+const CP_VERSION = '1.75.0';
 const CP_BUILD   = '2026-10-30';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R64-001', 'version' => '1.75.0', 'date' => '2026-10-31', 'title' => 'Personal and payroll data visible to HR and Owner only (plain administrators no longer see or import them). The Owner is excluded from the activity rankings, the most-active lists and the winner of the month. Who is online: a drop-down on the topbar with the names and the time online; full table with sign-in time, uptime and last activity on My Account. Annual evaluation gains two computed criteria — training participation (ranked among colleagues) and attendance & consistency (early leaves / late arrivals, unplanned absences, last-moment requests) — included in the overall score; "How we evaluate you" on My leave explains the eight criteria, the computed scores, the targets and shows each person his computed scores so far, plus a note from HR. Targets for the company, departments and individuals (HR › Targets; managers for their people): measure, target value, due date, weight, progress and status with history; everybody sees the targets that concern him on My leave and updates his own progress; achievement is summarised in the evaluation.', 'db' => 'install/migrate_cp_r64_targets.sql', 'check' => 'r64'],
         ['ref' => 'GAS-CP-R63-003', 'version' => '1.74.1', 'date' => '2026-10-31', 'title' => 'Two new manual editions under Support: the HR Manager Handbook (people register and card, imports, leave engine, requests, periods and closures, training, evaluations, off-boarding, the 1 January checklist, Community tools, data protection — HR / Owner / administrators) and the Employee Guide (balances, requesting leave, periods, my program, trainings and certificates, my evaluation, messages with HR, Community — every Golden A/S account). Both are searched by the help search.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R63-001', 'version' => '1.74.0', 'date' => '2026-10-31', 'title' => 'Community: wishes on birthdays, name days, work anniversaries and new colleagues (one click from the dashboard, wishes wall for the person); kudos between colleagues with most-thanked lists; noticeboard with posts, polls and photos (reactions, comments, pinning); automatic badges; winner of the month with prize; onboarding checklist with a buddy; morning celebration nudge and Monday digest in Notifications. New page Community (🤝).', 'db' => 'install/migrate_cp_r63_social.sql', 'check' => 'r63'],
         ['ref' => 'GAS-CP-R62-006', 'version' => '1.73.5', 'date' => '2026-10-30', 'title' => 'Dark mode: navy text (planning board headers and day numbers, discipline group rows, tab titles, section headings, pill labels) turns light on the dark background; planning board name and header columns get a solid dark background.', 'db' => null, 'check' => null],
@@ -246,6 +247,7 @@ function cp_migration_state(): array {
         'r50' => $has("SHOW TABLES LIKE 'ai_log'") && $has("SHOW COLUMNS FROM customer_users LIKE 'can_ai'"),
         'r61' => $has("SHOW TABLES LIKE 'hr_leave_periods'") && $has("SHOW COLUMNS FROM hr_requests LIKE 'period_id'"),
         'r63' => $has("SHOW TABLES LIKE 'soc_kudos'") && $has("SHOW TABLES LIKE 'soc_onboard'"),
+        'r64' => $has("SHOW TABLES LIKE 'hr_targets'") && $has("SHOW TABLES LIKE 'hr_target_log'"),
         'r62' => $has("SHOW TABLES LIKE 'hr_trainings'") && $has("SHOW TABLES LIKE 'hr_evaluations'") && $has("SHOW COLUMNS FROM hr_people LIKE 'gross_salary'") && $has("SHOW COLUMNS FROM hr_leave_periods LIKE 'mandatory'"),
         'r60c' => $has("SHOW COLUMNS FROM hr_people LIKE 'iban'"),
         'r60b' => $has("SHOW COLUMNS FROM hr_entitlements LIKE 'counted_from'"),

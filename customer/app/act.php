@@ -57,7 +57,7 @@ function act_sources(): array {
 /** Top $n Golden A/S accounts by activity between two dates: [['uid','name','score','parts' => [key => n],'hours'], …]. */
 function act_top(string $from, string $to, int $n = 10): array {
     static $cache = []; $ck = "$from|$to|$n"; if (isset($cache[$ck])) return $cache[$ck];
-    $staff = []; foreach (all("SELECT id, full_name FROM customer_users WHERE role IN ('staff','admin') AND is_active = 1") as $u) $staff[(int)$u['id']] = $u['full_name'];
+    $staff = []; $skip = function_exists('hr_owner_ids') ? hr_owner_ids() : []; foreach (all("SELECT id, full_name FROM customer_users WHERE role IN ('staff','admin') AND is_active = 1") as $u) if (!in_array((int)$u['id'], $skip, true)) $staff[(int)$u['id']] = $u['full_name'];   // R64-001: the Owner is not ranked
     $score = []; $parts = []; $b = [$from, $to . ' 23:59:59'];
     foreach (act_sources() as [$key, $sql]) { try { foreach (all($sql, $b) as $r) { $uid = (int)$r['uid']; if (!isset($staff[$uid])) continue; $score[$uid] = ($score[$uid] ?? 0) + (int)$r['n']; $parts[$uid][$key] = ($parts[$uid][$key] ?? 0) + (int)$r['n']; } } catch (Throwable $e) {} }
     $hours = []; try { foreach (all('SELECT t.user_id uid, SUM(l.hours) h FROM timesheet_lines l JOIN timesheets t ON t.id = l.timesheet_id WHERE l.work_date BETWEEN ? AND ? GROUP BY t.user_id', [$from, $to]) as $r) $hours[(int)$r['uid']] = (float)$r['h']; } catch (Throwable $e) {}

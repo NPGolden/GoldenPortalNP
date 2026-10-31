@@ -6,6 +6,7 @@ const HR_TR_KINDS = ['introductory', 'internal', 'external'];
 const HR_TR_STATUS = ['open', 'closed', 'done', 'cancelled'];
 const HR_TRM_STATUS = ['applied', 'approved', 'rejected', 'attended', 'absent'];
 const HR_EVAL_CRITERIA = ['quality', 'productivity', 'technical', 'teamwork', 'initiative', 'reliability', 'safety', 'communication'];
+const HR_EVAL_AUTO = ['training_auto', 'attendance_auto'];   // R64-001: computed by the portal
 
 function hr_tr_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'hr_trainings'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function hr_tr_kind_pill(string $k): string { return pill(['introductory' => 'blue', 'internal' => 'navy', 'external' => 'gold'][$k] ?? 'mute', t('hr.tk_' . $k)); }
@@ -96,6 +97,7 @@ function hr_evaluation_save_from_post(int $pid): void {
     $year = (int)($_POST['year'] ?? date('Y')); if ($year < 2000 || $year > 2100) throw new RuntimeException(t('pl.bad_dates'));
     $cur = hr_evaluation($pid, $year); if ($cur && $cur['status'] !== 'draft' && !hr_can()) throw new RuntimeException(t('hr.ev_locked'));
     $sc = []; foreach (HR_EVAL_CRITERIA as $c) { $v = (int)($_POST['sc'][$c] ?? 0); if ($v >= 1 && $v <= 5) $sc[$c] = $v; }
+    if ($sc && function_exists('hr_eval_auto')) foreach (hr_eval_auto($pid, $year) as $k => $a) $sc[$k] = (int)$a['score'];   // R64-001: training participation and attendance consistency, computed
     $overall = $sc ? round(array_sum($sc) / count($sc), 1) : null; $status = in_array($_POST['status'] ?? '', ['draft', 'final'], true) ? $_POST['status'] : 'draft';
     $t = fn(string $k) => mb_substr(trim((string)($_POST[$k] ?? '')), 0, 8000) ?: null; $d = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['eval_date'] ?? '')) ? $_POST['eval_date'] : date('Y-m-d');
     $v = [$d, (int)(current_user()['id'] ?? 0) ?: null, json_encode($sc), $overall, $t('strengths'), $t('improvements'), $t('goals'), $t('training_needs'), $t('comments'), $status];

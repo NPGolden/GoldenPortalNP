@@ -61,7 +61,7 @@ $pend = count(array_filter(hr_requests_for('hr', 0), fn($r) => (int)$r['person_i
       <div class="field"><label><?= tt('hr.children') ?></label><div style="display:flex;gap:6px;"><input type="number" name="children" min="0" max="12" value="<?= (int)$p['children'] ?>" style="width:70px;"><input name="children_years" maxlength="60" value="<?= e($p['children_years'] ?? '') ?>" placeholder="2015, 2019"></div></div>
       <div class="field"><label><?= tt('hr.manager') ?></label><input value="<?= $mgr ? e((string) scalar('SELECT full_name FROM customer_users WHERE id = ?', [$mgr])) : '—' ?>" readonly><p class="hint"><?= tt('hr.manager_hint') ?></p></div>
       <div class="field" style="grid-column:1 / -1;"><label><?= tt('hr.notes') ?></label><input name="notes" maxlength="500" value="<?= e($p['notes'] ?? '') ?>"></div>
-      <?php if (function_exists('hr7_has') && hr7_has()): ?><input type="hidden" name="personal" value="1">
+      <?php if (function_exists('hr7_has') && hr7_has() && function_exists('hr_personal_can') && hr_personal_can()): ?><input type="hidden" name="personal" value="1">
       <div style="grid-column:1 / -1;margin-top:6px;"><h3 class="ac-h" style="margin:0 0 2px;">🔒 <?= tt('hr.personal') ?></h3><p class="hint" style="margin:0;"><?= tt('hr.personal_hint') ?></p></div>
       <div class="field"><label><?= tt('hr.personal_email') ?></label><input name="personal_email" type="email" maxlength="190" value="<?= e($p['personal_email'] ?? '') ?>" autocomplete="off"></div>
       <div class="field"><label><?= tt('hr.phone_mobile') ?></label><input name="phone_mobile" maxlength="40" value="<?= e($p['phone_mobile'] ?? '') ?>" autocomplete="off"></div>
