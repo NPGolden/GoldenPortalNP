@@ -235,6 +235,32 @@ function fsr_store_signature(string $dataUrl, array $r, ?string $side = null): ?
     return cp_store_bytes($png, 'signature.png', 'image/png', (int)$r['project_id'], $r['subproject_id'] ? (int)$r['subproject_id'] : null, 'fsr_sign', 'external', (int)$r['id'], null, ['sign' => $side ?? 'signature']);
 }
 
+/** The customer's decision on a submitted report (web page and mobile app): accepted (with the drawn signature kept as
+ *  an sp_files row, kind fsr_sign) or disputed with a remark. Records who / when / IP, the event, and regenerates the documents.   R68-001 */
+function fsr_customer_decide(int $id, string $decision, string $remark, ?string $signatureDataUrl = null, ?string $via = null): void {
+    $au = current_user(); if (!$au) throw new RuntimeException(t('err.noaccess'));
+    $r = fsr_load($id);
+    if (!$r || $r['status'] !== 'submitted') throw new RuntimeException(t('fsr.not_pending'));
+    $isCustomer = !is_staff() && (int)$au['customer_id'] === (int)$r['customer_id'];
+    if (!$isCustomer && !is_cp_admin()) throw new RuntimeException(t('err.noaccess'));
+    $remark = mb_substr(trim($remark), 0, 2000);
+    $ip = trim(explode(',', (string)($_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? ''))[0]);
+    if ($decision === 'disputed') {
+        if ($remark === '') throw new RuntimeException(t('fsr.remark_needed'));
+        q('UPDATE fsr_reports SET status = "disputed", customer_remark = ? WHERE id = ?', [$remark, $id]);
+        fsr_event($id, 'disputed', $remark . ($via ? " ($via)" : ''));
+        fsr_generate_documents($id);
+        return;
+    }
+    if ($decision !== 'accepted') throw new RuntimeException(t('err.notfound'));
+    $signId = $signatureDataUrl ? fsr_store_signature($signatureDataUrl, $r, 'customer') : null;
+    $name = $au['full_name'] . (!$isCustomer ? ' (' . t('fsr.on_behalf') . ')' : '');
+    q('UPDATE fsr_reports SET status = "accepted", accepted_by = ?, accepted_name = ?, accepted_at = NOW(), accepted_ip = ?, customer_remark = ?, customer_sign_id = COALESCE(?, customer_sign_id) WHERE id = ?',
+      [(int)$au['id'], $name, $ip ?: null, $remark ?: null, $signId, $id]);
+    fsr_event($id, 'accepted', trim(($remark ?: '') . ($via ? " ($via)" : '')) ?: null);
+    fsr_generate_documents($id);
+}
+
 /* ------------------------------------------------------- documents */
 
 /** Render both files and store them (replacing the previous version). */
@@ -391,19 +417,25 @@ function fsr_render_pdf(array $r): string {
     $need(48);
     [$gTxt, $cTxt, $cSub] = fsr_sign_texts($r);
     $half = $W / 2; $bx = 42.0;
-    foreach ([[$L, 'SUBMITTED BY GOLDEN A/S', 'Submitted electronically / Υποβλήθηκε ηλεκτρονικά', $gTxt],
-              [$L + $half, 'CUSTOMER ACCEPTANCE', $cSub, $cTxt]] as [$sx, $lab, $sub, $txt]) {
+    // R68-001: the drawn signatures (sp_files fsr_sign, stored by the engineer's app and by the customer's app / web page) are printed inside the boxes
+    $gSig = !empty($r['golden_sign_id']) ? cp_file_bytes((int)$r['golden_sign_id']) : null;
+    $cSig = !empty($r['customer_sign_id']) && $r['status'] === 'accepted' ? cp_file_bytes((int)$r['customer_sign_id']) : null;
+    $sigShown = false;
+    foreach ([[$L, 'SUBMITTED BY GOLDEN A/S', 'Submitted electronically / Υποβλήθηκε ηλεκτρονικά', $gTxt, $gSig],
+              [$L + $half, 'CUSTOMER ACCEPTANCE', $cSub, $cTxt, $cSig]] as [$sx, $lab, $sub, $txt, $sig]) {
         $pdf->setColor($line); $pdf->setLineWidth(0.3); $pdf->rect($sx + 2, $y + 2, $half - 4, $bx);
         $pdf->setColor($navy); $pdf->setFont('B', 8.5); $pdf->text($sx, $y + 10, $lab, 'C', $half);
         $pdf->setColor($ink); $pdf->setFont('R', 7.5); $pdf->text($sx, $y + 18, $sub, 'C', $half);
-        $pdf->setFont('B', 8.5); $pdf->text($sx, $y + 26, $txt, 'C', $half);
-        if ($sx > $L && $r['customer_remark']) {
+        $drawn = $sig ? $pdf->image($sig, $sx + $half / 2 - 24, $y + 19.5, 48, 13) : false;     // 48 × 13 mm, centred above the name line
+        if ($drawn) { $sigShown = $sigShown || $sx > $L; $pdf->setColor($line); $pdf->setLineWidth(0.2); $pdf->line($sx + $half / 2 - 26, $y + 33.5, $sx + $half / 2 + 26, $y + 33.5); $pdf->setColor($ink); }
+        $pdf->setFont('B', 8.5); $pdf->text($sx, $y + ($drawn ? 38 : 26), $txt, 'C', $half);
+        if ($sx > $L && $r['customer_remark'] && !$drawn) {
             $pdf->setFont('B', 7.5); $pdf->text($sx + 5, $y + 33, 'Customer notes / Σημειώσεις πελάτη:');
             $pdf->setFont('R', 7.5); $pdf->paragraph($sx + 5, $y + 34, $half - 10, (string)$r['customer_remark'], 3.6, 2);
         }
     }
     $y += $bx + 6;
-    if ($r['customer_remark'] && mb_strlen((string)$r['customer_remark']) > 120) {       // long notes get their own block
+    if ($r['customer_remark'] && (mb_strlen((string)$r['customer_remark']) > 120 || $sigShown)) {       // long notes (or notes next to a drawn signature) get their own block
         $pdf->setFont('R', 8); $h = $pdf->paragraphHeight($W - 4, (string)$r['customer_remark'], 4.0) + 8; $need($h);
         $pdf->setColor($head); $pdf->rect($L, $y, $W, 5, 'F'); $pdf->setColor($line); $pdf->rect($L, $y, $W, $h);
         $pdf->setColor($navy); $pdf->setFont('B', 7.5); $pdf->text($L + 1.8, $y + 3.6, 'Customer notes / Σημειώσεις πελάτη');

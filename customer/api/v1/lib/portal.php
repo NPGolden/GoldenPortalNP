@@ -22,7 +22,8 @@ final class Portal {
     public static function login(string $email, string $pass, ?string $totp): array {
         $u = one('SELECT cu.* FROM customer_users cu WHERE cu.email = ? AND cu.is_active = 1', [$email]);
         if (!$u || !password_verify($pass, (string)$u['password_hash'])) { usleep(300000); throw new ApiException(401, 'Invalid credentials'); }
-        if (!in_array($u['role'], ['staff', 'admin'], true)) throw new ApiException(403, 'Staff account required');
+        if (api_app() === 'customer') { if (($u['role'] ?? 'customer') !== 'customer') throw new ApiException(403, 'Customer account required'); }   // R68-001
+        elseif (!in_array($u['role'], ['staff', 'admin'], true)) throw new ApiException(403, 'Staff account required');
         if (!empty($u['locked_until']) && strtotime((string)$u['locked_until']) > time()) throw new ApiException(423, 'Account locked');
         if (!empty($u['totp_enabled']) && !empty($u['totp_secret'])) { if (!$totp || !totp_verify((string)$u['totp_secret'], $totp)) throw new ApiException(401, 'Authenticator code required', ['totp' => true]); }
         if (function_exists('login_log')) login_log((int)$u['id'], $email, 'success');

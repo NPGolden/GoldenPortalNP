@@ -1,5 +1,5 @@
 <?php
-/** Front controller of the mobile API — GAS-CP-R52-001 (+ R66-001 Golden PM routes /pm/*). Routes map 1:1 to Portal::* / PortalPM::* (lib/). */
+/** Front controller of the mobile API — GAS-CP-R52-001 (+ R66-001 Golden PM routes /pm/*, R68-001 customer app routes /cu/*). Routes map 1:1 to Portal::* / PortalPM::* / PortalCustomer::* (lib/). */
 declare(strict_types=1);
 require __DIR__ . '/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate'); header('Pragma: no-cache'); header('X-Content-Type-Options: nosniff'); header('Content-Type: application/json; charset=utf-8');
@@ -8,22 +8,25 @@ $path = '/' . trim((string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PAT
 $method = $_SERVER['REQUEST_METHOD']; $body = [];
 if (stripos($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') !== false) $body = json_decode(file_get_contents('php://input') ?: '[]', true) ?: [];
 try {
-    $app = api_app(); $isPm = $app === 'pm';                                                                                     // R66-001: 'engineer' (Service Engineer) or 'pm' (Golden PM)
+    $app = api_app(); $isPm = $app === 'pm'; $isCu = $app === 'customer';                                                       // R66-001: 'engineer' (Service Engineer) or 'pm' (Golden PM); R68-001: 'customer'
     if (!isset(API_APPS[strtolower(trim((string)($_SERVER['HTTP_X_APP'] ?? API_APP_ID)))])) Response::error(403, 'Wrong application');
     $min = api_setting('api_min_version_' . $app, API_APPS[$app]); $ver = $_SERVER['HTTP_X_APP_VERSION'] ?? '0.0.0';
     if (version_compare($ver, $min, '<')) Response::error(426, 'Update required', ['min_version' => $min]);
     /** GET /me: the SE shape, plus the PM fields for app pm (§1). */
-    $me = function (array $u) use ($isPm): array { $m = Portal::me($u); return $isPm ? array_replace($m, PortalPM::meExtra($u)) : $m; };
+    $me = function (array $u) use ($isPm, $isCu): array { if ($isCu) return PortalCustomer::me($u); $m = Portal::me($u); return $isPm ? array_replace($m, PortalPM::meExtra($u)) : $m; };
     if ($path === '/auth/login' && $method === 'POST') { RateLimit::check('auth', RateLimit::ip(), 10);
         $u = Portal::login(trim((string)($body['email'] ?? '')), (string)($body['password'] ?? ''), isset($body['totp']) ? (string)$body['totp'] : null);
-        $dev = (array)($body['device'] ?? []); $u = api_act_as((int)$u['id']); if ($isPm) PortalPM::allowed($u);                  // §0: who may sign in to the PM app (before the device is enrolled)
-        $did = Jwt::registerDevice((int)$u['id'], $dev);
+        $dev = (array)($body['device'] ?? []); $u = api_act_as((int)$u['id']); if ($isPm) PortalPM::allowed($u); if ($isCu) PortalCustomer::allowed($u);   // §0: who may sign in to each app (before the device is enrolled)
+        $did = Jwt::registerDevice((int)$u['id'], $dev); $u['device_id'] = $did;
         Response::json(['access_token' => Jwt::issue($u, $did), 'refresh_token' => Jwt::issueRefresh($did, $dev['platform'] ?? 'web'), 'user' => $me($u)]); }
     if ($path === '/auth/refresh' && $method === 'POST') { RateLimit::check('auth', RateLimit::ip(), 10);
-        $r = Jwt::consumeRefresh((string)($body['refresh_token'] ?? '')); $u = api_act_as((int)$r['user_id']); if ($isPm) PortalPM::allowed($u);
+        $r = Jwt::consumeRefresh((string)($body['refresh_token'] ?? '')); $u = api_act_as((int)$r['user_id']); if ($isPm) PortalPM::allowed($u); if ($isCu) PortalCustomer::allowed($u);
         Response::json(['access_token' => Jwt::issue($u, (int)$r['device_id']), 'refresh_token' => Jwt::issueRefresh((int)$r['device_id'], (string)$r['platform'], (int)$r['id'])]); }
     $u = Jwt::requireUser(); RateLimit::check('api', 'u' . $u['id'], 300);
     if (str_starts_with($path, '/pm/') && !$isPm) Response::error(403, 'Golden PM app only');
+    if (str_starts_with($path, '/cu/') && !$isCu) Response::error(403, 'Customer app only');
+    if ($isCu) { PortalCustomer::allowed($u); if (!str_starts_with($path, '/cu/') && !in_array($path, ['/me', '/auth/logout', '/devices/push-token'], true)) Response::error(403, 'Not available in the customer app'); }   // CS-03: staff routes never serve a customer token
+    if ($isCu) { $u['device_id'] = (int)$u['device_id']; require __DIR__ . '/endpoints/customer.php'; customer_routes($u, $method, $path, $body); }
     if ($isPm) PortalPM::allowed($u);                                                                                            // rights may change while a token lives
     switch (true) {
         case $method === 'POST' && $path === '/auth/logout': q('UPDATE mob_refresh_tokens SET revoked_at = NOW() WHERE device_id = ? AND revoked_at IS NULL', [$u['device_id']]); Response::json([], 204);

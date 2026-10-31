@@ -5909,6 +5909,7 @@ Best regards,
 'hr.acc_hours_hint' => 'Early leaves / late arrivals accumulate; every full 8 h takes one day of annual leave.',
 'mob.app_engineer' => 'Service Engineer app',
 'mob.app_pm' => 'Golden PM app',
+'mob.app_customer' => 'Customer app',
 /* ---- R67-001 HR Assistant ---- */
 'hra.title' => 'HR Assistant',
 'hra.lede' => 'Guided, step-by-step flows: you propose the data, HR checks and approves, nothing changes on your card before that.',

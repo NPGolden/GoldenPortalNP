@@ -958,29 +958,11 @@ function pm_handle_action(string $action, string $page): bool {
             redirect('isr_list', ['project' => (int)$r['project_id'], '_r' => uniqid()]);
         }
         case 'fsr_accept':
-        case 'fsr_dispute': {
-            $au = require_login();
+        case 'fsr_dispute': {                 // R68-001: one function for the web page and the customer app (fsr_customer_decide)
+            require_login();
             $id = (int)$_POST['id'];
-            $r = fsr_load($id);
-            if (!$r || $r['status'] !== 'submitted') throw new RuntimeException(t('fsr.not_pending'));
-            $isCustomer = !is_staff() && (int)$au['customer_id'] === (int)$r['customer_id'];
-            if (!$isCustomer && !is_cp_admin()) { http_response_code(403); exit(t('err.noaccess')); }
-            $remark = mb_substr(trim((string)($_POST['remark'] ?? '')), 0, 2000);
-            $ip = trim(explode(',', (string)($_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? ''))[0]);
-            if ($action === 'fsr_dispute') {
-                if ($remark === '') throw new RuntimeException(t('fsr.remark_needed'));
-                q('UPDATE fsr_reports SET status = "disputed", customer_remark = ? WHERE id = ?', [$remark, $id]);
-                fsr_event($id, 'disputed', $remark);
-                fsr_generate_documents($id);
-                flash('warn', t('fsr.disputed_done'));
-                redirect('fsr', ['id' => $id, '_r' => uniqid()]);
-            }
-            $name = $au['full_name'] . (!$isCustomer ? ' (' . t('fsr.on_behalf') . ')' : '');
-            q('UPDATE fsr_reports SET status = "accepted", accepted_by = ?, accepted_name = ?, accepted_at = NOW(), accepted_ip = ?, customer_remark = ? WHERE id = ?',
-              [(int)$au['id'], $name, $ip ?: null, $remark ?: null, $id]);
-            fsr_event($id, 'accepted', $remark ?: null);
-            fsr_generate_documents($id);
-            flash('good', t('fsr.accepted_done'));
+            fsr_customer_decide($id, $action === 'fsr_dispute' ? 'disputed' : 'accepted', (string)($_POST['remark'] ?? ''), isset($_POST['signature']) ? (string)$_POST['signature'] : null);
+            flash($action === 'fsr_dispute' ? 'warn' : 'good', t($action === 'fsr_dispute' ? 'fsr.disputed_done' : 'fsr.accepted_done'));
             redirect('fsr', ['id' => $id, '_r' => uniqid()]);
         }
         case 'fsr_reopen': {

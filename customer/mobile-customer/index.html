@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0A1B2E">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Golden A/S">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self' data: blob:; connect-src 'self' https://cdnjs.cloudflare.com; script-src 'self' https://cdnjs.cloudflare.com; worker-src 'self' blob: https://cdnjs.cloudflare.com; style-src 'self' 'unsafe-inline'; font-src 'self'; frame-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self'">
+<meta http-equiv="Cache-Control" content="no-store">
+<meta name="gas-api" content="../api/v1">
+<title>Golden A/S Portal</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div id="app" class="app">
+  <header id="topbar" class="topbar">
+    <img src="img/logo-white.png" alt="Golden A/S" class="topbar-logo">
+    <div class="topbar-title" id="topbar-title"></div>
+    <button class="topbar-btn" id="btn-sync" aria-label="Sync" title="Sync">&#x21bb;</button>
+  </header>
+  <main id="view" class="view" aria-live="polite"></main>
+  <nav id="tabbar" class="tabbar" aria-label="Main">
+    <a href="#/home" data-tab="home"><span class="ic">&#x2302;</span><span data-i18n="tab.home">Home</span></a>
+    <a href="#/sign" data-tab="sign"><span class="ic">&#x270E;</span><span data-i18n="tab.sign">Sign</span></a>
+    <a href="#/offers" data-tab="offers"><span class="ic">&#x20AC;</span><span data-i18n="tab.offers">Offers</span></a>
+    <a href="#/tickets" data-tab="tickets"><span class="ic">&#x2709;</span><span data-i18n="tab.tickets">Tickets</span></a>
+    <a href="#/more" data-tab="more"><span class="ic">&#x2630;</span><span data-i18n="tab.more">More</span></a>
+  </nav>
+  <div id="toast" class="toast" role="status"></div>
+  <div id="offline-bar" class="offline-bar" hidden data-i18n="app.offline">Offline — reading only</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module" crossorigin="anonymous"></script>
+<script src="mock/data.js"></script>
+<script src="i18n/i18n.js"></script>
+<script src="lib/store.js"></script>
+<script src="lib/api.js"></script>
+<script src="lib/ui.js"></script>
+<script src="lib/pdfview.js"></script>
+<script src="lib/sigpad.js"></script>
+<script src="lib/native.js"></script>
+<script src="screens/auth.js"></script>
+<script src="screens/home.js"></script>
+<script src="screens/sign.js"></script>
+<script src="screens/approvals.js"></script>
+<script src="screens/offers.js"></script>
+<script src="screens/tickets.js"></script>
+<script src="screens/more.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

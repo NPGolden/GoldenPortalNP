@@ -1,0 +1,29 @@
+{
+  "name": "gas-customer-app",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Golden A/S Customer Portal — iOS / Android wrap of the customer PWA",
+  "scripts": {
+    "sync": "node prepare-web.js && npx cap sync",
+    "ios": "npx cap open ios",
+    "android": "npx cap open android",
+    "build:android": "cd android && ./gradlew bundleRelease",
+    "build:ios": "cd ios/App && xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -archivePath build/App.xcarchive archive"
+  },
+  "dependencies": {
+    "@capacitor/android": "6.1.2",
+    "@capacitor/app": "6.0.1",
+    "@capacitor/camera": "6.0.2",
+    "@capacitor/core": "6.1.2",
+    "@capacitor/device": "6.0.1",
+    "@capacitor/filesystem": "6.0.1",
+    "@capacitor/ios": "6.1.2",
+    "@capacitor/keyboard": "6.0.2",
+    "@capacitor/push-notifications": "6.0.2",
+    "@capacitor/splash-screen": "6.0.2",
+    "@capacitor/status-bar": "6.0.1",
+    "capacitor-native-biometric": "4.2.2",
+    "@aparajita/capacitor-secure-storage": "6.0.2"
+  },
+  "devDependencies": { "@capacitor/cli": "6.1.2" }
+}

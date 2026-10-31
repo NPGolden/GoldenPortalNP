@@ -5909,6 +5909,7 @@ Cordiali saluti,
 'hr.acc_hours_hint' => 'Uscite anticipate / ritardi si accumulano; ogni 8 h complete tolgono un giorno di ferie.',
 'mob.app_engineer' => 'App Service Engineer',
 'mob.app_pm' => 'App Golden PM',
+'mob.app_customer' => 'App clienti',
 /* ---- R67-001 HR Assistant ---- */
 'hra.title' => 'HR Assistant',
 'hra.lede' => 'Percorsi guidati passo dopo passo: tu proponi i dati, HR verifica e approva — nulla cambia sulla tua scheda prima di allora.',

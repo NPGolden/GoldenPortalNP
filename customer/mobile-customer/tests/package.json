@@ -1,0 +1,1 @@
+{ "name": "gas-customer-app-tests", "private": true, "scripts": { "api": "node customer-api.test.js", "ui:mock": "node ui-flows.test.js mock", "ui:api": "node ui-flows.test.js api" }, "devDependencies": { "@playwright/test": "1.47.2" } }
