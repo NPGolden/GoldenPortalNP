@@ -13,14 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.76.2';
+const CP_VERSION = '1.76.5';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
-        ['ref' => 'GAS-CP-R65-003', 'version' => '1.76.2', 'date' => '2026-10-31', 'title' => 'Service Engineer app 0.6.2: Ukrainian and Bulgarian translations completed (the app had only the tabs and the sign-in screen in these languages and showed everything else in English), Greek and Italian completed to the full set; the remaining English labels of the equipment detail, the queue and the report header follow the chosen language. Client only, no API change.', 'db' => null, 'check' => null],
+        ['ref' => 'GAS-CP-R65-003', 'version' => '1.76.5', 'date' => '2026-10-31', 'title' => 'Service Engineer app 0.6.2: Ukrainian and Bulgarian translations completed (the app had only the tabs and the sign-in screen in these languages and showed everything else in English), Greek and Italian completed to the full set; the remaining English labels of the equipment detail, the queue and the report header follow the chosen language. Client only, no API change.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R64-006', 'version' => '1.76.4', 'date' => '2026-10-31', 'title' => 'Early leaves / late arrivals (and every hour type that consumes annual leave) accumulate: only each completed 8 hours takes one day of annual leave; the remaining hours are shown on My leave under the annual balance ("4 h accumulated · 4 h to the next day") instead of charging fractions of a day.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R64-005', 'version' => '1.76.3', 'date' => '2026-10-31', 'title' => 'Settings › Portal accounts: a deactivated account with no history at all (no sign-ins, tickets, timesheets, reports, planning, employee card, approvals, requests, community) can be deleted for good (🗑 next to Enable); any account with history is deactivated, never deleted, and the portal says what keeps it.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R64-004', 'version' => '1.76.2', 'date' => '2026-10-31', 'title' => 'People import: a column that is not in the file never touches the card — prior service, working days, children, technical flag, contract type / part-time and every personal field keep their values (the previous import wrote 0 / defaults / empty for absent columns). The preview shows "=" where the card keeps its value. Workbook GAS-HR-restore-import.xlsx restores technical / working days / children / prior service from the earlier imports.', 'db' => null, 'check' => null],
