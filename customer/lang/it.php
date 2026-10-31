@@ -5905,4 +5905,6 @@ Cordiali saluti,
 'au.delete_confirm' => 'Eliminare l\'account di {name}? Non è reversibile.',
 'au.deleted' => 'Account eliminato.',
 'au.delete_refs' => 'L\'account non può essere eliminato — ha uno storico: {l}. Disattivalo.',
+'hr.acc_hours' => '{h} h accumulate · {n} h al prossimo giorno',
+'hr.acc_hours_hint' => 'Uscite anticipate / ritardi si accumulano; ogni 8 h complete tolgono un giorno di ferie.',
 ];

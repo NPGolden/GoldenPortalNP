@@ -5905,4 +5905,6 @@ Best regards,
 'au.delete_confirm' => 'Delete the account of {name}? This cannot be undone.',
 'au.deleted' => 'Account deleted.',
 'au.delete_refs' => 'The account cannot be deleted — it has history: {l}. Deactivate it instead.',
+'hr.acc_hours' => '{h} h accumulated · {n} h to the next day',
+'hr.acc_hours_hint' => 'Early leaves / late arrivals accumulate; every full 8 h takes one day of annual leave.',
 ];
