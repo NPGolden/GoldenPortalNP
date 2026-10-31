@@ -193,6 +193,9 @@ function kpi_spark(array $trend, string $k): string {
 /** Worst projects for the dashboard cockpit (red first, then amber), by the number of red KPIs. */
 function kpi_cockpit(int $limit = 5): array {
     if (!kpi_can()) return [];
+    return function_exists('cache_remember') ? cache_remember('kpi_cockpit:' . $limit, 600, fn() => kpi_cockpit_compute($limit)) : kpi_cockpit_compute($limit);   // R69-002: ~15 queries per active sub-project
+}
+function kpi_cockpit_compute(int $limit): array {
     [$from, $to] = kpi_period('m'); $rows = [];
     foreach (kpi_projects($from, $to) as $P) { $red = count(array_filter($P['tone'], fn($t) => $t === 'red')); $amber = count(array_filter($P['tone'], fn($t) => $t === 'amber')); if ($red || $amber) $rows[] = ['P' => $P, 'red' => $red, 'amber' => $amber, 'reds' => array_keys(array_filter($P['tone'], fn($t) => $t === 'red'))]; }
     usort($rows, fn($a, $b) => [$b['red'], $b['amber']] <=> [$a['red'], $a['amber']]);

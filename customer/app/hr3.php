@@ -15,7 +15,8 @@ const HR_DOC_MIME = ['application/pdf' => 'pdf', 'image/jpeg' => 'jpg', 'image/p
 function hr3_has(): bool { static $h = null; if ($h === null) { try { $h = hr2_has() && (bool) scalar("SHOW TABLES LIKE 'hr_employments'") && (bool) scalar("SHOW COLUMNS FROM hr_people LIKE 'left_date'"); } catch (Throwable $e) { $h = false; } } return $h; }
 
 /* ------------------------------------------------------------ employment periods */
-function hr_employments(int $pid): array { return hr3_has() ? all('SELECT e.*, cu.full_name AS by_name FROM hr_employments e LEFT JOIN customer_users cu ON cu.id = e.created_by WHERE e.person_id = ? ORDER BY e.date_from, e.id', [$pid]) : []; }
+function hr_employments(int $pid): array { static $memo = []; if (($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && isset($memo[$pid])) return $memo[$pid]; return $memo[$pid] = hr_employments_load($pid); }   // R69-002 per-request memo
+function hr_employments_load(int $pid): array { return hr3_has() ? all('SELECT e.*, cu.full_name AS by_name FROM hr_employments e LEFT JOIN customer_users cu ON cu.id = e.created_by WHERE e.person_id = ? ORDER BY e.date_from, e.id', [$pid]) : []; }
 /** The open period (hired, not terminated) or null. */
 function hr_employment_open(int $pid): ?array { return hr3_has() ? one("SELECT * FROM hr_employments WHERE person_id = ? AND kind IN ('hire','rehire') AND date_to IS NULL ORDER BY date_from DESC LIMIT 1", [$pid]) : null; }
 /** Months of service at Golden A/S from all periods (closed ones to their end, the open one to $at). */

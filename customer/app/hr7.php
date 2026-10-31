@@ -12,7 +12,8 @@ function hr_targets_has(): bool { static $h = null; if ($h === null) { try { $h 
 
 /* ------------------------------------------------------------------ who is online */
 /** Online staff with the start of their current session (last successful sign-in) and the uptime. */
-function online_detail(): array {
+function online_detail(): array { return function_exists('cache_remember') ? cache_remember('online_detail', 60, 'online_detail_compute') : online_detail_compute(); }   // R69-002
+function online_detail_compute(): array {
     $out = [];
     foreach (online_users() as $o) {
         $since = null; $up = null; try { $r = one("SELECT MAX(created_at) s, TIMESTAMPDIFF(SECOND, MAX(created_at), NOW()) d FROM login_log WHERE user_id = ? AND outcome = 'success'", [(int)$o['id']]); $since = $r['s'] ?? null; $up = $r['d'] ?? null; } catch (Throwable $e) {}

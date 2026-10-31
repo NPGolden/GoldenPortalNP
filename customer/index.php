@@ -6,6 +6,7 @@ ini_set('display_errors', '0');
 if (is_dir(__DIR__ . '/storage') && is_writable(__DIR__ . '/storage')) { ini_set('log_errors', '1'); ini_set('error_log', __DIR__ . '/storage/php-errors.log'); }   // R69-001: PHP errors land where Settings › About › Diagnostics reads them
 
 require __DIR__ . '/app/db.php';
+require __DIR__ . '/app/cache.php';  // R69-002 block cache, query meter, house-keeping
 require __DIR__ . '/app/i18n.php';
 require __DIR__ . '/app/helpers.php';
 require __DIR__ . '/app/auth.php';
@@ -106,6 +107,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'csp_report') { $raw = (s
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'ai') { require_login(); ai_endpoint(); }   // R50-001: assistant endpoint (JSON; CSRF checked by header inside)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
+    if (function_exists('cache_forget') && ($cuPost = current_user())) cache_forget('badges:' . (int)$cuPost['id']);   // R69-002: an action may change what waits for me
     $action = (string)($_POST['action'] ?? '');
     try {
         if (function_exists('hr_only') && hr_only() && !in_array($action, HR_ACTIONS, true)) throw new RuntimeException(t('err.noaccess'));   // R51-001: HR scope

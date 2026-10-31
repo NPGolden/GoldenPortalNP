@@ -109,20 +109,50 @@ function hr_working_days(array $p, string $from, string $to): int {
 /** Balance of one person / type / year in the type's unit: entitled, carry, opening, taken (approved), pending, available (null for non-counting types). */
 function hr_cut_has(): bool { static $c = null; if ($c === null) { try { $c = (bool) scalar("SHOW COLUMNS FROM hr_entitlements LIKE 'counted_from'"); } catch (Throwable $e) { $c = false; } } return $c; }   // R60-004
 function hr_counted_sql(): string { static $c = null; if ($c === null) { try { $c = (bool) scalar("SHOW COLUMNS FROM hr_requests LIKE 'counted'") ? ' AND counted = 1' : ''; } catch (Throwable $e) { $c = ''; } } return $c; }   // R56-003
+/* ------------------------------------------------------------------ R69-002: bulk loaders for the balance engine (GET requests only)
+   The planning board and the HR dashboard compute the balance of every person × every type; per-row queries made 5 000 queries a page.
+   On a read-only request the year's entitlements, request sums and board days are loaded once and served from memory. */
+function hr_bulk_ok(): bool { return ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET'; }
+/** The entitlement row of a person-year-type: the person's own row first, else the row attached to the account. */
+function hr_ent_row(int $pid, int $uid, int $tid, int $year): ?array {
+    if (!hr_bulk_ok()) return one('SELECT * FROM hr_entitlements WHERE year = ? AND type_id = ? AND (person_id = ? OR (user_id = ? AND ? > 0)) ORDER BY person_id IS NULL LIMIT 1', [$year, $tid, $pid, $uid, $uid]);
+    static $Y = []; if (!isset($Y[$year])) { $Y[$year] = ['p' => [], 'u' => []]; foreach (all('SELECT * FROM hr_entitlements WHERE year = ? ORDER BY id', [$year]) as $r) { if ($r['person_id'] !== null && !isset($Y[$year]['p'][(int)$r['person_id'] . ':' . (int)$r['type_id']])) $Y[$year]['p'][(int)$r['person_id'] . ':' . (int)$r['type_id']] = $r; if ($r['user_id'] !== null && !isset($Y[$year]['u'][(int)$r['user_id'] . ':' . (int)$r['type_id']])) $Y[$year]['u'][(int)$r['user_id'] . ':' . (int)$r['type_id']] = $r; } }
+    return $Y[$year]['p'][$pid . ':' . $tid] ?? ($uid > 0 ? ($Y[$year]['u'][$uid . ':' . $tid] ?? null) : null);
+}
+/** SUM(days|hours) of a person's requests of a type in a year — $group approved | pending; $counted = only counted rows; $cfR = the counted_from clause (forces a direct query). */
+function hr_req_sum(int $pid, int $tid, int $year, string $group, string $field, bool $counted, string $cfR = ''): float {
+    $st = $group === 'approved' ? "status = 'approved'" : "status IN ('pending_mgr','pending_hr')";
+    if (!hr_bulk_ok() || $cfR !== '') return (float) scalar("SELECT COALESCE(SUM($field),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND $st" . ($counted ? hr_counted_sql() : '') . $cfR, [$pid, $tid, $year]);
+    static $Y = []; if (!isset($Y[$year])) { $Y[$year] = []; $hasC = hr_counted_sql() !== '';
+        foreach (all("SELECT person_id, type_id, status = 'approved' ap, " . ($hasC ? 'counted' : '1') . " c, COALESCE(SUM(days),0) d, COALESCE(SUM(hours),0) h FROM hr_requests WHERE YEAR(date_from) = ? AND status IN ('approved','pending_mgr','pending_hr') GROUP BY person_id, type_id, ap, c", [$year]) as $r) { $k = (int)$r['person_id'] . ':' . (int)$r['type_id'] . ':' . ((int)$r['ap'] ? 'approved' : 'pending'); $Y[$year][$k]['all_d'] = ($Y[$year][$k]['all_d'] ?? 0) + (float)$r['d']; $Y[$year][$k]['all_h'] = ($Y[$year][$k]['all_h'] ?? 0) + (float)$r['h']; if ((int)$r['c'] === 1) { $Y[$year][$k]['c_d'] = ($Y[$year][$k]['c_d'] ?? 0) + (float)$r['d']; $Y[$year][$k]['c_h'] = ($Y[$year][$k]['c_h'] ?? 0) + (float)$r['h']; } } }
+    $k = $pid . ':' . $tid . ':' . $group; $f = ($counted && hr_counted_sql() !== '' ? 'c_' : 'all_') . ($field === 'hours' ? 'h' : 'd'); return (float)($Y[$year][$k][$f] ?? 0);
+}
+/** Board days typed outside the request flow (request_id IS NULL) for an account-year-type. */
+function hr_board_days(int $uid, int $tid, int $year, string $cfP = ''): float {
+    if (!hr_bulk_ok() || $cfP !== '') return (float) scalar('SELECT COUNT(DISTINCT plan_date) FROM plan_entries WHERE user_id = ? AND leave_type_id = ? AND YEAR(plan_date) = ? AND request_id IS NULL' . $cfP, [$uid, $tid, $year]);
+    static $Y = []; if (!isset($Y[$year])) { $Y[$year] = []; try { foreach (all('SELECT user_id, leave_type_id, COUNT(DISTINCT plan_date) n FROM plan_entries WHERE YEAR(plan_date) = ? AND request_id IS NULL AND leave_type_id IS NOT NULL GROUP BY user_id, leave_type_id', [$year]) as $r) $Y[$year][(int)$r['user_id'] . ':' . (int)$r['leave_type_id']] = (float)$r['n']; } catch (Throwable $e) {} }
+    return $Y[$year][$uid . ':' . $tid] ?? 0.0;
+}
 function hr_balance(array $p, int $tid, int $year): array {
+    // R69-002: the board and the HR dashboard ask the same balance hundreds of times per page — remember it for this request (reads only; a POST recomputes)
+    static $memo = []; $mk = (int)$p['id'] . ':' . $tid . ':' . $year; $ro = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET';
+    if ($ro && isset($memo[$mk])) return $memo[$mk];
+    $b = hr_balance_compute($p, $tid, $year); if ($ro) $memo[$mk] = $b; return $b;
+}
+function hr_balance_compute(array $p, int $tid, int $year): array {
     $t = hr_type($tid); $pid = (int)$p['id']; $uid = (int)($p['user_id'] ?? 0);
-    $e = one('SELECT * FROM hr_entitlements WHERE year = ? AND type_id = ? AND (person_id = ? OR (user_id = ? AND ? > 0)) ORDER BY person_id IS NULL LIMIT 1', [$year, $tid, $pid, $uid, $uid]);
+    $e = hr_ent_row($pid, $uid, $tid, $year);   // R69-002 bulk-loaded on reads
     $ent = (float)($e['days'] ?? 0); $carry = (float)($e['carry'] ?? 0); $open = (float)($e['opening_taken'] ?? 0); $mode = $e ? 'manual' : 'none'; $st = null;
     $cf = !empty($e['counted_from']) ? (string)$e['counted_from'] : null; $cfR = $cf ? " AND date_from > '" . $cf . "'" : ''; $cfP = $cf ? " AND plan_date > '" . $cf . "'" : '';   // R60-004: records up to the cut-over date are inside opening_taken
     if (function_exists('hr4_has') && hr4_has() && $t && ($t['rule_key'] ?? '') !== '' && !(function_exists('hr_is_contractor') && hr_is_contractor($p))) { [$ent, $mode, $st] = hr_entitlement_effective($p, $tid, $year); }   // R55-001/002: the engine unless HR fixed the value
-    $taken = (float) scalar("SELECT COALESCE(SUM(days),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND status = 'approved'" . hr_counted_sql() . $cfR, [$pid, $tid, $year]);
-    $pend = (float) scalar("SELECT COALESCE(SUM(days),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND status IN ('pending_mgr','pending_hr')" . hr_counted_sql() . $cfR, [$pid, $tid, $year]);
-    if ($t && $t['unit'] === 'hour') { $taken = (float) scalar("SELECT COALESCE(SUM(hours),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND status = 'approved'" . hr_counted_sql() . $cfR, [$pid, $tid, $year]); $pend = (float) scalar("SELECT COALESCE(SUM(hours),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND status IN ('pending_mgr','pending_hr')" . hr_counted_sql(), [$pid, $tid, $year]); }
+    $taken = hr_req_sum($pid, $tid, $year, 'approved', 'days', true, $cfR);
+    $pend = hr_req_sum($pid, $tid, $year, 'pending', 'days', true, $cfR);
+    if ($t && $t['unit'] === 'hour') { $taken = hr_req_sum($pid, $tid, $year, 'approved', 'hours', true, $cfR); $pend = hr_req_sum($pid, $tid, $year, 'pending', 'hours', true); }
     // board entries written outside the request flow (HR typed them on the board) count as taken for day types
-    if ($uid && (!$t || $t['unit'] === 'day')) $taken += (float) scalar('SELECT COUNT(DISTINCT plan_date) FROM plan_entries WHERE user_id = ? AND leave_type_id = ? AND YEAR(plan_date) = ? AND request_id IS NULL' . $cfP, [$uid, $tid, $year]);
+    if ($uid && (!$t || $t['unit'] === 'day')) $taken += hr_board_days($uid, $tid, $year, $cfP);
     // annual leave also carries the hours of annual-consuming hour types (8 h = 1 day)
     $accH = 0.0;   // R64-006: hour types that consume annual leave accumulate; only whole days (8 h) are offset against the annual balance, the remainder waits for the next hours
-    if ($t && $t['rule_key'] === 'annual') { foreach (hr_types() as $x) if ($x['consumes_annual'] && $x['unit'] === 'hour') { $h = (float) scalar("SELECT COALESCE(SUM(hours),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND status = 'approved'" . hr_counted_sql() . $cfR, [$pid, (int)$x['id'], $year]); $taken += floor($h / HR_HOURS_PER_DAY); $accH += fmod($h, HR_HOURS_PER_DAY); $pend += (float) scalar("SELECT COALESCE(SUM(hours),0) FROM hr_requests WHERE person_id = ? AND type_id = ? AND YEAR(date_from) = ? AND status IN ('pending_mgr','pending_hr')", [$pid, (int)$x['id'], $year]) / HR_HOURS_PER_DAY; } }
+    if ($t && $t['rule_key'] === 'annual') { foreach (hr_types() as $x) if ($x['consumes_annual'] && $x['unit'] === 'hour') { $h = hr_req_sum($pid, (int)$x['id'], $year, 'approved', 'hours', true, $cfR); $taken += floor($h / HR_HOURS_PER_DAY); $accH += fmod($h, HR_HOURS_PER_DAY); $pend += hr_req_sum($pid, (int)$x['id'], $year, 'pending', 'hours', false) / HR_HOURS_PER_DAY; } }
     $cap = $t && $t['max_year'] !== null ? (float)$t['max_year'] : null; $counts = $t && ($t['counts'] || $cap !== null);
     if (function_exists('hr_is_contractor') && hr_is_contractor($p)) { $counts = false; $cap = null; }   // R55-002: contractors — agreed by the manager, no balances
     $total = $cap !== null && $ent <= 0 && $mode === 'none' ? $cap : $ent + $carry;

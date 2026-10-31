@@ -132,6 +132,16 @@ function diag_run(): array {
         if (function_exists('ai_can') && function_exists('ai_setting') && ai_setting('ai_enabled', '0') === '1') { $t = microtime(true); $ch = curl_init(rtrim((string) cfg('ai.base_url', 'https://api.anthropic.com'), '/') . '/v1/models'); curl_setopt_array($ch, [CURLOPT_NOBODY => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 6, CURLOPT_CONNECTTIMEOUT => 4, CURLOPT_SSL_VERIFYPEER => true]); curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE); $err = curl_error($ch); curl_close($ch); $ms = (int) round((microtime(true) - $t) * 1000); $R[] = diag_row('app', t('dg.ai_reach'), $code > 0 ? 'ok' : 'warn', $code > 0 ? 'HTTP ' . $code . ' · ' . $ms . ' ms' : $err, $code > 0 ? '' : t('dg.fix_ai')); }
     }, 'app', t('dg.config'));
 
+    // R69-002: block cache, house-keeping and the slow-pages log
+    $try(function () use (&$R) {
+        if (!function_exists('cache_backend')) return;
+        $n = cache_backend() === 'apcu' ? '-' : count((array) @glob(cache_dir() . '/*.cache'));
+        $R[] = diag_row('app', t('dg.cache'), is_writable(cache_dir()) || cache_backend() === 'apcu' ? 'ok' : 'warn', (cache_backend() === 'apcu' ? 'APCu' : t('dg.cache_files')) . ($n === '-' ? '' : ' · ' . $n . ' ' . t('dg.cache_entries')), is_writable(cache_dir()) || cache_backend() === 'apcu' ? '' : t('dg.fix_storage'));
+        $hk = (string) cp_setting('hk_last', ''); $R[] = diag_row('app', t('dg.housekeeping'), $hk === '' ? 'warn' : (substr($hk, 0, 10) < date('Y-m-d', strtotime('-2 days')) ? 'warn' : 'ok'), $hk === '' ? t('dg.hk_never') : $hk);
+        $sp = db_slow_pages(8); if (!$sp) { $R[] = diag_row('app', t('dg.slow_pages'), 'ok', t('dg.slow_none')); return; }
+        $R[] = diag_row('app', t('dg.slow_pages'), $sp[0]['ms'] > 8000 ? 'warn' : 'ok', implode("\n", array_map(fn($r) => $r['at'] . ' · ' . $r['page'] . ' · ' . $r['ms'] . ' ms · ' . $r['q'] . ' q · db ' . $r['db'] . ' ms' . ($r['slow'] ? ' · ' . mb_substr($r['slow'], 0, 160) : ''), $sp)), $sp[0]['ms'] > 8000 ? t('dg.fix_slow') : '');
+    }, 'app', t('dg.slow_pages'));
+
     // the error log the portal keeps since R69-001
     $try(function () use (&$R) {
         $f = diag_error_log_path(); if (!is_file($f)) { $R[] = diag_row('app', t('dg.errlog'), 'ok', t('dg.errlog_empty')); return; }
@@ -151,4 +161,6 @@ function diag_text(array $res): string {
     return $o;
 }
 /** Truncate the error log (admin). */
+function diag_cache_flush(): int { require_cp_admin(); return cache_flush(); }   // R69-002
+function diag_slowlog_clear(): void { require_cp_admin(); $f = dirname(__DIR__) . '/storage/slow-pages.log'; if (is_file($f)) @file_put_contents($f, ''); }
 function diag_errlog_clear(): void { require_cp_admin(); $f = diag_error_log_path(); if (is_file($f)) @file_put_contents($f, ''); }

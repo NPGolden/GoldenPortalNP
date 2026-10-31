@@ -66,7 +66,8 @@ function act_top(string $from, string $to, int $n = 10): array {
     return $cache[$ck] = $out;
 }
 /** The dashboard block: fleet KPIs + two top-10 lists. */
-function act_card(): string {
+function act_card(): string { return function_exists('cache_remember') ? cache_remember('act_card:' . locale(), 600, 'act_card_compute') : act_card_compute(); }   // R69-002
+function act_card_compute(): string {
     $y = (int) date('Y'); $yFrom = "$y-01-01"; $today = date('Y-m-d'); $mFrom = date('Y-m-d', strtotime('-30 days'));
     $fleetY = act_fleet($yFrom, $today); $fleetM = act_fleet($mFrom, $today); $new = act_new_vessels($y); $total = (int) scalar('SELECT COUNT(*) FROM vessels WHERE is_active = 1');
     $topY = act_top($yFrom, $today, 10); $topM = act_top($mFrom, $today, 10);

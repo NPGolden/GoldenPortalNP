@@ -29,7 +29,7 @@ function db(): PDO {
     return $pdo;
 }
 
-function q(string $sql, array $p = []): PDOStatement { $s = db()->prepare($sql); $s->execute($p); return $s; }
+function q(string $sql, array $p = []): PDOStatement { $t = microtime(true); $s = db()->prepare($sql); $s->execute($p); if (function_exists('db_meter')) db_meter($sql, (microtime(true) - $t) * 1000); return $s; }   // R69-002: query meter
 function all(string $sql, array $p = []): array { return q($sql, $p)->fetchAll(); }
 function one(string $sql, array $p = []): ?array { $r = q($sql, $p)->fetch(); return $r === false ? null : $r; }
 function scalar(string $sql, array $p = []) { return q($sql, $p)->fetchColumn(); }

@@ -238,7 +238,7 @@
   if (home) { load(home).then(function (d) { badge(home, d); }).catch(function () {}); setInterval(function () { load(home).then(function (d) { badge(home, d); }).catch(function () {}); }, 30 * 60000); }
 })();
 
-/* ---- Presence heartbeat: a signed-in portal page reports every minute, so "online" means signed in and
+/* ---- Presence heartbeat: a signed-in portal page reports every two minutes, so "online" means signed in and
         connected (page open); it stops when the server answers 401 (signed out / idle time-out).   GAS-CP-R24-002 */
 (function () {
   if (!document.querySelector('.who')) return;                       // not signed in
@@ -247,7 +247,7 @@
     if (stop || document.hidden && Math.random() < 0.5) return;        // hidden tabs still beat, half as often
     fetch('index.php?p=ping', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { if (r.status === 401) stop = true; }).catch(function () {});
   }
-  setInterval(beat, 60000);
+  setInterval(beat, 120000);                                          // R69-002: every 2 min (presence window 5 min)
 })();
 
 /* ---- R49-001: sign out when the browser is closed. Every signed-in tab refreshes a window marker in localStorage every

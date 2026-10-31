@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.79.3';
+const CP_VERSION = '1.79.4';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R69-002', 'version' => '1.79.4', 'date' => '2026-10-31', 'title' => 'Performance pass, no functional change: a short-lived block cache (APCu or storage/cache) keeps the menu counters (45 s per user, dropped on every action), the online list (20 s / 60 s) and the dashboard fleet, activity and celebration cards (10 min per language); 21 indexes on the tables behind the dashboard counters, the activity ranking and the HR balances; presence heartbeat every 2 min (online window 5 min); a daily house-keeping run on the first page of each day (read notifications older than 90 days, sign-in log older than a year, assistant log older than 180 days, sent push items older than 30 days, session files older than 7 days, update backups beyond the last 3, oversized logs trimmed); a query meter in the footer for administrators (queries · ms) with a slow-pages log (over 2 s or 150 queries) shown in Diagnostics together with the cache state and the last house-keeping; Flush cache and Clear slow-pages log buttons.', 'db' => 'install/migrate_cp_r69_perf.sql', 'check' => 'r69b'],
         ['ref' => 'GAS-CP-R69-001', 'version' => '1.79.3', 'date' => '2026-10-31', 'title' => 'Settings › About › Diagnostics: one click runs read-only checks of the database (queries running now, open transactions and locks, connections, table health, missing database steps, orphan references, duplicates, growing tables, backlog) and of the application (PHP version and limits, extensions, storage folders, disk, session files, update lock, configuration, assistant reachability, timings of the heaviest pages, the PHP error log) — each with OK / warn / fail and what to do; report download; the portal now writes PHP errors to storage/php-errors.log.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R67-002', 'version' => '1.79.2', 'date' => '2026-10-31', 'title' => 'HR Assistant: an AMKA whose first six digits differ from the date of birth is no longer refused — the AMKA is issued from the registration certificate, which may carry a later date. The employee ticks "My AMKA was issued with this date", the value is staged with a note that HR sees next to the field on the review ("AMKA date differs from the date of birth — confirmed by the employee"); the digits must still form a date (DDMMYY). Manuals and the five languages updated.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R64-007', 'version' => '1.79.1', 'date' => '2026-10-31', 'title' => 'Settings › Disciplines: one structure, no duplicates — each row now shows portal accounts and 🪪 employee cards, and "Merge into…" moves every account, card, target, leave period and training of a duplicate into the discipline you choose and deletes it. The people import no longer creates departments on its own: unknown names are matched loosely (case, accents, the word "department" ignored) and otherwise the card keeps its department unless HR ticks "create unknown departments".', 'db' => null, 'check' => null],
@@ -262,6 +263,7 @@ function cp_migration_state(): array {
         'r61' => $has("SHOW TABLES LIKE 'hr_leave_periods'") && $has("SHOW COLUMNS FROM hr_requests LIKE 'period_id'"),
         'r63' => $has("SHOW TABLES LIKE 'soc_kudos'") && $has("SHOW TABLES LIKE 'soc_onboard'"),
         'r64' => $has("SHOW TABLES LIKE 'hr_targets'") && $has("SHOW TABLES LIKE 'hr_target_log'"),
+        'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),
         'r67' => $has("SHOW TABLES LIKE 'hr_flows'") && $has("SHOW TABLES LIKE 'hr_flow_templates'") && $has("SHOW TABLES LIKE 'hr_invitations'"),
         'r62' => $has("SHOW TABLES LIKE 'hr_trainings'") && $has("SHOW TABLES LIKE 'hr_evaluations'") && $has("SHOW COLUMNS FROM hr_people LIKE 'gross_salary'") && $has("SHOW COLUMNS FROM hr_leave_periods LIKE 'mandatory'"),
         'r60c' => $has("SHOW COLUMNS FROM hr_people LIKE 'iban'"),

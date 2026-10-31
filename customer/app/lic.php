@@ -39,13 +39,19 @@ function lic_has(): bool {
 }
 function cp_setting(string $k, ?string $default = null): ?string {
     if (!lic_has()) return $default;
-    static $c = [];
-    if (!array_key_exists($k, $c)) { $r = one('SELECT v FROM cp_settings WHERE k = ?', [$k]); $c[$k] = $r ? $r['v'] : null; }
-    return $c[$k] ?? $default;
+    $c = &cp_settings_all();
+    return array_key_exists($k, $c) ? ($c[$k] ?? $default) : $default;
+}
+/** R69-002: the whole (small) settings table once per request instead of one query per key. */
+function &cp_settings_all(): array {
+    static $c = null;
+    if ($c === null) { $c = []; try { foreach (all('SELECT k, v FROM cp_settings') as $r) $c[$r['k']] = $r['v']; } catch (Throwable $e) {} }
+    return $c;
 }
 function cp_setting_set(string $k, ?string $v): void {
     if (!lic_has()) return;
     q('INSERT INTO cp_settings (k, v) VALUES (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)', [$k, $v]);
+    $c = &cp_settings_all(); $c[$k] = $v;
 }
 /** Random id of this installation, created once; the vendor may bind a licence to it. */
 function lic_instance_id(): string {

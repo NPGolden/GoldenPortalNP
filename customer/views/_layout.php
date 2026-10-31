@@ -48,6 +48,10 @@ function nav_groups(): array {
 }
 /** Badge counts per slug (what is waiting for this user). */
 function nav_badges(): array {
+    $u = current_user(); if (!$u || !function_exists('cache_remember')) return nav_badges_compute();
+    return cache_remember('badges:' . (int)$u['id'], 45, 'nav_badges_compute');   // R69-002: the menu counters cost a dozen queries per page
+}
+function nav_badges_compute(): array {
     $b = [];
     if (!is_staff() && function_exists('oa_pending')) $b['approvals'] = count(oa_pending());
     if (is_staff() && function_exists('ts_to_approve')) $b['timesheets'] = count(ts_to_approve());
@@ -219,7 +223,8 @@ $wxL = []; foreach (['clear', 'partly', 'cloudy', 'fog', 'drizzle', 'rain', 'sno
 <?php }
 
 function layout_foot(): void { ?>
-    <p class="buildtag"><?= e(CP_NAME) ?> · v<?= e(CP_VERSION) ?> · <?= e(CP_BUILD) ?><?php if (function_exists('lic') && ($LL = lic())): ?> · <?= e(t('lic.licensed_to', ['n' => $LL['licensee'] ?? ''])) ?> · S/N <?= e($LL['serial']) ?><?php endif; ?><?php if (function_exists('is_cp_admin') && is_cp_admin()): ?> · <a href="<?= url('admin_about') ?>"><?= tt('nav.about') ?></a><?php endif; ?></p>
+    <p class="buildtag"><?= e(CP_NAME) ?> · v<?= e(CP_VERSION) ?> · <?= e(CP_BUILD) ?><?php if (function_exists('lic') && ($LL = lic())): ?> · <?= e(t('lic.licensed_to', ['n' => $LL['licensee'] ?? ''])) ?> · S/N <?= e($LL['serial']) ?><?php endif; ?><?php if (function_exists('is_cp_admin') && is_cp_admin()): ?> · <a href="<?= url('admin_about') ?>"><?= tt('nav.about') ?></a><?php if (function_exists('db_stats')): $ds = db_stats(); ?> · <span class="hint" title="<?= e(t('perf.meter_tip')) ?>"><?= (int)$ds['queries'] ?> q · <?= (int)$ds['page_ms'] ?> ms</span><?php endif; ?><?php endif; ?></p>
+    <?php if (function_exists('db_meter_finish')) { db_meter_finish((string)($_GET['p'] ?? 'dashboard')); if (function_exists('hk_tick')) hk_tick(); } ?>
   </main>
 </div>
 <script nonce="<?= csp_nonce() ?>" src="../assets/portal.js?v=<?= @filemtime(__DIR__ . '/../../assets/portal.js') ?: 1 ?>"></script>

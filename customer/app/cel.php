@@ -114,7 +114,8 @@ function cel_upcoming(int $days = 7, bool $withAge = false): array {
     return $out;
 }
 /** Card HTML (dashboard / HR dashboard). $withAge only for HR. */
-function cel_card(int $days, bool $withAge, bool $linkCards): string {
+function cel_card(int $days, bool $withAge, bool $linkCards): string { return function_exists('cache_remember') ? cache_remember('cel_card:' . locale() . ':' . $days . ':' . (int)$withAge . (int)$linkCards, 600, fn() => cel_card_compute($days, $withAge, $linkCards)) : cel_card_compute($days, $withAge, $linkCards); }   // R69-002
+function cel_card_compute(int $days, bool $withAge, bool $linkCards): string {
     $rows = cel_upcoming($days, $withAge); if (!$rows) return '';
     $h = '<div class="card" id="celebrations"><h2>🎉 ' . tt('cel.title') . ' <span class="hint" style="display:inline;margin-left:6px;">' . e(t('cel.next_days', ['n' => $days])) . '</span></h2><ul class="cel-list" style="list-style:none;margin:0;padding:0;display:grid;gap:4px;">';
     $today = date('Y-m-d'); $tom = date('Y-m-d', strtotime('+1 day'));

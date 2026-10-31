@@ -86,7 +86,7 @@ function hr_statutory_type(array $p, array $t, int $year): ?array {
 }
 /** Effective annual-leave days of a person for a year: the engine unless HR fixed the value (auto = 0 with a row). Returns [days, 'auto'|'manual'|'none', statutory|null]. */
 function hr_entitlement_effective(array $p, int $tid, int $year): array {
-    $row = one('SELECT * FROM hr_entitlements WHERE year = ? AND type_id = ? AND (person_id = ? OR (user_id = ? AND ? > 0)) ORDER BY person_id IS NULL LIMIT 1', [$year, $tid, (int)$p['id'], (int)($p['user_id'] ?? 0), (int)($p['user_id'] ?? 0)]);
+    $row = hr_ent_row((int)$p['id'], (int)($p['user_id'] ?? 0), $tid, $year);   // R69-002 bulk-loaded on reads
     $t = hr_type($tid); $isAnn = $t && ($t['rule_key'] ?? '') !== '' && hr4_has(); $st = $isAnn ? hr_statutory_type($p, $t, $year) : null;
     if ($row && !$isAnn) return [(float)$row['days'], 'manual', null];
     if ($row && (int)($row['auto'] ?? 0) === 0 && hr4_has()) return [(float)$row['days'], 'manual', $st];

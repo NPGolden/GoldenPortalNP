@@ -111,7 +111,7 @@ function presence_touch(array $u): void {
     if ($u['last_seen_at'] && strtotime((string)$u['last_seen_at']) > time() - 60) return;
     try { q('UPDATE customer_users SET last_seen_at = NOW() WHERE id = ?', [$u['id']]); } catch (Throwable $e) {}
 }
-const PRESENCE_MINUTES = 3;
+const PRESENCE_MINUTES = 5;   // R69-002: heartbeat every 2 min (was 1 min / 3 min)
 /** Heartbeat endpoint (?p=ping): refresh the stamp without touching the idle timer; 204 when signed in, 401 otherwise. */
 function presence_ping(): void {
     $u = current_user();
@@ -123,6 +123,10 @@ function presence_ping(): void {
 function presence_leave(int $uid): void { try { q('UPDATE customer_users SET last_seen_at = NULL WHERE id = ?', [$uid]); } catch (Throwable $e) {} }
 /** People seen in the last PRESENCE_MINUTES, most recent first. */
 function online_users(): array {
+    if (function_exists('cache_remember')) return cache_remember('online', 20, 'online_users_compute');   // R69-002
+    return online_users_compute();
+}
+function online_users_compute(): array {
     try {
         return all('SELECT cu.id, cu.full_name, cu.role, cu.last_seen_at, c.name AS customer_name
                     FROM customer_users cu LEFT JOIN customers c ON c.id = cu.customer_id
