@@ -7,6 +7,8 @@
  */
 require __DIR__ . '/_layout.php';
 $u = require_cp_admin();
+$diag = isset($_GET['diag']) && function_exists('diag_run') ? diag_run() : null;   // R69-001: run only on demand
+if ($diag && ($_GET['export'] ?? '') === 'diag') { header('Content-Type: text/plain; charset=utf-8'); header('Content-Disposition: attachment; filename="GAS-portal-diagnostics-' . date('Ymd-Hi') . '.txt"'); echo diag_text($diag); exit; }
 $state = cp_migration_state();
 $integ = cp_integrity();
 $m = $integ['manifest'];
@@ -68,6 +70,18 @@ layout_head(t('ab.title'), 'admin_about');
   <?php endif; ?>
 </div>
 
+<div class="card" id="diag">
+  <div class="page-head" style="margin-bottom:6px;"><h2 style="margin:0;">🩺 <?= tt('dg.title') ?></h2><div class="btn-row"><a class="btn btn--gold btn--sm" href="<?= url('admin_about', ['diag' => 1]) ?>#diag">▶ <?= $diag ? tt('dg.rerun') : tt('dg.run') ?></a><?php if ($diag): ?><a class="btn btn--ghost btn--sm" href="<?= url('admin_about', ['diag' => 1, 'export' => 'diag']) ?>">⤓ <?= tt('dg.download') ?></a><?php endif; ?></div></div>
+  <p class="hint"><?= tt('dg.lede') ?></p>
+  <?php if ($diag): $nF = count(array_filter($diag['rows'], fn($r) => $r['state'] === 'fail')); $nW = count(array_filter($diag['rows'], fn($r) => $r['state'] === 'warn')); ?>
+  <p style="margin:0 0 8px;"><?= $nF ? pill('bad', $nF . ' ' . t('dg.fail')) : '' ?> <?= $nW ? pill('gold', $nW . ' ' . t('dg.warn')) : '' ?> <?= !$nF && !$nW ? pill('green', t('dg.all_ok')) : '' ?> <span class="hint">· <?= e($diag['at']) ?> · <?= (int)$diag['ms'] ?> ms</span></p>
+  <div class="table-scroll"><table class="tbl"><thead><tr><th></th><th><?= tt('dg.check') ?></th><th><?= tt('dg.detail') ?></th><th><?= tt('dg.fix') ?></th></tr></thead><tbody>
+  <?php foreach (['db' => t('dg.g_db'), 'app' => t('dg.g_app')] as $g => $gl): $rows = array_filter($diag['rows'], fn($r) => $r['group'] === $g); if (!$rows) continue; ?><tr><td colspan="4" style="background:var(--field-bg);font-weight:700;font-size:11px;letter-spacing:.06em;"><?= e(mb_strtoupper($gl)) ?></td></tr>
+  <?php foreach ($rows as $r): ?><tr><td><?= $r['state'] === 'ok' ? pill('green', 'OK') : ($r['state'] === 'warn' ? pill('gold', t('dg.warn')) : pill('bad', t('dg.fail'))) ?></td><td><b><?= e($r['name']) ?></b></td><td class="hint" style="white-space:pre-wrap;word-break:break-word;max-width:560px;"><?= e($r['detail']) ?></td><td class="hint"><?= e($r['fix']) ?></td></tr><?php endforeach; endforeach; ?>
+  </tbody></table></div>
+  <?php if (is_file(diag_error_log_path()) && filesize(diag_error_log_path()) > 0): ?><form method="post" action="<?= url('admin_about') ?>" class="inline" style="margin-top:8px;" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="diag_errlog_clear"><button class="btn btn--ghost btn--sm" type="submit" data-js-confirm="<?= tt('dg.errlog_clear_confirm') ?>">🧹 <?= tt('dg.errlog_clear') ?></button></form><?php endif; ?>
+  <?php endif; ?>
+</div>
 <div class="card">
   <h2><?= tt('ab.patches') ?></h2>
   <p class="hint"><?= tt('ab.patches_hint') ?></p>

@@ -3,6 +3,7 @@
 declare(strict_types=1);
 error_reporting(E_ALL);
 ini_set('display_errors', '0');
+if (is_dir(__DIR__ . '/storage') && is_writable(__DIR__ . '/storage')) { ini_set('log_errors', '1'); ini_set('error_log', __DIR__ . '/storage/php-errors.log'); }   // R69-001: PHP errors land where Settings › About › Diagnostics reads them
 
 require __DIR__ . '/app/db.php';
 require __DIR__ . '/app/i18n.php';
@@ -42,6 +43,7 @@ require __DIR__ . '/app/hr4.php';   // R55-001
 require __DIR__ . '/app/hr5.php';   // R61-001
 require __DIR__ . '/app/hr6.php';   // R62-001
 require __DIR__ . '/app/hr7.php';   // R64-001 targets, auto-metrics, personal gate
+require __DIR__ . '/app/diag.php';  // R69-001 diagnostics
 require __DIR__ . '/app/hra.php';   // R67-001 HR Assistant — guided flows with HR approval
 require __DIR__ . '/app/cel.php';   // R62-004 celebrations
 require __DIR__ . '/app/act.php';   // R62-005 fleet & activity
