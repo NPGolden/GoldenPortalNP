@@ -22,6 +22,13 @@ layout_head(t('hr.my_leave'), 'my_leave');
   <?php endif; ?>
   <p class="hint" style="margin:8px 0 0;"><?= e(t('hr.my_lede2', ['m' => $mgrName ?: t('hr.no_manager')])) ?></p>
 </div>
+<?php if (function_exists('hra_has') && hra_has() && hra_can_use()): $hc = hra_completeness($p); $hOpen = hra_my_flow((int)$u['id'], 'card'); ?>
+<div class="card" id="hra-card">
+  <h2>🤖 <?= tt('hra.ml_title') ?> <?= pill($hc['pct'] >= 90 ? 'green' : ($hc['pct'] >= 60 ? 'gold' : 'red'), $hc['pct'] . ' %') ?></h2>
+  <p class="hint"><?= e(t('hra.ml_text', ['p' => $hc['pct']])) ?><?= $hOpen ? ' ' . e(t('hra.ml_open', ['c' => $hOpen['code'], 's' => t('hra.st_' . $hOpen['status'])])) : '' ?></p>
+  <div class="btn-row"><?php if ($hOpen): ?><a class="btn btn--gold btn--sm" href="<?= url('hra_flow', ['id' => (int)$hOpen['id']]) ?>">▶ <?= tt($hOpen['status'] === 'draft' ? 'hra.continue' : 'hra.view_flow') ?></a><?php else: ?><form method="post" action="<?= url('my_leave') ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hra_start"><button class="btn btn--gold btn--sm" type="submit">🤖 <?= tt('hra.start_card') ?></button></form><?php endif; ?><a class="btn btn--ghost btn--sm" href="<?= url('hra') ?>"><?= tt('hra.title') ?></a></div>
+</div>
+<?php endif; ?>
 <?php if (function_exists('hr_lv_has') && hr_lv_has() && ($myPeriods = hr_periods_for($p))): ?>
 <div class="card" id="hr-periods">
   <h2>🏝 <?= tt('hr.periods_open') ?></h2>

@@ -32,7 +32,7 @@ function nf_groups(): array {
     return ['fleet' => t('nav.g_fleet'), 'work' => t('nav.g_work'), 'commercial' => t('nav.g_commercial'), 'library' => t('nav.g_library')];
 }
 const NF_GROUP_OF = ['tk' => 'work', 'wf' => 'work', 'jo' => 'work', 'fsr' => 'work', 'isr' => 'work', 'ts' => 'work', 'of' => 'commercial', 'oa' => 'commercial', 'ctn' => 'commercial',
-                     'cls' => 'fleet', 'drw' => 'fleet', 'spn' => 'fleet', 'spc' => 'fleet', 'doc' => 'library', 'td' => 'work', 'lic' => 'library', 'mt' => 'work', 'bg' => 'fleet', 'wp' => 'work', 'sec' => 'library', 'acc' => 'commercial', 'pd' => 'work', 'pi' => 'commercial', 'eng' => 'work', 'hrq' => 'work', 'hrm' => 'work', 'crq' => 'library', 'soc' => 'work', 'hrt' => 'work', 'hrev' => 'work'];
+                     'cls' => 'fleet', 'drw' => 'fleet', 'spn' => 'fleet', 'spc' => 'fleet', 'doc' => 'library', 'td' => 'work', 'lic' => 'library', 'mt' => 'work', 'bg' => 'fleet', 'wp' => 'work', 'sec' => 'library', 'acc' => 'commercial', 'pd' => 'work', 'pi' => 'commercial', 'eng' => 'work', 'hrq' => 'work', 'hrm' => 'work', 'crq' => 'library', 'soc' => 'work', 'hrt' => 'work', 'hrev' => 'work', 'hra' => 'work'];
 
 /* ------------------------------------------------------------ sweep */
 
@@ -52,6 +52,7 @@ function nf_sweep(int $every = 60, bool $force = false): int {
             }
             try { if (function_exists('td_remind')) $n += td_remind(); } catch (Throwable $e) {}        // R22-002 task reminders
             try { if (function_exists('lic_notify')) lic_notify(); } catch (Throwable $e) {}            // R22-001 licence expiry
+            try { if (function_exists('hra_remind')) { $n += hra_remind(); hra_purge(); } } catch (Throwable $e) {}   // R67-001 HR Assistant reminders + purge of closed flows
             q('INSERT INTO nf_cursor (source, last_id, run_at) VALUES (?, 0, NOW()) ON DUPLICATE KEY UPDATE run_at = NOW()', ['_meta']);
             if (random_int(1, 40) === 1) nf_prune();                         // seen entries older than 90 days, now and then
         } finally { scalar("SELECT RELEASE_LOCK('nf_sweep')"); }
@@ -369,7 +370,7 @@ function nf_label(array $r): string {
 function nf_source_label(string $kind): string {
     $src = explode(':', $kind, 2)[0];
     $map = ['tk' => 'nav.tickets', 'jo' => 'nav.joborders', 'fsr' => 'nav.reports', 'isr' => 'isr.plural', 'ts' => 'nav.timesheets', 'of' => 'nav.offers', 'oa' => 'nav.approvals', 'ctn' => 'nav.contacts',
-            'cls' => 'tab.class', 'drw' => 'tab.drawings', 'spn' => 'tab.weekly', 'spc' => 'tab.comments', 'doc' => 'nav.docs', 'td' => 'td.title', 'lic' => 'lic.title', 'mt' => 'mt.src', 'bg' => 'bg.tab', 'wp' => 'wp.title', 'sec' => 'au.title', 'acc' => 'acc.title', 'pd' => 'pd.title', 'pi' => 'pi.title', 'eng' => 'eng.title', 'hrq' => 'hr.requests', 'hrm' => 'hr.msg_title', 'crq' => 'cr.title', 'soc' => 'soc.title', 'hrt' => 'hr.training', 'hrev' => 'hr.evaluations'];
+            'cls' => 'tab.class', 'drw' => 'tab.drawings', 'spn' => 'tab.weekly', 'spc' => 'tab.comments', 'doc' => 'nav.docs', 'td' => 'td.title', 'lic' => 'lic.title', 'mt' => 'mt.src', 'bg' => 'bg.tab', 'wp' => 'wp.title', 'sec' => 'au.title', 'acc' => 'acc.title', 'pd' => 'pd.title', 'pi' => 'pi.title', 'eng' => 'eng.title', 'hrq' => 'hr.requests', 'hrm' => 'hr.msg_title', 'crq' => 'cr.title', 'soc' => 'soc.title', 'hrt' => 'hr.training', 'hrev' => 'hr.evaluations', 'hra' => 'hra.title'];
     $k = $map[$src] ?? ''; $s = $k ? t($k) : ''; return $s !== $k ? $s : '';
 }
 /** Amounts in offer notes stay hidden from roles without financial visibility. */

@@ -39,6 +39,7 @@ $pend = count(array_filter(hr_requests_for('hr', 0), fn($r) => (int)$r['person_i
 <?php if ($tab === 'data' || $tab === 'emp'): ?>
 <div class="cols">
 <?php if ($tab === 'data'): ?>
+<?php if (function_exists('hra_has') && hra_has() && hra_can_manage() && ($hf = one("SELECT id, code, status FROM hr_flows WHERE person_id = ? AND status IN ('draft','submitted','manager','hr','ceo') ORDER BY id DESC LIMIT 1", [$pid]))): ?><div class="flash flash--warn">🤖 <?= e(t('hra.card_banner', ['s' => t('hra.st_' . $hf['status']), 'c' => $hf['code']])) ?> <a href="<?= url('hra_flow', ['id' => (int)$hf['id']]) ?>"><?= tt('hra.open') ?> →</a></div><?php endif; ?>
 <div class="card" id="hr-data">
   <h2><?= tt('hr.person_edit') ?></h2>
   <form method="post" action="<?= url('hr_person', ['id' => $pid]) ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hr_person_save"><input type="hidden" name="id" value="<?= $pid ?>">

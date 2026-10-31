@@ -39,10 +39,11 @@ function nav_groups(): array {
     if ($staff && function_exists('hr_lv_has') && hr_lv_has() && hr_can()) $hr['items'][] = ['hr_leaves', t('hr.leaves'), '🏖'];                      // R61-001
     if ($staff && function_exists('hr_tr_has') && hr_tr_has() && hr_can()) $hr['items'][] = ['hr_training', t('hr.training'), '🎓'];                  // R62-001
     if ($staff && function_exists('hr_targets_has') && hr_targets_has() && (hr_can() || (function_exists('hr_is_manager') && hr_is_manager()))) $hr['items'][] = ['hr_targets', t('hr.targets'), '🎯'];   // R64-001
+    if ($staff && function_exists('hra_has') && hra_has() && (hra_can_manage() || hra_can_use())) $hr['items'][] = ['hra', t('hra.title'), '🤖'];   // R67-001
     if ($staff && function_exists('hr_can') && hr_can()) $hr['items'][] = ['admin_hr', t('hr.settings'), '🗂'];                                        // R61-001: Owner / HR / admin
     if ($hr['items']) array_splice($g, 3, 0, [$hr]);
-    if ($staff && function_exists('hr_only') && hr_only()) $g = [['key' => 'top', 'label' => '', 'items' => [['hr_dashboard', t('hr.dashboard'), '📊'], ['community', t('soc.title'), '🤝'], ['planning', t('pl.title'), '🗓'], ['hr_requests', t('hr.requests'), '📝'], ['hr_leaves', t('hr.leaves'), '🏖'], ['hr_training', t('hr.training'), '🎓'], ['hr_targets', t('hr.targets'), '🎯'], ['admin_hr', t('hr.settings'), '🗂']]]];   // R51-001 / R55-005 / R61-001: HR sees the board and its settings only
-    if ($staff && function_exists('emp_only') && emp_only()) $g = [['key' => 'top', 'label' => '', 'items' => [['planning', t('hr.my_program'), '🗓'], ['my_leave', t('hr.my_leave'), '🏖'], ['community', t('soc.title'), '🤝']]]];   // R54-001 / R56-002: employee scope
+    if ($staff && function_exists('hr_only') && hr_only()) $g = [['key' => 'top', 'label' => '', 'items' => [['hr_dashboard', t('hr.dashboard'), '📊'], ['community', t('soc.title'), '🤝'], ['planning', t('pl.title'), '🗓'], ['hr_requests', t('hr.requests'), '📝'], ['hr_leaves', t('hr.leaves'), '🏖'], ['hr_training', t('hr.training'), '🎓'], ['hr_targets', t('hr.targets'), '🎯'], ['hra', t('hra.title'), '🤖'], ['admin_hr', t('hr.settings'), '🗂']]]];   // R51-001 / R55-005 / R61-001: HR sees the board and its settings only
+    if ($staff && function_exists('emp_only') && emp_only()) $g = [['key' => 'top', 'label' => '', 'items' => [['planning', t('hr.my_program'), '🗓'], ['my_leave', t('hr.my_leave'), '🏖'], ['hra', t('hra.title'), '🤖'], ['community', t('soc.title'), '🤝']]]];   // R54-001 / R56-002 / R67-001: employee scope
     return $g;
 }
 /** Badge counts per slug (what is waiting for this user). */
@@ -54,6 +55,7 @@ function nav_badges(): array {
     if (function_exists('td_badge')) $b['tasks'] = td_badge();
     if (!is_staff() && function_exists('of_pending')) $b['offers'] = count(of_pending());
     if (is_staff() && function_exists('hr2_has') && hr2_has()) { $n = 0; if (hr_can()) $n = (int) scalar("SELECT COUNT(*) FROM hr_requests WHERE status = 'pending_hr'"); if (hr_is_manager()) $n += count(array_filter(hr_requests_for('manager'), fn($r) => $r['status'] === 'pending_mgr')); if ($n) $b['hr_requests'] = $n; if (function_exists('hr_msg_has') && hr_msg_has()) { $m = hr_messages_unread(); if ($m) { if (hr_can()) $b['admin_hr'] = $m; else $b['my_leave'] = $m; } } }   // R54-001 / R56-002
+    if (is_staff() && function_exists('hra_can_manage') && hra_can_manage() && ($n = hra_pending_count())) $b['hra'] = $n;   // R67-001
     if (is_staff() && function_exists('eng_is_management') && eng_has() && (eng_is_management() || eng_is_pm())) $b['eng_requests'] = count(array_filter(eng_requests(['status' => 'pending']), fn($q) => eng_can_decide(['project_id' => (int)$q['project_id'], 'pm_user_id' => null], (string)$q['stage'])));   // R47-001 / R48-001
     return array_filter($b);
 }

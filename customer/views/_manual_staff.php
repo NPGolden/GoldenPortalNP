@@ -41,6 +41,17 @@ return [
       'Noticeboard (Community): company news, polls and photos. React (👍 ❤️ 👏 🎉 😂 🚢), comment, vote; share a photo of the month from the field (jpg / png / webp up to 12 MB). Badges are earned automatically from your work in the portal (timesheets, tickets done, reports, Q&A answers, trainings attended, kudos …) and show next to your name. The winner of the month is named from the activity ranking of the dashboard — the score counts what you create in the portal: tickets, comments, timesheets, reports, answers, requests.',
       'New colleague: your onboarding checklist and your buddy are on your dashboard until all eight items are done — photo, manual, personal data checked, first timesheet, found on the Planning board, leave balance checked, introductory training, coffee with the buddy.',
     ]],
+    ['id' => 'card', 'title' => 'Completing my employee card with the HR Assistant', 'body' => [
+      'My leave shows how complete your employee card is. "Complete my card with the HR Assistant" opens a guided flow in six short steps: identity and family, contact and address, identification numbers and bank, education and work, documents, review and submit. Every field is pre-filled with what HR holds today — confirm, correct or leave it. You can stop at any time and continue later; the same flow is reachable from HR › HR Assistant.',
+      ['ul' => [
+        'Nothing is written to your card before HR approves. Your identification numbers (AMKA, ΑΦΜ, ID, passport, IBAN) are encrypted while the flow is open and only HR can read them.',
+        'The first step shows how your data is handled (who is responsible, why it is kept, who sees it, how long, your rights); tick "I have read the notice" to begin.',
+        'The portal checks what you type: AMKA must start with your date of birth, the ΑΦΜ check digit and the IBAN must be valid. If your account has two-factor authentication, the identification step and the submission ask for the 6-digit code.',
+        '✦ Let the assistant fill it in: describe your details in your own words, or photograph your ID card or passport. The assistant proposes values — press Use on the ones that are right; the photo is only read, not stored. Attach the scan itself in the Documents step (PDF, JPG, PNG, WebP).',
+        'Review & submit lists only what you changed, next to what the card holds; tick the declaration and submit. HR may return the flow with a note (you will find it on top of the flow), reject it, or approve it — you are notified each time, and the approved values appear on your card.',
+        'Withdraw cancels an open flow; the proposed values are discarded.',
+      ]],
+    ]],
     ['id' => 'help', 'title' => 'Help and good habits', 'body' => [
       ['ul' => ['Support › Knowledge base: ask a question, answer a colleague\'s — answers earn a badge.', 'Support › Portal requests: report a bug or propose an improvement; the developer answers with a decision and the release that carries it.', 'Keep your leave requests ahead of time — approved leave is what the PMs plan around.', 'Check Notifications once a day; the Monday digest sums up the week (celebrations, open trainings, new posts, last week\'s top three).', 'Your password and two-factor device are yours alone — never share them; sign out on shared computers.']],
     ]],
