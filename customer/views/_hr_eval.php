@@ -1,6 +1,9 @@
 <?php
 /** Evaluation panel — shared by the employee card tab (HR) and ?p=hr_eval (manager).   GAS-CP-R62-001   expects $pid, $evUrl(year), optional $evMgr */
-$evs = hr_evaluations($pid); $ey = (int)($_GET['year'] ?? date('Y')); $cur = hr_evaluation($pid, $ey); $series = hr_eval_series($pid); $fh = fn($v) => $v === null ? '—' : rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.'); $part = hr_participation($pid);
+$evs = hr_evaluations($pid); $ey = (int)($_GET['year'] ?? date('Y')); $cur = hr_evaluation($pid, $ey);
+$sug = $_SESSION['hr_ev_ai'][$pid . '-' . $ey] ?? null; if ($sug && ($cur['status'] ?? 'draft') !== 'draft' && !hr_can()) $sug = null;   // R64-002: the assistant's draft pre-fills the form until saved or cleared
+if ($sug) { $cur = $cur ?: ['sc' => [], 'status' => 'draft', 'overall' => null, 'eval_date' => date('Y-m-d'), 'employee_comment' => null, 'acknowledged_at' => null]; $cur['sc'] = array_merge($cur['sc'] ?? [], $sug['sc']); foreach ($sug['texts'] as $k => $v) if (trim((string)$v) !== '') $cur[$k] = $v; }
+$aiMsg = $_SESSION['hr_ev_ai_msg'] ?? null; unset($_SESSION['hr_ev_ai_msg']); $aiOn = function_exists('ai_can') && ai_can('hr_eval'); $series = hr_eval_series($pid); $fh = fn($v) => $v === null ? '—' : rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.'); $part = hr_participation($pid);
 ?>
 <div class="cols" style="grid-template-columns: 1fr 1fr;">
 <div>
@@ -19,6 +22,7 @@ $evs = hr_evaluations($pid); $ey = (int)($_GET['year'] ?? date('Y')); $cur = hr_
 <div>
 <div class="card">
   <h2><?= tt('hr.ev_form') ?> · <?= $ey ?></h2>
+  <?php if ($sug): ?><div class="flash flash--warn" style="margin:0 0 10px;">✨ <?= tt('hr.ev_ai_prefilled') ?><?= $sug['notes'] !== '' ? ' <span class="hint">— ' . e($sug['notes']) . '</span>' : '' ?> <form method="post" action="<?= $evUrl($ey) ?>" class="inline"><?= csrf_field() ?><input type="hidden" name="action" value="hr_ev_ai_clear"><input type="hidden" name="pid" value="<?= $pid ?>"><input type="hidden" name="year" value="<?= $ey ?>"><?= !empty($evMgr) ? '<input type="hidden" name="back" value="mgr">' : '' ?><button class="btn btn--ghost btn--sm" type="submit"><?= tt('hr.ev_ai_discard') ?></button></form></div><?php endif; ?>
   <form method="post" action="<?= $evUrl($ey) ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hr_ev_save"><input type="hidden" name="pid" value="<?= $pid ?>"><?= !empty($evMgr) ? '<input type="hidden" name="back" value="mgr">' : '' ?>
     <div class="grid grid-3">
       <div class="field"><label><?= tt('hr.year') ?></label><input type="number" name="year" min="2000" max="2100" value="<?= $ey ?>"<?= $cur ? ' readonly' : '' ?>></div>
@@ -36,6 +40,17 @@ $evs = hr_evaluations($pid); $ey = (int)($_GET['year'] ?? date('Y')); $cur = hr_
     <p class="hint"><?= tt('hr.ev_form_hint') ?></p>
     <div class="btn-row"><button class="btn btn--gold" type="submit"><?= tt('btn.save') ?></button></div>
   </form>
+</div>
+<div class="card" id="ev-ai">
+  <h2>✨ <?= tt('hr.ev_ai_title') ?></h2>
+  <?php if (!$aiOn): ?><p class="hint"><?= tt('hr.ai_off') ?></p><?php else: ?>
+  <p class="hint"><?= tt('hr.ev_ai_hint') ?></p>
+  <form method="post" action="<?= $evUrl($ey) ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hr_ev_ai"><input type="hidden" name="pid" value="<?= $pid ?>"><input type="hidden" name="year" value="<?= $ey ?>"><?= !empty($evMgr) ? '<input type="hidden" name="back" value="mgr">' : '' ?>
+    <div class="field"><textarea name="q" rows="2" maxlength="2000" placeholder="<?= tt('hr.ev_ai_ph') ?>"><?= e($aiMsg['q'] ?? '') ?></textarea></div>
+    <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit" name="mode" value="draft">✨ <?= tt('hr.ev_ai_draft') ?></button><button class="btn btn--ghost btn--sm" type="submit" name="mode" value="ask">? <?= tt('hr.ev_ai_ask') ?></button></div>
+  </form>
+  <?php if ($aiMsg && ($aiMsg['a'] !== '' || $aiMsg['err'] !== '')): ?><div class="<?= $aiMsg['err'] !== '' ? 'flash flash--bad' : 'card card--tight' ?>" style="margin-top:10px;white-space:pre-wrap;"><?= e($aiMsg['err'] !== '' ? $aiMsg['err'] : $aiMsg['a']) ?></div><?php endif; ?>
+  <?php endif; ?>
 </div>
 </div>
 </div>

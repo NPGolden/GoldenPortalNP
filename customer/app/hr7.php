@@ -118,3 +118,54 @@ function hr_target_log(int $id): array { return hr_targets_has() ? all('SELECT l
 function hr_targets_summary(array $p, int $year): array { $t = hr_targets_for($p, $year); $n = count($t); return ['n' => $n, 'achieved' => count(array_filter($t, fn($x) => $x['status'] === 'achieved')), 'avg' => $n ? (int) round(array_sum(array_column($t, 'progress')) / $n) : 0, 'rows' => $t]; }
 /** Progress bar HTML. */
 function hr_tg_bar(int $pct, string $status): string { $c = $status === 'achieved' ? '#2E7D32' : ($status === 'missed' ? '#B23B3B' : ($status === 'at_risk' ? '#C9A227' : '#1F3A5F')); return '<div style="height:6px;background:rgba(127,127,127,.18);border-radius:3px;overflow:hidden;min-width:80px;"><div style="width:' . max(0, min(100, $pct)) . '%;height:100%;background:' . $c . ';"></div></div>'; }
+
+/* ------------------------------------------------------------------ R64-002 · assistant on evaluations and targets */
+/** Facts about a person for the assistant (never personal / payroll data): job, service, trainings, computed metrics, targets, last evaluation, activity rank. */
+function hr_eval_ai_context(int $pid, int $year): string {
+    $p = hr_person($pid); if (!$p) return ''; $L = [];
+    $L[] = 'Employee: ' . $p['name_en'] . ' · ' . ($p['job_title'] ?: '—') . ' · department ' . ($p['department'] ?? '—') . ' · hired ' . ($p['hire_date'] ? fmt_date($p['hire_date']) : '—') . ' · year under evaluation ' . $year;
+    if (function_exists('hr_person_trainings')) { $tr = array_filter(hr_person_trainings($pid), fn($m) => (int) substr((string)($m['date_from'] ?? ''), 0, 4) === $year); $L[] = 'Trainings ' . $year . ': ' . ($tr ? implode('; ', array_map(fn($m) => $m['title'] . ' (' . t('hr.tm_' . $m['status']) . ($m['score'] ? ', ' . $m['score'] : '') . ($m['cert_no'] ? ', cert ' . $m['cert_no'] : '') . ')', $tr)) : 'none'); }
+    foreach (hr_eval_auto($pid, $year) as $k => $a) $L[] = t('hr.ec_' . $k) . ' (computed ' . $a['score'] . '/5): ' . hr_eval_auto_text($k, $a);
+    if (hr_targets_has()) { $tg = hr_targets_for($p, $year); $L[] = 'Targets ' . $year . ': ' . ($tg ? implode('; ', array_map(fn($t) => '[' . t('hr.tg_sc_' . $t['scope']) . '] ' . $t['title'] . ' — ' . ($t['measure'] ?: '') . ($t['target_value'] ? ' → ' . $t['target_value'] . ' ' . $t['unit'] : '') . ' · ' . (int)$t['progress'] . ' % · ' . t('hr.tg_s_' . $t['status']) . ($t['result_note'] ? ' · ' . $t['result_note'] : ''), $tg)) : 'none'); }
+    if (function_exists('hr_evaluation')) { $prev = hr_evaluation($pid, $year - 1); if ($prev) $L[] = 'Previous evaluation ' . ($year - 1) . ': overall ' . $prev['overall'] . '/5 · scores ' . json_encode($prev['sc']) . ($prev['improvements'] ? ' · areas to improve: ' . $prev['improvements'] : '') . ($prev['goals'] ? ' · goals set: ' . $prev['goals'] : '') . ($prev['training_needs'] ? ' · training needs: ' . $prev['training_needs'] : ''); }
+    if (function_exists('act_top') && !empty($p['user_id'])) { $top = act_top("$year-01-01", "$year-12-31", 200); foreach ($top as $i => $r) if ((int)$r['uid'] === (int)$p['user_id']) { $L[] = 'Portal activity ' . $year . ': rank ' . ($i + 1) . ' of ' . count($top) . ' · score ' . $r['score'] . ' · timesheet hours ' . $r['hours'] . ' · ' . implode(', ', array_map(fn($k, $v) => t($k) . ' ' . $v, array_keys($r['parts']), $r['parts'])); break; } }
+    try { if (function_exists('soc_has') && soc_has()) { $k = (int) scalar('SELECT COUNT(*) FROM soc_kudos WHERE to_user_id = ? AND YEAR(created_at) = ?', [(int)($p['user_id'] ?? 0), $year]); $L[] = 'Kudos received ' . $year . ': ' . $k; } } catch (Throwable $e) {}
+    if (hr_eval_policy() !== '') $L[] = 'Company evaluation note: ' . hr_eval_policy();
+    return implode("\n", $L);
+}
+function hr_eval_ai_fields(?array $cur): array {
+    $f = []; $opt = []; for ($i = 1; $i <= 5; $i++) $opt[] = ['value' => (string)$i, 'label' => (string)$i];
+    foreach (HR_EVAL_CRITERIA as $c) $f[] = ['name' => 'sc_' . $c, 'label' => t('hr.ec_' . $c) . ' — ' . t('hr.ecd_' . $c), 'type' => 'select', 'options' => $opt, 'value' => (string)($cur['sc'][$c] ?? '')];
+    foreach (['strengths', 'improvements', 'goals', 'training_needs', 'comments'] as $k) $f[] = ['name' => $k, 'label' => t('hr.ev_' . $k), 'type' => 'textarea', 'value' => (string)($cur[$k] ?? '')];
+    return $f;
+}
+/** Draft the evaluation (scores + texts) from the facts; the suggestion is kept in the session and pre-fills the form. */
+function hr_eval_ai_draft(int $pid, int $year, string $brief): array {
+    $p = hr_person($pid); if (!$p) throw new RuntimeException(t('err.notfound')); $isMgr = (int)(hr_manager_of($p) ?? 0) === (int)(current_user()['id'] ?? 0); if (!hr_can() && !$isMgr) throw new RuntimeException(t('err.noaccess'));
+    $cur = function_exists('hr_evaluation') ? hr_evaluation($pid, $year) : null;
+    $prompt = ($brief !== '' ? $brief . "\n" : '') . "Draft the annual evaluation of this employee from the facts below. Score each criterion 1–5 (3 = meets expectations; use 5 only for documented outstanding facts; when the facts say nothing about a criterion, propose 3 and say so in notes). Write strengths, areas to improve, goals for next year (3 SMART goals) and training needs in short sentences, British English, no names of other colleagues.\n" . hr_eval_ai_context($pid, $year);
+    $r = ai_run('fill', ['title' => t('hr.ev_form') . ' · ' . $p['name_en'] . ' · ' . $year, 'headline' => t('hr.ev_how_lede'), 'fields' => hr_eval_ai_fields($cur)], $prompt, null, 'hr_eval');
+    if ($r['ok']) { $sc = []; foreach (HR_EVAL_CRITERIA as $c) { $v = (int)($r['fields']['sc_' . $c] ?? 0); if ($v >= 1 && $v <= 5) $sc[$c] = $v; } $_SESSION['hr_ev_ai'][$pid . '-' . $year] = ['sc' => $sc, 'texts' => array_intersect_key($r['fields'], array_flip(['strengths', 'improvements', 'goals', 'training_needs', 'comments'])), 'notes' => (string)($r['notes'] ?? ''), 'at' => time()]; }
+    return $r;
+}
+/** Free question about the person's year (manager / HR). */
+function hr_eval_ai_ask(int $pid, int $year, string $q): array {
+    $p = hr_person($pid); if (!$p) throw new RuntimeException(t('err.notfound')); $isMgr = (int)(hr_manager_of($p) ?? 0) === (int)(current_user()['id'] ?? 0); if (!hr_can() && !$isMgr) throw new RuntimeException(t('err.noaccess'));
+    return ai_run('ask', ['title' => t('hr.ev_form') . ' · ' . $p['name_en'] . ' · ' . $year, 'headline' => hr_eval_ai_context($pid, $year)], $q, null, 'hr_eval');
+}
+/** Propose targets for a department or a person; parsed into rows the page can add with one click. */
+function hr_targets_ai_suggest(string $scope, int $deptId, int $pid, int $year, string $brief): array {
+    $draft = ['scope' => $scope, 'department_id' => $deptId ?: null, 'person_id' => $pid ?: null]; if (!hr_tg_can_manage($draft)) throw new RuntimeException(t('err.noaccess'));
+    $L = []; $who = t('hr.tg_sc_company');
+    if ($scope === 'department') { $d = null; foreach (hr_departments(false) as $x) if ((int)$x['id'] === $deptId) $d = $x; $who = 'department ' . ($d['name'] ?? $deptId); $pp = array_values(array_filter(hr_people(false), fn($p) => $p['is_active'] && (int)($p['department_id'] ?? 0) === $deptId)); $L[] = 'Department: ' . ($d['name'] ?? '—') . ' · head ' . ($d['head_name'] ?? '—') . ' · ' . count($pp) . ' people: ' . implode(', ', array_map(fn($p) => $p['name_en'] . ($p['job_title'] ? ' (' . $p['job_title'] . ')' : ''), array_slice($pp, 0, 40))); }
+    elseif ($scope === 'person') { $who = 'person'; $L[] = hr_eval_ai_context($pid, $year - 1); $L[] = hr_eval_ai_context($pid, $year); }
+    $prevT = hr_targets(['year' => $year - 1] + ($scope === 'department' ? ['department_id' => $deptId] : ($scope === 'person' ? ['person_id' => $pid] : ['scope' => 'company'])));
+    if ($prevT) $L[] = 'Targets of ' . ($year - 1) . ' and their result: ' . implode('; ', array_map(fn($t) => $t['title'] . ' (' . (int)$t['progress'] . ' %, ' . t('hr.tg_s_' . $t['status']) . ($t['result_note'] ? ', ' . $t['result_note'] : '') . ')', $prevT));
+    $curT = hr_targets(['year' => $year] + ($scope === 'department' ? ['department_id' => $deptId] : ($scope === 'person' ? ['person_id' => $pid] : ['scope' => 'company'])));
+    if ($curT) $L[] = 'Targets already set for ' . $year . ' (do not repeat): ' . implode('; ', array_column($curT, 'title'));
+    if (hr_eval_policy() !== '') $L[] = 'Company evaluation note: ' . hr_eval_policy();
+    $prompt = ($brief !== '' ? $brief . "\n" : '') . "Propose 4 to 6 SMART targets for {$year} for this {$who} of a marine electrical / automation / navigation integrator (projects on superyachts and ships, service, engineering, production, sales). Each target measurable, with a due date inside {$year}, weight 1–5. Answer ONLY a JSON object {\"targets\": [{\"title\": \"…\", \"measure\": \"how it is measured\", \"target_value\": \"…\", \"unit\": \"…\", \"due_date\": \"yyyy-mm-dd\", \"weight\": 3, \"description\": \"one or two sentences\"}, …]}.\n" . implode("\n", $L);
+    $r = ai_run('ask', ['title' => t('hr.targets') . ' · ' . $year, 'headline' => $who], $prompt, null, 'hr_targets');
+    if ($r['ok']) { $j = ai_json($r['text']); $rows = []; foreach ((array)($j['targets'] ?? []) as $t) { if (!is_array($t) || trim((string)($t['title'] ?? '')) === '') continue; $rows[] = ['title' => mb_substr(trim((string)$t['title']), 0, 160), 'measure' => mb_substr(trim((string)($t['measure'] ?? '')), 0, 160), 'target_value' => mb_substr(trim((string)($t['target_value'] ?? '')), 0, 60), 'unit' => mb_substr(trim((string)($t['unit'] ?? '')), 0, 20), 'due_date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($t['due_date'] ?? '')) ? $t['due_date'] : '', 'weight' => min(5, max(1, (int)($t['weight'] ?? 3))), 'description' => mb_substr(trim((string)($t['description'] ?? '')), 0, 4000)]; } $r['rows'] = $rows; }
+    return $r;
+}

@@ -8,6 +8,7 @@ $year = (int)($_GET['year'] ?? date('Y')); if ($year < 2000 || $year > 2100) $ye
 $f = ['year' => $year, 'scope' => (string)($_GET['scope'] ?? ''), 'department_id' => (int)($_GET['department_id'] ?? 0), 'person_id' => (int)($_GET['person_id'] ?? 0), 'status' => (string)($_GET['status'] ?? '')];
 $rows = array_values(array_filter(hr_targets($f), fn($t) => hr_tg_can_manage($t)));
 $edit = !empty($_GET['edit']) ? hr_target((int)$_GET['edit']) : null; if ($edit && !hr_tg_can_manage($edit)) $edit = null; $new = isset($_GET['new']) || $edit;
+if (!$edit && isset($_GET['ai']) && !empty($_SESSION['hr_tg_ai']['rows'][(int)$_GET['ai']])) { $ar = $_SESSION['hr_tg_ai']; $edit = $ar['rows'][(int)$_GET['ai']] + ['id' => 0, 'year' => $ar['year'], 'scope' => $ar['scope'], 'department_id' => $ar['department_id'], 'person_id' => $ar['person_id'], 'progress' => 0, 'status' => 'open', 'result_note' => '']; $new = true; }   // R64-002: edit an assistant proposal before saving
 $depts = array_values(array_filter(hr_departments(), fn($d) => hr_can() || (int)($d['head_user_id'] ?? 0) === $me)); $people = array_values(array_filter(hr_people(false), fn($p) => $p['is_active'] && (hr_can() || (int)(hr_manager_of($p) ?? 0) === $me)));
 $keep = array_filter($f); $open = count(array_filter($rows, fn($t) => in_array($t['status'], ['open', 'on_track', 'at_risk'], true))); $ach = count(array_filter($rows, fn($t) => $t['status'] === 'achieved')); $risk = count(array_filter($rows, fn($t) => $t['status'] === 'at_risk'));
 layout_head(t('hr.targets'), 'hr_targets');
@@ -26,7 +27,7 @@ layout_head(t('hr.targets'), 'hr_targets');
 
 <?php if ($new): $e = $edit ?: []; ?>
 <div class="card" id="tg-form">
-  <h2><?= $edit ? tt('btn.edit') . ' · ' . e($edit['title']) : tt('hr.tg_new') ?></h2>
+  <h2><?= $edit && !empty($edit['id']) ? tt('btn.edit') . ' · ' . e($edit['title']) : tt('hr.tg_new') ?></h2>
   <form method="post" action="<?= url('hr_targets') ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hr_tg_save"><input type="hidden" name="id" value="<?= (int)($e['id'] ?? 0) ?>">
     <div class="grid grid-4">
       <div class="field"><label><?= tt('hr.year') ?></label><input type="number" name="year" min="2000" max="2100" value="<?= (int)($e['year'] ?? $year) ?>"></div>
@@ -47,7 +48,7 @@ layout_head(t('hr.targets'), 'hr_targets');
     <div class="btn-row"><button class="btn btn--gold" type="submit"><?= tt('btn.save') ?></button><a class="btn btn--ghost" href="<?= url('hr_targets', $keep) ?>"><?= tt('btn.cancel') ?></a></div>
   </form>
 </div>
-<script>(function(){var s=document.getElementById('tg_scope');if(!s)return;function f(){document.querySelector('.tg-dept').style.visibility=s.value==='department'?'':'hidden';document.querySelector('.tg-person').style.visibility=s.value==='person'?'':'hidden';}s.addEventListener('change',f);f();})();</script>
+<script>(function(){var s=document.getElementById('tg_scope');if(!s)return;function f(){document.querySelector('.tg-dept').style.display=s.value==='department'?'':'none';document.querySelector('.tg-person').style.display=s.value==='person'?'':'none';}s.addEventListener('change',f);f();})();</script>
 <?php endif; ?>
 
 <div class="card">
@@ -76,6 +77,29 @@ layout_head(t('hr.targets'), 'hr_targets');
     <td class="row-actions"><input form="<?= $fid ?>" name="note" maxlength="600" placeholder="<?= tt('hr.notes') ?>" style="width:120px;"> <button class="btn btn--ghost btn--sm" type="submit" form="<?= $fid ?>"><?= tt('btn.save') ?></button> <form method="post" action="<?= url('hr_targets', $keep) ?>" class="inline"><?= csrf_field() ?><input type="hidden" name="action" value="hr_tg_delete"><input type="hidden" name="id" value="<?= (int)$tg['id'] ?>"><button class="btn btn--ghost btn--sm" type="submit" data-js-confirm="<?= tt('hr.tg_delete_confirm') ?>">🗑</button></form></td>
   </tr><?php endforeach; ?></tbody></table></div>
   <?php endif; ?>
+</div>
+<?php $tgAi = $_SESSION['hr_tg_ai'] ?? null; $aiOn = function_exists('ai_can') && ai_can('hr_targets'); ?>
+<div class="card" id="tg-ai">
+  <h2>✨ <?= tt('hr.tg_ai_title') ?></h2>
+  <?php if (!$aiOn): ?><p class="hint"><?= tt('hr.ai_off') ?></p><?php else: ?>
+  <p class="hint"><?= tt('hr.tg_ai_hint') ?></p>
+  <form method="post" action="<?= url('hr_targets', $keep) ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hr_tg_ai"><input type="hidden" name="year" value="<?= $year ?>">
+    <div class="grid grid-4">
+      <div class="field"><label><?= tt('hr.tg_scope') ?></label><select name="scope" id="tgai_scope" data-nosearch><?php foreach (['company', 'department', 'person'] as $sc): if ($sc === 'company' && !hr_can()) continue; ?><option value="<?= $sc ?>"<?= ($tgAi['scope'] ?? 'department') === $sc ? ' selected' : '' ?>><?= e(t('hr.tg_sc_' . $sc)) ?></option><?php endforeach; ?></select></div>
+      <div class="field tgai-dept"><label><?= tt('hr.department') ?></label><select name="department_id" data-nosearch><option value="">—</option><?php foreach ($depts as $d): ?><option value="<?= (int)$d['id'] ?>"<?= (int)($tgAi['department_id'] ?? 0) === (int)$d['id'] ? ' selected' : '' ?>><?= e($d['name']) ?></option><?php endforeach; ?></select></div>
+      <div class="field tgai-person"><label><?= tt('hr.person') ?></label><select name="person_id"><option value="">—</option><?php foreach ($people as $pp): ?><option value="<?= (int)$pp['id'] ?>"<?= (int)($tgAi['person_id'] ?? 0) === (int)$pp['id'] ? ' selected' : '' ?>><?= e($pp['name_en']) ?></option><?php endforeach; ?></select></div>
+      <div class="field" style="grid-column: span 1;"><label>&nbsp;</label><button class="btn btn--gold" type="submit">✨ <?= tt('hr.tg_ai_go') ?></button></div>
+      <div class="field" style="grid-column:1 / -1;"><label><?= tt('hr.tg_ai_brief') ?></label><input name="q" maxlength="2000" value="<?= e($tgAi['q'] ?? '') ?>" placeholder="<?= tt('hr.tg_ai_ph') ?>"></div>
+    </div>
+  </form>
+  <script>(function(){var s=document.getElementById('tgai_scope');if(!s)return;function f(){document.querySelector('.tgai-dept').style.display=s.value==='department'?'':'none';document.querySelector('.tgai-person').style.display=s.value==='person'?'':'none';}s.addEventListener('change',f);f();})();</script>
+  <?php if ($tgAi && $tgAi['err'] !== ''): ?><div class="flash flash--bad" style="margin-top:10px;"><?= e($tgAi['err']) ?></div><?php elseif ($tgAi && $tgAi['text'] !== ''): ?><div class="card card--tight" style="margin-top:10px;white-space:pre-wrap;"><?= e($tgAi['text']) ?></div><?php elseif ($tgAi && $tgAi['rows']): ?>
+  <h3 class="ac-h" style="margin-top:12px;"><?= e(t('hr.tg_ai_proposals', ['n' => count($tgAi['rows'])])) ?></h3>
+  <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('hr.tg_title') ?></th><th><?= tt('hr.tg_measure') ?></th><th><?= tt('hr.tg_due') ?></th><th>⚖</th><th></th></tr></thead><tbody>
+  <?php foreach ($tgAi['rows'] as $i => $r): ?><tr><td><b><?= e($r['title']) ?></b><?= $r['description'] ? '<br><span class="hint">' . e($r['description']) . '</span>' : '' ?></td><td class="hint"><?= e($r['measure']) ?><?= $r['target_value'] !== '' ? ' → <b>' . e($r['target_value']) . ($r['unit'] !== '' ? ' ' . e($r['unit']) : '') . '</b>' : '' ?></td><td class="hint"><?= $r['due_date'] ? e(fmt_date($r['due_date'])) : '—' ?></td><td class="num hint"><?= (int)$r['weight'] ?></td>
+    <td class="row-actions"><form method="post" action="<?= url('hr_targets', $keep) ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hr_tg_save"><input type="hidden" name="year" value="<?= (int)$tgAi['year'] ?>"><input type="hidden" name="scope" value="<?= e($tgAi['scope']) ?>"><input type="hidden" name="department_id" value="<?= (int)$tgAi['department_id'] ?>"><input type="hidden" name="person_id" value="<?= (int)$tgAi['person_id'] ?>"><?php foreach (['title', 'measure', 'target_value', 'unit', 'due_date', 'weight', 'description'] as $k): ?><input type="hidden" name="<?= $k ?>" value="<?= e((string)$r[$k]) ?>"><?php endforeach; ?><input type="hidden" name="status" value="open"><button class="btn btn--gold btn--sm" type="submit">➕ <?= tt('hr.tg_ai_add') ?></button></form> <a class="btn btn--ghost btn--sm" href="<?= url('hr_targets', $keep + ['new' => 1, 'ai' => $i]) ?>#tg-form"><?= tt('btn.edit') ?></a></td></tr><?php endforeach; ?>
+  </tbody></table></div>
+  <?php endif; endif; ?>
 </div>
 <?php if (hr_can()): ?>
 <div class="card" id="policy">

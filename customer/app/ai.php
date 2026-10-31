@@ -31,7 +31,7 @@ function ai_can(?string $page = null): bool {
     return in_array($page, ai_pages(), true);
 }
 function ai_pages(): array { return array_values(array_filter(array_map('trim', explode(',', ai_setting('ai_pages'))))); }
-function ai_all_pages(): array { return ['fsr_edit' => 'fsr.title', 'ticket_edit' => 'nav.tickets', 'ticket' => 'nav.tickets', 'timesheet_edit' => 'nav.timesheets', 'weekly_vessel' => 'wk.title', 'weekly' => 'wk.title', 'offer_edit' => 'nav.offers', 'subproject' => 'bg.tab', 'planning' => 'pl.title', 'isr_edit' => 'isr.plural', 'equipment_edit' => 'eq.title', 'production_edit' => 'pd.title', 'jo_edit' => 'nav.joborders', 'rs_edit' => 'rs.title', 'hr_leaves' => 'hr.leaves']; }
+function ai_all_pages(): array { return ['fsr_edit' => 'fsr.title', 'ticket_edit' => 'nav.tickets', 'ticket' => 'nav.tickets', 'timesheet_edit' => 'nav.timesheets', 'weekly_vessel' => 'wk.title', 'weekly' => 'wk.title', 'offer_edit' => 'nav.offers', 'subproject' => 'bg.tab', 'planning' => 'pl.title', 'isr_edit' => 'isr.plural', 'equipment_edit' => 'eq.title', 'production_edit' => 'pd.title', 'jo_edit' => 'nav.joborders', 'rs_edit' => 'rs.title', 'hr_leaves' => 'hr.leaves', 'hr_eval' => 'hr.evaluations', 'hr_targets' => 'hr.targets']; }   // R64-002
 
 /* ------------------------------------------------------------------ key at rest */
 function ai_crypt_key(): string { return sodium_crypto_generichash('gascp-ai|' . lic_instance_id() . '|' . (string) cfg('app.session_name', 'GASCP'), '', SODIUM_CRYPTO_SECRETBOX_KEYBYTES); }
