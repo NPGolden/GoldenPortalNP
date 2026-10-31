@@ -72,11 +72,11 @@ window.UI = (() => {
   }
 
   // documents: streamed by the portal (Bearer token) → opened from a blob URL; cached per viewer in the Cache API for offline reading
-  async function openDocument(id) {
+  async function openDocument(id, kind) {
     if (API.mock) return toast("Demo: the portal streams the PDF to the document viewer");
-    toast("Opening…"); const url = API.documentUrl(id);
-    try { let res = window.caches ? await (await caches.open("gas-service-docs")).match(url) : null;
-      if (!res) { res = await API.fetchDocument(id); if (window.caches && res.ok) (await caches.open("gas-service-docs")).put(url, res.clone()); }
+    toast("Opening…"); const url = kind === "hr" ? API.hrDocUrl(id) : API.documentUrl(id);
+    try { let res = window.caches && kind !== "hr" ? await (await caches.open("gas-service-docs")).match(url) : null;
+      if (!res) { res = await API.fetchDocument(id, kind); if (window.caches && res.ok && kind !== "hr") (await caches.open("gas-service-docs")).put(url, res.clone()); }
       const blob = await res.blob(); const u = URL.createObjectURL(blob); window.open(u, "_blank"); setTimeout(() => URL.revokeObjectURL(u), 60000); } catch (e) { toast(e.message || "Document not available"); }
   }
   // sync indicator
@@ -98,7 +98,7 @@ window.UI = (() => {
     [/^#\/tickets$/, () => SCREENS.tickets()], [/^#\/ticket\/(.+)$/, (m) => SCREENS.ticket(m[1])],
     [/^#\/fsr$/, () => SCREENS.fsrList()], [/^#\/fsr\/([^?]+)(\?.*)?$/, (m, q) => SCREENS.fsrEdit(m[1], q)],
     [/^#\/hours(\?.*)?$/, (m, q) => SCREENS.hours(q)], [/^#\/notes(\?.*)?$/, (m, q) => SCREENS.notes(q)], [/^#\/docs$/, () => SCREENS.docs()],
-    [/^#\/equipment(\?.*)?$/, (m, q) => SCREENS.equipment(q)], [/^#\/more$/, () => SCREENS.more()],
+    [/^#\/equipment(\?.*)?$/, (m, q) => SCREENS.equipment(q)], [/^#\/more$/, () => SCREENS.more()], [/^#\/hr(\?.*)?$/, (m, q) => HR.page(q)],
   ];
   const query = (h) => { const q = {}; const i = h.indexOf("?"); if (i < 0) return q; new URLSearchParams(h.slice(i + 1)).forEach((v, k) => { q[k] = v; }); return q; };
   async function render() {

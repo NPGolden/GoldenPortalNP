@@ -38,6 +38,9 @@ try {
         case $method === 'POST' && $path === '/files/photo': require __DIR__ . '/endpoints/files.php'; upload_photo($u);
         case $method === 'POST' && $path === '/assist': RateLimit::check('assist', 'u' . $u['id'], 30); Response::json(Portal::assist($u, $body));
         case $method === 'POST' && $path === '/devices/push-token': q('UPDATE mob_devices SET push_token = ?, push_service = ? WHERE id = ?', [mb_substr((string)($body['token'] ?? ''), 0, 255), in_array($body['service'] ?? '', ['apns', 'fcm', 'webpush'], true) ? $body['service'] : 'fcm', $u['device_id']]); Response::json([], 204);
+        case $method === 'GET' && $path === '/hr': Response::json(Portal::hr($u, (int)($_GET['year'] ?? date('Y'))));
+        case $method === 'POST' && $path === '/hr/request': RateLimit::check('sync', 'u' . $u['id'], 60); $in = $body ?: $_POST; Response::json(['status' => 'accepted'] + Portal::hrRequest($u, $in, isset($_FILES['doc']) && ($_FILES['doc']['error'] ?? 1) === UPLOAD_ERR_OK ? $_FILES['doc'] : null));
+        case $method === 'GET' && preg_match('#^/hr/doc/(\d+)$#', $path, $m): Portal::hrDocStream($u, (int)$m[1]);
         case $method === 'GET' && preg_match('#^/documents/(\d+)$#', $path, $m): require __DIR__ . '/endpoints/files.php'; stream_document($u, (int)$m[1]);
         default: Response::error(404, 'Not found');
     }

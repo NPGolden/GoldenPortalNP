@@ -21,6 +21,14 @@ function sync_ops(array $u, array $b): void {
                 case 'extra_hours':       $res = Portal::extraHours($u, $uuid, $p); break;
                 case 'note':              $res = Portal::note($u, $uuid, $p); break;
                 case 'equipment_correction': $res = Portal::equipmentCorrection($u, $uuid, $p); break;
+                case 'hr_request':        $res = Portal::hrRequest($u, $p, null); break;          // without a document (document → POST /hr/request multipart)
+                case 'hr_cancel':         $res = Portal::hrCancel($u, $p); break;
+                case 'hr_period_join':    $res = Portal::hrPeriodJoin($u, $p); break;
+                case 'hr_training_apply': $res = Portal::hrTrainingApply($u, $p); break;
+                case 'hr_eval_ack':       $res = Portal::hrEvalAck($u, $p); break;
+                case 'hr_message':        $res = Portal::hrMessage($u, $p); break;
+                case 'hr_seen':           $res = Portal::hrSeen($u); break;
+                case 'hr_decide': throw new ApiException(403, 'Leave decisions are portal-only');   // CS-23
                 case 'approve': case 'reject': case 'issue': throw new ApiException(403, 'Approvals are portal-only');   // CS-03
                 default: throw new ApiException(422, 'Unknown operation kind');
             }

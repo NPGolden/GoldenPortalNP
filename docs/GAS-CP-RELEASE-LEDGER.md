@@ -1,5 +1,5 @@
 # Golden A/S Customer Portal — release ledger and consolidation plan
-Prepared by Nikos Polykandriotis · R5 · 30 Oct 2026
+Prepared by Nikos Polykandriotis · R6 · 31 Oct 2026
 
 > **Status 29 Oct 09:40 — the live site runs the main line only.** The Service Engineer app package (0.5.0, "R57") has **not** been uploaded and its migration has **not** been run: nothing of it is effective on goldensas.com. The live baseline is main **v1.56.3** (patch uploaded, no SQL beyond R50). **All three lines are merged: v1.58.0** = R51 (HR) + R52 (mobile, renumbered from "R57") + R53-001/002 (security, mobile admin). **v1.62.0 = R54-001 … R54-005 + R56-001 + R56-002** (employee card, one structure, HR messages) (type names per language, staff Excel import, approver unified with portal accounts) (HR leave management step 1 of Solution C: staff registry, leave requests manager → HR, hour types, Employee scope, Excel import). One cumulative patch; migrations R51 → R52 → R54-001 → R54-002 in that order; the app client lives at `/customer/mobile/`.
 
@@ -37,6 +37,8 @@ The mobile line jumped to **R57** while the main line is at **R50**. To keep one
 - **R59-001** — portal change requests (`migrate_cp_r59_change_requests.sql`, check `r59`) — **v1.68.0**.
 - **R60-001 … R61-001** — births / off-boarding, planning drop-downs, per-page memory, cut-over balances, account button, accounts speed, personal data, Owner role + HR › Leaves — **v1.69.0 … v1.72.0**.
 - **R62-001** — payroll record on the card, company closure, HR › Training, annual evaluations (`migrate_cp_r62_training_eval.sql`, check `r62`) — **v1.73.0**; workbook `GAS-HR-personnel-import.xlsx`.
+- **R63-001 … R64-002** — Community, manuals, HR/Owner-only personal data, who is online, computed evaluation criteria, targets, assistant on evaluations — **v1.74.0 … v1.75.1**.
+- **R65-001** — Service Engineer app build 0.6.0: My HR page in the app, mobile API `/hr` routes and HR sync kinds (no SQL; client at `customer/mobile/`, module `customer/api/v1/`; tests and procedure in GAS-2026-PORTAL-APP-002) — **v1.76.0**.
 - Portal versions continue **1.73.0 (R62-001)**; deploys now run from GitHub (`NPGolden/GoldenPortalNP`, Actions › Deploy) — the updater applies pending migrations itself; whoever packages last sets `CP_VERSION` and adds the `cp_patches` entries in that order.
 
 ## 3. Migration order for the live database (phpMyAdmin, `goldensas_portal` selected)
