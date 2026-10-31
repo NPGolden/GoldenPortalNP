@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.76.5';
+const CP_VERSION = '1.77.0';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R66-001', 'version' => '1.77.0', 'date' => '2026-10-31', 'title' => 'Golden PM app 1.0.0 — the mobile API (customer/api/v1) serves a second application for project managers and managers (X-App: pm; sign-in limited to staff who are a PM, an HR manager, a timesheet approver or an administrator). Read model GET /pm/projects (project tree with the 7-stage percentages, fed stages, teams, overdue drawings, open submittals and issues), /pm/subproject/{id} (issues, comments, team notes, drawings, submittals, budgets as hours, team, who is away), /pm/drawings, /pm/submittals, /pm/hr/team (people I approve for with annual balance, requests to decide, timesheets to approve, 28-day absence matrix of codes only), /pm/absences, /pm/inbox. Sync kinds sp_stages (pct columns only, fed stages ignored, snapshot + invoicing follow-ups as the portal), sp_comment, issue_status, drawing_update, hr_decide (manager stage only, authenticator code when the account has 2FA, logged with "(mobile app)"), ts_decide (same step-up), nf_read. Monetary and personal / payroll data never leave; HR-stage decisions and engineering extra-hours decisions stay in the portal. Settings › Log › Mobile apps sets the minimum version of each app separately.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R65-003', 'version' => '1.76.5', 'date' => '2026-10-31', 'title' => 'Service Engineer app 0.6.2: Ukrainian and Bulgarian translations completed (the app had only the tabs and the sign-in screen in these languages and showed everything else in English), Greek and Italian completed to the full set; the remaining English labels of the equipment detail, the queue and the report header follow the chosen language. Client only, no API change.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R64-006', 'version' => '1.76.4', 'date' => '2026-10-31', 'title' => 'Early leaves / late arrivals (and every hour type that consumes annual leave) accumulate: only each completed 8 hours takes one day of annual leave; the remaining hours are shown on My leave under the annual balance ("4 h accumulated · 4 h to the next day") instead of charging fractions of a day.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R64-005', 'version' => '1.76.3', 'date' => '2026-10-31', 'title' => 'Settings › Portal accounts: a deactivated account with no history at all (no sign-ins, tickets, timesheets, reports, planning, employee card, approvals, requests, community) can be deleted for good (🗑 next to Enable); any account with history is deactivated, never deleted, and the portal says what keeps it.', 'db' => null, 'check' => null],

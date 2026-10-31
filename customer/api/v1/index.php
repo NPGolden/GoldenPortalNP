@@ -1,5 +1,5 @@
 <?php
-/** Front controller of the mobile API — GAS-CP-R52-001. Routes map 1:1 to Portal::* (lib/portal.php). */
+/** Front controller of the mobile API — GAS-CP-R52-001 (+ R66-001 Golden PM routes /pm/*). Routes map 1:1 to Portal::* / PortalPM::* (lib/). */
 declare(strict_types=1);
 require __DIR__ . '/bootstrap.php';
 header('Cache-Control: no-store, no-cache, must-revalidate'); header('Pragma: no-cache'); header('X-Content-Type-Options: nosniff'); header('Content-Type: application/json; charset=utf-8');
@@ -8,20 +8,33 @@ $path = '/' . trim((string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PAT
 $method = $_SERVER['REQUEST_METHOD']; $body = [];
 if (stripos($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') !== false) $body = json_decode(file_get_contents('php://input') ?: '[]', true) ?: [];
 try {
-    $min = api_setting('api_min_version_engineer', API_VERSION); $ver = $_SERVER['HTTP_X_APP_VERSION'] ?? '0.0.0';
+    $app = api_app(); $isPm = $app === 'pm';                                                                                     // R66-001: 'engineer' (Service Engineer) or 'pm' (Golden PM)
+    if (!isset(API_APPS[strtolower(trim((string)($_SERVER['HTTP_X_APP'] ?? API_APP_ID)))])) Response::error(403, 'Wrong application');
+    $min = api_setting('api_min_version_' . $app, API_APPS[$app]); $ver = $_SERVER['HTTP_X_APP_VERSION'] ?? '0.0.0';
     if (version_compare($ver, $min, '<')) Response::error(426, 'Update required', ['min_version' => $min]);
-    if (($_SERVER['HTTP_X_APP'] ?? API_APP_ID) !== API_APP_ID) Response::error(403, 'Wrong application');
+    /** GET /me: the SE shape, plus the PM fields for app pm (§1). */
+    $me = function (array $u) use ($isPm): array { $m = Portal::me($u); return $isPm ? array_replace($m, PortalPM::meExtra($u)) : $m; };
     if ($path === '/auth/login' && $method === 'POST') { RateLimit::check('auth', RateLimit::ip(), 10);
         $u = Portal::login(trim((string)($body['email'] ?? '')), (string)($body['password'] ?? ''), isset($body['totp']) ? (string)$body['totp'] : null);
-        $dev = (array)($body['device'] ?? []); $did = Jwt::registerDevice((int)$u['id'], $dev); $u = api_act_as((int)$u['id']);
-        Response::json(['access_token' => Jwt::issue($u, $did), 'refresh_token' => Jwt::issueRefresh($did, $dev['platform'] ?? 'web'), 'user' => Portal::me($u)]); }
+        $dev = (array)($body['device'] ?? []); $u = api_act_as((int)$u['id']); if ($isPm) PortalPM::allowed($u);                  // §0: who may sign in to the PM app (before the device is enrolled)
+        $did = Jwt::registerDevice((int)$u['id'], $dev);
+        Response::json(['access_token' => Jwt::issue($u, $did), 'refresh_token' => Jwt::issueRefresh($did, $dev['platform'] ?? 'web'), 'user' => $me($u)]); }
     if ($path === '/auth/refresh' && $method === 'POST') { RateLimit::check('auth', RateLimit::ip(), 10);
-        $r = Jwt::consumeRefresh((string)($body['refresh_token'] ?? '')); $u = api_act_as((int)$r['user_id']);
+        $r = Jwt::consumeRefresh((string)($body['refresh_token'] ?? '')); $u = api_act_as((int)$r['user_id']); if ($isPm) PortalPM::allowed($u);
         Response::json(['access_token' => Jwt::issue($u, (int)$r['device_id']), 'refresh_token' => Jwt::issueRefresh((int)$r['device_id'], (string)$r['platform'], (int)$r['id'])]); }
     $u = Jwt::requireUser(); RateLimit::check('api', 'u' . $u['id'], 300);
+    if (str_starts_with($path, '/pm/') && !$isPm) Response::error(403, 'Golden PM app only');
+    if ($isPm) PortalPM::allowed($u);                                                                                            // rights may change while a token lives
     switch (true) {
         case $method === 'POST' && $path === '/auth/logout': q('UPDATE mob_refresh_tokens SET revoked_at = NOW() WHERE device_id = ? AND revoked_at IS NULL', [$u['device_id']]); Response::json([], 204);
-        case $method === 'GET' && $path === '/me': Response::json(Portal::me($u));
+        case $method === 'GET' && $path === '/me': Response::json($me($u));
+        case $method === 'GET' && $path === '/pm/projects': Response::json(PortalPM::projects($u));
+        case $method === 'GET' && preg_match('#^/pm/subproject/(\d+)$#', $path, $m): Response::json(PortalPM::subproject($u, (int)$m[1]));
+        case $method === 'GET' && $path === '/pm/drawings': Response::json(['items' => PortalPM::drawings(isset($_GET['project']) && $_GET['project'] !== '' ? (int)$_GET['project'] : null)]);
+        case $method === 'GET' && $path === '/pm/submittals': Response::json(['items' => PortalPM::submittals(isset($_GET['project']) && $_GET['project'] !== '' ? (int)$_GET['project'] : null)]);
+        case $method === 'GET' && $path === '/pm/hr/team': Response::json(PortalPM::hrTeam($u, (int)($_GET['year'] ?? date('Y'))));
+        case $method === 'GET' && $path === '/pm/absences': Response::json(PortalPM::absencesForProject((int)($_GET['project'] ?? 0), (string)($_GET['from'] ?? date('Y-m-d')), (string)($_GET['to'] ?? date('Y-m-d', strtotime('+28 days')))));
+        case $method === 'GET' && $path === '/pm/inbox': Response::json(['items' => PortalPM::inbox($u, (int)($_GET['since'] ?? 0))]);
         case $method === 'GET' && $path === '/tickets': Response::json(['items' => Portal::tickets($u)]);
         case $method === 'GET' && $path === '/assignments': Response::json(['items' => Portal::assignments($u)]);
         case $method === 'GET' && $path === '/projects': Response::json(['items' => Portal::projects()]);

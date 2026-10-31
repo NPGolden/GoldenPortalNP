@@ -1,0 +1,12 @@
+{
+  "name": "golden-pm-ui-tests",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Golden PM 1.0.0 — Playwright UI flows against index.html?mock=1 (chromium at /opt/pw-browsers/chromium)",
+  "scripts": {
+    "test": "node ui-flows.test.js"
+  },
+  "devDependencies": {
+    "playwright-core": "^1.56.0"
+  }
+}

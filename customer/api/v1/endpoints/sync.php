@@ -1,9 +1,9 @@
 <?php
-/** POST /sync — batched, idempotent operations from the device outbox (sync_ops keeps the result per uuid). */
+/** POST /sync — batched, idempotent operations from the device outbox (sync_ops keeps the result per uuid). R66-001: PM kinds for app 'pm'. */
 declare(strict_types=1);
 function sync_ops(array $u, array $b): void {
     $ops = $b['ops'] ?? []; if (!is_array($ops) || count($ops) > 200) throw new ApiException(422, 'ops: array of max 200');
-    $results = [];
+    $results = []; $pm = api_app() === 'pm';
     foreach ($ops as $op) {
         $uuid = (string)($op['id'] ?? ''); $kind = (string)($op['kind'] ?? ''); $p = (array)($op['payload'] ?? []);
         if (!preg_match('/^[0-9a-f-]{36}$/', $uuid)) { $results[] = ['uuid' => $uuid, 'status' => 'rejected', 'error' => 'bad uuid']; continue; }
@@ -28,8 +28,17 @@ function sync_ops(array $u, array $b): void {
                 case 'hr_eval_ack':       $res = Portal::hrEvalAck($u, $p); break;
                 case 'hr_message':        $res = Portal::hrMessage($u, $p); break;
                 case 'hr_seen':           $res = Portal::hrSeen($u); break;
-                case 'hr_decide': throw new ApiException(403, 'Leave decisions are portal-only');   // CS-23
-                case 'approve': case 'reject': case 'issue': throw new ApiException(403, 'Approvals are portal-only');   // CS-03
+                /* R66-001 — Golden PM app only (api_app() === 'pm'); the Service Engineer app keeps its 403s */
+                case 'sp_stages':      $res = $pm ? PortalPM::setStages($u, $p) : throw new ApiException(403, 'Stage changes are for project managers (Golden PM app)'); break;
+                case 'sp_comment':     $res = $pm ? PortalPM::comment($u, $uuid, $p) : throw new ApiException(403, 'Comments are for project managers (Golden PM app)'); break;
+                case 'issue_status':   $res = $pm ? PortalPM::issueStatus($u, $p) : throw new ApiException(403, 'Issue status is for project managers (Golden PM app)'); break;
+                case 'drawing_update': $res = $pm ? PortalPM::drawingUpdate($u, $p) : throw new ApiException(403, 'Drawing tracker is for project managers (Golden PM app)'); break;
+                case 'hr_decide':      if (!$pm) throw new ApiException(403, 'Leave decisions are portal-only');   // CS-23 (SE app)
+                                       RateLimit::check('decide', 'u' . $u['id'], 30); $res = PortalPM::hrDecide($u, $p); break;
+                case 'ts_decide':      if (!$pm) throw new ApiException(403, 'Approvals are portal-only');          // CS-03 (SE app)
+                                       RateLimit::check('decide', 'u' . $u['id'], 30); $res = PortalPM::tsDecide($u, $p); break;
+                case 'nf_read':        $res = PortalPM::markRead($u, (array)($p['ids'] ?? [])); break;
+                case 'approve': case 'reject': case 'issue': case 'eng_decide': throw new ApiException(403, 'Approvals are portal-only');   // CS-03 (both apps: engineering extra-hours decisions stay in the portal)
                 default: throw new ApiException(422, 'Unknown operation kind');
             }
             if (isset($res['status'])) { $res['record_status'] = $res['status']; unset($res['status']); }   // 'status' is the sync result; the record's own status travels as record_status

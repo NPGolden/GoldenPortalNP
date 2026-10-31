@@ -5907,4 +5907,6 @@ Cordiali saluti,
 'au.delete_refs' => 'L\'account non può essere eliminato — ha uno storico: {l}. Disattivalo.',
 'hr.acc_hours' => '{h} h accumulate · {n} h al prossimo giorno',
 'hr.acc_hours_hint' => 'Uscite anticipate / ritardi si accumulano; ogni 8 h complete tolgono un giorno di ferie.',
+'mob.app_engineer' => 'App Service Engineer',
+'mob.app_pm' => 'App Golden PM',
 ];

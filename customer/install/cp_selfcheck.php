@@ -207,6 +207,7 @@ printf("%s storage/hr writable (leave documents)  %s\n", is_dir(__DIR__ . '/../s
 $r52 = (bool)$pdo->query("SHOW TABLES LIKE 'mob_devices'")->fetch() && (bool)$pdo->query("SHOW TABLES LIKE 'sync_ops'")->fetch();
 printf("%s R52 migration (mobile app API)  %s\n", $r52 ? '[ OK ]' : '[WARN]', $r52 ? '' : '— run install/migrate_cp_r52_mobile_engineer.sql');
 printf("%s api/v1 + mobile client present  %s\n", is_file(__DIR__ . '/../api/v1/index.php') && is_file(__DIR__ . '/../mobile/index.html') ? '[ OK ]' : '[WARN]', is_file(__DIR__ . '/../api/v1/index.php') ? '' : '— upload customer/api/v1 and customer/mobile');
+printf("%s R66-001 Golden PM adapter (api/v1/lib/portal_pm.php)  %s\n", is_file(__DIR__ . '/../api/v1/lib/portal_pm.php') ? '[ OK ]' : '[WARN]', is_file(__DIR__ . '/../api/v1/lib/portal_pm.php') ? '' : '— upload customer/api/v1/lib/portal_pm.php (the PM app cannot sign in without it)');
 printf("%s libsodium (assistant key encryption)  %s\n", function_exists('sodium_crypto_secretbox') ? '[ OK ]' : '[WARN]', function_exists('sodium_crypto_secretbox') ? '' : '— enable the sodium extension in cPanel › Select PHP Version');
 printf("%s curl to api.anthropic.com  %s\n", extension_loaded('curl') ? '[ OK ]' : '[WARN]', extension_loaded('curl') ? '' : '— the assistant needs the curl extension');
 $r30b = (bool)$pdo->query("SHOW TABLES LIKE 'rs_contracts'")->fetch() && (bool)$pdo->query("SHOW COLUMNS FROM tickets LIKE 'rs_contract_id'")->fetch();

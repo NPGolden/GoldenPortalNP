@@ -1224,7 +1224,7 @@ function pm_handle_action(string $action, string $page): bool {
             redirect('admin_users', au_keep() + ['_r' => uniqid()]);
         }
         case 'mob_revoke': { mob_revoke((int)($_POST['dev'] ?? 0)); flash('good', t('mob.revoked_done')); redirect('admin_users', ['_r' => uniqid()]); }   // R53-002
-        case 'mob_settings_save': { require_cp_admin(); if (!lic_has()) throw new RuntimeException(t('err.noaccess')); $v = trim((string)($_POST['min_version'] ?? '')); if (!preg_match('/^\d+\.\d+\.\d+$/', $v)) throw new RuntimeException(t('mob.bad_version')); cp_setting_set('api_min_version_engineer', $v); flash('good', t('mob.saved')); redirect('admin_log', ['_r' => uniqid()], '#mob'); }
+        case 'mob_settings_save': { require_cp_admin(); if (!lic_has()) throw new RuntimeException(t('err.noaccess')); $app = in_array($_POST['app'] ?? '', ['engineer', 'pm'], true) ? $_POST['app'] : 'engineer'; $v = trim((string)($_POST['min_version'] ?? '')); if (!preg_match('/^\d+\.\d+\.\d+$/', $v)) throw new RuntimeException(t('mob.bad_version')); cp_setting_set('api_min_version_' . $app, $v); flash('good', t('mob.saved')); redirect('admin_log', ['_r' => uniqid()], '#mob'); }   // R66-001: one minimum version per app (engineer | pm)
         case 'cu_revoke': {   // R49-001: sign a person out of every browser
             require_cp_admin(); $id = (int)($_POST['id'] ?? 0); if (!$id || !function_exists('sec_revoke_all')) throw new RuntimeException(t('err.notfound'));
             sec_revoke_all($id); $em = (string) scalar('SELECT email FROM customer_users WHERE id = ?', [$id]); login_log($id, $em, 'revoked');

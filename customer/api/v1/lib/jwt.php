@@ -14,7 +14,7 @@ final class Jwt {
     private static function unb64(string $s): string { return base64_decode(strtr($s, '-_', '+/')) ?: ''; }
     public static function issue(array $u, int $deviceId): string {
         $h = self::b64(json_encode(['alg' => 'HS256', 'typ' => 'JWT']));
-        $p = self::b64(json_encode(['sub' => (int)$u['id'], 'app' => API_APP_ID, 'dev' => $deviceId, 'br' => (int)($u['branch_id'] ?? 0), 'ep' => (int)($u['session_epoch'] ?? 0), 'iat' => time(), 'exp' => time() + 15 * 60]));   // ep = session epoch (R49 "sign out everywhere")
+        $p = self::b64(json_encode(['sub' => (int)$u['id'], 'app' => api_app(), 'dev' => $deviceId, 'br' => (int)($u['branch_id'] ?? 0), 'ep' => (int)($u['session_epoch'] ?? 0), 'iat' => time(), 'exp' => time() + 15 * 60]));   // ep = session epoch (R49 "sign out everywhere")
         return "$h.$p." . self::b64(hash_hmac('sha256', "$h.$p", self::secret(), true));
     }
     public static function verify(string $jwt): ?array {
@@ -27,7 +27,7 @@ final class Jwt {
         $hdr = $_SERVER['HTTP_AUTHORIZATION'] ?? ($_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '');
         if (!preg_match('/^Bearer\s+(.+)$/i', $hdr, $m)) throw new ApiException(401, 'Unauthorized');
         $c = self::verify(trim($m[1])); if (!$c) throw new ApiException(401, 'Token expired');
-        if (($c['app'] ?? '') !== API_APP_ID) throw new ApiException(403, 'Token issued for another application');   // CS-01
+        if (($c['app'] ?? '') !== api_app()) throw new ApiException(403, 'Token issued for another application');   // CS-01: claim must match X-App of this request
         $d = one('SELECT id, revoked_at, platform FROM mob_devices WHERE id = ?', [(int)$c['dev']]);
         if (!$d || $d['revoked_at']) throw new ApiException(401, 'Device revoked');
         $u = api_act_as((int)$c['sub']);
@@ -39,9 +39,9 @@ final class Jwt {
     }
     public static function registerDevice(int $uid, array $dev): int {
         $cid = mb_substr((string)($dev['device_id'] ?? ''), 0, 64); $plat = in_array($dev['platform'] ?? '', ['ios', 'android', 'web'], true) ? $dev['platform'] : 'web';
-        $x = one('SELECT id FROM mob_devices WHERE user_id = ? AND app_id = ? AND client_device_id = ? AND revoked_at IS NULL', [$uid, API_APP_ID, $cid]);
+        $x = one('SELECT id FROM mob_devices WHERE user_id = ? AND app_id = ? AND client_device_id = ? AND revoked_at IS NULL', [$uid, api_app(), $cid]);
         if ($x) { q('UPDATE mob_devices SET platform = ?, model = ?, app_version = ?, last_seen_at = NOW() WHERE id = ?', [$plat, mb_substr((string)($dev['ua'] ?? ''), 0, 120), (string)($dev['app_version'] ?? ''), (int)$x['id']]); return (int)$x['id']; }
-        q('INSERT INTO mob_devices (user_id, app_id, client_device_id, platform, model, app_version, enrolled_at, last_seen_at) VALUES (?,?,?,?,?,?,NOW(),NOW())', [$uid, API_APP_ID, $cid, $plat, mb_substr((string)($dev['ua'] ?? ''), 0, 120), (string)($dev['app_version'] ?? '')]);
+        q('INSERT INTO mob_devices (user_id, app_id, client_device_id, platform, model, app_version, enrolled_at, last_seen_at) VALUES (?,?,?,?,?,?,NOW(),NOW())', [$uid, api_app(), $cid, $plat, mb_substr((string)($dev['ua'] ?? ''), 0, 120), (string)($dev['app_version'] ?? '')]);
         return (int) db()->lastInsertId();
     }
     public static function issueRefresh(int $deviceId, string $platform, ?int $rotatedFrom = null): string {

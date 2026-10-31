@@ -10,7 +10,10 @@ error_reporting(E_ALL); ini_set('display_errors', '0');
 define('API_ROOT', __DIR__);
 define('CP_ROOT', dirname(__DIR__, 2));                 // customer/
 const API_VERSION = '0.5.0';
-const API_APP_ID  = 'engineer';                          // JWT app claim (CS-01); the PM app uses 'pm'
+const API_APP_ID  = 'engineer';                          // default app (kept for compatibility); per request see api_app()
+const API_APPS    = ['engineer' => '0.5.0', 'pm' => '1.0.0'];   // app id → default minimum version (R66-001: the Golden PM app)
+/** The client application of this request from X-App (CS-01): 'pm' or 'engineer'; anything else falls back to 'engineer' and fails the "Wrong application" check in index.php. */
+function api_app(): string { $a = strtolower(trim((string)($_SERVER['HTTP_X_APP'] ?? API_APP_ID))); return isset(API_APPS[$a]) ? $a : API_APP_ID; }
 
 $_SERVER['REQUEST_METHOD'] = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 ini_set('session.use_cookies', '0'); ini_set('session.use_only_cookies', '0'); ini_set('session.cache_limiter', '');
@@ -24,6 +27,7 @@ require_once API_ROOT . '/lib/response.php';
 require_once API_ROOT . '/lib/ratelimit.php';
 require_once API_ROOT . '/lib/jwt.php';
 require_once API_ROOT . '/lib/portal.php';
+require_once API_ROOT . '/lib/portal_pm.php';
 
 /** Act as a portal user for the rest of this request (the portal reads $_SESSION['cu_id']). */
 function api_act_as(int $uid): array {
