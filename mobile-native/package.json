@@ -8,19 +8,19 @@
     "assets": "npx @capacitor/assets generate --iconBackgroundColor '#FFFFFF' --iconBackgroundColorDark '#1F3A5F' --splashBackgroundColor \"$SPLASH\" --splashBackgroundColorDark \"$SPLASH\""
   },
   "dependencies": {
-    "@capacitor/android": "6.2.0",
+    "@capacitor/android": "6.2.2",
     "@capacitor/app": "6.0.2",
     "@capacitor/camera": "6.1.0",
     "@capacitor/core": "6.2.0",
     "@capacitor/device": "6.0.2",
-    "@capacitor/ios": "6.2.0",
+    "@capacitor/ios": "8.6.0",
     "@capacitor/network": "6.0.3",
     "@capacitor/push-notifications": "6.0.3",
     "@capacitor/splash-screen": "6.0.3",
     "@capacitor/status-bar": "6.0.2"
   },
   "devDependencies": {
-    "@capacitor/assets": "3.0.5",
-    "@capacitor/cli": "6.2.0"
+    "@capacitor/assets": "4.0.0",
+    "@capacitor/cli": "8.6.0"
   }
 }
