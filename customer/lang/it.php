@@ -5900,4 +5900,5 @@ Cordiali saluti,
 'hr.tg_ai_proposals' => '{n} proposte — aggiungi o modifica',
 'hr.tg_ai_add' => 'Aggiungi',
 'hr.imp_personal_skip' => 'Il file contiene colonne di dati personali / retributivi, ma il tuo account non è HR né Owner: quelle colonne saranno ignorate e il resto di ogni riga importato. Accedi con un account HR o Owner per importarle.',
+'hr.imp_keep' => 'non nel file — la scheda mantiene il valore',
 ];
