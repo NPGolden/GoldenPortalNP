@@ -58,6 +58,7 @@ $inp = function (string $k, string $v) use ($meta): string {
       <div class="field" id="fw-<?= e($k) ?>"><label for="f-<?= e($k) ?>"><?= e(hra_label($k)) ?><?= $req ? ' <span class="req" title="' . e(t('hra.required')) . '">*</span>' : '' ?><?= $prop ? ' ' . pill($fields[$k]['source'] === 'user' ? 'gold' : 'blue', t('hra.src_' . $fields[$k]['source'])) : '' ?></label>
         <?= $inp($k, $v) ?><input type="hidden" name="src[<?= e($k) ?>]" value="<?= e($prop ? $fields[$k]['source'] : 'user') ?>">
         <?php if (!empty($meta[$k][4])): ?><span class="hint"><?= e(t($meta[$k][4])) ?></span><?php endif; ?>
+        <?php if ($k === 'amka'): ?><label class="chk" style="display:block;margin-top:4px;"><input type="checkbox" name="amka_confirm" value="1"<?= $prop && $fields[$k]['hr_note'] ? ' checked' : '' ?>> <?= tt('hra.amka_confirm') ?></label><?php endif; ?>
         <?php if ($prop && $cur !== ''): ?><span class="hint"><?= tt('hra.on_card') ?>: <s><?= e(hra_show($k, $cur)) ?></s></span><?php elseif ($cur === '' && !$prop): ?><span class="hint"><?= tt('hra.empty_on_card') ?></span><?php endif; ?>
       </div>
     <?php endforeach; ?>

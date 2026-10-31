@@ -42,7 +42,8 @@ The mobile line jumped to **R57** while the main line is at **R50**. To keep one
 - **R65-002** — app 0.6.1: two-factor code on the app sign-in (no SQL) — **v1.76.1**.
 - **R65-003** — app 0.6.2: UK / BG / EL / IT translations completed (no SQL) — **v1.76.5**.
 - **R66-001** — Golden PM app 1.0.0 on the shared mobile module, `customer/mobile-pm/` (no SQL) — **v1.77.0**.
-- **R67-001** — HR Assistant: flow engine + staging approved by HR, "My card" flow, templates, encryption of staged identification numbers, purge and reminders (`migrate_cp_r67_hr_assistant.sql`, check `r67`; security review `docs/SECURITY-REVIEW_R67-001.md`) — **v1.78.0**. Next: R67-002 hiring with invitations and onboarding checklist, R67-003 leaving / dismissal on the existing off-boarding checklist (R60-001), R68 flows in the mobile apps.
+- **R67-001** — HR Assistant: flow engine + staging approved by HR, "My card" flow, templates, encryption of staged identification numbers, purge and reminders (`migrate_cp_r67_hr_assistant.sql`, check `r67`; security review `docs/SECURITY-REVIEW_R67-001.md`) — **v1.78.0**.
+- **R67-002** — HR Assistant: AMKA date ≠ date of birth allowed with the employee's confirmation and a note to HR (no SQL) — **v1.79.2**. Next: hiring with invitations and onboarding checklist, leaving / dismissal on the off-boarding checklist (R60-001), flows in the mobile apps.
 - Portal versions continue **1.73.0 (R62-001)**; deploys now run from GitHub (`NPGolden/GoldenPortalNP`, Actions › Deploy) — the updater applies pending migrations itself; whoever packages last sets `CP_VERSION` and adds the `cp_patches` entries in that order.
 
 ## 3. Migration order for the live database (phpMyAdmin, `goldensas_portal` selected)

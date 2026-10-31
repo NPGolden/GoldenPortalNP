@@ -72,10 +72,14 @@ function hra_validate(string $field, string $v, array $p): string {
         case 'children_years': if (!preg_match('/^\d{4}(\s*[,;\/ ]\s*\d{4})*$/', $v)) throw new RuntimeException(t('hra.bad_years')); $v = implode(', ', preg_split('/[^\d]+/', $v, -1, PREG_SPLIT_NO_EMPTY)); break;
         case 'birth_date': if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) || $v > date('Y-m-d', strtotime('-15 years')) || $v < '1930-01-01') throw new RuntimeException(t('hra.bad_birth')); break;
         case 'afm': if (!hra_afm_ok($v)) throw new RuntimeException(t('hra.bad_afm_check')); break;
-        case 'amka': $bd = (string)($p['birth_date'] ?? ''); if ($bd !== '' && substr($v, 0, 6) !== date('dmy', strtotime($bd))) throw new RuntimeException(t('hra.bad_amka_date')); break;
+        case 'amka': if (!hra_amka_date_ok($v)) throw new RuntimeException(t('hra.bad_amka_fmt')); if (hra_amka_mismatch($v, $p) && empty($_POST['amka_confirm'])) throw new RuntimeException(t('hra.bad_amka_date')); break;
     }
     return mb_substr($v, 0, max(1, (int)$m[1]));
 }
+/** The first six digits of an AMKA are a date (DDMMYY) — of birth, or of the registration certificate when that was issued later. */
+function hra_amka_date_ok(string $amka): bool { if (!preg_match('/^\d{11}$/', $amka)) return false; $d = (int)substr($amka, 0, 2); $m = (int)substr($amka, 2, 2); return $d >= 1 && $d <= 31 && $m >= 1 && $m <= 12; }
+/** True when the AMKA date differs from the date of birth on the card / in the proposal (allowed, but flagged to HR). */
+function hra_amka_mismatch(string $amka, array $p): bool { $bd = (string)($p['birth_date'] ?? ''); return $bd !== '' && substr($amka, 0, 6) !== date('dmy', strtotime($bd)); }
 /** Greek ΑΦΜ check digit (mod 11). */
 function hra_afm_ok(string $afm): bool { if (!preg_match('/^\d{9}$/', $afm) || $afm === '000000000') return false; $s = 0; for ($i = 0; $i < 8; $i++) $s += (int)$afm[$i] * (2 ** (8 - $i)); return ($s % 11) % 10 === (int)$afm[8]; }
 
@@ -160,6 +164,7 @@ function hra_set(array $f, array $p, string $field, string $value, string $sourc
     if ($new === $cur) { q('DELETE FROM hr_flow_fields WHERE flow_id = ? AND field = ?', [(int)$f['id'], $field]); return; }
     q('INSERT INTO hr_flow_fields (flow_id, field, old_value, new_value, enc, source, decision) VALUES (?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE old_value = VALUES(old_value), new_value = VALUES(new_value), enc = VALUES(enc), source = VALUES(source), decision = \'pending\', hr_note = NULL',
       [(int)$f['id'], $field, $enc ? hra_enc($cur) : $cur, $enc ? hra_enc($new) : $new, (int)$enc, in_array($source, ['user', 'assistant', 'document', 'hr'], true) ? $source : 'user', 'pending']);
+    if ($field === 'amka' && $new !== '' && hra_amka_mismatch($new, $p)) q('UPDATE hr_flow_fields SET hr_note = ? WHERE flow_id = ? AND field = ?', [mb_substr(t('hra.amka_note'), 0, 200), (int)$f['id'], $field]);   // flagged for HR, confirmed by the employee
 }
 /** Save the fields of one wizard step from $_POST (filling side). */
 function hra_step_save_from_post(array $f): int {

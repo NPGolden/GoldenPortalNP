@@ -46,7 +46,7 @@ return [
       ['ul' => [
         'Nothing is written to your card before HR approves. Your identification numbers (AMKA, ΑΦΜ, ID, passport, IBAN) are encrypted while the flow is open and only HR can read them.',
         'The first step shows how your data is handled (who is responsible, why it is kept, who sees it, how long, your rights); tick "I have read the notice" to begin.',
-        'The portal checks what you type: AMKA must start with your date of birth, the ΑΦΜ check digit and the IBAN must be valid. If your account has two-factor authentication, the identification step and the submission ask for the 6-digit code.',
+        'The portal checks what you type: the AMKA must be 11 digits starting with a date (normally your date of birth — if yours was issued with another date, tick "My AMKA was issued with this date" and HR will see the note), the ΑΦΜ check digit and the IBAN must be valid. If your account has two-factor authentication, the identification step and the submission ask for the 6-digit code.',
         '✦ Let the assistant fill it in: describe your details in your own words, or photograph your ID card or passport. The assistant proposes values — press Use on the ones that are right; the photo is only read, not stored. Attach the scan itself in the Documents step (PDF, JPG, PNG, WebP).',
         'Review & submit lists only what you changed, next to what the card holds; tick the declaration and submit. HR may return the flow with a note (you will find it on top of the flow), reject it, or approve it — you are notified each time, and the approved values appear on your card.',
         'Withdraw cancels an open flow; the proposed values are discarded.',
