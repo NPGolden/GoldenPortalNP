@@ -47,8 +47,9 @@ window.SCREENS = (() => {
       root.querySelector("#go").onclick = async () => {
         const b = root.querySelector("#go"); b.disabled = true; const er = root.querySelector("#err");
         try { await API.login(root.querySelector("#email").value.trim(), root.querySelector("#pw").value, root.querySelector("#totp").value.trim()); await SYNC.run(); location.hash = "#/home"; }
-        catch (e) { const code = e.data && e.data.code; if (code === "totp_required") { root.querySelector("#totprow").classList.remove("hidden"); er.textContent = t("login.totphint"); }
-          else er.textContent = e.status === 402 ? t("login.nolicence") : e.status === 423 ? t("login.locked") : e.status === 426 ? t("login.update") : e.status === 429 ? t("login.ratelimit") : t("login.failed"); er.classList.remove("hidden"); b.disabled = false; }
+        catch (e) { const d = e.data || {}; const totp = d.totp === true || d.code === "totp_required";
+          if (totp) { root.querySelector("#totprow").classList.remove("hidden"); er.textContent = root.querySelector("#totp").value ? t("login.totpbad") : t("login.totphint"); root.querySelector("#totp").focus(); }
+          else er.textContent = e.status === 402 ? t("login.nolicence") : e.status === 403 ? (d.error || t("login.staffonly")) : e.status === 423 ? t("login.locked") : e.status === 426 ? t("login.update") : e.status === 429 ? t("login.ratelimit") : e.status === 401 ? t("login.failed") : `${t("login.failed")} (${e.status || "offline"})`; er.classList.remove("hidden"); b.disabled = false; }
       };
       root.querySelector("#bio").onclick = async () => { if (await UI.biometric()) { await SYNC.run(); location.hash = "#/home"; } };
     } };

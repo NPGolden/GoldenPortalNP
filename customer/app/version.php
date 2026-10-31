@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.76.0';
+const CP_VERSION = '1.76.1';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R65-002', 'version' => '1.76.1', 'date' => '2026-10-31', 'title' => 'Service Engineer app 0.6.1: the sign-in screen now asks for the authenticator code when the account has two-factor authentication (the portal\'s reply was not recognised and showed "Sign in failed"); a wrong code and a non-staff account get their own messages.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R65-001', 'version' => '1.76.0', 'date' => '2026-10-31', 'title' => 'Service Engineer app build 0.6.0 — My HR page in the app (= HR › My leave): balances per leave type from the entitlement engine, leave periods to join with own dates, new leave request for every type enabled for the person (day / hour, reason and document rules; a document is sent as a PDF or photo), own requests with the manager\'s and HR\'s decisions and cancel while pending, training opportunities with apply and own trainings, annual evaluations with acknowledge and comment, private messages with HR (unread badge on Home and More). The mobile API (customer/api/v1) gains GET /hr, POST /hr/request, GET /hr/doc/{id} and the sync kinds hr_request, hr_cancel, hr_period_join, hr_training_apply, hr_eval_ack, hr_message, hr_seen — every write goes through the portal\'s own HR functions, decisions stay in the portal (hr_decide → 403), only the person\'s own records are readable, personal and payroll data are never read. Every engineer needs a person card linked to his portal account (HR › People).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R64-003', 'version' => '1.75.2', 'date' => '2026-10-31', 'title' => 'People Excel: the pre-filled template exports every card field as stored; the personal / payroll columns are included only for HR and Owner accounts (as on the card), and the import preview warns when a file carries personal columns the signed-in account cannot write (they are skipped, the rest of the row is imported). Empty cells never erase data.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R64-002', 'version' => '1.75.1', 'date' => '2026-10-31', 'title' => 'Assistant on evaluations and targets: on the evaluation panel (card and manager page) "Draft the evaluation" fills the eight scores and the texts from the facts of the year — trainings, computed scores, targets, last evaluation, portal activity, kudos — for review before saving, and "Ask" answers questions about the person\'s year; on HR › Targets "Propose" returns 4–6 SMART targets for a department or a person (from its people and roles, last year\'s targets and results, the evaluation) to add with one click or edit first. Personal and payroll data are never sent. Pages hr_eval and hr_targets must be enabled under Settings › Assistant › Pages.', 'db' => null, 'check' => null],
