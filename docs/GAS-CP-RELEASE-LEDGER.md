@@ -40,6 +40,7 @@ The mobile line jumped to **R57** while the main line is at **R50**. To keep one
 - **R63-001 … R64-002** — Community, manuals, HR/Owner-only personal data, who is online, computed evaluation criteria, targets, assistant on evaluations — **v1.74.0 … v1.75.1**.
 - **R65-001** — Service Engineer app build 0.6.0: My HR page in the app, mobile API `/hr` routes and HR sync kinds (no SQL; client at `customer/mobile/`, module `customer/api/v1/`; tests and procedure in GAS-2026-PORTAL-APP-002) — **v1.76.0**.
 - **R65-002** — app 0.6.1: two-factor code on the app sign-in (no SQL) — **v1.76.1**.
+- **R65-003** — app 0.6.2: UK / BG / EL / IT translations completed (no SQL) — **v1.76.2**.
 - Portal versions continue **1.73.0 (R62-001)**; deploys now run from GitHub (`NPGolden/GoldenPortalNP`, Actions › Deploy) — the updater applies pending migrations itself; whoever packages last sets `CP_VERSION` and adds the `cp_patches` entries in that order.
 
 ## 3. Migration order for the live database (phpMyAdmin, `goldensas_portal` selected)
