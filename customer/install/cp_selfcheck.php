@@ -185,6 +185,8 @@ $r61 = (bool)$pdo->query("SHOW TABLES LIKE 'hr_leave_periods'")->fetch();
 printf("%s R61-001 migration (owner role, leave periods)  %s\n", $r61 ? '[ OK ]' : '[WARN]', $r61 ? '' : '— run install/migrate_cp_r61_owner_leaves.sql');
 $r62 = (bool)$pdo->query("SHOW TABLES LIKE 'hr_evaluations'")->fetch() && (bool)$pdo->query("SHOW COLUMNS FROM hr_people LIKE 'gross_salary'")->fetch();
 printf("%s R62-001 migration (payroll fields, training, evaluations)  %s\n", $r62 ? '[ OK ]' : '[WARN]', $r62 ? '' : '— run install/migrate_cp_r62_training_eval.sql');
+$r63 = (bool)$pdo->query("SHOW TABLES LIKE 'soc_onboard'")->fetch();
+printf("%s R63-001 migration (community)  %s\n", $r63 ? '[ OK ]' : '[WARN]', $r63 ? '' : '— run install/migrate_cp_r63_social.sql');
 $r60c = (bool)$pdo->query("SHOW COLUMNS FROM hr_people LIKE 'iban'")->fetch();
 printf("%s R60-007 migration (personal data on the card)  %s\n", $r60c ? '[ OK ]' : '[WARN]', $r60c ? '' : '— run install/migrate_cp_r60_007_personal_data.sql');
 $r60b = (bool)$pdo->query("SHOW COLUMNS FROM hr_entitlements LIKE 'counted_from'")->fetch();

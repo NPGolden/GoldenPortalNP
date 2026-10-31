@@ -122,6 +122,7 @@ function tz_local(?string $d): ?DateTime { if (!$d || !preg_match('/\d{1,2}:\d{2
 /** Short zone label of a moment (EET / EEST / CET …). */
 function tz_abbr(?DateTime $dt = null): string { $dt = $dt ?: new DateTime('now', new DateTimeZone(tz_app())); $a = $dt->format('T'); return preg_match('/^[+-]\d/', $a) ? 'UTC' . $a : $a; }
 /** "27 Oct 2026 16:05 EET" — the stored moment in the company's zone, with the zone. */
+function fmt_month(string $ym): string { $t = strtotime($ym . '-01'); return $t ? date('M Y', $t) : $ym; }   // R63-001
 function fmt_datetime(?string $d, bool $zone = true): string { if (!$d) return '—'; $dt = tz_local($d); if (!$dt) return fmt_date($d); return $dt->format('j') . ' ' . t('month.' . (int)$dt->format('n')) . ' ' . $dt->format('Y H:i') . ($zone ? ' ' . tz_abbr($dt) : ''); }
 /** "27.10.2026 16:05" in the company's zone — for documents (no zone label unless asked). */
 function fmt_dt_doc(?string $d, bool $zone = false): string { if (!$d) return ''; $dt = tz_local($d); return $dt ? $dt->format('d.m.Y H:i') . ($zone ? ' ' . tz_abbr($dt) : '') : fmt_date($d); }

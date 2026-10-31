@@ -121,7 +121,7 @@ layout_head(t('dash.title'), 'dashboard');
   <?php endif; ?>
 </div>
 <?php if ($staff && function_exists('act_card')) echo act_card();   // R62-005 ?>
-<?php if ($staff && function_exists('cel_card') && function_exists('hr2_has') && hr2_has()) echo cel_card(14, false, false);   // R62-004 ?>
+<?php if ($staff && function_exists('soc_has') && soc_has()) { soc_tick(); require __DIR__ . '/_soc_dash.php'; } elseif ($staff && function_exists('cel_card') && function_exists('hr2_has') && hr2_has()) echo cel_card(14, false, false);   // R63-001 / R62-004 ?>
 <?php if ($staff && function_exists('kpi_can') && kpi_can()): kpi_snapshot_monthly(); $ck = kpi_cockpit(5); if ($ck): ?>
 <div class="card">
   <div class="page-head" style="margin-bottom:6px;"><h2 style="margin:0;">🎯 <?= tt('kpi.cockpit') ?></h2><a class="btn btn--ghost btn--sm" href="<?= url('kpis') ?>"><?= tt('kpi.title') ?> ›</a></div>

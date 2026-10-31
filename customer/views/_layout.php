@@ -12,7 +12,7 @@ function nav_items(): array {                           // flat list, kept for a
 function nav_groups(): array {
     $staff = function_exists('is_staff') && is_staff();
     $g = [
-        ['key' => 'top',        'label' => '',                   'items' => [['dashboard', t('nav.dashboard'), '⌂']]],
+        ['key' => 'top',        'label' => '',                   'items' => array_values(array_filter([['dashboard', t('nav.dashboard'), '⌂'], $staff && function_exists('soc_has') && soc_has() ? ['community', t('soc.title'), '🤝'] : null]))],
         ['key' => 'fleet',      'label' => t('nav.g_fleet'),      'items' => [['vessels', t('nav.vessels'), '⚓'], ['projects', t('nav.projects'), '▦']]],
         ['key' => 'work',       'label' => t('nav.g_work'),       'items' => [['tickets', t('nav.tickets'), '🎫'], ['joborders', t('nav.joborders'), '🛠'], ['reports', t('nav.reports'), '📋']]],
         ['key' => 'commercial', 'label' => t('nav.g_commercial'), 'items' => array_values(array_filter([(!function_exists('of_visible') || of_visible()) ? ['offers', t('nav.offers'), '€'] : null, ['approvals', t('nav.approvals'), '✓']]))],
@@ -40,8 +40,8 @@ function nav_groups(): array {
     if ($staff && function_exists('hr_tr_has') && hr_tr_has() && hr_can()) $hr['items'][] = ['hr_training', t('hr.training'), '🎓'];                  // R62-001
     if ($staff && function_exists('hr_can') && hr_can()) $hr['items'][] = ['admin_hr', t('hr.settings'), '🗂'];                                        // R61-001: Owner / HR / admin
     if ($hr['items']) array_splice($g, 3, 0, [$hr]);
-    if ($staff && function_exists('hr_only') && hr_only()) $g = [['key' => 'top', 'label' => '', 'items' => [['hr_dashboard', t('hr.dashboard'), '📊'], ['planning', t('pl.title'), '🗓'], ['hr_requests', t('hr.requests'), '📝'], ['hr_leaves', t('hr.leaves'), '🏖'], ['hr_training', t('hr.training'), '🎓'], ['admin_hr', t('hr.settings'), '🗂']]]];   // R51-001 / R55-005 / R61-001: HR sees the board and its settings only
-    if ($staff && function_exists('emp_only') && emp_only()) $g = [['key' => 'top', 'label' => '', 'items' => [['planning', t('hr.my_program'), '🗓'], ['my_leave', t('hr.my_leave'), '🏖']]]];   // R54-001 / R56-002: employee scope
+    if ($staff && function_exists('hr_only') && hr_only()) $g = [['key' => 'top', 'label' => '', 'items' => [['hr_dashboard', t('hr.dashboard'), '📊'], ['community', t('soc.title'), '🤝'], ['planning', t('pl.title'), '🗓'], ['hr_requests', t('hr.requests'), '📝'], ['hr_leaves', t('hr.leaves'), '🏖'], ['hr_training', t('hr.training'), '🎓'], ['admin_hr', t('hr.settings'), '🗂']]]];   // R51-001 / R55-005 / R61-001: HR sees the board and its settings only
+    if ($staff && function_exists('emp_only') && emp_only()) $g = [['key' => 'top', 'label' => '', 'items' => [['planning', t('hr.my_program'), '🗓'], ['my_leave', t('hr.my_leave'), '🏖'], ['community', t('soc.title'), '🤝']]]];   // R54-001 / R56-002: employee scope
     return $g;
 }
 /** Badge counts per slug (what is waiting for this user). */

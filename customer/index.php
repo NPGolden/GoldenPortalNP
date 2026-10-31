@@ -43,6 +43,7 @@ require __DIR__ . '/app/hr5.php';   // R61-001
 require __DIR__ . '/app/hr6.php';   // R62-001
 require __DIR__ . '/app/cel.php';   // R62-004 celebrations
 require __DIR__ . '/app/act.php';   // R62-005 fleet & activity
+require __DIR__ . '/app/soc.php';   // R63-001 community
 require __DIR__ . '/app/mt.php';
 require __DIR__ . '/app/bg.php';
 require __DIR__ . '/app/wp.php';
@@ -345,7 +346,8 @@ if ($page === 'plan_items') {                                                   
 }
 if ($page === 'customers_export') { ex_customers($_GET); }
 if ($page === 'kbfile') { kb_stream_file((int)($_GET['id'] ?? 0)); }
-if ($page === 'crfile') { cr_stream_file((int)($_GET['id'] ?? 0)); }                                                    // R59-001
+if ($page === 'crfile') { cr_stream_file((int)($_GET['id'] ?? 0)); }
+if ($page === 'socphoto') { soc_photo_stream((int)($_GET['id'] ?? 0)); }                                                // R63-001                                                    // R59-001
 if ($page === 'nf_open') { require_login(); nf_open((int)($_GET['id'] ?? 0)); }
 
 if (in_array($page, ['offers', 'offer', 'offer_edit', 'admin_offer_statuses'], true) && function_exists('of_visible')) { require_login(); of_require(); }   // R31-006
@@ -359,7 +361,7 @@ if ($page === 'vessel' && function_exists('vm_has') && vm_has() && ($mi = scalar
 $views = ['login','twofa','dashboard','vessels','projects','documents','reports','cyber','support','account',
           'subproject','drawings','overlay','weekly','monthly','report_sp',
           'project_new','subproject_new','project_edit','subproject_edit','vessel_new','vessel_edit','import',
-          'admin_numbering','admin_offer_classes','proformas','proforma','cashflow','report_cf','eng_requests','admin_engineering','admin_ai','admin_hr','hr_person','hr_dashboard','my_leave','hr_requests','production','production_order','production_edit','admin_systems','admin_users','admin_roles','admin_log','settings','approvals','approval','timesheets','timesheet','timesheet_edit','manhours','report_ts','admin_disciplines','admin_about','tickets','ticket','ticket_edit','vessel','report_vessel','offers','offer','offer_edit','weekly_vessel','report_weekly','fsr','fsr_edit','fsr_list','isr','isr_edit','isr_list','jo','jo_edit','jo_list','joborders','contacts','contact','contact_edit','companies','admin_offer_statuses','notifications','admin_customers','manual','kb','kb_q','requests','request','hr_leaves','hr_training','hr_eval','license','tasks','task_edit','admin_task_kinds','admin_file_kinds','admin_calendars','admin_branches','planning','equipment','equipment_view','equipment_edit','fd_import','admin_issue_cats','admin_vessel_merge','rs','rs_edit','wf','vessel_decks','admin_email_templates','admin_rate_cards','admin_offer_texts','cost_control','work','myworks','workload','acc_register','acc_reports','acc_report','fsr_ext','kpis','risks','admin_kpis','report_kpi','sales','report_sales','admin_sales'];
+          'admin_numbering','admin_offer_classes','proformas','proforma','cashflow','report_cf','eng_requests','admin_engineering','admin_ai','admin_hr','hr_person','hr_dashboard','my_leave','hr_requests','production','production_order','production_edit','admin_systems','admin_users','admin_roles','admin_log','settings','approvals','approval','timesheets','timesheet','timesheet_edit','manhours','report_ts','admin_disciplines','admin_about','tickets','ticket','ticket_edit','vessel','report_vessel','offers','offer','offer_edit','weekly_vessel','report_weekly','fsr','fsr_edit','fsr_list','isr','isr_edit','isr_list','jo','jo_edit','jo_list','joborders','contacts','contact','contact_edit','companies','admin_offer_statuses','notifications','admin_customers','manual','kb','kb_q','requests','request','hr_leaves','hr_training','hr_eval','community','license','tasks','task_edit','admin_task_kinds','admin_file_kinds','admin_calendars','admin_branches','planning','equipment','equipment_view','equipment_edit','fd_import','admin_issue_cats','admin_vessel_merge','rs','rs_edit','wf','vessel_decks','admin_email_templates','admin_rate_cards','admin_offer_texts','cost_control','work','myworks','workload','acc_register','acc_reports','acc_report','fsr_ext','kpis','risks','admin_kpis','report_kpi','sales','report_sales','admin_sales'];
 $view  = in_array($page, $views, true) ? $page : '404';
 if (in_array($view, ['subproject_new', 'project_edit', 'subproject_edit'], true)) $view = 'project_new';   // one file, four modes
 if (in_array($view, ['vessel_new', 'vessel_edit'], true)) $view = 'vessel_form';

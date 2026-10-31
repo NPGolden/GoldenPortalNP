@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.73.5';
+const CP_VERSION = '1.74.0';
 const CP_BUILD   = '2026-10-30';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R63-001', 'version' => '1.74.0', 'date' => '2026-10-31', 'title' => 'Community: wishes on birthdays, name days, work anniversaries and new colleagues (one click from the dashboard, wishes wall for the person); kudos between colleagues with most-thanked lists; noticeboard with posts, polls and photos (reactions, comments, pinning); automatic badges; winner of the month with prize; onboarding checklist with a buddy; morning celebration nudge and Monday digest in Notifications. New page Community (🤝).', 'db' => 'install/migrate_cp_r63_social.sql', 'check' => 'r63'],
         ['ref' => 'GAS-CP-R62-006', 'version' => '1.73.5', 'date' => '2026-10-30', 'title' => 'Dark mode: navy text (planning board headers and day numbers, discipline group rows, tab titles, section headings, pill labels) turns light on the dark background; planning board name and header columns get a solid dark background.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R62-005', 'version' => '1.73.4', 'date' => '2026-10-30', 'title' => 'Dashboard › Fleet & activity: vessels worked on this year and in the last 30 days, new vessels of the year, active vessels; the ten most active colleagues of the year and of the last 30 days (records created across the portal, with the breakdown on hover and the timesheet hours).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R62-004', 'version' => '1.73.3', 'date' => '2026-10-30', 'title' => 'Celebrations: staff dashboard shows birthdays and Greek Orthodox name days of colleagues for the next 14 days (no ages); the HR dashboard shows 30 days with the age and a link to the card. Name days include the movable feasts (Easter, St George, St Thomas, Ψυχοσάββατο …).', 'db' => null, 'check' => null],
@@ -243,6 +244,7 @@ function cp_migration_state(): array {
         'r49' => $has("SHOW COLUMNS FROM customer_users LIKE 'session_epoch'"),
         'r50' => $has("SHOW TABLES LIKE 'ai_log'") && $has("SHOW COLUMNS FROM customer_users LIKE 'can_ai'"),
         'r61' => $has("SHOW TABLES LIKE 'hr_leave_periods'") && $has("SHOW COLUMNS FROM hr_requests LIKE 'period_id'"),
+        'r63' => $has("SHOW TABLES LIKE 'soc_kudos'") && $has("SHOW TABLES LIKE 'soc_onboard'"),
         'r62' => $has("SHOW TABLES LIKE 'hr_trainings'") && $has("SHOW TABLES LIKE 'hr_evaluations'") && $has("SHOW COLUMNS FROM hr_people LIKE 'gross_salary'") && $has("SHOW COLUMNS FROM hr_leave_periods LIKE 'mandatory'"),
         'r60c' => $has("SHOW COLUMNS FROM hr_people LIKE 'iban'"),
         'r60b' => $has("SHOW COLUMNS FROM hr_entitlements LIKE 'counted_from'"),

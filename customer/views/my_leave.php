@@ -65,6 +65,7 @@ layout_head(t('hr.my_leave'), 'my_leave');
   </tbody></table></div>
   <?php endif; ?>
 </div>
+<?php if (function_exists('soc_has') && soc_has() && function_exists('emp_only') && emp_only()) { soc_tick(); $socBack = 'my_leave'; require __DIR__ . '/_soc_dash.php'; }   // R63-001: employee scope sees the community block here ?>
 <?php if (function_exists('hr_tr_has') && hr_tr_has()): $opp = hr_trainings_for($p); $myTr = hr_person_trainings((int)$p['id']); $myEv = array_values(array_filter(hr_evaluations((int)$p['id']), fn($e) => $e['status'] !== 'draft')); $fh2 = fn($v) => $v === null ? '—' : rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.'); ?>
 <div class="card" id="hr-training">
   <h2>🎓 <?= tt('hr.tr_opportunities') ?></h2>
