@@ -1253,6 +1253,7 @@ function pm_handle_action(string $action, string $page): bool {
             flash('good', t('au.unlocked'));
             redirect('admin_users', au_keep() + ['_r' => uniqid()]);
         }
+        case 'cu_delete': { $u = require_cp_admin(); cu_account_delete((int)($_POST['id'] ?? 0)); flash('good', t('au.deleted')); redirect('admin_users', au_keep() + ['_r' => uniqid()]); }   // R64-005
         case 'cu_toggle': {
             $u = require_cp_admin();
             $id = (int)$_POST['id'];

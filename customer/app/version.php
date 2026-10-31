@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.76.2';
+const CP_VERSION = '1.76.3';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R64-005', 'version' => '1.76.3', 'date' => '2026-10-31', 'title' => 'Settings › Portal accounts: a deactivated account with no history at all (no sign-ins, tickets, timesheets, reports, planning, employee card, approvals, requests, community) can be deleted for good (🗑 next to Enable); any account with history is deactivated, never deleted, and the portal says what keeps it.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R64-004', 'version' => '1.76.2', 'date' => '2026-10-31', 'title' => 'People import: a column that is not in the file never touches the card — prior service, working days, children, technical flag, contract type / part-time and every personal field keep their values (the previous import wrote 0 / defaults / empty for absent columns). The preview shows "=" where the card keeps its value. Workbook GAS-HR-restore-import.xlsx restores technical / working days / children / prior service from the earlier imports.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R65-002', 'version' => '1.76.1', 'date' => '2026-10-31', 'title' => 'Service Engineer app 0.6.1: the sign-in screen now asks for the authenticator code when the account has two-factor authentication (the portal\'s reply was not recognised and showed "Sign in failed"); a wrong code and a non-staff account get their own messages.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R65-001', 'version' => '1.76.0', 'date' => '2026-10-31', 'title' => 'Service Engineer app build 0.6.0 — My HR page in the app (= HR › My leave): balances per leave type from the entitlement engine, leave periods to join with own dates, new leave request for every type enabled for the person (day / hour, reason and document rules; a document is sent as a PDF or photo), own requests with the manager\'s and HR\'s decisions and cancel while pending, training opportunities with apply and own trainings, annual evaluations with acknowledge and comment, private messages with HR (unread badge on Home and More). The mobile API (customer/api/v1) gains GET /hr, POST /hr/request, GET /hr/doc/{id} and the sync kinds hr_request, hr_cancel, hr_period_join, hr_training_apply, hr_eval_ack, hr_message, hr_seen — every write goes through the portal\'s own HR functions, decisions stay in the portal (hr_decide → 403), only the person\'s own records are readable, personal and payroll data are never read. Every engineer needs a person card linked to his portal account (HR › People).', 'db' => null, 'check' => null],

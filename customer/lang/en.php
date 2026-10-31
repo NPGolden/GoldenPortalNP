@@ -5901,4 +5901,8 @@ Best regards,
 'hr.tg_ai_add' => 'Add',
 'hr.imp_personal_skip' => 'This file carries personal / payroll columns, but your account is not HR or Owner: those columns will be ignored and the rest of each row imported. Sign in with an HR or Owner account to import them.',
 'hr.imp_keep' => 'not in the file — the card keeps its value',
+'au.delete_hint' => 'Delete this account for good — only possible because it has no history (no sign-ins, tickets, timesheets, reports, card, approvals). Accounts with history are deactivated instead.',
+'au.delete_confirm' => 'Delete the account of {name}? This cannot be undone.',
+'au.deleted' => 'Account deleted.',
+'au.delete_refs' => 'The account cannot be deleted — it has history: {l}. Deactivate it instead.',
 ];

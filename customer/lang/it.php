@@ -5901,4 +5901,8 @@ Cordiali saluti,
 'hr.tg_ai_add' => 'Aggiungi',
 'hr.imp_personal_skip' => 'Il file contiene colonne di dati personali / retributivi, ma il tuo account non è HR né Owner: quelle colonne saranno ignorate e il resto di ogni riga importato. Accedi con un account HR o Owner per importarle.',
 'hr.imp_keep' => 'non nel file — la scheda mantiene il valore',
+'au.delete_hint' => 'Elimina definitivamente l\'account — possibile solo perché non ha storico (accessi, ticket, timesheet, rapporti, scheda, approvazioni). Gli account con storico vengono disattivati.',
+'au.delete_confirm' => 'Eliminare l\'account di {name}? Non è reversibile.',
+'au.deleted' => 'Account eliminato.',
+'au.delete_refs' => 'L\'account non può essere eliminato — ha uno storico: {l}. Disattivalo.',
 ];

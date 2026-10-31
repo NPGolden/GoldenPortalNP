@@ -169,3 +169,33 @@ function hr_targets_ai_suggest(string $scope, int $deptId, int $pid, int $year, 
     if ($r['ok']) { $j = ai_json($r['text']); $rows = []; foreach ((array)($j['targets'] ?? []) as $t) { if (!is_array($t) || trim((string)($t['title'] ?? '')) === '') continue; $rows[] = ['title' => mb_substr(trim((string)$t['title']), 0, 160), 'measure' => mb_substr(trim((string)($t['measure'] ?? '')), 0, 160), 'target_value' => mb_substr(trim((string)($t['target_value'] ?? '')), 0, 60), 'unit' => mb_substr(trim((string)($t['unit'] ?? '')), 0, 20), 'due_date' => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($t['due_date'] ?? '')) ? $t['due_date'] : '', 'weight' => min(5, max(1, (int)($t['weight'] ?? 3))), 'description' => mb_substr(trim((string)($t['description'] ?? '')), 0, 4000)]; } $r['rows'] = $rows; }
     return $r;
 }
+
+/* ------------------------------------------------------------------ R64-005 · delete a portal account that never did anything */
+/** Records that keep an account alive: [label => count]. Only an account with none can be deleted; otherwise deactivate. */
+function cu_account_refs(int $uid): array {
+    $checks = [
+        'tickets' => 'SELECT COUNT(*) FROM tickets WHERE created_by = ? OR assigned_to = ?', 'ticket comments' => 'SELECT COUNT(*) FROM ticket_comments WHERE user_id = ? OR 0 = ?',
+        'timesheets' => 'SELECT COUNT(*) FROM timesheets WHERE user_id = ? OR 0 = ?', 'planning' => 'SELECT COUNT(*) FROM plan_entries WHERE user_id = ? OR created_by = ?',
+        'offers' => 'SELECT COUNT(*) FROM offers WHERE created_by = ? OR 0 = ?', 'service reports' => 'SELECT COUNT(*) FROM fsr_reports WHERE created_by = ? OR submitted_by = ?',
+        'inspection reports' => 'SELECT COUNT(*) FROM isr_reports WHERE created_by = ? OR submitted_by = ?', 'production orders' => 'SELECT COUNT(*) FROM production_orders WHERE created_by = ? OR manager_user_id = ?',
+        'employee card' => 'SELECT COUNT(*) FROM hr_people WHERE user_id = ? OR 0 = ?', 'HR requests' => 'SELECT COUNT(*) FROM hr_requests WHERE user_id = ? OR created_by = ?',
+        'approvals' => 'SELECT COUNT(*) FROM hr_requests WHERE manager_user_id = ? OR hr_user_id = ?', 'manages people' => 'SELECT COUNT(*) FROM customer_users WHERE manager_user_id = ? OR 0 = ?',
+        'manages disciplines' => 'SELECT COUNT(*) FROM disciplines WHERE manager_user_id = ? OR 0 = ?', 'portal requests' => 'SELECT COUNT(*) FROM cp_requests WHERE user_id = ? OR 0 = ?',
+        'Q&A' => 'SELECT COUNT(*) FROM kb_questions WHERE author_id = ? OR 0 = ?', 'Q&A answers' => 'SELECT COUNT(*) FROM kb_answers WHERE author_id = ? OR 0 = ?',
+        'equipment' => 'SELECT COUNT(*) FROM equipment WHERE created_by = ? OR 0 = ?', 'accounting' => 'SELECT COUNT(*) FROM acc_reports WHERE created_by = ? OR 0 = ?',
+        'community' => 'SELECT COUNT(*) FROM soc_posts WHERE user_id = ? OR 0 = ?', 'kudos' => 'SELECT COUNT(*) FROM soc_kudos WHERE from_user_id = ? OR to_user_id = ?',
+        'sign-ins' => "SELECT COUNT(*) FROM login_log WHERE user_id = ? AND outcome = 'success' AND 0 = ?",
+    ];
+    $out = []; foreach ($checks as $k => $sql) { try { $n = (int) scalar($sql, [$uid, $uid]); if ($n) $out[$k] = $n; } catch (Throwable $e) {} }
+    return $out;
+}
+/** Delete an account that has no history at all (created by mistake); everything else is deactivated, never deleted. */
+function cu_account_delete(int $uid): void {
+    $me = require_cp_admin(); if ($uid === (int)$me['id']) throw new RuntimeException(t('err.noaccess'));
+    $u = one('SELECT id, email, full_name FROM customer_users WHERE id = ?', [$uid]); if (!$u) throw new RuntimeException(t('err.notfound'));
+    $refs = cu_account_refs($uid); if ($refs) throw new RuntimeException(t('au.delete_refs', ['l' => implode(', ', array_map(fn($k, $n) => $k . ' ' . $n, array_keys($refs), $refs))]));
+    foreach (['notifications' => 'user_id', 'mob_devices' => 'user_id', 'mob_refresh_tokens' => 'user_id', 'login_log' => 'user_id', 'ai_log' => 'user_id', 'sales_targets' => 'user_id', 'hr_entitlements' => 'user_id'] as $t => $c) { try { q("DELETE FROM `$t` WHERE `$c` = ?", [$uid]); } catch (Throwable $e) {} }
+    q('DELETE FROM customer_users WHERE id = ?', [$uid]);
+    try { if (function_exists('login_log')) login_log((int)$me['id'], 'deleted:' . $u['email'], 'logout'); } catch (Throwable $e) {}
+}
+
