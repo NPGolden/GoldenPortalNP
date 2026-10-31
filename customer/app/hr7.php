@@ -199,3 +199,25 @@ function cu_account_delete(int $uid): void {
     try { if (function_exists('login_log')) login_log((int)$me['id'], 'deleted:' . $u['email'], 'logout'); } catch (Throwable $e) {}
 }
 
+/* ------------------------------------------------------------------ R64-007 · merge two disciplines (duplicates from imports) */
+/** Move everything that points at discipline $from to $into, then delete $from: employee cards, portal accounts, targets, leave periods / trainings targeted by discipline, planning import rows, engineering map, rates stay with $into. */
+function disc_merge(int $from, int $into): array {
+    require_cp_admin(); if ($from <= 0 || $into <= 0 || $from === $into) throw new RuntimeException(t('disc.merge_same'));
+    $a = one('SELECT * FROM disciplines WHERE id = ?', [$from]); $b = one('SELECT * FROM disciplines WHERE id = ?', [$into]); if (!$a || !$b) throw new RuntimeException(t('err.notfound'));
+    db()->beginTransaction();
+    try {
+        $people = 0; $accounts = 0;
+        try { $people = (int) q('UPDATE hr_people SET department_id = ? WHERE department_id = ?', [$into, $from])->rowCount(); } catch (Throwable $e) {}
+        $accounts = (int) q('UPDATE customer_users SET discipline_id = ? WHERE discipline_id = ?', [$into, $from])->rowCount();
+        foreach (['hr_targets' => 'department_id', 'sp_team' => 'discipline_id', 'eng_sections_map' => 'discipline_id', 'timesheets' => 'discipline_id', 'plan_entries' => 'discipline_id', 'tasks' => 'discipline_id'] as $t => $c) { try { q("UPDATE `$t` SET `$c` = ? WHERE `$c` = ?", [$into, $from]); } catch (Throwable $e) {} }
+        foreach (['hr_leave_periods', 'hr_trainings'] as $t) { try { foreach (all("SELECT id, target_ids FROM `$t` WHERE target = 'disciplines' AND FIND_IN_SET(?, target_ids)", [$from]) as $r) { $ids = array_unique(array_map(fn($x) => (int)$x === $from ? $into : (int)$x, array_filter(explode(',', (string)$r['target_ids'])))); q("UPDATE `$t` SET target_ids = ? WHERE id = ?", [implode(',', $ids), (int)$r['id']]); } } catch (Throwable $e) {} }
+        if (empty($b['manager_user_id']) && !empty($a['manager_user_id'])) q('UPDATE disciplines SET manager_user_id = ? WHERE id = ?', [(int)$a['manager_user_id'], $into]);
+        q('DELETE FROM disciplines WHERE id = ?', [$from]);
+        db()->commit();
+    } catch (Throwable $e) { db()->rollBack(); throw $e; }
+    try { if (function_exists('hr_audit')) hr_audit(0, 'discipline', 'merge', $a['name'], $b['name'], null); } catch (Throwable $e) {}
+    return ['people' => $people, 'accounts' => $accounts, 'into' => $b['name'], 'from' => $a['name']];
+}
+/** Loose department match for imports: case-insensitive, accents and the words department / dept / τμήμα ignored. */
+function disc_norm(string $s): string { $s = mb_strtolower(trim($s)); $s = strtr($s, ['ά' => 'α', 'έ' => 'ε', 'ή' => 'η', 'ί' => 'ι', 'ό' => 'ο', 'ύ' => 'υ', 'ώ' => 'ω', 'ϊ' => 'ι', 'ϋ' => 'υ']); $s = preg_replace('/\b(department|dept\.?|τμήμα|τμημα|section|group)\b/u', '', $s); return trim(preg_replace('/[\s\-_\/]+/u', ' ', (string)$s)); }
+

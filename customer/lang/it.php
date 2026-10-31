@@ -6118,4 +6118,13 @@ Cordiali saluti,
 'hra.ml_text' => 'La tua scheda è completa al {p} %. Conferma o correggi i tuoi dati personali con l\'HR Assistant — HR approva prima che qualcosa venga salvato.',
 'hra.ml_open' => 'Un percorso è aperto: {c} · {s}.',
 'hra.card_banner' => 'Un percorso HR Assistant per questa persona è {s}: {c}.',
+// ---- GAS-CP-R64-007 · merge disciplines
+'disc.counts_hint' => 'account del portale · 🪪 schede dipendenti (HR) in questo reparto',
+'disc.merge' => 'Unisci',
+'disc.merge_into' => 'Unisci in…',
+'disc.merge_hint' => 'Sposta ogni account, scheda, obiettivo, periodo e corso di questo reparto in quello scelto e lo elimina — per i duplicati creati dalle importazioni.',
+'disc.merge_confirm' => 'Unire "{d}" nel reparto scelto ed eliminarlo? Account, schede, obiettivi, periodi e corsi vengono spostati; nulla va perso.',
+'disc.merged' => 'Unito: {n} account / schede spostati in {d}.',
+'disc.merge_same' => 'Scegli un reparto diverso in cui unire.',
+'hr.imp_create_depts' => 'Crea i reparti sconosciuti come nuove discipline (altrimenti le persone mantengono il reparto della scheda)',
 ];

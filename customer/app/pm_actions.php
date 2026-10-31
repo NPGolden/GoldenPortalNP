@@ -1048,6 +1048,7 @@ function pm_handle_action(string $action, string $page): bool {
         case 'ts_uninvoice': { require_cp_admin(); $id = (int)$_POST['id']; ts_uninvoice($id); flash('good', t('ts.uninvoiced_ok')); redirect('timesheet', ['id' => $id, '_r' => uniqid()]); }
 
         /* -------------------------------------- admin: disciplines (R11) */
+        case 'disc_merge': { require_cp_admin(); $r = disc_merge((int)($_POST['from'] ?? 0), (int)($_POST['into'] ?? 0)); flash('good', t('disc.merged', ['n' => $r['people'] + $r['accounts'], 'd' => $r['into']])); redirect('admin_disciplines', ['_r' => uniqid()]); }   // R64-007
         case 'disc_save': {
             require_cp_admin();
             if (!ts_has()) throw new RuntimeException(t('ts.need_r11'));

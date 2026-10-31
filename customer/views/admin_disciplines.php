@@ -8,7 +8,8 @@ require __DIR__ . '/_layout.php';
 $u = require_cp_admin();
 $ok = ts_has();
 $rows = $ok ? all('SELECT d.*, m.full_name AS manager_name,
-                          (SELECT COUNT(*) FROM customer_users cu WHERE cu.discipline_id = d.id AND cu.is_active = 1) AS n_people
+                          (SELECT COUNT(*) FROM customer_users cu WHERE cu.discipline_id = d.id AND cu.is_active = 1) AS n_people,
+                          (SELECT COUNT(*) FROM hr_people hp WHERE hp.department_id = d.id AND hp.is_active = 1) AS n_cards
                    FROM disciplines d LEFT JOIN customer_users m ON m.id = d.manager_user_id ORDER BY d.is_active DESC, d.sort_order, d.name') : [];
 $people = staff_users();
 $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : '';
@@ -43,7 +44,7 @@ layout_head(t('disc.title'), 'admin_disciplines');
         <td><input form="<?= $fid ?>" name="name" value="<?= e($d['name']) ?>" maxlength="80" required></td>
         <td><select form="<?= $fid ?>" name="manager_user_id"><option value=""><?= tt('disc.no_manager') ?></option><?php foreach ($people as $pp): ?><option value="<?= $pp['id'] ?>"<?= $sel($pp['id'], $d['manager_user_id']) ?>><?= e($pp['full_name']) ?></option><?php endforeach; ?></select>
           <?php if (!$d['manager_user_id']): ?><br><span class="hint is-late"><?= tt('disc.no_manager_warn') ?></span><?php endif; ?></td>
-        <td class="hint"><?= (int)$d['n_people'] ?><?php if ($engCol): $esec = eng_section_of((int)$d['id']); ?><br><a class="hint" href="<?= url('admin_engineering') ?>" title="<?= tt('eng.map_hint') ?>">📐 <?= $esec ? e(eng_sections()[$esec]['name']) : '—' ?></a><?php endif; ?></td>
+        <td class="hint" title="<?= tt('disc.counts_hint') ?>"><?= (int)$d['n_people'] ?> <span class="hint">· 🪪 <?= (int)$d['n_cards'] ?></span><?php if ($engCol): $esec = eng_section_of((int)$d['id']); ?><br><a class="hint" href="<?= url('admin_engineering') ?>" title="<?= tt('eng.map_hint') ?>">📐 <?= $esec ? e(eng_sections()[$esec]['name']) : '—' ?></a><?php endif; ?></td>
         <?php if ($rates): foreach (['rate_normal', 'rate_overtime', 'rate_holiday'] as $rk): ?><td class="num"><input form="<?= $fid ?>" name="<?= $rk ?>" type="number" step="0.01" min="0" value="<?= $d[$rk] !== null ? e((string)$d[$rk]) : '' ?>" placeholder="€/h" style="width:90px;"></td><?php endforeach; endif; ?>
         <?php if ($accCards): ?><td><select form="<?= $fid ?>" name="rate_card" data-nosearch title="<?= tt('acc.card_hint') ?>"><option value=""><?= e(t('acc.card_auto', ['c' => acc_card_of((int)$d['id'])])) ?></option><?php foreach ($accCards as $ck => $cc): if ($cc['section'] !== 'hourly') continue; ?><option value="<?= e($cc['card']) ?>"<?= (string)($d['rate_card'] ?? '') === (string)$cc['card'] ? ' selected' : '' ?>><?= e($cc['card'] . ' · ' . $cc['name']) ?></option><?php endforeach; ?></select></td><?php endif; ?>
         <td><?= $d['is_active'] ? pill('green', t('sys.active')) : pill('mute', t('sys.retired')) ?></td>
@@ -51,6 +52,7 @@ layout_head(t('disc.title'), 'admin_disciplines');
           <form method="post" action="<?= url('admin_disciplines') ?>" id="<?= $fid ?>" style="display:contents;"><?= csrf_field() ?><input type="hidden" name="action" value="disc_save"><input type="hidden" name="id" value="<?= (int)$d['id'] ?>"></form>
           <button form="<?= $fid ?>" class="btn btn--ghost btn--sm" type="submit"><?= tt('btn.save') ?></button>
           <button form="<?= $fid ?>" class="btn btn--ghost btn--sm" type="submit" name="toggle" value="1"><?= $d['is_active'] ? tt('sys.retire') : tt('sys.restore') ?></button>
+          <form method="post" action="<?= url('admin_disciplines') ?>" class="inline" data-lock data-confirm="<?= e(t('disc.merge_confirm', ['d' => $d['name']])) ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('disc.merge') ?>" data-confirm-cancel="<?= tt('btn.cancel') ?>" data-confirm-danger><?= csrf_field() ?><input type="hidden" name="action" value="disc_merge"><input type="hidden" name="from" value="<?= (int)$d['id'] ?>"><select name="into" data-nosearch title="<?= tt('disc.merge_hint') ?>" style="max-width:150px;"><option value=""><?= tt('disc.merge_into') ?></option><?php foreach ($rows as $o): if ((int)$o['id'] === (int)$d['id']) continue; ?><option value="<?= (int)$o['id'] ?>"><?= e($o['name']) ?></option><?php endforeach; ?></select> <button class="btn btn--ghost btn--sm" type="submit">⤵ <?= tt('disc.merge') ?></button></form>
         </td>
       </tr>
     <?php endforeach; ?></tbody>
