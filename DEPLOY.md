@@ -23,3 +23,6 @@ Releases go live from GitHub, through the portal's own updater — nobody upload
 
 ## Rules that still apply
 `app/config.php` is never in the repository or a zip · the manifest is rebuilt twice before zipping (the Action does it) · every release note carries a security review · manuals are updated with every version · after a deploy, press Ctrl+F5 once in the browser.
+
+## Store builds of the mobile apps
+Actions › **Build Android app** / **Build iOS app** (input: engineer | pm | customer) build the Capacitor shells of `mobile-native/` on GitHub runners — signed AAB to the Play Console track, IPA to TestFlight — with the certificates and keys held as repository secrets. Accounts, secrets and the release sequence: `mobile-native/README.md`; test plan and store checklist: GAS-2026-PORTAL-APP-002.

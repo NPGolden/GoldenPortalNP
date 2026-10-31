@@ -1,0 +1,5 @@
+{
+  "engineer": { "appId": "gr.goldenas.service",  "appName": "Golden A/S Service", "client": "customer/mobile",          "url": "https://goldensas.com/customer/mobile/",          "splash": "#1F3A5F", "pwaVersionFile": "js/api.js" },
+  "pm":       { "appId": "gr.goldenas.pm",       "appName": "Golden PM",          "client": "customer/mobile-pm",       "url": "https://goldensas.com/customer/mobile-pm/",       "splash": "#1F3A5F", "pwaVersionFile": "js/api.js" },
+  "customer": { "appId": "gr.goldenas.customer", "appName": "Golden A/S Portal",  "client": "customer/mobile-customer", "url": "https://goldensas.com/customer/mobile-customer/", "splash": "#0A1B2E", "pwaVersionFile": "app.js" }
+}

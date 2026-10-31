@@ -1,0 +1,26 @@
+{
+  "name": "golden-mobile-native",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Capacitor shells of the three Golden A/S apps (Service Engineer, Golden PM, Customer). Built by .github/workflows/build-android.yml and build-ios.yml.",
+  "scripts": {
+    "prepare-app": "node prepare.js",
+    "assets": "npx @capacitor/assets generate --iconBackgroundColor '#FFFFFF' --iconBackgroundColorDark '#1F3A5F' --splashBackgroundColor \"$SPLASH\" --splashBackgroundColorDark \"$SPLASH\""
+  },
+  "dependencies": {
+    "@capacitor/android": "6.2.0",
+    "@capacitor/app": "6.0.2",
+    "@capacitor/camera": "6.1.0",
+    "@capacitor/core": "6.2.0",
+    "@capacitor/device": "6.0.2",
+    "@capacitor/ios": "6.2.0",
+    "@capacitor/network": "6.0.3",
+    "@capacitor/push-notifications": "6.0.3",
+    "@capacitor/splash-screen": "6.0.3",
+    "@capacitor/status-bar": "6.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "6.2.0"
+  }
+}

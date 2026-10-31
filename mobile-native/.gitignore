@@ -1,0 +1,11 @@
+www/
+android/
+ios/
+node_modules/
+assets/
+capacitor.config.json
+APP_VERSION
+*.keystore
+*.p12
+*.mobileprovision
+

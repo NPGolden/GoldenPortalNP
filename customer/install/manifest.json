@@ -1,17 +1,17 @@
 {
     "name": "Golden A/S Customer Portal",
-    "version": "1.79.4",
+    "version": "1.79.5",
     "build": "2026-10-31",
-    "generated_at": "2026-10-31T19:50:00+00:00",
-    "count": 633,
+    "generated_at": "2026-10-31T19:57:10+00:00",
+    "count": 622,
     "files": {
         ".htaccess": {
             "sha256": "1bf5deb26fd95b271e85398d6ceba8a7389b3918d9ebe946e627ffa06a69f423",
             "size": 181
         },
         "CHANGELOG.md": {
-            "sha256": "8740c28c4d3dfc5f31f549ea44ae69c2b8503b4877f0b3669992ed179d9fb5ec",
-            "size": 83336
+            "sha256": "0f0f1ba8d5d7b987cb1144c6f6aaf280fc29f0cff0fd1759f1de16fe15c936cc",
+            "size": 83863
         },
         "README.md": {
             "sha256": "2db8ea64aa86bcb4790bb1f848f60413eba56228453dc6b4c9f582463f908b50",
@@ -810,8 +810,8 @@
             "size": 38450
         },
         "customer/app/version.php": {
-            "sha256": "e5f5216101460f9256482c01ddace14c15b1d723444af1339a80f0811c66e799",
-            "size": 111288
+            "sha256": "9c28b6413be5f78a1da2a0834f08039d17b81d5bd926af924139bee884dd519e",
+            "size": 111896
         },
         "customer/app/vh.php": {
             "sha256": "e48f7d44763f6ac11691f44d3be783d532dc2788a159710b6bd796808936ac76",
@@ -1405,6 +1405,10 @@
             "sha256": "5839f3f7060af50a49f5ad3b976d4c247c1281498568d08f0cf0c0b61bc174c7",
             "size": 531832
         },
+        "customer/mobile-customer/.htaccess": {
+            "sha256": "bad5fce9c0d087a572ee16e3e3a6ae01812894b96fbf9ff6a6b0be85dc5fea8b",
+            "size": 152
+        },
         "customer/mobile-customer/app.js": {
             "sha256": "08cf34fd1feee1bfdc357b1720efcbc439ffec4a1d3e0c2f7e254279dc3549eb",
             "size": 4150
@@ -1412,6 +1416,10 @@
         "customer/mobile-customer/i18n/i18n.js": {
             "sha256": "bfe0dd04d5030e398222a4aa49ba6b5370fbe91fc685bcef4b7c065a1a0bfb00",
             "size": 38793
+        },
+        "customer/mobile-customer/icons/icon-1024.png": {
+            "sha256": "ddc6c3e28a9d92363f79e73a6cdc67b5c61d22828b6688220263308d83c5906d",
+            "size": 65093
         },
         "customer/mobile-customer/icons/icon-192.png": {
             "sha256": "ccbee777886016bbf13965fa9e5e3c510cfd49bb4a22ef1d5a95fad169a3ed25",
@@ -1514,8 +1522,8 @@
             "size": 9404
         },
         "customer/mobile-pm/.htaccess": {
-            "sha256": "86425b3cececcf1317ea52ea946b01da85cc057bcb5271b559b9cd48f98519f1",
-            "size": 746
+            "sha256": "1ef31dc70d473d88569d92d0680772a13194dbd010433b6fb5244cded4631bf6",
+            "size": 772
         },
         "customer/mobile-pm/css/app.css": {
             "sha256": "122c2e291f19d5c9f43d609e7a1092153de3dc0f3a35fb811fd0e5fb6c8f834c",
@@ -1590,8 +1598,8 @@
             "size": 11280
         },
         "customer/mobile/.htaccess": {
-            "sha256": "1763fbaaf43e36d7a331f1bb59e203c9af65e23565ba46116abca1ee44235f7c",
-            "size": 734
+            "sha256": "75424a3896161de8f43995a377f4beb5da8561deab399c7759b58a7f6d59ac6c",
+            "size": 760
         },
         "customer/mobile/css/app.css": {
             "sha256": "56a7bad4816ba433dd0728501aefc1c37e098dfffe0d0b244829a00f1795bacc",
@@ -2244,58 +2252,6 @@
         "customer/views/workload.php": {
             "sha256": "166ee087411263e03ba775bc3f74f5f1104291b67598e13e4d077100931004ae",
             "size": 5695
-        },
-        "docs-R68/SECURITY-REVIEW_R68-001.md": {
-            "sha256": "eedfb2de945544fa82d4d67fc5043221b01cfc1e4ebe2e854781c28e6d34db41",
-            "size": 3887
-        },
-        "docs-R68/capacitor-customer/README-build.md": {
-            "sha256": "b9ba0d238559f2ef346f1df617dc161fcfecbbd179de2e219cf25a0017dbfb51",
-            "size": 1150
-        },
-        "docs-R68/capacitor-customer/capacitor.config.json": {
-            "sha256": "8187054d4c19be848b4da3aac49197d5199eba93bfdf2064f3dac46fa4df3c44",
-            "size": 578
-        },
-        "docs-R68/capacitor-customer/native-bridge.js": {
-            "sha256": "b1e41ce16e6f3af1261946690f6a89c84e6f51c2f29afa9a352e6a50d20efd51",
-            "size": 2161
-        },
-        "docs-R68/capacitor-customer/package.json": {
-            "sha256": "06e435801f481f7ae95a89239b9ae6365bd261f2682e773c09b84a393855073f",
-            "size": 1081
-        },
-        "docs-R68/capacitor-customer/prepare-web.js": {
-            "sha256": "f95f68bfa79c83aa9d64fd1d1b3f7b7610e12ad015f33876c61d5ccf05275747",
-            "size": 1585
-        },
-        "docs-R68/help-customer-app.md": {
-            "sha256": "76e714a8b37ffddc9dd1abac881a520f83fb76be77b5ab2079e7afd2d37fc380",
-            "size": 4438
-        },
-        "docs-R68/shot-approval.png": {
-            "sha256": "c213a5627b9472c8d118b6e1b1cfa1edf4a08e4803ecdc922e1c40819fbc8fd1",
-            "size": 88647
-        },
-        "docs-R68/shot-home.png": {
-            "sha256": "d2e1a1723b787bbbe60c46c9d87c5f8ce4d3bab23917a959c9bd02f9c42b77c0",
-            "size": 147874
-        },
-        "docs-R68/shot-offer.png": {
-            "sha256": "542a8f2eb9d85069f07854ef42f54b68b62bfa5d2677b4e8dfc0b5ec25c8a3d1",
-            "size": 82782
-        },
-        "docs-R68/shot-projects.png": {
-            "sha256": "10eed44647493363c482a82ca28fdd4e9594e2607d8cb04e2ff752ccbb4fd63f",
-            "size": 93077
-        },
-        "docs-R68/shot-sign.png": {
-            "sha256": "4d302f8def59393baa285ff3bde6b529bfc46f66ad06e325d23c9064976e3f7e",
-            "size": 159680
-        },
-        "docs-R68/shot-ticket.png": {
-            "sha256": "a6fd7d712f54d09225d8f5305707ad81e440660eeecf941f8171a6deebb96dff",
-            "size": 111703
         },
         "employee/.htaccess": {
             "sha256": "5e8963c763f79af442578cec13f9a0840375f45d2b5a07665f5131262d90c5c6",

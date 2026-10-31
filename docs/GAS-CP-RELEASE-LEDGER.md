@@ -84,3 +84,4 @@ Files edited by more than one line (merge by hand or by the packaging session �
 
 ## 6. Standing packaging rules (unchanged)
 Binary FTP upload then Ctrl+F5; `app/config.php` never in a zip; vendor licence kit never shipped; `php tools/build-manifest.php` twice before zipping; every release note carries a short security review; manuals updated with every version.
+- **R70-001** — store builds from GitHub (mobile-native/, build-android.yml, build-ios.yml), DirectoryIndex for the app folders (no SQL) — **v1.79.5**.

@@ -1,0 +1,91 @@
+# Golden A/S mobile apps — Android store build (AAB) from the repository, no local tooling.      GAS-CP-R70-001
+#
+#   Run workflow → app (engineer | pm | customer), track (none | internal | alpha | production).
+#   Steps: prepare the Capacitor shell from the live client folder → generate icons / splash → add the Android
+#          project → set applicationId / version → build a signed App Bundle → keep it as a workflow artifact →
+#          optionally upload it to the Play Console track.
+#   versionName = the client's own version (api.js VERSION), versionCode = this run number (always increasing).
+#
+#   Secrets (GitHub › Settings › Secrets and variables › Actions):
+#     ANDROID_KEYSTORE_B64        base64 of the upload keystore (keytool -genkeypair -v -keystore golden-upload.keystore -alias golden -keyalg RSA -keysize 2048 -validity 10000; base64 -w0 golden-upload.keystore)
+#     ANDROID_KEYSTORE_PASSWORD   its store password
+#     ANDROID_KEY_ALIAS           golden
+#     ANDROID_KEY_PASSWORD        the key password
+#     PLAY_SERVICE_ACCOUNT_JSON   JSON key of a Google Cloud service account invited to the Play Console (Release manager) — only for track ≠ none
+#     FIREBASE_GOOGLE_SERVICES_B64  optional: base64 of google-services.json (push via FCM); omitted = build without push
+name: Build Android app
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'Which app'
+        type: choice
+        options: [engineer, pm, customer]
+        default: engineer
+      track:
+        description: 'Play Console track to upload to (none = artifact only)'
+        type: choice
+        options: [none, internal, alpha, production]
+        default: none
+concurrency: { group: "android-${{ github.event.inputs.app }}", cancel-in-progress: false }
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: mobile-native } }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - uses: actions/setup-java@v4
+        with: { distribution: 'temurin', java-version: '17' }
+      - name: Prepare the shell (client → www, config, icons)
+        id: prep
+        run: |
+          set -e; npm ci --no-audit --no-fund
+          node prepare.js "${{ github.event.inputs.app }}"
+          echo "version=$(cat APP_VERSION)" >> "$GITHUB_OUTPUT"
+          echo "app_id=$(node -e "console.log(require('./apps.json')['${{ github.event.inputs.app }}'].appId)")" >> "$GITHUB_OUTPUT"
+          echo "splash=$(node -e "console.log(require('./apps.json')['${{ github.event.inputs.app }}'].splash)")" >> "$GITHUB_OUTPUT"
+      - name: Add the Android project
+        run: |
+          set -e; npx cap add android
+          SPLASH="${{ steps.prep.outputs.splash }}" npx @capacitor/assets generate --android --iconBackgroundColor '#FFFFFF' --iconBackgroundColorDark '#1F3A5F' --splashBackgroundColor "$SPLASH" --splashBackgroundColorDark "$SPLASH" || echo "assets: default icons kept"
+          npx cap sync android
+      - name: Version, signing and push configuration
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}
+          GS_B64: ${{ secrets.FIREBASE_GOOGLE_SERVICES_B64 }}
+        run: |
+          set -e; cd android
+          sed -i "s/versionCode 1$/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"${{ steps.prep.outputs.version }}\"/" app/build.gradle
+          grep -E "versionCode|versionName|applicationId" app/build.gradle
+          [ -n "$KS_B64" ] || { echo "ANDROID_KEYSTORE_B64 secret missing"; exit 1; }
+          echo "$KS_B64" | base64 -d > app/golden-upload.keystore
+          printf '\nandroid {\n  signingConfigs { release { storeFile file("golden-upload.keystore"); storePassword System.getenv("KS_PASS"); keyAlias System.getenv("KS_ALIAS"); keyPassword System.getenv("KEY_PASS") } }\n  buildTypes { release { signingConfig signingConfigs.release } }\n}\n' >> app/build.gradle
+          if [ -n "$GS_B64" ]; then echo "$GS_B64" | base64 -d > app/google-services.json; echo "push: google-services.json in place"; fi
+      - name: Build the App Bundle
+        env:
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -e; cd android; chmod +x gradlew; ./gradlew bundleRelease --no-daemon -q
+          ls -la app/build/outputs/bundle/release/
+          cp app/build/outputs/bundle/release/app-release.aab "../${{ steps.prep.outputs.app_id }}-${{ steps.prep.outputs.version }}-${{ github.run_number }}.aab"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.prep.outputs.app_id }}-${{ steps.prep.outputs.version }}-${{ github.run_number }}
+          path: mobile-native/*.aab
+          retention-days: 30
+      - name: Upload to the Play Console track
+        if: ${{ github.event.inputs.track != 'none' }}
+        uses: r0adkll/upload-google-play@v1.1.3
+        with:
+          serviceAccountJsonPlainText: ${{ secrets.PLAY_SERVICE_ACCOUNT_JSON }}
+          packageName: ${{ steps.prep.outputs.app_id }}
+          releaseFiles: mobile-native/*.aab
+          track: ${{ github.event.inputs.track }}
+          status: completed
+          inAppUpdatePriority: 2
+      - name: Summary
+        run: echo "### ${{ github.event.inputs.app }} — ${{ steps.prep.outputs.app_id }} ${{ steps.prep.outputs.version }} (versionCode ${{ github.run_number }}) → track ${{ github.event.inputs.track }}" >> "$GITHUB_STEP_SUMMARY"

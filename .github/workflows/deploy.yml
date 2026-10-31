@@ -52,7 +52,7 @@ jobs:
           set -e; php tools/build-manifest.php >/dev/null; php tools/build-manifest.php
           V=$(php -r 'require "customer/app/version.php"; echo CP_VERSION;'); echo "version=$V" >> "$GITHUB_OUTPUT"
           Z="goldensas-portal-$V-${GITHUB_SHA::7}.zip"; echo "zip=$Z" >> "$GITHUB_OUTPUT"
-          zip -qr "$Z" . -x "docs/*" "DEPLOY.md" ".gitignore" "customer/app/config.php" "customer/storage/*" "customer/tools/*" "tools/*" "*/sessions/*" "*.log" "node_modules/*" ".git/*" ".github/*" "*/.DS_Store"
+          zip -qr "$Z" . -x "docs/*" "mobile-native/*" "docs-R68/*" "DEPLOY.md" ".gitignore" "customer/app/config.php" "customer/storage/*" "customer/tools/*" "tools/*" "*/sessions/*" "*.log" "node_modules/*" ".git/*" ".github/*" "*/.DS_Store"
           unzip -l "$Z" | grep -q "config.php" && { echo "config.php inside the zip — abort"; exit 1; } || true
           ls -la "$Z"
       - name: Upload the zip to customer/storage/updates/
