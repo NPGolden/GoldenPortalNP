@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 /** Help search across the manual editions the user may read (GAS-CP-R31-005). */
-function mn_editions(): array { $e = ['customer' => t('mn.for_customer')]; if (is_staff()) { $e['golden'] = t('mn.for_golden'); $e['pm'] = t('mn.for_pm'); } return $e; }
+function mn_editions(): array { $e = ['customer' => t('mn.for_customer')]; if (is_staff()) { $e['golden'] = t('mn.for_golden'); $e['pm'] = t('mn.for_pm'); $e['staff'] = t('mn.for_staff'); if (function_exists('hr_can') && hr_can()) $e['hr'] = t('mn.for_hr'); } return $e; }   // R63-003: staff and HR editions
 function mn_flatten(array $body): string {
     $out = [];
     foreach ($body as $b) {

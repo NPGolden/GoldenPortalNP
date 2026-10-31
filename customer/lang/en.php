@@ -5803,4 +5803,11 @@ Best regards,
 'soc.nf_digest' => 'Your week {w} at Golden A/S',
 'soc.digest_body' => '{c} celebrations this week · {t} open trainings · {p} new posts · last week\'s top: {w}',
 'soc.year_1' => '1 year at Golden A/S',
+// ---- GAS-CP-R63-003 · HR and employee manuals
+'mn.for_staff' => 'Employee guide',
+'mn.for_hr' => 'HR handbook',
+'mn.card_staff' => 'Employee guide',
+'mn.card_staff_sub' => 'Your leave and balances, requests, leave periods and closures, your program, trainings and certificates, your evaluation, messages with HR, Community.',
+'mn.card_hr' => 'HR Manager Handbook',
+'mn.card_hr_sub' => 'People register and the employee card, imports, leave engine, requests, periods and closures, training, evaluations, off-boarding, the yearly cycle, Community tools, data protection.',
 ];

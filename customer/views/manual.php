@@ -4,8 +4,9 @@
 require __DIR__ . '/_layout.php';
 $u = require_login();
 $for = (string)($_GET['for'] ?? 'customer');
-if (in_array($for, ['golden', 'pm'], true) && !is_staff()) $for = 'customer';
-if (!in_array($for, ['customer', 'golden', 'pm'], true)) $for = 'customer';
+if (in_array($for, ['golden', 'pm', 'staff', 'hr'], true) && !is_staff()) $for = 'customer';
+if ($for === 'hr' && !(function_exists('hr_can') && hr_can())) $for = 'staff';   // R63-003: the HR handbook is for HR / Owner / administrators
+if (!in_array($for, ['customer', 'golden', 'pm', 'staff', 'hr'], true)) $for = 'customer';
 $M = require __DIR__ . '/_manual_' . $for . '.php';
 $news = []; foreach (array_slice(cp_patches(), 0, 14) as $pt) $news[] = $pt['version'] . ' · ' . fmt_date($pt['date']) . ' — ' . $pt['title'];
 $M['sections'][] = ['id' => 'whatsnew', 'title' => t('mn.whatsnew'), 'body' => [t('mn.whatsnew_lede', ['v' => CP_VERSION]), ['ul' => $news]]];   // R23-002: release notes from the patch list, always current
@@ -36,7 +37,7 @@ layout_head($M['title'], 'support');
 <div class="page-head no-print">
   <div><h1><?= e($M['title']) ?></h1><p class="lede"><?= e($M['lede']) ?></p></div>
   <div class="btn-row">
-    <?php if (is_staff()): ?><a class="btn btn--ghost btn--sm<?= $for === 'customer' ? ' is-on' : '' ?>" href="<?= url('manual', ['for' => 'customer']) ?>"><?= tt('mn.for_customer') ?></a><a class="btn btn--ghost btn--sm<?= $for === 'golden' ? ' is-on' : '' ?>" href="<?= url('manual', ['for' => 'golden']) ?>"><?= tt('mn.for_golden') ?></a><a class="btn btn--ghost btn--sm<?= $for === 'pm' ? ' is-on' : '' ?>" href="<?= url('manual', ['for' => 'pm']) ?>"><?= tt('mn.for_pm') ?></a><?php endif; ?>
+    <?php if (is_staff()): ?><a class="btn btn--ghost btn--sm<?= $for === 'customer' ? ' is-on' : '' ?>" href="<?= url('manual', ['for' => 'customer']) ?>"><?= tt('mn.for_customer') ?></a><a class="btn btn--ghost btn--sm<?= $for === 'golden' ? ' is-on' : '' ?>" href="<?= url('manual', ['for' => 'golden']) ?>"><?= tt('mn.for_golden') ?></a><a class="btn btn--ghost btn--sm<?= $for === 'pm' ? ' is-on' : '' ?>" href="<?= url('manual', ['for' => 'pm']) ?>"><?= tt('mn.for_pm') ?></a><a class="btn btn--ghost btn--sm<?= $for === 'staff' ? ' is-on' : '' ?>" href="<?= url('manual', ['for' => 'staff']) ?>"><?= tt('mn.for_staff') ?></a><?php if (function_exists('hr_can') && hr_can()): ?><a class="btn btn--ghost btn--sm<?= $for === 'hr' ? ' is-on' : '' ?>" href="<?= url('manual', ['for' => 'hr']) ?>"><?= tt('mn.for_hr') ?></a><?php endif; endif; ?>
     <button class="btn btn--gold btn--sm" type="button" data-js-print="1">⎙ <?= tt('mn.print') ?></button>
   </div>
 </div>

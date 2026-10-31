@@ -5803,4 +5803,11 @@ Cordiali saluti,
 'soc.nf_digest' => 'La tua settimana {w} in Golden A/S',
 'soc.digest_body' => '{c} ricorrenze questa settimana · {t} corsi aperti · {p} nuovi post · top della scorsa settimana: {w}',
 'soc.year_1' => '1 anno in Golden A/S',
+// ---- GAS-CP-R63-003 · HR and employee manuals
+'mn.for_staff' => 'Guida del dipendente',
+'mn.for_hr' => 'Manuale HR',
+'mn.card_staff' => 'Guida del dipendente',
+'mn.card_staff_sub' => 'Ferie e saldi, richieste, periodi di ferie e chiusure, il tuo programma, corsi e certificati, la tua valutazione, messaggi con HR, Community.',
+'mn.card_hr' => 'Manuale del responsabile HR',
+'mn.card_hr_sub' => 'Registro del personale e scheda del dipendente, importazioni, motore delle ferie, richieste, periodi e chiusure, formazione, valutazioni, uscita, il ciclo annuale, strumenti Community, protezione dei dati.',
 ];

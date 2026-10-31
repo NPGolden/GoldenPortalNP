@@ -1,0 +1,45 @@
+<?php
+/** User manual — Staff edition: what every Golden A/S employee does for himself in the portal — leave, program, training, evaluations, community.   GAS-CP-R63-003 */
+return [
+  'title' => 'Customer Portal — Employee Guide',
+  'lede'  => 'Your own corner of the portal: your leave balance and requests, the leave periods you can join, your program on the Planning board, the trainings you can apply for and your certificates, your annual evaluation, your messages with HR, and the Community — wishes, kudos, the noticeboard and badges. Short, with the steps to follow.',
+  'sections' => [
+    ['id' => 'start', 'title' => 'Getting in and getting around', 'body' => [
+      'Sign in with your company e-mail and password; the code of the authenticator app follows (two-factor sign-in). The first time: My Account › set your photo (it appears next to your name everywhere), your language (English, Greek, Italian, Bulgarian, Ukrainian) and the theme (light / dark). 🔔 Notifications at the top is where every decision, wish and reminder arrives.',
+      'The left menu — what matters for you: Dashboard (your attention list, celebrations, fleet & activity, your program of the week), HR › My leave (balances, requests, periods, trainings, evaluations, messages with HR), Work › Planning (where you are planned, day by day), Community 🤝, Support › Manual and Knowledge base. Accounts scoped "Employee" see only My program, My leave, the manual, notifications and the account.',
+    ]],
+    ['id' => 'balance', 'title' => 'My leave — balances', 'body' => [
+      'HR › My leave shows for the year, per leave type: entitled (the statutory annual leave is computed by the portal from your service — 20 to 26 days, pro rata in the year of hiring), carried over from last year, taken, pending (requested, not yet decided) and available; red means over the entitlement. Hour types (early leave, school visits) accumulate in hours. If a figure looks wrong, write to HR from the same page (Messages with HR) — HR can see the computation and correct it.',
+    ]],
+    ['id' => 'request', 'title' => 'Requesting leave', 'body' => [
+      ['ol' => ['My leave › New request: choose the type (annual leave, sick, paternity / maternity, marriage, child care, school visit, strike, unpaid …), the dates (or hours for hour types) and the reason when the type asks for it; attach the document when the type requires one (medical certificate …). The portal counts working days only — weekends and public holidays are never charged.', 'Send. Your manager decides first (types marked HR only, such as sick leave, go straight to HR), then HR. You are notified at every step; a note from the approver appears with the decision.', 'Approved leave appears on the Planning board (one chip per day) and moves from pending to taken; a rejected request returns the days to your balance.', 'While a request is pending you can cancel it yourself; afterwards ask HR to correct it.']],
+      ['fig' => 'flow-timesheet.svg', 'cap' => 'The approval ladder — you, your manager, HR, then the board'],
+      'Maternity and paternity leave are once per birth: HR keeps your children\'s birth years on your card; days already taken at a previous employer for the same birth are deducted — tell HR.',
+    ]],
+    ['id' => 'periods', 'title' => 'Leave periods, groups and company closures', 'body' => [
+      'HR publishes leave periods (the summer groups, a quiet week in a yard) on My leave › Open periods. Join one with your own dates inside the period — your manager approves and the leave is recorded without a second request. Periods marked 🔒 Mandatory are company closures (Christmas week, August): HR assigns them to everybody, you cannot join or opt out; the working days of the closure are charged to your annual leave automatically. "Full" means the places of a period are taken.',
+    ]],
+    ['id' => 'program', 'title' => 'My program — the Planning board', 'body' => [
+      'Work › Planning (or My program for employee accounts) shows where you are planned day by day: sub-projects and vessels in colour, your leave, the days off of your calendar. Click a chip to see the sub-project, the open items and the contacts. The week view on the dashboard shows the next seven days. Changes are made by the project managers and HR — if your program is wrong, tell your PM.',
+      ['fig' => 'g-colour-code.jpg', 'cap' => 'The colour code of the chips'],
+    ]],
+    ['id' => 'training', 'title' => 'Training opportunities, my trainings and certificates', 'body' => [
+      ['ol' => ['My leave › Training opportunities lists the trainings you are invited to — introductory, internal or external — with dates, hours, places and the apply-by date. Open the programme, add a note if you like and press Apply. Your manager or HR approves; you are notified.', 'My trainings keeps your record: status (applied, approved, attended), result and certificate — number, valid-until date and the scanned copy to download. Expiring certificates are followed by HR; the refresher is published as a new training.', 'Introductory trainings are part of the onboarding of a new colleague; internal ones are given by Golden A/S engineers — propose topics to HR through Messages with HR.']],
+    ]],
+    ['id' => 'evaluation', 'title' => 'My annual evaluation', 'body' => [
+      'Once a year your manager (with HR) writes your evaluation: eight criteria scored 1 to 5 — quality of work, productivity, technical skills, teamwork, initiative, reliability, safety & procedures, communication — with strengths, areas to improve, goals for next year and training needs. When it is final you are notified; read it on My leave › My evaluations, add your own comment if you wish, and press Acknowledge. Acknowledging means you have read it, not necessarily that you agree — write your view in the comment; it stays with the evaluation. Your evaluations of past years stay on the same page.',
+    ]],
+    ['id' => 'messages', 'title' => 'Messages with HR and your personal data', 'body' => [
+      'My leave › Messages with HR is a private thread between you and HR — nobody else, not even your manager, can read it. Use it for balances, certificates, documents, personal data changes (address, phone, bank account, family status — HR keeps them on your card; you can see your own data on My leave). HR is notified of every message and you of every reply.',
+    ]],
+    ['id' => 'community', 'title' => 'Community — wishes, kudos, noticeboard, badges', 'body' => [
+      'Celebrations on the dashboard: the birthdays, name days, work anniversaries and new colleagues of the next 14 days. On the day (and the day before) a Send wishes button appears — pick an emoji, add a few words, send; the colleague is notified and sees everybody\'s wishes on his own dashboard. Every morning the portal posts the celebrations of the day in Notifications.',
+      'Kudos: thank a colleague for a job well done — from the dashboard or Community, choose the person and say what for in one line (up to three a day to the same person). The kudos wall and the most-thanked lists are on Community.',
+      'Noticeboard (Community): company news, polls and photos. React (👍 ❤️ 👏 🎉 😂 🚢), comment, vote; share a photo of the month from the field (jpg / png / webp up to 12 MB). Badges are earned automatically from your work in the portal (timesheets, tickets done, reports, Q&A answers, trainings attended, kudos …) and show next to your name. The winner of the month is named from the activity ranking of the dashboard — the score counts what you create in the portal: tickets, comments, timesheets, reports, answers, requests.',
+      'New colleague: your onboarding checklist and your buddy are on your dashboard until all eight items are done — photo, manual, personal data checked, first timesheet, found on the Planning board, leave balance checked, introductory training, coffee with the buddy.',
+    ]],
+    ['id' => 'help', 'title' => 'Help and good habits', 'body' => [
+      ['ul' => ['Support › Knowledge base: ask a question, answer a colleague\'s — answers earn a badge.', 'Support › Portal requests: report a bug or propose an improvement; the developer answers with a decision and the release that carries it.', 'Keep your leave requests ahead of time — approved leave is what the PMs plan around.', 'Check Notifications once a day; the Monday digest sums up the week (celebrations, open trainings, new posts, last week\'s top three).', 'Your password and two-factor device are yours alone — never share them; sign out on shared computers.']],
+    ]],
+  ],
+];

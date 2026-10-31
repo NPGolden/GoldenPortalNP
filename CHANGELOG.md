@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.74.0** (build 2026-10-30). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.74.1** (build 2026-10-30). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.74.1 | GAS-CP-R63-003 | 2026-10-31 | Two new manual editions under Support: the HR Manager Handbook (people register and card, imports, leave engine, requests, periods and closures, training, evaluations, off-boarding, the 1 January checklist, Community tools, data protection — HR / Owner / administrators) and the Employee Guide (balances, requesting leave, periods, my program, trainings and certificates, my evaluation, messages with HR, Community — every Golden A/S account). Both are searched by the help search. | — |
 | 1.74.0 | GAS-CP-R63-001 | 2026-10-31 | Community: wishes on birthdays, name days, work anniversaries and new colleagues (one click from the dashboard, wishes wall for the person); kudos between colleagues with most-thanked lists; noticeboard with posts, polls and photos (reactions, comments, pinning); automatic badges; winner of the month with prize; onboarding checklist with a buddy; morning celebration nudge and Monday digest in Notifications. New page Community (🤝). | `install/migrate_cp_r63_social.sql` |
 | 1.73.5 | GAS-CP-R62-006 | 2026-10-30 | Dark mode: navy text (planning board headers and day numbers, discipline group rows, tab titles, section headings, pill labels) turns light on the dark background; planning board name and header columns get a solid dark background. | — |
 | 1.73.4 | GAS-CP-R62-005 | 2026-10-30 | Dashboard › Fleet & activity: vessels worked on this year and in the last 30 days, new vessels of the year, active vessels; the ten most active colleagues of the year and of the last 30 days (records created across the portal, with the breakdown on hover and the timesheet hours). | — |
