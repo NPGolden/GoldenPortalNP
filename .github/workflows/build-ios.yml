@@ -103,7 +103,7 @@ jobs:
         env: { KID: "${{ secrets.ASC_KEY_ID }}", ISS: "${{ secrets.ASC_ISSUER_ID }}" }
         run: |
           set -e; mkdir -p ~/.private_keys; cp "$RUNNER_TEMP/AuthKey.p8" ~/.private_keys/AuthKey_$KID.p8
-          xcrun altool --validate-app --file "mobile-native/${{ steps.prep.outputs.app_id }}-${{ steps.prep.outputs.version }}-${{ github.run_number }}.ipa" --type ios --apiKey "$KID" --apiIssuer "$ISS" --output-format xml 2>&1 | sed -n '1,200p'
+          xcrun altool --validate-app --file "${{ steps.prep.outputs.app_id }}-${{ steps.prep.outputs.version }}-${{ github.run_number }}.ipa" --type ios --apiKey "$KID" --apiIssuer "$ISS" --output-format xml 2>&1 | sed -n '1,200p'
       - name: Upload to TestFlight
         if: ${{ github.event.inputs.testflight == 'true' }}
         uses: apple-actions/upload-testflight-build@v3
