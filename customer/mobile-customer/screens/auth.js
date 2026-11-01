@@ -14,12 +14,14 @@ window.Auth = (function () {
         <div id="login-err" class="notice err" hidden></div>
         <button class="btn gold" type="submit" id="btn-login">${esc(t("login.btn"))}</button>
       </form>
+      ${Api.passkeyCapable() ? `<button class="btn line" id="btn-pk" style="margin-top:10px">🔑 ${esc(t("login.passkey"))}</button>` : ""}
       <p class="meta" style="text-align:center;margin-top:14px">${esc(t("login.help"))}</p>
       ${Api.cfg.mock ? `<div class="notice" style="margin-top:14px">Demo: <b>captain@demo-fleet.com</b> / <b>GoldenDemo2026!</b> — authenticator code <b>123456</b></div>` : ""}
       <div class="langs">${I18N.LANGS.map(([c, n]) => `<button type="button" data-lang="${c}" class="${I18N.get() === c ? "on" : ""}">${n}</button>`).join("")}</div>
     </div>`, "");
     I18N.apply(v);
     v.querySelectorAll("[data-lang]").forEach(b => b.onclick = () => { I18N.set(b.dataset.lang); login(needTotp); });
+    const pkb = $("#btn-pk"); if (pkb) pkb.onclick = async () => { const err = $("#login-err"); err.hidden = true; UI.busy(pkb, true); try { await Api.passkeyLogin(); await App.afterLogin(); } catch (ex) { err.textContent = ex && ex.name === "NotAllowedError" ? t("pk.failed") : (ex.status === 403 ? t("login.notcustomer") : UI.errMsg(ex)); err.hidden = false; } finally { UI.busy(pkb, false); } };   // R71-001
     $("#f-login").onsubmit = async e => {
       e.preventDefault(); const f = e.target, btn = $("#btn-login"), err = $("#login-err"); err.hidden = true; UI.busy(btn, true);
       try { await Api.login(f.email.value.trim(), f.password.value, f.totp.value.trim()); await App.afterLogin(); }

@@ -18,7 +18,7 @@ function api_app(): string { $a = strtolower(trim((string)($_SERVER['HTTP_X_APP'
 $_SERVER['REQUEST_METHOD'] = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 ini_set('session.use_cookies', '0'); ini_set('session.use_only_cookies', '0'); ini_set('session.cache_limiter', '');
 
-foreach (['db', 'i18n', 'helpers', 'auth', 'totp', 'pm', 'pm_actions', 'fsr', 'isr', 'br', 'tm', 'pl', 'eq', 'fd', 'iss', 'rc', 'flt', 'vm', 'rs', 'wf', 'mn', 'rt', 'acc', 'kpi', 'sales', 'pd', 'num', 'pi', 'cf', 'eng', 'ai', 'mt', 'bg', 'wp', 'rl', 'ob', 'et', 'em', 'jo', 'oa', 'ts', 'version', 'tk', 'vh', 'of', 'wk', 'avatar', 'theme', 'ct', 'export', 'nf', 'iv', 'ar', 'rp', 'kb', 'lic', 'td', 'fk', 'wc', 'hr', 'hr2', 'hr3', 'hr4', 'hr5', 'hr6'] as $m) {
+foreach (['db', 'i18n', 'helpers', 'auth', 'totp', 'pm', 'pm_actions', 'fsr', 'isr', 'br', 'tm', 'pl', 'eq', 'fd', 'iss', 'rc', 'flt', 'vm', 'rs', 'wf', 'mn', 'rt', 'acc', 'kpi', 'sales', 'pd', 'num', 'pi', 'cf', 'eng', 'ai', 'mt', 'bg', 'wp', 'rl', 'ob', 'et', 'em', 'jo', 'oa', 'ts', 'version', 'tk', 'vh', 'of', 'wk', 'avatar', 'theme', 'ct', 'export', 'nf', 'iv', 'ar', 'rp', 'kb', 'lic', 'td', 'fk', 'wc', 'hr', 'hr2', 'hr3', 'hr4', 'hr5', 'hr6', 'pk'] as $m) {
     $f = CP_ROOT . '/app/' . $m . '.php'; if (is_file($f)) require_once $f;
 }
 date_default_timezone_set(tz_app());

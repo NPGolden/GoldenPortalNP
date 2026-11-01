@@ -85,11 +85,22 @@ layout_head(t('ll.title'), 'admin_log');
         <label class="chk"><input type="checkbox" name="bind_ua" value="1"<?= sec_cfg('sec_bind_ua') ? ' checked' : '' ?>> <?= tt('sec.bind_ua') ?></label>
         <label class="chk"><input type="checkbox" name="bind_ip" value="1"<?= sec_cfg('sec_bind_ip') ? ' checked' : '' ?>> <?= tt('sec.bind_ip') ?></label><p class="hint"><?= tt('sec.binding_hint') ?></p></div>
       <div class="field"><label><?= tt('sec.csp') ?></label><select name="csp" data-nosearch><?php foreach (['on', 'report', 'off'] as $cm): ?><option value="<?= $cm ?>"<?= sec_csp_mode() === $cm ? ' selected' : '' ?>><?= tt('sec.csp_' . $cm) ?></option><?php endforeach; ?></select><p class="hint"><?= tt('sec.csp_hint') ?></p></div>
+      <div class="field"><label><?= tt('pk.title') ?></label><label class="chk"><input type="checkbox" name="passkeys" value="1"<?= function_exists('pk_enabled') && cp_setting('sec_passkeys', '1') === '1' ? ' checked' : '' ?>> <?= tt('pk.allow') ?></label><p class="hint"><?= tt('pk.allow_hint') ?></p></div>
       <div class="field"><label><?= tt('sec.close') ?></label><label class="chk"><input type="checkbox" name="close_signout" value="1"<?= sec_cfg('sec_close_signout') ? ' checked' : '' ?>> <?= tt('sec.close_signout') ?></label><p class="hint"><?= tt('sec.close_hint') ?></p></div>
     </div>
     <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit"><?= tt('btn.save') ?></button><span class="hint"><?= tt('sec.save_hint') ?></span></div>
   </form>
 </div>
+<?php if (function_exists('pk_has') && pk_has()): $allPk = all('SELECT w.id, w.name, w.created_at, w.last_used_at, w.backup_eligible, cu.full_name, cu.email FROM webauthn_credentials w JOIN customer_users cu ON cu.id = w.user_id ORDER BY cu.full_name, w.created_at'); ?>
+<div class="card" id="passkeys">
+  <h2>🔑 <?= tt('pk.title') ?> <span class="hint" style="display:inline;margin-left:6px;"><?= count($allPk) ?></span></h2>
+  <p class="hint"><?= tt('pk.admin_hint') ?></p>
+  <?php if ($allPk): ?><div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('pk.user') ?></th><th><?= tt('pk.name') ?></th><th><?= tt('pk.created') ?></th><th><?= tt('pk.last_used') ?></th><th></th></tr></thead><tbody>
+    <?php foreach ($allPk as $k): ?><tr><td><b><?= e($k['full_name']) ?></b><br><span class="hint"><?= e($k['email']) ?></span></td><td><?= e($k['name']) ?><?= $k['backup_eligible'] ? ' ☁' : '' ?></td><td class="hint"><?= e(fmt_datetime($k['created_at'])) ?></td><td class="hint"><?= $k['last_used_at'] ? e(fmt_datetime($k['last_used_at'])) : '—' ?></td>
+      <td class="row-actions"><form method="post" action="<?= url('admin_log') ?>" class="inline" data-lock data-confirm="<?= tt('pk.remove_confirm') ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('btn.delete') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="pk_admin_remove"><input type="hidden" name="id" value="<?= (int)$k['id'] ?>"><button class="btn btn--ghost btn--sm" type="submit">🗑</button></form></td></tr><?php endforeach; ?>
+  </tbody></table></div><?php else: ?><p class="hint">—</p><?php endif; ?>
+</div>
+<?php endif; ?>
 <?php endif; ?>
 <div class="page-head">
   <div><h2 class="settings-h"><?= tt('ll.title') ?></h2><p class="lede" style="margin-bottom:0;"><?= tt('ll.lede') ?></p></div>

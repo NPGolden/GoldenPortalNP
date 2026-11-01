@@ -97,6 +97,26 @@ if ($has2fa): ?>
   <?php endif; ?>
 </div>
 <?php endif; ?>
+<?php if (function_exists('pk_has') && pk_has()): $pks = pk_list((int)$u['id']); $pkOn = pk_enabled(); ?>
+<div class="card" id="passkeys">
+  <h2>🔑 <?= tt('pk.title') ?></h2>
+  <p class="hint"><?= tt('pk.lede') ?></p>
+  <?php if ($pks): ?><div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('pk.name') ?></th><th><?= tt('pk.created') ?></th><th><?= tt('pk.last_used') ?></th><th></th></tr></thead><tbody>
+    <?php foreach ($pks as $k): ?><tr><td><b><?= e($k['name']) ?></b><?= $k['backup_eligible'] ? ' <span class="hint" title="' . tt('pk.synced_tip') . '">☁</span>' : '' ?></td><td class="hint"><?= e(fmt_datetime($k['created_at'])) ?></td><td class="hint"><?= $k['last_used_at'] ? e(fmt_datetime($k['last_used_at'])) : '—' ?></td>
+      <td class="row-actions"><form method="post" action="<?= url('account') ?>" class="inline" data-lock data-confirm="<?= tt('pk.remove_confirm') ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('btn.delete') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="pk_remove"><input type="hidden" name="id" value="<?= (int)$k['id'] ?>"><button class="btn btn--ghost btn--sm" type="submit">🗑</button></form></td></tr><?php endforeach; ?>
+  </tbody></table></div><?php else: ?><p class="hint"><?= tt('pk.none') ?></p><?php endif; ?>
+  <?php if ($pkOn): ?>
+  <div class="grid grid-3" style="margin-top:10px;align-items:end;">
+    <div class="field"><label><?= tt('pk.name') ?></label><input id="pk-name" maxlength="80" placeholder="<?= tt('pk.name_ph') ?>"></div>
+    <div class="field" id="pk-code-row"<?= !empty($u['totp_enabled']) ? '' : ' hidden' ?>><label><?= tt('pk.code') ?></label><input id="pk-code" inputmode="numeric" maxlength="6" autocomplete="one-time-code" placeholder="123456"></div>
+    <div class="field"><button type="button" class="btn btn--gold" id="pk-add" data-wait="<?= tt('pk.wait') ?>" data-ok="<?= tt('pk.added') ?>" data-cancel="<?= tt('pk.cancelled') ?>" data-exists="<?= tt('pk.exists') ?>" data-unsupported="<?= tt('pk.unsupported') ?>">+ <?= tt('pk.add') ?></button></div>
+  </div>
+  <p id="pk-reg-msg" class="flash" hidden style="margin-top:8px;"></p>
+  <p class="hint" style="margin-top:8px;"><?= tt('pk.how') ?></p>
+  <script nonce="<?= csp_nonce() ?>" src="../assets/passkey.js?v=<?= @filemtime(__DIR__ . '/../../assets/passkey.js') ?: 1 ?>"></script>
+  <?php else: ?><p class="hint"><?= tt('pk.off') ?></p><?php endif; ?>
+</div>
+<?php endif; ?>
 <?php if (array_key_exists('session_epoch', $u ?? [])): ?>
 <div class="card">
   <h2>⎋ <?= tt('sec.my_sessions') ?></h2>

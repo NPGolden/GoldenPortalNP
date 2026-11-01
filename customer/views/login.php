@@ -36,6 +36,14 @@
       </div>
       <button class="btn btn--gold" type="submit" style="width:100%;"><?= tt('login.continue') ?></button>
     </form>
+    <?php if (function_exists('pk_enabled') && pk_enabled()): ?>
+    <div class="pk-login" style="margin-top:12px;">
+      <div style="display:flex;align-items:center;gap:10px;margin:6px 0;"><span style="flex:1;height:1px;background:var(--line);"></span><span class="hint"><?= tt('pk.or') ?></span><span style="flex:1;height:1px;background:var(--line);"></span></div>
+      <button type="button" class="btn btn--ghost" id="pk-login" style="width:100%;" data-wait="<?= tt('pk.wait') ?>" data-ok="<?= tt('pk.ok') ?>" data-cancel="<?= tt('pk.cancelled') ?>">🔑 <?= tt('pk.signin') ?></button>
+      <p id="pk-msg" class="flash" hidden style="margin-top:8px;"></p>
+    </div>
+    <script nonce="<?= csp_nonce() ?>" src="../assets/passkey.js?v=<?= @filemtime(__DIR__ . '/../../assets/passkey.js') ?: 1 ?>"></script>
+    <?php endif; ?>
 
     <div style="display:flex;justify-content:center;margin-top:18px;"><?= lang_selector(false) ?></div>
     <p class="buildtag buildtag--gate">v<?= e(CP_VERSION) ?> · <?= e(CP_BUILD) ?></p>

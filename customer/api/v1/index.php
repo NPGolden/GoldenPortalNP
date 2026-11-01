@@ -19,18 +19,36 @@ try {
         $dev = (array)($body['device'] ?? []); $u = api_act_as((int)$u['id']); if ($isPm) PortalPM::allowed($u); if ($isCu) PortalCustomer::allowed($u);   // §0: who may sign in to each app (before the device is enrolled)
         $did = Jwt::registerDevice((int)$u['id'], $dev); $u['device_id'] = $did;
         Response::json(['access_token' => Jwt::issue($u, $did), 'refresh_token' => Jwt::issueRefresh($did, $dev['platform'] ?? 'web'), 'user' => $me($u)]); }
+    /* R71-001: passkey sign-in — challenge kept server-side (5 min, single use); the assertion is verified in app/pk.php; a verified passkey satisfies the authenticator step */
+    if ($path === '/auth/passkey/options' && $method === 'POST') { RateLimit::check('auth', RateLimit::ip(), 10); if (!pk_enabled()) Response::error(403, 'Passkeys are switched off');
+        $c = pk_challenge_new('auth', null, 'db'); Response::json(['challenge_id' => $c['id'], 'options' => pk_login_options($c['challenge'])]); }
+    if ($path === '/auth/passkey/login' && $method === 'POST') { RateLimit::check('auth', RateLimit::ip(), 10); if (!pk_enabled()) Response::error(403, 'Passkeys are switched off');
+        $c = pk_challenge_take('auth', 'db', (string)($body['challenge_id'] ?? '')); if (!$c) Response::error(400, 'Challenge expired');
+        try { $u = pk_assert_finish($c['challenge'], (array)($body['credential'] ?? [])); } catch (RuntimeException $e) { usleep(300000); Response::error(401, 'Passkey rejected (' . $e->getMessage() . ')'); }
+        if ($isCu) { if (($u['role'] ?? 'customer') !== 'customer') Response::error(403, 'Customer account required'); } elseif (!in_array($u['role'], ['staff', 'admin'], true)) Response::error(403, 'Staff account required');
+        if (function_exists('login_log')) login_log((int)$u['id'], (string)$u['email'], 'passkey');
+        $dev = (array)($body['device'] ?? []); $u = api_act_as((int)$u['id']); if ($isPm) PortalPM::allowed($u); if ($isCu) PortalCustomer::allowed($u);
+        $did = Jwt::registerDevice((int)$u['id'], $dev); $u['device_id'] = $did;
+        Response::json(['access_token' => Jwt::issue($u, $did), 'refresh_token' => Jwt::issueRefresh($did, $dev['platform'] ?? 'web'), 'user' => $me($u)]); }
     if ($path === '/auth/refresh' && $method === 'POST') { RateLimit::check('auth', RateLimit::ip(), 10);
         $r = Jwt::consumeRefresh((string)($body['refresh_token'] ?? '')); $u = api_act_as((int)$r['user_id']); if ($isPm) PortalPM::allowed($u); if ($isCu) PortalCustomer::allowed($u);
         Response::json(['access_token' => Jwt::issue($u, (int)$r['device_id']), 'refresh_token' => Jwt::issueRefresh((int)$r['device_id'], (string)$r['platform'], (int)$r['id'])]); }
     $u = Jwt::requireUser(); RateLimit::check('api', 'u' . $u['id'], 300);
     if (str_starts_with($path, '/pm/') && !$isPm) Response::error(403, 'Golden PM app only');
     if (str_starts_with($path, '/cu/') && !$isCu) Response::error(403, 'Customer app only');
-    if ($isCu) { PortalCustomer::allowed($u); if (!str_starts_with($path, '/cu/') && !in_array($path, ['/me', '/auth/logout', '/devices/push-token'], true)) Response::error(403, 'Not available in the customer app'); }   // CS-03: staff routes never serve a customer token
-    if ($isCu) { $u['device_id'] = (int)$u['device_id']; require __DIR__ . '/endpoints/customer.php'; customer_routes($u, $method, $path, $body); }
+    if ($isCu) { PortalCustomer::allowed($u); if (!str_starts_with($path, '/cu/') && !in_array($path, ['/me', '/auth/logout', '/devices/push-token', '/me/passkeys', '/me/passkeys/options'], true) && !preg_match('#^/me/passkeys/\d+$#', $path)) Response::error(403, 'Not available in the customer app'); }   // CS-03: staff routes never serve a customer token
+    if ($isCu && !str_starts_with($path, '/me/passkeys')) { $u['device_id'] = (int)$u['device_id']; require __DIR__ . '/endpoints/customer.php'; customer_routes($u, $method, $path, $body); }
     if ($isPm) PortalPM::allowed($u);                                                                                            // rights may change while a token lives
     switch (true) {
         case $method === 'POST' && $path === '/auth/logout': q('UPDATE mob_refresh_tokens SET revoked_at = NOW() WHERE device_id = ? AND revoked_at IS NULL', [$u['device_id']]); Response::json([], 204);
         case $method === 'GET' && $path === '/me': Response::json($me($u));
+        /* R71-001: passkeys of the signed-in account (enrolment needs a fresh authenticator code when the account has one) */
+        case $method === 'GET' && $path === '/me/passkeys': Response::json(['enabled' => pk_enabled(), 'items' => pk_list((int)$u['id'])]);
+        case $method === 'POST' && $path === '/me/passkeys/options': if (!pk_enabled()) Response::error(403, 'Passkeys are switched off'); if (!pk_stepup_ok($u, isset($body['totp']) ? (string)$body['totp'] : null)) Response::error(401, 'Authenticator code required', ['totp' => true]);
+            $c = pk_challenge_new('reg', (int)$u['id'], 'db'); Response::json(['challenge_id' => $c['id'], 'options' => pk_registration_options($u, $c['challenge'])]);
+        case $method === 'POST' && $path === '/me/passkeys': $c = pk_challenge_take('reg', 'db', (string)($body['challenge_id'] ?? '')); if (!$c || $c['uid'] !== (int)$u['id']) Response::error(400, 'Challenge expired');
+            try { $id = pk_register_finish($u, $c['challenge'], (array)($body['credential'] ?? []), (string)($body['name'] ?? ''), (int)$u['device_id']); } catch (RuntimeException $e) { Response::error(400, 'Passkey not accepted (' . $e->getMessage() . ')'); } Response::json(['id' => $id], 201);
+        case $method === 'DELETE' && preg_match('#^/me/passkeys/(\d+)$#', $path, $m): try { pk_remove((int)$u['id'], (int)$m[1]); } catch (RuntimeException $e) { Response::error(404, 'Not found'); } Response::json([], 204);
         case $method === 'GET' && $path === '/pm/projects': Response::json(PortalPM::projects($u));
         case $method === 'GET' && preg_match('#^/pm/subproject/(\d+)$#', $path, $m): Response::json(PortalPM::subproject($u, (int)$m[1]));
         case $method === 'GET' && $path === '/pm/drawings': Response::json(['items' => PortalPM::drawings(isset($_GET['project']) && $_GET['project'] !== '' ? (int)$_GET['project'] : null)]);

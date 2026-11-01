@@ -7,7 +7,8 @@ if (is_dir(__DIR__ . '/storage') && is_writable(__DIR__ . '/storage')) { ini_set
 
 require __DIR__ . '/app/db.php';
 require __DIR__ . '/app/cache.php';
-require __DIR__ . '/app/clk.php';    // R70-004 world clocks per user  // R69-002 block cache, query meter, house-keeping
+require __DIR__ . '/app/clk.php';    // R70-004 world clocks per user
+require __DIR__ . '/app/pk.php';     // R71-001 passkeys  // R69-002 block cache, query meter, house-keeping
 require __DIR__ . '/app/i18n.php';
 require __DIR__ . '/app/helpers.php';
 require __DIR__ . '/app/auth.php';
@@ -105,7 +106,8 @@ $page = preg_replace('/[^a-z0-9_]/', '', (string)($_GET['p'] ?? 'dashboard'));
 
 /* ------------------------------------------------------------- POST */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'csp_report') { $raw = (string) file_get_contents('php://input'); if (strlen($raw) < 8192) @file_put_contents(__DIR__ . '/storage/csp.log', date('c') . ' ' . preg_replace('/\s+/', ' ', $raw) . "\n", FILE_APPEND | LOCK_EX); http_response_code(204); exit; }   // R53-001
-if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'ai') { require_login(); ai_endpoint(); }   // R50-001: assistant endpoint (JSON; CSRF checked by header inside)
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'ai') { require_login(); ai_endpoint(); }
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'pk') { pk_endpoint(); }   // R71-001: passkey JSON endpoint (its own CSRF / challenge checks)   // R50-001: assistant endpoint (JSON; CSRF checked by header inside)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     csrf_check();
     if (function_exists('cache_forget') && ($cuPost = current_user())) cache_forget('badges:' . (int)$cuPost['id']);   // R69-002: an action may change what waits for me
@@ -279,6 +281,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 foreach (['id', 'project', 'vessel', 'tab', 'week', 'view'] as $k) if (isset($_GET[$k])) $keep[$k] = $_GET[$k];
                 redirect($back ?: 'dashboard', $keep + ['_r' => uniqid()]);
             }
+            case 'pk_remove': { $pu = require_login(); pk_remove((int)$pu['id'], (int)($_POST['id'] ?? 0)); flash('good', t('pk.removed')); redirect('account', ['_r' => uniqid()], '#passkeys'); }   // R71-001
+            case 'pk_admin_remove': { require_cp_admin(); pk_remove(0, (int)($_POST['id'] ?? 0), true); flash('good', t('pk.removed')); redirect('admin_log', ['_r' => uniqid()], '#passkeys'); }
             case 'clocks_save': { clk_save_from_post(); flash('good', t('clk.saved')); redirect('account', ['_r' => uniqid()], '#clocks'); }   // R70-004
             case 'avatar_save': {
                 $au = require_login();

@@ -118,7 +118,7 @@ final class PortalPM {
         $today = date('Y-m-d');
         return array_map(fn($d) => ['id' => (int)$d['id'], 'project_id' => (int)$d['project_id'], 'subproject_id' => (int)($d['subproject_id'] ?? 0) ?: null, 'kind' => (string)$d['kind'], 'seq_no' => (int)($d['seq_no'] ?? 0) ?: null, 'title' => (string)$d['title'], 'system' => (string)($d['system'] ?? ''), 'location' => (string)($d['location'] ?? ''), 'location_status' => (string)$d['location_status'], 'responsible' => (string)$d['responsible'],
                 'request_sent' => $d['request_sent'], 'expected_at' => $d['expected_at'], 'received_at' => $d['received_at'], 'status' => (string)$d['status'], 'overdue_days' => self::overdue($d['expected_at'], $d['status'] === 'pending'), 'remarks' => (string)($d['remarks'] ?? ''), 'file_id' => (int)($d['file_id'] ?? 0) ?: null],
-            all('SELECT d.*, vs.name AS system FROM drawing_requests d LEFT JOIN vessel_systems vs ON vs.id = d.system_id WHERE d.project_id IN (' . implode(',', $pids) . ") ORDER BY FIELD(d.status,'pending','received','not_required'), d.expected_at IS NULL, d.expected_at, d.seq_no, d.id"));
+            all('SELECT d.*, vs.name AS `system` FROM drawing_requests d LEFT JOIN vessel_systems vs ON vs.id = d.system_id WHERE d.project_id IN (' . implode(',', $pids) . ") ORDER BY FIELD(d.status,'pending','received','not_required'), d.expected_at IS NULL, d.expected_at, d.seq_no, d.id"));
     }
     /** owner_approvals (kind owner) + class_submittals (kind class); open = submitted | resubmitted. */
     public static function submittals(?int $pid, ?array $tree = null): array {

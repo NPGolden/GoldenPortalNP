@@ -41,7 +41,7 @@ window.SCREENS = (() => {
       <div id="totprow" class="hidden"><label>${t("login.totp")}</label><input id="totp" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></div>
       <p id="err" class="note red hidden"></p>
       <button class="btn gold" id="go">${t("login.signin")}</button>
-      <button class="btn line" id="bio" ${API.signedIn ? "" : "disabled"}>${t("login.bio")}</button>${API.signedIn ? "" : `<p class="muted" style="text-align:center;margin-top:-6px">${t("login.bio_hint")}</p>`}
+      <button class="btn line" id="bio" ${API.signedIn ? "" : "disabled"}>${t("login.bio")}</button>${API.signedIn ? "" : (API.passkeyCapable ? `<button class="btn line" id="pkin">🔑 ${t("login.passkey")}</button>` : `<p class="muted" style="text-align:center;margin-top:-6px">${t("login.bio_hint")}</p>`)}
       <h2>${t("login.lang")}</h2><div class="lang">${I18N.LANGS.map(([c, l]) => `<button data-l="${c}" class="${I18N.get() === c ? "on" : ""}">${l}</button>`).join("")}</div>
       <p class="muted" style="text-align:center;margin-top:16px">${ctx.me.home_branch || "GR"} • Golden A/S ${ctx.me.home_branch === "GIT" ? "Italian Branch" : "head office"} • Golden PM v${API.VERSION}</p>
     </div>`, bind(root) {
@@ -54,6 +54,7 @@ window.SCREENS = (() => {
           else er.textContent = e.status === 402 ? t("login.nolicence") : e.status === 403 ? (d.error || t("login.pmonly")) : e.status === 423 ? t("login.locked") : e.status === 426 ? t("login.update") : e.status === 429 ? t("login.ratelimit") : e.status === 401 ? t("login.failed") : `${t("login.failed")} (${e.status || "offline"})`; er.classList.remove("hidden"); b.disabled = false; }
       };
       root.querySelector("#bio").onclick = async () => { if (await UI.biometric()) { await SYNC.run(); location.hash = "#/home"; } };
+      const pkb = root.querySelector("#pkin"); if (pkb) pkb.onclick = async () => { pkb.disabled = true; try { await API.passkeyLogin(); await SYNC.run(); location.hash = "#/home"; } catch (e) { root.querySelector("#err").textContent = e && e.name === "NotAllowedError" ? t("pk.failed") : (e.data && e.data.error) || e.message || t("pk.failed"); root.querySelector("#err").classList.remove("hidden"); pkb.disabled = false; } };
     } };
   }
 
@@ -285,13 +286,17 @@ window.SCREENS = (() => {
       <label>${t("more.lang")}</label><div class="lang">${I18N.LANGS.map(([c, l]) => `<button data-l="${c}" class="${I18N.get() === c ? "on" : ""}">${l}</button>`).join("")}</div>
       <label>${t("more.bio")}</label><div class="seg" data-k="bio"><button data-v="1" class="${bio ? "on" : ""}">${t("more.bio_on")}</button><button data-v="0" class="${bio ? "" : "on"}">${t("more.bio_off")}</button></div>
       <h2>${t("more.about")}</h2><p class="muted">${t("more.about_txt")}</p>
-      <button class="btn navy" id="sync">${t("more.sync")}</button><button class="btn line" id="clear">${t("set.clear")}</button><button class="btn line" id="lock">🔒 ${t("more.lock")}</button><button class="btn line" id="out">${t("more.signout")}</button>`, bind(root) {
+      <button class="btn navy" id="sync">${t("more.sync")}</button><button class="btn line" id="clear">${t("set.clear")}</button><h2>🔑 ${t("pk.title")}</h2><p class="muted">${t("pk.hint")}</p><div id="pklist" class="muted">…</div>${API.passkeyCapable ? `<label>${t("pk.name")}</label><input id="pkname" maxlength="80" placeholder="iPhone"><div id="pkcoderow" class="hidden"><label>${t("pk.code")}</label><input id="pkcode" inputmode="numeric" maxlength="6" autocomplete="one-time-code"></div><button class="btn line" id="pkadd">+ ${t("pk.add")}</button>` : `<p class="muted">${t("pk.unsupported")}</p>`}
+      <button class="btn line" id="lock">🔒 ${t("more.lock")}</button><button class="btn line" id="out">${t("more.signout")}</button>`, bind(root) {
       UI.goLinks(root); root.querySelectorAll(".lang button").forEach((b) => b.onclick = () => { I18N.set(b.dataset.l); I18N.apply(); UI.render(); });
       UI.segs(root, (k, v) => { try { localStorage.setItem("gpm.bio", v); } catch (e) {} });
       root.querySelector("#sync").onclick = () => SYNC.run().then(() => UI.render());
       root.querySelector("#ai").onclick = () => ASSIST.open({ page: "fsr_edit", title: "Golden PM — help", headline: "How do I…", fields: () => [], noFill: true });
       root.querySelector("#clear").onclick = async () => { if (window.caches) await caches.delete("gas-pm-docs"); UI.toast(t("common.ok")); };
       root.querySelector("#out").onclick = async () => { await API.logout(); await DB.wipe(); location.hash = "#/login"; };
+      const pkRender = async () => { const el = root.querySelector("#pklist"); if (!el) return; try { const r = await API.passkeys(); el.innerHTML = r.items.length ? r.items.map((k) => `<div class="kv"><b>${esc(k.name)}</b><span class="v">${k.last_used_at ? esc(k.last_used_at.slice(0, 10)) : "—"} <button class="btn red sm" data-pkrm="${k.id}">${t("pk.remove")}</button></span></div>`).join("") : t("pk.none"); el.querySelectorAll("[data-pkrm]").forEach((b) => b.onclick = async () => { try { await API.passkeyRemove(b.dataset.pkrm); } catch (e) {} pkRender(); }); } catch (e) { el.textContent = (e.data && e.data.error) || "—"; } };
+      if (!API.mock) pkRender(); else { const el = root.querySelector("#pklist"); if (el) el.textContent = t("pk.none"); }
+      const pka = root.querySelector("#pkadd"); if (pka) pka.onclick = async () => { pka.disabled = true; try { await API.passkeyRegister(root.querySelector("#pkname").value.trim(), root.querySelector("#pkcode").value.trim()); UI.toast(t("pk.added")); pkRender(); } catch (e) { if (e.data && e.data.totp) root.querySelector("#pkcoderow").classList.remove("hidden"); UI.toast(e && e.name === "InvalidStateError" ? t("pk.added") : (e.data && e.data.error) || e.message || t("pk.failed")); } pka.disabled = false; };
       root.querySelector("#lock").onclick = async () => { if (!(await UI.biometricAvailable())) { UI.toast(t("lock.need_bio")); await API.logout(); await DB.wipe(); location.hash = "#/login"; return; } try { localStorage.setItem("gpm.locked", "1"); } catch (e) {} location.hash = "#/lock"; };
     } };
   }

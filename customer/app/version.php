@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.79.9';
+const CP_VERSION = '1.80.0';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R71-001', 'version' => '1.80.0', 'date' => '2026-11-01', 'title' => 'Passkeys (WebAuthn / FIDO2): sign in to the portal and the three mobile apps with Face ID, Touch ID, fingerprint or Windows Hello instead of password + authenticator code — also after a sign-out. My Account › Passkeys: add this device (fresh authenticator code required when the account has one), list, remove; the login page offers "Sign in with a passkey" and the browser autofill; Settings › Login history: allow / forbid passkeys, every passkey of the portal with remove; notifications on add / remove; sign-in outcomes passkey / passkey_failed / passkey_added / passkey_removed. Mobile API: /auth/passkey/options + /auth/passkey/login, /me/passkeys. Verification in-house (no library): origin and rpId checks, user verification required, single-use 5-minute challenges, signature-counter regression refused and reported, 10 attempts per address per 10 minutes, at most 10 passkeys per account. Apps: Service 0.6.4, Golden PM 1.0.2, Customer 1.0.2. Security review docs/SECURITY-REVIEW_R71-001.md.', 'db' => 'install/migrate_cp_r71_passkeys.sql', 'check' => 'r71'],
         ['ref' => 'GAS-CP-R70-005', 'version' => '1.79.9', 'date' => '2026-11-01', 'title' => 'Mobile apps — Lock with Face ID (Service 0.6.3, Golden PM 1.0.1, Customer 1.0.1): More › 🔒 Lock app keeps the session on the phone and Face ID / fingerprint opens it again; a cancelled prompt returns to the lock screen instead of signing out (Golden PM used to sign out); the Service app gains the "Face ID on open" setting; the login screen explains that Unlock is available after one password sign-in on the device. Sign out remains the full revoke.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R70-004', 'version' => '1.79.8', 'date' => '2026-11-01', 'title' => 'World clocks per user: My Account › World clocks — tick up to 7 zones from a catalogue of 34 yachting and business places (Monaco, Barcelona, Split, Tivat, Fort Lauderdale, Singapore …); UTC is always first for everybody; Reset returns to the company set. Fix: the HR requests page died at the bottom (training applications box called two functions that did not exist), which also left the clock strip at --:-- and the pickers dead on that page. Fix: the monthly KPI snapshot (first page of each month) broke after the first project with a KPI drop (a variable clash) and took the dashboard down for the first visitor of the month; it now resumes project by project and completes.', 'db' => 'install/migrate_cp_r70_clocks.sql', 'check' => 'r70d'],
         ['ref' => 'GAS-CP-R70-003', 'version' => '1.79.7', 'date' => '2026-11-01', 'title' => 'Community: @mentions in post comments and post bodies — type @ and pick a colleague (same picker as notes and ticket comments), the handle is highlighted in the thread and the colleague is notified ("… mentioned you in Community · <post>"); the post author still receives the usual comment notice.', 'db' => null, 'check' => null],
@@ -268,6 +269,7 @@ function cp_migration_state(): array {
         'r61' => $has("SHOW TABLES LIKE 'hr_leave_periods'") && $has("SHOW COLUMNS FROM hr_requests LIKE 'period_id'"),
         'r63' => $has("SHOW TABLES LIKE 'soc_kudos'") && $has("SHOW TABLES LIKE 'soc_onboard'"),
         'r64' => $has("SHOW TABLES LIKE 'hr_targets'") && $has("SHOW TABLES LIKE 'hr_target_log'"),
+        'r71' => $has("SHOW TABLES LIKE 'webauthn_credentials'") && $has("SHOW TABLES LIKE 'webauthn_challenges'"),
         'r70d' => $has("SHOW COLUMNS FROM customer_users LIKE 'clocks'"),
         'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),
         'r67' => $has("SHOW TABLES LIKE 'hr_flows'") && $has("SHOW TABLES LIKE 'hr_flow_templates'") && $has("SHOW TABLES LIKE 'hr_invitations'"),

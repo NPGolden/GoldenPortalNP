@@ -2,7 +2,7 @@
  * and a MOCK mode (built-in sample data in the shapes of the contract) for the demo and the UI tests.
  * Mock mode: localStorage gpm.mock = "1", or ?mock=1 on the URL. */
 window.API = (() => {
-  const VERSION = "1.0.1";
+  const VERSION = "1.0.2";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   try { MOCK = localStorage.getItem("gpm.mock") === "1" || /[?&]mock=1/.test(location.search); if (/[?&]mock=1/.test(location.search)) localStorage.setItem("gpm.mock", "1"); } catch (e) {}
@@ -28,6 +28,12 @@ window.API = (() => {
       throw e;
     }
   }
+  // R71-001 base64url + credential → JSON (what the API verifies)
+  const pkB64 = { enc: (buf) => { let s = ""; const b = new Uint8Array(buf); for (let i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""); },
+                  dec: (s) => { s = s.replace(/-/g, "+").replace(/_/g, "/"); while (s.length % 4) s += "="; const bin = atob(s), b = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) b[i] = bin.charCodeAt(i); return b.buffer; } };
+  function pkToJSON(cred) { const r = cred.response, out = { id: cred.id, rawId: pkB64.enc(cred.rawId), type: cred.type, response: { clientDataJSON: pkB64.enc(r.clientDataJSON) } };
+    if (r.attestationObject) { out.response.attestationObject = pkB64.enc(r.attestationObject); try { out.response.transports = r.getTransports ? r.getTransports() : []; } catch (e) { out.response.transports = []; } }
+    if (r.authenticatorData) { out.response.authenticatorData = pkB64.enc(r.authenticatorData); out.response.signature = pkB64.enc(r.signature); out.response.userHandle = r.userHandle ? pkB64.enc(r.userHandle) : null; } return out; }
   const deviceInfo = () => ({ platform: (window.Capacitor && Capacitor.getPlatform && Capacitor.getPlatform()) || "web", ua: navigator.userAgent.slice(0, 120), app_version: VERSION, device_id: deviceId() });
   function deviceId() { try { let d = localStorage.getItem("gpm.device"); if (!d) { d = DB.uuid(); localStorage.setItem("gpm.device", d); } return d; } catch (e) { return "web"; } }
 
@@ -36,6 +42,18 @@ window.API = (() => {
     get signedIn() { return !!(tok.refresh || (MOCK && mockState.user)); },
     async login(email, password, totp) { const r = await call("POST", "/auth/login", { email, password, totp: totp || undefined, device: deviceInfo() }); tok.access = r.access_token; tok.refresh = r.refresh_token; return r; },
     async logout() { try { await call("POST", "/auth/logout", {}); } catch (e) {} tok.access = null; tok.refresh = null; },
+    /* R71-001 passkeys — the browser / platform authenticator signs a server challenge; a passkey replaces password + authenticator code */
+    get passkeyCapable() { return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.get && !MOCK); },
+    async passkeyLogin() {
+      const o = await call("POST", "/auth/passkey/options", {}); const pk = o.options; pk.challenge = pkB64.dec(pk.challenge); pk.allowCredentials = [];
+      const cred = await navigator.credentials.get({ publicKey: pk });
+      const r = await call("POST", "/auth/passkey/login", { challenge_id: o.challenge_id, credential: pkToJSON(cred), device: deviceInfo() }); tok.access = r.access_token; tok.refresh = r.refresh_token; return r; },
+    async passkeyRegister(name, totp) {
+      const o = await call("POST", "/me/passkeys/options", { totp: totp || undefined }); const pk = o.options; pk.challenge = pkB64.dec(pk.challenge); pk.user.id = pkB64.dec(pk.user.id); pk.excludeCredentials = (pk.excludeCredentials || []).map((c) => ({ type: c.type, id: pkB64.dec(c.id) }));
+      const cred = await navigator.credentials.create({ publicKey: pk });
+      return call("POST", "/me/passkeys", { challenge_id: o.challenge_id, credential: pkToJSON(cred), name }); },
+    passkeys: () => call("GET", "/me/passkeys"), passkeyRemove: (id) => call("DELETE", `/me/passkeys/${id}`),
+
     me: () => call("GET", "/me"), master: () => call("GET", "/master"), documents: () => call("GET", "/documents"), notes: () => call("GET", "/notes"),
     projects: () => call("GET", "/pm/projects"), subproject: (id) => call("GET", `/pm/subproject/${id}`),
     drawings: (project) => call("GET", `/pm/drawings${project ? `?project=${project}` : ""}`), submittals: (project) => call("GET", `/pm/submittals${project ? `?project=${project}` : ""}`),
@@ -59,7 +77,7 @@ window.API = (() => {
   const STAGES = ["engineering", "procurement", "production", "fat", "installation", "sathat", "commissioning"];
   const overall = (st) => { const v = STAGES.map((k) => st[k]).filter((x) => x !== -1 && x != null); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0; };
   const mockState = { user: null, n: 0 };
-  const ME = { id: 2, name: "Nikos Polykandriotis", email: "np@goldenas.com.gr", role: "staff", discipline: "Management", discipline_id: 9, section_id: null, home_branch: "GR", branch_scope: ["GR", "GIT"], languages: ["en", "el", "it", "uk", "bg"], min_app_version: "1.0.1", ai: true, calendar: "GR", hr: true,
+  const ME = { id: 2, name: "Nikos Polykandriotis", email: "np@goldenas.com.gr", role: "staff", discipline: "Management", discipline_id: 9, section_id: null, home_branch: "GR", branch_scope: ["GR", "GIT"], languages: ["en", "el", "it", "uk", "bg"], min_app_version: "1.0.2", ai: true, calendar: "GR", hr: true,
     pm: true, hr_manager: true, ts_approver: true, totp_enabled: true, counts: { hr_pending: 2, ts_pending: 2, drawings_overdue: 2, submittals_open: 5, hr_unread: 1 } };
   const STAFF = [
     { id: 2, name: "Nikos Polykandriotis", discipline: "Management", discipline_id: 9, person_id: 1 },
