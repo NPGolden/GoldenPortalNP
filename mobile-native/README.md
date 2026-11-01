@@ -38,3 +38,11 @@ One-time setup on the relying-party domain:
 3. Portal › Settings › Login history › Session policy › "Android app signing SHA-256": paste the same fingerprint(s). The portal then accepts the Android app origin (`android:apk-key-hash:…`) in the passkey check; iOS reports `https://goldensas.com` by itself (iOS 17.4+).
 4. Rebuild the apps (Build Android / Build iOS). First passkey use on a device may take up to 24 h after step 2 (Apple caches the association file through its CDN).
 Dependencies: Capacitor 8.6 (Node 22, Java 21, Xcode 16); `npm audit` clean with `overrides` for the build-tool transitive packages.
+
+## iOS build notes (learned on the first publication, 01/11/2026)
+- Runner `macos-15` with **Xcode 26** selected (Apple refuses uploads built with an older SDK; Capacitor 8 itself needs Xcode 16+).
+- Capacitor 8 iOS template uses Swift Package Manager: no `App.xcworkspace`, the workflow archives `App.xcodeproj`.
+- Manual signing is written into the App target of `project.pbxproj` (team, profile, identity, bundle id, versions); passing them on the `xcodebuild` command line breaks the Swift packages ("does not support provisioning profiles").
+- The Apple actions take the `.p8` **text**; the workflow decodes `ASC_KEY_P8_B64` first.
+- Git Bash on Windows: prefix `openssl req … -subj "/CN=…"` with `MSYS_NO_PATHCONV=1`, otherwise the leading slash becomes a Windows path.
+- First TestFlight build asks the export-compliance question once (answer No: standard HTTPS only).
