@@ -48,6 +48,10 @@ jobs:
           echo "app_id=$(node -e "console.log(require('./apps.json')['${{ github.event.inputs.app }}'].appId)")" >> "$GITHUB_OUTPUT"
           echo "splash=$(node -e "console.log(require('./apps.json')['${{ github.event.inputs.app }}'].splash)")" >> "$GITHUB_OUTPUT"
           case "${{ github.event.inputs.app }}" in engineer) echo "profile=${{ vars.IOS_PROFILE_ENGINEER }}";; pm) echo "profile=${{ vars.IOS_PROFILE_PM }}";; customer) echo "profile=${{ vars.IOS_PROFILE_CUSTOMER }}";; esac >> "$GITHUB_OUTPUT"
+      - name: Select Xcode 26 (App Store Connect requires the iOS 26 SDK)
+        run: |
+          X=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1); [ -n "$X" ] || { echo "No Xcode 26 on this runner image — use a newer macos image"; ls /Applications | grep Xcode; exit 1; }
+          sudo xcode-select -s "$X"; xcodebuild -version
       - name: Add the iOS project
         run: |
           set -e; npx cap add ios
