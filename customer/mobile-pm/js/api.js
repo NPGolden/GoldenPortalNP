@@ -2,7 +2,7 @@
  * and a MOCK mode (built-in sample data in the shapes of the contract) for the demo and the UI tests.
  * Mock mode: localStorage gpm.mock = "1", or ?mock=1 on the URL. */
 window.API = (() => {
-  const VERSION = "1.0.3";
+  const VERSION = "1.0.4";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   try { MOCK = localStorage.getItem("gpm.mock") === "1" || /[?&]mock=1/.test(location.search); if (/[?&]mock=1/.test(location.search)) localStorage.setItem("gpm.mock", "1"); } catch (e) {}
@@ -81,7 +81,7 @@ window.API = (() => {
   const STAGES = ["engineering", "procurement", "production", "fat", "installation", "sathat", "commissioning"];
   const overall = (st) => { const v = STAGES.map((k) => st[k]).filter((x) => x !== -1 && x != null); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0; };
   const mockState = { user: null, n: 0 };
-  const ME = { id: 2, name: "Nikos Polykandriotis", email: "np@goldenas.com.gr", role: "staff", discipline: "Management", discipline_id: 9, section_id: null, home_branch: "GR", branch_scope: ["GR", "GIT"], languages: ["en", "el", "it", "uk", "bg"], min_app_version: "1.0.3", ai: true, calendar: "GR", hr: true,
+  const ME = { id: 2, name: "Nikos Polykandriotis", email: "np@goldenas.com.gr", role: "staff", discipline: "Management", discipline_id: 9, section_id: null, home_branch: "GR", branch_scope: ["GR", "GIT"], languages: ["en", "el", "it", "uk", "bg"], min_app_version: "1.0.4", ai: true, calendar: "GR", hr: true,
     pm: true, hr_manager: true, ts_approver: true, totp_enabled: true, counts: { hr_pending: 2, ts_pending: 2, drawings_overdue: 2, submittals_open: 5, hr_unread: 1 } };
   const STAFF = [
     { id: 2, name: "Nikos Polykandriotis", discipline: "Management", discipline_id: 9, person_id: 1 },

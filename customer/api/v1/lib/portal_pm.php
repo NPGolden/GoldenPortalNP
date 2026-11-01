@@ -83,6 +83,13 @@ final class PortalPM {
     }
 
     /* ------------------------------------------------------------------ §3 sub-project detail */
+    /** Offers of a sub-project (plus the project's offers without a sub-project): number, revision, title, status with its label and tone, dates — no money. */
+    public static function offers(int $pid, int $sid): array {
+        try { $rows = all('SELECT id, offer_no, revision, title, status, sent_at, valid_until, status_at, decided_name, created_at FROM offers WHERE project_id = ? AND (subproject_id = ? OR subproject_id IS NULL) ORDER BY created_at DESC LIMIT 50', [$pid, $sid]); } catch (Throwable $e) { return []; }
+        return array_map(fn($o) => ['id' => (int)$o['id'], 'offer_no' => (string)$o['offer_no'], 'revision' => (string)($o['revision'] ?? ''), 'title' => (string)$o['title'], 'status' => (string)$o['status'],
+            'status_label' => function_exists('of_status_label') ? of_status_label((string)$o['status']) : (string)$o['status'], 'tone' => function_exists('of_status_tone') ? of_status_tone((string)$o['status']) : 'mute',
+            'sent_at' => $o['sent_at'], 'valid_until' => $o['valid_until'], 'status_at' => $o['status_at'], 'decided_name' => $o['decided_name'], 'created_at' => $o['created_at']], $rows);
+    }
     public static function subproject(array $u, int $id): array {
         $sp = load_subproject($id); if (!$sp) throw new ApiException(404, 'Sub-project not found');
         $pid = (int)$sp['project_id']; $tree = self::tree($pid); $p = $tree[0] ?? one('SELECT p.*, v.name AS vessel, c.name AS customer_name FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id LEFT JOIN customers c ON c.id = p.customer_id WHERE p.id = ?', [$pid]);
@@ -98,6 +105,7 @@ final class PortalPM {
         $teamRows = function_exists('tm_members_full') ? tm_members_full($id) : []; $persons = self::personsOfUsers(array_map(fn($t) => (int)$t['id'], $teamRows));
         $teamOut = array_map(fn($t) => ['id' => (int)$t['id'], 'name' => (string)$t['full_name'], 'discipline' => (string)($t['discipline'] ?? ''), 'person_id' => isset($persons[(int)$t['id']]) ? (int)$persons[(int)$t['id']]['id'] : null], $teamRows);
         return ['subproject' => $sub, 'project' => ['id' => $pid, 'code' => (string)($p['project_code'] ?: $p['erp_code'] ?: 'P' . $pid), 'name' => (string)$p['name'], 'vessel' => (string)($p['vessel'] ?? ''), 'customer' => (string)($p['customer_name'] ?? ''), 'branch' => function_exists('br_of') ? (string)(br_of($pid, $id)['code'] ?? 'GAS') : 'GAS'],
+            'offers' => self::offers($pid, $id),   // R72-002: PMs see the offers of the sub-project and their status (never the amounts)
             'issues' => Response::noMoney($issues), 'comments' => $comments, 'notes' => $notes,
             'drawings' => array_values(array_filter(self::drawings($pid, $tree), fn($d) => $d['subproject_id'] === $id)), 'submittals' => array_values(array_filter(self::submittals($pid, $tree), fn($s) => $s['subproject_id'] === $id)),
             'budgets' => Response::noMoney(self::budgets($id)), 'team' => $teamOut, 'absences' => self::matrix(date('Y-m-d'), date('Y-m-d', strtotime('+28 days')), array_values($persons))];

@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.80.5';
+const CP_VERSION = '1.80.6';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R72-002', 'version' => '1.80.6', 'date' => '2026-11-01', 'title' => 'Golden PM 1.0.4 / Service 0.6.6: a message to HR sent from the app by someone who holds the HR or owner role was refused ("Not found") because the portal treated it as HR writing to a person — it now goes to the sender\'s own thread; queued HR operations show their text instead of raw data, and a rejected one shows the reason with a Discard button. Golden PM: the project search filters the list in place (the full re-render under a moving finger opened the first project by itself). Golden PM: Offers of the sub-project with number, revision, title, status, sent / valid-until dates and who decided — no amounts.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R72-001', 'version' => '1.80.5', 'date' => '2026-11-01', 'title' => 'Public privacy policy page (?p=privacy, no sign-in) for the portal and the three mobile apps — required by Google Play and the App Store; house style, English.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R71-005', 'version' => '1.80.4', 'date' => '2026-11-01', 'title' => 'Settings › Login history: saving the Android app-signing SHA-256 was blocked by the website firewall (a long hex string in a POST looks like an exploit) — the form now sends it encoded and the portal normalises it (colons optional, upper-case, 64 hex digits each).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R71-004', 'version' => '1.80.3', 'date' => '2026-11-01', 'title' => 'Login page: "Sign in with a passkey" was rendered outside the white card, navy on the navy backdrop — invisible; it now sits inside the card under Sign in, with the house secondary-button style.', 'db' => null, 'check' => null],

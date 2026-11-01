@@ -2,7 +2,7 @@
  * Precache the shell; never cache the API (Cache-Control: no-store on the server as well).
  * Bump VERSION with every portal release: the old cache is dropped on activate.
  */
-const VERSION = "1.0.3";
+const VERSION = "1.0.4";
 const SHELL = `gas-pm-v${VERSION}`;
 const IMAGES = "gas-pm-images";
 const ASSETS = [

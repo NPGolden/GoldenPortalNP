@@ -133,7 +133,7 @@ function hr_messages_mark_seen(int $pid): void { if (!hr_msg_has()) return; if (
 function hr_message_send_from_post(): int {
     if (!hr_msg_has()) throw new RuntimeException(t('err.noaccess')); $u = current_user(); if (!$u || !is_staff()) throw new RuntimeException(t('err.noaccess'));
     $body = mb_substr(trim((string)($_POST['body'] ?? '')), 0, 2000); if ($body === '') throw new RuntimeException(t('hr.msg_need'));
-    if (hr_can()) { $pid = (int)($_POST['person_id'] ?? 0); $p = hr_person($pid); if (!$p) throw new RuntimeException(t('err.notfound')); $fromHr = 1; }
+    if (hr_can() && empty($_POST['as_employee'])) { $pid = (int)($_POST['person_id'] ?? 0); $p = hr_person($pid); if (!$p) throw new RuntimeException(t('err.notfound')); $fromHr = 1; }   // R72-002: as_employee = my own thread even when I hold the HR role (the apps)
     else { $p = hr_person_of_user((int)$u['id']); if (!$p) throw new RuntimeException(t('hr.no_person')); $pid = (int)$p['id']; $fromHr = 0; }
     q('INSERT INTO hr_messages (person_id, from_user_id, from_hr, body) VALUES (?,?,?,?)', [$pid, (int)$u['id'], $fromHr, $body]); $id = (int) db()->lastInsertId();
     if (function_exists('nf_push')) {

@@ -3,6 +3,7 @@
 window.I18N = (() => {
   const S = {
     en: {
+      "sub.offers": "Offers", "sub.offer_sent": "sent", "sub.offer_created": "created", "sub.offer_valid": "valid until", "more.discard": "Discard",
       "login.passkey": "Sign in with Face ID / passkey", "pk.title": "Passkeys", "pk.hint": "Sign in with Face ID / fingerprint instead of password and authenticator code — also after a sign-out. Add this device once; remove it here if the phone is lost.", "pk.add": "Add this device", "pk.name": "Name of this device", "pk.code": "Authenticator code", "pk.added": "Passkey added", "pk.failed": "Passkey failed", "pk.remove": "Remove", "pk.none": "No passkey on this account yet.", "pk.unsupported": "Passkeys are not available in this app on this device.",
       "more.lock": "Lock app", "lock.title": "Locked", "lock.lede": "Unlock with Face ID, Touch ID or your fingerprint to continue.", "lock.unlock": "Unlock", "lock.signout": "Sign out instead", "login.bio_hint": "Available after you sign in once on this device.", "lock.need_bio": "Face ID / fingerprint is not available on this device — the app was signed out instead.",
       "tab.home": "Home", "tab.more": "More", "login.title": "Project Manager", "login.portal": "Portal", "login.email": "E-mail", "login.password": "Password",
@@ -70,6 +71,7 @@ window.I18N = (() => {
       "pst.done": "done",
     },
     el: {
+      "sub.offers": "Προσφορές", "sub.offer_sent": "στάλθηκε", "sub.offer_created": "δημιουργήθηκε", "sub.offer_valid": "ισχύει έως", "more.discard": "Απόρριψη",
       "login.passkey": "Σύνδεση με Face ID / passkey", "pk.title": "Passkeys", "pk.hint": "Σύνδεση με Face ID / αποτύπωμα αντί για κωδικό και κωδικό επαληθευτή — και μετά από αποσύνδεση. Προσθέστε τη συσκευή μία φορά· αφαιρέστε την εδώ αν χαθεί.", "pk.add": "Προσθήκη αυτής της συσκευής", "pk.name": "Όνομα συσκευής", "pk.code": "Κωδικός επαληθευτή", "pk.added": "Το passkey προστέθηκε", "pk.failed": "Το passkey απέτυχε", "pk.remove": "Αφαίρεση", "pk.none": "Κανένα passkey ακόμη.", "pk.unsupported": "Τα passkeys δεν είναι διαθέσιμα σε αυτή την εφαρμογή σε αυτή τη συσκευή.",
       "more.lock": "Κλείδωμα εφαρμογής", "lock.title": "Κλειδωμένο", "lock.lede": "Ξεκλειδώστε με Face ID, Touch ID ή δακτυλικό αποτύπωμα για να συνεχίσετε.", "lock.unlock": "Ξεκλείδωμα", "lock.signout": "Αποσύνδεση αντί αυτού", "login.bio_hint": "Διαθέσιμο αφού συνδεθείτε μία φορά σε αυτή τη συσκευή.", "lock.need_bio": "Face ID / αποτύπωμα δεν είναι διαθέσιμο σε αυτή τη συσκευή — έγινε αποσύνδεση.",
       "hr.title": "Το HR μου", "hr.tab_leave": "Άδειες", "hr.tab_requests": "Αιτήσεις", "hr.tab_training": "Εκπαίδευση", "hr.tab_messages": "Μηνύματα HR", "hr.manager": "Εγκρίνων προϊστάμενος",
@@ -123,6 +125,7 @@ window.I18N = (() => {
       "pst.active": "ενεργό", "pst.quoted": "προσφορά", "pst.onhold": "σε αναμονή", "pst.completed": "ολοκληρωμένο", "pst.planned": "προγραμματισμένο", "pst.done": "ολοκληρώθηκε",
     },
     it: {
+      "sub.offers": "Offerte", "sub.offer_sent": "inviata", "sub.offer_created": "creata", "sub.offer_valid": "valida fino al", "more.discard": "Scarta",
       "login.passkey": "Accedi con Face ID / passkey", "pk.title": "Passkey", "pk.hint": "Accedi con Face ID / impronta invece di password e codice — anche dopo l'uscita. Aggiungi il dispositivo una volta; rimuovilo qui se lo perdi.", "pk.add": "Aggiungi questo dispositivo", "pk.name": "Nome del dispositivo", "pk.code": "Codice autenticatore", "pk.added": "Passkey aggiunta", "pk.failed": "Passkey non riuscita", "pk.remove": "Rimuovi", "pk.none": "Nessuna passkey.", "pk.unsupported": "Le passkey non sono disponibili in questa app su questo dispositivo.",
       "more.lock": "Blocca app", "lock.title": "Bloccata", "lock.lede": "Sblocca con Face ID, Touch ID o impronta per continuare.", "lock.unlock": "Sblocca", "lock.signout": "Esci invece", "login.bio_hint": "Disponibile dopo il primo accesso su questo dispositivo.", "lock.need_bio": "Face ID / impronta non disponibile su questo dispositivo — l'app è stata disconnessa.",
       "tab.home": "Home", "tab.more": "Altro", "login.title": "Project Manager", "login.password": "Password", "login.signin": "Accedi", "login.bio": "Sblocca con Face ID / impronta",
@@ -170,6 +173,7 @@ window.I18N = (() => {
       "pst.planned": "pianificato", "pst.done": "fatto",
     },
     uk: {
+      "sub.offers": "Пропозиції", "sub.offer_sent": "надіслано", "sub.offer_created": "створено", "sub.offer_valid": "дійсна до", "more.discard": "Відхилити",
       "login.passkey": "Увійти з Face ID / passkey", "pk.title": "Passkeys", "pk.hint": "Вхід за Face ID / відбитком замість пароля та коду — також після виходу. Додайте пристрій один раз; видаліть тут, якщо його втрачено.", "pk.add": "Додати цей пристрій", "pk.name": "Назва пристрою", "pk.code": "Код автентифікатора", "pk.added": "Passkey додано", "pk.failed": "Passkey не спрацював", "pk.remove": "Видалити", "pk.none": "Passkey ще немає.", "pk.unsupported": "Passkeys недоступні в цьому застосунку на цьому пристрої.",
       "more.lock": "Заблокувати застосунок", "lock.title": "Заблоковано", "lock.lede": "Розблокуйте за допомогою Face ID, Touch ID або відбитка, щоб продовжити.", "lock.unlock": "Розблокувати", "lock.signout": "Натомість вийти", "login.bio_hint": "Доступно після першого входу на цьому пристрої.", "lock.need_bio": "Face ID / відбиток недоступні на цьому пристрої — виконано вихід.",
       "tab.home": "Головна", "tab.more": "Більше", "login.title": "Керівник проєкту", "login.password": "Пароль", "login.signin": "Увійти", "login.bio": "Розблокувати Face ID / відбитком",
@@ -214,6 +218,7 @@ window.I18N = (() => {
       "hrs.pending_hr": "очікує HR", "hrs.approved": "погоджено", "hrs.rejected": "відхилено", "hrs.cancelled": "скасовано",
     },
     bg: {
+      "sub.offers": "Оферти", "sub.offer_sent": "изпратена", "sub.offer_created": "създадена", "sub.offer_valid": "валидна до", "more.discard": "Отхвърли",
       "login.passkey": "Вход с Face ID / passkey", "pk.title": "Passkeys", "pk.hint": "Вход с Face ID / отпечатък вместо парола и код — и след излизане. Добавете устройството веднъж; премахнете го тук при загуба.", "pk.add": "Добави това устройство", "pk.name": "Име на устройството", "pk.code": "Код от приложението", "pk.added": "Passkey е добавен", "pk.failed": "Passkey не успя", "pk.remove": "Премахни", "pk.none": "Все още няма passkey.", "pk.unsupported": "Passkeys не са налични в това приложение на това устройство.",
       "more.lock": "Заключи приложението", "lock.title": "Заключено", "lock.lede": "Отключете с Face ID, Touch ID или отпечатък, за да продължите.", "lock.unlock": "Отключи", "lock.signout": "Вместо това излез", "login.bio_hint": "Налично след първото влизане на това устройство.", "lock.need_bio": "Face ID / отпечатък не е наличен на това устройство — приложението излезе.",
       "tab.home": "Начало", "tab.more": "Още", "login.title": "Ръководител проект", "login.password": "Парола", "login.signin": "Вход", "login.bio": "Отключване с Face ID / пръстов отпечатък",
