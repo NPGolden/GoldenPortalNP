@@ -29,7 +29,7 @@ A WebAuthn credential (public key) stored per account in `webauthn_credentials`;
 
 ## 3. Residual risks and open points
 
-1. **Native store builds (Capacitor shells, R70-001).** WKWebView / Android WebView do not expose WebAuthn; the apps hide the button when `navigator.credentials.get` is absent, and the R70-005 Lock stays the way in. Closing it needs a native passkey plug-in (`@capacitor-firebase/authentication` is not suitable; a FIDO2 plug-in with the same JSON contract) and associated-domain files (`/.well-known/apple-app-site-association`, `assetlinks.json`) so the native passkey is bound to `goldensas.com`. Planned as R71-002.
+1. **Native store builds (Capacitor shells, R70-001).** WKWebView / Android WebView do not expose WebAuthn; the apps hide the button when `navigator.credentials.get` is absent, and the R70-005 Lock stays the way in. Closing it needs a native passkey plug-in (`@capacitor-firebase/authentication` is not suitable; a FIDO2 plug-in with the same JSON contract) and associated-domain files (`/.well-known/apple-app-site-association`, `assetlinks.json`) so the native passkey is bound to `goldensas.com`. Planned as R71-003.
 2. **Synced passkeys** (iCloud Keychain / Google Password Manager, flag `backup_eligible` shown as ☁) follow the person's Apple / Google account: a compromised Apple ID would carry the passkey. Acceptable for staff and customers at the current risk level; the administrator can forbid synced passkeys later by refusing `BE` flag credentials if needed (one line in `pk_register_finish`).
 3. **Signature counter** is zero on most platform authenticators (Apple), so T3 only protects hardware keys that report it. Known WebAuthn limitation.
 4. **Sandbox origins** `http://localhost` / `http://127.0.0.1` are accepted only when the request's own host is one of them — never on the live host.
@@ -47,4 +47,4 @@ A WebAuthn credential (public key) stored per account in `webauthn_credentials`;
 
 ## 5. Verdict
 
-Approved for release 1.80.0. Re-review when R71-002 (native plug-in) lands or if synced passkeys are to be refused.
+Approved for release 1.80.0. Re-review when R71-003 (native plug-in) lands or if synced passkeys are to be refused.

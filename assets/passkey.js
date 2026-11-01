@@ -16,11 +16,12 @@
   function say(el, msg, bad) { if (!el) return; el.textContent = msg || ''; el.hidden = !msg; el.className = 'flash flash--' + (bad ? 'bad' : 'good'); }
 
   /* ---- login page ---- */
-  var lb = document.getElementById('pk-login');
+  var lb = document.getElementById('pk-login'), condAbort = null;   // the conditional (autofill) request must be aborted before a button request — browsers allow one at a time
   if (lb) {
     if (!supported()) { lb.hidden = true; }
     lb.addEventListener('click', function () {
       var msg = document.getElementById('pk-msg'); lb.disabled = true; say(msg, lb.getAttribute('data-wait'));
+      if (condAbort) { try { condAbort.abort(); } catch (e) {} condAbort = null; }
       api({ op: 'login_options' }).then(function (j) {
         if (!j.ok) throw new Error(j.error);
         var o = j.options; o.challenge = b64u.dec(o.challenge); o.allowCredentials = [];
@@ -34,8 +35,8 @@
     if (supported() && em && window.PublicKeyCredential.isConditionalMediationAvailable) {
       PublicKeyCredential.isConditionalMediationAvailable().then(function (ok) {
         if (!ok) return; em.setAttribute('autocomplete', 'username webauthn');
-        api({ op: 'login_options' }).then(function (j) { if (!j.ok) return; var o = j.options; o.challenge = b64u.dec(o.challenge); o.allowCredentials = [];
-          return navigator.credentials.get({ publicKey: o, mediation: 'conditional' }).then(function (cred) { return api({ op: 'login', credential: toJSON(cred) }); }).then(function (r) { if (r && r.ok) location.href = r.redirect; }); }).catch(function () {});
+        api({ op: 'login_options' }).then(function (j) { if (!j.ok) return; var o = j.options; o.challenge = b64u.dec(o.challenge); o.allowCredentials = []; condAbort = new AbortController();
+          return navigator.credentials.get({ publicKey: o, mediation: 'conditional', signal: condAbort.signal }).then(function (cred) { condAbort = null; return api({ op: 'login', credential: toJSON(cred) }); }).then(function (r) { if (r && r.ok) location.href = r.redirect; }); }).catch(function () { condAbort = null; });
       }).catch(function () {});
     }
   }
