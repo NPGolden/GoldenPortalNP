@@ -81,9 +81,11 @@ jobs:
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" App/Info.plist || true
           sed "s/__TEAM_ID__/$TEAM/; s/__APP_ID__/$APPID/; s/__PROFILE_NAME__/$PROFILE/" ../../ExportOptions.plist > ExportOptions.plist
           if [ -d App.xcworkspace ]; then X="-workspace App.xcworkspace"; else X="-project App.xcodeproj"; fi   # Capacitor 8 templates use SPM (no CocoaPods workspace)
-          xcodebuild $X -scheme App -configuration Release -destination 'generic/platform=iOS' -archivePath build/App.xcarchive archive -allowProvisioningUpdates=NO \
-            CODE_SIGN_STYLE=Manual DEVELOPMENT_TEAM="$TEAM" PRODUCT_BUNDLE_IDENTIFIER="$APPID" PROVISIONING_PROFILE_SPECIFIER="$PROFILE" CODE_SIGN_IDENTITY="Apple Distribution" \
-            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="${{ github.run_number }}" -quiet
+          # manual signing written into the App target only — command-line overrides would also hit the Swift packages, which refuse a provisioning profile
+          P=App.xcodeproj/project.pbxproj
+          sed -i '' "s/CODE_SIGN_STYLE = Automatic;/CODE_SIGN_STYLE = Manual;/g; s/PRODUCT_BUNDLE_IDENTIFIER = [^;]*;/PRODUCT_BUNDLE_IDENTIFIER = $APPID; DEVELOPMENT_TEAM = $TEAM; PROVISIONING_PROFILE_SPECIFIER = \"$PROFILE\"; CODE_SIGN_IDENTITY = \"Apple Distribution\"; MARKETING_VERSION = $VERSION; CURRENT_PROJECT_VERSION = ${{ github.run_number }};/g" "$P"
+          grep -c "PROVISIONING_PROFILE_SPECIFIER" "$P"
+          xcodebuild $X -scheme App -configuration Release -destination 'generic/platform=iOS' -archivePath build/App.xcarchive archive -quiet
           xcodebuild -exportArchive -archivePath build/App.xcarchive -exportOptionsPlist ExportOptions.plist -exportPath build/export -quiet
           ls -la build/export; cp build/export/*.ipa "../../$APPID-$VERSION-${{ github.run_number }}.ipa"
       - uses: actions/upload-artifact@v4
