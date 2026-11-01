@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.80.7';
+const CP_VERSION = '1.80.8';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R72-004', 'version' => '1.80.8', 'date' => '2026-11-01', 'title' => 'Golden PM 1.0.6: the offers of a sub-project show the net amount (excl. VAT) so the PM has the figure at hand when talking to the customer — decision of 01/11/2026 relaxing the "no money in the PM app" rule for offers only; VAT, totals, costs and budgets in money stay in the portal.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R72-003', 'version' => '1.80.7', 'date' => '2026-11-01', 'title' => 'Store builds: "Add this device" / passkey sign-in in the installed apps failed with "requestJson is required" — the native passkey plug-in takes the options as a JSON string (its JavaScript wrapper is not loaded by the shells); the three clients now call it that way (Service 0.6.7, Golden PM 1.0.5, Customer 1.0.4).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R72-002', 'version' => '1.80.6', 'date' => '2026-11-01', 'title' => 'Golden PM 1.0.4 / Service 0.6.6: a message to HR sent from the app by someone who holds the HR or owner role was refused ("Not found") because the portal treated it as HR writing to a person — it now goes to the sender\'s own thread; queued HR operations show their text instead of raw data, and a rejected one shows the reason with a Discard button. Golden PM: the project search filters the list in place (the full re-render under a moving finger opened the first project by itself). Golden PM: Offers of the sub-project with number, revision, title, status, sent / valid-until dates and who decided — no amounts.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R72-001', 'version' => '1.80.5', 'date' => '2026-11-01', 'title' => 'Public privacy policy page (?p=privacy, no sign-in) for the portal and the three mobile apps — required by Google Play and the App Store; house style, English.', 'db' => null, 'check' => null],

@@ -83,10 +83,10 @@ final class PortalPM {
     }
 
     /* ------------------------------------------------------------------ §3 sub-project detail */
-    /** Offers of a sub-project (plus the project's offers without a sub-project): number, revision, title, status with its label and tone, dates — no money. */
+    /** Offers of a sub-project (plus the project's offers without a sub-project): number, revision, title, status with its label and tone, dates and the net amount (R72-004). */
     public static function offers(int $pid, int $sid): array {
-        try { $rows = all('SELECT id, offer_no, revision, title, status, sent_at, valid_until, status_at, decided_name, created_at FROM offers WHERE project_id = ? AND (subproject_id = ? OR subproject_id IS NULL) ORDER BY created_at DESC LIMIT 50', [$pid, $sid]); } catch (Throwable $e) { return []; }
-        return array_map(fn($o) => ['id' => (int)$o['id'], 'offer_no' => (string)$o['offer_no'], 'revision' => (string)($o['revision'] ?? ''), 'title' => (string)$o['title'], 'status' => (string)$o['status'],
+        try { $rows = all('SELECT id, offer_no, revision, title, status, amount, currency, sent_at, valid_until, status_at, decided_name, created_at FROM offers WHERE project_id = ? AND (subproject_id = ? OR subproject_id IS NULL) ORDER BY created_at DESC LIMIT 50', [$pid, $sid]); } catch (Throwable $e) { return []; }
+        return array_map(fn($o) => ['id' => (int)$o['id'], 'offer_no' => (string)$o['offer_no'], 'revision' => (string)($o['revision'] ?? ''), 'title' => (string)$o['title'], 'status' => (string)$o['status'], 'amount' => $o['amount'] !== null ? round((float)$o['amount'], 2) : null, 'currency' => (string)($o['currency'] ?: 'EUR'),   // R72-004: the net amount is shown to the PM (decision of 01/11/2026); VAT and totals stay in the portal
             'status_label' => function_exists('of_status_label') ? of_status_label((string)$o['status']) : (string)$o['status'], 'tone' => function_exists('of_status_tone') ? of_status_tone((string)$o['status']) : 'mute',
             'sent_at' => $o['sent_at'], 'valid_until' => $o['valid_until'], 'status_at' => $o['status_at'], 'decided_name' => $o['decided_name'], 'created_at' => $o['created_at']], $rows);
     }

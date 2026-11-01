@@ -947,3 +947,6 @@ No SQL. `hr3.php hr_message_send_from_post()`: `$_POST['as_employee']` forces th
 
 ## 173. v1.80.7 — Native passkey call shape (GAS-CP-R72-003)
 No SQL. `@capgo/capacitor-passkey` native methods (`CapacitorPasskeyPlugin.java` / `.swift`) read `call.getString("requestJson")` and `origin`; the `{ publicKey }` shape belongs to the JS wrapper (`dist/esm/webauthn.js createNativeRequest`) which a server.url shell never loads. Clients: `n.createCredential({ requestJson: JSON.stringify(options), origin })`, `n.getCredential({ requestJson: JSON.stringify({ ...options, allowCredentials: [] }), origin })`; the native result is already the WebAuthn JSON shape the API verifies. Browser path re-tested headless.
+
+## 174. v1.80.8 — Offer amounts in Golden PM (GAS-CP-R72-004)
+No SQL. `PortalPM::offers()` adds `amount` (net, 2 dp) and `currency`; the payload is deliberately not passed through `Response::noMoney()`. Screen: `Intl.NumberFormat("el-GR", currency)` with `sub.offer_net` ×5. Security note: the PM app now carries offer net amounts for every signed-in PM-app user (PMs, managers, approvers, admins) — the same people who open the offer in the portal; no VAT / gross / cost figures. Recorded as a conscious exception to the R66-001 rule.
