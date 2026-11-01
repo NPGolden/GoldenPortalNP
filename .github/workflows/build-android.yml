@@ -51,6 +51,8 @@ jobs:
           set -e; npx cap add android
           SPLASH="${{ steps.prep.outputs.splash }}" npx @capacitor/assets generate --android --iconBackgroundColor '#FFFFFF' --iconBackgroundColorDark '#1F3A5F' --splashBackgroundColor "$SPLASH" --splashBackgroundColorDark "$SPLASH" || echo "assets: default icons kept"
           npx cap sync android
+          # safety net: without the adaptive layers the v26 launcher XML would not link — fall back to the legacy icons
+          [ -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_background.png ] || [ -f android/app/src/main/res/values/ic_launcher_background.xml ] || { echo "adaptive icon layers missing — legacy icons only"; rm -rf android/app/src/main/res/mipmap-anydpi-v26; }
       - name: Version, signing and push configuration
         env:
           KS_B64: ${{ secrets.ANDROID_KEYSTORE_B64 }}

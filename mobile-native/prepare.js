@@ -27,6 +27,9 @@ fs.copyFileSync(icon, path.join(__dirname, "assets", "icon-only.png")); fs.copyF
 // splash = icon centred on the brand colour (2732 × 2732, Capacitor's recommended size)
 (async () => { try { const sharp = require("sharp"); const logo = await sharp(icon).resize(760, 760).png().toBuffer();
   for (const name of ["splash.png", "splash-dark.png"]) await sharp({ create: { width: 2732, height: 2732, channels: 4, background: a.splash } }).composite([{ input: logo, gravity: "centre" }]).png().toFile(path.join(__dirname, "assets", name));
+  // Android adaptive icon: @capacitor/assets writes the foreground / background layers only when both source files exist (white background, logo inset for the safe zone)
+  await sharp({ create: { width: 1024, height: 1024, channels: 4, background: "#FFFFFF" } }).png().toFile(path.join(__dirname, "assets", "icon-background.png"));
+  await sharp({ create: { width: 1024, height: 1024, channels: 4, background: { r: 0, g: 0, b: 0, alpha: 0 } } }).composite([{ input: await sharp(icon).resize(680, 680).png().toBuffer(), gravity: "centre" }]).png().toFile(path.join(__dirname, "assets", "icon-foreground.png"));
   console.log("splash: icon centred on", a.splash); } catch (e) { fs.writeFileSync(path.join(__dirname, "assets", "splash.svg"), `<svg xmlns="http://www.w3.org/2000/svg" width="2732" height="2732"><rect width="2732" height="2732" fill="${a.splash}"/></svg>`); console.log("splash: plain colour (" + e.message + ")"); } })();
 const vf = fs.readFileSync(path.join(src, a.pwaVersionFile), "utf8"); const m = vf.match(/VERSION\s*=\s*["']([0-9.]+)["']/) || vf.match(/version["']?\s*[:=]\s*["']([0-9.]+)["']/i);
 const version = m ? m[1] : "1.0.0";
