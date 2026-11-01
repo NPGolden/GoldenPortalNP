@@ -46,3 +46,4 @@ Dependencies: Capacitor 8.6 (Node 22, Java 21, Xcode 16); `npm audit` clean with
 - The Apple actions take the `.p8` **text**; the workflow decodes `ASC_KEY_P8_B64` first.
 - Git Bash on Windows: prefix `openssl req … -subj "/CN=…"` with `MSYS_NO_PATHCONV=1`, otherwise the leading slash becomes a Windows path.
 - First TestFlight build asks the export-compliance question once (answer No: standard HTTPS only).
+- ITMS-90683 (missing purpose string): the camera plug-in references the photo library / camera APIs, so the workflow writes NSCameraUsageDescription, NSPhotoLibraryUsageDescription, NSPhotoLibraryAddUsageDescription and NSFaceIDUsageDescription into Info.plist, plus ITSAppUsesNonExemptEncryption = NO. Apple's processing rejections go by e-mail to the TestFlight tester / account holder, not into the build log — the `App Store Connect status` workflow shows whether a build survived processing.
