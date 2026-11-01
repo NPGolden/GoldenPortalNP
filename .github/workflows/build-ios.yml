@@ -33,7 +33,7 @@ on:
 concurrency: { group: "ios-${{ github.event.inputs.app }}", cancel-in-progress: false }
 jobs:
   ios:
-    runs-on: macos-14
+    runs-on: macos-15   # Xcode 16 — required by Capacitor 8
     defaults: { run: { working-directory: mobile-native } }
     steps:
       - uses: actions/checkout@v4
