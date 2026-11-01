@@ -935,3 +935,6 @@ No SQL. `mobile-native/package.json`: Capacitor 8.6.0 (+ plug-ins 8.x, @capacito
 
 ## 169. v1.80.3 — Passkey button inside the login card (GAS-CP-R71-004)
 No SQL. `views/login.php`: the `.pk-login` block (divider, button, message, script) moved inside `form.gate-card` (the form *is* the white card); `btn--ghost` = navy text, readable only on the card. **Rule (Nikos):** every new element is checked against the palette and the stored styles on the background it actually sits on — screenshot the page (light and dark theme where the page has one) before release; the login page is always the light card on the navy gate.
+
+## 170. v1.80.4 — Android SHA-256 field vs. Sucuri (GAS-CP-R71-005)
+No SQL. Sucuri virtual patching blocked `POST p=admin_log` with the `AA:BB:…` fingerprints (block reason "Exploit attempt denied by virtual patching"). `views/admin_log.php`: visible input `#pk-sha-view` (no name) + hidden `passkey_android_sha256_enc`; a nonce'd submit handler strips everything but hex and commas and base64-encodes it. `sec_save`: decodes, splits on commas, keeps 64-hex values, stores upper-case colon-separated. Rule: never POST long hex / colon-hex strings in clear through the WAF — encode them.

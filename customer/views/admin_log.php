@@ -85,11 +85,12 @@ layout_head(t('ll.title'), 'admin_log');
         <label class="chk"><input type="checkbox" name="bind_ua" value="1"<?= sec_cfg('sec_bind_ua') ? ' checked' : '' ?>> <?= tt('sec.bind_ua') ?></label>
         <label class="chk"><input type="checkbox" name="bind_ip" value="1"<?= sec_cfg('sec_bind_ip') ? ' checked' : '' ?>> <?= tt('sec.bind_ip') ?></label><p class="hint"><?= tt('sec.binding_hint') ?></p></div>
       <div class="field"><label><?= tt('sec.csp') ?></label><select name="csp" data-nosearch><?php foreach (['on', 'report', 'off'] as $cm): ?><option value="<?= $cm ?>"<?= sec_csp_mode() === $cm ? ' selected' : '' ?>><?= tt('sec.csp_' . $cm) ?></option><?php endforeach; ?></select><p class="hint"><?= tt('sec.csp_hint') ?></p></div>
-      <div class="field"><label><?= tt('pk.android_sha') ?></label><input name="passkey_android_sha256" value="<?= e((string) cp_setting('sec_passkey_android_sha256', '')) ?>" placeholder="AA:BB:…"><p class="hint"><?= tt('pk.android_sha_hint') ?></p></div>
+      <div class="field"><label><?= tt('pk.android_sha') ?></label><input id="pk-sha-view" value="<?= e((string) cp_setting('sec_passkey_android_sha256', '')) ?>" placeholder="AA:BB:…"><input type="hidden" name="passkey_android_sha256_enc" id="pk-sha-enc"><p class="hint"><?= tt('pk.android_sha_hint') ?></p></div>
       <div class="field"><label><?= tt('pk.title') ?></label><label class="chk"><input type="checkbox" name="passkeys" value="1"<?= function_exists('pk_enabled') && cp_setting('sec_passkeys', '1') === '1' ? ' checked' : '' ?>> <?= tt('pk.allow') ?></label><p class="hint"><?= tt('pk.allow_hint') ?></p></div>
       <div class="field"><label><?= tt('sec.close') ?></label><label class="chk"><input type="checkbox" name="close_signout" value="1"<?= sec_cfg('sec_close_signout') ? ' checked' : '' ?>> <?= tt('sec.close_signout') ?></label><p class="hint"><?= tt('sec.close_hint') ?></p></div>
     </div>
     <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit"><?= tt('btn.save') ?></button><span class="hint"><?= tt('sec.save_hint') ?></span></div>
+  <script nonce="<?= csp_nonce() ?>">(function(){var f=document.getElementById('pk-sha-enc');if(!f)return;f.form.addEventListener('submit',function(){var v=(document.getElementById('pk-sha-view').value||'').replace(/[^0-9A-Fa-f,]/g,'');f.value=btoa(v);});})();</script>
   </form>
 </div>
 <?php if (function_exists('pk_has') && pk_has()): $allPk = all('SELECT w.id, w.name, w.created_at, w.last_used_at, w.backup_eligible, cu.full_name, cu.email FROM webauthn_credentials w JOIN customer_users cu ON cu.id = w.user_id ORDER BY cu.full_name, w.created_at'); ?>

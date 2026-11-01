@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.80.3** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.80.4** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.80.4 | GAS-CP-R71-005 | 2026-11-01 | Settings › Login history: saving the Android app-signing SHA-256 was blocked by the website firewall (a long hex string in a POST looks like an exploit) — the form now sends it encoded and the portal normalises it (colons optional, upper-case, 64 hex digits each). | — |
 | 1.80.3 | GAS-CP-R71-004 | 2026-11-01 | Login page: "Sign in with a passkey" was rendered outside the white card, navy on the navy backdrop — invisible; it now sits inside the card under Sign in, with the house secondary-button style. | — |
 | 1.80.2 | GAS-CP-R71-003 | 2026-11-01 | Native passkeys for the store builds: the Capacitor shells move to Capacitor 8 with the @capgo/capacitor-passkey plug-in (same relying party goldensas.com, so a passkey made in Safari / Chrome works in the app and vice versa); the three clients use the native API when present (Service 0.6.5, Golden PM 1.0.3, Customer 1.0.3); one-time setup: mobile-native/wellknown.js writes the apple-app-site-association and assetlinks.json files for public_html/.well-known/, and Settings › Login history › "Android app signing SHA-256" lets the portal accept the Android app origin. npm audit of the shells: 0 vulnerabilities (was 17). Diagnostics: vessels already folded into a master are no longer reported as duplicates, and the remedy names Settings › Vessel duplicates. | — |
 | 1.80.1 | GAS-CP-R71-002 | 2026-11-01 | Passkeys: the "Sign in with a passkey" button failed with the browser message "A request is already pending" because the silent autofill request of the login page was still open — the button now cancels it first (AbortController), then asks for the passkey. | — |
