@@ -938,3 +938,6 @@ No SQL. `views/login.php`: the `.pk-login` block (divider, button, message, scri
 
 ## 170. v1.80.4 — Android SHA-256 field vs. Sucuri (GAS-CP-R71-005)
 No SQL. Sucuri virtual patching blocked `POST p=admin_log` with the `AA:BB:…` fingerprints (block reason "Exploit attempt denied by virtual patching"). `views/admin_log.php`: visible input `#pk-sha-view` (no name) + hidden `passkey_android_sha256_enc`; a nonce'd submit handler strips everything but hex and commas and base64-encodes it. `sec_save`: decodes, splits on commas, keeps 64-hex values, stores upper-case colon-separated. Rule: never POST long hex / colon-hex strings in clear through the WAF — encode them.
+
+## 171. v1.80.5 — Public privacy policy (GAS-CP-R72-001)
+No SQL. `views/privacy.php` (standalone page, portal.css, logo), `index.php`: `privacy` in `$public` (exempt from the signed-in → dashboard redirect) and in `$views`. URL for the store listings: https://goldensas.com/customer/index.php?p=privacy. Store kit (feature graphics 1024×500, icon 512, listing text, App-content answers) in `/outputs/play-listing/` — not in the repo. Update the page's date and §2 whenever the apps collect something new.
