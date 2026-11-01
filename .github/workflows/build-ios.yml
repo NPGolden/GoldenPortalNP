@@ -84,6 +84,13 @@ jobs:
           set -e; cd ios/App
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" App/Info.plist || true
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" App/Info.plist || true
+          # purpose strings (ITMS-90683): the camera plug-in references the photo library and camera APIs; Face ID for the lock / passkeys; export compliance: standard HTTPS only
+          for kv in "NSCameraUsageDescription=The camera is used to attach photos of equipment, panels and documents to reports, tickets and posts." \
+                    "NSPhotoLibraryUsageDescription=Photos from your library can be attached to reports, tickets and posts; nothing else is read." \
+                    "NSPhotoLibraryAddUsageDescription=Photos you take in the app can be saved to your library." \
+                    "NSFaceIDUsageDescription=Face ID unlocks the app and signs you in with your passkey." \
+                    "ITSAppUsesNonExemptEncryption=NO"; do k="${kv%%=*}"; v="${kv#*=}"; /usr/libexec/PlistBuddy -c "Delete :$k" App/Info.plist 2>/dev/null || true; if [ "$k" = ITSAppUsesNonExemptEncryption ]; then /usr/libexec/PlistBuddy -c "Add :$k bool false" App/Info.plist; else /usr/libexec/PlistBuddy -c "Add :$k string $v" App/Info.plist; fi; done
+          /usr/libexec/PlistBuddy -c "Print" App/Info.plist | grep -E "UsageDescription|NonExempt"
           sed "s/__TEAM_ID__/$TEAM/; s/__APP_ID__/$APPID/; s/__PROFILE_NAME__/$PROFILE/" ../../ExportOptions.plist > ExportOptions.plist
           if [ -d App.xcworkspace ]; then X="-workspace App.xcworkspace"; else X="-project App.xcodeproj"; fi   # Capacitor 8 templates use SPM (no CocoaPods workspace)
           # manual signing written into the App target only — command-line overrides would also hit the Swift packages, which refuse a provisioning profile
