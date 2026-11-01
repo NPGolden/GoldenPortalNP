@@ -2,7 +2,7 @@
  * and a MOCK mode (built-in sample data in the same shape the portal returns) for the demo and the UI tests.
  * Mock mode: localStorage gas.mock = "1", or ?mock=1 on the URL. */
 window.API = (() => {
-  const VERSION = "0.6.6";
+  const VERSION = "0.6.7";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   try { MOCK = localStorage.getItem("gas.mock") === "1" || /[?&]mock=1/.test(location.search); if (/[?&]mock=1/.test(location.search)) localStorage.setItem("gas.mock", "1"); } catch (e) {}
@@ -48,12 +48,12 @@ window.API = (() => {
     get passkeyCapable() { return !MOCK && (!!pkNative() || !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.get)); },
     async passkeyLogin() {
       const o = await call("POST", "/auth/passkey/options", {}); const n = pkNative(); let cred;
-      if (n) { cred = await n.getCredential({ publicKey: { ...o.options, allowCredentials: [] }, origin: "https://goldensas.com" }); }
+      if (n) { cred = await n.getCredential({ requestJson: JSON.stringify({ ...o.options, allowCredentials: [] }), origin: "https://goldensas.com" }); }   // native plug-in contract: requestJson string (the JS wrapper that builds it is not loaded in a server.url shell) }
       else { const pk = o.options; pk.challenge = pkB64.dec(pk.challenge); pk.allowCredentials = []; cred = pkToJSON(await navigator.credentials.get({ publicKey: pk })); }
       const r = await call("POST", "/auth/passkey/login", { challenge_id: o.challenge_id, credential: cred, device: deviceInfo() }); tok.access = r.access_token; tok.refresh = r.refresh_token; return r; },
     async passkeyRegister(name, totp) {
       const o = await call("POST", "/me/passkeys/options", { totp: totp || undefined }); const n = pkNative(); let cred;
-      if (n) { cred = await n.createCredential({ publicKey: o.options, origin: "https://goldensas.com" }); }
+      if (n) { cred = await n.createCredential({ requestJson: JSON.stringify(o.options), origin: "https://goldensas.com" }); }
       else { const pk = o.options; pk.challenge = pkB64.dec(pk.challenge); pk.user.id = pkB64.dec(pk.user.id); pk.excludeCredentials = (pk.excludeCredentials || []).map((c) => ({ type: c.type, id: pkB64.dec(c.id) })); cred = pkToJSON(await navigator.credentials.create({ publicKey: pk })); }
       return call("POST", "/me/passkeys", { challenge_id: o.challenge_id, credential: cred, name }); },
     passkeys: () => call("GET", "/me/passkeys"), passkeyRemove: (id) => call("DELETE", `/me/passkeys/${id}`),

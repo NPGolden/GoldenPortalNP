@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.80.6** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.80.7** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.80.7 | GAS-CP-R72-003 | 2026-11-01 | Store builds: "Add this device" / passkey sign-in in the installed apps failed with "requestJson is required" — the native passkey plug-in takes the options as a JSON string (its JavaScript wrapper is not loaded by the shells); the three clients now call it that way (Service 0.6.7, Golden PM 1.0.5, Customer 1.0.4). | — |
 | 1.80.6 | GAS-CP-R72-002 | 2026-11-01 | Golden PM 1.0.4 / Service 0.6.6: a message to HR sent from the app by someone who holds the HR or owner role was refused ("Not found") because the portal treated it as HR writing to a person — it now goes to the sender's own thread; queued HR operations show their text instead of raw data, and a rejected one shows the reason with a Discard button. Golden PM: the project search filters the list in place (the full re-render under a moving finger opened the first project by itself). Golden PM: Offers of the sub-project with number, revision, title, status, sent / valid-until dates and who decided — no amounts. | — |
 | 1.80.5 | GAS-CP-R72-001 | 2026-11-01 | Public privacy policy page (?p=privacy, no sign-in) for the portal and the three mobile apps — required by Google Play and the App Store; house style, English. | — |
 | 1.80.4 | GAS-CP-R71-005 | 2026-11-01 | Settings › Login history: saving the Android app-signing SHA-256 was blocked by the website firewall (a long hex string in a POST looks like an exploit) — the form now sends it encoded and the portal normalises it (colons optional, upper-case, 64 hex digits each). | — |
