@@ -1,0 +1,35 @@
+# App Store Connect status probe — lists the builds App Store Connect holds for an app and their processing state.   GAS-CP-R71-003
+#   Run workflow → app. Uses the same ASC API key as the iOS build. Read-only.
+name: App Store Connect status
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'Which app'
+        type: choice
+        options: [engineer, pm, customer]
+        default: pm
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: mobile-native } }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Query App Store Connect
+        env: { KID: "${{ secrets.ASC_KEY_ID }}", ISS: "${{ secrets.ASC_ISSUER_ID }}", K: "${{ secrets.ASC_KEY_P8_B64 }}", APP: "${{ github.event.inputs.app }}" }
+        run: |
+          set -e; pip -q install pyjwt cryptography requests >/dev/null
+          echo "$K" | base64 -d > "$RUNNER_TEMP/AuthKey.p8"
+          python3 - <<'PY'
+          import os, time, jwt, requests, json
+          bid = json.load(open("apps.json"))[os.environ["APP"]]["appId"]
+          tok = jwt.encode({"iss": os.environ["ISS"], "iat": int(time.time()), "exp": int(time.time()) + 600, "aud": "appstoreconnect-v1"}, open(os.environ["RUNNER_TEMP"] + "/AuthKey.p8").read(), algorithm="ES256", headers={"kid": os.environ["KID"]})
+          H = {"Authorization": "Bearer " + tok}; B = "https://api.appstoreconnect.apple.com/v1"
+          apps = requests.get(B + "/apps", params={"filter[bundleId]": bid}, headers=H).json().get("data", [])
+          print("app records for", bid, ":", [(a["id"], a["attributes"]["name"], a["attributes"]["sku"]) for a in apps])
+          for a in apps:
+              b = requests.get(B + "/builds", params={"filter[app]": a["id"], "sort": "-uploadedDate", "limit": 10, "fields[builds]": "version,uploadedDate,processingState,expired,minOsVersion"}, headers=H).json()
+              print("builds:", json.dumps([x["attributes"] for x in b.get("data", [])], indent=1) if b.get("data") else "NONE", b.get("errors", ""))
+              pv = requests.get(B + "/apps/" + a["id"] + "/preReleaseVersions", headers=H).json()
+              print("pre-release versions:", [x["attributes"] for x in pv.get("data", [])])
+          PY
