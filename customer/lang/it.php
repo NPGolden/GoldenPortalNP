@@ -6245,4 +6245,11 @@ Cordiali saluti,
 // ---- GAS-CP-R70-002 community photo on every post
 'soc.photo_optional' => '(facoltativa)',
 'soc.photo_too_big' => 'La foto supera il limite del server — ridimensionala sotto i 12 MB.',
+// ---- GAS-CP-R70-004 world clocks per user
+'clk.my_title' => 'Orologi mondiali',
+'clk.my_hint' => 'Scegli fino a {n} località per la barra degli orologi in cima a ogni pagina. UTC è sempre il primo.',
+'clk.utc_fixed' => 'UTC è sempre il primo',
+'clk.reset' => 'Torna al set aziendale',
+'clk.saved' => 'Orologi salvati.',
+'clk.too_many' => 'Scegli al massimo {n} località.',
 ];

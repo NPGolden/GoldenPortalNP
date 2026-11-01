@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.79.7';
+const CP_VERSION = '1.79.8';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R70-004', 'version' => '1.79.8', 'date' => '2026-11-01', 'title' => 'World clocks per user: My Account › World clocks — tick up to 7 zones from a catalogue of 34 yachting and business places (Monaco, Barcelona, Split, Tivat, Fort Lauderdale, Singapore …); UTC is always first for everybody; Reset returns to the company set. Fix: the HR requests page died at the bottom (training applications box called two functions that did not exist), which also left the clock strip at --:-- and the pickers dead on that page. Fix: the monthly KPI snapshot (first page of each month) broke after the first project with a KPI drop (a variable clash) and took the dashboard down for the first visitor of the month; it now resumes project by project and completes.', 'db' => 'install/migrate_cp_r70_clocks.sql', 'check' => 'r70d'],
         ['ref' => 'GAS-CP-R70-003', 'version' => '1.79.7', 'date' => '2026-11-01', 'title' => 'Community: @mentions in post comments and post bodies — type @ and pick a colleague (same picker as notes and ticket comments), the handle is highlighted in the thread and the colleague is notified ("… mentioned you in Community · <post>"); the post author still receives the usual comment notice.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R70-002', 'version' => '1.79.6', 'date' => '2026-11-01', 'title' => 'Community: the kind selector and the photo field work again — four inline scripts (Community compose, Targets scope ×2, Training target) carried no Content-Security-Policy nonce and were blocked by the browser, so the photo field never appeared and the scope / target selectors did not switch. A photo (jpg / png / webp up to 12 MB) can now accompany any post or poll, not only the photo kind; an oversized upload says so instead of "choose a photo".', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R70-001', 'version' => '1.79.5', 'date' => '2026-10-31', 'title' => 'Store builds from GitHub: Actions › Build Android app (signed App Bundle → artifact → Play Console track) and Build iOS app (macOS runner, archive → IPA → TestFlight) for the three apps from mobile-native/ (Capacitor shells of customer/mobile, mobile-pm, mobile-customer; icons and splash generated from the clients\' icons; setup of the Apple / Google accounts and secrets in mobile-native/README.md). The three app folders answer at their short URL (DirectoryIndex).', 'db' => null, 'check' => null],
@@ -266,6 +267,7 @@ function cp_migration_state(): array {
         'r61' => $has("SHOW TABLES LIKE 'hr_leave_periods'") && $has("SHOW COLUMNS FROM hr_requests LIKE 'period_id'"),
         'r63' => $has("SHOW TABLES LIKE 'soc_kudos'") && $has("SHOW TABLES LIKE 'soc_onboard'"),
         'r64' => $has("SHOW TABLES LIKE 'hr_targets'") && $has("SHOW TABLES LIKE 'hr_target_log'"),
+        'r70d' => $has("SHOW COLUMNS FROM customer_users LIKE 'clocks'"),
         'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),
         'r67' => $has("SHOW TABLES LIKE 'hr_flows'") && $has("SHOW TABLES LIKE 'hr_flow_templates'") && $has("SHOW TABLES LIKE 'hr_invitations'"),
         'r62' => $has("SHOW TABLES LIKE 'hr_trainings'") && $has("SHOW TABLES LIKE 'hr_evaluations'") && $has("SHOW COLUMNS FROM hr_people LIKE 'gross_salary'") && $has("SHOW COLUMNS FROM hr_leave_periods LIKE 'mandatory'"),

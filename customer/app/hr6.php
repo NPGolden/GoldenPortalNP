@@ -63,6 +63,19 @@ function hr_training_apply(array $p, int $id): void {
     q('INSERT INTO hr_training_members (training_id, person_id, status, applied_at, note) VALUES (?,?,?,NOW(),?) ON DUPLICATE KEY UPDATE status = "applied", applied_at = NOW(), note = VALUES(note), decided_by = NULL, decided_at = NULL', [$id, (int)$p['id'], 'applied', mb_substr(trim((string)($_POST['note'] ?? '')), 0, 300) ?: null]);
     if (function_exists('nf_push')) { $to = array_values(array_filter(array_merge(hr_hr_user_ids(), [(int)(hr_manager_of($p) ?? 0)]))); nf_push($to, 'hrt:applied', 'hrt:' . $id . ':' . (int)$p['id'], t('hr.nf_tr_applied', ['u' => $p['name_en'], 't' => $tr['title']]), null, url('hr_training', ['id' => $id]), (int)(current_user()['id'] ?? 0) ?: null, (string)(current_user()['full_name'] ?? '')); }
 }
+/** R70-004: the people a manager answers for (discipline manager, department head or account manager). */
+function hr_team_of(int $uid): array {
+    if ($uid <= 0 || !hr2_has()) return [];
+    return array_values(array_filter(hr_people(), fn($p) => hr_manager_of($p) === $uid));
+}
+/** Training applications waiting for a decision — all of them for HR, the manager's own people otherwise (name_en, title, kind, date_from, note, applied_at). */
+function hr_training_queue(): array {
+    if (!hr_tr_has()) return [];
+    $rows = all('SELECT m.id, m.training_id, m.person_id, m.note, m.applied_at, p.name_en, tr.title, tr.kind, tr.date_from FROM hr_training_members m JOIN hr_trainings tr ON tr.id = m.training_id JOIN hr_people p ON p.id = m.person_id WHERE m.status = "applied" AND p.is_active = 1 ORDER BY m.applied_at');
+    if (hr_can()) return $rows;
+    $mine = array_map(fn($p) => (int)$p['id'], hr_team_of((int)(current_user()['id'] ?? 0)));
+    return array_values(array_filter($rows, fn($r) => in_array((int)$r['person_id'], $mine, true)));
+}
 /** HR (or the person's manager) decides an application / records attendance, result and certificate. */
 function hr_training_member_save(int $mid): void {
     $m = one('SELECT m.*, p.user_id, p.name_en FROM hr_training_members m JOIN hr_people p ON p.id = m.person_id WHERE m.id = ?', [$mid]); if (!$m) throw new RuntimeException(t('err.notfound'));

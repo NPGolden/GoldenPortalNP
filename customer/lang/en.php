@@ -6245,4 +6245,11 @@ Best regards,
 // ---- GAS-CP-R70-002 community photo on every post
 'soc.photo_optional' => '(optional)',
 'soc.photo_too_big' => 'The photo is larger than the server accepts — resize it below 12 MB.',
+// ---- GAS-CP-R70-004 world clocks per user
+'clk.my_title' => 'World clocks',
+'clk.my_hint' => 'Choose up to {n} places for the clock strip at the top of every page. UTC is always shown first.',
+'clk.utc_fixed' => 'UTC is always shown first',
+'clk.reset' => 'Back to the company set',
+'clk.saved' => 'World clocks saved.',
+'clk.too_many' => 'Choose at most {n} places.',
 ];

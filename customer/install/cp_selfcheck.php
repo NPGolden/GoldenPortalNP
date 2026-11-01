@@ -189,6 +189,8 @@ $r63 = (bool)$pdo->query("SHOW TABLES LIKE 'soc_onboard'")->fetch();
 printf("%s R63-001 migration (community)  %s\n", $r63 ? '[ OK ]' : '[WARN]', $r63 ? '' : '— run install/migrate_cp_r63_social.sql');
 $r64 = (bool)$pdo->query("SHOW TABLES LIKE 'hr_targets'")->fetch();
 printf("%s R64-001 migration (targets)  %s\n", $r64 ? '[ OK ]' : '[WARN]', $r64 ? '' : '— run install/migrate_cp_r64_targets.sql');
+$r70d = (bool)$pdo->query("SHOW COLUMNS FROM customer_users LIKE 'clocks'")->fetch();
+printf("%s R70-004 migration (world clocks per user)  %s\n", $r70d ? '[ OK ]' : '[WARN]', $r70d ? '' : '— run install/migrate_cp_r70_clocks.sql');
 $r69b = (bool)$pdo->query("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'")->fetch();
 printf("%s R69-002 migration (performance indexes)  %s\n", $r69b ? '[ OK ]' : '[WARN]', $r69b ? '' : '— run install/migrate_cp_r69_perf.sql');
 printf("%s R69-002 cache folder (storage/cache)  %s\n", is_dir(__DIR__ . '/../storage/cache') && is_writable(__DIR__ . '/../storage/cache') ? '[ OK ]' : '[WARN]', is_dir(__DIR__ . '/../storage/cache') && is_writable(__DIR__ . '/../storage/cache') ? '' : '— created on first use; check storage/ is writable');

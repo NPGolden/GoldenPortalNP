@@ -104,6 +104,20 @@ if ($has2fa): ?>
   <form method="post" action="<?= url('account') ?>" data-lock data-confirm="<?= tt('sec.my_revoke_confirm') ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('sec.my_revoke') ?>" data-confirm-cancel="<?= tt('btn.cancel') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="account_revoke"><button class="btn btn--ghost btn--danger-ghost" type="submit"><?= tt('sec.my_revoke') ?></button></form>
 </div>
 <?php endif; ?>
+<?php if (function_exists('clk_has') && clk_has()): $myClk = clk_user_codes(); ?>
+<div class="card" id="clocks" style="max-width:860px;">
+  <h2>🕓 <?= tt('clk.my_title') ?></h2>
+  <p class="hint"><?= e(t('clk.my_hint', ['n' => CLK_MAX])) ?></p>
+  <form method="post" action="<?= url('account') ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="clocks_save">
+    <div class="clk-pick" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px 14px;">
+      <?php foreach (clk_catalogue() as $code => [$tz, $city]): ?><label class="pl-person" style="display:flex;gap:8px;align-items:center;"><input type="checkbox" name="clocks[]" value="<?= e($code) ?>"<?= in_array($code, $myClk, true) ? ' checked' : '' ?>> <b style="width:2.2em;color:var(--gold);font-size:11px;letter-spacing:.06em;"><?= e($code) ?></b> <?= e($city) ?> <span class="hint">· <?= e($tz) ?></span></label><?php endforeach; ?>
+    </div>
+    <p class="hint" style="margin:8px 0 6px;"><span id="clk-count"><?= count($myClk) ?></span> / <?= CLK_MAX ?> · <?= tt('clk.utc_fixed') ?></p>
+    <div class="btn-row"><button class="btn btn--gold" type="submit"><?= tt('btn.save') ?></button> <button class="btn btn--ghost" type="submit" name="clocks" value=""><?= tt('clk.reset') ?></button></div>
+  </form>
+</div>
+<script nonce="<?= csp_nonce() ?>">(function(){var b=document.querySelectorAll('#clocks input[type=checkbox]'),n=document.getElementById('clk-count'),max=<?= CLK_MAX ?>;function f(){var k=0;b.forEach(function(x){if(x.checked)k++;});n.textContent=k;b.forEach(function(x){x.disabled=!x.checked&&k>=max;});}b.forEach(function(x){x.addEventListener('change',f);});f();})();</script>
+<?php endif; ?>
 <?php if (is_staff() && function_exists('online_detail')): $od = online_detail(); ?>
 <div class="card" style="max-width:560px;" id="online">
   <h2>🟢 <?= tt('nav.online_who') ?> <span class="hint" style="display:inline;margin-left:6px;"><?= count($od) ?></span></h2>

@@ -6,7 +6,8 @@ ini_set('display_errors', '0');
 if (is_dir(__DIR__ . '/storage') && is_writable(__DIR__ . '/storage')) { ini_set('log_errors', '1'); ini_set('error_log', __DIR__ . '/storage/php-errors.log'); }   // R69-001: PHP errors land where Settings › About › Diagnostics reads them
 
 require __DIR__ . '/app/db.php';
-require __DIR__ . '/app/cache.php';  // R69-002 block cache, query meter, house-keeping
+require __DIR__ . '/app/cache.php';
+require __DIR__ . '/app/clk.php';    // R70-004 world clocks per user  // R69-002 block cache, query meter, house-keeping
 require __DIR__ . '/app/i18n.php';
 require __DIR__ . '/app/helpers.php';
 require __DIR__ . '/app/auth.php';
@@ -278,6 +279,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 foreach (['id', 'project', 'vessel', 'tab', 'week', 'view'] as $k) if (isset($_GET[$k])) $keep[$k] = $_GET[$k];
                 redirect($back ?: 'dashboard', $keep + ['_r' => uniqid()]);
             }
+            case 'clocks_save': { clk_save_from_post(); flash('good', t('clk.saved')); redirect('account', ['_r' => uniqid()], '#clocks'); }   // R70-004
             case 'avatar_save': {
                 $au = require_login();
                 if (!empty($_POST['remove'])) { avatar_remove((int)$au['id']); flash('good', t('av.removed')); }

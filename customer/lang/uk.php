@@ -6231,4 +6231,11 @@ GAS-MSB-2026-002',
 // ---- GAS-CP-R70-002 community photo on every post
 'soc.photo_optional' => '(необов’язково)',
 'soc.photo_too_big' => 'Фото більше, ніж приймає сервер — зменшіть його до 12 МБ.',
+// ---- GAS-CP-R70-004 world clocks per user
+'clk.my_title' => 'Світові годинники',
+'clk.my_hint' => 'Оберіть до {n} місць для смуги годинників угорі кожної сторінки. UTC завжди перший.',
+'clk.utc_fixed' => 'UTC завжди перший',
+'clk.reset' => 'Повернути набір компанії',
+'clk.saved' => 'Годинники збережено.',
+'clk.too_many' => 'Оберіть не більше {n} місць.',
 ];

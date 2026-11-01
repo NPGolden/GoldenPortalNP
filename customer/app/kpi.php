@@ -160,10 +160,12 @@ function kpi_period(string $sel): array {
 function kpi_snapshot_monthly(): void {
     if (!kpi_has()) return;
     $d = date('Y-m-01');
-    if (scalar('SELECT COUNT(*) FROM kpi_snapshots WHERE snap_date = ?', [$d])) return;
+    if (cp_setting('kpi_snap_done') === $d) return;   // R70-004: per-project resume — a run that broke half-way (as on 1 Nov 2026) completes on the next page instead of skipping the rest for good
     [$from, $to] = [date('Y-m-01', strtotime('first day of last month')), date('Y-m-t', strtotime('last day of last month'))];
     $prev = date('Y-m-01', strtotime('first day of last month'));
+    $done = array_map('intval', array_column(all('SELECT DISTINCT project_id FROM kpi_snapshots WHERE snap_date = ?', [$d]), 'project_id'));
     foreach (all("SELECT id, pm_user_id, project_code, name FROM projects WHERE status <> 'completed' AND project_code NOT LIKE 'GEN-%'") as $pr) {
+        if (in_array((int)$pr['id'], $done, true)) continue;
         $P = kpi_project((int)$pr['id'], $from, $to); if (!$P) continue;
         $drops = [];
         foreach (KPI_KEYS as $k) {
@@ -172,8 +174,9 @@ function kpi_snapshot_monthly(): void {
             if ($P['tone'][$k] === 'red' && $old && $old['tone'] !== 'red' && (int)(kpi_targets()[$k]['notify'] ?? 1)) $drops[] = kpi_label($k) . ' ' . kpi_fmt($k, $P['v'][$k]);
         }
         foreach ($P['subs'] as $K) foreach (KPI_KEYS as $k) q('INSERT IGNORE INTO kpi_snapshots (snap_date, project_id, subproject_id, kpi, value, tone) VALUES (?,?,?,?,?,?)', [$d, (int)$pr['id'], (int)$K['sid'], $k, $K['v'][$k], $K['tone'][$k]]);
-        if ($drops && function_exists('nf_push')) { $to = array_values(array_filter([(int)$pr['pm_user_id']])); if ($to) nf_push($to, 'kpi:red', 'kpi:' . (int)$pr['id'] . ':' . $d, trim(($pr['project_code'] ?: '') . ' ' . $pr['name']), implode(' · ', $drops), url('kpis', ['project' => (int)$pr['id']]), null, null); }
+        if ($drops && function_exists('nf_push')) { $rcpt = array_values(array_filter([(int)$pr['pm_user_id']])); if ($rcpt) nf_push($rcpt, 'kpi:red', 'kpi:' . (int)$pr['id'] . ':' . $d, trim(($pr['project_code'] ?: '') . ' ' . $pr['name']), implode(' · ', $drops), url('kpis', ['project' => (int)$pr['id']]), null, null); }
     }
+    cp_setting_set('kpi_snap_done', $d);
 }
 /** Trend of one KPI of a project (last 12 snapshots). */
 function kpi_trend(int $pid, string $k, ?int $sid = null): array {
