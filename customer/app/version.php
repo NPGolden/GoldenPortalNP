@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.79.6';
+const CP_VERSION = '1.79.7';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R70-003', 'version' => '1.79.7', 'date' => '2026-11-01', 'title' => 'Community: @mentions in post comments and post bodies — type @ and pick a colleague (same picker as notes and ticket comments), the handle is highlighted in the thread and the colleague is notified ("… mentioned you in Community · <post>"); the post author still receives the usual comment notice.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R70-002', 'version' => '1.79.6', 'date' => '2026-11-01', 'title' => 'Community: the kind selector and the photo field work again — four inline scripts (Community compose, Targets scope ×2, Training target) carried no Content-Security-Policy nonce and were blocked by the browser, so the photo field never appeared and the scope / target selectors did not switch. A photo (jpg / png / webp up to 12 MB) can now accompany any post or poll, not only the photo kind; an oversized upload says so instead of "choose a photo".', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R70-001', 'version' => '1.79.5', 'date' => '2026-10-31', 'title' => 'Store builds from GitHub: Actions › Build Android app (signed App Bundle → artifact → Play Console track) and Build iOS app (macOS runner, archive → IPA → TestFlight) for the three apps from mobile-native/ (Capacitor shells of customer/mobile, mobile-pm, mobile-customer; icons and splash generated from the clients\' icons; setup of the Apple / Google accounts and secrets in mobile-native/README.md). The three app folders answer at their short URL (DirectoryIndex).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R69-002', 'version' => '1.79.4', 'date' => '2026-10-31', 'title' => 'Performance pass, no functional change: a short-lived block cache (APCu or storage/cache) keeps the menu counters (45 s per user, dropped on every action), the online list (20 s / 60 s) and the dashboard fleet, activity and celebration cards (10 min per language); 21 indexes on the tables behind the dashboard counters, the activity ranking and the HR balances; presence heartbeat every 2 min (online window 5 min); a daily house-keeping run on the first page of each day (read notifications older than 90 days, sign-in log older than a year, assistant log older than 180 days, sent push items older than 30 days, session files older than 7 days, update backups beyond the last 3, oversized logs trimmed); a query meter in the footer for administrators (queries · ms) with a slow-pages log (over 2 s or 150 queries) shown in Diagnostics together with the cache state and the last house-keeping; Flush cache and Clear slow-pages log buttons.', 'db' => 'install/migrate_cp_r69_perf.sql', 'check' => 'r69b'],
