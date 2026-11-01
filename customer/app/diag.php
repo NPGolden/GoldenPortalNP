@@ -82,7 +82,7 @@ function diag_run(): array {
         try { $names = []; foreach (all('SELECT id, name FROM disciplines') as $d) { $k = function_exists('disc_norm') ? disc_norm($d['name']) : mb_strtolower($d['name']); $names[$k][] = $d['name']; } foreach ($names as $g) if (count($g) > 1) $dup[] = t('dg.disciplines') . ': ' . implode(' = ', $g); } catch (Throwable $e) {}
         try { foreach (all('SELECT name_en, COUNT(*) n FROM hr_people WHERE is_active = 1 GROUP BY name_en HAVING n > 1') as $d) $dup[] = t('dg.people') . ': ' . $d['name_en'] . ' ×' . $d['n']; } catch (Throwable $e) {}
         try { foreach (all('SELECT LOWER(email) e, COUNT(*) n FROM customer_users GROUP BY LOWER(email) HAVING n > 1') as $d) $dup[] = t('dg.accounts') . ': ' . $d['e'] . ' ×' . $d['n']; } catch (Throwable $e) {}
-        try { foreach (all('SELECT name, COUNT(*) n FROM vessels GROUP BY name HAVING n > 1 LIMIT 5') as $d) $dup[] = t('nav.vessels') . ': ' . $d['name'] . ' ×' . $d['n']; } catch (Throwable $e) {}
+        try { foreach (all('SELECT name, COUNT(*) n FROM vessels' . (function_exists('vm_has') && vm_has() ? ' WHERE merged_into IS NULL' : '') . ' GROUP BY name HAVING n > 1 LIMIT 5') as $d) $dup[] = t('nav.vessels') . ': ' . $d['name'] . ' ×' . $d['n'] . ' → ' . t('vm.title'); } catch (Throwable $e) {}   // R71-003: records already folded into a master (merged_into) are not duplicates
         $R[] = $dup ? diag_row('db', t('dg.duplicates'), 'warn', implode(' · ', array_slice($dup, 0, 12)), t('dg.fix_duplicates')) : diag_row('db', t('dg.duplicates'), 'ok', t('dg.none'));
     }, 'db', t('dg.orphans'));
 

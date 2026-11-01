@@ -1234,6 +1234,7 @@ function pm_handle_action(string $action, string $page): bool {
             foreach (['sec_bind_ua' => 'bind_ua', 'sec_bind_ip' => 'bind_ip', 'sec_close_signout' => 'close_signout'] as $k => $f) cp_setting_set($k, !empty($_POST[$f]) ? '1' : '0');
             cp_setting_set('sec_csp', in_array($_POST['csp'] ?? '', ['on', 'report', 'off'], true) ? $_POST['csp'] : 'on');   // R53-001
             cp_setting_set('sec_passkeys', !empty($_POST['passkeys']) ? '1' : '0');   // R71-001
+            cp_setting_set('sec_passkey_android_sha256', mb_substr(preg_replace('/[^0-9A-Fa-f:,\s]/', '', (string)($_POST['passkey_android_sha256'] ?? '')), 0, 400));   // R71-003
             flash('good', t('sec.saved')); redirect('admin_log', ['_r' => uniqid()]);
         }
         case 'cu_twofa_reset': {

@@ -19,7 +19,10 @@ function pk_enabled(): bool { return pk_has() && (function_exists('cp_setting') 
 /** Relying-party id: the portal's host (goldensas.com), overridable with sec_passkey_rpid. */
 function pk_rp_id(): string { $v = function_exists('cp_setting') ? (string) cp_setting('sec_passkey_rpid', '') : ''; if ($v !== '') return $v; return strtolower(preg_replace('/:\d+$/', '', (string)($_SERVER['HTTP_HOST'] ?? 'localhost'))); }
 /** Origins accepted in clientDataJSON: https://<rpid>, https://www.<rpid>, and (sandbox only) the http host. */
-function pk_origins(): array { $rp = pk_rp_id(); $o = ['https://' . $rp, 'https://www.' . $rp]; $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? '')); if ($host !== '' && (str_starts_with($host, '127.0.0.1') || str_starts_with($host, 'localhost'))) { $o[] = 'http://' . $host; } $x = function_exists('cp_setting') ? (string) cp_setting('sec_passkey_origins', '') : ''; foreach (array_filter(array_map('trim', explode(',', $x))) as $e) $o[] = $e; return array_values(array_unique($o)); }
+function pk_origins(): array { $rp = pk_rp_id(); $o = ['https://' . $rp, 'https://www.' . $rp]; $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? '')); if ($host !== '' && (str_starts_with($host, '127.0.0.1') || str_starts_with($host, 'localhost'))) { $o[] = 'http://' . $host; } $x = function_exists('cp_setting') ? (string) cp_setting('sec_passkey_origins', '') : ''; foreach (array_filter(array_map('trim', explode(',', $x))) as $e) $o[] = $e;
+    // R71-003: Android Credential Manager reports the app's signing certificate instead of the https origin — android:apk-key-hash:<base64url(sha256 of the certificate)>, from the SHA-256 fingerprints of Play Console
+    $fp = function_exists('cp_setting') ? (string) cp_setting('sec_passkey_android_sha256', '') : ''; foreach (array_filter(array_map('trim', explode(',', $fp))) as $f) { $hex = preg_replace('/[^0-9a-f]/', '', strtolower($f)); if (strlen($hex) === 64) $o[] = 'android:apk-key-hash:' . pk_b64u(hex2bin($hex)); }
+    return array_values(array_unique($o)); }
 
 /* ------------------------------------------------------------------ encoding */
 function pk_b64u(string $bin): string { return rtrim(strtr(base64_encode($bin), '+/', '-_'), '='); }

@@ -2,7 +2,7 @@
    Access JWT 15 min in sessionStorage; rotating refresh token in localStorage (Keychain / Keystore in the Capacitor build).
    Mock mode (?mock=1 or localStorage gcu.mock) serves mock/data.js in the shapes of the live contract — demo and UI tests only. */
 window.Api = (function () {
-  const APP_ID = "customer", APP_VERSION = "1.0.2";
+  const APP_ID = "customer", APP_VERSION = "1.0.3";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false; try { MOCK = localStorage.getItem("gcu.mock") === "1" || /[?&]mock=1/.test(location.search); if (/[?&]mock=1/.test(location.search)) localStorage.setItem("gcu.mock", "1"); } catch (e) {}
   const cfg = { base: BASE, get mock() { return MOCK; } };
@@ -54,17 +54,21 @@ window.Api = (function () {
   function pkToJSON(cred) { const r = cred.response, out = { id: cred.id, rawId: pkB64.enc(cred.rawId), type: cred.type, response: { clientDataJSON: pkB64.enc(r.clientDataJSON) } };
     if (r.attestationObject) { out.response.attestationObject = pkB64.enc(r.attestationObject); try { out.response.transports = r.getTransports ? r.getTransports() : []; } catch (e) { out.response.transports = []; } }
     if (r.authenticatorData) { out.response.authenticatorData = pkB64.enc(r.authenticatorData); out.response.signature = pkB64.enc(r.signature); out.response.userHandle = r.userHandle ? pkB64.enc(r.userHandle) : null; } return out; }
-  const passkeyCapable = () => !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.get && !MOCK);
+  // R71-003: in the store builds the WebView has no WebAuthn — the native plug-in (@capgo/capacitor-passkey) takes the same JSON options and returns the same JSON credential
+  const pkNative = () => (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform() && Capacitor.Plugins && Capacitor.Plugins.CapacitorPasskey) ? Capacitor.Plugins.CapacitorPasskey : null;
+  const passkeyCapable = () => !MOCK && (!!pkNative() || !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.get));
   async function passkeyLogin() {
-    const o = await raw("POST", "/auth/passkey/options", {}, { noAuth: true }); const pk = o.options; pk.challenge = pkB64.dec(pk.challenge); pk.allowCredentials = [];
-    const cred = await navigator.credentials.get({ publicKey: pk });
-    const d = await raw("POST", "/auth/passkey/login", { challenge_id: o.challenge_id, credential: pkToJSON(cred), device: deviceInfo() }, { noAuth: true });
+    const o = await raw("POST", "/auth/passkey/options", {}, { noAuth: true }); const n = pkNative(); let cred;
+    if (n) { cred = await n.getCredential({ publicKey: { ...o.options, allowCredentials: [] }, origin: "https://goldensas.com" }); }
+    else { const pk = o.options; pk.challenge = pkB64.dec(pk.challenge); pk.allowCredentials = []; cred = pkToJSON(await navigator.credentials.get({ publicKey: pk })); }
+    const d = await raw("POST", "/auth/passkey/login", { challenge_id: o.challenge_id, credential: cred, device: deviceInfo() }, { noAuth: true });
     setAccess(d.access_token); await setRefresh(d.refresh_token); me = d.user; return d;
   }
   async function passkeyRegister(name, totp) {
-    const o = await call("POST", "/me/passkeys/options", { totp: totp || undefined }); const pk = o.options; pk.challenge = pkB64.dec(pk.challenge); pk.user.id = pkB64.dec(pk.user.id); pk.excludeCredentials = (pk.excludeCredentials || []).map((c) => ({ type: c.type, id: pkB64.dec(c.id) }));
-    const cred = await navigator.credentials.create({ publicKey: pk });
-    return call("POST", "/me/passkeys", { challenge_id: o.challenge_id, credential: pkToJSON(cred), name });
+    const o = await call("POST", "/me/passkeys/options", { totp: totp || undefined }); const n = pkNative(); let cred;
+    if (n) { cred = await n.createCredential({ publicKey: o.options, origin: "https://goldensas.com" }); }
+    else { const pk = o.options; pk.challenge = pkB64.dec(pk.challenge); pk.user.id = pkB64.dec(pk.user.id); pk.excludeCredentials = (pk.excludeCredentials || []).map((c) => ({ type: c.type, id: pkB64.dec(c.id) })); cred = pkToJSON(await navigator.credentials.create({ publicKey: pk })); }
+    return call("POST", "/me/passkeys", { challenge_id: o.challenge_id, credential: cred, name });
   }
   async function logoutLocal() { setAccess(null); me = null; await setRefresh(null); await Store.clear(); if (MOCK) Mock.signOut(); }
   async function logout() { try { await call("POST", "/auth/logout", {}); } catch (e) {} await logoutLocal(); }
@@ -96,7 +100,7 @@ window.Mock = (function () {
   const now = () => new Date().toISOString().slice(0, 19).replace("T", " ");
   const nid = () => Math.floor(Math.random() * 1e6) + 1000;
   const stepUp = (b) => { if (data.user.totp_enabled && (b.totp || "") !== "123456") throw err(401, "Authenticator code required", { totp: true }); };
-  function meShape() { return { user: data.user, vessels: data.vessels, devices: data.devices, branch: data.branch, languages: ["en", "el", "it", "bg", "uk"], min_app_version: "1.0.2", features: data.features || { tickets: true, offers: true, approvals: true, reports: true, offer_2fa: true } }; }
+  function meShape() { return { user: data.user, vessels: data.vessels, devices: data.devices, branch: data.branch, languages: ["en", "el", "it", "bg", "uk"], min_app_version: "1.0.3", features: data.features || { tickets: true, offers: true, approvals: true, reports: true, offer_2fa: true } }; }
   function home() {
     const items = [];
     data.reports.filter(r => r.status === "sent_for_signature").forEach(r => items.push({ type: "sign", id: r.id, ref: r.doc_no + " " + r.revision, title: r.title, vessel: r.vessel, at: r.issued_at }));

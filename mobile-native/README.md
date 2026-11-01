@@ -28,3 +28,13 @@ Two workflows under Actions: **Build Android app** (AAB → artifact → Play Co
 
 ## Locally (optional)
 `npm install && node prepare.js engineer && npx cap add android && npx cap sync` — `npx cap open android` / `ios` opens the native project in Android Studio / Xcode on a machine that has them.
+
+
+## Native passkeys (R71-003, Capacitor 8 + @capgo/capacitor-passkey)
+The shells run the live clients in a WebView; WebViews have no WebAuthn, so the plug-in's native passkey APIs (ASAuthorization on iOS, Credential Manager on Android) are used by the clients when `Capacitor.Plugins.CapacitorPasskey` exists. Same relying party as the web portal (`goldensas.com`), so a passkey created in Safari or Chrome works in the app and vice versa (Apple / Google keychain).
+One-time setup on the relying-party domain:
+1. `node wellknown.js <APPLE_TEAM_ID> <SHA256 of the Play app-signing certificate[,upload cert]>` → `well-known/apple-app-site-association` and `well-known/assetlinks.json`. Fingerprints: Play Console › Setup › App signing (both "App signing key certificate" and "Upload key certificate"). The build-android workflow prints the upload-key fingerprint in its log as a convenience.
+2. Upload both files to `public_html/.well-known/` on goldensas.com — no extension for the Apple file; the folder's `.htaccess`: `<Files "apple-app-site-association">ForceType application/json</Files>`. They must be served without redirect over https.
+3. Portal › Settings › Login history › Session policy › "Android app signing SHA-256": paste the same fingerprint(s). The portal then accepts the Android app origin (`android:apk-key-hash:…`) in the passkey check; iOS reports `https://goldensas.com` by itself (iOS 17.4+).
+4. Rebuild the apps (Build Android / Build iOS). First passkey use on a device may take up to 24 h after step 2 (Apple caches the association file through its CDN).
+Dependencies: Capacitor 8.6 (Node 22, Java 21, Xcode 16); `npm audit` clean with `overrides` for the build-tool transitive packages.

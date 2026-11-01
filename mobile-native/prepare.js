@@ -11,7 +11,8 @@ const config = { appId: a.appId, appName: a.appName, webDir: "www",
   server: { url: a.url, cleartext: false, allowNavigation: ["goldensas.com"] },
   ios: { contentInset: "always", limitsNavigationsToAppBoundDomains: true, scheme: a.appName },
   android: { allowMixedContent: false, captureInput: true, webContentsDebuggingEnabled: false },
-  plugins: { SplashScreen: { launchShowDuration: 800, backgroundColor: a.splash, showSpinner: false, launchAutoHide: true }, PushNotifications: { presentationOptions: ["badge", "sound", "alert"] } } };
+  plugins: { SplashScreen: { launchShowDuration: 800, backgroundColor: a.splash, showSpinner: false, launchAutoHide: true }, PushNotifications: { presentationOptions: ["badge", "sound", "alert"] },
+             CapacitorPasskey: { origin: "https://goldensas.com", domains: ["goldensas.com"], autoShim: true } } };   // R71-003 native passkeys: same relying party as the web portal
 fs.writeFileSync(path.join(__dirname, "capacitor.config.json"), JSON.stringify(config, null, 2));
 fs.rmSync(www, { recursive: true, force: true }); fs.cpSync(src, www, { recursive: true });
 for (const d of ["mock", "tests", "sw.js", ".htaccess"]) fs.rmSync(path.join(www, d), { recursive: true, force: true });

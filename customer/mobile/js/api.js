@@ -2,7 +2,7 @@
  * and a MOCK mode (built-in sample data in the same shape the portal returns) for the demo and the UI tests.
  * Mock mode: localStorage gas.mock = "1", or ?mock=1 on the URL. */
 window.API = (() => {
-  const VERSION = "0.6.4";
+  const VERSION = "0.6.5";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   try { MOCK = localStorage.getItem("gas.mock") === "1" || /[?&]mock=1/.test(location.search); if (/[?&]mock=1/.test(location.search)) localStorage.setItem("gas.mock", "1"); } catch (e) {}
@@ -34,6 +34,8 @@ window.API = (() => {
   function pkToJSON(cred) { const r = cred.response, out = { id: cred.id, rawId: pkB64.enc(cred.rawId), type: cred.type, response: { clientDataJSON: pkB64.enc(r.clientDataJSON) } };
     if (r.attestationObject) { out.response.attestationObject = pkB64.enc(r.attestationObject); try { out.response.transports = r.getTransports ? r.getTransports() : []; } catch (e) { out.response.transports = []; } }
     if (r.authenticatorData) { out.response.authenticatorData = pkB64.enc(r.authenticatorData); out.response.signature = pkB64.enc(r.signature); out.response.userHandle = r.userHandle ? pkB64.enc(r.userHandle) : null; } return out; }
+  // R71-003: in the store builds the WebView has no WebAuthn — the native plug-in (@capgo/capacitor-passkey) takes the same JSON options and returns the same JSON credential
+  const pkNative = () => (window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform() && Capacitor.Plugins && Capacitor.Plugins.CapacitorPasskey) ? Capacitor.Plugins.CapacitorPasskey : null;
   const deviceInfo = () => ({ platform: (window.Capacitor && Capacitor.getPlatform && Capacitor.getPlatform()) || "web", ua: navigator.userAgent.slice(0, 120), app_version: VERSION, device_id: deviceId() });
   function deviceId() { try { let d = localStorage.getItem("gas.device"); if (!d) { d = DB.uuid(); localStorage.setItem("gas.device", d); } return d; } catch (e) { return "web"; } }
 
@@ -43,15 +45,17 @@ window.API = (() => {
     async login(email, password, totp) { const r = await call("POST", "/auth/login", { email, password, totp: totp || undefined, device: deviceInfo() }); tok.access = r.access_token; tok.refresh = r.refresh_token; return r; },
     async logout() { try { await call("POST", "/auth/logout", {}); } catch (e) {} tok.access = null; tok.refresh = null; },
     /* R71-001 passkeys — the browser / platform authenticator signs a server challenge; a passkey replaces password + authenticator code */
-    get passkeyCapable() { return !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.get && !MOCK); },
+    get passkeyCapable() { return !MOCK && (!!pkNative() || !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.get)); },
     async passkeyLogin() {
-      const o = await call("POST", "/auth/passkey/options", {}); const pk = o.options; pk.challenge = pkB64.dec(pk.challenge); pk.allowCredentials = [];
-      const cred = await navigator.credentials.get({ publicKey: pk });
-      const r = await call("POST", "/auth/passkey/login", { challenge_id: o.challenge_id, credential: pkToJSON(cred), device: deviceInfo() }); tok.access = r.access_token; tok.refresh = r.refresh_token; return r; },
+      const o = await call("POST", "/auth/passkey/options", {}); const n = pkNative(); let cred;
+      if (n) { cred = await n.getCredential({ publicKey: { ...o.options, allowCredentials: [] }, origin: "https://goldensas.com" }); }
+      else { const pk = o.options; pk.challenge = pkB64.dec(pk.challenge); pk.allowCredentials = []; cred = pkToJSON(await navigator.credentials.get({ publicKey: pk })); }
+      const r = await call("POST", "/auth/passkey/login", { challenge_id: o.challenge_id, credential: cred, device: deviceInfo() }); tok.access = r.access_token; tok.refresh = r.refresh_token; return r; },
     async passkeyRegister(name, totp) {
-      const o = await call("POST", "/me/passkeys/options", { totp: totp || undefined }); const pk = o.options; pk.challenge = pkB64.dec(pk.challenge); pk.user.id = pkB64.dec(pk.user.id); pk.excludeCredentials = (pk.excludeCredentials || []).map((c) => ({ type: c.type, id: pkB64.dec(c.id) }));
-      const cred = await navigator.credentials.create({ publicKey: pk });
-      return call("POST", "/me/passkeys", { challenge_id: o.challenge_id, credential: pkToJSON(cred), name }); },
+      const o = await call("POST", "/me/passkeys/options", { totp: totp || undefined }); const n = pkNative(); let cred;
+      if (n) { cred = await n.createCredential({ publicKey: o.options, origin: "https://goldensas.com" }); }
+      else { const pk = o.options; pk.challenge = pkB64.dec(pk.challenge); pk.user.id = pkB64.dec(pk.user.id); pk.excludeCredentials = (pk.excludeCredentials || []).map((c) => ({ type: c.type, id: pkB64.dec(c.id) })); cred = pkToJSON(await navigator.credentials.create({ publicKey: pk })); }
+      return call("POST", "/me/passkeys", { challenge_id: o.challenge_id, credential: cred, name }); },
     passkeys: () => call("GET", "/me/passkeys"), passkeyRemove: (id) => call("DELETE", `/me/passkeys/${id}`),
 
     me: () => call("GET", "/me"), tickets: () => call("GET", "/tickets"), assignments: () => call("GET", "/assignments"), projects: () => call("GET", "/projects"), vessels: () => call("GET", "/vessels"),

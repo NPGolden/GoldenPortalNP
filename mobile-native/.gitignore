@@ -9,3 +9,4 @@ APP_VERSION
 *.p12
 *.mobileprovision
 
+well-known/

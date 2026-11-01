@@ -36,6 +36,12 @@ A WebAuthn credential (public key) stored per account in `webauthn_credentials`;
 5. **Session fixation**: `finish_login()` regenerates the session id as on the password path.
 6. **Recovery**: a person who loses every device still has password + authenticator (and the administrator's 2FA reset) — passkeys add a method, they never remove one.
 
+## 3a. Addendum R71-003 (native store builds)
+- Shells on Capacitor 8 (the Capacitor 6 line carried critical advisories); `npm audit` 0.
+- Android Credential Manager reports `android:apk-key-hash:<sha256 of the signing certificate>` as origin. The portal accepts it only for the fingerprints the administrator enters (Settings › Login history); that list is as sensitive as the signing key — only the Play app-signing and upload certificates belong there. iOS 17.4+ reports `https://goldensas.com`.
+- The association files (`/.well-known/apple-app-site-association`, `assetlinks.json`) bind the three bundle ids / package names to the relying party; without them the OS refuses the passkey, so a rogue app cannot use the company's passkeys.
+- The plug-in is a third-party dependency (Capgo, MIT); pinned to 8.5.8; it patches the native projects at `cap sync` — reviewed scope: entitlements and asset statements only.
+
 ## 4. Tests performed (sandbox, Chromium virtual authenticator)
 
 - Enrol on My Account with the authenticator code → listed; `passkey_added` logged; notification sent.
