@@ -2,7 +2,7 @@
    Access JWT 15 min in sessionStorage; rotating refresh token in localStorage (Keychain / Keystore in the Capacitor build).
    Mock mode (?mock=1 or localStorage gcu.mock) serves mock/data.js in the shapes of the live contract — demo and UI tests only. */
 window.Api = (function () {
-  const APP_ID = "customer", APP_VERSION = "1.0.0";
+  const APP_ID = "customer", APP_VERSION = "1.0.1";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false; try { MOCK = localStorage.getItem("gcu.mock") === "1" || /[?&]mock=1/.test(location.search); if (/[?&]mock=1/.test(location.search)) localStorage.setItem("gcu.mock", "1"); } catch (e) {}
   const cfg = { base: BASE, get mock() { return MOCK; } };
@@ -78,7 +78,7 @@ window.Mock = (function () {
   const now = () => new Date().toISOString().slice(0, 19).replace("T", " ");
   const nid = () => Math.floor(Math.random() * 1e6) + 1000;
   const stepUp = (b) => { if (data.user.totp_enabled && (b.totp || "") !== "123456") throw err(401, "Authenticator code required", { totp: true }); };
-  function meShape() { return { user: data.user, vessels: data.vessels, devices: data.devices, branch: data.branch, languages: ["en", "el", "it", "bg", "uk"], min_app_version: "1.0.0", features: data.features || { tickets: true, offers: true, approvals: true, reports: true, offer_2fa: true } }; }
+  function meShape() { return { user: data.user, vessels: data.vessels, devices: data.devices, branch: data.branch, languages: ["en", "el", "it", "bg", "uk"], min_app_version: "1.0.1", features: data.features || { tickets: true, offers: true, approvals: true, reports: true, offer_2fa: true } }; }
   function home() {
     const items = [];
     data.reports.filter(r => r.status === "sent_for_signature").forEach(r => items.push({ type: "sign", id: r.id, ref: r.doc_no + " " + r.revision, title: r.title, vessel: r.vessel, at: r.issued_at }));

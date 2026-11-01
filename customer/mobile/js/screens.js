@@ -39,7 +39,7 @@ window.SCREENS = (() => {
       <div id="totprow" class="hidden"><label>${t("login.totp")}</label><input id="totp" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></div>
       <p id="err" class="note red hidden"></p>
       <button class="btn gold" id="go">${t("login.signin")}</button>
-      <button class="btn line" id="bio" ${API.signedIn ? "" : "disabled"}>${t("login.bio")}</button>
+      <button class="btn line" id="bio" ${API.signedIn ? "" : "disabled"}>${t("login.bio")}</button>${API.signedIn ? "" : `<p class="muted" style="text-align:center;margin-top:-6px">${t("login.bio_hint")}</p>`}
       <h2>${t("login.lang")}</h2><div class="lang">${I18N.LANGS.map(([c, l]) => `<button data-l="${c}" class="${I18N.get() === c ? "on" : ""}">${l}</button>`).join("")}</div>
       <p class="muted" style="text-align:center;margin-top:16px">${ctx.me.home_branch || "GR"} • Golden A/S ${ctx.me.home_branch === "GIT" ? "Italian Branch" : "head office"} • v${API.VERSION}</p>
     </div>`, bind(root) {
@@ -260,8 +260,19 @@ window.SCREENS = (() => {
       ${Object.keys(groups).sort().map((g) => `<h2>${esc(g)}</h2>${groups[g].map((x) => `<div class="card tap ${x.status === "open" ? "c-red" : "c-green"}" data-go="#/equipment?id=${x.id}"><div class="t">${esc(x.tag)} • ${esc(x.maker)} ${esc(x.model)} <small>${x.status === "open" ? "OPEN" : "OK"}</small></div><div class="s">${esc(x.location)} • SN ${esc(x.serial)}</div><div class="s muted">${(x.history || []).slice(-1)[0] ? esc(x.history.slice(-1)[0]) : t("equip.noopen")}</div></div>`).join("")}`).join("") || `<p class="list-empty">—</p>`}`,
       bind(root) { UI.goLinks(root); root.querySelector("#vessel").onchange = (e) => { eqVessel = +e.target.value; UI.render(); }; root.querySelectorAll(".seg button").forEach((b) => b.onclick = () => { eqMode = b.dataset.m; UI.render(); }); let tm; root.querySelector("#q").oninput = (e) => { eqQ = e.target.value; clearTimeout(tm); tm = setTimeout(() => { UI.render(); }, 250); }; } };
   }
+  // ---------------------------------------------------------------- lock screen (R70-005): the session stays on the device, Face ID / fingerprint opens it again
+  function lock() {
+    UI.chrome(false);
+    return { html: `<div class="login"><img class="logo" src="img/logo.png" alt=""><h1 style="text-align:center">${t("lock.title")}</h1><p class="muted" style="text-align:center">${t("lock.lede")}</p>
+      <button class="btn gold" id="unlock">${t("lock.unlock")}</button><button class="btn line" id="out">${t("lock.signout")}</button></div>`, bind(root) {
+      const go = async () => { if (await UI.biometric()) { try { localStorage.removeItem("gas.locked"); } catch (e) {} location.hash = "#/home"; } };
+      root.querySelector("#unlock").onclick = go; root.querySelector("#out").onclick = async () => { await API.logout(); await DB.wipe(); try { localStorage.removeItem("gas.locked"); } catch (e) {} location.hash = "#/login"; };
+      if (!API.mock) setTimeout(go, 300);   // on a phone the Face ID prompt opens by itself
+    } };
+  }
   // ---------------------------------------------------------------- S-14 more / settings
   async function more() {
+    let bio = false; try { bio = localStorage.getItem("gas.bio") === "1"; } catch (e) {}
     UI.chrome(true, t("tab.more"), "more");
     const ob = await DB.outbox();
     const hr = await DB.get("meta", "hr"); const hrUnread = hr ? hr.messages.filter((m) => m.from_hr && !m.seen).length : 0;
@@ -270,16 +281,18 @@ window.SCREENS = (() => {
       <div class="kv"><b>${t("set.account")}</b><span class="v">${esc(ctx.me.name)} • ${esc(ctx.me.discipline)}</span></div><div class="kv"><b>${t("set.branch")}</b><span class="v">${esc(ctx.me.home_branch)} ${ctx.me.home_branch === "GIT" ? "— GOLDEN AS ITALIAN" : "— Golden A/S Keratsini"}</span></div>
       <div class="kv"><b>${t("set.version")}</b><span class="v">${API.VERSION}${API.mock ? " (demo)" : ""}${ctx.me.min_app_version ? ` • portal min ${esc(ctx.me.min_app_version)}` : ""}</span></div><div class="kv"><b>${t("more.queue")}</b><span class="v">${ob.length}${ob.filter((o) => o.status === "rejected").length ? ` (${ob.filter((o) => o.status === "rejected").length} ${t("st.rejected").toLowerCase()})` : ""}</span></div>
       <label>${t("set.lang")}</label><div class="lang">${I18N.LANGS.map(([c, l]) => `<button data-l="${c}" class="${I18N.get() === c ? "on" : ""}">${l}</button>`).join("")}</div>
+      <label>${t("more.bio")}</label><div class="seg" data-k="bio"><button data-v="1" class="${bio ? "on" : ""}">${t("more.bio_on")}</button><button data-v="0" class="${bio ? "" : "on"}">${t("more.bio_off")}</button></div>
       ${ob.filter((o) => o.status === "rejected").map((o) => `<div class="note red">${esc(o.kind)} — ${esc(o.error)} <button class="btn red sm" data-drop="${o.id}">${t("more.discard")}</button></div>`).join("")}
-      <button class="btn navy" id="sync">${t("more.sync")}</button><button class="btn line" id="clear">${t("set.clear")}</button><button class="btn line" id="out">${t("more.signout")}</button>`, bind(root) {
-      UI.goLinks(root); root.querAll = null; root.querySelectorAll(".lang button").forEach((b) => b.onclick = () => { I18N.set(b.dataset.l); I18N.apply(); SYNC.refreshCount(); UI.render(); });
+      <button class="btn navy" id="sync">${t("more.sync")}</button><button class="btn line" id="clear">${t("set.clear")}</button><button class="btn line" id="lock">🔒 ${t("more.lock")}</button><button class="btn line" id="out">${t("more.signout")}</button>`, bind(root) {
+      UI.goLinks(root); UI.segs(root, (k, v) => { try { localStorage.setItem("gas.bio", v); } catch (e) {} }); root.querySelectorAll(".lang button").forEach((b) => b.onclick = () => { I18N.set(b.dataset.l); I18N.apply(); SYNC.refreshCount(); UI.render(); });
       root.querySelector("#sync").onclick = () => SYNC.run().then(() => UI.render());
       root.querySelector("#ai").onclick = () => ASSIST.open({ page: "fsr_edit", title: "Service Engineer app — help", headline: "How do I…", fields: () => [], noFill: true });
       root.querySelector("#clear").onclick = async () => { if (window.caches) await caches.delete("gas-service-docs"); UI.toast(t("common.ok")); };
       root.querySelectorAll("[data-drop]").forEach((b) => b.onclick = async () => { await DB.del("outbox", b.dataset.drop); UI.render(); });
       root.querySelector("#out").onclick = async () => { await API.logout(); await DB.wipe(); location.hash = "#/login"; };
+      root.querySelector("#lock").onclick = async () => { if (!(await UI.biometricAvailable())) { UI.toast(t("lock.need_bio")); await API.logout(); await DB.wipe(); location.hash = "#/login"; return; } try { localStorage.setItem("gas.locked", "1"); } catch (e) {} location.hash = "#/lock"; };
     } };
   }
 
-  return { load, ctx, esc, fmt, today, subName, subCode, projName, ticketNo, subOptions, projOptions, vesselName, stChip, login, home, assign, tickets, ticket, fsrList, fsrEdit, hours, notes, docs, equipment, more };
+  return { load, ctx, esc, fmt, today, subName, subCode, projName, ticketNo, subOptions, projOptions, vesselName, stChip, login, lock, home, assign, tickets, ticket, fsrList, fsrEdit, hours, notes, docs, equipment, more };
 })();

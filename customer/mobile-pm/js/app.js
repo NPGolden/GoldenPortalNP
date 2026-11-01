@@ -72,6 +72,9 @@ window.UI = (() => {
   }
 
   // biometric / platform unlock: Capacitor plug-in when present, WebAuthn otherwise (web demo: mock passes)
+  // R70-005: lock state — set by "Lock app", or on every start when the setting "Face ID on open" is on; cleared by a successful unlock
+  function isLocked() { try { return localStorage.getItem("gpm.locked") === "1"; } catch (e) { return false; } }
+  async function biometricAvailable() { if (API.mock) return true; try { if (window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.BiometricAuth) return true; return !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); } catch (e) { return false; } }
   async function biometric() {
     try {
       if (window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.BiometricAuth) { await Capacitor.Plugins.BiometricAuth.authenticate({ reason: "Unlock Golden PM" }); return true; }
@@ -108,7 +111,7 @@ window.UI = (() => {
 
   // router
   const routes = [
-    [/^#\/login$/, () => SCREENS.login()], [/^#\/home$/, () => SCREENS.home()],
+    [/^#\/login$/, () => SCREENS.login()], [/^#\/lock$/, () => SCREENS.lock()], [/^#\/home$/, () => SCREENS.home()],
     [/^#\/projects(\?.*)?$/, (m, q) => SCREENS.projects(q)], [/^#\/project\/(\d+)$/, (m) => SCREENS.project(m[1])], [/^#\/sub\/(\d+)(\?.*)?$/, (m, q) => SCREENS.sub(m[1], q)],
     [/^#\/team(\?.*)?$/, (m, q) => HR.team(q)], [/^#\/approvals(\?.*)?$/, (m, q) => SCREENS.approvals(q)],
     [/^#\/notes(\?.*)?$/, (m, q) => SCREENS.notes(q)], [/^#\/docs$/, () => SCREENS.docs()], [/^#\/inbox$/, () => SCREENS.inbox()], [/^#\/synclog$/, () => SCREENS.synclog()],
@@ -120,6 +123,7 @@ window.UI = (() => {
     try {
       let h = location.hash || "#/home";
       if (!API.signedIn && h !== "#/login") { location.hash = "#/login"; return; }
+      if (API.signedIn && h !== "#/lock" && h !== "#/login" && isLocked()) { location.hash = "#/lock"; return; }   // R70-005
       await SCREENS.load();
       const r = routes.find(([re]) => re.test(h)); const m = h.match(r ? r[0] : /.*/);
       const scr = r ? await r[1](m, query(h)) : { html: "<p class='list-empty'>Not found</p>" };
@@ -135,12 +139,11 @@ window.UI = (() => {
   (async () => {
     if ("serviceWorker" in navigator && location.protocol !== "file:") { try { await navigator.serviceWorker.register("sw.js"); } catch (e) {} }
     await DB.open(); I18N.apply(); await SYNC.refreshCount();
-    let bioOk = true; try { if (API.signedIn && localStorage.getItem("gpm.bio") === "1" && !API.mock) bioOk = await biometric(); } catch (e) {}
-    if (!bioOk) { await API.logout(); }
+    try { if (API.signedIn && localStorage.getItem("gpm.bio") === "1" && !API.mock) localStorage.setItem("gpm.locked", "1"); } catch (e) {}   // R70-005: the gate is the lock screen — a cancelled Face ID no longer signs you out
     if (API.signedIn) { const me = await DB.get("meta", "me"); if (!me) await SYNC.run(); else SYNC.run(); }
-    if (!location.hash) location.hash = API.signedIn ? "#/home" : "#/login"; else render();
+    if (!location.hash || isLocked()) location.hash = API.signedIn ? (isLocked() ? "#/lock" : "#/home") : "#/login"; else render();
     document.addEventListener("visibilitychange", () => { if (!document.hidden) SYNC.run(); });
     setInterval(() => SYNC.run(false), 5 * 60 * 1000);
   })();
-  return { chrome, badge, badges, toast, goLinks, segs, sheet, closeSheet, totpField, totpValue, totpSheet, processLine, opill, photos, biometric, render, assistContext, openDocument };
+  return { chrome, badge, badges, toast, goLinks, segs, sheet, closeSheet, totpField, totpValue, totpSheet, processLine, opill, photos, biometric, biometricAvailable, render, assistContext, openDocument };
 })();

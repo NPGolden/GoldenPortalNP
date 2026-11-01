@@ -2,6 +2,7 @@
 window.I18N = (() => {
   const S = {
     en: {
+      "more.lock": "Lock app", "more.bio": "Face ID / fingerprint on open", "more.bio_on": "Required", "more.bio_off": "Off", "lock.title": "Locked", "lock.lede": "Unlock with Face ID, Touch ID or your fingerprint to continue.", "lock.unlock": "Unlock", "lock.signout": "Sign out instead", "login.bio_hint": "Available after you sign in once on this device.", "lock.need_bio": "Face ID / fingerprint is not available on this device — the app was signed out instead.",
       "equip.maker": "Maker", "equip.model": "Model", "equip.kind": "Kind", "equip.serial": "Serial", "equip.installed": "Installed", "equip.warranty": "Warranty", "equip.inservice": "In service", "equip.inservice_open": "In service — open ticket", "equip.lastservice": "last service", "equip.noopen": "No open tickets", "more.discard": "Discard", "rep.reportno": "Report No",
       "tab.home": "Home", "tab.tickets": "Tickets", "tab.fsr": "Reports", "tab.hours": "Hours", "tab.more": "More",
       "login.title": "Service Engineer", "login.portal": "Portal", "login.email": "E-mail", "login.password": "Password", "login.signin": "Sign in",
@@ -71,6 +72,7 @@ window.I18N = (() => {
       "common.cancel": "Cancel", "common.ok": "OK", "common.back": "Back", "common.hours": "h",
     },
     el: {
+      "more.lock": "Κλείδωμα εφαρμογής", "more.bio": "Face ID / αποτύπωμα στο άνοιγμα", "more.bio_on": "Απαιτείται", "more.bio_off": "Όχι", "lock.title": "Κλειδωμένο", "lock.lede": "Ξεκλειδώστε με Face ID, Touch ID ή δακτυλικό αποτύπωμα για να συνεχίσετε.", "lock.unlock": "Ξεκλείδωμα", "lock.signout": "Αποσύνδεση αντί αυτού", "login.bio_hint": "Διαθέσιμο αφού συνδεθείτε μία φορά σε αυτή τη συσκευή.", "lock.need_bio": "Face ID / αποτύπωμα δεν είναι διαθέσιμο σε αυτή τη συσκευή — έγινε αποσύνδεση.",
       "equip.maker": "Κατασκευαστής", "equip.model": "Μοντέλο", "equip.kind": "Είδος", "equip.serial": "Σειριακός", "equip.installed": "Εγκατάσταση", "equip.warranty": "Εγγύηση", "equip.inservice": "Σε λειτουργία", "equip.inservice_open": "Σε λειτουργία — ανοικτό αίτημα", "equip.lastservice": "τελευταίο service", "equip.noopen": "Χωρίς ανοικτά αιτήματα", "more.discard": "Απόρριψη", "rep.reportno": "Αρ. αναφοράς",
       "tab.home": "Αρχική", "tab.tickets": "Αιτήματα", "tab.fsr": "Reports", "tab.hours": "Ώρες", "tab.more": "Περισσότερα",
       "login.title": "Μηχανικός Service", "login.portal": "Portal", "login.email": "E-mail", "login.password": "Κωδικός", "login.signin": "Σύνδεση", "login.bio": "Ξεκλείδωμα με Face ID / δακτυλικό αποτύπωμα", "login.lang": "Γλώσσα", "login.failed": "Αποτυχία σύνδεσης — ελέγξτε e-mail και κωδικό",
@@ -116,6 +118,7 @@ window.I18N = (() => {
       "common.cancel": "Άκυρο", "common.ok": "OK", "common.back": "Πίσω", "common.hours": "ώρ.",
     },
     it: {
+      "more.lock": "Blocca app", "more.bio": "Face ID / impronta all'apertura", "more.bio_on": "Richiesto", "more.bio_off": "No", "lock.title": "Bloccata", "lock.lede": "Sblocca con Face ID, Touch ID o impronta per continuare.", "lock.unlock": "Sblocca", "lock.signout": "Esci invece", "login.bio_hint": "Disponibile dopo il primo accesso su questo dispositivo.", "lock.need_bio": "Face ID / impronta non disponibile su questo dispositivo — l'app è stata disconnessa.",
       "equip.maker": "Costruttore", "equip.model": "Modello", "equip.kind": "Tipo", "equip.serial": "Matricola", "equip.installed": "Installato", "equip.warranty": "Garanzia", "equip.inservice": "In servizio", "equip.inservice_open": "In servizio — ticket aperto", "equip.lastservice": "ultimo intervento", "equip.noopen": "Nessun ticket aperto", "more.discard": "Scarta", "rep.reportno": "N. rapporto",
       "tab.home": "Home", "tab.tickets": "Ticket", "tab.fsr": "Reports", "tab.hours": "Ore", "tab.more": "Altro",
       "login.title": "Tecnico di assistenza", "login.portal": "Portale", "login.email": "E-mail", "login.password": "Password", "login.signin": "Accedi", "login.bio": "Sblocca con Face ID / impronta", "login.lang": "Lingua", "login.failed": "Accesso non riuscito — verificare e-mail e password",
@@ -161,6 +164,7 @@ window.I18N = (() => {
       "common.cancel": "Annulla", "common.ok": "OK", "common.back": "Indietro", "common.hours": "h",
     },
     uk: {
+      "more.lock": "Заблокувати застосунок", "more.bio": "Face ID / відбиток при відкритті", "more.bio_on": "Обов’язково", "more.bio_off": "Ні", "lock.title": "Заблоковано", "lock.lede": "Розблокуйте за допомогою Face ID, Touch ID або відбитка, щоб продовжити.", "lock.unlock": "Розблокувати", "lock.signout": "Натомість вийти", "login.bio_hint": "Доступно після першого входу на цьому пристрої.", "lock.need_bio": "Face ID / відбиток недоступні на цьому пристрої — виконано вихід.",
       "equip.maker": "Виробник", "equip.model": "Модель", "equip.kind": "Тип", "equip.serial": "Серійний №", "equip.installed": "Встановлено", "equip.warranty": "Гарантія", "equip.inservice": "В експлуатації", "equip.inservice_open": "В експлуатації — відкрита заявка", "equip.lastservice": "останнє обслуговування", "equip.noopen": "Відкритих заявок немає", "more.discard": "Видалити", "rep.reportno": "№ звіту",
       "tab.home": "Головна", "tab.tickets": "Заявки", "tab.fsr": "Звіти", "tab.hours": "Години", "tab.more": "Ще",
       "login.title": "Сервісний інженер", "login.portal": "Портал", "login.email": "E-mail", "login.password": "Пароль", "login.signin": "Увійти", "login.bio": "Розблокувати Face ID / відбитком", "login.lang": "Мова", "login.failed": "Вхід не вдався — перевірте e-mail і пароль",
@@ -206,6 +210,7 @@ window.I18N = (() => {
       "common.cancel": "Скасувати", "common.ok": "OK", "common.back": "Назад", "common.hours": "год",
     },
     bg: {
+      "more.lock": "Заключи приложението", "more.bio": "Face ID / отпечатък при отваряне", "more.bio_on": "Задължително", "more.bio_off": "Не", "lock.title": "Заключено", "lock.lede": "Отключете с Face ID, Touch ID или отпечатък, за да продължите.", "lock.unlock": "Отключи", "lock.signout": "Вместо това излез", "login.bio_hint": "Налично след първото влизане на това устройство.", "lock.need_bio": "Face ID / отпечатък не е наличен на това устройство — приложението излезе.",
       "equip.maker": "Производител", "equip.model": "Модел", "equip.kind": "Вид", "equip.serial": "Сериен №", "equip.installed": "Инсталирано", "equip.warranty": "Гаранция", "equip.inservice": "В експлоатация", "equip.inservice_open": "В експлоатация — отворена заявка", "equip.lastservice": "последен сервиз", "equip.noopen": "Няма отворени заявки", "more.discard": "Отхвърли", "rep.reportno": "№ на отчета",
       "tab.home": "Начало", "tab.tickets": "Заявки", "tab.fsr": "Отчети", "tab.hours": "Часове", "tab.more": "Още",
       "login.title": "Сервизен инженер", "login.portal": "Портал", "login.email": "E-mail", "login.password": "Парола", "login.signin": "Вход", "login.bio": "Отключване с Face ID / пръстов отпечатък", "login.lang": "Език", "login.failed": "Неуспешен вход — проверете e-mail и парола",

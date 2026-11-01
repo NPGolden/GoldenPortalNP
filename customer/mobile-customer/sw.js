@@ -1,5 +1,5 @@
 /* sw.js — precache the app shell; never cache the API (data is cached by the app in IndexedDB, under the user's control). */
-const VERSION = "gas-customer-1.0.0";
+const VERSION = "gas-customer-1.0.1";
 const SHELL = ["./", "index.html", "styles.css", "app.js", "manifest.webmanifest", "i18n/i18n.js", "lib/store.js", "lib/api.js", "lib/ui.js", "lib/pdfview.js", "lib/sigpad.js", "lib/native.js",
   "screens/auth.js", "screens/home.js", "screens/sign.js", "screens/approvals.js", "screens/offers.js", "screens/tickets.js", "screens/more.js", "img/logo.png", "img/logo-white.png", "icons/icon-192.png", "icons/icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(VERSION).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });

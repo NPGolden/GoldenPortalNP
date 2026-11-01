@@ -59,6 +59,9 @@ window.UI = (() => {
   };
 
   // biometric / platform unlock: Capacitor plug-in when present, WebAuthn otherwise, PIN prompt as last resort (web demo)
+  // R70-005: lock state — set by "Lock app", or on every start when the setting "Face ID on open" is on; cleared by a successful unlock
+  function isLocked() { try { return localStorage.getItem("gas.locked") === "1"; } catch (e) { return false; } }
+  async function biometricAvailable() { if (API.mock) return true; try { if (window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.BiometricAuth) return true; return !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); } catch (e) { return false; } }
   async function biometric() {
     try {
       if (window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.BiometricAuth) { await Capacitor.Plugins.BiometricAuth.authenticate({ reason: "Unlock Golden A/S Service" }); return true; }
@@ -94,7 +97,7 @@ window.UI = (() => {
 
   // router
   const routes = [
-    [/^#\/login$/, () => SCREENS.login()], [/^#\/home$/, () => SCREENS.home()], [/^#\/assign\/(.+)$/, (m) => SCREENS.assign(m[1])],
+    [/^#\/login$/, () => SCREENS.login()], [/^#\/lock$/, () => SCREENS.lock()], [/^#\/home$/, () => SCREENS.home()], [/^#\/assign\/(.+)$/, (m) => SCREENS.assign(m[1])],
     [/^#\/tickets$/, () => SCREENS.tickets()], [/^#\/ticket\/(.+)$/, (m) => SCREENS.ticket(m[1])],
     [/^#\/fsr$/, () => SCREENS.fsrList()], [/^#\/fsr\/([^?]+)(\?.*)?$/, (m, q) => SCREENS.fsrEdit(m[1], q)],
     [/^#\/hours(\?.*)?$/, (m, q) => SCREENS.hours(q)], [/^#\/notes(\?.*)?$/, (m, q) => SCREENS.notes(q)], [/^#\/docs$/, () => SCREENS.docs()],
@@ -106,6 +109,7 @@ window.UI = (() => {
     try {
       let h = location.hash || "#/home";
       if (!API.signedIn && h !== "#/login") { location.hash = "#/login"; return; }
+      if (API.signedIn && h !== "#/lock" && h !== "#/login" && isLocked()) { location.hash = "#/lock"; return; }   // R70-005
       await SCREENS.load();
       const r = routes.find(([re]) => re.test(h)); const m = h.match(r ? r[0] : /.*/);
       const scr = r ? await r[1](m, query(h)) : { html: "<p class='list-empty'>Not found</p>" };
@@ -122,10 +126,11 @@ window.UI = (() => {
     if ("serviceWorker" in navigator && !API.mock) { try { await navigator.serviceWorker.register("sw.js"); } catch (e) {} }
     else if ("serviceWorker" in navigator) { try { await navigator.serviceWorker.register("sw.js"); } catch (e) {} }
     await DB.open(); I18N.apply(); await SYNC.refreshCount();
+    try { if (API.signedIn && localStorage.getItem("gas.bio") === "1" && !API.mock) localStorage.setItem("gas.locked", "1"); } catch (e) {}   // R70-005
     if (API.signedIn) { const me = await DB.get("meta", "me"); if (!me) await SYNC.run(); else SYNC.run(); }
-    if (!location.hash) location.hash = API.signedIn ? "#/home" : "#/login"; else render();
+    if (!location.hash || isLocked()) location.hash = API.signedIn ? (isLocked() ? "#/lock" : "#/home") : "#/login"; else render();
     document.addEventListener("visibilitychange", () => { if (!document.hidden) SYNC.run(); });
     setInterval(() => SYNC.run(false), 5 * 60 * 1000);
   })();
-  return { chrome, badge, toast, goLinks, segs, sheet, closeSheet, photos, sig, biometric, render, assistContext, openDocument };
+  return { chrome, badge, toast, goLinks, segs, sheet, closeSheet, photos, sig, biometric, biometricAvailable, render, assistContext, openDocument };
 })();

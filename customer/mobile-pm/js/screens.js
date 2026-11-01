@@ -41,7 +41,7 @@ window.SCREENS = (() => {
       <div id="totprow" class="hidden"><label>${t("login.totp")}</label><input id="totp" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></div>
       <p id="err" class="note red hidden"></p>
       <button class="btn gold" id="go">${t("login.signin")}</button>
-      <button class="btn line" id="bio" ${API.signedIn ? "" : "disabled"}>${t("login.bio")}</button>
+      <button class="btn line" id="bio" ${API.signedIn ? "" : "disabled"}>${t("login.bio")}</button>${API.signedIn ? "" : `<p class="muted" style="text-align:center;margin-top:-6px">${t("login.bio_hint")}</p>`}
       <h2>${t("login.lang")}</h2><div class="lang">${I18N.LANGS.map(([c, l]) => `<button data-l="${c}" class="${I18N.get() === c ? "on" : ""}">${l}</button>`).join("")}</div>
       <p class="muted" style="text-align:center;margin-top:16px">${ctx.me.home_branch || "GR"} • Golden A/S ${ctx.me.home_branch === "GIT" ? "Italian Branch" : "head office"} • Golden PM v${API.VERSION}</p>
     </div>`, bind(root) {
@@ -260,6 +260,16 @@ window.SCREENS = (() => {
       root.querySelectorAll("[data-code]").forEach((b) => b.onclick = () => UI.totpSheet(async (code) => { await SYNC.retryWithTotp(b.dataset.code, code); UI.render(); }));
     } };
   }
+  // ---------------------------------------------------------------- lock screen (R70-005): the session stays on the device, Face ID / fingerprint opens it again
+  function lock() {
+    UI.chrome(false);
+    return { html: `<div class="login"><img class="logo" src="img/logo.png" alt=""><h1 style="text-align:center">${t("lock.title")}</h1><p class="muted" style="text-align:center">${t("lock.lede")}</p>
+      <button class="btn gold" id="unlock">${t("lock.unlock")}</button><button class="btn line" id="out">${t("lock.signout")}</button></div>`, bind(root) {
+      const go = async () => { if (await UI.biometric()) { try { localStorage.removeItem("gpm.locked"); } catch (e) {} location.hash = "#/home"; } };
+      root.querySelector("#unlock").onclick = go; root.querySelector("#out").onclick = async () => { await API.logout(); await DB.wipe(); try { localStorage.removeItem("gpm.locked"); } catch (e) {} location.hash = "#/login"; };
+      if (!API.mock) setTimeout(go, 300);   // on a phone the Face ID prompt opens by itself
+    } };
+  }
   // ---------------------------------------------------------------- more / settings
   async function more() {
     UI.chrome(true, t("tab.more"), "more");
@@ -275,15 +285,16 @@ window.SCREENS = (() => {
       <label>${t("more.lang")}</label><div class="lang">${I18N.LANGS.map(([c, l]) => `<button data-l="${c}" class="${I18N.get() === c ? "on" : ""}">${l}</button>`).join("")}</div>
       <label>${t("more.bio")}</label><div class="seg" data-k="bio"><button data-v="1" class="${bio ? "on" : ""}">${t("more.bio_on")}</button><button data-v="0" class="${bio ? "" : "on"}">${t("more.bio_off")}</button></div>
       <h2>${t("more.about")}</h2><p class="muted">${t("more.about_txt")}</p>
-      <button class="btn navy" id="sync">${t("more.sync")}</button><button class="btn line" id="clear">${t("set.clear")}</button><button class="btn line" id="out">${t("more.signout")}</button>`, bind(root) {
+      <button class="btn navy" id="sync">${t("more.sync")}</button><button class="btn line" id="clear">${t("set.clear")}</button><button class="btn line" id="lock">🔒 ${t("more.lock")}</button><button class="btn line" id="out">${t("more.signout")}</button>`, bind(root) {
       UI.goLinks(root); root.querySelectorAll(".lang button").forEach((b) => b.onclick = () => { I18N.set(b.dataset.l); I18N.apply(); UI.render(); });
       UI.segs(root, (k, v) => { try { localStorage.setItem("gpm.bio", v); } catch (e) {} });
       root.querySelector("#sync").onclick = () => SYNC.run().then(() => UI.render());
       root.querySelector("#ai").onclick = () => ASSIST.open({ page: "fsr_edit", title: "Golden PM — help", headline: "How do I…", fields: () => [], noFill: true });
       root.querySelector("#clear").onclick = async () => { if (window.caches) await caches.delete("gas-pm-docs"); UI.toast(t("common.ok")); };
       root.querySelector("#out").onclick = async () => { await API.logout(); await DB.wipe(); location.hash = "#/login"; };
+      root.querySelector("#lock").onclick = async () => { if (!(await UI.biometricAvailable())) { UI.toast(t("lock.need_bio")); await API.logout(); await DB.wipe(); location.hash = "#/login"; return; } try { localStorage.setItem("gpm.locked", "1"); } catch (e) {} location.hash = "#/lock"; };
     } };
   }
 
-  return { load, ctx, esc, fmt, today, weekOf, subName, projName, findSub, project, staffName, pstChip, sstChip, login, home, projects, project: projectScreen, sub, approvals, notes, docs, inbox, synclog, more };
+  return { load, ctx, esc, fmt, today, weekOf, subName, projName, findSub, project, staffName, pstChip, sstChip, login, lock, home, projects, project: projectScreen, sub, approvals, notes, docs, inbox, synclog, more };
 })();
