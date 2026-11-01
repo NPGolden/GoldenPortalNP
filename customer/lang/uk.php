@@ -6228,4 +6228,7 @@ GAS-MSB-2026-002',
 'dg.cache_flushed' => 'Кеш очищено.',
 'dg.slowlog_clear' => 'Очистити журнал повільних сторінок',
 'dg.slowlog_cleared' => 'Журнал повільних сторінок очищено.',
+// ---- GAS-CP-R70-002 community photo on every post
+'soc.photo_optional' => '(необов’язково)',
+'soc.photo_too_big' => 'Фото більше, ніж приймає сервер — зменшіть його до 12 МБ.',
 ];

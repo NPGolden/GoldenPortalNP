@@ -88,7 +88,7 @@ layout_head(t('hr.training'), 'hr_training');
     <div class="btn-row"><button class="btn btn--gold" type="submit"><?= tt('btn.save') ?></button><a class="btn btn--ghost" href="<?= $tr ? url('hr_training', ['id' => $id]) : url('hr_training') ?>"><?= tt('btn.cancel') ?></a></div>
   </form>
 </div>
-<script>(function(){var s=document.getElementById('tr_target');if(!s)return;function f(){document.querySelector('.tr-disc').style.display=s.value==='disciplines'?'':'none';document.querySelector('.tr-people').style.display=s.value==='people'?'':'none';}s.addEventListener('change',f);f();})();</script>
+<script nonce="<?= csp_nonce() ?>">(function(){var s=document.getElementById('tr_target');if(!s)return;function f(){document.querySelector('.tr-disc').style.display=s.value==='disciplines'?'':'none';document.querySelector('.tr-people').style.display=s.value==='people'?'':'none';}s.addEventListener('change',f);f();})();</script>
 <?php endif; ?>
 
 <?php $rows = hr_trainings($f); $alerts = hr_cert_alerts(90); ?>

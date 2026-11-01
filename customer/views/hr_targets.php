@@ -48,7 +48,7 @@ layout_head(t('hr.targets'), 'hr_targets');
     <div class="btn-row"><button class="btn btn--gold" type="submit"><?= tt('btn.save') ?></button><a class="btn btn--ghost" href="<?= url('hr_targets', $keep) ?>"><?= tt('btn.cancel') ?></a></div>
   </form>
 </div>
-<script>(function(){var s=document.getElementById('tg_scope');if(!s)return;function f(){document.querySelector('.tg-dept').style.display=s.value==='department'?'':'none';document.querySelector('.tg-person').style.display=s.value==='person'?'':'none';}s.addEventListener('change',f);f();})();</script>
+<script nonce="<?= csp_nonce() ?>">(function(){var s=document.getElementById('tg_scope');if(!s)return;function f(){document.querySelector('.tg-dept').style.display=s.value==='department'?'':'none';document.querySelector('.tg-person').style.display=s.value==='person'?'':'none';}s.addEventListener('change',f);f();})();</script>
 <?php endif; ?>
 
 <div class="card">
@@ -92,7 +92,7 @@ layout_head(t('hr.targets'), 'hr_targets');
       <div class="field" style="grid-column:1 / -1;"><label><?= tt('hr.tg_ai_brief') ?></label><input name="q" maxlength="2000" value="<?= e($tgAi['q'] ?? '') ?>" placeholder="<?= tt('hr.tg_ai_ph') ?>"></div>
     </div>
   </form>
-  <script>(function(){var s=document.getElementById('tgai_scope');if(!s)return;function f(){document.querySelector('.tgai-dept').style.display=s.value==='department'?'':'none';document.querySelector('.tgai-person').style.display=s.value==='person'?'':'none';}s.addEventListener('change',f);f();})();</script>
+  <script nonce="<?= csp_nonce() ?>">(function(){var s=document.getElementById('tgai_scope');if(!s)return;function f(){document.querySelector('.tgai-dept').style.display=s.value==='department'?'':'none';document.querySelector('.tgai-person').style.display=s.value==='person'?'':'none';}s.addEventListener('change',f);f();})();</script>
   <?php if ($tgAi && $tgAi['err'] !== ''): ?><div class="flash flash--bad" style="margin-top:10px;"><?= e($tgAi['err']) ?></div><?php elseif ($tgAi && $tgAi['text'] !== ''): ?><div class="card card--tight" style="margin-top:10px;white-space:pre-wrap;"><?= e($tgAi['text']) ?></div><?php elseif ($tgAi && $tgAi['rows']): ?>
   <h3 class="ac-h" style="margin-top:12px;"><?= e(t('hr.tg_ai_proposals', ['n' => count($tgAi['rows'])])) ?></h3>
   <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('hr.tg_title') ?></th><th><?= tt('hr.tg_measure') ?></th><th><?= tt('hr.tg_due') ?></th><th>⚖</th><th></th></tr></thead><tbody>

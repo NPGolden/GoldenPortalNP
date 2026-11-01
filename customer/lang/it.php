@@ -6242,4 +6242,7 @@ Cordiali saluti,
 'dg.cache_flushed' => 'Cache svuotata.',
 'dg.slowlog_clear' => 'Svuota il log delle pagine lente',
 'dg.slowlog_cleared' => 'Log delle pagine lente svuotato.',
+// ---- GAS-CP-R70-002 community photo on every post
+'soc.photo_optional' => '(facoltativa)',
+'soc.photo_too_big' => 'La foto supera il limite del server — ridimensionala sotto i 12 MB.',
 ];

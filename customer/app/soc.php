@@ -75,7 +75,9 @@ function soc_post_create(): int {
     $title = mb_substr(trim((string)($_POST['title'] ?? '')), 0, 200); if ($title === '') throw new RuntimeException(t('soc.need_title'));
     $body = mb_substr(trim((string)($_POST['body'] ?? '')), 0, 8000) ?: null; $pin = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['pinned_until'] ?? '')) && soc_can_post() ? $_POST['pinned_until'] : null; $closes = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['closes_at'] ?? '')) ? $_POST['closes_at'] : null;
     $stored = null; $mime = null;
-    if ($kind === 'photo') { $f = $_FILES['photo'] ?? null; if (!$f || ($f['error'] ?? 1) !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name']) || $f['size'] > 12 * 1024 * 1024) throw new RuntimeException(t('soc.need_photo'));
+    $f = $_FILES['photo'] ?? null; $hasFile = $f && ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;   // R70-002: a photo may accompany any post; it is required only for the photo kind
+    if ($hasFile && ($f['error'] ?? 1) === UPLOAD_ERR_INI_SIZE) throw new RuntimeException(t('soc.photo_too_big'));
+    if ($kind === 'photo' || $hasFile) { if (!$f || ($f['error'] ?? 1) !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name']) || $f['size'] > 12 * 1024 * 1024) throw new RuntimeException(t('soc.need_photo'));
         $ext = strtolower(pathinfo((string)$f['name'], PATHINFO_EXTENSION)); if (!in_array($ext, ['jpg', 'jpeg', 'png', 'webp'], true)) throw new RuntimeException(t('soc.need_photo'));
         $mime = (string)(function_exists('mime_content_type') ? @mime_content_type($f['tmp_name']) : ''); if (!str_starts_with($mime, 'image/')) throw new RuntimeException(t('soc.need_photo'));
         $dir = cp_storage() . '/_soc'; if (!is_dir($dir)) @mkdir($dir, 0755, true); $stored = '_soc/' . date('Ymd') . '_' . bin2hex(random_bytes(6)) . '.' . $ext; if (!move_uploaded_file($f['tmp_name'], cp_storage() . '/' . $stored)) throw new RuntimeException(t('soc.need_photo')); }
@@ -98,7 +100,7 @@ function soc_feed(int $limit = 30, ?string $kind = null): array {
         if ($p['kind'] === 'poll') { $p['options'] = all('SELECT o.idx, o.label, (SELECT COUNT(*) FROM soc_post_votes v WHERE v.post_id = o.post_id AND v.idx = o.idx) n FROM soc_post_options o WHERE o.post_id = ? ORDER BY o.idx', [(int)$p['id']]); $p['votes'] = array_sum(array_column($p['options'], 'n')); $mv = scalar('SELECT idx FROM soc_post_votes WHERE post_id = ? AND user_id = ?', [(int)$p['id'], $me]); $p['my_vote'] = ($mv === null || $mv === false) ? null : (int)$mv; $p['closed'] = $p['closes_at'] && $p['closes_at'] < date('Y-m-d'); }
     } unset($p); return $rows;
 }
-function soc_photo_stream(int $id): void { require_staff(); $p = soc_has() ? one('SELECT stored_name, mime_type FROM soc_posts WHERE id = ? AND kind = "photo"', [$id]) : null; $path = $p && $p['stored_name'] ? cp_storage() . '/' . $p['stored_name'] : ''; if (!$path || !is_file($path)) { http_response_code(404); exit; } header('Content-Type: ' . $p['mime_type']); header('X-Content-Type-Options: nosniff'); header('Content-Length: ' . filesize($path)); header('Cache-Control: private, max-age=3600'); readfile($path); exit; }
+function soc_photo_stream(int $id): void { require_staff(); $p = soc_has() ? one('SELECT stored_name, mime_type FROM soc_posts WHERE id = ?', [$id]) : null; $path = $p && $p['stored_name'] ? cp_storage() . '/' . $p['stored_name'] : ''; if (!$path || !is_file($path)) { http_response_code(404); exit; } header('Content-Type: ' . $p['mime_type']); header('X-Content-Type-Options: nosniff'); header('Content-Length: ' . filesize($path)); header('Cache-Control: private, max-age=3600'); readfile($path); exit; }
 
 /* ------------------------------------------------------------------ badges */
 function soc_metrics(int $uid): array {

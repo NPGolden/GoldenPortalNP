@@ -6242,4 +6242,7 @@ Best regards,
 'dg.cache_flushed' => 'Cache flushed.',
 'dg.slowlog_clear' => 'Clear the slow-pages log',
 'dg.slowlog_cleared' => 'Slow-pages log cleared.',
+// ---- GAS-CP-R70-002 community photo on every post
+'soc.photo_optional' => '(optional)',
+'soc.photo_too_big' => 'The photo is larger than the server accepts — resize it below 12 MB.',
 ];
