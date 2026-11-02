@@ -372,7 +372,7 @@ layout_head($sp['code'] . ' · ' . $sp['name'], 'projects');
     </div>
   <?php endforeach; ?>
   <?php if ($staff): ?><script nonce="<?= csp_nonce() ?>">(function(){
-    var T=<?= json_encode(['busy' => t('ai.assess_busy'), 'append' => t('ai.append'), 'err' => t('ai.failed'), 'net' => 'Network error', 'appended' => t('ai.appended')], JSON_UNESCAPED_UNICODE) ?>;
+    var T=<?= json_encode(['busy' => t('ai.assess_busy'), 'append' => t('ai.append'), 'err' => t('ai.failed'), 'net' => 'Network error', 'appended' => t('ai.appended'), 'photos' => t('ai.photos_sent')], JSON_UNESCAPED_UNICODE) ?>;
     function q(s,r){return (r||document).querySelector(s);} function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
     document.querySelectorAll('.js-note-edit').forEach(function(b){b.addEventListener('click',function(){var f=q('#ne-'+b.dataset.note);if(f){f.classList.toggle('hidden');if(!f.classList.contains('hidden'))f.querySelector('textarea').focus();}});});
     document.querySelectorAll('.js-note-cancel').forEach(function(b){b.addEventListener('click',function(){q('#ne-'+b.dataset.note).classList.add('hidden');});});
@@ -386,6 +386,7 @@ layout_head($sp['code'] . ' · ' . $sp['name'], 'projects');
           (it.risks||[]).forEach(function(x){h+='<p style="margin:0 0 2px 12px;"><span style="font-weight:700;color:'+(sev[x.severity]||'inherit')+'">⚠ '+esc(String(x.severity||'').toUpperCase())+'</span> '+esc(x.risk)+(x.consequence?' → '+esc(x.consequence):'')+'</p>';});
           (it.actions||[]).forEach(function(x){h+='<p style="margin:0 0 2px 12px;">☐ '+esc(x.action)+' <span class="hint">('+esc(x.priority)+(x.owner?' · '+esc(x.owner):'')+')</span></p>';});});
         if(r.summary)h+='<p style="margin-top:8px;"><b>'+esc(r.summary)+'</b></p>';
+        h+='<p class="hint" style="margin:6px 0 0;">'+esc((r.photos||[]).length)+' '+esc(T.photos)+'</p>';
         h+='</div>';var f=q('#ne-'+id);if(f)h+='<p style="margin:8px 0 0;"><button type="button" class="btn btn--sm js-ai-append">'+esc(T.append)+'</button></p>';
         box.innerHTML=h;var ab=q('.js-ai-append',box);if(ab)ab.addEventListener('click',function(){var ta=f.querySelector('textarea');ta.value=(ta.value.replace(/\s+$/,'')+'\n\n'+r.text).trim();f.classList.remove('hidden');ta.focus();ab.disabled=true;ab.textContent=T.appended;});
       }).catch(function(){b.disabled=false;box.innerHTML='<p class="flash flash--bad">'+esc(T.net)+'</p>';});

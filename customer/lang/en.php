@@ -6345,4 +6345,5 @@ Best regards,
 'wk.deleted' => 'Note deleted.',
 'wk.delete_confirm' => 'Delete this weekly note and its photos?',
 'wk.note_empty' => 'The note text cannot be empty.',
+'ai.photos_sent' => 'photo(s) sent to the assistant',
 ];
