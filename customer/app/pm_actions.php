@@ -822,6 +822,11 @@ function pm_handle_action(string $action, string $page): bool {
         }
 
         /* ------------------------------------- deletion (admin only) */
+        case 'gen_move': {
+            $n = pm_gen_move((int)$_POST['id'], (int)$_POST['to']);
+            flash('good', t('pr.gen_moved', ['n' => $n]));
+            redirect('projects', ['_r' => uniqid()]);
+        }
         case 'project_delete': {
             require_cp_admin();
             $id = (int)$_POST['id'];
@@ -1737,6 +1742,31 @@ function pm_project_refs(int $id): array {
         if ($n) $out[$k] = $n;
     }
     return $out;
+}
+/** R72-009: the records themselves (files with links) behind pm_project_refs, for the GEN- card. */
+function pm_project_ref_rows(int $id): array {
+    $out = [];
+    foreach (all('SELECT id, original_name, kind, created_at FROM sp_files WHERE project_id = ? ORDER BY id DESC LIMIT 20', [$id]) as $f) $out[] = ['t' => 'file', 'id' => (int)$f['id'], 'label' => (string)$f['original_name'], 'sub' => (string)$f['kind'], 'at' => (string)$f['created_at'], 'href' => url('file', ['id' => (int)$f['id']])];
+    foreach (all('SELECT id, offer_no, revision, title, status FROM offers WHERE project_id = ? ORDER BY id DESC LIMIT 20', [$id]) as $o) $out[] = ['t' => 'offer', 'id' => (int)$o['id'], 'label' => trim($o['offer_no'] . ' ' . $o['revision']), 'sub' => (string)$o['title'] . ' · ' . $o['status'], 'at' => '', 'href' => url('offer', ['id' => (int)$o['id']])];
+    foreach (all('SELECT id, report_no, status FROM fsr_reports WHERE project_id = ? ORDER BY id DESC LIMIT 20', [$id]) as $r) $out[] = ['t' => 'fsr', 'id' => (int)$r['id'], 'label' => (string)$r['report_no'], 'sub' => (string)$r['status'], 'at' => '', 'href' => url('fsr', ['id' => (int)$r['id']])];
+    try { foreach (all('SELECT id, report_no, status FROM isr_reports WHERE project_id = ? ORDER BY id DESC LIMIT 20', [$id]) as $r) $out[] = ['t' => 'isr', 'id' => (int)$r['id'], 'label' => (string)$r['report_no'], 'sub' => (string)$r['status'], 'at' => '', 'href' => url('isr', ['id' => (int)$r['id']])]; } catch (Throwable $e) {}
+    try { foreach (all('SELECT id, report_no, revision, status FROM acc_reports WHERE project_id = ? ORDER BY id DESC LIMIT 20', [$id]) as $r) $out[] = ['t' => 'acc', 'id' => (int)$r['id'], 'label' => trim($r['report_no'] . ' ' . $r['revision']), 'sub' => (string)$r['status'], 'at' => '', 'href' => url('acc_report', ['id' => (int)$r['id']])]; } catch (Throwable $e) {}
+    foreach (all('SELECT id, ticket_no, title FROM tickets WHERE project_id = ? ORDER BY id DESC LIMIT 20', [$id]) as $r) $out[] = ['t' => 'ticket', 'id' => (int)$r['id'], 'label' => (string)$r['ticket_no'], 'sub' => (string)$r['title'], 'at' => '', 'href' => url('ticket', ['id' => (int)$r['id']])];
+    return $out;
+}
+/** R72-009: move every record of a GEN- project to another project of the same vessel (sub-project cleared), so the empty GEN- project can be deleted. */
+function pm_gen_move(int $from, int $to): int {
+    require_cp_admin();
+    $a = one('SELECT * FROM projects WHERE id = ?', [$from]); $b = one('SELECT * FROM projects WHERE id = ?', [$to]);
+    if (!$a || !$b || $from === $to || !str_starts_with((string)$a['project_code'], 'GEN-')) throw new RuntimeException(t('err.notfound'));
+    if ((int)$a['vessel_id'] !== (int)$b['vessel_id']) throw new RuntimeException(t('pr.gen_move_vessel'));
+    $n = 0;
+    foreach (['offers', 'fsr_reports', 'isr_reports', 'acc_reports', 'tickets', 'timesheets', 'documents', 'drawing_requests', 'job_orders', 'production_orders', 'owner_approvals', 'class_submittals', 'plan_entries', 'weekly_notes', 'tasks', 'proformas', 'sp_files', 'acc_lines', 'kpi_snapshots'] as $tb) {
+        try { $hasSub = (bool) one("SHOW COLUMNS FROM `$tb` LIKE 'subproject_id'"); $n += q("UPDATE `$tb` SET project_id = ?" . ($hasSub ? ', subproject_id = NULL' : '') . " WHERE project_id = ?", [$to, $from])->rowCount(); } catch (Throwable $e) {}
+    }
+    try { $n += q('UPDATE subprojects SET project_id = ? WHERE project_id = ?', [$to, $from])->rowCount(); } catch (Throwable $e) {}
+    if (function_exists('audit')) try { audit('gen_move', 'project', $from, ['to' => $to, 'rows' => $n]); } catch (Throwable $e) {}
+    return $n;
 }
 function pm_project_footprint(int $id): array {
     return [

@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.80.12';
+const CP_VERSION = '1.80.13';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R72-009', 'version' => '1.80.13', 'date' => '2026-11-02', 'title' => 'Apps (Service 0.6.9, Golden PM 1.0.7): every long drop-down — vessels, projects, sub-projects, people, equipment — opens a searchable list (type to filter) instead of the native wheel. Portal: a draft service / inspection report can be moved to another project from its edit form; the General (GEN-) projects card shows the records each one carries (files, offers, reports, tickets, with links) and a "Move everything to" action to a project of the same vessel, so the emptied GEN- project can be deleted.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R72-008', 'version' => '1.80.12', 'date' => '2026-11-02', 'title' => 'A project is mandatory on every document: offers (the "vessel in general" choice is gone), service and inspection reports (portal, external attach and the Service app 0.6.8 — the "Service call (no project)" mode is gone; + Service report on a vessel with several projects asks which one, with no project offers New project), and an issued vessel-wide accounting report is filed under the project carrying most of its hours. No new GEN- general projects are created; the Projects card keeps listing the old ones for clean-up.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R72-007', 'version' => '1.80.11', 'date' => '2026-11-02', 'title' => 'Projects: administrators see a "General (GEN-) projects" card listing the vessel-level general projects the portal creates for offers / reports without a project, with what each one carries; an empty one can be deleted from the card, one in use is kept.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R72-006', 'version' => '1.80.10', 'date' => '2026-11-02', 'title' => 'Drawing tracker: a request saved with an empty System no longer lands under "— none —" — it inherits the system of the chosen sub-project (new rows and edits); a row whose system was made inactive keeps it selectable in the edit form instead of silently dropping it on save.', 'db' => null, 'check' => null],

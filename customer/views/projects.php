@@ -205,14 +205,20 @@ layout_head(t('pr.title'), 'projects');
 </div>
 <?= pager_html('projects', $pageNo, $total, $per, $keep) ?>
 <?php endif; ?>
-<?php if ($staff && is_cp_admin()): $gen = all("SELECT p.id, p.project_code, p.name, p.created_at, v.name AS vessel FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id WHERE p.project_code LIKE 'GEN-%' ORDER BY p.created_at DESC"); if ($gen): ?>
+<?php if ($staff && is_cp_admin()): $gen = all("SELECT p.id, p.project_code, p.name, p.created_at, p.vessel_id, v.name AS vessel FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id WHERE p.project_code LIKE 'GEN-%' ORDER BY p.created_at DESC"); if ($gen): ?>
 <div class="card" id="gen-projects">
   <h2>🗂 <?= tt('pr.gen_title') ?> <span class="hint" style="display:inline;margin-left:6px;"><?= count($gen) ?></span></h2>
   <p class="hint"><?= tt('pr.gen_hint') ?></p>
   <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('th.code') ?></th><th><?= tt('nav.vessels') ?></th><th><?= tt('th.date') ?></th><th><?= tt('pr.gen_refs') ?></th><th></th></tr></thead><tbody>
   <?php foreach ($gen as $g): $refs = pm_project_refs((int)$g['id']); $label = []; foreach ($refs as $k => $n) $label[] = $n . ' ' . t('pr.ref_' . $k); ?>
     <tr><td><a href="<?= url('projects', ['q' => $g['project_code']]) ?>"><b><?= e($g['project_code']) ?></b></a><br><span class="hint"><?= e($g['name']) ?></span></td><td><?= e((string)$g['vessel']) ?></td><td class="hint"><?= e(fmt_date(substr((string)$g['created_at'], 0, 10))) ?></td>
-      <td><?= $label ? e(implode(' · ', $label)) : '<span class="hint">' . tt('pr.gen_empty') . '</span>' ?></td>
+      <td><?= $label ? e(implode(' · ', $label)) : '<span class="hint">' . tt('pr.gen_empty') . '</span>' ?>
+        <?php if ($refs): $rows = pm_project_ref_rows((int)$g['id']); ?><details style="margin-top:4px;"><summary class="hint" style="cursor:pointer;"><?= tt('pr.gen_show') ?></summary><ul class="hint" style="margin:4px 0 0 16px;padding:0;">
+          <?php foreach ($rows as $x): ?><li><a href="<?= $x['href'] ?>"><?= e($x['label']) ?></a> <span><?= e(t('pr.ref_' . ['file' => 'files', 'offer' => 'offers', 'fsr' => 'fsr', 'isr' => 'isr', 'acc' => 'acc', 'ticket' => 'tickets'][$x['t']])) ?><?= $x['sub'] !== '' ? ' · ' . e($x['sub']) : '' ?></span></li><?php endforeach; ?></ul>
+          <?php $tg = all("SELECT id, project_code, name FROM projects WHERE vessel_id = ? AND id <> ? AND project_code NOT LIKE 'GEN-%' AND status <> 'completed' ORDER BY project_code DESC", [(int)$g['vessel_id'], (int)$g['id']]); if ($tg): ?>
+          <form method="post" action="<?= url('projects') ?>" class="inline" style="margin-top:6px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;" data-lock data-confirm="<?= e(t('pr.gen_move_confirm', ['code' => $g['project_code']])) ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('pr.gen_move') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="gen_move"><input type="hidden" name="id" value="<?= (int)$g['id'] ?>">
+            <select name="to" required style="max-width:320px;"><option value=""><?= tt('doc.pick_project') ?></option><?php foreach ($tg as $x): ?><option value="<?= (int)$x['id'] ?>"><?= e(trim(($x['project_code'] ?: '') . ' ' . $x['name'])) ?></option><?php endforeach; ?></select><button class="btn btn--ghost btn--sm" type="submit">⇢ <?= tt('pr.gen_move') ?></button></form>
+          <?php else: ?><p class="hint" style="margin:6px 0 0;"><?= tt('pr.gen_move_none') ?> <a href="<?= url('project_new', ['vessel' => (int)$g['vessel_id']]) ?>"><?= tt('pr.new') ?></a></p><?php endif; ?></details><?php endif; ?></td>
       <td class="row-actions"><?php if (!$refs): ?><form method="post" action="<?= url('projects') ?>" class="inline" data-lock data-confirm="<?= e(t('pr.gen_delete_confirm', ['code' => $g['project_code']])) ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('btn.delete') ?>" data-confirm-danger><?= csrf_field() ?><input type="hidden" name="action" value="project_delete"><input type="hidden" name="id" value="<?= (int)$g['id'] ?>"><button class="btn btn--ghost btn--sm btn--danger-ghost" type="submit">🗑 <?= tt('btn.delete') ?></button></form><?php else: ?><span class="hint"><?= tt('pr.gen_keep') ?></span><?php endif; ?></td></tr>
   <?php endforeach; ?>
   </tbody></table></div>

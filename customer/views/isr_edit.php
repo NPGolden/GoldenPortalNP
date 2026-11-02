@@ -17,6 +17,7 @@ if ($id && !$r) { http_response_code(404); exit(t('err.notfound')); }
 if ($r && $r['status'] === 'issued') redirect('isr', ['id' => $id]);
 
 $pid = $r ? (int)$r['project_id'] : (int)($_GET['project'] ?? 0);
+if ($r && (int)($_GET['project'] ?? 0) && ($r['status'] ?? 'draft') === 'draft') $pid = (int)$_GET['project'];   // R72-009
 $sid = $r ? (int)($r['subproject_id'] ?? 0) : (int)($_GET['sub'] ?? 0);
 $p = one('SELECT p.*, v.name AS vessel, v.imo, v.yard, c.name AS customer_name FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id LEFT JOIN customers c ON c.id = p.customer_id WHERE p.id = ?', [$pid]);
 if (!$p) { http_response_code(404); exit(t('err.notfound')); }
@@ -40,7 +41,10 @@ layout_head($title, 'projects');
 
 <form method="post" action="<?= url('isr_edit', $id ? ['id' => $id] : ['project' => $pid]) ?>" enctype="multipart/form-data" data-lock data-busy="<?= tt('fsr.saving') ?>" id="isrform">
   <?= csrf_field() ?>
-  <input type="hidden" name="action" value="isr_save"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="project_id" value="<?= $pid ?>">
+  <input type="hidden" name="action" value="isr_save"><input type="hidden" name="id" value="<?= $id ?>">
+<?php [$ps, $pa] = scope_sql('p'); $projOpts = all("SELECT p.id, p.project_code, p.name FROM projects p WHERE p.status <> 'completed' AND {$ps} ORDER BY p.project_code DESC, p.name", $pa); if (!array_filter($projOpts, fn($x) => (int)$x['id'] === $pid)) $projOpts[] = ['id' => $pid, 'project_code' => $p['project_code'], 'name' => $p['name']]; ?>
+    <div class="field"><label for="project_id"><?= tt('pr.one') ?></label><select name="project_id" id="project_id"><?php foreach ($projOpts as $x): ?><option value="<?= (int)$x['id'] ?>"<?= (int)$x['id'] === $pid ? ' selected' : '' ?>><?= e(trim(($x['project_code'] ?: '') . ' ' . $x['name'])) ?></option><?php endforeach; ?></select><p class="hint" style="margin:4px 0 0;"><?= tt('doc.project_change_hint') ?></p></div>
+    <script nonce="<?= csp_nonce() ?>">document.getElementById('project_id').addEventListener('change', function () { var u = new URL(location.href); u.searchParams.set('project', this.value); location.href = u.toString(); });</script>
 
   <div class="card">
     <div class="fsr-head">

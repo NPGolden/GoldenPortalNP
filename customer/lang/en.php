@@ -6320,4 +6320,12 @@ Best regards,
 'doc.pick_project' => '— choose a project —',
 'doc.need_project_hint' => 'Projects of the chosen vessel. A document cannot be filed on a vessel alone: create the project first if it is missing.',
 'doc.need_project_pick' => 'A service report belongs to a project. Choose one of the vessel\'s projects, or create one first.',
+// ---- GAS-CP-R72-009 pickers, project change, GEN move
+'doc.project_change_hint' => 'Changing the project reloads the form (sub-projects, job orders and tickets follow the project). Possible while the report is a draft.',
+'pr.gen_show' => 'show the records',
+'pr.gen_move' => 'Move everything to',
+'pr.gen_move_confirm' => 'Move every record of {code} (files, offers, reports, tickets, hours…) to the chosen project? The sub-project is cleared on each; the GEN- project can then be deleted.',
+'pr.gen_moved' => '{n} record(s) moved.',
+'pr.gen_move_vessel' => 'The target must be a project of the same vessel.',
+'pr.gen_move_none' => 'No other project of this vessel to move the records to —',
 ];

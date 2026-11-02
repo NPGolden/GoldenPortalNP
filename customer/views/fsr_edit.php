@@ -17,6 +17,7 @@ if ($r && !in_array($r['status'], ['draft', 'disputed'], true)) redirect('fsr', 
 $ext = null;                                                                     // R38-003: a service call on a vessel (no project) and / or a conversion of an external report
 if (!$r && fsr_ext_has() && (int)($_GET['from_ext'] ?? 0)) { $ext = one("SELECT * FROM fsr_reports WHERE id = ? AND kind = 'external' AND converted_id IS NULL", [(int)$_GET['from_ext']]); if (!$ext) { http_response_code(404); exit(t('err.notfound')); } }
 $pid = $r ? (int)$r['project_id'] : ($ext ? (int)$ext['project_id'] : (int)($_GET['project'] ?? 0));
+if ($r && (int)($_GET['project'] ?? 0) && $r['status'] === 'draft') $pid = (int)$_GET['project'];   // R72-009: a draft may be moved to another project before it is submitted
 if (!$pid && !$r && (int)($_GET['vessel'] ?? 0)) {                                                               // R72-008: a service call on a vessel needs a project — offer the vessel's projects or a new one
     $vid = (int)$_GET['vessel']; $vp = all("SELECT id, project_code, name, status FROM projects WHERE vessel_id = ? AND status <> 'completed' ORDER BY project_code DESC", [$vid]);
     if (count($vp) === 1) redirect('fsr_edit', ['project' => (int)$vp[0]['id'], 'vessel' => $vid]);
@@ -51,7 +52,10 @@ layout_head($title, 'projects');
 
 <form method="post" action="<?= url('fsr_edit', $id ? ['id' => $id] : ['project' => $pid]) ?>" enctype="multipart/form-data" data-lock data-busy="<?= tt('fsr.saving') ?>" id="fsrform">
   <?= csrf_field() ?>
-  <input type="hidden" name="action" value="fsr_save"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="project_id" value="<?= $pid ?>"><?php if ($ext): ?><input type="hidden" name="source_report_id" value="<?= (int)$ext['id'] ?>"><?php endif; ?>
+  <input type="hidden" name="action" value="fsr_save"><input type="hidden" name="id" value="<?= $id ?>">
+<?php [$ps, $pa] = scope_sql('p'); $projOpts = all("SELECT p.id, p.project_code, p.name FROM projects p WHERE p.status <> 'completed' AND {$ps} ORDER BY p.project_code DESC, p.name", $pa); if (!array_filter($projOpts, fn($x) => (int)$x['id'] === $pid)) $projOpts[] = ['id' => $pid, 'project_code' => $p['project_code'], 'name' => $p['name']]; ?>
+    <div class="field"><label for="project_id"><?= tt('pr.one') ?></label><select name="project_id" id="project_id"><?php foreach ($projOpts as $x): ?><option value="<?= (int)$x['id'] ?>"<?= (int)$x['id'] === $pid ? ' selected' : '' ?>><?= e(trim(($x['project_code'] ?: '') . ' ' . $x['name'])) ?></option><?php endforeach; ?></select><p class="hint" style="margin:4px 0 0;"><?= tt('doc.project_change_hint') ?></p></div>
+    <script nonce="<?= csp_nonce() ?>">document.getElementById('project_id').addEventListener('change', function () { var u = new URL(location.href); u.searchParams.set('project', this.value); location.href = u.toString(); });</script><?php if ($ext): ?><input type="hidden" name="source_report_id" value="<?= (int)$ext['id'] ?>"><?php endif; ?>
   <?php if ($ext): ?><div class="flash flash--warn">📎 <?= e(t('fsr.converting', ['no' => $ext['report_no']])) ?><?= $ext['ext_file_id'] ? ' <a href="' . url('file', ['id' => $ext['ext_file_id']]) . '" target="_blank">⤓ ' . tt('fsr.ext_file') . '</a>' : '' ?><?= $ext['ext_summary'] ? '<br><span class="hint">' . e($ext['ext_summary']) . '</span>' : '' ?><?= $ext['ext_engineers'] ? '<br><span class="hint">' . tt('fsr.ext_engineers') . ': ' . e($ext['ext_engineers']) . '</span>' : '' ?></div><?php endif; ?>
 
   <div class="card">

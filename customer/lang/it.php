@@ -6320,4 +6320,12 @@ Cordiali saluti,
 'doc.pick_project' => '— scegli un progetto —',
 'doc.need_project_hint' => 'Progetti della nave scelta. Un documento non può essere archiviato sulla sola nave: crea prima il progetto se manca.',
 'doc.need_project_pick' => 'Un rapporto di assistenza appartiene a un progetto. Scegli uno dei progetti della nave o creane uno prima.',
+// ---- GAS-CP-R72-009 pickers, project change, GEN move
+'doc.project_change_hint' => 'Cambiare progetto ricarica il modulo (sotto-progetti, ordini di lavoro e ticket seguono il progetto). Possibile finché il rapporto è una bozza.',
+'pr.gen_show' => 'mostra i record',
+'pr.gen_move' => 'Sposta tutto in',
+'pr.gen_move_confirm' => 'Spostare ogni record di {code} (file, offerte, rapporti, ticket, ore…) nel progetto scelto? Il sotto-progetto viene azzerato su ciascuno; il progetto GEN- potrà poi essere eliminato.',
+'pr.gen_moved' => '{n} record spostati.',
+'pr.gen_move_vessel' => 'La destinazione deve essere un progetto della stessa nave.',
+'pr.gen_move_none' => 'Nessun altro progetto della nave a cui spostare i record —',
 ];

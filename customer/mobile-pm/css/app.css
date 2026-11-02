@@ -211,3 +211,12 @@ table.week { width: 100%; border-collapse: collapse; } .week tr { border-bottom:
 .inbox .card.unread::before { background: var(--gold); } .inbox .card.read { opacity: .75; }
 .greet { font-size: 20px; color: var(--navy); font-weight: 700; margin: 6px 0 2px; } .greet small { display: block; font-size: 13px; color: var(--grey); font-weight: 400; }
 .week-h { font-size: 11px; color: var(--grey); letter-spacing: .5px; text-transform: uppercase; margin: 14px 0 6px; }
+
+/* searchable picker (R72-009) */
+.pk .in { display: flex; flex-direction: column; max-height: 80vh; }
+.pk input[type=search] { margin-bottom: 8px; }
+.pk-list { overflow: auto; flex: 1; min-height: 120px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: 8px; }
+.pk-g { font-size: 11px; font-weight: 700; color: var(--grey); text-transform: uppercase; padding: 8px 12px 2px; }
+.pk-it { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--light); padding: 12px; font: inherit; color: var(--text); }
+.pk-it.on { color: var(--navy); font-weight: 700; box-shadow: inset 4px 0 0 var(--gold); }
+.pk-it:active { background: var(--light); }
