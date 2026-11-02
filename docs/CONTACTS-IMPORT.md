@@ -968,3 +968,6 @@ No SQL. Apps: new `js/pick.js` (Service 0.6.9, Golden PM 1.0.7; shell lists + in
 
 ## 180. v1.80.14 — Golden PM open to managers (GAS-CP-R72-010)
 No SQL. `pm.php pm_is_manager($uid)`: `staff_roles.name` LIKE '%manager%' or in (ceo, owner), else `disciplines.manager_user_id = uid` or an active `customer_users.manager_user_id = uid` (memoised per request). `PortalPM::allowed()`: `pm_is_pm() || pm_is_manager() || hr_owner()`; 403 text "This account is not a project manager or manager". Manual: Golden PM access paragraph.
+
+## 181. v1.80.15 — HR excluded from Golden PM (GAS-CP-R72-011)
+No SQL. `PortalPM::allowed()`: `staff_roles.scope = 'hr'` for the account's `staff_role_id` → 403 "HR accounts use the web portal" before the PM / manager / owner checks. Manual: Golden PM access paragraph.

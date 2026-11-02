@@ -39,7 +39,7 @@ function api_act_as(int $uid): array {
     if (api_app() === 'customer') { if (($u['role'] ?? 'customer') !== 'customer' || empty($u['customer_id'])) throw new ApiException(403, 'Customer account required'); }   // R68-001: the customer app is for owner accounts only
     else {
         if (!in_array($u['role'] ?? '', ['staff', 'admin'], true)) throw new ApiException(403, 'Staff account required');
-        if (function_exists('hr_only') && hr_only()) throw new ApiException(403, 'This account is limited to the Planning board');   // R51 HR scope: no app access
+        if (function_exists('hr_only') && hr_only()) throw new ApiException(403, 'HR accounts use the web portal');   // R51 HR scope: no app access (wording R72-011)
     }
     $loc = (string)($_SERVER['HTTP_X_LANG'] ?? $u['locale'] ?? 'en'); locale(locale_valid($loc) ? $loc : 'en');
     return $u;

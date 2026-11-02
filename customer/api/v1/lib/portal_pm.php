@@ -22,6 +22,8 @@ final class PortalPM {
         // R72-005 (decision of 02/11/2026): Golden PM is for project managers only — PM of at least one project or the "Project Manager" staff role — plus the Owner scope, which sees everything in the portal by design.
         // Administrators, HR managers and timesheet approvers no longer qualify on those grounds; the check runs on every request, so existing sessions of other accounts end at once.
         // R72-010: managers too — any staff role containing "Manager" (Technical, Production, Service…), CEO / Owner, or whoever manages a discipline or people in HR.
+        // R72-011: HR accounts (staff role scope "hr") stay out whatever else they manage — a dedicated HR app is planned.
+        try { if ((string) scalar('SELECT scope FROM staff_roles WHERE id = ?', [(int)($u['staff_role_id'] ?? 0)]) === 'hr') throw new ApiException(403, 'HR accounts use the web portal'); } catch (ApiException $e) { throw $e; } catch (Throwable $e) {}
         if (pm_is_pm((int)$u['id']) || pm_is_manager((int)$u['id']) || (function_exists('hr_owner') && hr_owner())) return;
         throw new ApiException(403, 'This account is not a project manager or manager');
     }
