@@ -6332,4 +6332,6 @@ GAS-MSB-2026-002',
 'wk.delete_confirm' => 'Видалити цю тижневу нотатку та її фото?',
 'wk.note_empty' => 'Текст нотатки не може бути порожнім.',
 'ai.photos_sent' => 'фото надіслано асистенту',
+// ---- GAS-CP-R74-001 Golden HR
+'mob.app_hr' => 'Golden HR (iOS)',
 ];

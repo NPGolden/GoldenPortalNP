@@ -1,0 +1,95 @@
+/* Golden HR — i18n (EN master; EL / IT full; UK / BG partial, fall back to EN). GAS-CP-R74-001 */
+window.I18N = (() => {
+  const S = {
+    en: {
+      "tab.inbox": "Inbox", "tab.people": "People", "tab.messages": "Messages", "tab.calendar": "Calendar", "tab.more": "More", "tab.balances": "Leave balances",
+      "login.title": "HR", "login.portal": "Portal", "login.email": "E-mail", "login.password": "Password", "login.signin": "Sign in", "login.lang": "Language", "login.passkey": "Sign in with Face ID / passkey",
+      "login.totp": "Authenticator code", "login.totphint": "Enter the 6-digit code from your authenticator app", "login.totpbad": "Authenticator code not accepted — check the time on your phone and try the next code",
+      "login.failed": "Sign-in failed — check e-mail and password", "login.locked": "Account locked — contact the administrator", "login.update": "Update required — install the latest app version", "login.ratelimit": "Too many attempts — wait a minute",
+      "login.hronly": "Golden HR is for the HR role, the Owner and the CEO only.",
+      "lock.title": "Locked", "lock.lede": "Unlock with Face ID or Touch ID to continue. The app locks itself after 15 minutes.", "lock.unlock": "Unlock", "lock.signout": "Sign out instead", "lock.cancelled": "Unlock cancelled", "lock.need_bio": "Face ID / Touch ID is required for Golden HR and is not available on this device.",
+      "inbox.requests": "Leave", "inbox.trainings": "Training", "inbox.timesheets": "Timesheets", "inbox.history": "Decided", "inbox.empty": "Nothing waiting for you.", "inbox.empty_ts": "No timesheet waits for your approval.",
+      "dec.approve": "Approve", "dec.reject": "Reject", "dec.note": "Note to the employee", "dec.note_req": "A note is required to reject", "dec.sent": "Decision queued", "dec.queued": "Sending the decision…", "dec.needs_code": "waiting for the authenticator code", "dec.enter_code": "Enter code",
+      "dec.code": "Authenticator code", "dec.code_hint": "Decisions are confirmed with the 6-digit code of your authenticator app.", "dec.code_req": "Enter the 6-digit code", "dec.code_bad": "The code was not accepted — try the next one",
+      "dec.at_manager": "Waiting for the manager", "dec.at_hr": "Waiting for HR", "dec.mgr_ok": "manager approved", "dec.asked": "asked", "unit.d": "d", "unit.h": "h",
+      "st.pending_mgr": "waiting for manager", "st.pending_hr": "waiting for HR", "st.approved": "approved", "st.rejected": "rejected", "st.cancelled": "cancelled",
+      "ts.normal": "normal", "ts.overtime": "overtime", "ts.holiday": "holiday",
+      "people.search": "Search name, title, department…", "people.all_dep": "All departments", "people.count": "people", "people.away_today": "away today", "people.none": "Nobody found.", "people.alerts": "Expiring soon", "people.contract_end": "contract ends", "people.one": "Person",
+      "people.email": "E-mail", "people.phone_mobile": "Mobile", "people.phone_work": "Work phone", "people.manager": "Manager", "people.hire_date": "Hired", "people.contract": "Contract", "people.code": "Employee code", "people.part_time": "part-time", "people.technical": "technical",
+      "people.next_absences": "Next absences", "people.no_absences": "No absence in the next weeks.",
+      "bal.available": "available", "bal.taken": "taken", "bal.pending": "pending", "bal.none": "No balance this year.",
+      "msg.new": "New message", "msg.open": "Open thread", "msg.unread": "new", "msg.none": "No conversations yet.", "msg.empty": "No messages yet — write the first one.", "msg.write": "Message", "msg.send": "Send", "msg.sent": "Sent",
+      "cal.away": "away", "cal.pending": "(pending)", "cal.legend": "Codes",
+      "dow.0": "Sun", "dow.1": "Mon", "dow.2": "Tue", "dow.3": "Wed", "dow.4": "Thu", "dow.5": "Fri", "dow.6": "Sat",
+      "set.account": "Account", "set.branch": "Home branch", "set.version": "App version", "more.outbox": "Outbox", "more.lang": "Language", "more.sync": "Sync now", "more.clear_rejected": "Clear rejected operations", "more.lock": "Lock app", "more.signout": "Sign out",
+      "more.security": "Security", "more.security_txt": "Golden HR always asks for Face ID / Touch ID when it opens and after 15 minutes without use. Decisions are confirmed with your authenticator code. Personal, payroll and evaluation records never leave the portal.",
+      "more.about": "About", "more.about_txt": "Golden HR is the Golden A/S portal for the HR department on a phone: leave and training decisions, the people directory, who is away, balances and HR messages — everything goes through the portal's own rules, audit and notifications.",
+      "pk.title": "Passkeys", "pk.hint": "Sign in with Face ID instead of password and authenticator code — also after a sign-out. Add this device once; remove it here if the phone is lost.", "pk.add": "Add this device", "pk.name": "Name of this device", "pk.code": "Authenticator code", "pk.added": "Passkey added", "pk.failed": "Passkey failed", "pk.remove": "Remove", "pk.none": "No passkey on this account yet.", "pk.already": "This device already has a passkey for this account.",
+      "sync.ok": "Synced", "sync.off": "Offline", "sync.queued": "queued", "sync.rejected": "rejected", "sync.err": "Sync error", "sync.ago": "ago", "sync.now": "just now", "sync.loading": "Loading…", "common.ok": "OK", "common.cancel": "Cancel", "common.search": "Search…", "upd.done": "App updated to the latest version",
+    },
+    el: {
+      "tab.inbox": "Εισερχόμενα", "tab.people": "Άτομα", "tab.messages": "Μηνύματα", "tab.calendar": "Ημερολόγιο", "tab.more": "Περισσότερα", "tab.balances": "Υπόλοιπα αδειών",
+      "login.title": "HR", "login.portal": "Portal", "login.email": "E-mail", "login.password": "Κωδικός", "login.signin": "Σύνδεση", "login.lang": "Γλώσσα", "login.passkey": "Σύνδεση με Face ID / passkey",
+      "login.totp": "Κωδικός επαληθευτή", "login.totphint": "Εισάγετε τον 6ψήφιο κωδικό από την εφαρμογή επαληθευτή", "login.totpbad": "Ο κωδικός δεν έγινε δεκτός — ελέγξτε την ώρα του κινητού και δοκιμάστε τον επόμενο",
+      "login.failed": "Η σύνδεση απέτυχε — ελέγξτε e-mail και κωδικό", "login.locked": "Ο λογαριασμός κλειδώθηκε — επικοινωνήστε με τον διαχειριστή", "login.update": "Απαιτείται ενημέρωση — εγκαταστήστε την τελευταία έκδοση", "login.ratelimit": "Πολλές προσπάθειες — περιμένετε ένα λεπτό",
+      "login.hronly": "Το Golden HR είναι μόνο για τον ρόλο HR, τον Ιδιοκτήτη και τον CEO.",
+      "lock.title": "Κλειδωμένο", "lock.lede": "Ξεκλειδώστε με Face ID ή Touch ID. Η εφαρμογή κλειδώνει μόνη της μετά από 15 λεπτά.", "lock.unlock": "Ξεκλείδωμα", "lock.signout": "Αποσύνδεση", "lock.cancelled": "Το ξεκλείδωμα ακυρώθηκε", "lock.need_bio": "Το Face ID / Touch ID απαιτείται για το Golden HR και δεν είναι διαθέσιμο σε αυτή τη συσκευή.",
+      "inbox.requests": "Άδειες", "inbox.trainings": "Εκπαίδευση", "inbox.timesheets": "Φύλλα χρόνου", "inbox.history": "Αποφασισμένα", "inbox.empty": "Τίποτα σε αναμονή.", "inbox.empty_ts": "Κανένα φύλλο χρόνου δεν περιμένει έγκρισή σας.",
+      "dec.approve": "Έγκριση", "dec.reject": "Απόρριψη", "dec.note": "Σημείωση προς τον εργαζόμενο", "dec.note_req": "Για απόρριψη απαιτείται σημείωση", "dec.sent": "Η απόφαση μπήκε στην ουρά", "dec.queued": "Αποστολή απόφασης…", "dec.needs_code": "αναμονή κωδικού επαληθευτή", "dec.enter_code": "Εισαγωγή κωδικού",
+      "dec.code": "Κωδικός επαληθευτή", "dec.code_hint": "Οι αποφάσεις επιβεβαιώνονται με τον 6ψήφιο κωδικό του επαληθευτή.", "dec.code_req": "Εισάγετε τον 6ψήφιο κωδικό", "dec.code_bad": "Ο κωδικός δεν έγινε δεκτός — δοκιμάστε τον επόμενο",
+      "dec.at_manager": "Αναμονή προϊσταμένου", "dec.at_hr": "Αναμονή HR", "dec.mgr_ok": "εγκρίθηκε από", "dec.asked": "αίτηση", "unit.d": "ημ", "unit.h": "ώρ",
+      "st.pending_mgr": "αναμονή προϊσταμένου", "st.pending_hr": "αναμονή HR", "st.approved": "εγκρίθηκε", "st.rejected": "απορρίφθηκε", "st.cancelled": "ακυρώθηκε",
+      "ts.normal": "κανονικές", "ts.overtime": "υπερωρίες", "ts.holiday": "αργίες",
+      "people.search": "Αναζήτηση ονόματος, θέσης, τμήματος…", "people.all_dep": "Όλα τα τμήματα", "people.count": "άτομα", "people.away_today": "απόντες σήμερα", "people.none": "Δεν βρέθηκε κανείς.", "people.alerts": "Λήγουν σύντομα", "people.contract_end": "λήξη σύμβασης", "people.one": "Άτομο",
+      "people.email": "E-mail", "people.phone_mobile": "Κινητό", "people.phone_work": "Τηλ. εργασίας", "people.manager": "Προϊστάμενος", "people.hire_date": "Πρόσληψη", "people.contract": "Σύμβαση", "people.code": "Κωδικός εργαζομένου", "people.part_time": "μερική", "people.technical": "τεχνικός",
+      "people.next_absences": "Επόμενες απουσίες", "people.no_absences": "Καμία απουσία τις επόμενες εβδομάδες.",
+      "bal.available": "διαθέσιμα", "bal.taken": "ληφθέντα", "bal.pending": "εκκρεμή", "bal.none": "Χωρίς υπόλοιπο φέτος.",
+      "msg.new": "Νέο μήνυμα", "msg.open": "Άνοιγμα συνομιλίας", "msg.unread": "νέα", "msg.none": "Δεν υπάρχουν συνομιλίες.", "msg.empty": "Κανένα μήνυμα — γράψτε το πρώτο.", "msg.write": "Μήνυμα", "msg.send": "Αποστολή", "msg.sent": "Στάλθηκε",
+      "cal.away": "απόντες", "cal.pending": "(εκκρεμεί)", "cal.legend": "Κωδικοί",
+      "dow.0": "Κυρ", "dow.1": "Δευ", "dow.2": "Τρί", "dow.3": "Τετ", "dow.4": "Πέμ", "dow.5": "Παρ", "dow.6": "Σάβ",
+      "set.account": "Λογαριασμός", "set.branch": "Υποκατάστημα", "set.version": "Έκδοση εφαρμογής", "more.outbox": "Ουρά", "more.lang": "Γλώσσα", "more.sync": "Συγχρονισμός τώρα", "more.clear_rejected": "Καθαρισμός απορριφθέντων", "more.lock": "Κλείδωμα εφαρμογής", "more.signout": "Αποσύνδεση",
+      "more.security": "Ασφάλεια", "more.security_txt": "Το Golden HR ζητά πάντα Face ID / Touch ID στο άνοιγμα και μετά από 15 λεπτά αδράνειας. Οι αποφάσεις επιβεβαιώνονται με τον κωδικό επαληθευτή. Προσωπικά, μισθοδοτικά στοιχεία και αξιολογήσεις δεν φεύγουν ποτέ από το portal.",
+      "more.about": "Σχετικά", "more.about_txt": "Το Golden HR είναι το portal της Golden A/S για το τμήμα HR στο κινητό: αποφάσεις αδειών και εκπαιδεύσεων, κατάλογος προσωπικού, απουσίες, υπόλοιπα και μηνύματα HR — όλα μέσω των κανόνων, του ιστορικού και των ειδοποιήσεων του portal.",
+      "pk.title": "Passkeys", "pk.hint": "Σύνδεση με Face ID αντί για κωδικό και κωδικό επαληθευτή — και μετά από αποσύνδεση. Προσθέστε τη συσκευή μία φορά· αφαιρέστε την εδώ αν χαθεί.", "pk.add": "Προσθήκη αυτής της συσκευής", "pk.name": "Όνομα συσκευής", "pk.code": "Κωδικός επαληθευτή", "pk.added": "Το passkey προστέθηκε", "pk.failed": "Το passkey απέτυχε", "pk.remove": "Αφαίρεση", "pk.none": "Κανένα passkey ακόμη.", "pk.already": "Η συσκευή έχει ήδη passkey για τον λογαριασμό.",
+      "sync.ok": "Συγχρονισμένο", "sync.off": "Εκτός σύνδεσης", "sync.queued": "σε ουρά", "sync.rejected": "απορρίφθηκαν", "sync.err": "Σφάλμα συγχρονισμού", "sync.ago": "πριν", "sync.now": "μόλις τώρα", "sync.loading": "Φόρτωση…", "common.ok": "OK", "common.cancel": "Άκυρο", "common.search": "Αναζήτηση…", "upd.done": "Η εφαρμογή ενημερώθηκε στην τελευταία έκδοση",
+    },
+    it: {
+      "tab.inbox": "In arrivo", "tab.people": "Persone", "tab.messages": "Messaggi", "tab.calendar": "Calendario", "tab.more": "Altro", "tab.balances": "Saldi ferie",
+      "login.title": "HR", "login.portal": "Portale", "login.email": "E-mail", "login.password": "Password", "login.signin": "Accedi", "login.lang": "Lingua", "login.passkey": "Accedi con Face ID / passkey",
+      "login.totp": "Codice autenticatore", "login.totphint": "Inserisci il codice a 6 cifre dell'app autenticatore", "login.totpbad": "Codice non accettato — controlla l'ora del telefono e prova il successivo",
+      "login.failed": "Accesso non riuscito — controlla e-mail e password", "login.locked": "Account bloccato — contatta l'amministratore", "login.update": "Aggiornamento richiesto — installa l'ultima versione", "login.ratelimit": "Troppi tentativi — attendi un minuto",
+      "login.hronly": "Golden HR è solo per il ruolo HR, il Titolare e il CEO.",
+      "lock.title": "Bloccata", "lock.lede": "Sblocca con Face ID o Touch ID. L'app si blocca da sola dopo 15 minuti.", "lock.unlock": "Sblocca", "lock.signout": "Esci", "lock.cancelled": "Sblocco annullato", "lock.need_bio": "Face ID / Touch ID è richiesto per Golden HR e non è disponibile su questo dispositivo.",
+      "inbox.requests": "Ferie", "inbox.trainings": "Formazione", "inbox.timesheets": "Timesheet", "inbox.history": "Decise", "inbox.empty": "Niente in attesa.", "inbox.empty_ts": "Nessun timesheet attende la tua approvazione.",
+      "dec.approve": "Approva", "dec.reject": "Rifiuta", "dec.note": "Nota al dipendente", "dec.note_req": "Per rifiutare serve una nota", "dec.sent": "Decisione in coda", "dec.queued": "Invio della decisione…", "dec.needs_code": "in attesa del codice", "dec.enter_code": "Inserisci codice",
+      "dec.code": "Codice autenticatore", "dec.code_hint": "Le decisioni sono confermate con il codice a 6 cifre dell'autenticatore.", "dec.code_req": "Inserisci il codice a 6 cifre", "dec.code_bad": "Codice non accettato — prova il successivo",
+      "dec.at_manager": "In attesa del responsabile", "dec.at_hr": "In attesa di HR", "dec.mgr_ok": "approvato da", "dec.asked": "richiesta", "unit.d": "g", "unit.h": "h",
+      "st.pending_mgr": "attende il responsabile", "st.pending_hr": "attende HR", "st.approved": "approvata", "st.rejected": "rifiutata", "st.cancelled": "annullata",
+      "ts.normal": "ordinarie", "ts.overtime": "straordinario", "ts.holiday": "festivo",
+      "people.search": "Cerca nome, ruolo, reparto…", "people.all_dep": "Tutti i reparti", "people.count": "persone", "people.away_today": "assenti oggi", "people.none": "Nessuno trovato.", "people.alerts": "In scadenza", "people.contract_end": "fine contratto", "people.one": "Persona",
+      "people.email": "E-mail", "people.phone_mobile": "Cellulare", "people.phone_work": "Telefono ufficio", "people.manager": "Responsabile", "people.hire_date": "Assunzione", "people.contract": "Contratto", "people.code": "Codice dipendente", "people.part_time": "part-time", "people.technical": "tecnico",
+      "people.next_absences": "Prossime assenze", "people.no_absences": "Nessuna assenza nelle prossime settimane.",
+      "bal.available": "disponibili", "bal.taken": "godute", "bal.pending": "in attesa", "bal.none": "Nessun saldo quest'anno.",
+      "msg.new": "Nuovo messaggio", "msg.open": "Apri conversazione", "msg.unread": "nuovi", "msg.none": "Nessuna conversazione.", "msg.empty": "Nessun messaggio — scrivi il primo.", "msg.write": "Messaggio", "msg.send": "Invia", "msg.sent": "Inviato",
+      "cal.away": "assenti", "cal.pending": "(in attesa)", "cal.legend": "Codici",
+      "dow.0": "Dom", "dow.1": "Lun", "dow.2": "Mar", "dow.3": "Mer", "dow.4": "Gio", "dow.5": "Ven", "dow.6": "Sab",
+      "set.account": "Account", "set.branch": "Sede", "set.version": "Versione app", "more.outbox": "Coda", "more.lang": "Lingua", "more.sync": "Sincronizza ora", "more.clear_rejected": "Elimina operazioni rifiutate", "more.lock": "Blocca app", "more.signout": "Esci",
+      "more.security": "Sicurezza", "more.security_txt": "Golden HR chiede sempre Face ID / Touch ID all'apertura e dopo 15 minuti di inattività. Le decisioni sono confermate con il codice autenticatore. Dati personali, paghe e valutazioni non lasciano mai il portale.",
+      "more.about": "Informazioni", "more.about_txt": "Golden HR è il portale Golden A/S per l'ufficio HR sul telefono: decisioni su ferie e formazione, rubrica del personale, assenze, saldi e messaggi HR — tutto tramite regole, audit e notifiche del portale.",
+      "pk.title": "Passkey", "pk.hint": "Accedi con Face ID invece di password e codice — anche dopo l'uscita. Aggiungi il dispositivo una volta; rimuovilo qui se il telefono va perso.", "pk.add": "Aggiungi questo dispositivo", "pk.name": "Nome del dispositivo", "pk.code": "Codice autenticatore", "pk.added": "Passkey aggiunta", "pk.failed": "Passkey non riuscita", "pk.remove": "Rimuovi", "pk.none": "Nessuna passkey.", "pk.already": "Questo dispositivo ha già una passkey.",
+      "sync.ok": "Sincronizzato", "sync.off": "Offline", "sync.queued": "in coda", "sync.rejected": "rifiutate", "sync.err": "Errore di sincronizzazione", "sync.ago": "fa", "sync.now": "adesso", "sync.loading": "Caricamento…", "common.ok": "OK", "common.cancel": "Annulla", "common.search": "Cerca…", "upd.done": "App aggiornata all'ultima versione",
+    },
+    uk: { "tab.inbox": "Вхідні", "tab.people": "Люди", "tab.messages": "Повідомлення", "tab.calendar": "Календар", "tab.more": "Більше", "tab.balances": "Залишки відпусток", "login.signin": "Увійти", "login.password": "Пароль", "login.lang": "Мова", "dec.approve": "Схвалити", "dec.reject": "Відхилити", "common.cancel": "Скасувати", "common.search": "Пошук…", "more.signout": "Вийти", "lock.unlock": "Розблокувати" },
+    bg: { "tab.inbox": "Входящи", "tab.people": "Хора", "tab.messages": "Съобщения", "tab.calendar": "Календар", "tab.more": "Още", "tab.balances": "Отпуски — салда", "login.signin": "Вход", "login.password": "Парола", "login.lang": "Език", "dec.approve": "Одобри", "dec.reject": "Отхвърли", "common.cancel": "Отказ", "common.search": "Търсене…", "more.signout": "Изход", "lock.unlock": "Отключи" },
+  };
+  const LANGS = [["en", "EN"], ["el", "EL"], ["it", "IT"], ["uk", "UK"], ["bg", "BG"]];
+  let cur = "en";
+  try { cur = localStorage.getItem("ghr.lang") || (navigator.language || "en").slice(0, 2); } catch (e) {}
+  if (!S[cur]) cur = "en";
+  const t = (k, vars) => { let s = (S[cur] && S[cur][k]) || S.en[k] || k; if (vars) Object.keys(vars).forEach((v) => { s = s.split(`{${v}}`).join(vars[v]); }); return s; };
+  const set = (l) => { if (S[l]) { cur = l; try { localStorage.setItem("ghr.lang", l); } catch (e) {} } };
+  const apply = (root) => (root || document).querySelectorAll("[data-i18n]").forEach((el) => { el.textContent = t(el.dataset.i18n); });
+  const date = (iso) => { if (!iso) return ""; const [y, m, d] = String(iso).slice(0, 10).split("-"); return d && m && y ? `${d}/${m}/${y}` : String(iso); };
+  const has = (k) => !!((S[cur] && S[cur][k]) || S.en[k]);
+  return { t, set, get: () => cur, LANGS, apply, date, has };
+})();

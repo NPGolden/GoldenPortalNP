@@ -8,15 +8,15 @@ $path = '/' . trim((string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PAT
 $method = $_SERVER['REQUEST_METHOD']; $body = [];
 if (stripos($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') !== false) $body = json_decode(file_get_contents('php://input') ?: '[]', true) ?: [];
 try {
-    $app = api_app(); $isPm = $app === 'pm'; $isCu = $app === 'customer';                                                       // R66-001: 'engineer' (Service Engineer) or 'pm' (Golden PM); R68-001: 'customer'
+    $app = api_app(); $isPm = $app === 'pm'; $isCu = $app === 'customer'; $isHr = $app === 'hr';   // R74-001: 'hr' (Golden HR)                                                       // R66-001: 'engineer' (Service Engineer) or 'pm' (Golden PM); R68-001: 'customer'
     if (!isset(API_APPS[strtolower(trim((string)($_SERVER['HTTP_X_APP'] ?? API_APP_ID)))])) Response::error(403, 'Wrong application');
     $min = api_setting('api_min_version_' . $app, API_APPS[$app]); $ver = $_SERVER['HTTP_X_APP_VERSION'] ?? '0.0.0';
     if (version_compare($ver, $min, '<')) Response::error(426, 'Update required', ['min_version' => $min]);
     /** GET /me: the SE shape, plus the PM fields for app pm (§1). */
-    $me = function (array $u) use ($isPm, $isCu): array { if ($isCu) return PortalCustomer::me($u); $m = Portal::me($u); return $isPm ? array_replace($m, PortalPM::meExtra($u)) : $m; };
+    $me = function (array $u) use ($isPm, $isCu, $isHr): array { if ($isCu) return PortalCustomer::me($u); if ($isHr) return PortalHR::me($u); $m = Portal::me($u); return $isPm ? array_replace($m, PortalPM::meExtra($u)) : $m; };
     if ($path === '/auth/login' && $method === 'POST') { RateLimit::check('auth', RateLimit::ip(), 10);
         $u = Portal::login(trim((string)($body['email'] ?? '')), (string)($body['password'] ?? ''), isset($body['totp']) ? (string)$body['totp'] : null);
-        $dev = (array)($body['device'] ?? []); $u = api_act_as((int)$u['id']); if ($isPm) PortalPM::allowed($u); if ($isCu) PortalCustomer::allowed($u);   // §0: who may sign in to each app (before the device is enrolled)
+        $dev = (array)($body['device'] ?? []); $u = api_act_as((int)$u['id']); if ($isPm) PortalPM::allowed($u); if ($isCu) PortalCustomer::allowed($u); if ($isHr) PortalHR::allowed($u);   // §0: who may sign in to each app (before the device is enrolled)
         $did = Jwt::registerDevice((int)$u['id'], $dev); $u['device_id'] = $did;
         Response::json(['access_token' => Jwt::issue($u, $did), 'refresh_token' => Jwt::issueRefresh($did, $dev['platform'] ?? 'web'), 'user' => $me($u)]); }
     /* R71-001: passkey sign-in — challenge kept server-side (5 min, single use); the assertion is verified in app/pk.php; a verified passkey satisfies the authenticator step */
@@ -27,15 +27,17 @@ try {
         try { $u = pk_assert_finish($c['challenge'], (array)($body['credential'] ?? [])); } catch (RuntimeException $e) { usleep(300000); Response::error(401, 'Passkey rejected (' . $e->getMessage() . ')'); }
         if ($isCu) { if (($u['role'] ?? 'customer') !== 'customer') Response::error(403, 'Customer account required'); } elseif (!in_array($u['role'], ['staff', 'admin'], true)) Response::error(403, 'Staff account required');
         if (function_exists('login_log')) login_log((int)$u['id'], (string)$u['email'], 'passkey');
-        $dev = (array)($body['device'] ?? []); $u = api_act_as((int)$u['id']); if ($isPm) PortalPM::allowed($u); if ($isCu) PortalCustomer::allowed($u);
+        $dev = (array)($body['device'] ?? []); $u = api_act_as((int)$u['id']); if ($isPm) PortalPM::allowed($u); if ($isCu) PortalCustomer::allowed($u); if ($isHr) PortalHR::allowed($u);
         $did = Jwt::registerDevice((int)$u['id'], $dev); $u['device_id'] = $did;
         Response::json(['access_token' => Jwt::issue($u, $did), 'refresh_token' => Jwt::issueRefresh($did, $dev['platform'] ?? 'web'), 'user' => $me($u)]); }
     if ($path === '/auth/refresh' && $method === 'POST') { RateLimit::check('auth', RateLimit::ip(), 10);
-        $r = Jwt::consumeRefresh((string)($body['refresh_token'] ?? '')); $u = api_act_as((int)$r['user_id']); if ($isPm) PortalPM::allowed($u); if ($isCu) PortalCustomer::allowed($u);
+        $r = Jwt::consumeRefresh((string)($body['refresh_token'] ?? '')); $u = api_act_as((int)$r['user_id']); if ($isPm) PortalPM::allowed($u); if ($isCu) PortalCustomer::allowed($u); if ($isHr) PortalHR::allowed($u);
         Response::json(['access_token' => Jwt::issue($u, (int)$r['device_id']), 'refresh_token' => Jwt::issueRefresh((int)$r['device_id'], (string)$r['platform'], (int)$r['id'])]); }
     $u = Jwt::requireUser(); RateLimit::check('api', 'u' . $u['id'], 300);
     if (str_starts_with($path, '/pm/') && !$isPm) Response::error(403, 'Golden PM app only');
     if (str_starts_with($path, '/cu/') && !$isCu) Response::error(403, 'Customer app only');
+    if (str_starts_with($path, '/hr/app/') && !$isHr) Response::error(403, 'Golden HR app only');
+    if ($isHr) { PortalHR::allowed($u); if (!str_starts_with($path, '/hr/app/') && !in_array($path, ['/me', '/auth/logout', '/devices/push-token', '/me/passkeys', '/me/passkeys/options', '/sync'], true) && !preg_match('#^/me/passkeys/\d+$#', $path)) Response::error(403, 'Not available in Golden HR'); }   // R74-001: the HR app sees only its own routes
     if ($isCu) { PortalCustomer::allowed($u); if (!str_starts_with($path, '/cu/') && !in_array($path, ['/me', '/auth/logout', '/devices/push-token', '/me/passkeys', '/me/passkeys/options'], true) && !preg_match('#^/me/passkeys/\d+$#', $path)) Response::error(403, 'Not available in the customer app'); }   // CS-03: staff routes never serve a customer token
     if ($isCu && !str_starts_with($path, '/me/passkeys')) { $u['device_id'] = (int)$u['device_id']; require __DIR__ . '/endpoints/customer.php'; customer_routes($u, $method, $path, $body); }
     if ($isPm) PortalPM::allowed($u);                                                                                            // rights may change while a token lives
@@ -49,6 +51,15 @@ try {
         case $method === 'POST' && $path === '/me/passkeys': $c = pk_challenge_take('reg', 'db', (string)($body['challenge_id'] ?? '')); if (!$c || $c['uid'] !== (int)$u['id']) Response::error(400, 'Challenge expired');
             try { $id = pk_register_finish($u, $c['challenge'], (array)($body['credential'] ?? []), (string)($body['name'] ?? ''), (int)$u['device_id']); } catch (RuntimeException $e) { Response::error(400, 'Passkey not accepted (' . $e->getMessage() . ')'); } Response::json(['id' => $id], 201);
         case $method === 'DELETE' && preg_match('#^/me/passkeys/(\d+)$#', $path, $m): try { pk_remove((int)$u['id'], (int)$m[1]); } catch (RuntimeException $e) { Response::error(404, 'Not found'); } Response::json([], 204);
+        /* R74-001 Golden HR */
+        case $method === 'GET' && $path === '/hr/app/inbox': Response::json(PortalHR::inbox($u));
+        case $method === 'GET' && $path === '/hr/app/history': Response::json(PortalHR::history((int)($_GET['year'] ?? date('Y'))));
+        case $method === 'GET' && $path === '/hr/app/people': Response::json(PortalHR::people());
+        case $method === 'GET' && $path === '/hr/app/away': Response::json(PortalHR::away((string)($_GET['from'] ?? date('Y-m-d')), (string)($_GET['to'] ?? date('Y-m-d', strtotime('+27 days')))));
+        case $method === 'GET' && $path === '/hr/app/balances': Response::json(PortalHR::balances((int)($_GET['year'] ?? date('Y'))));
+        case $method === 'GET' && $path === '/hr/app/threads': Response::json(PortalHR::threads());
+        case $method === 'GET' && preg_match('#^/hr/app/thread/(\d+)$#', $path, $mm): Response::json(PortalHR::thread((int)$mm[1]));
+        case $method === 'POST' && $path === '/hr/app/send': RateLimit::check('sync', 'u' . $u['id'], 60); Response::json(PortalHR::send($u, $body), 201);
         case $method === 'GET' && $path === '/pm/projects': Response::json(PortalPM::projects($u));
         case $method === 'GET' && preg_match('#^/pm/subproject/(\d+)$#', $path, $m): Response::json(PortalPM::subproject($u, (int)$m[1]));
         case $method === 'GET' && $path === '/pm/drawings': Response::json(['items' => PortalPM::drawings(isset($_GET['project']) && $_GET['project'] !== '' ? (int)$_GET['project'] : null)]);

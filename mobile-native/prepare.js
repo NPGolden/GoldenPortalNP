@@ -1,4 +1,4 @@
-/* Prepares one app for Capacitor:  node prepare.js <engineer|pm|customer>
+/* Prepares one app for Capacitor:  node prepare.js <engineer|pm|customer|hr>
  * - writes capacitor.config.json (appId, appName, server.url = the live client, so screens follow the portal releases)
  * - copies the client folder to www/ as the offline fallback shell (API base absolute, mock/tests/sw removed, native bridge injected)
  * - copies the 1024 px icon to assets/ for @capacitor/assets (icons + splash for both platforms)

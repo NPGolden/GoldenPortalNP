@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.81.1';
+const CP_VERSION = '1.82.0';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R74-001', 'version' => '1.82.0', 'date' => '2026-11-02', 'title' => 'Golden HR 1.0.0 — the HR app for iPhone (customer/mobile-hr, bundle gr.goldenas.hr): HR inbox (leave / absence requests, training applications, timesheets) with approve / reject and authenticator step-up, people directory (work data only), who is away and public holidays, leave balances, HR message threads; sign-in for the HR role, Owner and CEO only; Face ID / Touch ID mandatory on open and after 15 minutes. API scope "hr" (/hr/app/*), Settings › Login history › Mobile apps lists it; the Customer app\'s minimum version is now saved under its own key.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R73-002', 'version' => '1.81.1', 'date' => '2026-11-02', 'title' => 'Assistant on the sub-project page: when asked in the ✨ panel to look at saved photos it now says that the photo assessment is the "✨ Assess photos" button on the note (the panel never sees stored photos); the assessment box shows how many photos were sent and the assistant\'s own text when it does not answer in the expected structure.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R73-001', 'version' => '1.81.0', 'date' => '2026-11-02', 'title' => 'Weekly notes editable in the portal (sub-project › Weekly: ✎ Edit date, visibility, text, add / remove photos; Delete) by the author, the project manager or an administrator — notes from the apps included. Assistant: ✨ Assess photos on a note reads its photos and proposes, per photo, the equipment, the condition as found, the risks with severity and the corrective actions with priority and owner; Append to the note puts the text into the edit form for review.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R72-012', 'version' => '1.80.16', 'date' => '2026-11-02', 'title' => 'Apps update themselves (Service 0.6.10, Golden PM 1.0.8, Customer 1.0.5): a new version on the server is picked up on every foreground and every 30 min, installed, and the app restarts — at once when idle, on the next screen change while something is being edited — with an "App updated" notice. No force-close needed.', 'db' => null, 'check' => null],

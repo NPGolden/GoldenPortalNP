@@ -6346,4 +6346,6 @@ Best regards,
 'wk.delete_confirm' => 'Delete this weekly note and its photos?',
 'wk.note_empty' => 'The note text cannot be empty.',
 'ai.photos_sent' => 'photo(s) sent to the assistant',
+// ---- GAS-CP-R74-001 Golden HR
+'mob.app_hr' => 'Golden HR (iOS)',
 ];

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 function sync_ops(array $u, array $b): void {
     $ops = $b['ops'] ?? []; if (!is_array($ops) || count($ops) > 200) throw new ApiException(422, 'ops: array of max 200');
-    $results = []; $pm = api_app() === 'pm';
+    $results = []; $pm = api_app() === 'pm'; $hr = api_app() === 'hr';   // R74-001
     foreach ($ops as $op) {
         $uuid = (string)($op['id'] ?? ''); $kind = (string)($op['kind'] ?? ''); $p = (array)($op['payload'] ?? []);
         if (!preg_match('/^[0-9a-f-]{36}$/', $uuid)) { $results[] = ['uuid' => $uuid, 'status' => 'rejected', 'error' => 'bad uuid']; continue; }
@@ -38,6 +38,9 @@ function sync_ops(array $u, array $b): void {
                 case 'ts_decide':      if (!$pm) throw new ApiException(403, 'Approvals are portal-only');          // CS-03 (SE app)
                                        RateLimit::check('decide', 'u' . $u['id'], 30); $res = PortalPM::tsDecide($u, $p); break;
                 case 'nf_read':        $res = PortalPM::markRead($u, (array)($p['ids'] ?? [])); break;
+                case 'hr_app_decide':   if (!$hr) throw new ApiException(403, 'Golden HR only'); RateLimit::check('decide', 'u' . $u['id'], 30); $res = PortalHR::decideRequest($u, $p); break;    // R74-001
+                case 'hr_app_training': if (!$hr) throw new ApiException(403, 'Golden HR only'); RateLimit::check('decide', 'u' . $u['id'], 30); $res = PortalHR::decideTraining($u, $p); break;
+                case 'hr_app_ts':       if (!$hr) throw new ApiException(403, 'Golden HR only'); RateLimit::check('decide', 'u' . $u['id'], 30); $res = PortalPM::tsDecide($u, $p); break;
                 case 'approve': case 'reject': case 'issue': case 'eng_decide': throw new ApiException(403, 'Approvals are portal-only');   // CS-03 (both apps: engineering extra-hours decisions stay in the portal)
                 default: throw new ApiException(422, 'Unknown operation kind');
             }

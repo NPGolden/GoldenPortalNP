@@ -6346,4 +6346,6 @@ Cordiali saluti,
 'wk.delete_confirm' => 'Eliminare questa nota settimanale e le sue foto?',
 'wk.note_empty' => 'Il testo della nota non può essere vuoto.',
 'ai.photos_sent' => 'foto inviate all\'assistente',
+// ---- GAS-CP-R74-001 Golden HR
+'mob.app_hr' => 'Golden HR (iOS)',
 ];
