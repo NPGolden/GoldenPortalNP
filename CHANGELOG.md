@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.80.16** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.81.0** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.81.0 | GAS-CP-R73-001 | 2026-11-02 | Weekly notes editable in the portal (sub-project › Weekly: ✎ Edit date, visibility, text, add / remove photos; Delete) by the author, the project manager or an administrator — notes from the apps included. Assistant: ✨ Assess photos on a note reads its photos and proposes, per photo, the equipment, the condition as found, the risks with severity and the corrective actions with priority and owner; Append to the note puts the text into the edit form for review. | — |
 | 1.80.16 | GAS-CP-R72-012 | 2026-11-02 | Apps update themselves (Service 0.6.10, Golden PM 1.0.8, Customer 1.0.5): a new version on the server is picked up on every foreground and every 30 min, installed, and the app restarts — at once when idle, on the next screen change while something is being edited — with an "App updated" notice. No force-close needed. | — |
 | 1.80.15 | GAS-CP-R72-011 | 2026-11-02 | Golden PM: HR accounts (staff role with the HR scope) are excluded from the app whatever else they manage — a dedicated HR app is planned. | — |
 | 1.80.14 | GAS-CP-R72-010 | 2026-11-02 | Golden PM: managers may sign in as well as project managers — any staff role containing "Manager" (Technical, Production, Service…), the CEO and the Owner, and whoever manages a discipline or people in HR. The check still runs on every request. | — |

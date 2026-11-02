@@ -416,12 +416,12 @@ function wk_render_docx(array $W): string {
     return $w->bytes($docNo, $bd['footer'] . ' · ' . $docNo);
 }
 /** JPEG bytes (≤ 900 px) for Word; GD when available, else the original if it is already a JPEG. */
-function wk_photo_jpeg(string $path): ?string {
+function wk_photo_jpeg(string $path, int $max = 900): ?string {
     $bytes = (string) @file_get_contents($path); if ($bytes === '') return null;
     $info = @getimagesizefromstring($bytes); if (!$info) return null;
     if (!function_exists('imagecreatefromstring')) return $info[2] === IMAGETYPE_JPEG ? $bytes : null;
     $im = @imagecreatefromstring($bytes); if (!$im) return null;
-    $wd = imagesx($im); $ht = imagesy($im); $r = min(1, 900 / max($wd, $ht)); $nw = max(1, (int) round($wd * $r)); $nh = max(1, (int) round($ht * $r));
+    $wd = imagesx($im); $ht = imagesy($im); $r = min(1, $max / max($wd, $ht)); $nw = max(1, (int) round($wd * $r)); $nh = max(1, (int) round($ht * $r));
     $out = imagecreatetruecolor($nw, $nh); $white = imagecolorallocate($out, 255, 255, 255); imagefill($out, 0, 0, $white); imagecopyresampled($out, $im, 0, 0, 0, 0, $nw, $nh, $wd, $ht);
     ob_start(); imagejpeg($out, null, 82); $jpg = (string) ob_get_clean(); imagedestroy($im); imagedestroy($out);
     return $jpg;

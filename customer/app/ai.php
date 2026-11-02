@@ -15,7 +15,8 @@
  */
 declare(strict_types=1);
 
-const AI_KINDS = ['fill', 'write', 'translate', 'ask'];
+const AI_KINDS = ['fill', 'write', 'translate', 'ask', 'assess'];
+const AI_ASSESS_PHOTOS = 6;   // R73-001: photos per weekly-note assessment
 const AI_MODELS = ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'];
 const AI_MAX_TEXT = 24000;      // characters of pasted text
 const AI_MAX_IMAGE = 4 * 1024 * 1024;
@@ -74,6 +75,10 @@ function ai_system(string $kind, array $ctx): string {
         case 'fill':      $s .= "\nTask: from the user's input (text and/or photo) propose values for the form fields. Answer ONLY a JSON object {\"fields\": {\"<name>\": <value>, …}, \"notes\": \"<one line on what could not be filled>\"}. Use field names exactly as listed; for select fields answer with an option value; dates as yyyy-mm-dd; numbers plain; multi-line text allowed. Omit fields you cannot fill."; break;
         case 'write':     $s .= "\nTask: write or improve the text of ONE field as asked. Answer ONLY the final text, no preamble, no quotes."; break;
         case 'translate': $s .= "\nTask: translate the given text to English, keeping technical terms, numbers, names and layout (line breaks, bullets). Answer ONLY the translation."; break;
+        case 'assess':    $s .= "\nTask: you are a senior marine electrical / automation commissioning engineer surveying equipment on board. The photos are attached to a weekly site note of a sub-project; the note text (if any) is in <input>. For EVERY photo, in order, assess what is shown and answer ONLY a JSON object: "
+                              . "{\"items\": [{\"photo\": <1-based number>, \"equipment\": \"<what it is, with tag / maker if legible>\", \"condition\": \"good|fair|poor|defective|not assessable\", \"as_found\": \"<2-4 sentences: condition as found, visible defects, workmanship, cleanliness, labelling, cable management, corrosion, overheating marks, IP integrity, missing covers / guards>\", "
+                              . "\"risks\": [{\"risk\": \"<hazard or failure mode>\", \"severity\": \"low|medium|high\", \"consequence\": \"<safety / availability / class consequence>\"}], \"actions\": [{\"action\": \"<corrective action, specific and verifiable>\", \"priority\": \"immediate|before next sailing|next port call|planned\", \"owner\": \"GAS|yard|crew|maker|owner\"}]}], \"summary\": \"<2-3 sentences overall>\"}. "
+                              . "Rules: judge only what is visible — write \"not assessable\" rather than guess; severity follows the worst credible consequence (electric shock, fire, loss of propulsion / steering / navigation, class non-compliance = high); cite the applicable practice when relevant (IEC 60092, class rules, maker instructions) without inventing clause numbers; British English; no marketing tone."; break;
         default:          $s .= "\nTask: answer the question using the page and form data only; say when the data does not contain the answer. Short answer, plain text, lists allowed."; break;
     }
     return $s;
@@ -86,16 +91,18 @@ function ai_run(string $kind, array $ctx, string $prompt, ?array $image, string 
     $prompt = mb_substr(trim($prompt), 0, AI_MAX_TEXT);
     if ($prompt === '' && !$image) return ['ok' => false, 'error' => t('ai.need_input')];
     $content = [];
-    if ($image) $content[] = ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $image['type'], 'data' => base64_encode($image['bytes'])]];
+    $images = $image ? (isset($image['bytes']) ? [$image] : array_values($image)) : [];   // R73-001: one image or a list
+    foreach ($images as $i => $im) { if (count($images) > 1) $content[] = ['type' => 'text', 'text' => 'Photo ' . ($i + 1) . ':']; $content[] = ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $im['type'], 'data' => base64_encode($im['bytes'])]]; }
     $content[] = ['type' => 'text', 'text' => '<input>' . ($prompt !== '' ? $prompt : '(see photo)') . '</input>'];
     $model = ai_setting('ai_model', AI_MODELS[1]);
-    $body = ['model' => $model, 'max_tokens' => $kind === 'ask' ? 1200 : 2500, 'system' => [['type' => 'text', 'text' => ai_system($kind, $ctx), 'cache_control' => ['type' => 'ephemeral']]], 'messages' => [['role' => 'user', 'content' => $content]]];
+    $body = ['model' => $model, 'max_tokens' => $kind === 'ask' ? 1200 : ($kind === 'assess' ? 4000 : 2500), 'system' => [['type' => 'text', 'text' => ai_system($kind, $ctx), 'cache_control' => ['type' => 'ephemeral']]], 'messages' => [['role' => 'user', 'content' => $content]]];
     $t0 = microtime(true); $res = ai_http($body); $ms = (int) round((microtime(true) - $t0) * 1000);
     $in = (int)($res['usage']['input_tokens'] ?? 0) + (int)($res['usage']['cache_creation_input_tokens'] ?? 0) + (int)($res['usage']['cache_read_input_tokens'] ?? 0); $out = (int)($res['usage']['output_tokens'] ?? 0);
     $ok = empty($res['_error']); $text = ''; if ($ok) foreach ((array)($res['content'] ?? []) as $c) if (($c['type'] ?? '') === 'text') $text .= $c['text'];
     try { q('INSERT INTO ai_log (user_id, user_name, page, kind, model, in_tokens, out_tokens, cost_eur, ms, ok, error) VALUES (?,?,?,?,?,?,?,?,?,?,?)', [$uid, (string)$u['full_name'], mb_substr($page, 0, 40), $kind, $model, $in, $out, ai_cost($in, $out), $ms, (int)$ok, $ok ? null : mb_substr((string)$res['_error'], 0, 255)]); } catch (Throwable $e) {}
     if (!$ok) return ['ok' => false, 'error' => t('ai.failed') . ' (' . e((string)$res['_error']) . ')'];
     $outp = ['ok' => true, 'text' => trim($text), 'tokens' => $in + $out];
+    if ($kind === 'assess') { $j = ai_json($text); $outp['items'] = array_slice((array)($j['items'] ?? []), 0, AI_ASSESS_PHOTOS); $outp['summary'] = mb_substr((string)($j['summary'] ?? ''), 0, 1500); $outp['text'] = ai_assess_text($outp['items'], $outp['summary']); }
     if ($kind === 'fill') {
         $j = ai_json($text); $allowed = array_column($ctx['fields'] ?? [], 'name'); $vals = [];
         foreach ((array)($j['fields'] ?? []) as $k => $v) if (in_array((string)$k, $allowed, true) && (is_scalar($v) || $v === null)) $vals[(string)$k] = $v === null ? '' : (is_bool($v) ? ($v ? '1' : '') : mb_substr((string)$v, 0, 4000));
@@ -116,12 +123,41 @@ function ai_http(array $body): array {
     return $d;
 }
 /** ?p=ai — JSON endpoint for the panel (POST, same-origin, CSRF header). */
+/** R73-001: the assessment as plain text for the note body. */
+function ai_assess_text(array $items, string $summary): string {
+    $L = [];
+    foreach ($items as $it) {
+        if (!is_array($it)) continue;
+        $L[] = '📷 ' . t('ai.ph') . ' ' . (int)($it['photo'] ?? 0) . ' — ' . trim((string)($it['equipment'] ?? '')) . ' — ' . t('ai.condition') . ': ' . strtoupper(trim((string)($it['condition'] ?? '')));
+        if (trim((string)($it['as_found'] ?? '')) !== '') $L[] = t('ai.as_found') . ': ' . trim((string)$it['as_found']);
+        foreach ((array)($it['risks'] ?? []) as $r) if (is_array($r)) $L[] = '  ⚠ [' . strtoupper((string)($r['severity'] ?? '')) . '] ' . trim((string)($r['risk'] ?? '')) . ((string)($r['consequence'] ?? '') !== '' ? ' → ' . trim((string)$r['consequence']) : '');
+        foreach ((array)($it['actions'] ?? []) as $a) if (is_array($a)) $L[] = '  ☐ ' . trim((string)($a['action'] ?? '')) . ' (' . trim((string)($a['priority'] ?? '')) . ((string)($a['owner'] ?? '') !== '' ? ' · ' . trim((string)$a['owner']) : '') . ')';
+        $L[] = '';
+    }
+    if ($summary !== '') $L[] = t('ai.summary') . ': ' . $summary;
+    return trim(implode("\n", $L));
+}
+/** R73-001: assess the photos of a weekly note (sp_notes) — the photos are read from storage, nothing is re-uploaded. */
+function ai_assess_note(int $noteId): array {
+    $n = one('SELECT n.*, s.project_id FROM sp_notes n JOIN subprojects s ON s.id = n.subproject_id WHERE n.id = ?', [$noteId]);
+    if (!$n || !is_staff() || !load_subproject((int)$n['subproject_id'])) return ['ok' => false, 'error' => t('err.noaccess')];
+    $ph = all("SELECT id, stored_name, original_name FROM sp_files WHERE note_id = ? AND kind = 'photo' ORDER BY id LIMIT " . AI_ASSESS_PHOTOS, [$noteId]);
+    if (!$ph) return ['ok' => false, 'error' => t('ai.no_photos')];
+    $imgs = [];
+    foreach ($ph as $f) { $j = function_exists('wk_photo_jpeg') ? wk_photo_jpeg(cp_storage() . '/' . $f['stored_name'], 1280) : null; if ($j !== null && $j !== '') $imgs[] = ['type' => 'image/jpeg', 'bytes' => $j]; }
+    if (!$imgs) return ['ok' => false, 'error' => t('ai.no_photos')];
+    $ctx = ['title' => t('wk.notes'), 'headline' => trim((string)($n['note_date'] ?? '') . ' ' . (string)($n['iso_week'] ?? '')), 'fields' => []];
+    $r = ai_run('assess', $ctx, (string)$n['body'], $imgs, 'subproject');
+    if ($r['ok']) $r['photos'] = array_map(fn($f) => ['id' => (int)$f['id'], 'name' => (string)$f['original_name']], $ph);
+    return $r;
+}
 function ai_endpoint(): void {
     header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store');
     $out = function (array $r, int $code = 200): never { http_response_code($code); echo json_encode($r, JSON_UNESCAPED_UNICODE); exit; };
     if ($_SERVER['REQUEST_METHOD'] !== 'POST' || !hash_equals($_SESSION['csrf'] ?? '', (string)($_SERVER['HTTP_X_CSRF'] ?? ''))) $out(['ok' => false, 'error' => t('err.noaccess')], 403);
     $kind = (string)($_POST['kind'] ?? ''); $page = preg_replace('/[^a-z_]/', '', (string)($_POST['page'] ?? ''));
     if (!ai_can($page)) $out(['ok' => false, 'error' => t('err.noaccess')], 403);
+    if ($kind === 'assess') $out(ai_assess_note((int)($_POST['note_id'] ?? 0)));   // R73-001
     $ctx = json_decode((string)($_POST['ctx'] ?? '{}'), true); if (!is_array($ctx)) $ctx = [];
     $fields = []; foreach ((array)($ctx['fields'] ?? []) as $f) { if (!is_array($f) || empty($f['name']) || !preg_match('/^[A-Za-z0-9_\[\]\-]{1,80}$/', (string)$f['name'])) continue; if (count($fields) >= 120) break;
         $opts = []; foreach ((array)($f['options'] ?? []) as $o) { if (count($opts) >= 60) break; if (is_array($o)) $opts[] = ['value' => mb_substr((string)($o['value'] ?? ''), 0, 60), 'label' => mb_substr((string)($o['label'] ?? ''), 0, 80)]; }

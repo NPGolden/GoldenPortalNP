@@ -687,6 +687,29 @@ function pm_handle_action(string $action, string $page): bool {
             $back();
         }
 
+        case 'note_update': {   // R73-001: edit a weekly note in the portal — author, administrator or the project's PM
+            $u = require_staff(); $nid = (int)$_POST['id'];
+            $n = one('SELECT n.*, s.project_id FROM sp_notes n JOIN subprojects s ON s.id = n.subproject_id WHERE n.id = ?', [$nid]); if (!$n) throw new RuntimeException(t('err.notfound'));
+            if ((int)$n['author_id'] !== (int)$u['id'] && !tm_can_edit((int)$n['subproject_id'], $u)) { http_response_code(403); exit(t('err.noaccess')); }
+            $d = $date('note_date') ?: (string)$n['note_date']; $vis = ($_POST['visibility'] ?? '') === 'internal' ? 'internal' : 'external';
+            $body = $str('body', 8000); if ($body === null || $body === '') throw new RuntimeException(t('wk.note_empty'));
+            q('UPDATE sp_notes SET note_date = ?, iso_week = ?, visibility = ?, body = ? WHERE id = ?', [$d, iso_week($d), $vis, $body, $nid]);
+            q("UPDATE sp_files SET visibility = ? WHERE note_id = ? AND kind = 'photo'", [$vis, $nid]);
+            foreach ((array)($_POST['del_photo'] ?? []) as $fid) { $fid = (int)$fid; if ($fid && scalar("SELECT COUNT(*) FROM sp_files WHERE id = ? AND note_id = ? AND kind = 'photo'", [$fid, $nid])) cp_delete_file($fid); }
+            $k = 0; foreach (files_list('photos') as $f) { if (cp_store_file($f, (int)$n['project_id'], (int)$n['subproject_id'], 'photo', $vis, null, $nid)) $k++; }
+            flash('good', t('wk.updated', ['n' => $k]));
+            $back();
+        }
+        case 'note_delete': {
+            $u = require_staff(); $nid = (int)$_POST['id'];
+            $n = one('SELECT * FROM sp_notes WHERE id = ?', [$nid]); if (!$n) throw new RuntimeException(t('err.notfound'));
+            if ((int)$n['author_id'] !== (int)$u['id'] && !tm_can_edit((int)$n['subproject_id'], $u)) { http_response_code(403); exit(t('err.noaccess')); }
+            foreach (all("SELECT id FROM sp_files WHERE note_id = ?", [$nid]) as $f) cp_delete_file((int)$f['id']);
+            q('DELETE FROM sp_notes WHERE id = ?', [$nid]);
+            flash('good', t('wk.deleted'));
+            $back();
+        }
+
         /* ------------------------------------------- comments / chat */
         case 'cm_post': {
             $u = require_login();

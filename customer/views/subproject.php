@@ -340,16 +340,57 @@ layout_head($sp['code'] . ' · ' . $sp['name'], 'projects');
     </form>
   <?php endif; ?>
   <?php if (!$notes): ?><div class="empty"><p><?= tt('wk.empty') ?></p></div><?php endif; ?>
-  <?php foreach ($notes as $n): ?>
-    <div class="note">
+  <?php $aiOk = $staff && function_exists('ai_can') && ai_can('subproject'); $me = (int)(current_user()['id'] ?? 0); $canAll = $staff && function_exists('tm_can_edit') && tm_can_edit($id);
+  foreach ($notes as $n): $nid = (int)$n['id']; $canEdit = $staff && ($canAll || (int)$n['author_id'] === $me); $nph = $photos[$nid] ?? []; ?>
+    <div class="note" id="note-<?= $nid ?>">
       <span class="when"><?= e(fmt_date($n['note_date'])) ?> · <?= e($n['iso_week']) ?> · <?= e($n['full_name']) ?></span>
       <?php if ($staff): ?><span class="vis-tag <?= e($n['visibility']) ?>"><?= tt('vis.' . $n['visibility']) ?></span><?php endif; ?>
-      <p style="margin:6px 0 0;"><?= mt_html($n['body']) ?></p>
-      <?php if (!empty($photos[(int)$n['id']])): ?><div class="photos">
-        <?php foreach ($photos[(int)$n['id']] as $ph): ?><a href="<?= url('file', ['id' => $ph['id']]) ?>" target="_blank"><img src="<?= url('file', ['id' => $ph['id']]) ?>" alt=""></a><?php endforeach; ?>
+      <?php if ($canEdit || ($aiOk && $nph)): ?><span class="row-actions" style="float:right;display:inline-flex;gap:6px;">
+        <?php if ($aiOk && $nph): ?><button type="button" class="btn btn--ghost btn--sm js-note-ai" data-note="<?= $nid ?>" title="<?= tt('ai.assess_hint') ?>">✨ <?= tt('ai.assess') ?></button><?php endif; ?>
+        <?php if ($canEdit): ?><button type="button" class="btn btn--ghost btn--sm js-note-edit" data-note="<?= $nid ?>">✎ <?= tt('btn.edit') ?></button><?php endif; ?>
+      </span><?php endif; ?>
+      <p style="margin:6px 0 0;" class="note-body"><?= mt_html($n['body']) ?></p>
+      <?php if ($nph): ?><div class="photos">
+        <?php foreach ($nph as $k => $ph): ?><a href="<?= url('file', ['id' => $ph['id']]) ?>" target="_blank" title="<?= tt('ai.ph') ?> <?= $k + 1 ?>"><img src="<?= url('file', ['id' => $ph['id']]) ?>" alt=""></a><?php endforeach; ?>
       </div><?php endif; ?>
+      <div class="ai-assess hidden" id="ai-<?= $nid ?>"></div>
+      <?php if ($canEdit): ?>
+      <form method="post" action="<?= $backTo ?>" enctype="multipart/form-data" data-lock class="note-edit hidden" id="ne-<?= $nid ?>" style="margin-top:10px;">
+        <?= csrf_field() ?><input type="hidden" name="action" value="note_update"><input type="hidden" name="id" value="<?= $nid ?>">
+        <div class="grid grid-3">
+          <div class="field"><label><?= tt('th.date') ?></label><input name="note_date" type="date" value="<?= e($n['note_date']) ?>" required></div>
+          <div class="field"><label><?= tt('vis.label') ?></label><select name="visibility" data-nosearch><option value="external"<?= $n['visibility'] === 'external' ? ' selected' : '' ?>><?= tt('vis.external') ?></option><option value="internal"<?= $n['visibility'] === 'internal' ? ' selected' : '' ?>><?= tt('vis.internal') ?></option></select></div>
+          <div class="field"><label><?= tt('wk.add_photos') ?></label><input name="photos[]" type="file" accept="image/*" multiple></div>
+        </div>
+        <div class="field"><label><?= tt('wk.note') ?></label><textarea data-mt name="body" required rows="8"><?= e($n['body']) ?></textarea></div>
+        <?php if ($nph): ?><div class="field"><label><?= tt('wk.remove_photos') ?></label><div style="display:flex;gap:10px;flex-wrap:wrap;"><?php foreach ($nph as $k => $ph): ?><label style="display:inline-flex;align-items:center;gap:4px;font-weight:400;"><input type="checkbox" name="del_photo[]" value="<?= (int)$ph['id'] ?>"> <?= tt('ai.ph') ?> <?= $k + 1 ?></label><?php endforeach; ?></div></div><?php endif; ?>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;"><button class="btn" type="submit"><?= tt('btn.save') ?></button><button type="button" class="btn btn--ghost js-note-cancel" data-note="<?= $nid ?>"><?= tt('btn.cancel') ?></button>
+          <button class="btn btn--ghost btn--danger-ghost" type="submit" form="nd-<?= $nid ?>" style="margin-left:auto;">🗑 <?= tt('btn.delete') ?></button></div>
+      </form>
+      <form method="post" action="<?= $backTo ?>" id="nd-<?= $nid ?>" class="inline" data-lock data-confirm="<?= tt('wk.delete_confirm') ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('btn.delete') ?>" data-confirm-danger><?= csrf_field() ?><input type="hidden" name="action" value="note_delete"><input type="hidden" name="id" value="<?= $nid ?>"></form>
+      <?php endif; ?>
     </div>
   <?php endforeach; ?>
+  <?php if ($staff): ?><script nonce="<?= csp_nonce() ?>">(function(){
+    var T=<?= json_encode(['busy' => t('ai.assess_busy'), 'append' => t('ai.append'), 'err' => t('ai.failed'), 'net' => 'Network error', 'appended' => t('ai.appended')], JSON_UNESCAPED_UNICODE) ?>;
+    function q(s,r){return (r||document).querySelector(s);} function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+    document.querySelectorAll('.js-note-edit').forEach(function(b){b.addEventListener('click',function(){var f=q('#ne-'+b.dataset.note);if(f){f.classList.toggle('hidden');if(!f.classList.contains('hidden'))f.querySelector('textarea').focus();}});});
+    document.querySelectorAll('.js-note-cancel').forEach(function(b){b.addEventListener('click',function(){q('#ne-'+b.dataset.note).classList.add('hidden');});});
+    document.querySelectorAll('.js-note-ai').forEach(function(b){b.addEventListener('click',function(){
+      var id=b.dataset.note,box=q('#ai-'+id);if(!window.GASAI){return;} box.classList.remove('hidden');box.innerHTML='<p class="hint">'+esc(T.busy)+'</p>';b.disabled=true;
+      var fd=new FormData();fd.append('kind','assess');fd.append('page',GASAI.page);fd.append('note_id',id);
+      fetch('index.php?p=ai',{method:'POST',body:fd,credentials:'same-origin',headers:{'X-CSRF':GASAI.csrf}}).then(function(r){return r.json();}).then(function(r){b.disabled=false;
+        if(!r.ok){box.innerHTML='<p class="flash flash--bad">'+esc(r.error||T.err)+'</p>';return;}
+        var h='<div class="ai-answer">';(r.items||[]).forEach(function(it){var sev={high:'var(--red)',medium:'var(--amber)',low:'var(--green)'};
+          h+='<p style="margin:8px 0 2px;"><b>📷 '+esc(it.photo)+' — '+esc(it.equipment)+'</b> <span class="pill pill--gold">'+esc(String(it.condition||'').toUpperCase())+'</span></p><p style="margin:0 0 4px;">'+esc(it.as_found)+'</p>';
+          (it.risks||[]).forEach(function(x){h+='<p style="margin:0 0 2px 12px;"><span style="font-weight:700;color:'+(sev[x.severity]||'inherit')+'">⚠ '+esc(String(x.severity||'').toUpperCase())+'</span> '+esc(x.risk)+(x.consequence?' → '+esc(x.consequence):'')+'</p>';});
+          (it.actions||[]).forEach(function(x){h+='<p style="margin:0 0 2px 12px;">☐ '+esc(x.action)+' <span class="hint">('+esc(x.priority)+(x.owner?' · '+esc(x.owner):'')+')</span></p>';});});
+        if(r.summary)h+='<p style="margin-top:8px;"><b>'+esc(r.summary)+'</b></p>';
+        h+='</div>';var f=q('#ne-'+id);if(f)h+='<p style="margin:8px 0 0;"><button type="button" class="btn btn--sm js-ai-append">'+esc(T.append)+'</button></p>';
+        box.innerHTML=h;var ab=q('.js-ai-append',box);if(ab)ab.addEventListener('click',function(){var ta=f.querySelector('textarea');ta.value=(ta.value.replace(/\s+$/,'')+'\n\n'+r.text).trim();f.classList.remove('hidden');ta.focus();ab.disabled=true;ab.textContent=T.appended;});
+      }).catch(function(){b.disabled=false;box.innerHTML='<p class="flash flash--bad">'+esc(T.net)+'</p>';});
+    });});
+  })();</script><?php endif; ?>
 </div>
 
 <?php /* ============================================== COMMENTS ========= */ elseif ($tab === 'comments'):

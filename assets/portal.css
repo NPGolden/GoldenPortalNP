@@ -1781,3 +1781,7 @@ html[data-theme="dark"] .pl-board td, html[data-theme="dark"] .pl-board .num { c
 html[data-theme="dark"] .online-pop { background: #0F2436; }
 .online-row { display: flex; gap: 8px; align-items: center; padding: 4px 0; border-bottom: 1px solid var(--line-soft); } .online-row:last-of-type { border-bottom: 0; }
 
+/* R73-001 weekly note edit + assessment */
+.note .note-edit.hidden, .note .ai-assess.hidden { display: none; }
+.note .ai-assess { margin-top: 8px; }
+.note .ai-assess .ai-answer { white-space: normal; }
