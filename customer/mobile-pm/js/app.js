@@ -137,7 +137,7 @@ window.UI = (() => {
   $("#hdr-ai").onclick = () => ASSIST.open(assistCtx || { page: "fsr_edit", title: "Golden PM", headline: location.hash, fields: () => [], noFill: true });
   // app start
   (async () => {
-    if ("serviceWorker" in navigator && location.protocol !== "file:") { try { await navigator.serviceWorker.register("sw.js"); } catch (e) {} }
+    if ("serviceWorker" in navigator && location.protocol !== "file:") { try { UPD.init(await navigator.serviceWorker.register("sw.js")); } catch (e) {} }   // R72-012 self-update
     await DB.open(); I18N.apply(); await SYNC.refreshCount();
     try { if (API.signedIn && localStorage.getItem("gpm.bio") === "1" && !API.mock) localStorage.setItem("gpm.locked", "1"); } catch (e) {}   // R70-005: the gate is the lock screen — a cancelled Face ID no longer signs you out
     if (API.signedIn) { const me = await DB.get("meta", "me"); if (!me) await SYNC.run(); else SYNC.run(); }

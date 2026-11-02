@@ -2,14 +2,14 @@
  * Precache the shell; never cache the API (Cache-Control: no-store on the server as well).
  * Bump VERSION with every portal release: the old cache is dropped on activate.
  */
-const VERSION = "1.0.7";
+const VERSION = "1.0.8";
 const SHELL = `gas-pm-v${VERSION}`;
 const IMAGES = "gas-pm-images";
 const ASSETS = [
   "./", "./index.html", "./manifest.webmanifest",
   `./css/app.css?v=${VERSION}`,
   `./js/i18n.js?v=${VERSION}`, `./js/db.js?v=${VERSION}`, `./js/api.js?v=${VERSION}`,
-  `./js/sync.js?v=${VERSION}`, `./js/screens.js?v=${VERSION}`, `./js/hr.js?v=${VERSION}`, `./js/assist.js?v=${VERSION}`, `./js/pick.js?v=${VERSION}`, `./js/app.js?v=${VERSION}`,
+  `./js/sync.js?v=${VERSION}`, `./js/screens.js?v=${VERSION}`, `./js/hr.js?v=${VERSION}`, `./js/assist.js?v=${VERSION}`, `./js/upd.js?v=${VERSION}`, `./js/pick.js?v=${VERSION}`, `./js/app.js?v=${VERSION}`,
   "./img/logo.png", "./img/logo-white.png", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon-180.png",
 ];
 

@@ -43,7 +43,7 @@ window.App = (function () {
       refreshBadges();
     }
     Native.onResume(() => { if (Api.hasSession()) refreshBadges(); });
-    if ("serviceWorker" in navigator && !Api.cfg.mock && location.protocol === "https:") { navigator.serviceWorker.register("sw.js").catch(() => {}); }
+    if ("serviceWorker" in navigator && !Api.cfg.mock && location.protocol === "https:") { navigator.serviceWorker.register("sw.js").then((r) => UPD.init(r)).catch(() => {}); }   // R72-012 self-update
     // Deep links: goldenas://… and https://goldensas.com/customer/mobile-customer/#/… arrive as the hash.
     route();
   }

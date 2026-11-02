@@ -123,8 +123,7 @@ window.UI = (() => {
   $("#hdr-ai").onclick = () => ASSIST.open(assistCtx || { screen: (location.hash.match(/^#\/(\w+)/) || [])[1] || "generic", context: () => ({ screen: location.hash }) });
   // app start
   (async () => {
-    if ("serviceWorker" in navigator && !API.mock) { try { await navigator.serviceWorker.register("sw.js"); } catch (e) {} }
-    else if ("serviceWorker" in navigator) { try { await navigator.serviceWorker.register("sw.js"); } catch (e) {} }
+    if ("serviceWorker" in navigator) { try { UPD.init(await navigator.serviceWorker.register("sw.js")); } catch (e) {} }   // R72-012 self-update
     await DB.open(); I18N.apply(); await SYNC.refreshCount();
     try { if (API.signedIn && localStorage.getItem("gas.bio") === "1" && !API.mock) localStorage.setItem("gas.locked", "1"); } catch (e) {}   // R70-005
     if (API.signedIn) { const me = await DB.get("meta", "me"); if (!me) await SYNC.run(); else SYNC.run(); }
