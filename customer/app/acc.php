@@ -338,7 +338,8 @@ function acc_issue(int $id): array {
     if (str_starts_with((string)$R['report_no'], 'DRAFT-')) { $R['report_no'] = acc_number((int)$R['branch_id'] ?: null); $R['revision'] = 'R0'; }
     elseif ($R['status'] === 'returned') $R['revision'] = 'R' . ((int) substr((string)$R['revision'], 1) + 1);
     acc_recalc($id); $R = array_merge($R, one('SELECT total_hours, total_gross, total_net FROM acc_reports WHERE id = ?', [$id]) ?: []);
-    $pid = (int)$R['project_id'] ?: (function_exists('ob_general_project') && $R['vessel_id'] ? ob_general_project((int)$R['vessel_id']) : 0);
+    $pid = (int)$R['project_id'] ?: (int) scalar('SELECT project_id FROM acc_lines WHERE report_id = ? AND project_id IS NOT NULL GROUP BY project_id ORDER BY SUM(hours) DESC LIMIT 1', [$id]);   // R72-008: vessel-wide report → the project carrying most of its hours (no GEN- project)
+    if (!$pid) throw new RuntimeException(t('doc.need_project'));
     $R['status'] = 'issued'; $pdf = acc_render_pdf($R); $xlsx = acc_render_xlsx($R);
     $pdfId = cp_store_bytes($pdf, $R['report_no'] . '_' . $R['revision'] . '.pdf', 'application/pdf', $pid, $R['subproject_id'] ? (int)$R['subproject_id'] : null, 'issued', 'internal', null, $R['report_no'] . ' ' . t('acc.report'), ['doc_no' => $R['report_no'], 'revision' => $R['revision']]);
     $xlsId = cp_store_bytes($xlsx, $R['report_no'] . '_' . $R['revision'] . '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', $pid, $R['subproject_id'] ? (int)$R['subproject_id'] : null, 'issued', 'internal', null, $R['report_no'] . ' ' . t('acc.report'), ['doc_no' => $R['report_no'], 'revision' => $R['revision']]);

@@ -17,7 +17,15 @@ if ($r && !in_array($r['status'], ['draft', 'disputed'], true)) redirect('fsr', 
 $ext = null;                                                                     // R38-003: a service call on a vessel (no project) and / or a conversion of an external report
 if (!$r && fsr_ext_has() && (int)($_GET['from_ext'] ?? 0)) { $ext = one("SELECT * FROM fsr_reports WHERE id = ? AND kind = 'external' AND converted_id IS NULL", [(int)$_GET['from_ext']]); if (!$ext) { http_response_code(404); exit(t('err.notfound')); } }
 $pid = $r ? (int)$r['project_id'] : ($ext ? (int)$ext['project_id'] : (int)($_GET['project'] ?? 0));
-if (!$pid && !$r && (int)($_GET['vessel'] ?? 0)) $pid = fsr_project_for_vessel((int)$_GET['vessel']);
+if (!$pid && !$r && (int)($_GET['vessel'] ?? 0)) {                                                               // R72-008: a service call on a vessel needs a project — offer the vessel's projects or a new one
+    $vid = (int)$_GET['vessel']; $vp = all("SELECT id, project_code, name, status FROM projects WHERE vessel_id = ? AND status <> 'completed' ORDER BY project_code DESC", [$vid]);
+    if (count($vp) === 1) redirect('fsr_edit', ['project' => (int)$vp[0]['id'], 'vessel' => $vid]);
+    layout_head(t('fsr.one')); ?>
+<div class="card" style="max-width:720px;margin:0 auto;"><h2><?= tt('fsr.one') ?></h2><p><?= tt('doc.need_project_pick') ?></p>
+  <?php foreach ($vp as $x): ?><p><a class="btn btn--ghost btn--sm" href="<?= url('fsr_edit', ['project' => (int)$x['id'], 'vessel' => $vid]) ?>"><?= e(($x['project_code'] ?: '') . ' ' . $x['name']) ?></a></p><?php endforeach; ?>
+  <p><a class="btn btn--gold btn--sm" href="<?= url('project_new', ['vessel' => $vid]) ?>"><?= tt('pr.new') ?></a> <a class="btn btn--ghost btn--sm" href="<?= url('vessel_view', ['id' => $vid]) ?>"><?= tt('hra.back') ?></a></p>
+</div>
+<?php layout_foot(); exit; }
 $sid = $r ? (int)($r['subproject_id'] ?? 0) : ($ext ? (int)($ext['subproject_id'] ?? 0) : (int)($_GET['sub'] ?? 0));
 $joId = $r ? (int)($r['job_order_id'] ?? 0) : (int)($_GET['jo'] ?? 0);
 $tkId = $r ? (int)($r['ticket_id'] ?? 0) : (int)($_GET['ticket'] ?? 0);

@@ -142,7 +142,7 @@ function of_save_from_post(int $id): int {
     require_staff(); $u = current_user();
     $pid = (int)($_POST['project_id'] ?? 0); $ob = function_exists('ob_has') && ob_has();
     $vid = $ob ? ((int)($_POST['vessel_id'] ?? 0) ?: null) : null;
-    if (!$pid && $vid && $ob) $pid = ob_general_project($vid);                                                    // R33: "vessel in general" → the vessel's general project
+    if (!$pid) throw new RuntimeException(t('doc.need_project'));                                                  // R72-008: every document belongs to a project (no GEN- fallback)
     $p = one('SELECT * FROM projects WHERE id = ?', [$pid]); if (!$p) throw new RuntimeException(t('err.notfound'));
     if ($ob && !$vid) $vid = (int)($p['vessel_id'] ?? 0) ?: null;
     $tid = $ob ? ((int)($_POST['ticket_id'] ?? 0) ?: null) : null; if ($tid && !scalar('SELECT COUNT(*) FROM tickets WHERE id = ?', [$tid])) $tid = null;

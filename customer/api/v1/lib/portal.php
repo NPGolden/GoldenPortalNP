@@ -197,7 +197,7 @@ final class Portal {
     public static function createFsr(array $u, string $uuid, array $p): array {
         $existing = one('SELECT id, report_no FROM fsr_reports WHERE created_by = ? AND report_no = ?', [(int)$u['id'], (string)($p['number'] ?? '')]);
         $pid = (int)($p['project_id'] ?? 0); $sid = (int)($p['subproject_id'] ?? 0) ?: null;
-        if (!$pid) { $vid = (int)($p['vessel_id'] ?? 0); if (!$vid) throw new ApiException(422, 'Vessel required'); $pid = function_exists('fsr_project_for_vessel') ? fsr_project_for_vessel($vid) : 0; if (!$pid) throw new ApiException(422, 'No project for this vessel — the PM must create the service project first'); $sid = null; }
+        if (!$pid) throw new ApiException(422, 'Project required');   // R72-008
         $post = ['project_id' => $pid, 'subproject_id' => $sid, 'report_date' => (string)$p['date'], 'customer_name' => (string)($p['customer'] ?? ''), 'vessel_name' => (string)($p['vessel'] ?? ''), 'location' => (string)($p['location'] ?? ''),
             'pic_name' => (string)($p['pic'] ?? ''), 'pic_position' => (string)($p['pic_position'] ?? ''), 'pic_mobile' => (string)($p['pic_mobile'] ?? ''), 'pic_email' => (string)($p['pic_email'] ?? ''), 'wk_desc' => [], 'wk_issues' => [], 'wk_part' => [], 'wk_ptype' => [], 'wk_eng' => [], 'wk_spec' => [], 'wk_start' => [], 'wk_end' => [], 'wk_type' => [], 'eq_ids' => []];
         if (!empty($p['ticket_id'])) $post['ticket_id'] = (int)$p['ticket_id'];
@@ -233,7 +233,7 @@ final class Portal {
     /** Inspection report (SF-GLD-020): isr_save_from_post + isr_submit (→ checking; issued by a checker in the portal). */
     public static function createIsr(array $u, string $uuid, array $p): array {
         $pid = (int)($p['project_id'] ?? 0); $sid = (int)($p['subproject_id'] ?? 0) ?: null;
-        if (!$pid) { $vid = (int)($p['vessel_id'] ?? 0); $pid = $vid && function_exists('fsr_project_for_vessel') ? fsr_project_for_vessel($vid) : 0; if (!$pid) throw new ApiException(422, 'Project required'); }
+        if (!$pid) throw new ApiException(422, 'Project required');   // R72-008
         $post = ['project_id' => $pid, 'subproject_id' => $sid, 'report_date' => (string)$p['date'], 'subject' => (string)($p['subject'] ?? ''), 'customer_name' => (string)($p['customer'] ?? ''), 'vessel_name' => (string)($p['vessel'] ?? ''), 'location' => (string)($p['location'] ?? ''), 'pic_name' => (string)($p['pic'] ?? ''),
             'class_flag' => (string)($p['class_flag'] ?? ''), 'builder_year' => (string)($p['builder_year'] ?? ''), 'hull_no' => (string)($p['hull_no'] ?? ''), 'objective' => (string)($p['objective'] ?? ''), 'findings' => (string)($p['findings'] ?? ''), 'risks' => (string)($p['risks'] ?? ''), 'performed_name' => $u['full_name'],
             'it_name' => [], 'it_sys' => [], 'it_cond' => [], 'it_regs' => [], 'it_risk' => [], 'it_act' => [], 'it_level' => [], 'it_q' => [], 'it_a' => [], 'eq_ids' => []];

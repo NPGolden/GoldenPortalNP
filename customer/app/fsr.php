@@ -530,15 +530,14 @@ function fsr_ext_number(string $engineer, string $date): string {
     return $base . $n;
 }
 /** The project an engineer reports under for a plain service call on a vessel: the vessel's general project (GEN-<id>). */
-function fsr_project_for_vessel(int $vesselId): int { if (!function_exists('ob_general_project')) throw new RuntimeException(t('err.notfound')); return ob_general_project($vesselId); }
+function fsr_project_for_vessel(int $vesselId): int { throw new RuntimeException(t('doc.need_project')); }   // R72-008: no vessel-level reports any more — a project is chosen first
 /** Attach an external report (a file written outside the portal). Returns the id. */
 function fsr_ext_save_from_post(): int {
     require_staff(); if (!fsr_ext_has()) throw new RuntimeException(t('fsr.ext_need_db'));
     $u = current_user(); $str = fn(string $k, int $max = 255) => mb_substr(trim((string)($_POST[$k] ?? '')), 0, $max) ?: null;
     $vid = (int)($_POST['vessel_id'] ?? 0); $pid = (int)($_POST['project_id'] ?? 0);
     if ($pid) { $p = one('SELECT * FROM projects WHERE id = ?', [$pid]); if (!$p) throw new RuntimeException(t('err.notfound')); $vid = $vid ?: (int)$p['vessel_id']; }
-    elseif ($vid) $pid = fsr_project_for_vessel($vid);
-    if (!$pid) throw new RuntimeException(t('acc.need_scope'));
+    if (!$pid) throw new RuntimeException(t('doc.need_project'));
     $p = one('SELECT p.*, v.name AS vessel, c.name AS customer_name FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id LEFT JOIN customers c ON c.id = p.customer_id WHERE p.id = ?', [$pid]);
     $sid = (int)($_POST['subproject_id'] ?? 0) ?: null; if ($sid && !one('SELECT id FROM subprojects WHERE id = ? AND project_id = ?', [$sid, $pid])) $sid = null;
     $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['report_date'] ?? '')) ? $_POST['report_date'] : date('Y-m-d');

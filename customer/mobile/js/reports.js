@@ -27,7 +27,7 @@ window.REPORTS = (() => {
   const newItem = (sys) => ({ system_id: sys ? sys.id || null : null, system_name: sys ? sys.name : "", condition_found: "", checklist: sysBank(sys && sys.name), class_regs: "", risk_level: "none", risk_analysis: "", actions: "", equipment_id: null });
   const blank = (kind, tk, q) => { const vs = S().ctx.vessels; const v = vs.find((x) => x.id === (tk ? tk.vessel_id : (q.vessel ? +q.vessel : (vs[0] || {}).id))) || {};
     const eq = q.equipment ? S().ctx.equipment.find((e) => e.id === +q.equipment) : null;
-    const f = { id: DB.uuid(), kind, status: "draft", type: "internal", mode: tk && !tk.project_id ? "service" : (q.project || (tk && tk.project_id) ? "project" : (v.id && S().ctx.projects.some((p) => p.vessel_id === v.id) ? "project" : "service")), date: S().today(),
+    const f = { id: DB.uuid(), kind, status: "draft", type: "internal", mode: "project",   // R72-008: every report belongs to a project
       vessel_id: v.id, vessel: v.name || "", customer: v.customer || "", location: v.yard || "", pic: "", pic_position: "", pic_mobile: "", pic_email: "",
       project_id: tk ? tk.project_id : (q.project ? +q.project : (S().ctx.projects.find((p) => p.vessel_id === v.id) || {}).id || null), subproject_id: tk ? tk.subproject_id : (q.sub ? +q.sub : null), ticket_id: tk ? tk.id : null,
       tasks: [{ ...newTask(), description: tk ? tk.title + (tk.description ? "\n" + tk.description : "") : "", issues: tk && tk.open_issues ? [...tk.open_issues] : [], equipment_id: eq ? eq.id : null }],
@@ -107,9 +107,8 @@ window.REPORTS = (() => {
       <div class="row2"><div><label>${t("rep.customer")}</label><input id="customer" value="${esc(f.customer)}"></div><div><label>${t("rep.location")}</label><input id="loc" value="${esc(f.location)}"></div></div>
       <div class="row2"><div><label>${t("rep.pic")}</label><input id="pic" value="${esc(f.pic)}"></div><div><label>${t("rep.position")}</label><input id="pos" value="${esc(f.pic_position)}" ${kind === "inspection" ? "disabled placeholder='—'" : ""}></div></div>
       ${kind === "service" ? `<div class="row2"><div><label>${t("rep.mobile")}</label><input id="mob" type="tel" value="${esc(f.pic_mobile)}"></div><div><label>E-mail</label><input id="mail" type="email" value="${esc(f.pic_email)}"></div></div>` : `<div class="row2"><div><label>${t("ins.classflag")}</label><input id="classflag" value="${esc(f.class_flag)}"></div><div><label>${t("ins.builderyear")}</label><input id="builderyear" value="${esc(f.builder_year)}"></div></div><label>${t("ins.hullno")}</label><input id="hullno" value="${esc(f.hull_no)}">`}
-      <div class="seg" data-k="mode" style="margin-top:12px"><button data-v="project" class="${f.mode === "project" ? "on" : ""}">${t("fsr.project")}</button><button data-v="service" class="${f.mode === "service" ? "on" : ""}">${t("fsr.service")}</button></div>
-      <div id="projrow" class="${f.mode === "service" ? "hidden" : ""}"><label>${t("fsr.project")}</label><select id="project">${S().projOptions(f.project_id)}</select><label>${t("fsr.sub")}</label><select id="sub">${S().subOptions(f.project_id, f.subproject_id)}</select></div>
-      <p class="muted ${f.mode === "service" ? "" : "hidden"}" id="svchint">${t("fsr.svchint")}</p>
+      <div id="projrow" style="margin-top:12px"><label>${t("fsr.project")}</label><select id="project">${S().projOptions(f.project_id)}</select><label>${t("fsr.sub")}</label><select id="sub">${S().subOptions(f.project_id, f.subproject_id)}</select></div>
+      <p class="muted" id="svchint">${t("fsr.svchint")}</p>
       <label>${t("fsr.ticket")}</label><select id="ticket"><option value="">—</option>${myTickets.map((x) => `<option value="${x.id}" ${x.id === f.ticket_id ? "selected" : ""}>${esc(x.ticket_no)} — ${esc(x.title)}</option>`).join("")}</select>
       ${kind === "service" ? `<p class="muted ${f.type === "external" ? "" : "hidden"}" id="exthint">${t("fsr.exthint")}</p>` : ""}`;
     const html = kind === "service" ? `${header}
@@ -135,7 +134,7 @@ window.REPORTS = (() => {
 
     const read = (root) => {
       const $ = (s) => root.querySelector(s); const val = (s) => ($(s) ? $(s).value.trim() : ""); const segv = (k) => ((root.querySelector(`.seg[data-k=${k}] .on`) || {}).dataset || {}).v;
-      const mode = segv("mode") || "service"; const vid = +$("#vessel").value;
+      const mode = "project"; const vid = +$("#vessel").value;
       const base = { mode, date: $("#date").value, vessel_id: vid, vessel: ($("#vessel").selectedOptions[0] || {}).textContent.split(" — ")[0] || "", customer: val("#customer"), location: val("#loc"), pic: val("#pic"), pic_position: val("#pos"),
         project_id: mode === "project" ? (+$("#project").value || null) : null, subproject_id: mode === "project" ? (+$("#sub").value || null) : null, ticket_id: +$("#ticket").value || null };
       if (kind === "inspection") return { ...base, subject: val("#subject"), class_flag: val("#classflag"), builder_year: val("#builderyear"), hull_no: val("#hullno"), objective: val("#objective"), findings: val("#findings"), risks: val("#risks"),
@@ -151,7 +150,7 @@ window.REPORTS = (() => {
     return { html, bind(root) {
       const $ = (s) => root.querySelector(s);
       const renderSummary = () => { if (!$("#summary")) return; const sm = summary(read(root)); $("#summary").innerHTML = `<div class="overflow"><table class="week"><tr><th style="text-align:left">${t("rep.engineer")}</th><th>WT</th><th>TT</th><th>NC</th><th>${t("rep.total")}</th></tr>${sm.rows.map((r) => `<tr><td>${esc(r.engineer)} <span class="muted">${esc(r.specialty)}</span></td><td>${hm(r.wt)}</td><td>${hm(r.tt)}</td><td>${hm(r.nc)}</td><td><b>${hm(r.wt + r.tt + r.nc)}</b></td></tr>`).join("")}<tr><td><b>${t("rep.total")}</b></td><td><b>${hm(sm.tot.wt)}</b></td><td><b>${hm(sm.tot.tt)}</b></td><td><b>${hm(sm.tot.nc)}</b></td><td><b>${hm(sm.tot.wt + sm.tot.tt + sm.tot.nc)}</b></td></tr></table></div>`; };
-      UI.segs(root, (k, v) => { if (k === "mode") { $("#projrow").classList.toggle("hidden", v === "service"); $("#svchint").classList.toggle("hidden", v !== "service"); } if (k === "acc") { $("#sigblock").classList.toggle("hidden", v !== "onsite"); if (v === "onsite") UI.sig.fit(root); $("#acchint").textContent = t(v === "onsite" ? "rep.acconsitehint" : "rep.accportalhint"); } });
+      UI.segs(root, (k, v) => { if (k === "acc") { $("#sigblock").classList.toggle("hidden", v !== "onsite"); if (v === "onsite") UI.sig.fit(root); $("#acchint").textContent = t(v === "onsite" ? "rep.acconsitehint" : "rep.accportalhint"); } });
       if ($("#type")) $("#type").onchange = (e) => $("#exthint").classList.toggle("hidden", e.target.value !== "external");
       $("#vessel").onchange = (e) => { const o = e.target.selectedOptions[0]; $("#customer").value = o.dataset.customer || ""; if (!$("#loc").value) $("#loc").value = o.dataset.yard || ""; const p = ctx.projects.find((x) => x.vessel_id === +e.target.value); if (p) { $("#project").value = p.id; $("#sub").innerHTML = S().subOptions(p.id, null); } };
       $("#project").onchange = (e) => { $("#sub").innerHTML = S().subOptions(+e.target.value, null); };
