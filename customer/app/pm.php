@@ -66,6 +66,16 @@ function split_project_code(string $code): array {
 
 /** R57-002: is this staff member a project manager at all — PM of at least one project, or a staff role named "Project Manager"?
  *  Every PM may edit teams and budgets of every project, not only his own, so work is not held up by one person. */
+/** R72-010: a manager for the Golden PM app — a staff role whose name contains "Manager" or "CEO" / "Owner", or someone who manages a discipline or people in HR. */
+function pm_is_manager(?int $uid = null): bool {
+    static $c = [];
+    $uid = $uid ?? (int)(current_user()['id'] ?? 0); if (!$uid || !is_staff()) return false;
+    if (!isset($c[$uid])) {
+        $c[$uid] = (bool) scalar("SELECT COUNT(*) FROM customer_users cu JOIN staff_roles r ON r.id = cu.staff_role_id WHERE cu.id = ? AND (LOWER(r.name) LIKE '%manager%' OR LOWER(r.name) IN ('ceo', 'owner'))", [$uid]);
+        if (!$c[$uid]) try { $c[$uid] = (bool) scalar('SELECT COUNT(*) FROM disciplines WHERE manager_user_id = ?', [$uid]) || (bool) scalar('SELECT COUNT(*) FROM customer_users WHERE manager_user_id = ? AND is_active = 1', [$uid]); } catch (Throwable $e) {}
+    }
+    return $c[$uid];
+}
 function pm_is_pm(?int $uid = null): bool {
     static $c = [];
     $uid = $uid ?? (int)(current_user()['id'] ?? 0); if (!$uid || !is_staff()) return false;
