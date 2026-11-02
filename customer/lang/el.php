@@ -6288,4 +6288,6 @@ GAS-MSB-2026-002',
 // ---- GAS-CP-R71-003 native passkeys
 'pk.android_sha' => 'SHA-256 υπογραφής εφαρμογής Android',
 'pk.android_sha_hint' => 'Αποτύπωμα(τα) του πιστοποιητικού υπογραφής του Play (Play Console › App signing), χωρισμένα με κόμμα — επιτρέπει στις εκδόσεις των stores να συνδέονται με passkeys. Βλ. mobile-native/README.',
+// ---- GAS-CP-R72-006 drawings
+'dr.sys_follows' => 'κενό = το σύστημα του υποέργου',
 ];

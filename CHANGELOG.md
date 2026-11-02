@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.80.9** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.80.10** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.80.10 | GAS-CP-R72-006 | 2026-11-02 | Drawing tracker: a request saved with an empty System no longer lands under "— none —" — it inherits the system of the chosen sub-project (new rows and edits); a row whose system was made inactive keeps it selectable in the edit form instead of silently dropping it on save. | — |
 | 1.80.9 | GAS-CP-R72-005 | 2026-11-02 | Offers: the Notes field of the offer is now printed in the PDF and Word document as a numbered "Notes" section after the prices (before Exclusions). Golden PM: sign-in restricted to project managers — PM of at least one project or the "Project Manager" staff role — plus the Owner; administrators, HR managers and timesheet approvers no longer qualify on those grounds (existing sessions end at once). | — |
 | 1.80.8 | GAS-CP-R72-004 | 2026-11-01 | Golden PM 1.0.6: the offers of a sub-project show the net amount (excl. VAT) so the PM has the figure at hand when talking to the customer — decision of 01/11/2026 relaxing the "no money in the PM app" rule for offers only; VAT, totals, costs and budgets in money stay in the portal. | — |
 | 1.80.7 | GAS-CP-R72-003 | 2026-11-01 | Store builds: "Add this device" / passkey sign-in in the installed apps failed with "requestJson is required" — the native passkey plug-in takes the options as a JSON string (its JavaScript wrapper is not loaded by the shells); the three clients now call it that way (Service 0.6.7, Golden PM 1.0.5, Customer 1.0.4). | — |

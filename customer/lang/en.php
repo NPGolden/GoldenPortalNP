@@ -6288,4 +6288,6 @@ Best regards,
 // ---- GAS-CP-R71-003 native passkeys
 'pk.android_sha' => 'Android app signing SHA-256',
 'pk.android_sha_hint' => 'Fingerprint(s) of the Play app-signing certificate (Play Console › App signing), comma-separated — lets the store builds sign in with passkeys. See mobile-native/README.',
+// ---- GAS-CP-R72-006 drawings
+'dr.sys_follows' => 'empty = the sub-project\'s system',
 ];

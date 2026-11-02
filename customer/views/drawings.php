@@ -34,6 +34,7 @@ $revs = all('SELECT * FROM drawing_tracker_revisions WHERE project_id = ? ORDER 
 $subs = $staff ? all('SELECT id, code, name, system_id FROM subprojects WHERE project_id = ? ORDER BY sort_order, code', [$pid]) : [];
 $systems = $staff ? sys_options() : [];
 $ed = $staff && (int)($_GET['edit'] ?? 0) ? one('SELECT * FROM drawing_requests WHERE id = ? AND project_id = ?', [(int)$_GET['edit'], $pid]) : null;   // R36-003: edit one request
+if ($ed && $ed['system_id'] && !in_array((int)$ed['system_id'], array_map(fn($s) => (int)$s['id'], $systems), true)) { $cur = one('SELECT * FROM vessel_systems WHERE id = ?', [(int)$ed['system_id']]); if ($cur) $systems[] = $cur; }   // R72-006: an inactive system stays selectable on its own row
 $self = url('drawings', ['project' => $pid]);
 $today = date('Y-m-d');
 
@@ -63,7 +64,7 @@ layout_head(t('dr.title'), 'projects');
       <div class="field" style="grid-column:span 2;"><label><?= tt('dr.item') ?> *</label><input name="title" required maxlength="200" value="<?= $v('title') ?>" placeholder="<?= tt('dr.item_ph') ?>"></div>
       <div class="field"><label><?= tt('dr.kind') ?></label><select name="kind" data-nosearch><option value="equipment"<?= $sel('equipment', $ed['kind'] ?? 'equipment') ?>><?= tt('dr.equipment') ?></option><option value="principal"<?= $sel('principal', $ed['kind'] ?? '') ?>><?= tt('dr.principal') ?></option></select></div>
       <div class="field"><label><?= tt('sp.one') ?></label><select name="subproject_id"><option value=""><?= tt('fsr.whole_project') ?></option><?php foreach ($subs as $s): ?><option value="<?= $s['id'] ?>" data-system="<?= (int)$s['system_id'] ?>"<?= $sel($s['id'], $ed['subproject_id'] ?? '') ?>><?= e(trim($s['code'] . ' ' . $s['name'])) ?></option><?php endforeach; ?></select></div>
-      <div class="field"><label><?= tt('sys.one') ?></label><select name="system_id"><option value=""><?= tt('sys.none') ?></option><?php foreach ($systems as $s): ?><option value="<?= $s['id'] ?>"<?= $sel($s['id'], $ed['system_id'] ?? '') ?>><?= e(sys_label($s)) ?></option><?php endforeach; ?></select></div>
+      <div class="field"><label><?= tt('sys.one') ?></label><select name="system_id"><option value=""><?= tt('sys.none') ?></option><?php if (!empty($subs)): ?><option value="" disabled>— <?= tt('dr.sys_follows') ?> —</option><?php endif; ?><?php foreach ($systems as $s): ?><option value="<?= $s['id'] ?>"<?= $sel($s['id'], $ed['system_id'] ?? '') ?>><?= e(sys_label($s)) ?></option><?php endforeach; ?></select></div>
       <div class="field"><label><?= tt('dr.responsible') ?></label><input name="responsible" list="dr-resp" value="<?= $v('responsible', 'Shipyard') ?>" maxlength="80"><datalist id="dr-resp"><option value="Shipyard"><option value="Owner"><option value="Golden A/S"><option value="Supplier"></datalist></div>
       <div class="field"><label><?= tt('dr.location') ?></label><input name="location" maxlength="120" value="<?= $v('location') ?>"></div>
       <div class="field"><label><?= tt('dr.locstat') ?></label><select name="location_status" data-nosearch><?php foreach (['TBD', 'Confirmed', 'N/A'] as $ls): ?><option<?= $sel($ls, $ed['location_status'] ?? 'TBD') ?>><?= $ls ?></option><?php endforeach; ?></select></div>

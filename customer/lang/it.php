@@ -6288,4 +6288,6 @@ Cordiali saluti,
 // ---- GAS-CP-R71-003 native passkeys
 'pk.android_sha' => 'SHA-256 firma app Android',
 'pk.android_sha_hint' => 'Impronta/e del certificato di firma di Play (Play Console › App signing), separate da virgola — consente alle build degli store di accedere con passkey. Vedi mobile-native/README.',
+// ---- GAS-CP-R72-006 drawings
+'dr.sys_follows' => 'vuoto = il sistema del sotto-progetto',
 ];

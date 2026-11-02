@@ -221,13 +221,16 @@ function pm_handle_action(string $action, string $page): bool {
         case 'dr_save': {
             require_staff();
             $pid = (int)$_POST['project_id']; $sid = (int)($_POST['subproject_id'] ?? 0) ?: null;
+        /** R72-006: the system of a drawing request — the posted one, else the sub-project's, else (on edit) the one already stored. */
+        $drSystem = function (?int $sid, ?int $keep = null): ?int { $v = (int)($_POST['system_id'] ?? 0); if ($v) return $v; if ($sid) { $s = (int) scalar('SELECT system_id FROM subprojects WHERE id = ?', [$sid]); if ($s) return $s; } return $keep ?: null; };
+
             $fileId = null;
             if (!empty($_FILES['file']['name'])) $fileId = cp_store_file($_FILES['file'], $pid, $sid, 'drawing', 'external', $str('title', 200));
             $next = (int) scalar('SELECT COALESCE(MAX(seq_no),0)+1 FROM drawing_requests WHERE project_id = ? AND kind = ?', [$pid, $_POST['kind'] ?? 'equipment']);
             q('INSERT INTO drawing_requests (project_id, subproject_id, system_id, kind, seq_no, title, location, location_status, responsible,
                                              request_sent, expected_at, received_at, file_name, file_id, status, remarks)
                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-              [$pid, $sid, (int)($_POST['system_id'] ?? 0) ?: null, ($_POST['kind'] ?? '') === 'principal' ? 'principal' : 'equipment', $next,
+              [$pid, $sid, $drSystem($sid), ($_POST['kind'] ?? '') === 'principal' ? 'principal' : 'equipment', $next,
                $str('title', 200), $str('location', 120), in_array($_POST['location_status'] ?? '', ['TBD','Confirmed','N/A'], true) ? $_POST['location_status'] : 'TBD',
                $str('responsible', 80) ?: 'Shipyard', $date('request_sent'), $date('expected_at'), $date('received_at'),
                $fileId ? mb_substr((string)$_FILES['file']['name'], 0, 255) : null, $fileId,
@@ -241,12 +244,14 @@ function pm_handle_action(string $action, string $page): bool {
             if (!$d) throw new RuntimeException(t('err.notfound'));
             $pid = (int)$d['project_id']; $sid = (int)($_POST['subproject_id'] ?? 0) ?: null;
             if ($sid && !scalar('SELECT id FROM subprojects WHERE id = ? AND project_id = ?', [$sid, $pid])) $sid = null;
+        /** R72-006: the system of a drawing request — the posted one, else the sub-project's, else (on edit) the one already stored. */
+        $drSystem = function (?int $sid, ?int $keep = null): ?int { $v = (int)($_POST['system_id'] ?? 0); if ($v) return $v; if ($sid) { $s = (int) scalar('SELECT system_id FROM subprojects WHERE id = ?', [$sid]); if ($s) return $s; } return $keep ?: null; };
             $fileId = (int)$d['file_id'] ?: null; $fileName = $d['file_name'];
             if (!empty($_FILES['file']['name'])) { $fileId = cp_store_file($_FILES['file'], $pid, $sid, 'drawing', 'external', $str('title', 200) ?: $d['title']); $fileName = mb_substr((string)$_FILES['file']['name'], 0, 255); }
             $status = in_array($_POST['status'] ?? '', ['pending','received','not_required'], true) ? $_POST['status'] : $d['status'];
             $recv = $date('received_at'); if ($status === 'received' && !$recv) $recv = date('Y-m-d'); if ($status === 'pending') $recv = null;
             q('UPDATE drawing_requests SET subproject_id = ?, system_id = ?, kind = ?, title = ?, location = ?, location_status = ?, responsible = ?, request_sent = ?, expected_at = ?, received_at = ?, file_name = ?, file_id = ?, status = ?, remarks = ? WHERE id = ?',
-              [$sid, (int)($_POST['system_id'] ?? 0) ?: null, ($_POST['kind'] ?? '') === 'principal' ? 'principal' : 'equipment', $str('title', 200) ?: $d['title'], $str('location', 120),
+              [$sid, $drSystem($sid, (int)$d['system_id'] ?: null), ($_POST['kind'] ?? '') === 'principal' ? 'principal' : 'equipment', $str('title', 200) ?: $d['title'], $str('location', 120),
                in_array($_POST['location_status'] ?? '', ['TBD','Confirmed','N/A'], true) ? $_POST['location_status'] : $d['location_status'], $str('responsible', 80) ?: 'Shipyard',
                $date('request_sent'), $date('expected_at'), $recv, $fileName, $fileId, $status, $str('remarks', 2000), $id]);
             flash('good', t('dr.saved'));

@@ -6274,4 +6274,6 @@ GAS-MSB-2026-002',
 // ---- GAS-CP-R71-003 native passkeys
 'pk.android_sha' => 'SHA-256 підпису Android-застосунку',
 'pk.android_sha_hint' => 'Відбиток(и) сертифіката підпису Play (Play Console › App signing), через кому — дозволяє збіркам із магазинів входити з passkeys. Див. mobile-native/README.',
+// ---- GAS-CP-R72-006 drawings
+'dr.sys_follows' => 'порожньо = система підпроєкту',
 ];
