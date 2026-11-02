@@ -1728,6 +1728,16 @@ function pm_delete_project(int $id): void {
 }
 
 /** What a project deletion would remove — for the confirmation text. */
+/** R72-007: every record that hangs on a project — what a GEN- (vessel general) project may be carrying. Counts only, per table that has one. */
+function pm_project_refs(int $id): array {
+    $out = [];
+    foreach (['offers' => 'offers', 'fsr_reports' => 'fsr', 'isr_reports' => 'isr', 'acc_reports' => 'acc', 'tickets' => 'tickets', 'timesheets' => 'timesheets', 'documents' => 'documents', 'subprojects' => 'subs', 'drawing_requests' => 'drawings',
+             'job_orders' => 'jobs', 'production_orders' => 'po', 'owner_approvals' => 'approvals', 'class_submittals' => 'submittals', 'plan_entries' => 'plan', 'weekly_notes' => 'notes', 'tasks' => 'tasks', 'proformas' => 'proformas', 'sp_files' => 'files'] as $tb => $k) {
+        try { $n = (int) scalar("SELECT COUNT(*) FROM `$tb` WHERE project_id = ?", [$id]); } catch (Throwable $e) { $n = 0; }
+        if ($n) $out[$k] = $n;
+    }
+    return $out;
+}
 function pm_project_footprint(int $id): array {
     return [
         'subs'     => (int) scalar('SELECT COUNT(*) FROM subprojects WHERE project_id = ?', [$id]),

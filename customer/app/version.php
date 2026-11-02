@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.80.10';
+const CP_VERSION = '1.80.11';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R72-007', 'version' => '1.80.11', 'date' => '2026-11-02', 'title' => 'Projects: administrators see a "General (GEN-) projects" card listing the vessel-level general projects the portal creates for offers / reports without a project, with what each one carries; an empty one can be deleted from the card, one in use is kept.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R72-006', 'version' => '1.80.10', 'date' => '2026-11-02', 'title' => 'Drawing tracker: a request saved with an empty System no longer lands under "— none —" — it inherits the system of the chosen sub-project (new rows and edits); a row whose system was made inactive keeps it selectable in the edit form instead of silently dropping it on save.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R72-005', 'version' => '1.80.9', 'date' => '2026-11-02', 'title' => 'Offers: the Notes field of the offer is now printed in the PDF and Word document as a numbered "Notes" section after the prices (before Exclusions). Golden PM: sign-in restricted to project managers — PM of at least one project or the "Project Manager" staff role — plus the Owner; administrators, HR managers and timesheet approvers no longer qualify on those grounds (existing sessions end at once).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R72-004', 'version' => '1.80.8', 'date' => '2026-11-01', 'title' => 'Golden PM 1.0.6: the offers of a sub-project show the net amount (excl. VAT) so the PM has the figure at hand when talking to the customer — decision of 01/11/2026 relaxing the "no money in the PM app" rule for offers only; VAT, totals, costs and budgets in money stay in the portal.', 'db' => null, 'check' => null],
