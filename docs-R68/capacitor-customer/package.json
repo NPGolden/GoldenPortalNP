@@ -11,7 +11,7 @@
     "build:ios": "cd ios/App && xcodebuild -workspace App.xcworkspace -scheme App -configuration Release -archivePath build/App.xcarchive archive"
   },
   "dependencies": {
-    "@capacitor/android": "6.1.2",
+    "@capacitor/android": "6.2.2",
     "@capacitor/app": "6.0.1",
     "@capacitor/camera": "6.0.2",
     "@capacitor/core": "6.1.2",
