@@ -19,7 +19,9 @@ final class PortalPM {
     /** Staff / admin AND (PM, HR manager, timesheet approver or administrator) — else 403. */
     public static function allowed(array $u): void {
         if (!in_array($u['role'] ?? '', ['staff', 'admin'], true)) throw new ApiException(403, 'Staff account required');
-        if (is_cp_admin() || pm_is_pm((int)$u['id']) || self::hrManager() || self::tsApprover((int)$u['id'])) return;
+        // R72-005 (decision of 02/11/2026): Golden PM is for project managers only — PM of at least one project or the "Project Manager" staff role — plus the Owner scope, which sees everything in the portal by design.
+        // Administrators, HR managers and timesheet approvers no longer qualify on those grounds; the check runs on every request, so existing sessions of other accounts end at once.
+        if (pm_is_pm((int)$u['id']) || (function_exists('hr_owner') && hr_owner())) return;
         throw new ApiException(403, 'This account is not a project manager');
     }
     private static function hrManager(): bool { return function_exists('hr_is_manager') && hr_is_manager(); }

@@ -247,6 +247,7 @@ function ob_render_pdf(array $o): string {
     $need(count($tot) * 6 + 4); $y += 1;
     foreach ($tot as [$k, $v, $b]) { $pdf->setFont($b ? 'B' : 'R', 8.5); $pdf->setColor($b ? $navy : $ink); $pdf->text($R - 100, $y + 4, $k, 'R', 60); $pdf->text($R - 40, $y + 4, $v, 'R', 38.5); $y += 5.5; }
     $y += 2;
+    if (trim((string)($o['notes'] ?? '')) !== '') { $n++; $h1($n . '. ' . $T('of.notes')); $para((string)$o['notes']); }   // R72-005: the offer's Notes field goes into the document
     foreach ($after as $k) $block($k);
     $footer();
     return $pdf->bytes($o['offer_no'] . ' ' . $o['revision']);
@@ -270,6 +271,7 @@ function ob_render_docx(array $o): string {
     if ((float)$o['vat_pct'] > 0) { $rows[] = ['', '', $T('ob.vat', ['p' => (string)(float)$o['vat_pct']]), '', '', '', '', number_format((float)$o['vat_total'], 2, ',', '.')]; $rows[] = ['', '', $T('ob.gross'), '', '', '', '', number_format((float)$o['gross_total'], 2, ',', '.')]; }
     else $rows[] = ['', '', $T('ob.vat_excl'), '', '', '', '', ''];
     $d->table([$T('ob.c_no'), $T('ob.c_code'), $T('ob.c_desc'), $T('ob.c_unit'), $T('ob.c_qty'), $T('ob.c_price') . ' (' . $cur . ')', $T('ob.c_disc'), $T('ob.c_total') . ' (' . $cur . ')'], $rows);
+    if (trim((string)($o['notes'] ?? '')) !== '') { $n++; $d->heading($n . '. ' . $T('of.notes'), 2); foreach (preg_split('/\n{2,}/', trim((string)$o['notes'])) as $p) if (trim($p) !== '') $d->para(trim($p)); }   // R72-005
     foreach (['exclusions', 'validity', 'payment', 'terms', 'closing'] as $k) $block($k);
     return $d->bytes($o['offer_no'] . ' ' . $o['revision'], (string)($bd['footer'] ?? $bd['name'] ?? ''));
 }
