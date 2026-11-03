@@ -4,7 +4,7 @@
 require __DIR__ . '/_layout.php';
 $u = require_staff();
 if (!ct_has()) { layout_head(t('ct.title'), 'contacts'); echo '<h1>' . tt('ct.title') . '</h1><div class="flash flash--warn">' . tt('ct.need_r17') . '</div>'; layout_foot(); return; }
-$f = ct_filters_from_request($_GET); $co = co_has(); $admin = is_cp_admin();
+$f = ct_filters_from_request($_GET); $co = co_has(); $admin = ct_manage();   // R75-005
 $companies = $co ? co_all(false) : [];
 $l = ct_list($f); $s = ct_summary(); $up = ct_upcoming(30);
 $customers = all('SELECT id, name FROM customers WHERE is_active = 1 ORDER BY name');

@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.83.2** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.83.3** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.83.3 | GAS-CP-R75-005 | 2026-11-03 | Personal Assistant role (scope "assistant", created by the update, financials off): vessels, contacts, companies, customers and their Excel imports — create, edit, delete, link contacts to vessels and companies — and nothing else in the portal. Companies, customers, contact deletion / bulk / imports are now open to administrators, the Owner and this role. | `install/migrate_cp_r75_assistant_role.sql` |
 | 1.83.2 | GAS-CP-R75-004 | 2026-11-03 | Sidebar: the HR group now sits after Commercial, just before Library. | — |
 | 1.83.1 | GAS-CP-R75-003 | 2026-11-03 | Vessel groups: ⊞ expand all / ⊟ collapse all buttons next to the Grouped / Flat switch on the Projects, Offers, Reports and Accounting pages. | — |
 | 1.83.0 | GAS-CP-R75-001 | 2026-11-03 | Sales pipeline (hybrid): stages Sent → Received → Under evaluation → Negotiation → Verbal OK with a base success % each, signals that adjust it (budget confirmed, decision maker met, competitor, no reply 14 days, validity passed), a mandatory next action with owner on every open offer, the default follow-up cadence on send, morning reminders with escalation after 3 days, automatic Expired on validity, and Commercial › Pipeline (board / list, follow-ups due, funnel, per sales person). The Sales KPIs forecast uses the adjusted %. | `install/migrate_cp_r75_pipeline.sql` |

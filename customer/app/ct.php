@@ -72,7 +72,7 @@ function co_load(int $id): ?array {
     return $c ?: null;
 }
 function co_save_from_post(int $id): int {
-    require_cp_admin();
+    require_ct_manage();   // R75-005
     $str = fn(string $k, int $max) => ($v = trim((string)($_POST[$k] ?? ''))) === '' ? null : mb_substr($v, 0, $max);
     $name = $str('name', 160); if (!$name) throw new RuntimeException(t('co.need_name'));
     $dup = scalar('SELECT id FROM companies WHERE LOWER(name) = LOWER(?) AND id <> ?', [$name, $id]); if ($dup) throw new RuntimeException(t('co.dup', ['v' => $name]));
@@ -86,7 +86,7 @@ function co_save_from_post(int $id): int {
     return $id;
 }
 function co_delete(int $id): void {
-    require_cp_admin();
+    require_ct_manage();   // R75-005
     q('UPDATE contacts SET company_id = NULL WHERE company_id = ?', [$id]);
     q('DELETE FROM companies WHERE id = ?', [$id]);
 }
@@ -234,7 +234,7 @@ function ct_ids(array $f): array {
     return array_map(fn($r) => (int)$r['id'], $l['rows']);
 }
 function ct_delete_many(array $ids): int {
-    require_cp_admin();
+    require_ct_manage();   // R75-005
     $ids = array_values(array_filter(array_map('intval', $ids))); if (!$ids) return 0;
     $in = implode(',', $ids);
     q("DELETE FROM contact_notes WHERE contact_id IN ($in)"); q("DELETE FROM contact_vessels WHERE contact_id IN ($in)");
@@ -324,7 +324,7 @@ function ct_save_from_post(int $id): int {
     return $id;
 }
 function ct_delete(int $id): void {
-    require_cp_admin();
+    require_ct_manage();   // R75-005
     q('DELETE FROM contact_notes WHERE contact_id = ?', [$id]);
     q('DELETE FROM contact_vessels WHERE contact_id = ?', [$id]);
     q('DELETE FROM contacts WHERE id = ?', [$id]);
@@ -521,7 +521,7 @@ function au_generate_password(): string {
 
 /* ------------------------------------------------------------ Excel import: companies (administrators) */
 function co_import(string $path, bool $dry): array {
-    require_cp_admin();
+    require_ct_manage();   // R75-005
     if (!co_has()) throw new RuntimeException(t('co.need_r17b'));
     $rows = xlsx_rows($path);
     $res = ['rows' => 0, 'companies_new' => 0, 'companies_upd' => 0, 'customers_new' => 0, 'skipped' => [], 'warnings' => []];

@@ -116,6 +116,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     try {
         if (function_exists('hr_only') && hr_only() && !in_array($action, HR_ACTIONS, true)) throw new RuntimeException(t('err.noaccess'));   // R51-001: HR scope
         if (function_exists('emp_only') && emp_only() && !in_array($action, EMP_ACTIONS, true)) throw new RuntimeException(t('err.noaccess'));   // R54-001: employee scope
+        if (function_exists('pa_only') && pa_only() && !in_array($action, PA_ACTIONS, true)) throw new RuntimeException(t('err.noaccess'));     // R75-005: assistant scope
         if (lic_locked() && !in_array($action, ['login', 'twofa', 'logout', 'lic_install', 'lic_remove', 'theme_save', 'account_save', 'avatar_save', 'twofa_begin', 'twofa_confirm', 'twofa_off'], true)) { flash('bad', t('lic.locked_title')); redirect('license'); }   // R22-001
         if (pm_handle_action($action, $page)) exit;     // PM-tool actions (always redirect)
         switch ($action) {
@@ -365,7 +366,8 @@ if ($page === 'nf_open') { require_login(); nf_open((int)($_GET['id'] ?? 0)); }
 
 if (in_array($page, ['offers', 'offer', 'offer_edit', 'admin_offer_statuses'], true) && function_exists('of_visible')) { require_login(); of_require(); }   // R31-006
 if (function_exists('hr_only')) hr_gate($page);
-if (function_exists('emp_only')) emp_gate($page);                                                 // R54-001: employee scope → My leave only
+if (function_exists('emp_only')) emp_gate($page);
+if (function_exists('pa_only')) pa_gate($page);                                                   // R75-005: assistant scope → address book + vessels                                                 // R54-001: employee scope → My leave only
 if ($page === 'hr_doc') { require_staff(); hr_doc_stream((int)($_GET['id'] ?? 0)); }
 if ($page === 'hr_people_template') { require_staff(); hr_people_template(); }   // R54-002
 if ($page === 'hr_pdoc') { require_staff(); hr_pdoc_stream((int)($_GET['id'] ?? 0)); }      // R56-001

@@ -52,6 +52,7 @@ layout_head(t('im.title'), 'import');
     </form>
   </div>
 
+  <?php if (!pa_only()): ?>
   <div class="card imp-card">
     <h2><?= tt('im.projects') ?></h2>
     <p class="hint"><?= tt('im.projects_hint') ?></p>
@@ -76,7 +77,8 @@ layout_head(t('im.title'), 'import');
     </form>
   </div>
 
-  <?php if (of_has() && of_visible()): ?>
+  <?php endif; ?>
+  <?php if (of_has() && of_visible() && !pa_only()): ?>
   <div class="card imp-card" id="offers">
     <h2><?= tt('of.title') ?></h2>
     <p class="hint"><?= tt('of.im_hint') ?></p>
@@ -104,7 +106,7 @@ layout_head(t('im.title'), 'import');
   </div>
   <?php endif; ?>
 
-  <?php if (is_cp_admin() && co_has()): ?>
+  <?php if (ct_manage() && co_has()): ?>
   <div class="card imp-card" id="companies">
     <h2><?= tt('co.title') ?></h2>
     <p class="hint"><?= tt('co.im_hint') ?></p>
@@ -118,7 +120,7 @@ layout_head(t('im.title'), 'import');
   </div>
   <?php endif; ?>
 
-  <?php if (is_cp_admin()): ?>
+  <?php if (ct_manage()): ?>
   <div class="card imp-card" id="customers">
     <h2><?= tt('cu.title') ?></h2>
     <p class="hint"><?= tt('cu.im_hint') ?></p>
@@ -130,6 +132,7 @@ layout_head(t('im.title'), 'import');
       <button class="btn" type="submit"><?= tt('im.run') ?></button>
     </form>
   </div>
+  <?php if (!pa_only()): ?>
   <div class="card imp-card" id="users">
     <h2><?= tt('au.title') ?></h2>
     <p class="hint"><?= tt('au.im_hint') ?></p>
@@ -141,6 +144,7 @@ layout_head(t('im.title'), 'import');
       <button class="btn" type="submit"><?= tt('im.run') ?></button>
     </form>
   </div>
+  <?php endif; ?>
   <?php endif; ?>
 </div>
 

@@ -2,7 +2,7 @@
 /** Settings › Customers — the owners whose people sign in: master data and invoicing details.   GAS-CP-R19-001
  *   ?p=admin_customers[&edit=ID][&q=&status=all|active|inactive][&iv=ID] */
 require __DIR__ . '/_layout.php';
-$u = require_cp_admin();
+$u = require_ct_manage();   // R75-005: administrators, Owner, Personal Assistant
 $q = trim((string)($_GET['q'] ?? '')); $st = (string)($_GET['status'] ?? 'active'); if (!in_array($st, ['all', 'active', 'inactive'], true)) $st = 'active';
 $editId = (int)($_GET['edit'] ?? 0); $edit = $editId ? cu_load($editId) : null; $isNew = isset($_GET['edit']) && !$editId;
 $ext = cu_cols_ok(); $ivOk = iv_has();

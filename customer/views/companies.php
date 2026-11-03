@@ -4,7 +4,7 @@
 require __DIR__ . '/_layout.php';
 $u = require_staff();
 if (!co_has()) { layout_head(t('co.title'), 'contacts'); echo '<h1>' . tt('co.title') . '</h1><div class="flash flash--warn">' . tt('co.need_r17b') . '</div>'; layout_foot(); return; }
-$admin = is_cp_admin();
+$admin = ct_manage();   // R75-005
 $q = trim((string)($_GET['q'] ?? '')); $fk = (string)($_GET['kind'] ?? ''); $editId = (int)($_GET['edit'] ?? 0);
 $edit = $editId ? co_load($editId) : null;
 $w = []; $b = [];

@@ -6434,4 +6434,7 @@ Best regards,
 'pp.ev_followup_done' => 'Action done',
 'vg.expand_all' => 'Expand all vessels',
 'vg.collapse_all' => 'Collapse all vessels',
+// ---- GAS-CP-R75-005 personal assistant scope
+'pa.only' => 'Your account handles the address book — vessels, contacts, companies and customers.',
+'hr.scope_assistant' => 'Personal assistant (address book + vessels)',
 ];

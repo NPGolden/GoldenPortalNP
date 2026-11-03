@@ -6434,4 +6434,7 @@ Cordiali saluti,
 'pp.ev_followup_done' => 'Azione eseguita',
 'vg.expand_all' => 'Espandi tutte le navi',
 'vg.collapse_all' => 'Comprimi tutte le navi',
+// ---- GAS-CP-R75-005 personal assistant scope
+'pa.only' => 'Il tuo account gestisce la rubrica — navi, contatti, società e clienti.',
+'hr.scope_assistant' => 'Assistente personale (rubrica + navi)',
 ];

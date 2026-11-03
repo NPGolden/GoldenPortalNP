@@ -1192,7 +1192,7 @@ function pm_handle_action(string $action, string $page): bool {
             } elseif ($id) {
                 q('UPDATE staff_roles SET name = ?, sort_order = ? WHERE id = ?', [$str('name', 80), (int)($_POST['sort_order'] ?? 0), $id]);
                 try { q('UPDATE staff_roles SET see_financials = ? WHERE id = ?', [(int)!empty($_POST['see_financials']), $id]); } catch (Throwable $e) {}
-                try { if (isset($_POST['scope'])) q('UPDATE staff_roles SET scope = ? WHERE id = ?', [in_array($_POST['scope'], ['full', 'hr', 'employee', 'owner'], true) ? $_POST['scope'] : 'full', $id]); } catch (Throwable $e) {}   // R51-001
+                try { if (isset($_POST['scope'])) q('UPDATE staff_roles SET scope = ? WHERE id = ?', [in_array($_POST['scope'], ['full', 'hr', 'employee', 'owner', 'assistant'], true) ? $_POST['scope'] : 'full', $id]); } catch (Throwable $e) {}   // R51-001
                 try { q('UPDATE staff_roles SET can_offer = ? WHERE id = ?', [(int)!empty($_POST['can_offer']), $id]); } catch (Throwable $e) {}
             } else {
                 q('INSERT INTO staff_roles (name, sort_order) VALUES (?, ?) ON DUPLICATE KEY UPDATE sort_order = VALUES(sort_order), is_active = 1',

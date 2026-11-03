@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.83.2';
+const CP_VERSION = '1.83.3';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R75-005', 'version' => '1.83.3', 'date' => '2026-11-03', 'title' => 'Personal Assistant role (scope "assistant", created by the update, financials off): vessels, contacts, companies, customers and their Excel imports — create, edit, delete, link contacts to vessels and companies — and nothing else in the portal. Companies, customers, contact deletion / bulk / imports are now open to administrators, the Owner and this role.', 'db' => 'install/migrate_cp_r75_assistant_role.sql', 'check' => 'r75b'],
         ['ref' => 'GAS-CP-R75-004', 'version' => '1.83.2', 'date' => '2026-11-03', 'title' => 'Sidebar: the HR group now sits after Commercial, just before Library.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R75-003', 'version' => '1.83.1', 'date' => '2026-11-03', 'title' => 'Vessel groups: ⊞ expand all / ⊟ collapse all buttons next to the Grouped / Flat switch on the Projects, Offers, Reports and Accounting pages.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R75-001', 'version' => '1.83.0', 'date' => '2026-11-03', 'title' => 'Sales pipeline (hybrid): stages Sent → Received → Under evaluation → Negotiation → Verbal OK with a base success % each, signals that adjust it (budget confirmed, decision maker met, competitor, no reply 14 days, validity passed), a mandatory next action with owner on every open offer, the default follow-up cadence on send, morning reminders with escalation after 3 days, automatic Expired on validity, and Commercial › Pipeline (board / list, follow-ups due, funnel, per sales person). The Sales KPIs forecast uses the adjusted %.', 'db' => 'install/migrate_cp_r75_pipeline.sql', 'check' => 'r75'],
@@ -296,6 +297,7 @@ function cp_migration_state(): array {
         'r71' => $has("SHOW TABLES LIKE 'webauthn_credentials'") && $has("SHOW TABLES LIKE 'webauthn_challenges'"),
         'r74' => $has("SHOW COLUMNS FROM sp_files LIKE 'offer_id'"),
         'r75' => $has("SHOW TABLES LIKE 'offer_signals'") && $has("SHOW COLUMNS FROM offers LIKE 'next_action_at'"),
+        'r75b' => $has("SELECT 1 FROM staff_roles WHERE scope = 'assistant'"),
         'r70d' => $has("SHOW COLUMNS FROM customer_users LIKE 'clocks'"),
         'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),
         'r67' => $has("SHOW TABLES LIKE 'hr_flows'") && $has("SHOW TABLES LIKE 'hr_flow_templates'") && $has("SHOW TABLES LIKE 'hr_invitations'"),

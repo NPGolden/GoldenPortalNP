@@ -115,7 +115,7 @@ function cu_load(int $id): ?array {
                        (SELECT COUNT(*) FROM customer_users u WHERE u.customer_id = c.id) AS n_users FROM customers c WHERE c.id = ?', [$id]);
 }
 function cu_save_from_post(int $id): int {
-    require_cp_admin();
+    require_ct_manage();   // R75-005
     $str = fn(string $k, int $max) => ($v = trim((string)($_POST[$k] ?? ''))) === '' ? null : mb_substr($v, 0, $max);
     $name = $str('name', 160); if (!$name) throw new RuntimeException(t('cu.need_name'));
     $dup = scalar('SELECT id FROM customers WHERE LOWER(name) = LOWER(?) AND id <> ?', [$name, $id]); if ($dup) throw new RuntimeException(t('cu.dup', ['v' => $name]));
@@ -135,7 +135,7 @@ function cu_save_from_post(int $id): int {
 }
 /** Only a customer nobody refers to can go. */
 function cu_delete(int $id): void {
-    require_cp_admin();
+    require_ct_manage();   // R75-005
     $c = cu_load($id); if (!$c) throw new RuntimeException(t('err.notfound'));
     $refs = (int)$c['n_vessels'] + (int)$c['n_projects'] + (int)$c['n_users'];
     try { $refs += (int) scalar('SELECT COUNT(*) FROM contacts WHERE customer_id = ?', [$id]); } catch (Throwable $e) {}
@@ -164,7 +164,7 @@ function cu_import_columns(): array {
     ];
 }
 function cu_import(string $path, bool $dry): array {
-    require_cp_admin();
+    require_ct_manage();   // R75-005
     $rows = xlsx_rows($path);
     $res = ['rows' => 0, 'customers_new' => 0, 'customers_upd' => 0, 'invoicing_new' => 0, 'invoicing_upd' => 0, 'skipped' => [], 'warnings' => []];
     $cols = cu_import_columns();

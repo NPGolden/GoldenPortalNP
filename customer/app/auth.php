@@ -98,6 +98,20 @@ function hr_only(): bool {
     if (!$u || !is_staff() || is_cp_admin() || empty($u['staff_role_id'])) return $v = false;
     try { return $v = (string) scalar('SELECT scope FROM staff_roles WHERE id = ?', [(int)$u['staff_role_id']]) === 'hr'; } catch (Throwable $e) { return $v = false; }
 }
+/* ---------------------------------------------------------- R75-005: Personal Assistant scope */
+const PA_PAGES = ['vessels', 'vessel', 'vessel_view', 'vessel_new', 'vessel_edit', 'contacts', 'contact', 'contact_edit', 'companies', 'admin_customers', 'import', 'vessel_duplicates', 'admin_vessel_merge', 'file', 'community', 'socphoto', 'account', 'manual', 'notifications', 'nf_open', 'kb', 'kb_q', 'kbfile', 'avatar', 'logout', 'login', 'twofa', 'ping', 'privacy', 'pk', 'clocks'];
+const PA_ACTIONS = ['ct_save', 'ct_delete', 'ct_note', 'ct_note_delete', 'ct_vessel_link', 'ct_vessel_unlink', 'ct_bulk', 'co_save', 'co_delete', 'cu_customer_save', 'cu_customer_delete', 'vessel_save', 'vessel_delete', 'vm_merge', 'ct_import', 'co_import', 'cu_import', 'vessel_import',
+                    'account_save', 'avatar_save', 'theme_save', 'clocks_save', 'twofa_enable', 'twofa_disable', 'twofa_setup', 'pk_remove', 'logout', 'nf_read', 'nf_read_all', 'kb_ask', 'soc_wish', 'soc_kudos', 'soc_post', 'soc_react', 'soc_comment', 'soc_vote', 'soc_delete', 'soc_photo'];
+/** A staff account whose role is scoped "Personal assistant": companies, contacts, customers and vessels — nothing else, no money. Administrators are never scoped. */
+function pa_only(): bool {
+    static $v = null; if ($v !== null) return $v; $u = current_user();
+    if (!$u || !is_staff() || is_cp_admin() || empty($u['staff_role_id'])) return $v = false;
+    try { return $v = (string) scalar('SELECT scope FROM staff_roles WHERE id = ?', [(int)$u['staff_role_id']]) === 'assistant'; } catch (Throwable $e) { return $v = false; }
+}
+function pa_gate(string $page): void { if (pa_only() && !in_array($page, PA_PAGES, true)) { flash('warn', t('pa.only')); redirect('contacts'); } }
+/** May manage the address book: companies, customer companies, contact deletion / bulk / imports — administrators, the Owner and the Personal Assistant. */
+function ct_manage(): bool { return is_staff() && (is_cp_admin() || pa_only() || (function_exists('hr_owner') && hr_owner())); }
+function require_ct_manage(): array { $u = require_login(); if (!ct_manage()) { http_response_code(403); exit(t('err.noaccess')); } return $u; }
 function hr_gate(string $page): void { if (hr_only() && !in_array($page, HR_PAGES, true)) { flash('warn', t('hr.only')); redirect(function_exists('hr2_has') && hr2_has() ? 'hr_dashboard' : 'planning'); } }
 
 /* ---------------------------------------------------------- presence */
