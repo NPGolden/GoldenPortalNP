@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.83.0';
+const CP_VERSION = '1.83.1';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R75-003', 'version' => '1.83.1', 'date' => '2026-11-03', 'title' => 'Vessel groups: ⊞ expand all / ⊟ collapse all buttons next to the Grouped / Flat switch on the Projects, Offers, Reports and Accounting pages.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R75-001', 'version' => '1.83.0', 'date' => '2026-11-03', 'title' => 'Sales pipeline (hybrid): stages Sent → Received → Under evaluation → Negotiation → Verbal OK with a base success % each, signals that adjust it (budget confirmed, decision maker met, competitor, no reply 14 days, validity passed), a mandatory next action with owner on every open offer, the default follow-up cadence on send, morning reminders with escalation after 3 days, automatic Expired on validity, and Commercial › Pipeline (board / list, follow-ups due, funnel, per sales person). The Sales KPIs forecast uses the adjusted %.', 'db' => 'install/migrate_cp_r75_pipeline.sql', 'check' => 'r75'],
         ['ref' => 'GAS-CP-R75-002', 'version' => '1.82.2', 'date' => '2026-11-03', 'title' => 'Projects, Offers, Reports (service and inspection) and Accounting reports pages grouped per vessel: a gold header per vessel with the count, click to fold, and a "Grouped by vessel / Flat list" switch remembered on the browser.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R74-002', 'version' => '1.82.1', 'date' => '2026-11-03', 'title' => 'Offers: several supporting files per offer (approval letter, specifications, drawings…) besides the offer document — uploaded on the offer form (several at once), listed on the offer page with view / remove, visible to the customer or internal per upload, attached to the e-mail card when external; a recorded event on each add / remove.', 'db' => 'install/migrate_cp_r74_offer_files.sql', 'check' => 'r74'],

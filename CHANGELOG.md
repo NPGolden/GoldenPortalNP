@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.83.0** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.83.1** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.83.1 | GAS-CP-R75-003 | 2026-11-03 | Vessel groups: ⊞ expand all / ⊟ collapse all buttons next to the Grouped / Flat switch on the Projects, Offers, Reports and Accounting pages. | — |
 | 1.83.0 | GAS-CP-R75-001 | 2026-11-03 | Sales pipeline (hybrid): stages Sent → Received → Under evaluation → Negotiation → Verbal OK with a base success % each, signals that adjust it (budget confirmed, decision maker met, competitor, no reply 14 days, validity passed), a mandatory next action with owner on every open offer, the default follow-up cadence on send, morning reminders with escalation after 3 days, automatic Expired on validity, and Commercial › Pipeline (board / list, follow-ups due, funnel, per sales person). The Sales KPIs forecast uses the adjusted %. | `install/migrate_cp_r75_pipeline.sql` |
 | 1.82.2 | GAS-CP-R75-002 | 2026-11-03 | Projects, Offers, Reports (service and inspection) and Accounting reports pages grouped per vessel: a gold header per vessel with the count, click to fold, and a "Grouped by vessel / Flat list" switch remembered on the browser. | — |
 | 1.82.1 | GAS-CP-R74-002 | 2026-11-03 | Offers: several supporting files per offer (approval letter, specifications, drawings…) besides the offer document — uploaded on the offer form (several at once), listed on the offer page with view / remove, visible to the customer or internal per upload, attached to the e-mail card when external; a recorded event on each add / remove. | `install/migrate_cp_r74_offer_files.sql` |

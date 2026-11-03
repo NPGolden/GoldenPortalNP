@@ -6418,4 +6418,6 @@ GAS-MSB-2026-002',
 'pp.ev_signal_off' => 'Сигнал знято',
 'pp.ev_followup_set' => 'Заплановано наступну дію',
 'pp.ev_followup_done' => 'Дію виконано',
+'vg.expand_all' => 'Розгорнути всі судна',
+'vg.collapse_all' => 'Згорнути всі судна',
 ];

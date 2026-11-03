@@ -6432,4 +6432,6 @@ Cordiali saluti,
 'pp.ev_signal_off' => 'Segnale rimosso',
 'pp.ev_followup_set' => 'Prossima azione pianificata',
 'pp.ev_followup_done' => 'Azione eseguita',
+'vg.expand_all' => 'Espandi tutte le navi',
+'vg.collapse_all' => 'Comprimi tutte le navi',
 ];

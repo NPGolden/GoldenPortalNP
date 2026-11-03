@@ -6432,4 +6432,6 @@ Best regards,
 'pp.ev_signal_off' => 'Signal cleared',
 'pp.ev_followup_set' => 'Next action planned',
 'pp.ev_followup_done' => 'Action done',
+'vg.expand_all' => 'Expand all vessels',
+'vg.collapse_all' => 'Collapse all vessels',
 ];

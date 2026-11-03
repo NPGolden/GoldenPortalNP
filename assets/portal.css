@@ -1812,4 +1812,5 @@ tr.vg-h td { background: var(--cp-gold-dim, #F6F2E7); border-top: 2px solid var(
 .pp-funval { text-align: right; white-space: nowrap; }
 .btn.is-on { border-color: var(--cp-gold, #C89B3C); }
 html[data-theme="dark"] .pp-col { background: #16263A; } html[data-theme="dark"] .pp-card { background: #1F3A5F; }
-
+.vg-tools { display: inline-flex; gap: 4px; align-items: center; }
+.vg-all { padding-left: 8px; padding-right: 8px; font-size: 15px; line-height: 1; }
