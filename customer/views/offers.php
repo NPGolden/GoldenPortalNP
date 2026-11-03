@@ -24,7 +24,7 @@ layout_head(t('of.title'), 'offers');
 ?>
 <div class="page-head">
   <div><h1><?= tt('of.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt($staff ? 'of.lede_staff' : 'of.lede') ?></p></div>
-  <?php if ($staff): ?><div class="btn-row"><a class="btn btn--ghost" href="<?= url('import') ?>#offers">⤒ <?= tt('nav.import') ?></a><a class="btn btn--gold" href="<?= url('offer_edit', $f['project'] ? ['project' => $f['project']] : []) ?>">+ <?= tt('of.new') ?></a></div><?php endif; ?>
+  <?php if ($staff): ?><div class="btn-row"><?= vg_toggle('offers') ?><a class="btn btn--ghost" href="<?= url('import') ?>#offers">⤒ <?= tt('nav.import') ?></a><a class="btn btn--gold" href="<?= url('offer_edit', $f['project'] ? ['project' => $f['project']] : []) ?>">+ <?= tt('of.new') ?></a></div><?php endif; ?>
 </div>
 <?php if ($k['sent'] && !$staff): ?><div class="flash flash--warn"><?= e(t('of.pending_n', ['n' => $k['sent']])) ?></div><?php endif; ?>
 
@@ -49,11 +49,11 @@ layout_head(t('of.title'), 'offers');
 
 <div class="card">
 <?php if (!$rows): ?><div class="empty"><?= tt('of.none') ?></div>
-<?php else: $tot = 0.0; foreach ($rows as $o) $tot += (float)$o['amount']; [$pageRows, $pager] = page_list($rows, 'offers', $keep); ?>
+<?php else: $tot = 0.0; foreach ($rows as $o) $tot += (float)$o['amount']; $vg = vg_on('offers'); if ($vg) $rows = vg_sort($rows, 'vessel'); [$pageRows, $pager] = page_list($rows, 'offers', $keep); $vgCounts = []; foreach ($pageRows as $o) { $vgCounts[(string)($o['vessel'] ?? '')] = ($vgCounts[(string)($o['vessel'] ?? '')] ?? 0) + 1; } $vgLast = null; ?>
   <div class="table-scroll"><table>
     <thead><tr><th><?= tt('of.no') ?></th><th><?= tt('of.title_f') ?></th><th><?= tt('pr.one') ?></th><th><?= tt('v.one') ?></th><th class="num"><?= tt('of.amount') ?></th><th><?= tt('of.sent') ?></th><th><?= tt('th.status') ?></th><th class="num"><?= tt('of.aging') ?></th><th><?= tt('oa.decision') ?></th><th></th></tr></thead>
-    <tbody><?php foreach ($pageRows as $o): ?>
-      <tr>
+    <tbody><?php foreach ($pageRows as $o): $vgV = (string)($o['vessel'] ?? ''); if ($vg && $vgV !== $vgLast) { echo vg_row($vgV, $vgCounts[$vgV], 10); $vgLast = $vgV; } ?>
+      <tr<?= $vg ? ' data-vg="' . e(vg_slug($vgV)) . '"' : '' ?>>
         <td class="ref"><a href="<?= url('offer', ['id' => $o['id']]) ?>"><?= e($o['offer_no']) ?></a> <span class="hint"><?= e($o['revision']) ?></span> <?= of_origin_pill($o) ?><?= !empty($o['sq_no']) ? '<br><span class="hint mono" title="SQ">' . e($o['sq_no']) . '</span>' : '' ?></td>
         <td><strong><?= e($o['title']) ?></strong></td>
         <td><?= e($o['project_code'] ?: $o['project_name']) ?><?= $o['sub_code'] ? '<br><span class="hint">' . e($o['sub_code'] . ' ' . $o['sub_name']) . '</span>' : '' ?></td>

@@ -548,4 +548,11 @@ document.addEventListener('click', function (ev) {
     var el = e.target; if (!el || !el.hasAttribute || !el.hasAttribute('data-js-opacity-demo')) return;
     var v = document.getElementById('wf-op-val'), d = document.getElementById('wf-op-demo'); if (v) v.textContent = el.value + ' %'; if (d) d.style.opacity = el.value / 100;
   });
+  /* R75-002: vessel groups — collapse a group, remember collapsed groups per page in sessionStorage; the toggle button sets the cookie and reloads */
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('.vg-btn'); if (b) { var h = b.closest('.vg-h'); var k = h.getAttribute('data-vg-h'); var root = h.closest('table, .ptree, .vg-root') || document; var col = !h.classList.contains('is-collapsed'); h.classList.toggle('is-collapsed', col);
+      root.querySelectorAll('[data-vg="' + k + '"]').forEach(function (r) { r.classList.toggle('vg-hidden', col); }); try { var key = 'vg:' + location.search; var st = JSON.parse(sessionStorage.getItem(key) || '{}'); st[k] = col ? 1 : 0; sessionStorage.setItem(key, JSON.stringify(st)); } catch (x) {} return; }
+    var t = e.target.closest && e.target.closest('.vg-toggle'); if (t) { var on = t.classList.contains('is-on'); document.cookie = 'cp_vg_' + t.getAttribute('data-vg-page') + '=' + (on ? '0' : '1') + '; path=/; max-age=31536000; SameSite=Lax'; location.reload(); }
+  });
+  try { var st0 = JSON.parse(sessionStorage.getItem('vg:' + location.search) || '{}'); Object.keys(st0).forEach(function (k) { if (!st0[k]) return; document.querySelectorAll('.vg-h[data-vg-h="' + k + '"]').forEach(function (h) { h.classList.add('is-collapsed'); }); document.querySelectorAll('[data-vg="' + k + '"]').forEach(function (r) { r.classList.add('vg-hidden'); }); }); } catch (x) {}
 })();

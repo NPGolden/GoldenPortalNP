@@ -60,11 +60,11 @@ layout_head(t('acc.title'), 'acc_reports');
 </div>
 
 <div class="card">
-  <h2><?= tt('acc.reports') ?> <span class="count"><?= count($rows) ?></span></h2>
-  <?php if (!$rows): ?><p class="hint"><?= tt('acc.none') ?></p><?php else: ?>
+  <div class="page-head" style="margin-bottom:8px;"><h2 style="margin:0;"><?= tt('acc.reports') ?> <span class="count"><?= count($rows) ?></span></h2><?= vg_toggle('acc_reports') ?></div>
+  <?php if (!$rows): ?><p class="hint"><?= tt('acc.none') ?></p><?php else: $vg = vg_on('acc_reports'); if ($vg) $rows = vg_sort($rows, 'vessel'); $vgCounts = []; foreach ($rows as $r) { $vgCounts[(string)($r['vessel'] ?? '')] = ($vgCounts[(string)($r['vessel'] ?? '')] ?? 0) + 1; } $vgLast = null; ?>
   <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('acc.doc_no') ?></th><th><?= tt('acc.scope') ?></th><th><?= tt('acc.period') ?></th><th class="num"><?= tt('ts.hours') ?></th><th class="num"><?= tt('acc.total_net') ?></th><th><?= tt('th.status') ?></th><th><?= tt('acc.invoice') ?></th><th><?= tt('acc.prepared_by') ?></th><th></th></tr></thead><tbody>
-  <?php foreach ($rows as $r): ?>
-    <tr><td class="mono"><a href="<?= url('acc_report', ['id' => $r['id']]) ?>"><b><?= e(str_starts_with($r['report_no'], 'DRAFT-') ? t('acc.rs_draft') : $r['report_no']) ?></b> <?= e($r['revision']) ?></a></td>
+  <?php foreach ($rows as $r): $vgV = (string)($r['vessel'] ?? ''); if ($vg && $vgV !== $vgLast) { echo vg_row($vgV, $vgCounts[$vgV], 12); $vgLast = $vgV; } ?>
+    <tr<?= $vg ? ' data-vg="' . e(vg_slug($vgV)) . '"' : '' ?>><td class="mono"><a href="<?= url('acc_report', ['id' => $r['id']]) ?>"><b><?= e(str_starts_with($r['report_no'], 'DRAFT-') ? t('acc.rs_draft') : $r['report_no']) ?></b> <?= e($r['revision']) ?></a></td>
       <td><?= e($r['vessel'] ?: '') ?><?= $r['project_code'] ? '<br><span class="hint">' . e(trim($r['project_code'] . ' ' . $r['project_name'])) . '</span>' : '' ?><?= $r['sub_code'] ? '<br><span class="hint">' . e(trim($r['sub_code'] . ' ' . $r['sub_name'])) . '</span>' : '' ?></td>
       <td class="hint"><?= $r['period_start'] ? e(fmt_date($r['period_start'])) : '…' ?> – <?= $r['period_end'] ? e(fmt_date($r['period_end'])) : '…' ?></td>
       <td class="num"><?= e(acc_h((float)$r['total_hours'])) ?> <span class="hint">(<?= (int)$r['n_lines'] ?>)</span></td>

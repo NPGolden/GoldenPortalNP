@@ -6356,4 +6356,9 @@ Cordiali saluti,
 'of.att_remove_confirm' => 'Rimuovere questo file dall\'offerta?',
 'of.ev_file_added' => 'Documenti a corredo aggiunti',
 'of.ev_file_removed' => 'Documento a corredo rimosso',
+// ---- GAS-CP-R75-002 vessel groups
+'vg.grouped' => 'Per nave',
+'vg.flat' => 'Elenco unico',
+'vg.toggle_hint' => 'Alterna elenco unico / gruppi per nave (ricordato nel browser); clicca l\'intestazione della nave per ripiegarla.',
+'vg.no_vessel' => 'Senza nave',
 ];

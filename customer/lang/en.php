@@ -6356,4 +6356,9 @@ Best regards,
 'of.att_remove_confirm' => 'Remove this file from the offer?',
 'of.ev_file_added' => 'Supporting file(s) added',
 'of.ev_file_removed' => 'Supporting file removed',
+// ---- GAS-CP-R75-002 vessel groups
+'vg.grouped' => 'Grouped by vessel',
+'vg.flat' => 'Flat list',
+'vg.toggle_hint' => 'Switch between one list and groups per vessel (remembered on this browser); click a vessel header to fold it.',
+'vg.no_vessel' => 'No vessel',
 ];

@@ -6,7 +6,8 @@ function fsr_status_pill(string $s): string {
 }
 function fsr_table(array $rows, bool $showProject = true, string $slug = 'reports', array $keep = [], string $param = 'page'): void {
     if (!$rows) { echo '<div class="empty">' . tt('fsr.none') . '</div>'; return; }
-    [$rows, $pager] = page_list($rows, $slug, $keep, $param);
+    $vg = $slug === 'reports' && vg_on('reports'); if ($vg) $rows = vg_sort($rows, 'vessel');
+    [$rows, $pager] = page_list($rows, $slug, $keep, $param); $vgCounts = []; foreach ($rows as $r) { $vgCounts[(string)($r['vessel'] ?? '')] = ($vgCounts[(string)($r['vessel'] ?? '')] ?? 0) + 1; } $vgLast = null;
     ?>
     <div class="table-scroll"><table>
       <thead><tr>
@@ -14,8 +15,8 @@ function fsr_table(array $rows, bool $showProject = true, string $slug = 'report
         <?php if ($showProject): ?><th><?= tt('pr.one') ?></th><?php endif; ?>
         <th><?= tt('th.vessel') ?></th><th><?= tt('fsr.engineer') ?></th><th><?= tt('fsr.hours') ?></th><th><?= tt('th.status') ?></th><th><?= tt('fsr.acceptance') ?></th><th></th>
       </tr></thead>
-      <tbody><?php foreach ($rows as $r): ?>
-        <tr>
+      <tbody><?php foreach ($rows as $r): $vgV = (string)($r['vessel'] ?? ''); if ($vg && $vgV !== $vgLast) { echo vg_row($vgV, $vgCounts[$vgV], 9); $vgLast = $vgV; } ?>
+        <tr<?= $vg ? ' data-vg="' . e(vg_slug($vgV)) . '"' : '' ?>>
           <td class="num"><a href="<?= url('fsr', ['id' => $r['id']]) ?>"><?= e($r['report_no']) ?></a><?= ($r['kind'] ?? 'internal') === 'external' ? '<br>' . pill('navy', t('fsr.external')) . (empty($r['converted_id']) && is_staff() ? ' ' . pill('gold', t('fsr.not_processed')) : '') : (!empty($r['source_report_id']) ? '<br><span class="hint">⇄ EXT</span>' : '') ?></td>
           <td class="date"><?= e(fmt_date($r['report_date'])) ?></td>
           <?php if ($showProject): ?><td><?= e($r['project_code'] ?: $r['project_name']) ?><?= $r['sub_code'] ? ' <span class="hint">' . e($r['sub_code'] . ' ' . $r['sub_name']) . '</span>' : '' ?></td><?php endif; ?>

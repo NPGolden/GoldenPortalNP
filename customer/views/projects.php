@@ -55,6 +55,7 @@ layout_head(t('pr.title'), 'projects');
       <a class="btn btn--ghost" href="<?= url('import') ?>"><?= tt('nav.import') ?></a>
       <a class="btn btn--gold" href="<?= url('project_new') ?>"><?= tt('pr.new') ?></a>
     <?php endif; ?>
+    <?= vg_toggle('projects') ?>
   </div>
 </div>
 
@@ -114,9 +115,11 @@ layout_head(t('pr.title'), 'projects');
   <div class="card"><div class="empty"><p><?= $total === 0 && ($q !== '' || $fCustomer || $fVessel || $fPm !== '' || $st !== array_values(array_intersect($allSt, ['active', 'quoted', 'onhold']))) ? tt('flt.none') : tt('pr.empty') ?></p></div></div>
 <?php else: ?>
 <?= process_legend() ?>
-<div class="ptree">
-  <?php foreach ($tree as $i => $p): $pinv = project_inv_summary($p['subs']); $pof = of_has() ? of_project_summary((int)$p['id']) : null; $ofBySub = of_has() ? of_by_sub((int)$p['id']) : []; ?>
-    <details id="pr<?= (int)$p['id'] ?>" <?= ($openId ? $openId === (int)$p['id'] : ($i === 0 || $q !== '')) ? 'open' : '' ?>>
+<?php $vg = vg_on('projects'); if ($vg) $tree = vg_sort($tree, 'vessel'); $vgCounts = []; foreach ($tree as $p) { $vgCounts[(string)($p['vessel'] ?? '')] = ($vgCounts[(string)($p['vessel'] ?? '')] ?? 0) + 1; } $vgLast = null; ?>
+<div class="ptree vg-root">
+  <?php foreach ($tree as $i => $p): $pinv = project_inv_summary($p['subs']); $pof = of_has() ? of_project_summary((int)$p['id']) : null; $ofBySub = of_has() ? of_by_sub((int)$p['id']) : []; $vgV = (string)($p['vessel'] ?? '');
+    if ($vg && $vgV !== $vgLast) { $vgLast = $vgV; echo '<div class="vg-hdr vg-h" data-vg-h="' . e(vg_slug($vgV)) . '"><button type="button" class="vg-btn"><span class="vg-tw">▾</span> ' . ($vgV !== '' ? e($vgV) : tt('vg.no_vessel')) . ' <span class="hint">' . $vgCounts[$vgV] . '</span></button></div>'; } ?>
+    <details id="pr<?= (int)$p['id'] ?>" <?= ($openId ? $openId === (int)$p['id'] : ($i === 0 || $q !== '')) ? 'open' : '' ?><?= $vg ? ' data-vg="' . e(vg_slug($vgV)) . '"' : '' ?>>
       <summary>
         <span class="tw">▶</span>
         <span>

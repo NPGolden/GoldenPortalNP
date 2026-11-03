@@ -10,7 +10,7 @@ $docs = all("SELECT d.*, v.name AS vessel FROM documents d LEFT JOIN vessels v O
              ORDER BY d.updated_at DESC LIMIT 200", [$cid]);
 layout_head(t('r.title'), 'reports');
 ?>
-<h1><?= tt('r.title') ?></h1>
+<div class="page-head"><h1><?= tt('r.title') ?></h1><?= vg_toggle('reports') ?></div>
 <p class="lede"><?= tt('r.lede') ?></p>
 <?php if ($pending && !is_staff()): ?><div class="flash flash--warn"><?= e(t('fsr.pending_n', ['n' => count($pending)])) ?></div><?php endif; ?>
 <div class="card">

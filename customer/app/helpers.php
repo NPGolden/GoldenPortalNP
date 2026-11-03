@@ -155,3 +155,15 @@ function doc_status_pill(string $s): string {
     [$tone, $label] = $map[$s] ?? ['mute', $s];
     return '<span class="pill pill--' . $tone . '">' . e($label) . '</span>';
 }
+
+/* ---------------------------------------------------------------- R75-002: group list rows per vessel */
+/** Grouping on for this page? Cookie cp_vg_<page> = 0 switches it off (the toggle button sets it); default on. */
+function vg_on(string $page): bool { return (($_COOKIE['cp_vg_' . $page] ?? '1') !== '0'); }
+/** Sort rows by vessel name (empty last) keeping the original order inside a vessel; $key = column with the vessel name. */
+function vg_sort(array $rows, string $key = 'vessel'): array { $i = 0; foreach ($rows as &$r) $r['_vgi'] = $i++; unset($r); usort($rows, fn($a, $b) => [((string)($a[$key] ?? '')) === '' ? 1 : 0, mb_strtolower((string)($a[$key] ?? '')), $a['_vgi']] <=> [((string)($b[$key] ?? '')) === '' ? 1 : 0, mb_strtolower((string)($b[$key] ?? '')), $b['_vgi']]); return $rows; }
+/** Group header row for a table: ▸ vessel (n). Rows that follow must carry data-vg="<slug>". */
+function vg_row(string $vessel, int $n, int $cols): string { $slug = vg_slug($vessel); return '<tr class="vg-h" data-vg-h="' . e($slug) . '"><td colspan="' . $cols . '"><button type="button" class="vg-btn"><span class="vg-tw">▾</span> ' . ($vessel !== '' ? e($vessel) : tt('vg.no_vessel')) . ' <span class="hint">' . $n . '</span></button></td></tr>'; }
+function vg_slug(string $vessel): string { return $vessel === '' ? '_none' : substr(md5($vessel), 0, 10); }
+/** The toggle button (grouped ⇄ flat) for the page head. */
+function vg_toggle(string $page): string { $on = vg_on($page); return '<button type="button" class="btn btn--ghost btn--sm vg-toggle' . ($on ? ' is-on' : '') . '" data-vg-page="' . e($page) . '" title="' . tt('vg.toggle_hint') . '">' . ($on ? '▤ ' . tt('vg.grouped') : '☰ ' . tt('vg.flat')) . '</button>'; }
+

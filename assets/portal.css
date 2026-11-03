@@ -1785,3 +1785,14 @@ html[data-theme="dark"] .online-pop { background: #0F2436; }
 .note .note-edit.hidden, .note .ai-assess.hidden { display: none; }
 .note .ai-assess { margin-top: 8px; }
 .note .ai-assess .ai-answer { white-space: normal; }
+
+/* R75-002 vessel groups */
+tr.vg-h td { background: var(--cp-gold-dim, #F6F2E7); border-top: 2px solid var(--cp-gold, #C89B3C); padding: 6px 10px; }
+.vg-btn { background: none; border: 0; font: inherit; font-weight: 700; color: var(--cp-navy, #0B1E2D); cursor: pointer; padding: 0; display: inline-flex; gap: 6px; align-items: center; }
+.vg-tw { display: inline-block; transition: transform .15s; }
+.vg-h.is-collapsed .vg-tw, .vg-hdr.is-collapsed .vg-tw { transform: rotate(-90deg); }
+.vg-hidden { display: none !important; }
+.vg-hdr { display: flex; align-items: center; gap: 8px; margin: 14px 0 6px; padding: 6px 10px; background: var(--cp-gold-dim, #F6F2E7); border-left: 4px solid var(--cp-gold, #C89B3C); border-radius: 6px; }
+.vg-hdr .vg-btn { font-size: 15px; }
+.vg-toggle.is-on { border-color: var(--cp-gold, #C89B3C); }
+
