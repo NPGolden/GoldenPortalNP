@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.82.0';
+const CP_VERSION = '1.82.1';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R74-002', 'version' => '1.82.1', 'date' => '2026-11-03', 'title' => 'Offers: several supporting files per offer (approval letter, specifications, drawings…) besides the offer document — uploaded on the offer form (several at once), listed on the offer page with view / remove, visible to the customer or internal per upload, attached to the e-mail card when external; a recorded event on each add / remove.', 'db' => 'install/migrate_cp_r74_offer_files.sql', 'check' => 'r74'],
         ['ref' => 'GAS-CP-R74-001', 'version' => '1.82.0', 'date' => '2026-11-02', 'title' => 'Golden HR 1.0.0 — the HR app for iPhone (customer/mobile-hr, bundle gr.goldenas.hr): HR inbox (leave / absence requests, training applications, timesheets) with approve / reject and authenticator step-up, people directory (work data only), who is away and public holidays, leave balances, HR message threads; sign-in for the HR role, Owner and CEO only; Face ID / Touch ID mandatory on open and after 15 minutes. API scope "hr" (/hr/app/*), Settings › Login history › Mobile apps lists it; the Customer app\'s minimum version is now saved under its own key.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R73-002', 'version' => '1.81.1', 'date' => '2026-11-02', 'title' => 'Assistant on the sub-project page: when asked in the ✨ panel to look at saved photos it now says that the photo assessment is the "✨ Assess photos" button on the note (the panel never sees stored photos); the assessment box shows how many photos were sent and the assistant\'s own text when it does not answer in the expected structure.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R73-001', 'version' => '1.81.0', 'date' => '2026-11-02', 'title' => 'Weekly notes editable in the portal (sub-project › Weekly: ✎ Edit date, visibility, text, add / remove photos; Delete) by the author, the project manager or an administrator — notes from the apps included. Assistant: ✨ Assess photos on a note reads its photos and proposes, per photo, the equipment, the condition as found, the risks with severity and the corrective actions with priority and owner; Append to the note puts the text into the edit form for review.', 'db' => null, 'check' => null],
@@ -289,6 +290,7 @@ function cp_migration_state(): array {
         'r63' => $has("SHOW TABLES LIKE 'soc_kudos'") && $has("SHOW TABLES LIKE 'soc_onboard'"),
         'r64' => $has("SHOW TABLES LIKE 'hr_targets'") && $has("SHOW TABLES LIKE 'hr_target_log'"),
         'r71' => $has("SHOW TABLES LIKE 'webauthn_credentials'") && $has("SHOW TABLES LIKE 'webauthn_challenges'"),
+        'r74' => $has("SHOW COLUMNS FROM sp_files LIKE 'offer_id'"),
         'r70d' => $has("SHOW COLUMNS FROM customer_users LIKE 'clocks'"),
         'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),
         'r67' => $has("SHOW TABLES LIKE 'hr_flows'") && $has("SHOW TABLES LIKE 'hr_flow_templates'") && $has("SHOW TABLES LIKE 'hr_invitations'"),

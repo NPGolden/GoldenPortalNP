@@ -382,6 +382,7 @@ function pm_handle_action(string $action, string $page): bool {
             flash('good', t('of.saved'));
             redirect('offer', ['id' => $id, '_r' => uniqid()]);
         }
+        case 'of_att_delete': { require_staff(); of_require(); $oid = (int)($_POST['id'] ?? 0); of_att_delete($oid, (int)($_POST['file_id'] ?? 0)); flash('good', t('of.att_removed')); redirect('offer', ['id' => $oid, '_r' => uniqid()]); }
         case 'of_delete': {
             require_cp_admin();
             of_delete((int)$_POST['id']);

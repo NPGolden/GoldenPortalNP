@@ -6348,4 +6348,12 @@ Cordiali saluti,
 'ai.photos_sent' => 'foto inviate all\'assistente',
 // ---- GAS-CP-R74-001 Golden HR
 'mob.app_hr' => 'Golden HR (iOS)',
+// ---- GAS-CP-R74-002 offer attachments
+'of.att' => 'Documenti a corredo',
+'of.att_hint' => 'Lettera di approvazione, specifiche, disegni, corrispondenza — più file insieme (PDF, Word, Excel, immagini). Restano con l\'offerta e le sue revisioni.',
+'of.att_files' => 'file',
+'of.att_removed' => 'File rimosso dall\'offerta.',
+'of.att_remove_confirm' => 'Rimuovere questo file dall\'offerta?',
+'of.ev_file_added' => 'Documenti a corredo aggiunti',
+'of.ev_file_removed' => 'Documento a corredo rimosso',
 ];

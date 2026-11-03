@@ -6348,4 +6348,12 @@ Best regards,
 'ai.photos_sent' => 'photo(s) sent to the assistant',
 // ---- GAS-CP-R74-001 Golden HR
 'mob.app_hr' => 'Golden HR (iOS)',
+// ---- GAS-CP-R74-002 offer attachments
+'of.att' => 'Supporting files',
+'of.att_hint' => 'Approval letter, specifications, drawings, correspondence — several at once (PDF, Word, Excel, images). They stay with the offer and its revisions.',
+'of.att_files' => 'file(s)',
+'of.att_removed' => 'File removed from the offer.',
+'of.att_remove_confirm' => 'Remove this file from the offer?',
+'of.ev_file_added' => 'Supporting file(s) added',
+'of.ev_file_removed' => 'Supporting file removed',
 ];

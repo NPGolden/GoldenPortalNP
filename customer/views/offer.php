@@ -8,7 +8,7 @@ if (!$o) { http_response_code(404); layout_head(t('err.notfound'), 'offers'); ec
 $pending = $o['status'] === 'sent';
 $canDecide = $pending && (!$staff || is_cp_admin());
 $next = of_next_statuses($o);
-$ev = ['draft' => t('of.ev_draft'), 'sent' => t('of.ev_sent'), 'edited' => t('of.ev_edited'), 'approved' => t('of.st_approved'), 'rejected' => t('of.st_rejected'), 'status_cancelled' => t('of.st_cancelled'), 'status_in_progress' => t('of.st_in_progress'), 'status_to_be_invoiced' => t('of.st_to_be_invoiced'), 'status_finished' => t('of.st_finished'), 'status_sent' => t('of.ev_resent'), 'imported' => t('of.ev_imported'), 'project_active' => t('of.ev_project_active')];
+$ev = ['file_added' => t('of.ev_file_added'), 'file_removed' => t('of.ev_file_removed'), 'draft' => t('of.ev_draft'), 'sent' => t('of.ev_sent'), 'edited' => t('of.ev_edited'), 'approved' => t('of.st_approved'), 'rejected' => t('of.st_rejected'), 'status_cancelled' => t('of.st_cancelled'), 'status_in_progress' => t('of.st_in_progress'), 'status_to_be_invoiced' => t('of.st_to_be_invoiced'), 'status_finished' => t('of.st_finished'), 'status_sent' => t('of.ev_resent'), 'imported' => t('of.ev_imported'), 'project_active' => t('of.ev_project_active')];
 layout_head($o['offer_no'] . ' · ' . $o['title'], 'offers');
 ?>
 <p class="eyebrow"><a href="<?= url('offers') ?>"><?= tt('of.title') ?></a> › <?= pr_link((int)$o['project_id'], $o['project_code'], $o['project_name']) ?><?= $o['sub_code'] ? ' › <a href="' . url('subproject', ['id' => $o['subproject_id']]) . '">' . e($o['sub_code']) . '</a>' : '' ?></p>
@@ -34,6 +34,10 @@ layout_head($o['offer_no'] . ' · ' . $o['title'], 'offers');
         <div class="rowitem" style="margin-top:14px;"><span class="ico">📄</span><span class="tx"><b><?= e($o['original_name']) ?></b><span><?= e($o['file_mime'] ?? '') ?><?= $o['file_size'] ? ' · ' . number_format((int)$o['file_size'] / 1024, 0) . ' KB' : '' ?></span></span>
           <a class="btn btn--gold btn--sm" href="<?= url('file', ['id' => $o['file_id']]) ?>" target="_blank"><?= tt('rd.view') ?></a></div>
       <?php else: ?><p class="hint" style="margin-top:12px;"><?= tt('oa.nofile') ?></p><?php endif; ?>
+      <?php $atts = function_exists('of_attachments') ? of_attachments($id) : []; if ($atts): ?><p class="hint" style="margin:12px 0 4px;"><b><?= tt('of.att') ?></b></p>
+        <?php foreach ($atts as $af): ?><div class="rowitem"><span class="ico">📎</span><span class="tx"><b><?= e($af['original_name']) ?></b><span><?= e($af['mime_type'] ?? '') ?><?= $af['size_bytes'] ? ' · ' . number_format((int)$af['size_bytes'] / 1024, 0) . ' KB' : '' ?><?= $staff ? ' · ' . tt('vis.' . $af['visibility']) . ($af['by_name'] ? ' · ' . e($af['by_name']) : '') . ' · ' . e(fmt_date(substr((string)$af['created_at'], 0, 10))) : '' ?></span></span>
+          <a class="btn btn--gold btn--sm" href="<?= url('file', ['id' => (int)$af['id']]) ?>" target="_blank"><?= tt('rd.view') ?></a><?php if ($staff): ?><form method="post" action="<?= url('offer', ['id' => $id]) ?>" class="inline" data-lock data-confirm="<?= tt('of.att_remove_confirm') ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('btn.delete') ?>" data-confirm-danger><?= csrf_field() ?><input type="hidden" name="action" value="of_att_delete"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="file_id" value="<?= (int)$af['id'] ?>"><button class="btn btn--ghost btn--sm btn--danger-ghost" type="submit">🗑</button></form><?php endif; ?></div><?php endforeach; ?>
+      <?php endif; ?>
       <?php if ($o['notes']): ?><div class="tk-desc"><?= rt_html($o['notes']) ?></div><?php endif; ?>
     </div>
 
@@ -111,7 +115,7 @@ layout_head($o['offer_no'] . ' · ' . $o['title'], 'offers');
 </div>
 <?php if ($staff && function_exists('pi_can_view') && pi_can_view()) require __DIR__ . '/_offer_proformas.php'; ?>
 <?php require __DIR__ . '/_offer_builder.php'; ?>
-<?php if ($staff && function_exists('em_card_html')): $emAtts = $o['file_id'] ? [['f:' . (int)$o['file_id'], (string)$o['original_name']]] : [];
+<?php if ($staff && function_exists('em_card_html')): $emAtts = $o['file_id'] ? [['f:' . (int)$o['file_id'], (string)$o['original_name']]] : []; foreach (function_exists('of_attachments') ? of_attachments($id) : [] as $af) if ($af['visibility'] === 'external') $emAtts[] = ['f:' . (int)$af['id'], (string)$af['original_name']];
   echo em_card_html(['kind' => 'offer', 'ctx' => ['no' => $o['offer_no'] . ' ' . $o['revision'], 'title' => (string)$o['title'], 'vessel' => (string)($o['vessel'] ?? ''), 'customer' => (string)($o['customer_name'] ?? ''), 'project' => (string)($o['project_code'] ?? ''), 'doc' => t('em.w_offer', ['no' => $o['offer_no'] . ' ' . $o['revision']]), 'project_id' => (int)$o['project_id'], 'customer_id' => (int)($o['customer_id'] ?? 0)],
     'people' => em_people((int)($o['vessel_id'] ?? 0) ?: null, (int)($o['customer_id'] ?? 0) ?: null), 'atts' => $emAtts, 'back' => url('offer', ['id' => $id])]); endif; ?>
 <?php $adAction = 'of_delete'; $adId = $id; $adBack = 'offers'; $adConfirm = t('of.delete_confirm', ['no' => $o['offer_no'] . ' ' . $o['revision']]); $adNote = t('of.delete_note'); require __DIR__ . '/_admin_delete.php'; ?>

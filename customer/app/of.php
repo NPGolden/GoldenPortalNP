@@ -169,7 +169,7 @@ function of_save_from_post(int $id): int {
         if (function_exists('sl_has') && sl_has() && array_key_exists('requested_at', $_POST)) q('UPDATE offers SET requested_at = ? WHERE id = ?', [preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$_POST['requested_at']) ? $_POST['requested_at'] : null, $id]);   // R39-002
         if ($ob) ob_recalc($id);
         of_event($id, 'edited', $fileId ? t('of.file_replaced') : null);
-        return $id;
+        of_att_after_save($id, $pid, $sid); return $id;
     }
     $draft = $ob && !empty($_POST['as_draft']);
     q('INSERT INTO offers (project_id, subproject_id, offer_no, revision, title, amount, currency, status, sent_at, valid_until, status_at, file_id, notes, created_by' . ($ob ? ', vessel_id, ticket_id, layout, vat_pct, validity_days' : '') . ') VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?' . ($ob ? ',?,?,?,?,?' : '') . ')',
@@ -179,6 +179,7 @@ function of_save_from_post(int $id): int {
     if (function_exists('sl_has') && sl_has()) q('UPDATE offers SET requested_at = ? WHERE id = ?', [preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['requested_at'] ?? '')) ? $_POST['requested_at'] : ($tid ? (scalar('SELECT DATE(created_at) FROM tickets WHERE id = ?', [$tid]) ?: null) : null), $id]);   // R39-002: quote turnaround
     if ($ob && !empty($o = of_load($id)) && empty($o['rate_list_id']) && function_exists('rl_current')) { $b = function_exists('br_of') ? br_of($pid, $sid) : []; $rl = rl_current((int)($b['id'] ?? 0) ?: null, (string)($b['code'] ?? '')); if ($rl) q('UPDATE offers SET rate_list_id = ? WHERE id = ?', [(int)$rl['id'], $id]); }
     of_event($id, $draft ? 'draft' : 'sent', $draft ? null : of_money($amount, $cur));
+    of_att_after_save($id, $pid, $sid);
     return $id;
 }
 /** The owner's decision on a sent offer (or an administrator recording it on the owner's behalf). */
@@ -208,7 +209,21 @@ function of_set_status(int $id, string $status, string $note = ''): void {
     of_event($id, 'status_' . $status, mb_substr(trim($note), 0, 1000) ?: null);
     of_sync_project((int)$o['project_id']);                                                                           // R57-001
 }
-function of_delete(int $id): void { require_cp_admin(); $o = of_load($id); if (!$o) throw new RuntimeException(t('err.notfound')); q('DELETE FROM offers WHERE id = ?', [$id]); if (!empty($o['file_id'])) cp_delete_file((int)$o['file_id']); of_sync_project((int)$o['project_id']); }
+/* R74-002: several supporting files per offer (approval letter, specifications, drawings…) — sp_files.offer_id, kind 'offer_att'. */
+function of_att_after_save(int $id, int $pid, ?int $sid): void { if (!empty($_FILES['attachments']['name'][0] ?? '')) { $na = of_att_store($id, $pid, $sid, (string)($_POST['att_visibility'] ?? 'external')); if ($na) of_event($id, 'file_added', $na . ' ' . t('of.att_files')); } }   // R74-002
+function of_att_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM sp_files LIKE 'offer_id'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function of_attachments(int $offerId): array { if (!of_att_has()) return []; return all("SELECT f.*, cu.full_name AS by_name FROM sp_files f LEFT JOIN customer_users cu ON cu.id = f.uploaded_by WHERE f.offer_id = ? AND f.kind = 'offer_att'" . (is_staff() ? '' : " AND f.visibility = 'external'") . ' ORDER BY f.id', [$offerId]); }
+/** Store the files of input attachments[] on an offer; $vis external (customer sees them with the offer) or internal. Returns how many. */
+function of_att_store(int $offerId, int $pid, ?int $sid, string $vis): int {
+    if (!of_att_has()) return 0; $n = 0; $o = one('SELECT offer_no, revision FROM offers WHERE id = ?', [$offerId]);
+    foreach (files_list('attachments') as $f) { $fid = cp_store_file($f, $pid, $sid, 'offer_att', $vis === 'internal' ? 'internal' : 'external', trim(($o['offer_no'] ?? '') . ' ' . ($o['revision'] ?? '')) . ' — ' . mb_substr((string)$f['name'], 0, 120), null, null, []); if ($fid) { q('UPDATE sp_files SET offer_id = ? WHERE id = ?', [$offerId, $fid]); $n++; } }
+    return $n;
+}
+function of_att_delete(int $offerId, int $fileId): void {
+    require_staff(); $f = one("SELECT id FROM sp_files WHERE id = ? AND offer_id = ? AND kind = 'offer_att'", [$fileId, $offerId]); if (!$f) throw new RuntimeException(t('err.notfound'));
+    cp_delete_file($fileId); of_event($offerId, 'file_removed', null);
+}
+function of_delete(int $id): void { require_cp_admin(); $o = of_load($id); if (!$o) throw new RuntimeException(t('err.notfound')); foreach (of_attachments($id) as $af) cp_delete_file((int)$af['id']); q('DELETE FROM offers WHERE id = ?', [$id]); if (!empty($o['file_id'])) cp_delete_file((int)$o['file_id']); of_sync_project((int)$o['project_id']); }
 
 /* ---------------------------------------------------- R15: deadlines */
 /** Save the deadline posted with a project / sub-project form (column exists from R15). */
