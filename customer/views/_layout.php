@@ -25,6 +25,7 @@ function nav_groups(): array {
     if ($staff && function_exists('ct_has') && ct_has()) $g[3]['items'][] = ['contacts', t('nav.contacts'), '☎'];
     if ($staff && function_exists('acc_visible') && acc_visible()) $g[3]['items'][] = ['acc_reports', t('acc.title'), '🧾'];
     if ($staff && function_exists('kpi_can') && kpi_can()) $g[2]['items'][] = ['kpis', t('kpi.title'), '🎯'];
+    if ($staff && function_exists('pp_can') && pp_can()) $g[3]['items'][] = ['pipeline', t('pp.title'), '🎯'];   // R75-001
     if ($staff && function_exists('sl_can') && sl_can()) $g[3]['items'][] = ['sales', t('sl.title'), '📈'];
     if ($staff && function_exists('pi_can_view') && pi_can_view()) $g[3]['items'][] = ['proformas', t('pi.title'), '💶'];
     if ($staff && function_exists('cf_can') && cf_can()) $g[3]['items'][] = ['cashflow', t('cf.title'), '💰'];

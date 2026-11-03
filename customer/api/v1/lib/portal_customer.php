@@ -136,9 +136,9 @@ final class PortalCustomer {
     }
 
     /* ------------------------------------------------------------------ offers (customer sees amount, never cost; drafts hidden) */
-    private const OF_STATUS = ['sent' => 'issued', 'approved' => 'accepted', 'in_progress' => 'order_confirmed', 'to_be_invoiced' => 'order_confirmed', 'finished' => 'order_confirmed', 'rejected' => 'declined', 'cancelled' => 'superseded'];
+    private const OF_STATUS = ['sent' => 'issued', 'received' => 'issued', 'evaluation' => 'issued', 'negotiation' => 'issued', 'verbal_ok' => 'issued', 'expired' => 'superseded', 'approved' => 'accepted', 'in_progress' => 'order_confirmed', 'to_be_invoiced' => 'order_confirmed', 'finished' => 'order_confirmed', 'rejected' => 'declined', 'cancelled' => 'superseded'];
     private static function offerShape(array $o): array {
-        $exp = !empty($o['valid_until']) && $o['status'] === 'sent' && strtotime((string)$o['valid_until'] . ' 23:59:59') < time();
+        $exp = !empty($o['valid_until']) && of_is_pending($o) && strtotime((string)$o['valid_until'] . ' 23:59:59') < time();
         return ['id' => (int)$o['id'], 'offer_no' => (string)$o['offer_no'], 'revision' => (string)$o['revision'], 'title' => (string)$o['title'], 'vessel' => (string)($o['vessel'] ?? ''), 'project' => (string)($o['project_code'] ?? ''),
             'status' => $exp ? 'expired' : (self::OF_STATUS[$o['status']] ?? (string)$o['status']), 'portal_status' => (string)$o['status'], 'portal_status_label' => function_exists('of_status_label') ? of_status_label((string)$o['status']) : (string)$o['status'],
             'total_cents' => (int)round((float)$o['amount'] * 100), 'currency' => (string)($o['currency'] ?: 'EUR'), 'vat_pct' => isset($o['vat_pct']) ? (float)$o['vat_pct'] : null,

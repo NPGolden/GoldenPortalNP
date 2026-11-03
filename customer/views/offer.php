@@ -5,10 +5,11 @@ $u = require_login(); $staff = is_staff();
 $id = (int)($_GET['id'] ?? 0);
 $o = of_has() ? of_load($id) : null;
 if (!$o) { http_response_code(404); layout_head(t('err.notfound'), 'offers'); echo '<h1>' . tt('err.notfound') . '</h1>'; layout_foot(); return; }
-$pending = $o['status'] === 'sent';
+$pending = of_is_pending($o);
 $canDecide = $pending && (!$staff || is_cp_admin());
 $next = of_next_statuses($o);
-$ev = ['file_added' => t('of.ev_file_added'), 'file_removed' => t('of.ev_file_removed'), 'draft' => t('of.ev_draft'), 'sent' => t('of.ev_sent'), 'edited' => t('of.ev_edited'), 'approved' => t('of.st_approved'), 'rejected' => t('of.st_rejected'), 'status_cancelled' => t('of.st_cancelled'), 'status_in_progress' => t('of.st_in_progress'), 'status_to_be_invoiced' => t('of.st_to_be_invoiced'), 'status_finished' => t('of.st_finished'), 'status_sent' => t('of.ev_resent'), 'imported' => t('of.ev_imported'), 'project_active' => t('of.ev_project_active')];
+$ev = ['file_added' => t('of.ev_file_added'), 'file_removed' => t('of.ev_file_removed'), 'draft' => t('of.ev_draft'), 'sent' => t('of.ev_sent'), 'edited' => t('of.ev_edited'), 'approved' => t('of.st_approved'), 'rejected' => t('of.st_rejected'), 'status_cancelled' => t('of.st_cancelled'), 'status_in_progress' => t('of.st_in_progress'), 'status_to_be_invoiced' => t('of.st_to_be_invoiced'), 'status_finished' => t('of.st_finished'), 'status_sent' => t('of.ev_resent'), 'imported' => t('of.ev_imported'), 'project_active' => t('of.ev_project_active'), 'signal_on' => t('pp.ev_signal_on'), 'signal_off' => t('pp.ev_signal_off'), 'followup_set' => t('pp.ev_followup_set'), 'followup_done' => t('pp.ev_followup_done')];
+foreach (of_status_defs() as $evK => $evD) if (!isset($ev['status_' . $evK])) $ev['status_' . $evK] = $evD['label'];   // R75-001: every stage
 layout_head($o['offer_no'] . ' · ' . $o['title'], 'offers');
 ?>
 <p class="eyebrow"><a href="<?= url('offers') ?>"><?= tt('of.title') ?></a> › <?= pr_link((int)$o['project_id'], $o['project_code'], $o['project_name']) ?><?= $o['sub_code'] ? ' › <a href="' . url('subproject', ['id' => $o['subproject_id']]) . '">' . e($o['sub_code']) . '</a>' : '' ?></p>
@@ -67,6 +68,42 @@ layout_head($o['offer_no'] . ' · ' . $o['title'], 'offers');
       <div class="card"><p class="hint" style="margin:0;"><?= tt('of.awaiting_owner') ?></p></div>
     <?php endif; ?>
 
+    <?php if ($staff && function_exists('pp_can') && pp_can() && of_is_pending($o)): $sig = pp_signals($id); $prob = pp_prob($o, $sig); $base = pp_base($o['status']); $late = pp_overdue_days($o); $plan = pp_cadence_plan($o); $staffList = function_exists('mt_staff') ? mt_staff() : []; $ownerId = pp_owner($o); ?>
+      <div class="card" id="followup">
+        <div class="card-head"><h2>🎯 <?= tt('pp.card') ?></h2><span><?= pp_prob_pill($prob) ?> <span class="hint"><?= e(t('pp.prob_explain', ['b' => $base, 's' => $prob - $base >= 0 ? '+' . ($prob - $base) : (string)($prob - $base)])) ?></span></span></div>
+        <?php if (isset(PP_STAGE_DAYS[$o['status']])): $dis = (int) floor((time() - strtotime($o['status_at'] ?: $o['sent_at'] ?: date('Y-m-d'))) / 86400); ?><p class="hint" style="margin:0 0 8px;"><?= e(t('pp.days_in_stage', ['n' => $dis, 'x' => PP_STAGE_DAYS[$o['status']]])) ?><?= $dis > PP_STAGE_DAYS[$o['status']] ? ' ' . pill('bad', t('pp.stage_late')) : '' ?></p><?php endif; ?>
+        <div class="grid grid-2">
+          <div>
+            <h3 class="ed-h"><?= tt('pp.next_action') ?></h3>
+            <?php if ($o['next_action_type']): ?><p style="margin:0 0 6px;"><b><?= e(pp_action_label($o['next_action_type'])) ?></b> · <?= e(fmt_date($o['next_action_at'])) ?><?= $late > 0 ? ' ' . pill('bad', t('pp.overdue_d', ['d' => $late])) : ($late === 0 ? ' ' . pill('gold', t('pp.today')) : '') ?><?= $ownerId ? ' · ' . e((string)(array_values(array_filter($staffList, fn($x) => (int)$x['id'] === $ownerId))[0]['name'] ?? '')) : '' ?><?= $o['next_action_note'] ? '<br><span class="hint">' . e($o['next_action_note']) . '</span>' : '' ?></p>
+            <?php else: ?><p class="flash flash--warn" style="margin:0 0 6px;"><?= tt('pp.no_action') ?></p><?php endif; ?>
+            <form method="post" action="<?= url('offer', ['id' => $id]) ?>#followup" data-lock>
+              <?= csrf_field() ?><input type="hidden" name="action" value="pp_action"><input type="hidden" name="id" value="<?= $id ?>">
+              <?php if ($o['next_action_type']): ?><label class="chk"><input type="checkbox" name="done" value="1"> <?= tt('pp.mark_done') ?></label><div class="field"><label><?= tt('pp.outcome') ?></label><input name="outcome" maxlength="1000" placeholder="<?= tt('pp.outcome_ph') ?>"></div><?php endif; ?>
+              <div class="grid grid-3">
+                <div class="field"><label><?= tt('pp.act_type') ?></label><select name="type" data-nosearch><?php foreach (PP_ACTIONS as $a): ?><option value="<?= $a ?>"<?= $a === ($o['next_action_type'] ?: 'call') ? ' selected' : '' ?>><?= e(pp_action_label($a)) ?></option><?php endforeach; ?></select></div>
+                <div class="field"><label><?= tt('th.date') ?></label><input type="date" name="date" value="<?= e($o['next_action_at'] ?: date('Y-m-d', strtotime('+7 days'))) ?>" required></div>
+                <div class="field"><label><?= tt('pp.owner') ?></label><select name="user_id"><?php foreach ($staffList as $x): ?><option value="<?= (int)$x['id'] ?>"<?= (int)$x['id'] === $ownerId ? ' selected' : '' ?>><?= e($x['name']) ?></option><?php endforeach; ?></select></div>
+              </div>
+              <div class="field"><label><?= tt('oa.note') ?></label><input name="note" maxlength="300" value="<?= e((string)$o['next_action_note']) ?>"></div>
+              <button class="btn btn--sm" type="submit"><?= tt('pp.save_action') ?></button>
+            </form>
+            <p class="hint" style="margin:8px 0 0;"><b><?= tt('pp.cadence') ?>:</b> <?= implode(' · ', array_map(fn($c) => e(pp_action_label($c['type'])) . ' ' . e(fmt_date($c['date'])) . (!empty($c['validity']) ? ' (' . tt('of.valid_until') . ')' : ''), $plan)) ?></p>
+          </div>
+          <div>
+            <h3 class="ed-h"><?= tt('pp.signals') ?></h3>
+            <form method="post" action="<?= url('offer', ['id' => $id]) ?>#followup" data-lock>
+              <?= csrf_field() ?><input type="hidden" name="action" value="pp_signal"><input type="hidden" name="id" value="<?= $id ?>">
+              <?php foreach (PP_SIGNALS as $k => $d): $auto = in_array($k, PP_AUTO_SIGNALS, true); $on = isset($sig[$k]); ?>
+              <label class="chk" style="display:flex;gap:8px;align-items:center;margin:4px 0;"><input type="checkbox" name="sig[<?= $k ?>]" value="1"<?= $on ? ' checked' : '' ?><?= $auto ? ' disabled' : '' ?>> <span><?= e(t('pp.sig_' . $k)) ?> <b style="color:<?= $d > 0 ? 'var(--green)' : 'var(--red)' ?>"><?= $d > 0 ? '+' : '' ?><?= $d ?></b><?= $auto ? ' <span class="hint">(' . tt('pp.auto') . ')</span>' : '' ?><?= $on && !empty($sig[$k]['set_name']) ? ' <span class="hint">' . e($sig[$k]['set_name']) . ' ' . e(fmt_date(substr((string)$sig[$k]['set_at'], 0, 10))) . '</span>' : '' ?></span></label>
+              <?php endforeach; ?>
+              <button class="btn btn--ghost btn--sm" type="submit"><?= tt('btn.save') ?></button>
+            </form>
+            <p class="hint" style="margin:8px 0 0;"><?= tt('pp.signals_hint') ?></p>
+          </div>
+        </div>
+      </div>
+    <?php endif; ?>
     <?php if ($staff && $next): ?>
       <div class="card">
         <h2><?= tt('of.progress') ?></h2>

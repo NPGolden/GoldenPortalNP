@@ -193,6 +193,8 @@ $r71 = (bool)$pdo->query("SHOW TABLES LIKE 'webauthn_credentials'")->fetch();
 printf("%s R71-001 migration (passkeys)  %s\n", $r71 ? '[ OK ]' : '[WARN]', $r71 ? '' : '— run install/migrate_cp_r71_passkeys.sql');
 $r74 = (bool)$pdo->query("SHOW COLUMNS FROM sp_files LIKE 'offer_id'")->fetch();
 printf("%s R74-002 migration (offer attachments)  %s\n", $r74 ? '[ OK ]' : '[WARN]', $r74 ? '' : '— run install/migrate_cp_r74_offer_files.sql');
+$r75 = (bool)$pdo->query("SHOW TABLES LIKE 'offer_signals'")->fetch();
+printf("%s R75-001 migration (sales pipeline)  %s\n", $r75 ? '[ OK ]' : '[WARN]', $r75 ? '' : '— run install/migrate_cp_r75_pipeline.sql');
 printf("%s R71-001 openssl extension (passkey signatures)  %s\n", function_exists('openssl_verify') ? '[ OK ]' : '[FAIL]', function_exists('openssl_verify') ? '' : '— enable ext-openssl');
 $r70d = (bool)$pdo->query("SHOW COLUMNS FROM customer_users LIKE 'clocks'")->fetch();
 printf("%s R70-004 migration (world clocks per user)  %s\n", $r70d ? '[ OK ]' : '[WARN]', $r70d ? '' : '— run install/migrate_cp_r70_clocks.sql');

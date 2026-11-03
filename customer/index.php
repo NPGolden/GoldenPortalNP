@@ -8,7 +8,8 @@ if (is_dir(__DIR__ . '/storage') && is_writable(__DIR__ . '/storage')) { ini_set
 require __DIR__ . '/app/db.php';
 require __DIR__ . '/app/cache.php';
 require __DIR__ . '/app/clk.php';    // R70-004 world clocks per user
-require __DIR__ . '/app/pk.php';     // R71-001 passkeys  // R69-002 block cache, query meter, house-keeping
+require __DIR__ . '/app/pk.php';     // R71-001 passkeys
+require __DIR__ . '/app/pipe.php';   // R75-001 sales pipeline  // R69-002 block cache, query meter, house-keeping
 require __DIR__ . '/app/i18n.php';
 require __DIR__ . '/app/helpers.php';
 require __DIR__ . '/app/auth.php';
@@ -371,7 +372,7 @@ if ($page === 'hr_pdoc') { require_staff(); hr_pdoc_stream((int)($_GET['id'] ?? 
 if ($page === 'hra_doc') { require_staff(); hra_doc_stream((int)($_GET['id'] ?? 0)); }       // R67-001                                                   // R51-001: HR scope → Planning only
 flt_apply($page);                                                                               // R29-008: remembered list filters
 if ($page === 'vessel' && function_exists('vm_has') && vm_has() && ($mi = scalar('SELECT merged_into FROM vessels WHERE id = ?', [(int)($_GET['id'] ?? 0)]))) redirect('vessel', ['id' => vm_resolve((int)$mi)] + array_diff_key($_GET, ['p' => 1, 'id' => 1]));   // R30-001: a retired duplicate opens its master
-$views = ['login','twofa','privacy','dashboard','vessels','projects','documents','reports','cyber','support','account',
+$views = ['login','twofa','privacy','dashboard','vessels','projects','pipeline','documents','reports','cyber','support','account',
           'subproject','drawings','overlay','weekly','monthly','report_sp',
           'project_new','subproject_new','project_edit','subproject_edit','vessel_new','vessel_edit','import',
           'admin_numbering','admin_offer_classes','proformas','proforma','cashflow','report_cf','eng_requests','admin_engineering','admin_ai','admin_hr','hr_person','hr_dashboard','my_leave','hr_requests','hra','hra_flow','production','production_order','production_edit','admin_systems','admin_users','admin_roles','admin_log','settings','approvals','approval','timesheets','timesheet','timesheet_edit','manhours','report_ts','admin_disciplines','admin_about','tickets','ticket','ticket_edit','vessel','report_vessel','offers','offer','offer_edit','weekly_vessel','report_weekly','fsr','fsr_edit','fsr_list','isr','isr_edit','isr_list','jo','jo_edit','jo_list','joborders','contacts','contact','contact_edit','companies','admin_offer_statuses','notifications','admin_customers','manual','kb','kb_q','requests','request','hr_leaves','hr_training','hr_eval','hr_targets','community','license','tasks','task_edit','admin_task_kinds','admin_file_kinds','admin_calendars','admin_branches','planning','equipment','equipment_view','equipment_edit','fd_import','admin_issue_cats','admin_vessel_merge','rs','rs_edit','wf','vessel_decks','admin_email_templates','admin_rate_cards','admin_offer_texts','cost_control','work','myworks','workload','acc_register','acc_reports','acc_report','fsr_ext','kpis','risks','admin_kpis','report_kpi','sales','report_sales','admin_sales'];

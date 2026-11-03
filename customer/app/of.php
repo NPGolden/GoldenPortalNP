@@ -34,7 +34,7 @@ function of_status_defs(bool $activeOnly = false): array {
     static $all = null;
     if ($all === null) {
         $all = [];
-        $builtin = [['draft', 'mute', 'draft', 5], ['sent', 'gold', 'open', 10], ['rejected', 'bad', 'closed_lost', 20], ['cancelled', 'mute', 'closed_lost', 30], ['approved', 'green', 'approved', 40], ['in_progress', 'blue', 'approved', 50], ['to_be_invoiced', 'navy', 'approved', 60], ['finished', 'mute', 'closed_won', 70]];
+        $builtin = [['draft', 'mute', 'draft', 5], ['sent', 'gold', 'open', 10], ['received', 'gold', 'open', 11], ['evaluation', 'gold', 'open', 12], ['negotiation', 'blue', 'open', 13], ['verbal_ok', 'green', 'open', 14], ['expired', 'mute', 'closed_lost', 19], ['rejected', 'bad', 'closed_lost', 20], ['cancelled', 'mute', 'closed_lost', 30], ['approved', 'green', 'approved', 40], ['in_progress', 'blue', 'approved', 50], ['to_be_invoiced', 'navy', 'approved', 60], ['finished', 'mute', 'closed_won', 70]];
         foreach ($builtin as [$k, $tone, $b, $o]) $all[$k] = ['skey' => $k, 'label' => t('of.st_' . $k), 'tone' => $tone, 'behaves' => $b, 'sort_order' => $o, 'is_builtin' => 1, 'is_active' => 1];
         if (of_status_table()) foreach (all('SELECT * FROM offer_statuses ORDER BY sort_order, label') as $r) {
             if (isset($all[$r['skey']])) { $all[$r['skey']]['sort_order'] = (int)$r['sort_order']; $all[$r['skey']]['is_active'] = (int)$r['is_active']; $all[$r['skey']]['tone'] = $r['tone'] ?: $all[$r['skey']]['tone']; }
@@ -47,6 +47,8 @@ function of_status_defs(bool $activeOnly = false): array {
 function of_statuses(): array { return array_keys(of_status_defs(true)); }
 function of_status_label(string $s): string { $d = of_status_defs()[$s] ?? null; return $d ? $d['label'] : $s; }
 function of_status_tone(string $s): string { return of_status_defs()[$s]['tone'] ?? 'mute'; }
+/** R75-001: waiting for the customer's decision = any open stage after draft (sent, received, evaluation, negotiation, verbal OK or a custom open status). */
+function of_is_pending(array $o): bool { return ($o['status'] ?? '') !== 'draft' && of_status_behaves((string)($o['status'] ?? '')) === 'open'; }
 function of_status_behaves(string $s): string { return of_status_defs()[$s]['behaves'] ?? 'open'; }
 function of_statuses_where(array $behaves): array { return array_keys(array_filter(of_status_defs(), fn($d) => in_array($d['behaves'], $behaves, true))); }
 /** Statuses that count as "open" (awaiting or in hand). */
@@ -55,7 +57,7 @@ function of_status_pill(string $s): string { return pill(of_status_tone($s), of_
 /** Where an offer may go next from its current status (staff). Built-in flow as before; the administrators' own statuses are reachable from anywhere and lead anywhere. */
 function of_next_statuses(array $o): array {
     $cur = $o['status'];
-    $flow = ['draft' => ['cancelled'], 'sent' => ['cancelled'], 'approved' => ['in_progress', 'to_be_invoiced', 'cancelled'], 'in_progress' => ['to_be_invoiced', 'finished', 'cancelled'], 'to_be_invoiced' => ['finished', 'in_progress'], 'rejected' => ['sent'], 'cancelled' => ['sent'], 'finished' => ['to_be_invoiced']];
+    $flow = ['draft' => ['cancelled'], 'sent' => ['received', 'evaluation', 'negotiation', 'verbal_ok', 'cancelled'], 'received' => ['evaluation', 'negotiation', 'verbal_ok', 'cancelled'], 'evaluation' => ['negotiation', 'verbal_ok', 'received', 'cancelled'], 'negotiation' => ['verbal_ok', 'evaluation', 'sent', 'cancelled'], 'verbal_ok' => ['negotiation', 'cancelled'], 'expired' => ['sent'], 'approved' => ['in_progress', 'to_be_invoiced', 'cancelled'], 'in_progress' => ['to_be_invoiced', 'finished', 'cancelled'], 'to_be_invoiced' => ['finished', 'in_progress'], 'rejected' => ['sent'], 'cancelled' => ['sent'], 'finished' => ['to_be_invoiced']];
     $defs = of_status_defs(true); $isBuiltin = !empty($defs[$cur]['is_builtin']);
     $next = $isBuiltin ? ($flow[$cur] ?? []) : array_keys(array_filter($defs, fn($d) => $d['is_builtin'] && !in_array($d['skey'], ['approved', 'rejected'], true)));
     foreach ($defs as $k => $d) if (!$d['is_builtin'] && $k !== $cur) $next[] = $k;
@@ -108,7 +110,7 @@ function of_list(array $f = []): array {
                 WHERE " . implode(' AND ', $w) . " ORDER BY FIELD(o.status,'draft','sent','approved','in_progress','to_be_invoiced','rejected','cancelled','finished'), o.sent_at DESC, o.id DESC", $args);
 }
 /** Offers awaiting the owner's answer (customers: theirs; staff: all). */
-function of_pending(): array { return of_list(['status' => 'sent']); }
+function of_pending(): array { return array_values(array_filter(of_list(['status' => 'open']), fn($o) => of_is_pending($o))); }   // R75-001: every open stage
 /** Per-project roll-up for the project tree and the weekly report. */
 function of_project_summary(int $pid): array {
     $s = ['n' => 0, 'sent' => 0, 'sent_amount' => 0.0, 'approved' => 0, 'approved_amount' => 0.0, 'oldest_sent' => 0, 'rows' => []];
@@ -185,7 +187,7 @@ function of_save_from_post(int $id): int {
 /** The owner's decision on a sent offer (or an administrator recording it on the owner's behalf). */
 function of_decide(int $id, string $decision, string $note): void {
     $o = of_load($id); $u = current_user();
-    if (!$o || $o['status'] !== 'sent' || !in_array($decision, ['approved', 'rejected'], true)) throw new RuntimeException(t('of.not_pending'));
+    if (!$o || !of_is_pending($o) || !in_array($decision, ['approved', 'rejected'], true)) throw new RuntimeException(t('of.not_pending'));
     if (is_staff() && !is_cp_admin()) throw new RuntimeException(t('err.noaccess'));
     $note = mb_substr(trim($note), 0, 4000);
     if ($decision === 'rejected' && $note === '') throw new RuntimeException(t('of.reject_note_req'));
@@ -199,7 +201,7 @@ function of_decide(int $id, string $decision, string $note): void {
 function of_set_status(int $id, string $status, string $note = ''): void {
     require_staff();
     $o = of_load($id); if (!$o || !in_array($status, of_statuses(), true)) throw new RuntimeException(t('err.notfound'));
-    $allowed = of_next_statuses($o); if ($o['status'] === 'sent') array_push($allowed, 'approved', 'rejected');
+    $allowed = of_next_statuses($o); if (of_is_pending($o)) array_push($allowed, 'approved', 'rejected');
     if (!in_array($status, $allowed, true)) throw new RuntimeException(t('of.bad_transition'));
     if (in_array($status, ['approved', 'rejected'], true)) { of_decide($id, $status, $note); return; }
     $sets = ['status = ?', 'status_at = CURDATE()']; $vals = [$status];
@@ -207,6 +209,7 @@ function of_set_status(int $id, string $status, string $note = ''): void {
     $vals[] = $id;
     q('UPDATE offers SET ' . implode(', ', $sets) . ' WHERE id = ?', $vals);
     of_event($id, 'status_' . $status, mb_substr(trim($note), 0, 1000) ?: null);
+    if (function_exists('pp_has') && pp_has()) { if ($status === 'sent') pp_cadence_start($id, (int)(current_user()['id'] ?? 0)); elseif (!pp_is_open($status)) pp_set_action($id, null, null, null, null, true); }   // R75-001
     of_sync_project((int)$o['project_id']);                                                                           // R57-001
 }
 /* R74-002: several supporting files per offer (approval letter, specifications, drawings…) — sp_files.offer_id, kind 'offer_att'. */

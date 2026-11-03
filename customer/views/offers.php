@@ -10,7 +10,7 @@ $all = of_list(array_filter(['project' => $f['project'], 'vessel' => $f['vessel'
 $k = ['sent' => 0, 'sent_amount' => 0.0, 'approved' => 0, 'approved_amount' => 0.0, 'tbi' => 0, 'tbi_amount' => 0.0, 'rejected' => 0, 'oldest' => 0, 'ages' => []];
 foreach ($all as $o) {
     $a = (float)$o['amount'];
-    if ($o['status'] === 'sent') { $k['sent']++; $k['sent_amount'] += $a; $age = of_age($o) ?? 0; $k['ages'][] = $age; $k['oldest'] = max($k['oldest'], $age); }
+    if (of_is_pending($o)) { $k['sent']++; $k['sent_amount'] += $a; $age = of_age($o) ?? 0; $k['ages'][] = $age; $k['oldest'] = max($k['oldest'], $age); }
     elseif (in_array($o['status'], ['approved', 'in_progress', 'to_be_invoiced', 'finished'], true)) { $k['approved']++; $k['approved_amount'] += $a; if ($o['status'] === 'to_be_invoiced') { $k['tbi']++; $k['tbi_amount'] += $a; } }
     elseif ($o['status'] === 'rejected') $k['rejected']++;
 }
@@ -49,10 +49,10 @@ layout_head(t('of.title'), 'offers');
 
 <div class="card">
 <?php if (!$rows): ?><div class="empty"><?= tt('of.none') ?></div>
-<?php else: $tot = 0.0; foreach ($rows as $o) $tot += (float)$o['amount']; $vg = vg_on('offers'); if ($vg) $rows = vg_sort($rows, 'vessel'); [$pageRows, $pager] = page_list($rows, 'offers', $keep); $vgCounts = []; foreach ($pageRows as $o) { $vgCounts[(string)($o['vessel'] ?? '')] = ($vgCounts[(string)($o['vessel'] ?? '')] ?? 0) + 1; } $vgLast = null; ?>
+<?php else: $tot = 0.0; foreach ($rows as $o) $tot += (float)$o['amount']; $vg = vg_on('offers'); if ($vg) $rows = vg_sort($rows, 'vessel'); [$pageRows, $pager] = page_list($rows, 'offers', $keep); $vgSig = function_exists('pp_signals_bulk') ? pp_signals_bulk(array_column($pageRows, 'id')) : []; $vgCounts = []; foreach ($pageRows as $o) { $vgCounts[(string)($o['vessel'] ?? '')] = ($vgCounts[(string)($o['vessel'] ?? '')] ?? 0) + 1; } $vgLast = null; ?>
   <div class="table-scroll"><table>
-    <thead><tr><th><?= tt('of.no') ?></th><th><?= tt('of.title_f') ?></th><th><?= tt('pr.one') ?></th><th><?= tt('v.one') ?></th><th class="num"><?= tt('of.amount') ?></th><th><?= tt('of.sent') ?></th><th><?= tt('th.status') ?></th><th class="num"><?= tt('of.aging') ?></th><th><?= tt('oa.decision') ?></th><th></th></tr></thead>
-    <tbody><?php foreach ($pageRows as $o): $vgV = (string)($o['vessel'] ?? ''); if ($vg && $vgV !== $vgLast) { echo vg_row($vgV, $vgCounts[$vgV], 10); $vgLast = $vgV; } ?>
+    <thead><tr><th><?= tt('of.no') ?></th><th><?= tt('of.title_f') ?></th><th><?= tt('pr.one') ?></th><th><?= tt('v.one') ?></th><th class="num"><?= tt('of.amount') ?></th><th><?= tt('of.sent') ?></th><th><?= tt('th.status') ?></th><?php if ($staff && function_exists('pp_can') && pp_can()): ?><th><?= tt('pp.next_short') ?></th><?php endif; ?><th class="num"><?= tt('of.aging') ?></th><th><?= tt('oa.decision') ?></th><th></th></tr></thead>
+    <tbody><?php foreach ($pageRows as $o): $vgV = (string)($o['vessel'] ?? ''); if ($vg && $vgV !== $vgLast) { echo vg_row($vgV, $vgCounts[$vgV], 11); $vgLast = $vgV; } ?>
       <tr<?= $vg ? ' data-vg="' . e(vg_slug($vgV)) . '"' : '' ?>>
         <td class="ref"><a href="<?= url('offer', ['id' => $o['id']]) ?>"><?= e($o['offer_no']) ?></a> <span class="hint"><?= e($o['revision']) ?></span> <?= of_origin_pill($o) ?><?= !empty($o['sq_no']) ? '<br><span class="hint mono" title="SQ">' . e($o['sq_no']) . '</span>' : '' ?></td>
         <td><strong><?= e($o['title']) ?></strong></td>
@@ -60,13 +60,14 @@ layout_head(t('of.title'), 'offers');
         <td><?= e($o['vessel'] ?: '—') ?><?= $staff && $o['customer_name'] ? '<br><span class="hint">' . e($o['customer_name']) . '</span>' : '' ?></td>
         <td class="num"><b><?= e(of_money((float)$o['amount'], $o['currency'])) ?></b></td>
         <td class="date"><?= e(fmt_date($o['sent_at'])) ?><?= $o['valid_until'] ? '<br><span class="hint">' . tt('of.valid_until') . ' ' . e(fmt_date($o['valid_until'])) . '</span>' : '' ?></td>
-        <td><?= of_status_pill($o['status']) ?></td>
+        <td><?= of_status_pill($o['status']) ?><?= $staff && function_exists('pp_can') && pp_can() && of_is_pending($o) ? ' ' . pp_prob_pill(pp_prob($o, $vgSig[(int)$o['id']] ?? [])) : '' ?></td>
+        <?php if ($staff && function_exists('pp_can') && pp_can()): $late = pp_overdue_days($o); ?><td class="hint"><?= $o['next_action_type'] ? e(pp_action_label($o['next_action_type'])) . '<br>' . ($late > 0 ? pill('bad', fmt_date($o['next_action_at'])) : e(fmt_date($o['next_action_at']))) : (of_is_pending($o) ? pill('bad', t('pp.none_short')) : '—') ?></td><?php endif; ?>
         <td class="num"><?= pill(of_age_tone($o), of_age_label($o)) ?></td>
         <td class="date"><?= $o['decided_at'] ? e(($o['decided_name'] ?? '') . ' · ' . fmt_datetime($o['decided_at'])) : '—' ?></td>
-        <td class="row-actions"><a class="btn <?= $o['status'] === 'sent' && !$staff ? 'btn--gold' : 'btn--ghost' ?> btn--sm" href="<?= url('offer', ['id' => $o['id']]) ?>"><?= $o['status'] === 'sent' && !$staff ? tt('oa.review') : tt('fsr.open') ?></a></td>
+        <td class="row-actions"><a class="btn <?= of_is_pending($o) && !$staff ? 'btn--gold' : 'btn--ghost' ?> btn--sm" href="<?= url('offer', ['id' => $o['id']]) ?>"><?= of_is_pending($o) && !$staff ? tt('oa.review') : tt('fsr.open') ?></a></td>
       </tr>
     <?php endforeach; ?></tbody>
-    <tfoot><tr><td colspan="4"><b><?= e(t('of.count', ['n' => count($rows)])) ?></b></td><td class="num"><b><?= e(of_money($tot)) ?></b></td><td colspan="5"></td></tr></tfoot>
+    <tfoot><tr><td colspan="4"><b><?= e(t('of.count', ['n' => count($rows)])) ?></b></td><td class="num"><b><?= e(of_money($tot)) ?></b></td><td colspan="6"></td></tr></tfoot>
   </table></div>
   <?= $pager ?>
 <?php endif; ?>

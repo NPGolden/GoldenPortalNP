@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.82.2';
+const CP_VERSION = '1.83.0';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R75-001', 'version' => '1.83.0', 'date' => '2026-11-03', 'title' => 'Sales pipeline (hybrid): stages Sent → Received → Under evaluation → Negotiation → Verbal OK with a base success % each, signals that adjust it (budget confirmed, decision maker met, competitor, no reply 14 days, validity passed), a mandatory next action with owner on every open offer, the default follow-up cadence on send, morning reminders with escalation after 3 days, automatic Expired on validity, and Commercial › Pipeline (board / list, follow-ups due, funnel, per sales person). The Sales KPIs forecast uses the adjusted %.', 'db' => 'install/migrate_cp_r75_pipeline.sql', 'check' => 'r75'],
         ['ref' => 'GAS-CP-R75-002', 'version' => '1.82.2', 'date' => '2026-11-03', 'title' => 'Projects, Offers, Reports (service and inspection) and Accounting reports pages grouped per vessel: a gold header per vessel with the count, click to fold, and a "Grouped by vessel / Flat list" switch remembered on the browser.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R74-002', 'version' => '1.82.1', 'date' => '2026-11-03', 'title' => 'Offers: several supporting files per offer (approval letter, specifications, drawings…) besides the offer document — uploaded on the offer form (several at once), listed on the offer page with view / remove, visible to the customer or internal per upload, attached to the e-mail card when external; a recorded event on each add / remove.', 'db' => 'install/migrate_cp_r74_offer_files.sql', 'check' => 'r74'],
         ['ref' => 'GAS-CP-R74-001', 'version' => '1.82.0', 'date' => '2026-11-02', 'title' => 'Golden HR 1.0.0 — the HR app for iPhone (customer/mobile-hr, bundle gr.goldenas.hr): HR inbox (leave / absence requests, training applications, timesheets) with approve / reject and authenticator step-up, people directory (work data only), who is away and public holidays, leave balances, HR message threads; sign-in for the HR role, Owner and CEO only; Face ID / Touch ID mandatory on open and after 15 minutes. API scope "hr" (/hr/app/*), Settings › Login history › Mobile apps lists it; the Customer app\'s minimum version is now saved under its own key.', 'db' => null, 'check' => null],
@@ -292,6 +293,7 @@ function cp_migration_state(): array {
         'r64' => $has("SHOW TABLES LIKE 'hr_targets'") && $has("SHOW TABLES LIKE 'hr_target_log'"),
         'r71' => $has("SHOW TABLES LIKE 'webauthn_credentials'") && $has("SHOW TABLES LIKE 'webauthn_challenges'"),
         'r74' => $has("SHOW COLUMNS FROM sp_files LIKE 'offer_id'"),
+        'r75' => $has("SHOW TABLES LIKE 'offer_signals'") && $has("SHOW COLUMNS FROM offers LIKE 'next_action_at'"),
         'r70d' => $has("SHOW COLUMNS FROM customer_users LIKE 'clocks'"),
         'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),
         'r67' => $has("SHOW TABLES LIKE 'hr_flows'") && $has("SHOW TABLES LIKE 'hr_flow_templates'") && $has("SHOW TABLES LIKE 'hr_invitations'"),
