@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.83.3** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.84.0** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.84.0 | GAS-CP-R76-001 | 2026-11-03 | Proformas: payments without an invoice — record an advance or full payment on an issued proforma (date, amount, method, reference); status, offer trail and financial status follow; the payments of all proformas of an offer may not exceed the offer total (net + VAT); the invoice recorded later settles the payments it covers (counted once). | `install/migrate_cp_r76_payments.sql` |
 | 1.83.3 | GAS-CP-R75-005 | 2026-11-03 | Personal Assistant role (scope "assistant", created by the update, financials off): vessels, contacts, companies, customers and their Excel imports — create, edit, delete, link contacts to vessels and companies — and nothing else in the portal. Companies, customers, contact deletion / bulk / imports are now open to administrators, the Owner and this role. | `install/migrate_cp_r75_assistant_role.sql` |
 | 1.83.2 | GAS-CP-R75-004 | 2026-11-03 | Sidebar: the HR group now sits after Commercial, just before Library. | — |
 | 1.83.1 | GAS-CP-R75-003 | 2026-11-03 | Vessel groups: ⊞ expand all / ⊟ collapse all buttons next to the Grouped / Flat switch on the Projects, Offers, Reports and Accounting pages. | — |

@@ -72,11 +72,43 @@ layout_head($r['pi_no'], 'proformas');
   </div>
 </div>
 
+<?php if (function_exists('ppay_has') && ppay_has()): $pays = $r['payments'] ?? []; $offerRow = one('SELECT * FROM offers WHERE id = ?', [(int)$r['offer_id']]); $cap = $offerRow ? ppay_offer_cap($offerRow) : 0.0; $offerPaid = ppay_offer_paid((int)$r['offer_id']); $capLeft = max(0, $cap - $offerPaid); $ep = (int)($_GET['pay'] ?? 0); $exp = null; foreach ($pays as $x) if ((int)$x['id'] === $ep) $exp = $x; ?>
+<div class="card" id="payments">
+  <div class="card-head"><h2>💳 <?= tt('pay.title') ?> <span class="hint">(<?= count($pays) ?>)</span></h2><span class="hint"><?= tt('pay.hint') ?></span></div>
+  <div class="kpi kpi--4" style="margin-bottom:10px;">
+    <div class="stat green"><b><?= e(pi_money($paid, $cur)) ?></b><?= tt('pay.k_paid') ?><span class="s"><?= tt('pay.of') ?> <?= e(pi_money((float)$r['gross'], $cur)) ?></span></div>
+    <div class="stat<?= $open > 0 ? ' gold' : '' ?>"><b><?= e(pi_money($open, $cur)) ?></b><?= tt('pay.k_open') ?></div>
+    <div class="stat"><b><?= e(pi_money($offerPaid, $cur)) ?></b><?= tt('pay.k_offer_paid') ?><span class="s"><?= tt('pay.of') ?> <?= e(pi_money($cap, $cur)) ?> · <?= e($r['offer_no']) ?></span></div>
+    <div class="stat<?= $capLeft <= 0 ? ' red' : '' ?>"><b><?= e(pi_money($capLeft, $cur)) ?></b><?= tt('pay.k_cap_left') ?></div>
+  </div>
+  <?php if (!$pays): ?><p class="hint"><?= tt('pay.none') ?></p><?php else: ?>
+  <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('th.date') ?></th><th class="num"><?= tt('pt.amount') ?></th><th><?= tt('pay.method') ?></th><th><?= tt('pay.reference') ?></th><th><?= tt('pd.note') ?></th><th><?= tt('pay.invoiced') ?></th><th><?= tt('th.by') ?></th><?php if ($canInv): ?><th></th><?php endif; ?></tr></thead><tbody>
+  <?php foreach ($pays as $x): ?><tr><td class="date"><?= e(fmt_date($x['paid_on'])) ?></td><td class="num"><b><?= e(pi_money((float)$x['amount'], $cur)) ?></b></td><td><?= e(t('pay.m_' . $x['method'])) ?></td><td class="mono"><?= e((string)$x['reference']) ?></td><td class="hint"><?= e((string)$x['note']) ?></td>
+    <td><?= $x['invoice_id'] ? pill('green', (string)$x['invoice_no']) : pill('gold', t('pay.not_invoiced')) ?></td><td class="hint"><?= e((string)$x['by_name']) ?></td>
+    <?php if ($canInv): ?><td class="row-actions stack"><a class="btn btn--ghost btn--sm" href="<?= url('proforma', ['id' => $id, 'pay' => (int)$x['id']]) ?>#pay-form">✎</a><form method="post" action="<?= $backTo ?>#payments" class="inline" data-lock data-confirm="<?= tt('pay.delete_confirm') ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('btn.delete') ?>" data-confirm-danger><?= csrf_field() ?><input type="hidden" name="action" value="ppay_delete"><input type="hidden" name="pay_id" value="<?= (int)$x['id'] ?>"><button class="btn btn--ghost btn--sm btn--danger-ghost" type="submit">🗑</button></form></td><?php endif; ?></tr><?php endforeach; ?>
+  </tbody></table></div>
+  <?php endif; ?>
+  <?php if ($canInv && !$draft && $r['status'] !== 'cancelled'): ?>
+  <form method="post" action="<?= $backTo ?>#payments" id="pay-form" data-lock style="margin-top:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="ppay_save"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="pay_id" value="<?= $exp ? (int)$exp['id'] : 0 ?>">
+    <h3 style="margin:0 0 6px;"><?= $exp ? tt('pay.edit') : tt('pay.add') ?></h3>
+    <div class="grid grid-3">
+      <div class="field"><label><?= tt('th.date') ?></label><input type="date" name="paid_on" value="<?= e((string)($exp['paid_on'] ?? date('Y-m-d'))) ?>" required></div>
+      <div class="field"><label><?= tt('pt.amount') ?> *</label><input name="amount" inputmode="decimal" required value="<?= $exp ? e(number_format((float)$exp['amount'], 2, ',', '.')) : e(number_format(min($open, $capLeft), 2, ',', '.')) ?>"><p class="hint" style="margin:4px 0 0;"><?= e(t('pay.max_hint', ['v' => pi_money($capLeft + ($exp ? (float)$exp['amount'] : 0), $cur)])) ?></p></div>
+      <div class="field"><label><?= tt('pay.method') ?></label><select name="method" data-nosearch><?php foreach (PPAY_METHODS as $m): ?><option value="<?= $m ?>"<?= ($exp['method'] ?? 'bank') === $m ? ' selected' : '' ?>><?= e(t('pay.m_' . $m)) ?></option><?php endforeach; ?></select></div>
+      <div class="field"><label><?= tt('pay.reference') ?></label><input name="reference" maxlength="80" value="<?= e((string)($exp['reference'] ?? '')) ?>" placeholder="<?= tt('pay.reference_ph') ?>"></div>
+      <div class="field" style="grid-column:span 2;"><label><?= tt('pd.note') ?></label><input name="note" maxlength="255" value="<?= e((string)($exp['note'] ?? '')) ?>"></div>
+    </div>
+    <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit"><?= $exp ? tt('btn.save') : tt('pay.record') ?></button><?php if ($exp): ?><a class="btn btn--ghost btn--sm" href="<?= $backTo ?>#payments"><?= tt('btn.cancel') ?></a><?php endif; ?></div>
+  </form>
+  <?php elseif ($draft): ?><p class="hint"><?= tt('pay.not_issued') ?></p><?php endif; ?>
+</div>
+<?php endif; ?>
+
 <div class="card" id="invoices">
   <div class="card-head"><h2>🧾 <?= tt('pi.invoices') ?> <span class="hint">(<?= count($r['invoices']) ?>)</span></h2><span class="hint"><?= tt('pi.invoices_hint') ?></span></div>
   <?php if (!$r['invoices']): ?><p class="hint"><?= tt('pi.no_invoices') ?></p><?php else: ?>
   <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('pi.invoice_no') ?></th><th><?= tt('th.date') ?></th><th class="num"><?= tt('pt.amount') ?></th><th class="num"><?= tt('pi.paid_lbl') ?></th><th><?= tt('pi.paid_on') ?></th><th><?= tt('pd.note') ?></th><?php if ($canInv): ?><th></th><?php endif; ?></tr></thead><tbody>
-  <?php foreach ($r['invoices'] as $x): ?><tr><td class="mono"><b><?= e($x['invoice_no']) ?></b></td><td class="date"><?= $x['invoice_date'] ? e(fmt_date($x['invoice_date'])) : '—' ?></td><td class="num"><?= e(pi_money((float)$x['amount'], $cur)) ?></td><td class="num"><?= e(pi_money((float)$x['paid_amount'], $cur)) ?></td><td class="date"><?= $x['paid_at'] ? e(fmt_date($x['paid_at'])) : '—' ?></td><td class="hint"><?= e((string)$x['note']) ?></td>
+  <?php foreach ($r['invoices'] as $x): ?><tr><td class="mono"><b><?= e($x['invoice_no']) ?></b></td><td class="date"><?= $x['invoice_date'] ? e(fmt_date($x['invoice_date'])) : '—' ?></td><td class="num"><?= e(pi_money((float)$x['amount'], $cur)) ?></td><td class="num"><?= !empty($x['settled']) && (float)$x['settled'] > 0 ? e(pi_money((float)$x['settled'], $cur)) . ' <span class="hint">' . tt('pay.via_payments') . '</span>' : e(pi_money((float)$x['paid_amount'], $cur)) ?></td><td class="date"><?= $x['paid_at'] ? e(fmt_date($x['paid_at'])) : '—' ?></td><td class="hint"><?= e((string)$x['note']) ?></td>
     <?php if ($canInv): ?><td class="row-actions stack"><a class="btn btn--ghost btn--sm" href="<?= url('proforma', ['id' => $id, 'inv' => (int)$x['id']]) ?>#inv-form">✎</a><form method="post" action="<?= $backTo ?>#invoices" class="inline" data-lock data-confirm="<?= tt('pi.inv_delete_confirm') ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('btn.delete') ?>" data-confirm-cancel="<?= tt('btn.cancel') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="pinv_delete"><input type="hidden" name="inv_id" value="<?= (int)$x['id'] ?>"><button class="btn btn--ghost btn--sm" type="submit">×</button></form></td><?php endif; ?></tr><?php endforeach; ?>
   </tbody></table></div>
   <?php endif; ?>
@@ -91,6 +123,9 @@ layout_head($r['pi_no'], 'proformas');
       <div class="field"><label><?= tt('pi.paid_on') ?></label><input type="date" name="paid_at" value="<?= e((string)($ex['paid_at'] ?? '')) ?>"></div>
       <div class="field"><label><?= tt('pd.note') ?></label><input name="inv_note" maxlength="255" value="<?= e((string)($ex['note'] ?? '')) ?>"></div>
     </div>
+    <?php if (function_exists('ppay_has') && ppay_has()): $linkable = array_values(array_filter($r['payments'] ?? [], fn($x) => !$x['invoice_id'] || ($ex && (int)$x['invoice_id'] === (int)$ex['id']))); if ($linkable): ?>
+    <div class="field"><label><?= tt('pay.settles') ?></label><input type="hidden" name="pay_link" value="1"><div style="display:flex;gap:12px;flex-wrap:wrap;"><?php foreach ($linkable as $x): ?><label class="chk" style="font-weight:400;"><input type="checkbox" name="pay_ids[]" value="<?= (int)$x['id'] ?>"<?= ($ex && (int)$x['invoice_id'] === (int)$ex['id']) ? ' checked' : '' ?>> <?= e(fmt_date($x['paid_on'])) ?> · <?= e(pi_money((float)$x['amount'], $cur)) ?><?= $x['reference'] ? ' · ' . e($x['reference']) : '' ?></label><?php endforeach; ?></div><p class="hint" style="margin:4px 0 0;"><?= tt('pay.settles_hint') ?></p></div>
+    <?php endif; endif; ?>
     <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit"><?= tt('btn.save') ?></button><?php if ($ex): ?><a class="btn btn--ghost btn--sm" href="<?= $backTo ?>#invoices"><?= tt('btn.cancel') ?></a><?php endif; ?></div>
   </form>
   <?php endif; ?>

@@ -924,6 +924,8 @@ function pm_handle_action(string $action, string $page): bool {
         case 'pi_status': { require_staff(); $pid = (int)$_POST['id']; pi_set_status($pid, (string)($_POST['status'] ?? '')); flash('good', t('pi.status_saved')); redirect('proforma', ['id' => $pid, '_r' => uniqid()]); }
         case 'pinv_save': { require_staff(); $pid = (int)$_POST['id']; pinv_save_from_post($pid); flash('good', t('pi.inv_saved')); redirect('proforma', ['id' => $pid, '_r' => uniqid()], '#invoices'); }
         case 'pinv_delete': { require_staff(); $pid = pinv_delete((int)$_POST['inv_id']); flash('good', t('pi.inv_deleted')); redirect('proforma', ['id' => $pid, '_r' => uniqid()], '#invoices'); }
+        case 'ppay_save': { require_staff(); $pid = (int)$_POST['id']; ppay_save_from_post($pid); flash('good', t('pay.saved')); redirect('proforma', ['id' => $pid, '_r' => uniqid()], '#payments'); }
+        case 'ppay_delete': { require_staff(); $pid = ppay_delete((int)$_POST['pay_id']); flash('good', t('pay.deleted')); redirect('proforma', ['id' => $pid, '_r' => uniqid()], '#payments'); }
         case 'pi_delete': { $oid = pi_delete((int)$_POST['id']); flash('good', t('pi.deleted')); redirect('offer', ['id' => $oid, '_r' => uniqid()], '#proformas'); }
         case 'pd_delete': { pd_delete((int)$_POST['id']); flash('good', t('pd.deleted')); redirect('production', ['_r' => uniqid()]); }
         case 'eq_save': { $id = eq_save((int)($_POST['id'] ?? 0) ?: null); flash('good', t('eq.saved')); redirect('equipment_view', ['id' => $id, '_r' => uniqid()]); }
