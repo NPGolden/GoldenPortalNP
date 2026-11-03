@@ -42,7 +42,7 @@ function nav_groups(): array {
     if ($staff && function_exists('hr_targets_has') && hr_targets_has() && (hr_can() || (function_exists('hr_is_manager') && hr_is_manager()))) $hr['items'][] = ['hr_targets', t('hr.targets'), '🎯'];   // R64-001
     if ($staff && function_exists('hra_has') && hra_has() && (hra_can_manage() || hra_can_use())) $hr['items'][] = ['hra', t('hra.title'), '🤖'];   // R67-001
     if ($staff && function_exists('hr_can') && hr_can()) $hr['items'][] = ['admin_hr', t('hr.settings'), '🗂'];                                        // R61-001: Owner / HR / admin
-    if ($hr['items']) array_splice($g, 3, 0, [$hr]);
+    if ($hr['items']) array_splice($g, 4, 0, [$hr]);   // R75-004: HR group after Commercial, before Library
     if ($staff && function_exists('hr_only') && hr_only()) $g = [['key' => 'top', 'label' => '', 'items' => [['hr_dashboard', t('hr.dashboard'), '📊'], ['community', t('soc.title'), '🤝'], ['planning', t('pl.title'), '🗓'], ['hr_requests', t('hr.requests'), '📝'], ['hr_leaves', t('hr.leaves'), '🏖'], ['hr_training', t('hr.training'), '🎓'], ['hr_targets', t('hr.targets'), '🎯'], ['hra', t('hra.title'), '🤖'], ['admin_hr', t('hr.settings'), '🗂']]]];   // R51-001 / R55-005 / R61-001: HR sees the board and its settings only
     if ($staff && function_exists('emp_only') && emp_only()) $g = [['key' => 'top', 'label' => '', 'items' => [['planning', t('hr.my_program'), '🗓'], ['my_leave', t('hr.my_leave'), '🏖'], ['hra', t('hra.title'), '🤖'], ['community', t('soc.title'), '🤝']]]];   // R54-001 / R56-002 / R67-001: employee scope
     return $g;

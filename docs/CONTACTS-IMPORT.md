@@ -995,3 +995,6 @@ SQL `install/migrate_cp_r75_pipeline.sql` (`offers.next_action_type|at|user_id|n
 
 ## 189. v1.83.1 — Expand / collapse all vessel groups (GAS-CP-R75-003)
 No SQL. `vg_toggle()` renders `.vg-tools` with two `.vg-all` buttons (`data-vg-all` 1 / 0) when grouping is on; `portal.js` folds or opens every `.vg-h` / `[data-vg]` and stores the state per query string in sessionStorage. Keys `vg.expand_all`, `vg.collapse_all` ×5 (6323).
+
+## 190. v1.83.2 — HR group moved before Library (GAS-CP-R75-004)
+No SQL. `views/_layout.php nav_groups()`: `array_splice($g, 4, 0, [$hr])` (was 3) → Fleet · Work · Commercial · HR · Library.
