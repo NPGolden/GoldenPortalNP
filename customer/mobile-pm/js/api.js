@@ -2,7 +2,7 @@
  * and a MOCK mode (built-in sample data in the shapes of the contract) for the demo and the UI tests.
  * Mock mode: localStorage gpm.mock = "1", or ?mock=1 on the URL. */
 window.API = (() => {
-  const VERSION = "1.0.8";
+  const VERSION = "1.0.9";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   try { MOCK = localStorage.getItem("gpm.mock") === "1" || /[?&]mock=1/.test(location.search); if (/[?&]mock=1/.test(location.search)) localStorage.setItem("gpm.mock", "1"); } catch (e) {}
@@ -20,11 +20,13 @@ window.API = (() => {
     if (!res.ok) { const err = new Error(data.error || `HTTP ${res.status}`); err.status = res.status; err.data = data; throw err; }
     return data;
   }
+  let refreshing = null;   // R77-004: one refresh at a time — parallel 401s share it (a second call with the same token would be "reuse")
+  const refreshOnce = () => refreshing || (refreshing = raw("POST", "/auth/refresh", { refresh_token: tok.refresh }).then((r) => { tok.access = r.access_token; tok.refresh = r.refresh_token; return r; }).catch((e) => { if (e.status === 401 || e.status === 403) { tok.access = null; tok.refresh = null; } throw e; }).finally(() => { refreshing = null; }));
   async function call(method, path, body, isForm) {
     if (MOCK) return mock(method, path, body);
     try { return await raw(method, path, body, isForm); }
     catch (e) {
-      if (e.status === 401 && tok.refresh && !path.startsWith("/auth/")) { const r = await raw("POST", "/auth/refresh", { refresh_token: tok.refresh }); tok.access = r.access_token; tok.refresh = r.refresh_token; return raw(method, path, body, isForm); }
+      if (e.status === 401 && tok.refresh && !path.startsWith("/auth/")) { await refreshOnce(); return raw(method, path, body, isForm); }
       throw e;
     }
   }

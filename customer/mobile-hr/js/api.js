@@ -1,7 +1,7 @@
 /* Golden HR — API client for the portal module /customer/api/v1 (JWT access + rotating refresh), app "hr" (GAS-CP-R74-001).
  * Same transport as Golden PM (customer/mobile-pm/js/api.js); routes under /hr/app/*. No mock mode: HR data is never faked. */
 window.API = (() => {
-  const VERSION = "1.0.0";
+  const VERSION = "1.0.1";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   const tok = { get access() { try { return sessionStorage.getItem("ghr.at"); } catch (e) { return null; } }, set access(v) { try { v ? sessionStorage.setItem("ghr.at", v) : sessionStorage.removeItem("ghr.at"); } catch (e) {} },
     get refresh() { try { return localStorage.getItem("ghr.rt"); } catch (e) { return null; } }, set refresh(v) { try { v ? localStorage.setItem("ghr.rt", v) : localStorage.removeItem("ghr.rt"); } catch (e) {} } };
@@ -16,12 +16,13 @@ window.API = (() => {
     if (!res.ok) { const err = new Error(data.error || `HTTP ${res.status}`); err.status = res.status; err.data = data; throw err; }
     return data;
   }
+  let refreshing = null;   // R77-004: one refresh at a time — parallel 401s share it (a second call with the same token would be "reuse")
+  const refreshOnce = () => refreshing || (refreshing = raw("POST", "/auth/refresh", { refresh_token: tok.refresh }).then((r) => { tok.access = r.access_token; tok.refresh = r.refresh_token; return r; }).catch((e) => { if (e.status === 401 || e.status === 403) { tok.access = null; tok.refresh = null; } throw e; }).finally(() => { refreshing = null; }));
   async function call(method, path, body, isForm) {
     try { return await raw(method, path, body, isForm); }
     catch (e) {
       if (e.status === 401 && tok.refresh && !path.startsWith("/auth/")) {
-        try { const r = await raw("POST", "/auth/refresh", { refresh_token: tok.refresh }); tok.access = r.access_token; tok.refresh = r.refresh_token; return await raw(method, path, body, isForm); }
-        catch (e2) { if (e2.status === 401 || e2.status === 403) { tok.access = null; tok.refresh = null; } throw e2; }
+        await refreshOnce(); return await raw(method, path, body, isForm);
       }
       throw e;
     }

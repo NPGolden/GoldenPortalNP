@@ -53,7 +53,10 @@ final class Jwt {
     public static function consumeRefresh(string $raw): array {
         $r = one('SELECT t.*, d.user_id, d.platform FROM mob_refresh_tokens t JOIN mob_devices d ON d.id = t.device_id WHERE t.token_hash = ?', [hash('sha256', $raw)]);
         if (!$r || $r['revoked_at'] || strtotime((string)$r['expires_at']) < time()) throw new ApiException(401, 'Refresh token invalid');
-        if ($r['rotated_to']) { q('UPDATE mob_refresh_tokens SET revoked_at = NOW() WHERE device_id = ? AND revoked_at IS NULL', [(int)$r['device_id']]); throw new ApiException(401, 'Refresh token reuse detected'); }
+        if ($r['rotated_to']) {   // R77-004: within 60 s of the rotation this is a concurrent retry of the same app (parallel 401s) — refuse it alone; later it is a replay → the whole device is signed out
+            $age = scalar('SELECT TIMESTAMPDIFF(SECOND, issued_at, NOW()) FROM mob_refresh_tokens WHERE id = ?', [(int)$r['rotated_to']]);
+            if ($age !== null && $age !== false && (int)$age < 60) throw new ApiException(401, 'Refresh token already rotated');
+            q('UPDATE mob_refresh_tokens SET revoked_at = NOW() WHERE device_id = ? AND revoked_at IS NULL', [(int)$r['device_id']]); throw new ApiException(401, 'Refresh token reuse detected'); }
         return $r;
     }
 }

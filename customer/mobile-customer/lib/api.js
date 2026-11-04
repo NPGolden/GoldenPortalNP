@@ -2,7 +2,7 @@
    Access JWT 15 min in sessionStorage; rotating refresh token in localStorage (Keychain / Keystore in the Capacitor build).
    Mock mode (?mock=1 or localStorage gcu.mock) serves mock/data.js in the shapes of the live contract — demo and UI tests only. */
 window.Api = (function () {
-  const APP_ID = "customer", APP_VERSION = "1.0.5";
+  const APP_ID = "customer", APP_VERSION = "1.0.6";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false; try { MOCK = localStorage.getItem("gcu.mock") === "1" || /[?&]mock=1/.test(location.search); if (/[?&]mock=1/.test(location.search)) localStorage.setItem("gcu.mock", "1"); } catch (e) {}
   const cfg = { base: BASE, get mock() { return MOCK; } };
@@ -29,10 +29,10 @@ window.Api = (function () {
     if (!r.ok) { const err = new Error((data && data.error) || r.statusText); err.status = r.status; err.data = data; err.code = r.status === 401 && data && data.totp ? "totp" : (r.status === 426 ? "upgrade" : (r.status === 401 ? "unauthorized" : (r.status === 429 ? "rate" : ""))); throw err; }
     return data;
   }
-  async function refreshAccess() {
-    if (!refresh) throw Object.assign(new Error("no session"), { status: 401 });
-    const d = await raw("POST", "/auth/refresh", { refresh_token: refresh }, { noAuth: true });
-    setAccess(d.access_token); await setRefresh(d.refresh_token); return d;
+  let refreshing = null;   // R77-004: one refresh at a time — parallel 401s share it
+  function refreshAccess() {
+    if (!refresh) return Promise.reject(Object.assign(new Error("no session"), { status: 401 }));
+    return refreshing || (refreshing = raw("POST", "/auth/refresh", { refresh_token: refresh }, { noAuth: true }).then(async (d) => { setAccess(d.access_token); await setRefresh(d.refresh_token); return d; }).finally(() => { refreshing = null; }));
   }
   async function call(method, path, body, opts = {}) {
     if (!online() && method !== "GET") throw Object.assign(new Error(I18N.t("app.net")), { code: "offline" });
