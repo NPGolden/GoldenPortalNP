@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.85.0** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.85.1** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.85.1 | GAS-CP-R76-005 | 2026-11-04 | Personnel file to HR and Owner / CEO only — administrators no longer see, upload or delete the documents on a person's card or file documents with employment events (direct links answer 403; the person still sees his own). HR role gets Support (portal requests) in its menu, without the customers' ticket inbox. | — |
 | 1.85.0 | GAS-CP-R76-004 | 2026-11-04 | Accounting: lines covered by an offer (lump sum already in the budget) — per line or the whole report — settled against the offer and never invoiced per hour; a report with nothing left to invoice closes without accounting (no more "No line is included" dead end); the timesheets / service reports behind it show "Covered by an offer"; the offer page shows the hours it covers; register filter and PDF section. | `install/migrate_cp_r76_covered.sql` |
 | 1.84.2 | GAS-CP-R76-003 | 2026-11-04 | Upload limits: .user.ini raises the server to 60 files / 20 MB per file / 256 MB per request; file fields check the selection before sending (red hint, button disabled); an oversized request gets a clear message instead of "session expired"; a trimmed batch says how many files were received; Diagnostics shows max_file_uploads. | — |
 | 1.84.1 | GAS-CP-R76-002 | 2026-11-03 | Financial statement per project / sub-project (project tree 💶, sub-project head): offers with payment terms, proformas with paid / open / overdue, payment register, invoice register and totals (offered, issued, still to invoice, collected, outstanding, overdue); Excel with one sheet per register; for the staff who see money and for accounting. Cash flow counts the payments recorded without an invoice. | — |

@@ -5,6 +5,8 @@ declare(strict_types=1);
 
 /* ------------------------------------------------------------------ access */
 /** Personal and payroll data: HR (scope hr) and Owner (scope owner) only — plain administrators do not see them. */
+/** R76-005: the personnel file (documents on the card, employment-event documents) — HR and Owner only; administrators never. */
+function hr_files_can(): bool { return hr_personal_can(); }
 function hr_personal_can(): bool { return is_staff() && ((function_exists('hr_only') && hr_only()) || (function_exists('hr_owner') && hr_owner())); }
 /** Accounts with the Owner scope — kept out of the activity rankings, the most-active lists and the winner of the month. */
 function hr_owner_ids(): array { static $c = null; if ($c === null) { try { $c = array_map('intval', array_column(all("SELECT cu.id FROM customer_users cu JOIN staff_roles r ON r.id = cu.staff_role_id WHERE r.scope = 'owner'"), 'id')); } catch (Throwable $e) { $c = []; } } return $c; }

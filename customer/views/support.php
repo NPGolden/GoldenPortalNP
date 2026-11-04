@@ -45,7 +45,7 @@ layout_head(t('su.title'), 'support');
 </div>
 
 <div class="cols">
-  <?php if ($staff): ?>
+  <?php if ($staff && !(function_exists('hr_only') && hr_only())): ?>
   <div class="card">
     <h2><?= tt('su.inbox') ?> <span class="hint" style="display:inline;margin-left:8px;"><?= count(array_filter($tickets, fn($t) => $t['status'] === 'open')) ?> <?= tt('su.open') ?></span></h2>
     <p class="hint"><?= tt('su.staff_note') ?></p>

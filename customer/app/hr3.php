@@ -62,7 +62,7 @@ function hr_employment_event_from_post(int $pid): int {
             if (!empty($p['user_id'])) q('UPDATE customer_users SET is_active = 0 WHERE id = ? AND role = ?', [(int)$p['user_id'], 'staff']);   // the portal account closes with the employment (administrators are never touched)
             hr_off_open($pid, $id);                                                                                      // R60-001: release-of-contract procedure
         } else throw new RuntimeException(t('err.notfound'));
-        hr_docs_store_from_files($pid, $id, (string)($_POST['doc_kind'] ?? ($ev === 'end' ? 'termination' : 'contract')), $note);
+        if (function_exists('hr_files_can') && hr_files_can()) hr_docs_store_from_files($pid, $id, (string)($_POST['doc_kind'] ?? ($ev === 'end' ? 'termination' : 'contract')), $note);   // R76-005: administrators cannot file documents
         db()->commit();
     } catch (Throwable $e) { db()->rollBack(); throw $e; }
     return $id;
@@ -78,7 +78,7 @@ function hr_employment_delete(int $id): void {
 }
 
 /* ------------------------------------------------------------ documents */
-function hr_docs(int $pid): array { return hr3_has() ? all('SELECT d.*, cu.full_name AS by_name FROM hr_docs d LEFT JOIN customer_users cu ON cu.id = d.uploaded_by WHERE d.person_id = ? ORDER BY d.created_at DESC, d.id DESC', [$pid]) : []; }
+function hr_docs(int $pid): array { return hr3_has() && function_exists('hr_files_can') && hr_files_can() ? all('SELECT d.*, cu.full_name AS by_name FROM hr_docs d LEFT JOIN customer_users cu ON cu.id = d.uploaded_by WHERE d.person_id = ? ORDER BY d.created_at DESC, d.id DESC', [$pid]) : []; }
 /** Store every file of $_FILES['doc'] (multiple) for the person / event. */
 function hr_docs_store_from_files(int $pid, ?int $empId, string $kind, ?string $note = null): int {
     $f = $_FILES['doc'] ?? null; if (!$f) return 0; $kind = in_array($kind, HR_DOC_KINDS, true) ? $kind : 'other'; $me = (int)(current_user()['id'] ?? 0); $n = 0;
@@ -98,12 +98,12 @@ function hr_docs_store_from_files(int $pid, ?int $empId, string $kind, ?string $
     if (count($names) >= up_limits()['files']) flash('warn', t('up.truncated', ['max' => up_limits()['files']]));   // R76-003: PHP drops the files beyond max_file_uploads silently
     return $n;
 }
-function hr_doc_upload_from_post(int $pid): int { if (!hr_can() || !hr3_has()) throw new RuntimeException(t('err.noaccess')); if (!hr_person($pid)) throw new RuntimeException(t('err.notfound')); $emp = (int)($_POST['employment_id'] ?? 0) ?: null; return hr_docs_store_from_files($pid, $emp, (string)($_POST['doc_kind'] ?? 'other'), mb_substr(trim((string)($_POST['note'] ?? '')), 0, 200) ?: null); }
-function hr_doc_delete(int $id): void { if (!hr_can() || !hr3_has()) throw new RuntimeException(t('err.noaccess')); $d = one('SELECT * FROM hr_docs WHERE id = ?', [$id]); if (!$d) throw new RuntimeException(t('err.notfound')); $f = dirname(__DIR__) . '/storage/hr/' . $d['path']; if (is_file($f)) @unlink($f); q('DELETE FROM hr_docs WHERE id = ?', [$id]); }
+function hr_doc_upload_from_post(int $pid): int { if (!hr_can() || !hr3_has() || !hr_files_can()) throw new RuntimeException(t('err.noaccess')); if (!hr_person($pid)) throw new RuntimeException(t('err.notfound')); $emp = (int)($_POST['employment_id'] ?? 0) ?: null; return hr_docs_store_from_files($pid, $emp, (string)($_POST['doc_kind'] ?? 'other'), mb_substr(trim((string)($_POST['note'] ?? '')), 0, 200) ?: null); }
+function hr_doc_delete(int $id): void { if (!hr_can() || !hr3_has() || !hr_files_can()) throw new RuntimeException(t('err.noaccess')); $d = one('SELECT * FROM hr_docs WHERE id = ?', [$id]); if (!$d) throw new RuntimeException(t('err.notfound')); $f = dirname(__DIR__) . '/storage/hr/' . $d['path']; if (is_file($f)) @unlink($f); q('DELETE FROM hr_docs WHERE id = ?', [$id]); }
 /** ?p=hr_pdoc&id= — stream a card document to HR / admins, or to the person himself. */
 function hr_pdoc_stream(int $id): void {
     $d = hr3_has() ? one('SELECT d.*, p.user_id FROM hr_docs d JOIN hr_people p ON p.id = d.person_id WHERE d.id = ?', [$id]) : null; $u = current_user(); if (!$d || !$u) { http_response_code(404); exit; }
-    if (!(hr_can() || (int)$d['user_id'] === (int)$u['id'])) { http_response_code(403); exit; }
+    if (!((function_exists('hr_files_can') && hr_files_can()) || (int)$d['user_id'] === (int)$u['id'])) { http_response_code(403); exit; }   // R76-005: HR / Owner or the person
     $f = dirname(__DIR__) . '/storage/hr/' . $d['path']; if (!is_file($f)) { http_response_code(404); exit; }
     $ct = ['pdf' => 'application/pdf', 'jpg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'doc' => 'application/msword'][strtolower(pathinfo($f, PATHINFO_EXTENSION))] ?? 'application/octet-stream';
     $inline = in_array($ct, ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'], true);
