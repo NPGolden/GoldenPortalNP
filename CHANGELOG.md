@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.86.0** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.86.1** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.86.1 | GAS-CP-R77-002 | 2026-11-04 | Service app 0.6.11: photos per task (service report) and per inspected system (inspection report) — a strip under every block, filed under that task / system on the portal; removing a block removes its photos. | — |
 | 1.86.0 | GAS-CP-R77-001 | 2026-11-04 | Function checks / commissioning sheets filled on line: template-driven OEM forms (first: Emerson / AVENTICS Marex OS III) — header, Portside / Starboard check items (tested · not existing · open), verified adjustment values, closing statement, remarks, engineer and customer signatures (on the spot or later on the portal), one-page PDF mirroring the maker's sheet, revisions, history; listed under Reports with a + button per form. | `install/migrate_cp_r77_fc.sql` |
 | 1.85.1 | GAS-CP-R76-005 | 2026-11-04 | Personnel file to HR and Owner / CEO only — administrators no longer see, upload or delete the documents on a person's card or file documents with employment events (direct links answer 403; the person still sees his own). HR role gets Support (portal requests) in its menu, without the customers' ticket inbox. | — |
 | 1.85.0 | GAS-CP-R76-004 | 2026-11-04 | Accounting: lines covered by an offer (lump sum already in the budget) — per line or the whole report — settled against the offer and never invoiced per hour; a report with nothing left to invoice closes without accounting (no more "No line is included" dead end); the timesheets / service reports behind it show "Covered by an offer"; the offer page shows the hours it covers; register filter and PDF section. | `install/migrate_cp_r76_covered.sql` |

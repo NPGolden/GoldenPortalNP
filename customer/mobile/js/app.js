@@ -26,13 +26,14 @@ window.UI = (() => {
 
   // photos: picked → compressed on device (≤1600 px, JPEG q0.8 ≈ ≤400 kB) → canvas re-encode strips all EXIF (CS-06)
   const photos = {
-    init(box, record, max) {
-      box.innerHTML = `<label class="add">+<input type="file" accept="image/*" capture="environment" multiple></label>`; box._max = max || 9;
+    init(box, record, max, task) {   // R77-002: task = the task / inspected-system number the photos belong to (undefined = report level)
+      box.innerHTML = `<label class="add">+<input type="file" accept="image/*" capture="environment" multiple></label>`; box._max = max || 9; box._init = true;
       box.querySelector("input").onchange = async (e) => { for (const f of e.target.files) { if (box.querySelectorAll(".ph").length >= box._max) { toast(`Max ${box._max} photos`); break; } const blob = await compress(f); addThumb(box, blob, f.name.replace(/\.[^.]+$/, "") + ".jpg"); } e.target.value = ""; };
-      if (record) DB.all("photos").then((all) => all.filter((p) => p.record === record).forEach((p) => addThumb(box, p.blob, p.name, p.id)));
+      if (record) DB.all("photos").then((all) => all.filter((p) => p.record === record && (task === undefined || (p.task || 1) === task)).forEach((p) => addThumb(box, p.blob, p.name, p.id)));
     },
     count: (box) => box.querySelectorAll(".ph").length,
-    async store(box, record) { for (const ph of box.querySelectorAll(".ph")) { if (ph._stored) continue; await DB.put("photos", { id: ph._id || DB.uuid(), record, blob: ph._blob, name: ph._name, captured_at: new Date().toISOString() }); ph._stored = true; } },
+    async store(box, record, task) { for (const ph of box.querySelectorAll(".ph")) { if (ph._stored && (task === undefined || ph._task === task)) continue; await DB.put("photos", { id: ph._id || (ph._id = DB.uuid()), record, task: task || 1, blob: ph._blob, name: ph._name, captured_at: new Date().toISOString() }); ph._stored = true; ph._task = task; } },
+    async drop(box) { for (const ph of box.querySelectorAll(".ph")) if (ph._id) await DB.del("photos", ph._id); },
   };
   function addThumb(box, blob, name, id) {
     const ph = document.createElement("div"); ph.className = "ph"; ph._blob = blob; ph._name = name; ph._id = id; ph._stored = !!id;

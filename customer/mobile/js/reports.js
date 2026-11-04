@@ -115,7 +115,6 @@ window.REPORTS = (() => {
       <h2>${t("rep.tasks")} <span class="muted">(${t("rep.limits", { l: L.lines, p: L.parts })})</span></h2><div id="tasks">${f.tasks.map((tk, i) => taskBlock(tk, i, engs, eqOptions, L)).join("")}</div>
       <button class="btn line sm" id="addtask">${t("rep.addtask")}</button>
       <h2>${t("rep.hours")}</h2><div id="summary"></div>
-      <h2>${t("fsr.photos")} <span class="muted">(≤ ${L.photos})</span></h2><div class="photos" id="ph"></div>
       <h2>${t("fsr.sign")}</h2>
       <div class="seg" data-k="acc"><button data-v="portal" class="${f.acceptance !== "onsite" ? "on" : ""}">${t("rep.accportal")}</button><button data-v="onsite" class="${f.acceptance === "onsite" ? "on" : ""}">${t("rep.acconsite")}</button></div>
       <p class="muted" id="acchint">${t(f.acceptance === "onsite" ? "rep.acconsitehint" : "rep.accportalhint")}</p>
@@ -128,7 +127,6 @@ window.REPORTS = (() => {
       <div class="row2"><select id="addsys"><option value="">${t("ins.addsystem")}</option>${(M().isr_systems || []).map((s) => `<option value="${esc(s.name)}">${esc(s.name)}${s.abbr ? ` (${esc(s.abbr)})` : ""}</option>`).join("")}</select><button class="btn line sm" id="addsysok" style="margin:0">+</button></div>
       <h2>${t("ins.findings")}</h2><textarea id="findings">${esc(f.findings)}</textarea>${ASSIST.button()}
       <h2>${t("ins.risks")}</h2><textarea id="risks">${esc(f.risks)}</textarea>${ASSIST.button()}
-      <h2>${t("fsr.photos")} <span class="muted">(≤ ${L.photos})</span></h2><div class="photos" id="ph"></div>
       <p class="muted">${t("ins.flow")}</p>
       <button class="btn gold" id="submit">${t("ins.submit")}</button><button class="btn line" id="save">${t("fsr.save")}</button>`;
 
@@ -156,7 +154,8 @@ window.REPORTS = (() => {
       $("#project").onchange = (e) => { $("#sub").innerHTML = S().subOptions(+e.target.value, null); };
       const limits = (tk) => { tk.querySelector(".addpart").classList.toggle("hidden", tk.querySelectorAll(".part").length >= L.parts); tk.querySelector(".addline").classList.toggle("hidden", tk.querySelectorAll(".tl").length >= L.lines); tk.querySelector(".addtravel").classList.toggle("hidden", tk.querySelectorAll(".tl").length >= L.lines); };
       const wire = () => {
-        root.querySelectorAll("[data-rm]").forEach((b) => b.onclick = () => { const row = b.closest("[data-row]"); const tk = row.closest(".task"); row.remove(); renumber(); if (tk && tk.isConnected) limits(tk); renderSummary(); });
+        root.querySelectorAll("[data-rm]").forEach((b) => b.onclick = async () => { const row = b.closest("[data-row]"); const tk = row.closest(".task"); const pb = row.querySelector(".bph"); if (pb && (row.classList.contains("task") || row.classList.contains("item"))) await UI.photos.drop(pb); row.remove(); renumber(); if (tk && tk.isConnected) limits(tk); renderSummary(); await storePhotos(); });
+        root.querySelectorAll(".task .bph, .item .bph").forEach((box, i) => { if (!box._init) UI.photos.init(box, f.id, L.photos, i + 1); });   // R77-002: photos per task / inspected system
         root.querySelectorAll(".task").forEach((tk) => { limits(tk);
           tk.querySelector(".addpart").onclick = () => { tk.querySelector(".parts").insertAdjacentHTML("beforeend", partRow({ name: "", type: "I" })); wire(); };
           tk.querySelector(".addissue").onclick = () => { tk.querySelector(".issues").insertAdjacentHTML("beforeend", issueRow("")); wire(); };
@@ -180,8 +179,9 @@ window.REPORTS = (() => {
       UI.assistContext({ page, title: kind === "inspection" ? "Inspection report SF-GLD-020" : "Field Service Report SF-GLD-014", headline: read(root).vessel, fields: () => fields(""), getText: () => kind === "inspection" ? read(root).findings : read(root).tasks.map((x) => x.description).join("\n") });
       if ($("#addtask")) $("#addtask").onclick = () => { if (root.querySelectorAll(".task").length >= 20) return UI.toast(t("rep.maxtasks")); $("#tasks").insertAdjacentHTML("beforeend", taskBlock(newTask(), root.querySelectorAll(".task").length, engs, eqOptions, L)); wire(); renderSummary(); };
       if ($("#addsysok")) $("#addsysok").onclick = () => { const name = $("#addsys").value; if (!name) return; const sys = (M().isr_systems || []).find((s) => s.name === name); $("#items").insertAdjacentHTML("beforeend", itemBlock(newItem(sys || { id: 0, name }), root.querySelectorAll(".item").length, eqOptions)); $("#addsys").value = ""; wire(); };
-      UI.photos.init($("#ph"), f.id, L.photos); UI.sig.init(root, f.signature);
-      const save = async () => { f = { ...f, ...read(root) }; await DB.put("fsr", f); await UI.photos.store($("#ph"), f.id); };
+      UI.sig.init(root, f.signature);
+      const storePhotos = async () => { const boxes = root.querySelectorAll(".task .bph, .item .bph"); for (let i = 0; i < boxes.length; i++) await UI.photos.store(boxes[i], f.id, i + 1); };   // the box position is the task / system number the portal files the photo under
+      const save = async () => { f = { ...f, ...read(root) }; await DB.put("fsr", f); await storePhotos(); };
       $("#save").onclick = async () => { await save(); UI.toast(t("fsr.save")); location.hash = "#/fsr"; };
       $("#submit").onclick = async () => {
         const v = read(root);
@@ -204,6 +204,7 @@ window.REPORTS = (() => {
   const taskBlock = (tk, i, engs, eqOptions, L) => `<div class="card task c-grey" data-row><div class="t"><span class="tn">${t("rep.task")} ${i + 1}</span>${i > 0 ? rm : ""}</div>
     <label>${t("rep.description")}</label><textarea class="td">${esc(tk.description)}</textarea>${ASSIST.button()}
     <label>${t("rep.equipment")}</label><select class="te">${eqOptions(tk.equipment_id)}</select>
+    <label>${t("fsr.photos")} <span class="muted">(≤ ${L.photos})</span></label><div class="photos bph"></div>
     <label>${t("rep.parts")} <span class="muted">(≤ ${L.parts} · W ${t("part.warranty")} · G ${t("part.goodwill")} · I ${t("part.invoice")})</span></label><div class="parts">${(tk.parts || []).map(partRow).join("")}</div><button class="btn line sm addpart">${t("fsr.addpart")}</button>
     <label>${t("rep.issues")}</label><div class="issues">${(tk.issues || []).map(issueRow).join("")}</div><button class="btn line sm addissue">${t("rep.addissue")}</button>
     <label>${t("rep.timelines")} <span class="muted">(≤ ${L.lines} · WT ${t("rep.wt")} · TT ${t("rep.tt")} · NC ${t("rep.nc")})</span></label><div class="lines">${(tk.times || []).map((l) => lineRow(l, engs)).join("")}</div>
@@ -220,6 +221,7 @@ window.REPORTS = (() => {
     <label>${t("ins.classregs")}</label><input class="icr" value="${esc(it.class_regs)}">
     <label>${t("ins.risklevel")}</label><select class="ilv">${RISK.map((r) => `<option value="${r}" ${it.risk_level === r ? "selected" : ""}>${t("risk." + r)}</option>`).join("")}</select>
     <label>${t("ins.riskanalysis")}</label><textarea class="ira">${esc(it.risk_analysis)}</textarea>${ASSIST.button()}
-    <label>${t("ins.actions")}</label><textarea class="iac">${esc(it.actions)}</textarea>${ASSIST.button()}</div>`;
+    <label>${t("ins.actions")}</label><textarea class="iac">${esc(it.actions)}</textarea>${ASSIST.button()}
+    <label>${t("fsr.photos")}</label><div class="photos bph"></div></div>`;
   return { list, edit, summary, hm };
 })();
