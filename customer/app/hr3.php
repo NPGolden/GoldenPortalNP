@@ -84,8 +84,10 @@ function hr_docs_store_from_files(int $pid, ?int $empId, string $kind, ?string $
     $f = $_FILES['doc'] ?? null; if (!$f) return 0; $kind = in_array($kind, HR_DOC_KINDS, true) ? $kind : 'other'; $me = (int)(current_user()['id'] ?? 0); $n = 0;
     $names = (array)$f['name']; $tmps = (array)$f['tmp_name']; $errs = (array)$f['error']; $sizes = (array)$f['size'];
     foreach ($names as $i => $name) {
-        if (($errs[$i] ?? 1) !== UPLOAD_ERR_OK || !is_uploaded_file($tmps[$i])) continue;
-        if ((int)$sizes[$i] > 15 * 1024 * 1024) throw new RuntimeException(t('hr.doc_big'));
+        $er = (int)($errs[$i] ?? UPLOAD_ERR_NO_FILE); if ($er === UPLOAD_ERR_NO_FILE) continue;
+        if (in_array($er, [UPLOAD_ERR_INI_SIZE, UPLOAD_ERR_FORM_SIZE], true)) throw new RuntimeException(t('up.file_big', ['name' => (string)$name, 'max' => up_mb(min(up_limits()['file'], 15 * 1048576))]));   // R76-003
+        if ($er !== UPLOAD_ERR_OK || !is_uploaded_file($tmps[$i])) throw new RuntimeException(t('up.file_err', ['name' => (string)$name]));
+        if ((int)$sizes[$i] > 15 * 1024 * 1024) throw new RuntimeException(t('up.file_big', ['name' => (string)$name, 'max' => '15']));
         $mime = (string)(mime_content_type($tmps[$i]) ?: ''); $ext = HR_DOC_MIME[$mime] ?? null; $origExt = strtolower(pathinfo((string)$name, PATHINFO_EXTENSION));
         if ($ext === 'docx' && !in_array($origExt, ['docx', 'doc'], true)) $ext = null;   // zip-based: accept only when the original was a Word file
         if (!$ext) throw new RuntimeException(t('hr.doc_type2'));
@@ -93,6 +95,7 @@ function hr_docs_store_from_files(int $pid, ?int $empId, string $kind, ?string $
         $fn = bin2hex(random_bytes(12)) . '.' . $ext; if (!move_uploaded_file($tmps[$i], $dir . '/' . $fn)) throw new RuntimeException(t('hr.doc_fail'));
         q('INSERT INTO hr_docs (person_id, employment_id, kind, name, path, sha, size, note, uploaded_by) VALUES (?,?,?,?,?,?,?,?,?)', [$pid, $empId, $kind, mb_substr((string)$name, 0, 160), 'people/' . $pid . '/' . $fn, hash_file('sha256', $dir . '/' . $fn), (int)$sizes[$i], $note ? mb_substr($note, 0, 200) : null, $me]); $n++;
     }
+    if (count($names) >= up_limits()['files']) flash('warn', t('up.truncated', ['max' => up_limits()['files']]));   // R76-003: PHP drops the files beyond max_file_uploads silently
     return $n;
 }
 function hr_doc_upload_from_post(int $pid): int { if (!hr_can() || !hr3_has()) throw new RuntimeException(t('err.noaccess')); if (!hr_person($pid)) throw new RuntimeException(t('err.notfound')); $emp = (int)($_POST['employment_id'] ?? 0) ?: null; return hr_docs_store_from_files($pid, $emp, (string)($_POST['doc_kind'] ?? 'other'), mb_substr(trim((string)($_POST['note'] ?? '')), 0, 200) ?: null); }

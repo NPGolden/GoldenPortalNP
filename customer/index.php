@@ -111,6 +111,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'csp_report') { $raw = (s
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'ai') { require_login(); ai_endpoint(); }
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'pk') { pk_endpoint(); }   // R71-001: passkey JSON endpoint (its own CSRF / challenge checks)   // R50-001: assistant endpoint (JSON; CSRF checked by header inside)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    up_overflow_check();   // R76-003: oversized upload → clear message, not "session expired"
     csrf_check();
     if (function_exists('cache_forget') && ($cuPost = current_user())) cache_forget('badges:' . (int)$cuPost['id']);   // R69-002: an action may change what waits for me
     $action = (string)($_POST['action'] ?? '');

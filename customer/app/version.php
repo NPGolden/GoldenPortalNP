@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.84.1';
+const CP_VERSION = '1.84.2';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R76-003', 'version' => '1.84.2', 'date' => '2026-11-04', 'title' => 'Upload limits: .user.ini raises the server to 60 files / 20 MB per file / 256 MB per request; file fields check the selection before sending (red hint, button disabled); an oversized request gets a clear message instead of "session expired"; a trimmed batch says how many files were received; Diagnostics shows max_file_uploads.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R76-002', 'version' => '1.84.1', 'date' => '2026-11-03', 'title' => 'Financial statement per project / sub-project (project tree 💶, sub-project head): offers with payment terms, proformas with paid / open / overdue, payment register, invoice register and totals (offered, issued, still to invoice, collected, outstanding, overdue); Excel with one sheet per register; for the staff who see money and for accounting. Cash flow counts the payments recorded without an invoice.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R76-001', 'version' => '1.84.0', 'date' => '2026-11-03', 'title' => 'Proformas: payments without an invoice — record an advance or full payment on an issued proforma (date, amount, method, reference); status, offer trail and financial status follow; the payments of all proformas of an offer may not exceed the offer total (net + VAT); the invoice recorded later settles the payments it covers (counted once).', 'db' => 'install/migrate_cp_r76_payments.sql', 'check' => 'r76'],
         ['ref' => 'GAS-CP-R75-005', 'version' => '1.83.3', 'date' => '2026-11-03', 'title' => 'Personal Assistant role (scope "assistant", created by the update, financials off): vessels, contacts, companies, customers and their Excel imports — create, edit, delete, link contacts to vessels and companies — and nothing else in the portal. Companies, customers, contact deletion / bulk / imports are now open to administrators, the Owner and this role.', 'db' => 'install/migrate_cp_r75_assistant_role.sql', 'check' => 'r75b'],

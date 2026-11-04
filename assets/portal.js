@@ -556,4 +556,20 @@ document.addEventListener('click', function (ev) {
     var t = e.target.closest && e.target.closest('.vg-toggle'); if (t) { var on = t.classList.contains('is-on'); document.cookie = 'cp_vg_' + t.getAttribute('data-vg-page') + '=' + (on ? '0' : '1') + '; path=/; max-age=31536000; SameSite=Lax'; location.reload(); }
   });
   try { var st0 = JSON.parse(sessionStorage.getItem('vg:' + location.search) || '{}'); Object.keys(st0).forEach(function (k) { if (!st0[k]) return; document.querySelectorAll('.vg-h[data-vg-h="' + k + '"]').forEach(function (h) { h.classList.add('is-collapsed'); }); document.querySelectorAll('[data-vg="' + k + '"]').forEach(function (r) { r.classList.add('vg-hidden'); }); }); } catch (x) {}
+
+  /* R76-003: check multi-file inputs against the PHP limits before the upload starts (body data-up-*) */
+  (function () {
+    var b = document.body, perFile = +b.dataset.upFile || 0, total = +b.dataset.upTotal || 0, maxN = +b.dataset.upFiles || 0, msgs = (b.dataset.upMsg || '').split('|');
+    if (!maxN && !total) return;
+    document.querySelectorAll('input[type=file]').forEach(function (inp) {
+      inp.addEventListener('change', function () {
+        var fs = inp.files || [], sum = 0, bad = '', i; for (i = 0; i < fs.length; i++) sum += fs[i].size;
+        if (maxN && fs.length > maxN) bad = (msgs[0] || '').replace('{n}', fs.length);
+        else if (total && sum > total) bad = (msgs[1] || '').replace('{size}', Math.round(sum / 1048576));
+        else if (perFile) for (i = 0; i < fs.length; i++) if (fs[i].size > perFile) { bad = (msgs[2] || '').replace('{name}', fs[i].name); break; }
+        var p = inp.parentNode.querySelector('.up-err'); if (!p) { p = document.createElement('p'); p.className = 'hint up-err'; p.style.color = '#B42318'; inp.parentNode.appendChild(p); }
+        p.textContent = bad; var f = inp.form; if (f) f.querySelectorAll('button[type=submit]').forEach(function (x) { x.disabled = !!bad; });
+      });
+    });
+  })();
 })();

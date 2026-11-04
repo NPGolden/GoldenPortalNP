@@ -6492,4 +6492,12 @@ Best regards,
 'fr.pay_register' => 'Payment register',
 'fr.inv_register' => 'Invoice register',
 'fr.method' => 'Offered = approved offers (net + VAT). Proformas issued = gross of every proforma that is not a draft or cancelled; collected = payments recorded on them plus the paid amount of invoices that settle no recorded payment; outstanding = issued − collected; overdue = outstanding past the due date; still to invoice = offered − proformas issued. Excel: one sheet per register.',
+// ---- GAS-CP-R76-003 upload limits
+'up.hint' => 'Up to {n} files per upload, {f} MB per file, {t} MB in total — more than that: upload in batches.',
+'up.too_many' => '{n} files selected — the server accepts at most {max} per upload. Upload them in batches.',
+'up.too_big' => 'The selected files total {size} MB; the limit per upload is {max} MB. Upload them in batches.',
+'up.file_big' => '{name} is larger than {max} MB.',
+'up.file_err' => '{name} could not be received — try again.',
+'up.post_big' => 'The upload ({size} MB) exceeds the server limit of {max} MB per request — nothing was saved. Upload fewer files at a time (max {n}).',
+'up.truncated' => 'Only the first {max} files were received — the server accepts {max} per upload. Upload the rest separately.',
 ];

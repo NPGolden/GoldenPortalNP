@@ -6478,4 +6478,12 @@ GAS-MSB-2026-002',
 'fr.pay_register' => 'Payment register',
 'fr.inv_register' => 'Invoice register',
 'fr.method' => 'Offered = approved offers (net + VAT). Proformas issued = gross of every proforma that is not a draft or cancelled; collected = payments recorded on them plus the paid amount of invoices that settle no recorded payment; outstanding = issued − collected; overdue = outstanding past the due date; still to invoice = offered − proformas issued. Excel: one sheet per register.',
+// ---- GAS-CP-R76-003 upload limits
+'up.hint' => 'До {n} файла на качване, {f} MB на файл, {t} MB общо — над това: качвайте на части.',
+'up.too_many' => 'Избрани са {n} файла — сървърът приема най-много {max} на качване. Качете ги на части.',
+'up.too_big' => 'Избраните файлове са общо {size} MB; лимитът на качване е {max} MB. Качете ги на части.',
+'up.file_big' => '{name} е по-голям от {max} MB.',
+'up.file_err' => '{name} не беше получен — опитайте отново.',
+'up.post_big' => 'Качването ({size} MB) надвишава лимита на сървъра от {max} MB на заявка — нищо не е запазено. Качвайте по-малко файлове наведнъж (макс. {n}).',
+'up.truncated' => 'Получени са само първите {max} файла — сървърът приема {max} на качване. Качете останалите отделно.',
 ];

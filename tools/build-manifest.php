@@ -13,7 +13,7 @@ $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, Filesy
 foreach ($it as $f) {
     $rel = str_replace('\\', '/', substr($f->getPathname(), strlen($root) + 1));
     if (preg_match('#^(\.git|\.github|tools|docs|mobile-native|docs-R68|customer/storage|employee/storage|employee/uploads)/|/storage/|(^|/)config\.php$|install/manifest\.json$|^(DEPLOY\.md|\.gitignore)$|\.(log|bak|tmp|DS_Store)$#', $rel)) continue;   // R59-003: repository-only files (docs/, DEPLOY.md, .github) are not shipped
-    if (!preg_match('/\.(php|js|css|sql|png|jpg|ico|xlsx|ttf|json|md|txt|htaccess)$/i', $rel) && !str_ends_with($rel, '.htaccess')) continue;
+    if (!preg_match('/\.(php|js|css|sql|png|jpg|ico|xlsx|ttf|json|md|txt|htaccess|ini)$/i', $rel) && !str_ends_with($rel, '.htaccess')) continue;
     $files[$rel] = ['sha256' => hash_file('sha256', $f->getPathname()), 'size' => $f->getSize()];
 }
 ksort($files);

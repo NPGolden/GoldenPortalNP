@@ -72,6 +72,18 @@ function gate_debug(string $sent): void {
     @file_put_contents($dir . '/gate_debug.log', $line, FILE_APPEND);
 }
 
+/** PHP upload limits in bytes: per file, per request, files per request.   GAS-CP-R76-003 */
+function up_bytes(string $v): int { $v = trim($v); if ($v === '' || $v === '-1') return PHP_INT_MAX; $n = (float)$v; switch (strtolower(substr($v, -1))) { case 'g': $n *= 1024; case 'm': $n *= 1024; case 'k': $n *= 1024; } return (int)$n; }
+function up_limits(): array { static $L = null; if ($L === null) { $f = up_bytes((string)ini_get('upload_max_filesize')); $p = up_bytes((string)ini_get('post_max_size')); $L = ['file' => min($f, $p), 'total' => $p, 'files' => max(1, (int)ini_get('max_file_uploads'))]; } return $L; }
+function up_mb(int $b): string { return $b >= PHP_INT_MAX ? '∞' : (string)round($b / 1048576); }
+/** A POST bigger than post_max_size reaches PHP with $_POST and $_FILES empty — say so instead of "session expired". */
+function up_overflow_check(): void {
+    $len = (int)($_SERVER['CONTENT_LENGTH'] ?? 0); if ($len <= 0 || $_POST || $_FILES) return;
+    $L = up_limits(); if ($len <= $L['total']) return;
+    flash('error', t('up.post_big', ['size' => up_mb($len), 'max' => up_mb($L['total']), 'n' => $L['files']]));
+    $back = (string)($_SERVER['REQUEST_URI'] ?? ''); if ($back !== '' && $back[0] === '/' && !str_starts_with($back, '//')) { header('Location: ' . $back); exit; } redirect('dashboard');
+}
+
 function csrf_check(): void {
     $s = $_POST['_csrf'] ?? '';
     if (is_string($s)) {

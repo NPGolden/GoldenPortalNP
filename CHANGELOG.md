@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.84.1** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.84.2** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.84.2 | GAS-CP-R76-003 | 2026-11-04 | Upload limits: .user.ini raises the server to 60 files / 20 MB per file / 256 MB per request; file fields check the selection before sending (red hint, button disabled); an oversized request gets a clear message instead of "session expired"; a trimmed batch says how many files were received; Diagnostics shows max_file_uploads. | — |
 | 1.84.1 | GAS-CP-R76-002 | 2026-11-03 | Financial statement per project / sub-project (project tree 💶, sub-project head): offers with payment terms, proformas with paid / open / overdue, payment register, invoice register and totals (offered, issued, still to invoice, collected, outstanding, overdue); Excel with one sheet per register; for the staff who see money and for accounting. Cash flow counts the payments recorded without an invoice. | — |
 | 1.84.0 | GAS-CP-R76-001 | 2026-11-03 | Proformas: payments without an invoice — record an advance or full payment on an issued proforma (date, amount, method, reference); status, offer trail and financial status follow; the payments of all proformas of an offer may not exceed the offer total (net + VAT); the invoice recorded later settles the payments it covers (counted once). | `install/migrate_cp_r76_payments.sql` |
 | 1.83.3 | GAS-CP-R75-005 | 2026-11-03 | Personal Assistant role (scope "assistant", created by the update, financials off): vessels, contacts, companies, customers and their Excel imports — create, edit, delete, link contacts to vessels and companies — and nothing else in the portal. Companies, customers, contact deletion / bulk / imports are now open to administrators, the Owner and this role. | `install/migrate_cp_r75_assistant_role.sql` |

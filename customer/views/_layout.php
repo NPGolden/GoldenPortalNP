@@ -154,7 +154,7 @@ function layout_head(string $title, string $active = ''): void {
 <link rel="apple-touch-icon" href="../assets/favicon.png">
 <link rel="stylesheet" href="../assets/portal.css?v=<?= @filemtime(__DIR__ . '/../../assets/portal.css') ?: 1 ?>">
 </head>
-<body<?= function_exists('flt_restored') && flt_restored() ? ' data-flt="1"' : '' ?><?php if (!empty($_SESSION['cu_id']) && !empty($_SESSION['wkey']) && function_exists('sec_cfg') && sec_cfg('sec_close_signout')): ?> data-wchk="<?= e((string)$_SESSION['wkey']) ?>"<?= !empty($_SESSION['wkey_new']) ? ' data-wnew="1"' : '' ?><?php $_SESSION['wkey_new'] = false; endif; ?>>
+<body<?php if (function_exists('up_limits')) { $UL = up_limits(); echo ' data-up-file="' . min($UL['file'], PHP_INT_MAX) . '" data-up-total="' . $UL['total'] . '" data-up-files="' . $UL['files'] . '" data-up-msg="' . e(t('up.too_many', ['n' => '{n}', 'max' => $UL['files']]) . '|' . t('up.too_big', ['size' => '{size}', 'max' => up_mb($UL['total'])]) . '|' . t('up.file_big', ['name' => '{name}', 'max' => up_mb($UL['file'])])) . '"'; } ?><?= function_exists('flt_restored') && flt_restored() ? ' data-flt="1"' : '' ?><?php if (!empty($_SESSION['cu_id']) && !empty($_SESSION['wkey']) && function_exists('sec_cfg') && sec_cfg('sec_close_signout')): ?> data-wchk="<?= e((string)$_SESSION['wkey']) ?>"<?= !empty($_SESSION['wkey_new']) ? ' data-wnew="1"' : '' ?><?php $_SESSION['wkey_new'] = false; endif; ?>>
 <a class="skip" href="#main"><?= tt('nav.skip') ?></a>
 
 <header class="topbar">

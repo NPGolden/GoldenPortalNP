@@ -6492,4 +6492,12 @@ Cordiali saluti,
 'fr.pay_register' => 'Registro pagamenti',
 'fr.inv_register' => 'Registro fatture',
 'fr.method' => 'Offerto = offerte approvate (netto + IVA). Proforma emesse = lordo di ogni proforma non bozza né annullata; incassato = pagamenti registrati più il pagato delle fatture che non chiudono pagamenti registrati; in sospeso = emesso − incassato; scaduto = in sospeso oltre la scadenza; da fatturare = offerto − proforma emesse. Excel: un foglio per registro.',
+// ---- GAS-CP-R76-003 upload limits
+'up.hint' => 'Fino a {n} file per caricamento, {f} MB per file, {t} MB in totale — oltre: caricare a lotti.',
+'up.too_many' => '{n} file selezionati — il server accetta al massimo {max} per caricamento. Caricarli a lotti.',
+'up.too_big' => 'I file selezionati totalizzano {size} MB; il limite per caricamento è {max} MB. Caricarli a lotti.',
+'up.file_big' => '{name} supera {max} MB.',
+'up.file_err' => '{name} non è stato ricevuto — riprovare.',
+'up.post_big' => 'Il caricamento ({size} MB) supera il limite del server di {max} MB per richiesta — nulla è stato salvato. Caricare meno file alla volta (max {n}).',
+'up.truncated' => 'Sono stati ricevuti solo i primi {max} file — il server ne accetta {max} per caricamento. Caricare gli altri separatamente.',
 ];
