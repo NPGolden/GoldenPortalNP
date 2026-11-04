@@ -2,6 +2,7 @@
 require __DIR__ . '/_layout.php';
 require __DIR__ . '/_fsr_list.php';
 require __DIR__ . '/_isr_list.php';
+require __DIR__ . '/_fc_list.php';   // R77-001
 $u = require_login(); $cid = (int)$u['customer_id'];
 $fsrs = fsr_list(null, null, is_staff() ? null : $cid);
 $pending = array_values(array_filter($fsrs, fn($r) => $r['status'] === 'submitted'));
@@ -21,6 +22,13 @@ layout_head(t('r.title'), 'reports');
 <div class="card">
   <h2><?= tt('isr.plural') ?></h2>
   <?php isr_table(isr_list(), true); ?>
+</div>
+<?php endif; ?>
+<?php if (function_exists('fc_has') && fc_has()): ?>
+<div class="card">
+  <div class="card-head"><h2>🧪 <?= tt('fc.plural') ?></h2><?php if (is_staff()): ?><div class="btn-row"><?php foreach (fc_forms() as $fk => $ft): ?><a class="btn btn--gold btn--sm" href="<?= url('fc_edit', ['form' => $fk]) ?>">+ <?= e($ft['short']) ?></a><?php endforeach; ?></div><?php endif; ?></div>
+  <p class="hint"><?= tt('fc.lede') ?></p>
+  <?php fc_table(fc_list(null, null, null), true); ?>
 </div>
 <?php endif; ?>
 <?php if ($docs): ?>

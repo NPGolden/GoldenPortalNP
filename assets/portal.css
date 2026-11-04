@@ -1814,3 +1814,27 @@ tr.vg-h td { background: var(--cp-gold-dim, #F6F2E7); border-top: 2px solid var(
 html[data-theme="dark"] .pp-col { background: #16263A; } html[data-theme="dark"] .pp-card { background: #1F3A5F; }
 .vg-tools { display: inline-flex; gap: 4px; align-items: center; }
 .vg-all { padding-left: 8px; padding-right: 8px; font-size: 15px; line-height: 1; }
+
+/* R77-001 function checks */
+.fc-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .fc-grid { grid-template-columns: 1fr; } }
+.fc-side h3 { margin: 0 0 6px; color: var(--navy); font-size: 15px; text-align: center; }
+.fc-tbl { width: 100%; border-collapse: collapse; margin-bottom: 8px; font-size: 13px; }
+.fc-tbl th { background: #EEF1F4; color: var(--navy); text-align: left; padding: 4px 8px; font-size: 12px; text-transform: uppercase; letter-spacing: .03em; }
+.fc-tbl td { border: 1px solid var(--line); padding: 3px 6px; vertical-align: middle; white-space: nowrap; }
+.fc-tbl td.fc-n { width: 22px; text-align: center; color: var(--ink-2); font-size: 12px; }
+.fc-tbl td.fc-v input { width: 70px; text-align: right; padding: 3px 5px; font-size: 13px; }
+.fc-tri { display: inline-flex; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; vertical-align: middle; margin-right: 4px; }
+.fc-tri label { margin: 0; cursor: pointer; }
+.fc-tri input { position: absolute; opacity: 0; width: 0; height: 0; }
+.fc-tri span { display: inline-block; min-width: 22px; text-align: center; padding: 2px 0; font-size: 12px; color: var(--ink-2); background: #fff; border-right: 1px solid var(--line); }
+.fc-tri label:last-child span { border-right: 0; }
+.fc-tri input:checked + span { background: #CBD2D9; color: var(--navy); }
+.fc-tri .fc-t-ok input:checked + span { background: #2E7D32; }
+.fc-tri .fc-t-na input:checked + span { background: #6B7280; }
+.fc-tri input:focus-visible + span { outline: 2px solid var(--gold); outline-offset: -2px; }
+.fc-free { width: 130px; padding: 2px 5px; font-size: 12px; }
+.fc-m { display: inline-block; min-width: 16px; text-align: center; font-weight: 700; color: var(--ink-2); }
+.fc-m-ok { color: #2E7D32; } .fc-m-na { color: #6B7280; } .fc-na { text-decoration: line-through; color: var(--ink-2); }
+.fc-ro { padding: 6px 0; border-bottom: 1px solid var(--line); font-weight: 600; }
+.fc-extra { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }

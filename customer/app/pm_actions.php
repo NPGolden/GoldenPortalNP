@@ -973,6 +973,12 @@ function pm_handle_action(string $action, string $page): bool {
         /* ------------------------------- branches (R24-001) */
         case 'br_save':   { br_save(); flash('good', t('br.saved')); redirect('admin_branches', ['_r' => uniqid()]); }
         case 'br_delete': { br_delete((int)$_POST['id']); flash('good', t('br.deleted')); redirect('admin_branches', ['_r' => uniqid()]); }
+        /* ------------------------------- function checks (R77-001) */
+        case 'fc_save':    { $id = fc_save_from_post((int)($_POST['id'] ?? 0) ?: null); flash('good', t('fc.saved')); redirect('fc_edit', ['id' => $id, '_r' => uniqid()]); }
+        case 'fc_submit':  { $id = (int)$_POST['id']; $st = fc_submit($id); flash('good', t($st === 'accepted' ? 'fc.submitted_signed' : 'fc.submitted')); redirect('fc', ['id' => $id, '_r' => uniqid()]); }
+        case 'fc_reopen':  { $id = (int)$_POST['id']; fc_reopen($id); flash('good', t('fc.reopened')); redirect('fc_edit', ['id' => $id, '_r' => uniqid()]); }
+        case 'fc_delete':  { $id = (int)$_POST['id']; fc_delete($id); flash('good', t('fc.deleted')); redirect('reports', ['_r' => uniqid()]); }
+        case 'fc_accept': case 'fc_dispute': { $id = (int)$_POST['id']; fc_customer_decide($id, $action === 'fc_dispute' ? 'disputed' : 'accepted', (string)($_POST['remark'] ?? ''), isset($_POST['signature']) ? (string)$_POST['signature'] : null); flash('good', t($action === 'fc_dispute' ? 'fsr.disputed_done' : 'fsr.accepted_done')); redirect('fc', ['id' => $id, '_r' => uniqid()]); }
         /* ------------------------------- inspection reports (R23-003) */
         case 'isr_save': {
             require_staff();

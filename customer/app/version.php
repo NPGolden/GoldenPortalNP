@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.85.1';
+const CP_VERSION = '1.86.0';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R77-001', 'version' => '1.86.0', 'date' => '2026-11-04', 'title' => 'Function checks / commissioning sheets filled on line: template-driven OEM forms (first: Emerson / AVENTICS Marex OS III) — header, Portside / Starboard check items (tested · not existing · open), verified adjustment values, closing statement, remarks, engineer and customer signatures (on the spot or later on the portal), one-page PDF mirroring the maker\'s sheet, revisions, history; listed under Reports with a + button per form.', 'db' => 'install/migrate_cp_r77_fc.sql', 'check' => 'r77'],
         ['ref' => 'GAS-CP-R76-005', 'version' => '1.85.1', 'date' => '2026-11-04', 'title' => 'Personnel file to HR and Owner / CEO only — administrators no longer see, upload or delete the documents on a person\'s card or file documents with employment events (direct links answer 403; the person still sees his own). HR role gets Support (portal requests) in its menu, without the customers\' ticket inbox.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R76-004', 'version' => '1.85.0', 'date' => '2026-11-04', 'title' => 'Accounting: lines covered by an offer (lump sum already in the budget) — per line or the whole report — settled against the offer and never invoiced per hour; a report with nothing left to invoice closes without accounting (no more "No line is included" dead end); the timesheets / service reports behind it show "Covered by an offer"; the offer page shows the hours it covers; register filter and PDF section.', 'db' => 'install/migrate_cp_r76_covered.sql', 'check' => 'r76b'],
         ['ref' => 'GAS-CP-R76-003', 'version' => '1.84.2', 'date' => '2026-11-04', 'title' => 'Upload limits: .user.ini raises the server to 60 files / 20 MB per file / 256 MB per request; file fields check the selection before sending (red hint, button disabled); an oversized request gets a clear message instead of "session expired"; a trimmed batch says how many files were received; Diagnostics shows max_file_uploads.', 'db' => null, 'check' => null],
@@ -305,6 +306,7 @@ function cp_migration_state(): array {
         'r75b' => $has("SELECT 1 FROM staff_roles WHERE scope = 'assistant'"),
         'r76' => $has("SHOW TABLES LIKE 'proforma_payments'"),
         'r76b' => $has("SHOW COLUMNS FROM acc_lines LIKE 'offer_id'"),
+        'r77' => $has("SHOW TABLES LIKE 'fc_reports'"),
         'r70d' => $has("SHOW COLUMNS FROM customer_users LIKE 'clocks'"),
         'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),
         'r67' => $has("SHOW TABLES LIKE 'hr_flows'") && $has("SHOW TABLES LIKE 'hr_flow_templates'") && $has("SHOW TABLES LIKE 'hr_invitations'"),

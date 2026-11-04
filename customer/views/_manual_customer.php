@@ -96,6 +96,9 @@ return [
       ['fig' => 'c-fsr.jpg', 'cap' => 'A service report — report data, hours summary, tasks and the acceptance block'],
       ['ul' => ['When a report concerns registered equipment (shore converters, propulsion controls …), the work done, the open issues and the parts replaced also appear in the service history of each unit — Fleet › Equipment › serial number.']],
     ]],
+    ['id' => 'fc', 'title' => 'Function checks — signing a commissioning sheet', 'body' => [
+      'After commissioning or a function test of a system (for example a Marex OS propulsion control), the Golden A/S engineer fills the maker\'s function-check sheet on line: the functions tested on each side, the ones that do not exist on your vessel (crossed out), the verified adjustment values and the statement that no fault or alarm was present when leaving. If you were on board you may have signed on the engineer\'s screen; otherwise the sheet waits for you under Reports › Function checks — read it, draw your signature and accept, or dispute it with a remark. The signed PDF is archived with the project and mirrors the maker\'s original form.',
+    ]],
     ['id' => 'isr', 'title' => 'Inspection reports', 'body' => [
       'After a condition survey on board, Golden A/S issues an inspection report (form SF-GLD-020): the subject and objective of the inspection, the main findings and recommendations, the risks identified and, for each inspected system, the condition as found, the checklist answered, the class regulations that apply, a risk level with its analysis, the proposed corrective actions and the photos or documents taken. Reports appear on Work › Service Reports and on the sub-project\'s Service reports tab once they have been checked and issued by Golden A/S; download the PDF or the Word version from the report page.',
       ['fig' => 'c-isr.jpg', 'cap' => 'An inspection report — report data, introduction and the inspected systems with their risk levels'],
