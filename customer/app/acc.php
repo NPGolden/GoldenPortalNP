@@ -27,6 +27,38 @@ function acc_can_prepare(?int $pid = null): bool {
     return (bool) scalar("SELECT COUNT(*) FROM projects WHERE pm_user_id = ? AND status <> 'completed'", [(int)current_user()['id']]);
 }
 /** Answers as accounting (invoiced / returned): administrators and accounts ticked "Accounting". */
+/** R76-004: lines covered by an offer (lump sum already in the budget) — settled against the offer, never invoiced per hour. */
+function acc_cov_has(): bool { static $h = null; if ($h === null) { try { $h = acc_has() && (bool) scalar("SHOW COLUMNS FROM acc_lines LIKE 'offer_id'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** Offers that may cover a report's lines: approved / won (or still open) offers of the report's project, else of its vessel. */
+function acc_offers_for(array $R): array {
+    if (!acc_cov_has() || !function_exists('of_statuses_where')) return [];
+    $st = of_statuses_where(['approved', 'closed_won', 'open']); if (!$st) return [];
+    $ph = implode(',', array_fill(0, count($st), '?'));
+    if ($R['project_id']) return all("SELECT o.id, o.offer_no, o.revision, o.title, o.amount, o.currency, o.status, s.code AS sub_code FROM offers o LEFT JOIN subprojects s ON s.id = o.subproject_id WHERE o.project_id = ? AND o.status IN ({$ph}) ORDER BY o.subproject_id IS NULL, s.code, o.sent_at DESC, o.id DESC", array_merge([(int)$R['project_id']], $st));
+    if ($R['vessel_id']) return all("SELECT o.id, o.offer_no, o.revision, o.title, o.amount, o.currency, o.status, s.code AS sub_code FROM offers o JOIN projects p ON p.id = o.project_id LEFT JOIN subprojects s ON s.id = o.subproject_id WHERE p.vessel_id = ? AND o.status IN ({$ph}) ORDER BY o.sent_at DESC, o.id DESC", array_merge([(int)$R['vessel_id']], $st));
+    return [];
+}
+/** Hours settled against an offer, for the offer page. */
+function acc_offer_covered(int $oid): array { return acc_cov_has() ? (one("SELECT COUNT(*) n, COALESCE(SUM(hours),0) h, COUNT(DISTINCT report_id) r FROM acc_lines WHERE offer_id = ? AND state = 'covered'", [$oid]) ?: ['n' => 0, 'h' => 0, 'r' => 0]) : ['n' => 0, 'h' => 0, 'r' => 0]; }
+/** Every line of a draft report → covered by the offer; then the report can be closed without accounting. */
+function acc_cover_all(int $id, int $oid): int {
+    $R = acc_load($id); if (!$R || !$R['can_edit']) throw new RuntimeException(t('err.noaccess'));
+    if (!$oid || !in_array($oid, array_map(fn($o) => (int)$o['id'], acc_offers_for($R)), true)) throw new RuntimeException(t('acc.need_offer'));
+    q('UPDATE acc_reports SET offer_id = ? WHERE id = ?', [$oid, $id]);
+    q("UPDATE acc_lines SET state = 'covered', offer_id = ?, discount_pct = 0, discount_reason = NULL, value = 0 WHERE report_id = ? AND state IN ('draft','excluded','covered')", [$oid, $id]);
+    acc_recalc($id); $o = one('SELECT offer_no, revision FROM offers WHERE id = ?', [$oid]); acc_event($id, 'covered', trim(($o['offer_no'] ?? '') . ' ' . ($o['revision'] ?? '')));
+    return (int) scalar("SELECT COUNT(*) FROM acc_lines WHERE report_id = ? AND state = 'covered'", [$id]);
+}
+/** Close a draft without accounting: allowed only when no line is left to invoice (all excluded or covered by an offer). */
+function acc_close(int $id): void {
+    $R = acc_load($id); if (!$R || !in_array($R['status'], ['draft', 'returned'], true) || !acc_can_prepare((int)$R['project_id'] ?: null)) throw new RuntimeException(t('err.noaccess'));
+    if (!$R['lines']) throw new RuntimeException(t('acc.no_lines'));
+    foreach ($R['lines'] as $l) { if (!in_array($l['state'], ['excluded', 'covered'], true)) throw new RuntimeException(t('acc.close_not_empty')); if ($l['state'] === 'covered' && !$l['offer_id']) throw new RuntimeException(t('acc.need_offer')); }
+    $u = current_user();
+    q("UPDATE acc_reports SET status = 'closed', issued_at = NOW(), issued_by = ?, issued_name = ? WHERE id = ?", [(int)$u['id'], (string)$u['full_name'], $id]);
+    acc_cascade_docs($id); acc_event($id, 'closed');
+}
+
 function acc_is_accounting(): bool { return acc_has() && is_staff() && (is_cp_admin() || acc_user_flag('is_accounting')); }
 /** Sees the register and the reports at all. */
 function acc_visible(): bool { return acc_has() && is_staff() && (acc_can_prepare() || acc_is_accounting() || fin_visible()); }
@@ -144,7 +176,7 @@ function acc_sync(): int {
 function acc_filters_from_request(array $g): array {
     $f = [];
     foreach (['vessel', 'project', 'sub', 'discipline', 'user'] as $k) $f[$k] = (int)($g[$k] ?? 0) ?: null;
-    $f['state'] = in_array($g['state'] ?? '', ['open', 'draft', 'reported', 'invoiced', 'excluded'], true) ? $g['state'] : '';
+    $f['state'] = in_array($g['state'] ?? '', ['open', 'draft', 'reported', 'invoiced', 'excluded', 'covered'], true) ? $g['state'] : '';
     $f['type'] = in_array($g['type'] ?? '', ACC_TYPES, true) ? $g['type'] : '';
     $f['from'] = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($g['from'] ?? '')) ? $g['from'] : '';
     $f['to'] = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($g['to'] ?? '')) ? $g['to'] : '';
@@ -162,14 +194,14 @@ function acc_register(array $f): array {
     if ($f['type']) { $w[] = 'a.hour_type = ?'; $a[] = $f['type']; }
     if ($f['from']) { $w[] = 'a.work_date >= ?'; $a[] = $f['from']; }
     if ($f['to']) { $w[] = 'a.work_date <= ?'; $a[] = $f['to']; }
-    if ($f['q'] !== '') { $w[] = '(a.doc_no LIKE ? OR a.user_name LIKE ? OR a.description LIKE ? OR a.invoice_ref LIKE ? OR r.report_no LIKE ?)'; $like = '%' . $f['q'] . '%'; array_push($a, $like, $like, $like, $like, $like); }
+    if ($f['q'] !== '') { $w[] = '(a.doc_no LIKE ? OR a.user_name LIKE ? OR a.description LIKE ? OR a.invoice_ref LIKE ? OR r.report_no LIKE ?' . (acc_cov_has() ? ' OR o.offer_no LIKE ?' : '') . ')'; $like = '%' . $f['q'] . '%'; array_push($a, $like, $like, $like, $like, $like); if (acc_cov_has()) $a[] = $like; }
     if (!is_cp_admin() && !acc_user_flag('can_accounting') && !acc_is_accounting()) { $w[] = 'p.pm_user_id = ?'; $a[] = (int)current_user()['id']; }   // a PM sees his projects
-    return all("SELECT a.*, v.name AS vessel, p.project_code, p.name AS project_name, s.code AS sub_code, s.name AS sub_name, d.name AS discipline, r.report_no, r.revision AS report_rev, r.status AS report_status
-                FROM acc_lines a LEFT JOIN vessels v ON v.id = a.vessel_id LEFT JOIN projects p ON p.id = a.project_id LEFT JOIN subprojects s ON s.id = a.subproject_id LEFT JOIN disciplines d ON d.id = a.discipline_id LEFT JOIN acc_reports r ON r.id = a.report_id
+    return all("SELECT a.*, v.name AS vessel, p.project_code, p.name AS project_name, s.code AS sub_code, s.name AS sub_name, d.name AS discipline, r.report_no, r.revision AS report_rev, r.status AS report_status" . (acc_cov_has() ? ', o.offer_no AS cov_offer' : ', NULL AS cov_offer') . "
+                FROM acc_lines a LEFT JOIN vessels v ON v.id = a.vessel_id LEFT JOIN projects p ON p.id = a.project_id LEFT JOIN subprojects s ON s.id = a.subproject_id LEFT JOIN disciplines d ON d.id = a.discipline_id LEFT JOIN acc_reports r ON r.id = a.report_id" . (acc_cov_has() ? ' LEFT JOIN offers o ON o.id = a.offer_id' : '') . "
                 WHERE " . implode(' AND ', $w) . ' ORDER BY a.work_date DESC, a.user_name, a.id DESC', $a);
 }
-function acc_state_pill(string $s): string { return pill(['open' => 'gold', 'draft' => 'navy', 'reported' => 'navy', 'invoiced' => 'green', 'excluded' => 'mute'][$s] ?? 'mute', t('acc.st_' . $s)); }
-function acc_status_pill(string $s): string { return pill(['draft' => 'mute', 'issued' => 'gold', 'sent' => 'navy', 'returned' => 'bad', 'partly_invoiced' => 'gold', 'invoiced' => 'green'][$s] ?? 'mute', t('acc.rs_' . $s)); }
+function acc_state_pill(string $s): string { return pill(['open' => 'gold', 'draft' => 'navy', 'reported' => 'navy', 'invoiced' => 'green', 'excluded' => 'mute', 'covered' => 'green'][$s] ?? 'mute', t('acc.st_' . $s)); }
+function acc_status_pill(string $s): string { return pill(['draft' => 'mute', 'issued' => 'gold', 'sent' => 'navy', 'returned' => 'bad', 'partly_invoiced' => 'gold', 'invoiced' => 'green', 'closed' => 'mute'][$s] ?? 'mute', t('acc.rs_' . $s)); }
 function acc_h(float $h): string { return rtrim(rtrim(number_format($h, 2, '.', ''), '0'), '.'); }
 function acc_m(?float $v, string $cur = 'EUR'): string { return $v === null ? '—' : number_format($v, 2, ',', '.') . ' ' . $cur; }
 
@@ -201,8 +233,8 @@ function acc_load(int $id): ?array {
               FROM acc_reports r LEFT JOIN vessels v ON v.id = r.vessel_id LEFT JOIN projects p ON p.id = r.project_id LEFT JOIN customers c ON c.id = p.customer_id LEFT JOIN subprojects s ON s.id = r.subproject_id WHERE r.id = ?', [$id]);
     if (!$R) return null;
     if (!$R['customer_id'] && $R['vessel_id']) { $vv = one('SELECT v.customer_id, c.name FROM vessels v LEFT JOIN customers c ON c.id = v.customer_id WHERE v.id = ?', [(int)$R['vessel_id']]); $R['customer_id'] = $vv['customer_id'] ?? null; $R['customer_name'] = $vv['name'] ?? null; }
-    $R['lines'] = all('SELECT a.*, p.project_code, p.name AS project_name, s.code AS sub_code, s.name AS sub_name, d.name AS discipline, i.description AS rate_desc, i.card AS rate_card
-                       FROM acc_lines a LEFT JOIN projects p ON p.id = a.project_id LEFT JOIN subprojects s ON s.id = a.subproject_id LEFT JOIN disciplines d ON d.id = a.discipline_id LEFT JOIN rate_items i ON i.id = a.rate_item_id
+    $R['lines'] = all('SELECT a.*, p.project_code, p.name AS project_name, s.code AS sub_code, s.name AS sub_name, d.name AS discipline, i.description AS rate_desc, i.card AS rate_card' . (acc_cov_has() ? ', o.offer_no AS cov_offer, o.revision AS cov_rev' : ', NULL AS cov_offer, NULL AS cov_rev, NULL AS offer_id') . '
+                       FROM acc_lines a' . (acc_cov_has() ? ' LEFT JOIN offers o ON o.id = a.offer_id' : '') . ' LEFT JOIN projects p ON p.id = a.project_id LEFT JOIN subprojects s ON s.id = a.subproject_id LEFT JOIN disciplines d ON d.id = a.discipline_id LEFT JOIN rate_items i ON i.id = a.rate_item_id
                        WHERE a.report_id = ? ORDER BY p.project_code, s.sort_order, s.code, d.sort_order, a.work_date, a.user_name, FIELD(a.hour_type,"normal","overtime","holiday","travel")', [$id]);
     $R['events'] = all('SELECT * FROM acc_events WHERE report_id = ? ORDER BY id', [$id]);
     $R['can_edit'] = $R['status'] === 'draft' && acc_can_prepare((int)$R['project_id'] ?: null);
@@ -271,7 +303,7 @@ function acc_reprice(int $id, bool $all = false): void {
 function acc_recalc(int $id): void {
     $R = one('SELECT * FROM acc_reports WHERE id = ?', [$id]); if (!$R) return;
     $hd = (float)$R['header_discount_pct']; $hours = 0.0; $gross = 0.0; $net = 0.0;
-    foreach (all("SELECT * FROM acc_lines WHERE report_id = ? AND state <> 'excluded'", [$id]) as $l) {
+    foreach (all("SELECT * FROM acc_lines WHERE report_id = ? AND state NOT IN ('excluded','covered')", [$id]) as $l) {
         $g = (float)$l['hours'] * (float)($l['unit_price'] ?? 0); $v = $g * (1 - (float)$l['discount_pct'] / 100);
         q('UPDATE acc_lines SET value = ? WHERE id = ?', [round($v, 2), (int)$l['id']]);
         $hours += (float)$l['hours']; $gross += $g; $net += $v;
@@ -288,17 +320,19 @@ function acc_lines_save_from_post(int $id): void {
     q('UPDATE acc_reports SET zone = ?, header_discount_pct = ?, note = ?, period_start = ?, period_end = ? WHERE id = ?',
       [$zone, $hd, mb_substr(trim((string)($_POST['note'] ?? '')), 0, 1000) ?: null,
        preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['from'] ?? '')) ? $_POST['from'] : $R['period_start'], preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['to'] ?? '')) ? $_POST['to'] : $R['period_end'], $id]);
+    $cov = acc_cov_has(); $oid = $cov ? ((int)($_POST['offer_id'] ?? 0) ?: null) : null; if ($cov) { if ($oid && !in_array($oid, array_map(fn($o) => (int)$o['id'], acc_offers_for($R)), true)) $oid = null; q('UPDATE acc_reports SET offer_id = ? WHERE id = ?', [$oid, $id]); }   // R76-004
     $inc = (array)($_POST['inc'] ?? []); $disc = (array)($_POST['disc'] ?? []); $why = (array)($_POST['why'] ?? []); $lz = (array)($_POST['lz'] ?? []); $ri = (array)($_POST['ri'] ?? []);
     foreach ($R['lines'] as $l) {
         $lid = (int)$l['id']; if (!array_key_exists($lid, $inc) && !array_key_exists($lid, $disc)) continue;
         $include = (string)($inc[$lid] ?? '1') !== '0';
+        if ($cov && (string)($inc[$lid] ?? '1') === '2') { if (!$oid) throw new RuntimeException(t('acc.need_offer')); q("UPDATE acc_lines SET state = 'covered', offer_id = ?, discount_pct = 0, discount_reason = NULL, exclude_reason = ?, value = 0 WHERE id = ? AND report_id = ?", [$oid, mb_substr(trim((string)($why[$lid] ?? '')), 0, 255) ?: null, $lid, $id]); continue; }   // R76-004
         $d = max(0.0, min(100.0, (float) str_replace(',', '.', (string)($disc[$lid] ?? '0'))));
         $z = ($lz[$lid] ?? '') === 'overseas' ? 'overseas' : (($lz[$lid] ?? '') === 'local' ? 'local' : null);
         $r = (int)($ri[$lid] ?? 0) ?: null;
         if (($zoneChanged || $z !== $l['zone']) && $r === ((int)$l['rate_item_id'] ?: null)) $r = null;   // zone changed and no new pick → price again automatically
         $reason = mb_substr(trim((string)($why[$lid] ?? '')), 0, 255) ?: null;
         $reprice = $zoneChanged || $z !== $l['zone'] || $r !== ((int)$l['rate_item_id'] ?: null);
-        q('UPDATE acc_lines SET state = ?, discount_pct = ?, discount_reason = ?, exclude_reason = ?, zone = ?, rate_item_id = ?' . ($reprice ? ', unit_price = NULL' : '') . ' WHERE id = ? AND report_id = ?',
+        q('UPDATE acc_lines SET state = ?, discount_pct = ?, discount_reason = ?, exclude_reason = ?, zone = ?, rate_item_id = ?' . ($reprice ? ', unit_price = NULL' : '') . ($cov ? ', offer_id = NULL' : '') . ' WHERE id = ? AND report_id = ?',
           [$include ? 'draft' : 'excluded', $include ? $d : 0, $include ? $reason : null, $include ? null : $reason, $z, $r ?: ($reprice ? null : $l['rate_item_id']), $lid, $id]);
     }
     acc_reprice($id, false);
@@ -307,12 +341,12 @@ function acc_lines_save_from_post(int $id): void {
 /** Put a line back (excluded → draft) or release it from a draft report (→ open). */
 function acc_line_release(int $id, int $lid): void {
     $R = acc_load($id); if (!$R || !$R['can_edit']) throw new RuntimeException(t('err.noaccess'));
-    q("UPDATE acc_lines SET state = 'open', report_id = NULL, discount_pct = 0, discount_reason = NULL, exclude_reason = NULL, value = NULL WHERE id = ? AND report_id = ? AND state IN ('draft','excluded')", [$lid, $id]);
+    q("UPDATE acc_lines SET state = 'open', report_id = NULL, discount_pct = 0, discount_reason = NULL, exclude_reason = NULL, value = NULL WHERE id = ? AND report_id = ? AND state IN ('draft','excluded','covered')", [$lid, $id]); if (acc_cov_has()) q('UPDATE acc_lines SET offer_id = NULL WHERE id = ? AND report_id = ?', [$lid, $id]);
     acc_recalc($id);
 }
 function acc_delete_draft(int $id): void {
     $R = acc_load($id); if (!$R || $R['status'] !== 'draft' || !$R['can_edit']) throw new RuntimeException(t('err.noaccess'));
-    q("UPDATE acc_lines SET state = 'open', report_id = NULL, discount_pct = 0, discount_reason = NULL, exclude_reason = NULL, value = NULL, unit_price = NULL, rate_item_id = NULL WHERE report_id = ?", [$id]);
+    q("UPDATE acc_lines SET state = 'open', report_id = NULL, discount_pct = 0, discount_reason = NULL, exclude_reason = NULL, value = NULL, unit_price = NULL, rate_item_id = NULL" . (acc_cov_has() ? ', offer_id = NULL' : '') . " WHERE report_id = ?", [$id]);
     q('DELETE FROM acc_events WHERE report_id = ?', [$id]); q('DELETE FROM acc_reports WHERE id = ?', [$id]);
 }
 /** Budget vs invoiced per sub-project › discipline for the report's lines. */
@@ -332,8 +366,9 @@ function acc_budget_rows(array $R): array {
 function acc_issue(int $id): array {
     $R = acc_load($id); if (!$R || !acc_can_prepare((int)$R['project_id'] ?: null)) throw new RuntimeException(t('err.noaccess'));
     if (!in_array($R['status'], ['draft', 'returned'], true)) throw new RuntimeException(t('acc.not_draft'));
-    $inc = array_values(array_filter($R['lines'], fn($l) => $l['state'] !== 'excluded'));
-    if (!$inc) throw new RuntimeException(t('acc.nothing_to_issue'));
+    $inc = array_values(array_filter($R['lines'], fn($l) => !in_array($l['state'], ['excluded', 'covered'], true)));
+    if (!$inc) throw new RuntimeException(t($R['lines'] ? 'acc.nothing_to_issue2' : 'acc.nothing_to_issue'));
+    foreach ($R['lines'] as $l) if ($l['state'] === 'covered' && !$l['offer_id']) throw new RuntimeException(t('acc.need_offer'));
     foreach ($inc as $l) if ($l['unit_price'] === null) throw new RuntimeException(t('acc.unpriced', ['n' => $l['user_name'] . ' ' . fmt_date($l['work_date'])]));
     if (str_starts_with((string)$R['report_no'], 'DRAFT-')) { $R['report_no'] = acc_number((int)$R['branch_id'] ?: null); $R['revision'] = 'R0'; }
     elseif ($R['status'] === 'returned') $R['revision'] = 'R' . ((int) substr((string)$R['revision'], 1) + 1);
@@ -384,8 +419,9 @@ function acc_answer_from_post(int $id): void {
 function acc_cascade_docs(int $id): void {
     foreach (all('SELECT DISTINCT source, doc_id FROM acc_lines WHERE report_id = ?', [$id]) as $d) {
         $st = all("SELECT state, invoice_ref FROM acc_lines WHERE source = ? AND doc_id = ? AND state <> 'excluded'", [$d['source'], (int)$d['doc_id']]);
+        $covN = count(array_filter($st, fn($x) => $x['state'] === 'covered')); $st = array_values(array_filter($st, fn($x) => $x['state'] !== 'covered'));   // R76-004: covered lines are settled by the offer
         $states = array_column($st, 'state'); $n = count($states); $inv = count(array_filter($states, fn($s) => $s === 'invoiced')); $rep = count(array_filter($states, fn($s) => $s === 'reported'));
-        $v = $n && $inv === $n ? 'invoiced' : ($inv > 0 ? 'partly' : ($rep > 0 ? 'sent' : 'none'));
+        $v = $n && $inv === $n ? 'invoiced' : ($inv > 0 ? 'partly' : ($rep > 0 ? 'sent' : (!$n && $covN ? 'covered' : 'none')));
         $refs = implode(', ', array_unique(array_filter(array_column($st, 'invoice_ref'))));
         if ($d['source'] === 'ts') {
             q('UPDATE timesheets SET invoicing = ?, acc_report_id = ? WHERE id = ?', [$v, $v === 'none' ? null : $id, (int)$d['doc_id']]);
@@ -408,12 +444,12 @@ function acc_type_label(string $t): string { return t('acc.t_' . $t); }
 
 function acc_group_lines(array $R): array {
     $g = [];
-    foreach ($R['lines'] as $l) { if ($l['state'] === 'excluded') continue; $k1 = trim(($l['project_code'] ?: '') . ' ' . ($l['project_name'] ?: '')) ?: t('tk.generic'); $k2 = trim(($l['sub_code'] ?: '') . ' ' . ($l['sub_name'] ?: '')) ?: t('fsr.whole_project'); $k3 = (string)($l['discipline'] ?: t('bg.no_discipline')); $g[$k1][$k2][$k3][] = $l; }
+    foreach ($R['lines'] as $l) { if (in_array($l['state'], ['excluded', 'covered'], true)) continue; $k1 = trim(($l['project_code'] ?: '') . ' ' . ($l['project_name'] ?: '')) ?: t('tk.generic'); $k2 = trim(($l['sub_code'] ?: '') . ' ' . ($l['sub_name'] ?: '')) ?: t('fsr.whole_project'); $k3 = (string)($l['discipline'] ?: t('bg.no_discipline')); $g[$k1][$k2][$k3][] = $l; }
     return $g;
 }
 function acc_summary_rows(array $R): array {
     $out = [];
-    foreach ($R['lines'] as $l) { if ($l['state'] === 'excluded') continue; $k = trim(($l['sub_code'] ?: '') . ' ' . ($l['sub_name'] ?: '')) . '|' . ($l['discipline'] ?: t('bg.no_discipline')); $out[$k] ??= ['sub' => trim(($l['sub_code'] ?: '') . ' ' . ($l['sub_name'] ?: '')) ?: t('fsr.whole_project'), 'discipline' => (string)($l['discipline'] ?: t('bg.no_discipline')), 'normal' => 0.0, 'overtime' => 0.0, 'holiday' => 0.0, 'travel' => 0.0, 'hours' => 0.0, 'value' => 0.0]; $out[$k][$l['hour_type']] += (float)$l['hours']; $out[$k]['hours'] += (float)$l['hours']; $out[$k]['value'] += (float)$l['value']; }
+    foreach ($R['lines'] as $l) { if (in_array($l['state'], ['excluded', 'covered'], true)) continue; $k = trim(($l['sub_code'] ?: '') . ' ' . ($l['sub_name'] ?: '')) . '|' . ($l['discipline'] ?: t('bg.no_discipline')); $out[$k] ??= ['sub' => trim(($l['sub_code'] ?: '') . ' ' . ($l['sub_name'] ?: '')) ?: t('fsr.whole_project'), 'discipline' => (string)($l['discipline'] ?: t('bg.no_discipline')), 'normal' => 0.0, 'overtime' => 0.0, 'holiday' => 0.0, 'travel' => 0.0, 'hours' => 0.0, 'value' => 0.0]; $out[$k][$l['hour_type']] += (float)$l['hours']; $out[$k]['hours'] += (float)$l['hours']; $out[$k]['value'] += (float)$l['value']; }
     return array_values($out);
 }
 function acc_render_pdf(array $R): string {
@@ -468,6 +504,9 @@ function acc_render_pdf(array $R): string {
     $exc = array_values(array_filter($R['lines'], fn($l) => $l['state'] === 'excluded'));
     if ($exc) { $h1(($bud ? '4' : '3') . '. ' . t('acc.sec_excluded')); $rows = []; foreach ($exc as $l) $rows[] = ['tone' => 'grey', 'v' => [fmt_date($l['work_date']), (string)$l['user_name'], ($l['source'] === 'ts' ? 'TS ' : 'SR ') . $l['doc_no'], acc_type_label($l['hour_type']), acc_h((float)$l['hours']), (string)($l['exclude_reason'] ?? '')]];
         $table(t('acc.sec_excluded'), [[t('th.date'), 20, 'L'], [t('wv.by'), 34, 'L'], [t('th.ref'), 30, 'L'], [t('ts.type'), 18, 'L'], [t('ts.hours'), 14, 'R'], [t('acc.reason'), 64, 'L']], $rows); }
+    $cov = array_values(array_filter($R['lines'], fn($l) => $l['state'] === 'covered'));   // R76-004
+    if ($cov) { $h1(($bud ? '4' : '3') . ($exc ? 'b' : '') . '. ' . t('acc.sec_covered')); $rows = []; foreach ($cov as $l) $rows[] = ['tone' => 'grey', 'v' => [fmt_date($l['work_date']), (string)$l['user_name'], ($l['source'] === 'ts' ? 'TS ' : 'SR ') . $l['doc_no'], acc_type_label($l['hour_type']), acc_h((float)$l['hours']), trim((string)($l['cov_offer'] ?? '') . ' ' . (string)($l['cov_rev'] ?? '')) . ($l['exclude_reason'] ? ' — ' . $l['exclude_reason'] : '')]];
+        $table(t('acc.sec_covered'), [[t('th.date'), 20, 'L'], [t('wv.by'), 34, 'L'], [t('th.ref'), 30, 'L'], [t('ts.type'), 18, 'L'], [t('ts.hours'), 14, 'R'], [t('of.one'), 64, 'L']], $rows); }
     $y += 6; $need(24);
     $pdf->setColor($ink); $pdf->setFont('R', 8); $pdf->text($L, $y + 4, t('acc.sign_pm') . ': ' . (string)$R['created_name']); $pdf->text($L + 95, $y + 4, t('acc.sign_acc') . ': ' . (string)($R['answered_name'] ?: '')); $pdf->setColor($line); $pdf->line($L, $y + 14, $L + 80, $y + 14); $pdf->line($L + 95, $y + 14, $L + 175, $y + 14);
     $footer();

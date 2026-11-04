@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.84.2';
+const CP_VERSION = '1.85.0';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R76-004', 'version' => '1.85.0', 'date' => '2026-11-04', 'title' => 'Accounting: lines covered by an offer (lump sum already in the budget) — per line or the whole report — settled against the offer and never invoiced per hour; a report with nothing left to invoice closes without accounting (no more "No line is included" dead end); the timesheets / service reports behind it show "Covered by an offer"; the offer page shows the hours it covers; register filter and PDF section.', 'db' => 'install/migrate_cp_r76_covered.sql', 'check' => 'r76b'],
         ['ref' => 'GAS-CP-R76-003', 'version' => '1.84.2', 'date' => '2026-11-04', 'title' => 'Upload limits: .user.ini raises the server to 60 files / 20 MB per file / 256 MB per request; file fields check the selection before sending (red hint, button disabled); an oversized request gets a clear message instead of "session expired"; a trimmed batch says how many files were received; Diagnostics shows max_file_uploads.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R76-002', 'version' => '1.84.1', 'date' => '2026-11-03', 'title' => 'Financial statement per project / sub-project (project tree 💶, sub-project head): offers with payment terms, proformas with paid / open / overdue, payment register, invoice register and totals (offered, issued, still to invoice, collected, outstanding, overdue); Excel with one sheet per register; for the staff who see money and for accounting. Cash flow counts the payments recorded without an invoice.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R76-001', 'version' => '1.84.0', 'date' => '2026-11-03', 'title' => 'Proformas: payments without an invoice — record an advance or full payment on an issued proforma (date, amount, method, reference); status, offer trail and financial status follow; the payments of all proformas of an offer may not exceed the offer total (net + VAT); the invoice recorded later settles the payments it covers (counted once).', 'db' => 'install/migrate_cp_r76_payments.sql', 'check' => 'r76'],
@@ -302,6 +303,7 @@ function cp_migration_state(): array {
         'r75' => $has("SHOW TABLES LIKE 'offer_signals'") && $has("SHOW COLUMNS FROM offers LIKE 'next_action_at'"),
         'r75b' => $has("SELECT 1 FROM staff_roles WHERE scope = 'assistant'"),
         'r76' => $has("SHOW TABLES LIKE 'proforma_payments'"),
+        'r76b' => $has("SHOW COLUMNS FROM acc_lines LIKE 'offer_id'"),
         'r70d' => $has("SHOW COLUMNS FROM customer_users LIKE 'clocks'"),
         'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),
         'r67' => $has("SHOW TABLES LIKE 'hr_flows'") && $has("SHOW TABLES LIKE 'hr_flow_templates'") && $has("SHOW TABLES LIKE 'hr_invitations'"),
