@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.86.1';
+const CP_VERSION = '1.86.2';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R77-003', 'version' => '1.86.2', 'date' => '2026-11-04', 'title' => 'Service app 0.6.12: the sync chip and More show the real reason of a sync error (message + failing call). Whole-project service / inspection reports accepted from a restricted engineer who is on a sub-project of that project (the app was refused with "the sub-project is not assigned to you").', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-002', 'version' => '1.86.1', 'date' => '2026-11-04', 'title' => 'Service app 0.6.11: photos per task (service report) and per inspected system (inspection report) — a strip under every block, filed under that task / system on the portal; removing a block removes its photos.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-001', 'version' => '1.86.0', 'date' => '2026-11-04', 'title' => 'Function checks / commissioning sheets filled on line: template-driven OEM forms (first: Emerson / AVENTICS Marex OS III) — header, Portside / Starboard check items (tested · not existing · open), verified adjustment values, closing statement, remarks, engineer and customer signatures (on the spot or later on the portal), one-page PDF mirroring the maker\'s sheet, revisions, history; listed under Reports with a + button per form.', 'db' => 'install/migrate_cp_r77_fc.sql', 'check' => 'r77'],
         ['ref' => 'GAS-CP-R76-005', 'version' => '1.85.1', 'date' => '2026-11-04', 'title' => 'Personnel file to HR and Owner / CEO only — administrators no longer see, upload or delete the documents on a person\'s card or file documents with employment events (direct links answer 403; the person still sees his own). HR role gets Support (portal requests) in its menu, without the customers\' ticket inbox.', 'db' => null, 'check' => null],

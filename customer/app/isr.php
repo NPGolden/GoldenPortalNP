@@ -115,7 +115,7 @@ function isr_save_from_post(?int $id): int {
     $p = one('SELECT p.*, v.name AS vessel, v.imo, c.name AS customer_name FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id LEFT JOIN customers c ON c.id = p.customer_id WHERE p.id = ?', [$pid]);
     if (!$p) throw new RuntimeException(t('err.notfound'));
     if ($sid && !one('SELECT id FROM subprojects WHERE id = ? AND project_id = ?', [$sid, $pid])) $sid = null;
-    if (!$id && function_exists('tm_allowed_ids') && ($tmIds = tm_allowed_ids($pid)) !== null && (!$sid || !in_array($sid, $tmIds, true))) throw new RuntimeException(t('tm.not_allowed'));   // R25-001
+    if (!$id && function_exists('tm_allowed_ids') && ($tmIds = tm_allowed_ids($pid)) !== null && ($sid ? !in_array($sid, $tmIds, true) : !$tmIds)) throw new RuntimeException(t('tm.not_allowed'));   // R25-001 · R77-003: whole-project report allowed when the engineer is on a sub-project of it
     $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['report_date'] ?? '')) ? $_POST['report_date'] : date('Y-m-d');
     $fields = [$pid, $sid, $date, $str('subject', 200), $str('customer_name', 160) ?? $p['customer_name'], $str('vessel_name', 120) ?? $p['vessel'], $str('location', 160), $str('pic_name', 120),
                $str('class_flag', 120), $str('builder_year', 120), $str('hull_no', 60), $str('objective', 8000), $str('findings', 8000), $str('risks', 8000), $str('performed_name', 120) ?? $u['full_name']];

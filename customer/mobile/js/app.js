@@ -87,7 +87,7 @@ window.UI = (() => {
   function syncUI(s) {
     const el = $("#sync"); el.classList.toggle("offline", !s.online || !!s.queued); el.classList.toggle("error", !!s.error);
     const ago = s.last ? Math.round((Date.now() - s.last) / 60000) : null;
-    let txt = !s.online ? I18N.t("sync.off") : s.error === "update-required" ? "Update required — open the store" : s.error ? I18N.t("sync.err") : `${I18N.t("sync.ok")} ${ago === null ? "" : ago < 1 ? I18N.t("sync.now") : `${ago} min ${I18N.t("sync.ago")}`}`;
+    let txt = !s.online ? I18N.t("sync.off") : s.error === "update-required" ? "Update required — open the store" : s.error ? `${I18N.t("sync.err")}: ${s.error}` : `${I18N.t("sync.ok")} ${ago === null ? "" : ago < 1 ? I18N.t("sync.now") : `${ago} min ${I18N.t("sync.ago")}`}`;
     if (s.queued) txt += ` — ${s.queued} ${I18N.t("sync.queued")}`;
     $("#synctext").textContent = txt;
   }
