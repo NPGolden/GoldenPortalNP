@@ -6755,4 +6755,7 @@ Vi preghiamo di verificarlo con le vostre registrazioni e di provvedere al saldo
 Cordiali saluti,
 {user}",
 'em.w_statement' => 'l\'estratto conto per {v} al {d}',
+// ---- GAS-CP-R78-005 log folding
+'eq.show_more' => 'Mostra {n} voci precedenti',
+'eq.show_less' => 'Solo le ultime 10',
 ];

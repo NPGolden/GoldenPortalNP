@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.89.3';
+const CP_VERSION = '1.89.4';
 const CP_BUILD   = '2026-11-05';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R78-005', 'version' => '1.89.4', 'date' => '2026-11-05', 'title' => 'Production order log (and the equipment timeline): the date column takes its own width and long entries wrap instead of overlapping; the log shows the last 10 entries with a "Show n older entries" button.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R78-004', 'version' => '1.89.3', 'date' => '2026-11-05', 'title' => 'Statement of account: vessels chosen from a searchable drop-down with check boxes instead of a grid; PDF columns re-cut — long proforma numbers wrap, amounts no longer touch.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R78-003', 'version' => '1.89.2', 'date' => '2026-11-05', 'title' => 'Accounting is its own menu group after Commercial — Accounting register, Proforma invoices, Cash flow, Collections (each entry only for those who may open it); Commercial keeps offers, approvals, pipeline, sales and contacts.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R78-002', 'version' => '1.89.1', 'date' => '2026-11-05', 'title' => 'Statement of account per vessel or selected vessels (PDF + Excel): every proforma issued, payments received, open balance, aging and bank details, addressed to the owner\'s accounting — prepared from the Collections page and e-mailed with the ✉ card (Outlook draft with the statement attached; e-mail template kind "Statement of account").', 'db' => null, 'check' => null],

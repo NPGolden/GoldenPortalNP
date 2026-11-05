@@ -589,3 +589,5 @@ document.addEventListener('click', function (ev) {
     d.addEventListener('toggle', function () { if (d.open && q) q.focus(); });
   });
 })();
+/* R78-005: [data-tl-more="#list"] shows the folded entries of a timeline (.eq-tl.is-folded keeps the first 10) */
+document.querySelectorAll('[data-tl-more]').forEach(function (b) { var more = b.textContent; b.addEventListener('click', function () { var l = document.querySelector(b.dataset.tlMore); if (!l) return; l.classList.toggle('is-folded'); b.textContent = l.classList.contains('is-folded') ? more : b.dataset.less; }); });

@@ -6755,4 +6755,7 @@ Kindly check it against your records and arrange the settlement of the open item
 Best regards,
 {user}",
 'em.w_statement' => 'the statement of account for {v} as of {d}',
+// ---- GAS-CP-R78-005 log folding
+'eq.show_more' => 'Show {n} older entries',
+'eq.show_less' => 'Show the last 10 only',
 ];

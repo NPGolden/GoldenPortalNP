@@ -198,7 +198,8 @@ layout_head($o['po_no'] . ' · ' . $o['title'], 'equipment');
 <div class="card" id="log">
   <h2><?= tt('pd.log') ?> <span class="hint">(<?= count($o['log']) ?>)</span></h2>
   <?php if (!$o['log']): ?><p class="hint">—</p><?php else: ?>
-  <ul class="eq-tl"><?php foreach ($o['log'] as $l): ?><li><span class="eq-d" style="margin-right:8px;"><?= e(fmt_datetime($l['created_at'])) ?></span><span><b><?= e(t('pd.ev_' . $l['event'])) ?></b><?= $l['note'] ? ' — ' . e($l['note']) : '' ?> <span class="hint">· <?= e((string)$l['user_name']) ?></span></span></li><?php endforeach; ?></ul>
+  <ul class="eq-tl<?= count($o['log']) > 10 ? ' is-folded' : '' ?>" id="pd-log"><?php foreach ($o['log'] as $l): ?><li><span class="eq-d"><?= e(fmt_datetime($l['created_at'])) ?></span><span><b><?= e(t('pd.ev_' . $l['event'])) ?></b><?= $l['note'] ? ' — ' . e($l['note']) : '' ?> <span class="hint">· <?= e((string)$l['user_name']) ?></span></span></li><?php endforeach; ?></ul>
+  <?php if (count($o['log']) > 10): ?><button type="button" class="btn btn--ghost btn--sm eq-tl-more" data-tl-more="#pd-log" data-less="<?= tt('eq.show_less') ?>"><?= e(t('eq.show_more', ['n' => count($o['log']) - 10])) ?></button><?php endif; ?>
   <?php endif; ?>
 </div>
 <?php if (is_cp_admin()): $adAction = 'pd_delete'; $adId = $id; $adBack = 'production'; $adConfirm = t('pd.delete_confirm', ['no' => $o['po_no']]); $adNote = t('pd.delete_note'); require __DIR__ . '/_admin_delete.php'; endif; ?>

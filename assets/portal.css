@@ -1390,8 +1390,10 @@ html[data-theme="dark"] .pl-l { background: #2E3A47; color: #C7D0DA; }
 
 /* ---- Equipment register                                                  GAS-CP-R27-001 */
 .eq-tl { list-style: none; margin: 0; padding: 0; }
-.eq-tl li { display: grid; grid-template-columns: 110px 1fr; gap: 12px; padding: 10px 0; border-top: 1px solid var(--line-soft); font-size: 13.5px; line-height: 1.5; }
-.eq-tl .eq-d { font-weight: 700; color: var(--navy-text); white-space: nowrap; }
+.eq-tl li { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 12px; padding: 8px 0; border-top: 1px solid var(--line-soft); font-size: 13.5px; line-height: 1.5; }
+.eq-tl li > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.eq-tl .eq-d { font-weight: 700; color: var(--navy-text); white-space: nowrap; }   /* R78-005: the date column takes its own width, the text wraps */
+.eq-tl.is-folded li:nth-child(n+11) { display: none; } .eq-tl-more { margin-top: 8px; }
 .eq-src { font-size: 12px; color: var(--ink-2); margin-top: 3px; }
 .eq-pick { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 4px 14px; }
 .eq-pick .chk { margin: 0; }
