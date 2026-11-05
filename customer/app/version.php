@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.90.1';
+const CP_VERSION = '1.91.0';
 const CP_BUILD   = '2026-11-05';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R80-001', 'version' => '1.91.0', 'date' => '2026-11-05', 'title' => 'Procurement R80-001 — Purchase requisitions: staff of the enabled disciplines, PMs, procurement and management ask for parts against a project / sub-project, stock or a service call (inventory picker or free text, needed-by date, estimate from the pricing rule); submit → Procurement checks the parts budget of the sub-project (budget − committed − spent) → within budget: approved, stock on hand reserved, rest marked to buy; over budget or no budget: Management approval with the reason; warehouse issues reserved lines (stock out + parts cost on the sub-project); PR number <project>.<sub>.PR.<n>; log and notifications; sub-project hub gains a Sales tab (offers, proformas) and a Procurement tab (parts budget line, requisitions); Procurement menu entry Requisitions.', 'db' => 'install/migrate_cp_r80_requisitions.sql', 'check' => 'r80'],
         ['ref' => 'GAS-CP-R79-002', 'version' => '1.90.1', 'date' => '2026-11-05', 'title' => 'Procurement assistant: Claude researches the online market with web search — replacement / equivalent parts (maker successor first, then other makers with approvals and differences) and current prices and availability at EU distributors, every proposal with its source page; results saved per item (or free query on Inventory › Research), "Keep as alternative" (proposed / approved / rejected) and "Record this price" into the price history; web-search cost and searches-per-research in Settings › Assistant.', 'db' => 'install/migrate_cp_r79_002_research.sql', 'check' => 'r79b'],
         ['ref' => 'GAS-CP-R79-001', 'version' => '1.90.0', 'date' => '2026-11-05', 'title' => 'Procurement R79 — Inventory (3 830 ERP codes imported with stock, location, category, maker, barcode, factory code and last buying price), categories, warehouses, stock movements (receipt, issue to sub-project → actual cost, adjustment / stocktake, transfer), price history kept to 100 records per code with a chart, pricing rule (last · mean of 2 · mean of n · weighted · lowest · same supplier · last + %) with overrides per category and supplier, suppliers with terms / lead time / rating / price list / bank details, Procurement menu group, Procurement and Warehouse account flags, Settings › Procurement.', 'db' => 'install/migrate_cp_r79_inventory.sql', 'check' => 'r79'],
         ['ref' => 'GAS-CP-R78-005', 'version' => '1.89.4', 'date' => '2026-11-05', 'title' => 'Production order log (and the equipment timeline): the date column takes its own width and long entries wrap instead of overlapping; the log shows the last 10 entries with a "Show n older entries" button.', 'db' => null, 'check' => null],
@@ -338,6 +339,7 @@ function cp_migration_state(): array {
         'r78' => $has("SHOW TABLES LIKE 'pi_followups'"),
         'r79' => $has("SHOW TABLES LIKE 'inv_items'"),
         'r79b' => $has("SHOW TABLES LIKE 'inv_research'"),
+        'r80' => $has("SHOW TABLES LIKE 'pr_requests'"),
         'r70d' => $has("SHOW COLUMNS FROM customer_users LIKE 'clocks'"),
         'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),
         'r67' => $has("SHOW TABLES LIKE 'hr_flows'") && $has("SHOW TABLES LIKE 'hr_flow_templates'") && $has("SHOW TABLES LIKE 'hr_invitations'"),

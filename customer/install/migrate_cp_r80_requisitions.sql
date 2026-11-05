@@ -1,0 +1,57 @@
+-- GAS-CP-R80-001 — Purchase requisitions: staff request parts against a project / sub-project; procurement approves against the parts budget; stock reserved; the rest to buy
+CREATE TABLE IF NOT EXISTS pr_requests (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  pr_no VARCHAR(60) NOT NULL,
+  branch_id TINYINT UNSIGNED NULL,
+  project_id INT UNSIGNED NOT NULL,
+  subproject_id INT UNSIGNED NULL,
+  offer_id INT UNSIGNED NULL,
+  order_id INT UNSIGNED NULL,
+  bom_rev_id INT UNSIGNED NULL,
+  purpose ENUM('project','stock','service') NOT NULL DEFAULT 'project',
+  title VARCHAR(160) NULL,
+  need_date DATE NULL,
+  status ENUM('draft','submitted','mgmt','approved','rejected','closed','cancelled') NOT NULL DEFAULT 'draft',
+  est_total DECIMAL(14,2) NULL,
+  currency CHAR(3) NOT NULL DEFAULT 'EUR',
+  budget_parts DECIMAL(14,2) NULL, budget_committed DECIMAL(14,2) NULL, budget_actual DECIMAL(14,2) NULL,
+  over_budget TINYINT(1) NOT NULL DEFAULT 0,
+  requester_id INT UNSIGNED NULL, requester_name VARCHAR(120) NULL, discipline_id INT UNSIGNED NULL,
+  submitted_at DATETIME NULL,
+  approved_by INT UNSIGNED NULL, approved_name VARCHAR(120) NULL, approved_at DATETIME NULL, approval_note VARCHAR(400) NULL,
+  mgmt_by INT UNSIGNED NULL, mgmt_name VARCHAR(120) NULL, mgmt_at DATETIME NULL, mgmt_note VARCHAR(400) NULL,
+  note TEXT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY ux_pr_no (pr_no), KEY ix_pr_project (project_id), KEY ix_pr_sub (subproject_id), KEY ix_pr_status (status), KEY ix_pr_req (requester_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pr_lines (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  request_id INT UNSIGNED NOT NULL,
+  seq SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+  item_id INT UNSIGNED NULL,
+  description VARCHAR(255) NOT NULL,
+  maker VARCHAR(80) NULL, part_no VARCHAR(80) NULL,
+  unit VARCHAR(12) NOT NULL DEFAULT 'pcs',
+  qty DECIMAL(12,3) NOT NULL,
+  qty_reserved DECIMAL(12,3) NOT NULL DEFAULT 0,
+  qty_ordered DECIMAL(12,3) NOT NULL DEFAULT 0,
+  qty_received DECIMAL(12,3) NOT NULL DEFAULT 0,
+  qty_issued DECIMAL(12,3) NOT NULL DEFAULT 0,
+  est_price DECIMAL(12,4) NULL,
+  price_origin VARCHAR(160) NULL,
+  need_date DATE NULL,
+  note VARCHAR(255) NULL,
+  status ENUM('open','reserved','to_buy','ordered','received','issued','cancelled') NOT NULL DEFAULT 'open',
+  warehouse_id INT UNSIGNED NULL,
+  KEY ix_prl_req (request_id, seq), KEY ix_prl_item (item_id), KEY ix_prl_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+CREATE TABLE IF NOT EXISTS pr_events (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  request_id INT UNSIGNED NOT NULL,
+  event VARCHAR(24) NOT NULL,
+  user_id INT UNSIGNED NULL, user_name VARCHAR(120) NULL, ip VARCHAR(64) NULL,
+  note VARCHAR(600) NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  KEY ix_pre_req (request_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

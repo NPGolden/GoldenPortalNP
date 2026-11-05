@@ -55,6 +55,9 @@ return [
         'Withdraw cancels an open flow; the proposed values are discarded.',
       ]],
     ]],
+    ['id' => 'requisitions', 'title' => 'Asking for parts — purchase requisitions (v1.91.0)', 'body' => [
+      'If your discipline is enabled for requisitions (or you are a PM), the left menu shows Procurement › Requisitions. "+ New requisition": pick the project and sub-project, the purpose (project, stock, service call) and the date you need the parts by; create it, then add the lines — search the inventory by code or description (the picker shows the free stock) or type a free-text line with maker and part number. "Submit to Procurement" freezes the lines; Procurement checks the parts budget of the sub-project and approves (stock reserved, the rest bought), sends it to management if it is over budget, or rejects with a reason — you are notified at every step and can follow the log on the request. The warehouse issues the reserved parts to you; the request closes when every line is issued.',
+    ]],
     ['id' => 'help', 'title' => 'Help and good habits', 'body' => [
       ['ul' => ['Support › Knowledge base: ask a question, answer a colleague\'s — answers earn a badge.', 'Support › Portal requests: report a bug or propose an improvement; the developer answers with a decision and the release that carries it.', 'Keep your leave requests ahead of time — approved leave is what the PMs plan around.', 'Check Notifications once a day; the Monday digest sums up the week (celebrations, open trainings, new posts, last week\'s top three).', 'Your password and two-factor device are yours alone — never share them; sign out on shared computers.']],
     ]],

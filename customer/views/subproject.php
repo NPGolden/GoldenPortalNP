@@ -35,6 +35,8 @@ $tabs = ['process','drawings','owner','class','tests','weekly','service','issues
 if ($staff && function_exists('rk_has') && rk_has()) array_splice($tabs, array_search('comments', $tabs, true), 0, ['risks']);   // R39-001
 if ($staff && !empty($sp['vessel_id']) && function_exists('ct_has') && ct_has()) $tabs[] = 'contacts';
 if (function_exists('bg_can') && bg_can()) array_splice($tabs, array_search('reports', $tabs, true), 0, ['budget']);   // R34-001
+if ($staff && fin_visible() && ((function_exists('of_has') && of_has()) || (function_exists('pi_has') && pi_has()))) array_splice($tabs, array_search('reports', $tabs, true), 0, ['sales']);   // R80-001: Sales group — offers and proformas of the sub-project
+if ($staff && function_exists('prq_has') && prq_has() && (prq_can() || pr_can())) { array_splice($tabs, array_search('reports', $tabs, true), 0, ['procurement']); $cnt['procurement'] = prq_sub_summary($id)['open']; }   // R80-001: Procurement group — requisitions (POs, receipts in R80-003/004)
 if ($staff && function_exists('wp_has') && wp_has()) array_splice($tabs, 1, 0, ['works']);   // R35-001
 if ($staff && function_exists('eng_has') && eng_has()) { array_splice($tabs, array_search('process', $tabs, true) + 1, 0, ['engineering']); $engSt = eng_sub_state($id); if (in_array($engSt, ['exceeded','pending','warn','extended'], true)) $cnt['engineering'] = '⚠'; }   // R47-001
 if (!in_array($tab, $tabs, true)) $tab = 'process';
@@ -500,6 +502,8 @@ layout_head($sp['code'] . ' · ' . $sp['name'], 'projects');
 
 <?php /* ================================================= WORKS ========= */ elseif ($tab === 'works'): require __DIR__ . '/_works_tab.php'; ?>
 <?php /* ======================================== BUDGET & ACTUAL ======== */ elseif ($tab === 'budget'): require __DIR__ . '/_budget_tab.php'; ?>
+<?php /* ======================================== SALES (R80-001) ======== */ elseif ($tab === 'sales'): require __DIR__ . '/_sales_tab.php'; ?>
+<?php /* ======================================== PROCUREMENT (R80-001) == */ elseif ($tab === 'procurement'): require __DIR__ . '/_procurement_tab.php'; ?>
 <?php /* =============================================== REPORTS ========= */ elseif ($tab === 'reports'): ?>
 <div class="card">
   <h2><?= tt('tab.reports') ?></h2>
