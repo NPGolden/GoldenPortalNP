@@ -6653,4 +6653,6 @@ Cordiali saluti,
 'hr.bd_board_hint' => 'le voci del planning senza richiesta contano come godute',
 'hr.bd_hours' => 'tipo a ore che consuma ferie (8 h = 1 giorno)',
 'hr.bd_formula' => '{t} totale − {o} iniziale − {k} godute − {p} in attesa',
+// ---- GAS-CP-R77-014
+'hr.opening_hint' => 'Giorni già goduti prima che il portale contasse l\'anno (registri cartacei, passaggio) — sottratti dai disponibili; la modifica è registrata.',
 ];

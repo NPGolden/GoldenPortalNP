@@ -213,9 +213,10 @@ $pend = count(array_filter(hr_requests_for('hr', 0), fn($r) => (int)$r['person_i
   <?php $stY = function_exists('hr_statutory_type') && hr_type((int)$ann) ? hr_statutory_type($p, hr_type((int)$ann), $ey) : hr_statutory($p, $ey); $cur = hr_balance($p, $ann, $ey); ?>
   <h3 style="margin-top:16px;"><?= e(t('hr.override_title', ['y' => $ey])) ?> — <?= e(hr_type((int)$ann)['code'] ?? '') ?> <?= e(hr_type((int)$ann)['name'] ?? '') ?></h3>
   <form method="post" action="<?= url('hr_person', ['id' => $pid, 'tab' => 'ent', 'year' => $ey]) ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hr_ent_override"><input type="hidden" name="pid" value="<?= $pid ?>"><input type="hidden" name="tid" value="<?= (int)$ann ?>"><input type="hidden" name="year" value="<?= $ey ?>">
-    <div class="grid grid-4">
+    <div class="grid grid-5">
       <div class="field"><label><?= tt('hr.mode') ?></label><select name="mode" id="hr_mode" data-nosearch><option value="auto"<?= $cur['mode'] !== 'manual' ? ' selected' : '' ?>>🔒 <?= tt('hr.mode_auto') ?><?= $stY ? ' (' . e($fh($stY['days'])) . ')' : '' ?></option><option value="manual"<?= $cur['mode'] === 'manual' ? ' selected' : '' ?>>🔓 <?= tt('hr.mode_manual') ?></option></select></div>
       <div class="field"><label><?= tt('hr.entitled') ?> (<?= tt('hr.days') ?>)</label><input name="days" inputmode="decimal" value="<?= e($fh($cur['entitled'])) ?>"></div>
+      <div class="field"><label><?= tt('hr.opening') ?> <span class="hint" title="<?= tt('hr.opening_hint') ?>">ⓘ</span></label><input name="opening" inputmode="decimal" value="<?= e($fh($cur['opening'])) ?>"></div>
       <div class="field" style="grid-column:span 2;"><label><?= tt('hr.override_note') ?></label><div style="display:flex;gap:6px;"><input name="note" maxlength="200" placeholder="<?= tt('hr.override_ph') ?>"><button class="btn btn--gold btn--sm" type="submit"><?= tt('btn.save') ?></button></div></div>
     </div>
     <p class="hint"><?= tt('hr.override_hint') ?></p>

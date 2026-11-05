@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.87.5';
+const CP_VERSION = '1.87.6';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R77-014', 'version' => '1.87.6', 'date' => '2026-11-05', 'title' => 'Opening taken days editable in the year Edit form on the person\'s Entitlements tab (logged in the audit).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-013', 'version' => '1.87.5', 'date' => '2026-11-05', 'title' => 'HR card: Σ balance breakdown per annual-leave year — entitled, carry-over, opening, every request with its days, board-only days, hour conversions, formula; lines that are not counted say why (other year, history only, before cut-over).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-012', 'version' => '1.87.4', 'date' => '2026-11-05', 'title' => 'HR dashboard: "Contracts expiring" heading back above its list (it had drifted above the review / off-boarding / certificate blocks). Ages only for HR / Owner / CEO wherever birthdays are listed (central guard in the celebrations helper; contacts page).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-011', 'version' => '1.87.3', 'date' => '2026-11-05', 'title' => 'Audit trail card folded by default on inspection, service and function-check report pages (entry count on the summary; click to unfold).', 'db' => null, 'check' => null],

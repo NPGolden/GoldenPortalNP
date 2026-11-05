@@ -6653,4 +6653,6 @@ Best regards,
 'hr.bd_board_hint' => 'board entries without a request count as taken',
 'hr.bd_hours' => 'hour type consuming annual leave (8 h = 1 day)',
 'hr.bd_formula' => '{t} total − {o} opening − {k} taken − {p} pending',
+// ---- GAS-CP-R77-014
+'hr.opening_hint' => 'Days already taken before the portal counted this year (paper records, cut-over) — subtracted from the available days; the change is logged.',
 ];

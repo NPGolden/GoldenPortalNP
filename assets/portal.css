@@ -138,6 +138,7 @@ h3 { font-size: 14px; font-weight: 700; }
 .grid-2 { grid-template-columns: repeat(2, 1fr); }
 .grid-3 { grid-template-columns: repeat(3, 1fr); }
 .grid-4 { grid-template-columns: repeat(4, 1fr); }
+.grid-5 { grid-template-columns: repeat(5, 1fr); }
 .cols   { display: grid; gap: 20px; grid-template-columns: 3fr 2fr; align-items: start; }
 
 /* navy stat cards, as in the Figma */
@@ -290,6 +291,7 @@ tr:last-child td { border-bottom: 0; }
    Tablet ≤ 1024, phones (iOS/Android) ≤ 760.                        */
 @media (max-width: 1024px) {
   .grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .grid-5 { grid-template-columns: repeat(2, 1fr); }
   .cols   { grid-template-columns: 1fr; }
   .sheet  { padding: 22px 18px 40px; }
 }

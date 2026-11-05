@@ -100,9 +100,12 @@ function hr_entitlement_override_from_post(): void {
     $mode = ($_POST['mode'] ?? '') === 'auto' ? 'auto' : 'manual'; $days = min(2000, max(0, (float) str_replace(',', '.', (string)($_POST['days'] ?? '0')))); $note = mb_substr(trim((string)($_POST['note'] ?? '')), 0, 200) ?: null; $me = (int)(current_user()['id'] ?? 0);
     [$oldDays, $oldMode] = hr_entitlement_effective($p, $tid, $year); $st = hr_statutory($p, $year); if ($mode === 'auto') $days = $st ? (float)$st['days'] : $oldDays;
     $row = one('SELECT id FROM hr_entitlements WHERE year = ? AND type_id = ? AND (person_id = ? OR (user_id = ? AND ? > 0)) LIMIT 1', [$year, $tid, $pid, (int)($p['user_id'] ?? 0), (int)($p['user_id'] ?? 0)]);
-    if ($row) q('UPDATE hr_entitlements SET days = ?, auto = ?, override_note = ?, person_id = ?, updated_by = ? WHERE id = ?', [$days, $mode === 'auto' ? 1 : 0, $note, $pid, $me, (int)$row['id']]);
-    else q('INSERT INTO hr_entitlements (user_id, person_id, year, type_id, days, carry, auto, override_note, updated_by) VALUES (?,?,?,?,?,?,?,?,?)', [(int)($p['user_id'] ?? 0) ?: null, $pid, $year, $tid, $days, 0, $mode === 'auto' ? 1 : 0, $note, $me]);
+    $hasOpen = isset($_POST['opening']) && function_exists('hr2_has') && hr2_has();   // R77-014: opening taken days editable on the card
+    $open = $hasOpen ? min(2000, max(0, (float) str_replace(',', '.', (string)$_POST['opening']))) : null; $oldOpen = $hasOpen ? (float) (scalar('SELECT opening_taken FROM hr_entitlements WHERE id = ?', [(int)($row['id'] ?? 0)]) ?: 0) : null;
+    if ($row) q('UPDATE hr_entitlements SET days = ?, auto = ?, override_note = ?, person_id = ?, updated_by = ?' . ($hasOpen ? ', opening_taken = ?' : '') . ' WHERE id = ?', array_merge([$days, $mode === 'auto' ? 1 : 0, $note, $pid, $me], $hasOpen ? [$open] : [], [(int)$row['id']]));
+    else q('INSERT INTO hr_entitlements (user_id, person_id, year, type_id, days, carry, auto, override_note, updated_by' . ($hasOpen ? ', opening_taken' : '') . ') VALUES (?,?,?,?,?,?,?,?,?' . ($hasOpen ? ',?' : '') . ')', array_merge([(int)($p['user_id'] ?? 0) ?: null, $pid, $year, $tid, $days, 0, $mode === 'auto' ? 1 : 0, $note, $me], $hasOpen ? [$open] : []));
     hr_audit($pid, 'entitlement', hr_type($tid)['code'] . ' ' . $year, $oldDays . ' (' . $oldMode . ')', $days . ' (' . $mode . ')', $note);
+    if ($hasOpen && abs($open - $oldOpen) > 0.001) hr_audit($pid, 'opening', hr_type($tid)['code'] . ' ' . $year, (string)$oldOpen, (string)$open, $note);
 }
 /** Year roll-over: one auto row per employed person for $year (annual type), carry = min(cap, remaining of the previous year); nothing overwritten. */
 function hr_entitlements_rollover(int $year): int {

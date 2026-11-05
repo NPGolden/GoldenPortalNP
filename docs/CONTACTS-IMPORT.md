@@ -1052,3 +1052,6 @@ No SQL. `hr_dashboard.php`: the `#hr-contracts` `<h3>` moved below the HRA / off
 
 ## 208. v1.87.5 — Balance breakdown (GAS-CP-R77-013)
 No SQL. `hr2.php` `hr_balance_breakdown($p,$tid,$year)` → balance, entitlement row, counted_from, requests of the type touching the year (approved / pending) each with `counts` and `why` ∈ other_year · history (counted = 0) · before_cutover, board-only plan dates, annual-consuming hour types. `hr_person.php` Entitlements tab: Σ button per year row toggles a `#bd-<year>` row (`[data-toggle]` helper added to portal.js). Keys `hr.bd_*` ×10 ×5 (6527).
+
+## 209. v1.87.6 — Opening days on the card (GAS-CP-R77-014)
+No SQL. `hr4.php` `hr_entitlement_override_from_post()` accepts `opening` (when hr2 columns exist), writes `opening_taken`, audits field `opening`. `hr_person.php` year Edit form: Opening field (grid-5; CSS `.grid-5` added). Key `hr.opening_hint` ×5 (6528).
