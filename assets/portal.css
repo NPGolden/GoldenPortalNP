@@ -1867,3 +1867,8 @@ html[data-theme="dark"] .pp-col { background: #16263A; } html[data-theme="dark"]
 .form-grid .field { margin: 0; }
 .field--full, .kv--full { grid-column: 1 / -1; }
 @media (max-width: 760px) { .form-grid { grid-template-columns: 1fr; } }
+/* R83-001 utilization */
+.ut-bar { display: flex; height: 14px; width: 100%; background: var(--line, #EEF1F4); border-radius: 4px; overflow: hidden; }
+.ut-bar span { display: block; height: 100%; } .ut-p { background: #2F7D5C; } .ut-i { background: #1F3A5F; } .ut-a { background: #B9C3CF; } .ut-x { background: #9B2C2C; }
+.ut-key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: middle; margin: 0 2px 0 8px; }
+:root[data-theme="dark"] .ut-bar { background: rgba(255, 255, 255, .1); }
