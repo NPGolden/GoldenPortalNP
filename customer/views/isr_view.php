@@ -98,7 +98,7 @@ layout_head(t('isr.title') . ' ' . $r['report_no'], $staff ? 'projects' : 'repor
         <div><h3 class="ac-h"><?= tt('isr.actions') ?></h3><?= $it['actions'] ? rt_html($it['actions']) : '<p>—</p>' ?></div>
       </div>
       <?php if ($it['files']): ?>
-        <div class="fsr-photos" style="margin-top:10px;"><?php foreach ($it['files'] as $f): ?><figure><a href="<?= url('file', ['id' => $f['id']]) ?>" target="_blank"><?php if ($f['is_image']): ?><img src="<?= url('file', ['id' => $f['id']]) ?>" alt=""><?php else: ?><div class="isr-doc">📄<br><span><?= e(mb_substr((string)$f['original_name'], 0, 28)) ?></span></div><?php endif; ?></a><figcaption><?= $f['is_image'] ? '<strong>Figure ' . (int)$f['figure'] . '</strong>' : '<strong>' . tt('isr.doc') . '</strong>' ?><?= $f['title'] ? ' — ' . e($f['title']) : '' ?></figcaption></figure><?php endforeach; ?></div>
+        <div class="fsr-photos" style="margin-top:10px;"><?php foreach ($it['files'] as $f): ?><figure><a href="<?= url('file', ['id' => $f['id']]) ?>" target="_blank"><?php if ($f['is_image']): ?><img src="<?= url('file', ['id' => $f['id'], 'thumb' => 1]) ?>" alt="" loading="lazy" decoding="async"><?php else: ?><div class="isr-doc">📄<br><span><?= e(mb_substr((string)$f['original_name'], 0, 28)) ?></span></div><?php endif; ?></a><figcaption><?= $f['is_image'] ? '<strong>Figure ' . (int)$f['figure'] . '</strong>' : '<strong>' . tt('isr.doc') . '</strong>' ?><?= $f['title'] ? ' — ' . e($f['title']) : '' ?></figcaption></figure><?php endforeach; ?></div>
       <?php endif; ?>
     </div>
   <?php endforeach; if (!$r['items']): ?><p class="hint"><?= tt('isr.no_systems') ?></p><?php endif; ?>

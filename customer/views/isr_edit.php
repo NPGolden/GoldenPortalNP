@@ -83,7 +83,8 @@ layout_head($title, 'projects');
 
   <div class="card">
     <h2><?= tt('isr.systems') ?></h2>
-    <p class="hint"><?= tt('isr.systems_hint') ?></p>
+    <p class="hint"><?= tt('isr.systems_hint') ?> <?= tt('isr.systems_fold_hint') ?></p>
+    <div class="isr-index" id="isr-index"><div class="btn-row" style="gap:6px;flex-wrap:wrap;align-items:center;"><button type="button" class="btn btn--ghost btn--sm js-exp-all">▾ <?= tt('isr.expand_all') ?></button><button type="button" class="btn btn--ghost btn--sm js-col-all">▸ <?= tt('isr.collapse_all') ?></button><span class="hint" id="isr-index-list"></span></div></div>
     <?php
     /* one system block; $i is the form index (any integer), $it the stored item or null */
     $sysBlock = function (int $i, ?array $it) use ($systems, $levels, $sel): void {
@@ -91,8 +92,8 @@ layout_head($title, 'projects');
         $name = (string)($it['system_name'] ?? ''); $sysId = (int)($it['system_id'] ?? 0);
         $known = false; foreach ($systems as $s) if (($sysId && $s['id'] === $sysId) || (!$sysId && strcasecmp($s['name'], $name) === 0)) { $known = true; break; }
         $pick = $it ? ($known ? ($sysId ? 'id:' . $sysId : 'n:' . $name) : '__other') : ''; ?>
-      <details class="fsr-work isr-sys" open data-task="<?= $i ?>">
-        <summary><span class="fsr-task-no"><?= e(t('isr.system_n', ['n' => '#'])) ?></span><span class="hint js-sum"><?= $name !== '' ? ' — ' . e($name) : '' ?></span>
+      <details class="fsr-work isr-sys"<?= !$it ? ' open' : '' ?> data-task="<?= $i ?>">
+        <summary><span class="fsr-task-no"><?= e(t('isr.system_n', ['n' => '#'])) ?></span><span class="hint js-sum"><?= $name !== '' ? ' — ' . e($name) : '' ?></span><?php if ($files): ?> <span class="pill pill--mute js-nph">📷 <?= count($files) ?></span><?php endif; ?><?php if (!empty($it['risk_level'])): ?> <?= isr_risk_pill((string)$it['risk_level']) ?><?php endif; ?>
           <button class="btn btn--ghost btn--sm btn--danger-ghost js-del-task" type="button" title="<?= tt('isr.del_system') ?>">✕ <?= tt('isr.del_system') ?></button></summary>
         <input type="hidden" name="it_orig[<?= $i ?>]" value="<?= (int)($it['seq'] ?? 0) ?>">
         <div class="grid grid-2">
@@ -125,7 +126,7 @@ layout_head($title, 'projects');
           <?php if ($files): ?>
             <div class="fsr-photos">
               <?php foreach ($files as $f): ?>
-                <figure><?php if ($f['is_image']): ?><img src="<?= url('file', ['id' => $f['id']]) ?>" alt=""><?php else: ?><div class="isr-doc">📄<br><span><?= e(mb_substr((string)$f['original_name'], 0, 28)) ?></span></div><?php endif; ?>
+                <figure><?php if ($f['is_image']): ?><a href="<?= url('file', ['id' => $f['id']]) ?>" target="_blank"><img src="<?= url('file', ['id' => $f['id'], 'thumb' => 1]) ?>" alt="" loading="lazy" decoding="async"></a><?php else: ?><div class="isr-doc">📄<br><span><?= e(mb_substr((string)$f['original_name'], 0, 28)) ?></span></div><?php endif; ?>
                   <figcaption><input name="file_caption[<?= (int)$f['id'] ?>]" maxlength="160" value="<?= e($f['title'] ?? '') ?>" placeholder="<?= $f['is_image'] ? e(t('fsr.caption_ph', ['n' => $f['figure']])) : tt('isr.caption_doc') ?>">
                     <button class="btn btn--ghost btn--sm btn--danger-ghost" type="submit" name="del_file" value="<?= (int)$f['id'] ?>" formnovalidate title="<?= tt('btn.delete') ?>">✕</button></figcaption></figure>
               <?php endforeach; ?>
@@ -230,6 +231,16 @@ layout_head($title, 'projects');
   });
   form.querySelectorAll('summary').forEach(function (sm) { sm.addEventListener('keydown', function (e) { if (e.target.closest('.js-del-task') && (e.key === ' ' || e.key === 'Enter')) e.stopPropagation(); }); });
   renumber();
+  /* R77-009: systems are folded; the index strip opens one for editing (others fold), expand / collapse all */
+  var idx = document.getElementById('isr-index-list');
+  function buildIndex() { if (!idx) return; idx.innerHTML = ''; Array.prototype.forEach.call(form.querySelectorAll('details.isr-sys'), function (d, n) { var b = document.createElement('button'); b.type = 'button'; b.className = 'btn btn--sm ' + (d.open ? 'btn--gold' : 'btn--ghost'); var nm = (d.querySelector('.js-sum') || {}).textContent || ''; var ph = d.querySelector('.js-nph'); b.textContent = (n + 1) + (nm ? nm : '') + (ph ? ' ' + ph.textContent : ''); b.title = nm.replace(/^ — /, ''); b.addEventListener('click', function () { var was = d.open; form.querySelectorAll('details.isr-sys').forEach(function (x) { x.open = false; }); d.open = !was; buildIndex(); if (d.open) d.scrollIntoView({ behavior: 'smooth', block: 'start' }); }); idx.appendChild(b); }); }
+  form.addEventListener('toggle', function () { buildIndex(); }, true);
+  form.addEventListener('input', function (e) { if (e.target.classList.contains('js-sys') || e.target.classList.contains('js-sysname')) buildIndex(); });
+  var ea = form.querySelector('.js-exp-all'), ca = form.querySelector('.js-col-all');
+  if (ea) ea.addEventListener('click', function () { form.querySelectorAll('details.isr-sys').forEach(function (x) { x.open = true; }); buildIndex(); });
+  if (ca) ca.addEventListener('click', function () { form.querySelectorAll('details.isr-sys').forEach(function (x) { x.open = false; }); buildIndex(); });
+  var obs = new MutationObserver(function () { buildIndex(); }); obs.observe(endMark.parentNode, { childList: true });
+  buildIndex();
 })();
 </script>
 <?php layout_foot(); ?>

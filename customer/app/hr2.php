@@ -210,6 +210,11 @@ function hr_request_doc_upload(int $id, ?array $file): void {
     q('UPDATE hr_requests SET doc_name = ?, doc_path = ?, doc_sha = ?, doc_due = NULL WHERE id = ?', [$doc['name'], $doc['path'], $doc['sha'], $id]);
     if ((int)$r['user_id'] === (int)$u['id']) hr_notify($id, 'doc');
 }
+/** R77-008: requests of a person that still lack their supporting document — a medical certificate with a due date, or a type that requires a document filed without one. */
+function hr_missing_docs(int $personId): array {
+    if (!$personId) return []; $due = hr_req_has_reasons() ? ', r.doc_due' : ', NULL AS doc_due';
+    return all("SELECT r.id, r.type_id, r.date_from, r.date_to, r.status, r.reason_code{$due}, t.code, t.name AS type_name, DATEDIFF(COALESCE(" . (hr_req_has_reasons() ? 'r.doc_due' : 'NULL') . ", CURDATE()), CURDATE()) AS days_left FROM hr_requests r JOIN hr_leave_types t ON t.id = r.type_id WHERE r.person_id = ? AND r.doc_path IS NULL AND r.status IN ('pending_mgr','pending_hr','approved') AND (" . (hr_req_has_reasons() ? 'r.doc_due IS NOT NULL OR ' : '') . "t.needs_doc = 1) AND r.date_from >= DATE_SUB(CURDATE(), INTERVAL 1 YEAR) ORDER BY r.date_from DESC", [$personId]);
+}
 /** Certificates still due (for the HR dashboard and the daily reminder). */
 function hr_doc_due_rows(?int $personId = null): array {
     if (!hr_req_has_reasons()) return []; $w = "r.doc_path IS NULL AND r.doc_due IS NOT NULL AND r.status IN ('pending_mgr','pending_hr','approved')"; $a = []; if ($personId) { $w .= ' AND r.person_id = ?'; $a[] = $personId; }

@@ -355,6 +355,23 @@ function files_list(string $field): array {
     return $out;
 }
 
+/** R77-009: a cached 480 px JPEG of an image (storage/thumbs/<id>.jpg); null when GD cannot read it — the caller then streams the original. */
+function cp_thumb_path(array $f, string $path, int $max = 480): ?string {
+    if (!function_exists('imagecreatefromstring') || filesize($path) > 40 * 1048576) return null;
+    $dir = cp_storage() . '/thumbs'; if (!is_dir($dir)) @mkdir($dir, 0750, true); $tp = $dir . '/' . (int)$f['id'] . '.jpg';
+    if (is_file($tp) && filemtime($tp) >= filemtime($path)) return $tp;
+    try {
+        $info = @getimagesize($path); if (!$info || $info[0] <= 0) return null; [$w, $h] = $info;
+        if ($w <= $max && $h <= $max && filesize($path) < 300000) return null;   // small enough already
+        $src = @imagecreatefromstring((string)file_get_contents($path)); if (!$src) return null;
+        $r = min(1, $max / max($w, $h)); $nw = max(1, (int)round($w * $r)); $nh = max(1, (int)round($h * $r));
+        $dst = imagecreatetruecolor($nw, $nh); imagefill($dst, 0, 0, imagecolorallocate($dst, 255, 255, 255)); imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+        // keep EXIF orientation of phone photos
+        if (function_exists('exif_read_data') && $info[2] === IMAGETYPE_JPEG) { $ex = @exif_read_data($path); $o = (int)($ex['Orientation'] ?? 1); if (in_array($o, [3, 6, 8], true)) { $dst = imagerotate($dst, [3 => 180, 6 => -90, 8 => 90][$o], 0); } }
+        imagejpeg($dst, $tp, 78); imagedestroy($dst); imagedestroy($src);
+        return is_file($tp) ? $tp : null;
+    } catch (Throwable $e) { return null; }
+}
 /** Stream a stored file after an access check. */
 function cp_stream_file(int $fileId): void {
     $f = one('SELECT f.*, p.customer_id FROM sp_files f JOIN projects p ON p.id = f.project_id WHERE f.id = ?', [$fileId]);
@@ -367,6 +384,7 @@ function cp_stream_file(int $fileId): void {
     }
     $path = cp_storage() . '/' . $f['stored_name'];
     if (!is_file($path)) { http_response_code(404); exit('File missing'); }
+    if (!empty($_GET['thumb']) && str_starts_with($f['mime_type'], 'image/') && ($tp = cp_thumb_path($f, $path))) { $path = $tp; $f['mime_type'] = 'image/jpeg'; }   // R77-009: 480 px thumbnail for grids
     header('Content-Type: ' . $f['mime_type']);
     header('Content-Length: ' . filesize($path));
     header('Cache-Control: private, max-age=600');

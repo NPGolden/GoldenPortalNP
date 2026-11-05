@@ -6627,4 +6627,12 @@ Cordiali saluti,
 'hr.rs_school' => 'Scuola del figlio',
 'hr.rs_prenatal' => 'Esami prenatali',
 'hr.rs_strike' => 'Sciopero',
+// ---- GAS-CP-R77-008 missing documents
+'hr.missing_docs' => '{n} documento/i giustificativo/i mancante/i',
+'hr.missing_docs_hint' => 'caricarli dalla richiesta qui sotto (certificato, invito, convocazione …)',
+'hr.doc_required_s' => 'documento richiesto',
+// ---- GAS-CP-R77-009
+'isr.systems_fold_hint' => 'I sistemi partono chiusi: dalla barra indice aprirne uno per la modifica — aprirne uno chiude gli altri; ▾ / ▸ apri o chiudi tutti.',
+'isr.expand_all' => 'Apri tutti i sistemi',
+'isr.collapse_all' => 'Chiudi tutti i sistemi',
 ];

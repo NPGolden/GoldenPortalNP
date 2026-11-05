@@ -137,7 +137,7 @@ layout_head($title, 'projects');
           <?php if ($photos): ?>
             <div class="fsr-photos">
               <?php foreach ($photos as $ph): ?>
-                <figure><img src="<?= url('file', ['id' => $ph['id']]) ?>" alt="">
+                <figure><img src="<?= url('file', ['id' => $ph['id'], 'thumb' => 1]) ?>" alt="" loading="lazy" decoding="async">
                   <figcaption><input name="photo_caption[<?= (int)$ph['id'] ?>]" maxlength="160" value="<?= e($ph['title'] ?? '') ?>" placeholder="<?= e(t('fsr.caption_ph', ['n' => $ph['figure']])) ?>">
                     <button class="btn btn--ghost btn--sm btn--danger-ghost" type="submit" name="del_photo" value="<?= (int)$ph['id'] ?>" formnovalidate title="<?= tt('btn.delete') ?>">✕</button></figcaption></figure>
               <?php endforeach; ?>

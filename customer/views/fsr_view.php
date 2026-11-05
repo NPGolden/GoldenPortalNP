@@ -100,7 +100,7 @@ layout_head(t('fsr.title') . ' ' . $r['report_no'], $staff ? 'projects' : 'repor
         <tbody><?php foreach ($wk['lines'] as $ln): ?><tr><td><?= e($ln['engineer'] ?: $ln['remarks']) ?></td><td><?= e($ln['specialty']) ?></td><td class="num"><?= e(fsr_fmt_time($ln['start_time'])) ?></td><td class="num"><?= e(fsr_fmt_time($ln['end_time'])) ?></td><td class="num"><?= e($ln['time_type']) ?></td><td class="num"><?= e(fsr_fmt_hours((float)$ln['hours'])) ?></td></tr><?php endforeach; ?></tbody></table>
       <?php endif; ?>
       <?php if ($wk['photos']): ?>
-        <div class="fsr-photos" style="margin-top:10px;"><?php foreach ($wk['photos'] as $ph): ?><figure><a href="<?= url('file', ['id' => $ph['id']]) ?>" target="_blank"><img src="<?= url('file', ['id' => $ph['id']]) ?>" alt=""></a><figcaption><strong>Figure <?= (int)$ph['figure'] ?></strong><?= $ph['title'] ? ' — ' . e($ph['title']) : '' ?></figcaption></figure><?php endforeach; ?></div>
+        <div class="fsr-photos" style="margin-top:10px;"><?php foreach ($wk['photos'] as $ph): ?><figure><a href="<?= url('file', ['id' => $ph['id']]) ?>" target="_blank"><img src="<?= url('file', ['id' => $ph['id'], 'thumb' => 1]) ?>" alt="" loading="lazy" decoding="async"></a><figcaption><strong>Figure <?= (int)$ph['figure'] ?></strong><?= $ph['title'] ? ' — ' . e($ph['title']) : '' ?></figcaption></figure><?php endforeach; ?></div>
       <?php endif; ?>
     </div>
   <?php endforeach; if (!$r['works']): ?><p class="hint">—</p><?php endif; ?>

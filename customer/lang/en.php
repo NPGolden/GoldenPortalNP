@@ -6627,4 +6627,12 @@ Best regards,
 'hr.rs_school' => 'School of the child',
 'hr.rs_prenatal' => 'Prenatal examinations',
 'hr.rs_strike' => 'Strike',
+// ---- GAS-CP-R77-008 missing documents
+'hr.missing_docs' => '{n} supporting document(s) missing',
+'hr.missing_docs_hint' => 'upload them from the request below (certificate, invitation, summons …)',
+'hr.doc_required_s' => 'document required',
+// ---- GAS-CP-R77-009
+'isr.systems_fold_hint' => 'Systems start folded: use the index strip to open one for editing — opening one folds the others; ▾ / ▸ expand or collapse all.',
+'isr.expand_all' => 'Expand all systems',
+'isr.collapse_all' => 'Collapse all systems',
 ];
