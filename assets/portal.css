@@ -1861,3 +1861,9 @@ html[data-theme="dark"] .pp-col { background: #16263A; } html[data-theme="dark"]
 /* GAS-CP-R79-001 — Inventory */
 .inv-list td.mono { white-space: nowrap; } .inv-move .field { margin: 0 0 8px; }
 .pr-disc { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 12px; } .pr-disc label { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; }
+
+/* R80: procurement forms — two-column field grid, full-width fields, kv full row */
+.form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 16px; }
+.form-grid .field { margin: 0; }
+.field--full, .kv--full { grid-column: 1 / -1; }
+@media (max-width: 760px) { .form-grid { grid-template-columns: 1fr; } }

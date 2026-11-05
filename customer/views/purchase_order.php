@@ -13,7 +13,9 @@ $projects = all("SELECT id, project_code, name FROM projects WHERE status IN ('a
 $subs = all("SELECT sp.id, sp.project_id, sp.code, sp.name FROM subprojects sp WHERE sp.status IN ('active','quoted','onhold') OR sp.id = ? ORDER BY sp.sort_order, sp.code LIMIT 1500", [(int)($o['subproject_id'] ?? 0)]);
 $preP = (int)($_GET['project_id'] ?? ($o['project_id'] ?? 0)); $preS = (int)($_GET['subproject_id'] ?? ($o['subproject_id'] ?? 0)); $preSup = (int)($_GET['supplier_id'] ?? ($o['supplier_id'] ?? 0));
 $back = url('purchase_orders', ['tab' => $isRfq ? 'rfq' : 'po']); $self = url('purchase_order', ['id' => $id]);
-$late = $o && $o['delivery_date'] && in_array($o['status'], PO_OPEN, true) && $o['delivery_date'] < date('Y-m-d');
+$r4 = function_exists('po_r4') && po_r4(); $expected = $o ? ($r4 ? ($o['expected_date'] ?: $o['delivery_date']) : $o['delivery_date']) : null;
+$late = $o && $expected && in_array($o['status'], PO_OPEN, true) && $expected < date('Y-m-d');
+$wh = function_exists('pr_wh') && pr_wh(); $receipts = $o && $r4 ? po_receipts($id) : []; $ncrs = $o && $r4 ? po_ncr_open($id) : []; $lcosts = $o && $r4 && !$isRfq ? po_costs($id) : []; $timeline = $o && $r4 && !$isRfq && $o['status'] !== 'draft' ? po_timeline($o) : [];
 layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . ' · ' . t('po.title'), 'purchase_orders');
 ?>
 <style>.prq-pick{position:relative}.prq-list{position:absolute;left:0;right:0;top:100%;z-index:20;background:var(--card,#fff);border:1px solid var(--line,#d9dee5);border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:280px;overflow:auto}.prq-opt{padding:7px 10px;cursor:pointer;border-bottom:1px solid var(--line,#eef1f5);font-size:.92em}.prq-opt:hover{background:var(--navy-soft,#eef2f8)}.prq-opt small{color:var(--muted,#6b7280);display:block}.alts{margin:6px 0 0;padding:6px 10px;border:1px dashed var(--gold,#c9a227);border-radius:8px;font-size:.9em}.alts button{margin:2px 4px 2px 0}</style>
@@ -34,12 +36,12 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
 <div class="kpi kpi--4" style="margin-bottom:10px;">
   <div class="stat gold"><b><?= e($m((float)$o['subtotal'])) ?></b><?= tt('po.net') ?><span class="s"><?= (float)$o['vat_pct'] > 0 ? e(t('po.vat_line', ['p' => rtrim(rtrim(number_format((float)$o['vat_pct'], 2, '.', ''), '0'), '.'), 'v' => $m((float)$o['vat_total'])])) : tt('po.no_vat') ?></span></div>
   <div class="stat"><b><?= e($m((float)$o['gross_total'])) ?></b><?= tt('po.gross') ?><span class="s"><?= $o['terms_days'] !== null ? e(t('po.terms_days_v', ['n' => (int)$o['terms_days']])) . ((float)$o['advance_pct'] > 0 ? ' · ' . e(t('po.advance_v', ['p' => rtrim(rtrim(number_format((float)$o['advance_pct'], 2, '.', ''), '0'), '.')])) : '') : tt('po.terms_none') ?></span></div>
-  <div class="stat<?= $late ? ' red' : '' ?>"><b><?= fmt_date($o['delivery_date']) ?></b><?= tt('po.delivery') ?><span class="s"><?= e($o['incoterms'] ?: '') ?><?= $o['warehouse'] ? ' · ' . e($o['warehouse']) : '' ?></span></div>
+  <div class="stat<?= $late ? ' red' : '' ?>"><b><?= fmt_date($expected) ?></b><?= $r4 && $o['expected_date'] && $o['expected_date'] !== $o['delivery_date'] ? tt('po.expected') : tt('po.delivery') ?><span class="s"><?= e($o['incoterms'] ?: '') ?><?= $o['warehouse'] ? ' · ' . e($o['warehouse']) : '' ?><?= $r4 && (float)$o['logistics_total'] > 0 ? ' · ' . e(t('po.landed', ['v' => $m((float)$o['subtotal'] + (float)$o['logistics_total'])])) : '' ?></span></div>
   <div class="stat"><b><?= count(array_filter($lines, fn($l) => $l['status'] !== 'cancelled')) ?></b><?= tt('prq.lines') ?><span class="s"><?= $isRfq ? tt('po.rfq_lines_hint') : e(t('po.received_n', ['n' => count(array_filter($lines, fn($l) => $l['status'] === 'received'))])) ?></span></div>
 </div>
 <?php endif; ?>
 
-<div class="grid-2">
+<div class="grid grid-2">
 <div class="card">
   <h2><?= tt('po.header') ?></h2>
   <?php if ($edit): ?>
@@ -79,6 +81,7 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
   <h3 style="margin-top:12px;"><?= tt('po.confirm_title') ?></h3>
   <form method="post" action="<?= $self ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="po_confirm"><input type="hidden" name="id" value="<?= $id ?>">
     <div class="form-grid"><div class="field"><label><?= tt('po.supplier_ref') ?></label><input name="supplier_ref" maxlength="80" value="<?= e($o['supplier_ref'] ?? '') ?>"></div><div class="field"><label><?= tt('po.delivery') ?></label><input name="delivery_date" type="date" value="<?= e($o['delivery_date'] ?? '') ?>"></div><div class="field field--full"><label><?= tt('prq.note') ?></label><input name="note" maxlength="400"></div></div>
+    <?php if ($r4): ?><p class="hint" style="margin:6px 0 2px;"><?= tt('po.promised_hint') ?></p><div class="form-grid"><?php foreach ($lines as $l): if ($l['status'] === 'cancelled') continue; ?><div class="field"><label>#<?= (int)$l['seq'] ?> · <?= e(mb_substr($l['description'], 0, 28)) ?></label><input name="promised[<?= (int)$l['id'] ?>]" type="date" value="<?= e($l['promised_date'] ?? po_line_expected($o, $l) ?? '') ?>"></div><?php endforeach; ?></div><?php endif; ?>
     <div class="btn-row"><button class="btn btn--sm" type="submit">✓ <?= tt('po.confirm') ?></button></div>
   </form>
   <?php endif; ?>
@@ -105,7 +108,7 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
     <?php endif; endif; ?></div>
   <?php if ($isRfq && $admin && in_array($o['status'], ['sent', 'quoted'], true)): ?><form method="post" action="<?= $self ?>" data-lock id="quote-form"><?= csrf_field() ?><input type="hidden" name="action" value="po_quote"><input type="hidden" name="id" value="<?= $id ?>"><?php endif; ?>
   <table class="tbl tbl--wrap">
-    <thead><tr><th>#</th><th><?= tt('prq.item') ?></th><th><?= tt('prq.desc') ?></th><th class="num"><?= tt('prq.qty') ?></th><?php if ($priced || $isRfq): ?><th class="num"><?= tt('po.unit_price') ?></th><th class="num"><?= tt('po.disc') ?></th><th class="num"><?= tt('po.line_total') ?></th><?php endif; ?><th><?= tt('po.lead') ?></th><th><?= tt('prq.need') ?></th><?php if (!$isRfq): ?><th class="num"><?= tt('po.received') ?></th><?php endif; ?><th><?= tt('prq.status') ?></th><th></th></tr></thead>
+    <thead><tr><th>#</th><th><?= tt('prq.item') ?></th><th><?= tt('prq.desc') ?></th><th class="num"><?= tt('prq.qty') ?></th><?php if ($priced || $isRfq): ?><th class="num"><?= tt('po.unit_price') ?></th><th class="num"><?= tt('po.disc') ?></th><th class="num"><?= tt('po.line_total') ?></th><?php endif; ?><th><?= tt('po.lead') ?></th><th><?= tt('prq.need') ?></th><?php if (!$isRfq): ?><th><?= tt('po.expected') ?></th><th class="num"><?= tt('po.received') ?></th><?php endif; ?><th><?= tt('prq.status') ?></th><th></th></tr></thead>
     <tbody>
     <?php if (!$lines): ?><tr><td colspan="13" class="hint"><?= tt('po.no_lines') ?></td></tr><?php endif; ?>
     <?php foreach ($lines as $l): $quoting = $isRfq && $admin && in_array($o['status'], ['sent', 'quoted'], true) && $l['status'] !== 'cancelled'; ?>
@@ -121,7 +124,7 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
         <?php endif; ?>
         <td><?php if ($quoting): ?><input name="lead[<?= (int)$l['id'] ?>]" type="number" min="0" max="999" value="<?= e((string)($l['lead_days'] ?? '')) ?>" style="width:4.5em;"> <?= tt('po.days') ?><?php else: ?><?= $l['lead_days'] !== null ? (int)$l['lead_days'] . ' ' . tt('po.days') : '—' ?><?php endif; ?></td>
         <td><?= fmt_date($l['need_date']) ?></td>
-        <?php if (!$isRfq): ?><td class="num"><?= (float)$l['qty_received'] > 0 ? stk_qty((float)$l['qty_received']) . ((float)$l['qty_accepted'] < (float)$l['qty_received'] ? ' <small class="hint">(' . stk_qty((float)$l['qty_accepted']) . ' ✓)</small>' : '') : '—' ?></td><?php endif; ?>
+        <?php if (!$isRfq): $lex = $r4 ? po_line_expected($o, $l) : null; $llate = $lex && in_array($l['status'], ['open', 'partial'], true) && in_array($o['status'], PO_OPEN, true) && $lex < date('Y-m-d'); ?><td<?= $llate ? ' style="color:var(--red)"' : '' ?>><?= fmt_date($lex) ?><?= $l['promised_date'] ? ' <small class="hint" title="' . tt('po.promised') . '">✓</small>' : '' ?></td><td class="num"><?= (float)$l['qty_received'] > 0 ? stk_qty((float)$l['qty_received']) . ((float)$l['qty_accepted'] < (float)$l['qty_received'] ? ' <small class="hint">(' . stk_qty((float)$l['qty_accepted']) . ' ✓)</small>' : '') : '—' ?></td><?php endif; ?>
         <td><?= pill(match ($l['status']) { 'received' => 'ok', 'partial' => 'gold', 'cancelled' => 'mute', default => 'navy' }, t('po.l_' . $l['status'])) ?></td>
         <td class="num" style="white-space:nowrap;"><?php if ($edit): ?><button class="btn btn--ghost btn--sm" type="button" data-edit-line='<?= e(json_encode(['id' => (int)$l['id'], 'item_id' => (int)$l['item_id'], 'alt_of' => (int)$l['alt_of_item_id'], 'code' => $l['item_code'], 'description' => $l['description'], 'maker' => $l['maker'], 'part_no' => $l['part_no'], 'unit' => $l['unit'], 'qty' => (float)$l['qty'], 'unit_price' => $l['unit_price'], 'discount_pct' => (float)$l['discount_pct'], 'lead_days' => $l['lead_days'], 'need_date' => $l['need_date'], 'note' => $l['note']])) ?>'>✎</button><form method="post" action="<?= $self ?>" style="display:inline" data-lock onsubmit="return confirm(<?= e(json_encode(t('prq.del_line_q'))) ?>)"><?= csrf_field() ?><input type="hidden" name="action" value="po_line_del"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="line_id" value="<?= (int)$l['id'] ?>"><button class="btn btn--ghost btn--sm" type="submit">🗑</button></form><?php endif; ?></td>
       </tr>
@@ -166,6 +169,108 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
   </script>
   <?php endif; ?>
 </div>
+
+<?php if ($o && $r4 && !$isRfq && $o['status'] !== 'draft'): ?>
+<div class="grid grid-2">
+<div class="card" id="timeline">
+  <h2>🚚 <?= tt('po.timeline') ?></h2><p class="hint"><?= tt('po.timeline_lede') ?></p>
+  <table class="tbl tbl--wrap"><thead><tr><th><?= tt('po.milestone') ?></th><th><?= tt('po.planned') ?></th><th><?= tt('po.actual') ?></th><th><?= tt('po.details') ?></th><th></th></tr></thead><tbody>
+  <?php foreach ($timeline as $tl): $mm = $tl['m']; ?>
+    <tr<?= $tl['actual'] ? ' style="background:var(--ok-soft,rgba(46,125,50,.06))"' : '' ?>>
+      <td><b><?= tt('po.m_' . $tl['kind']) ?></b><?= isset($tl['n']) && $tl['n'] ? ' <span class="pill pill--navy">' . (int)$tl['n'] . '</span>' : '' ?></td>
+      <td<?= $tl['late'] ? ' style="color:var(--red)"' : '' ?>><?= fmt_date($tl['planned']) ?><?= $tl['late'] ? ' <small>' . tt('po.late') . '</small>' : '' ?></td>
+      <td><?= $tl['actual'] ? '<b>' . fmt_date($tl['actual']) . '</b>' : '—' ?></td>
+      <td><?php if ($mm): ?><?= e(trim(implode(' · ', array_filter([$mm['carrier'], $mm['tracking'], $mm['ref'], $mm['packages'] ? $mm['packages'] . ' ' . t('po.packages') : '', $mm['weight_kg'] ? $mm['weight_kg'] . ' kg' : '', $mm['note']])))) ?><?= $mm['file_id'] ? ' <a href="' . url('file', ['id' => (int)$mm['file_id']]) . '" target="_blank">📎</a>' : '' ?><?php endif; ?></td>
+      <td class="num"><?php if (!$tl['fixed'] && $admin && in_array($o['status'], PO_OPEN, true)): ?><button class="btn btn--ghost btn--sm" type="button" data-ms='<?= e(json_encode(['kind' => $tl['kind'], 'planned' => $tl['planned'], 'actual' => $tl['actual'], 'carrier' => $mm['carrier'] ?? '', 'tracking' => $mm['tracking'] ?? '', 'ref' => $mm['ref'] ?? '', 'packages' => $mm['packages'] ?? '', 'weight' => $mm['weight_kg'] ?? '', 'note' => $mm['note'] ?? ''])) ?>'>✎</button><?php endif; ?></td>
+    </tr>
+  <?php endforeach; ?>
+  </tbody></table>
+  <?php if ($admin && in_array($o['status'], PO_OPEN, true)): ?>
+  <form method="post" action="<?= $self ?>#timeline" enctype="multipart/form-data" data-lock id="ms-form" style="margin-top:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="po_milestone"><input type="hidden" name="id" value="<?= $id ?>">
+    <div class="form-grid">
+      <div class="field"><label><?= tt('po.milestone') ?></label><select name="kind" id="ms-kind"><?php foreach (PO_MILESTONES as $k): ?><option value="<?= $k ?>"><?= tt('po.m_' . $k) ?></option><?php endforeach; ?></select></div>
+      <div class="field"><label><?= tt('po.planned') ?></label><input name="planned_date" id="ms-planned" type="date"></div>
+      <div class="field"><label><?= tt('po.actual') ?></label><input name="actual_date" id="ms-actual" type="date"></div>
+      <div class="field"><label><?= tt('po.carrier') ?></label><input name="carrier" id="ms-carrier" maxlength="120" placeholder="DHL, DSV, …"></div>
+      <div class="field"><label><?= tt('po.tracking') ?></label><input name="tracking" id="ms-tracking" maxlength="120" placeholder="AWB / B/L / tracking"></div>
+      <div class="field"><label><?= tt('po.ref') ?></label><input name="ref" id="ms-ref" maxlength="120" placeholder="<?= tt('po.ref_ph') ?>"></div>
+      <div class="field"><label><?= tt('po.packages') ?></label><input name="packages" id="ms-packages" type="number" min="0"></div>
+      <div class="field"><label><?= tt('po.weight') ?></label><input name="weight_kg" id="ms-weight" type="number" step="0.01" min="0"></div>
+      <div class="field field--full"><label><?= tt('prq.note') ?></label><input name="note" id="ms-note" maxlength="400"></div>
+      <div class="field field--full"><label><?= tt('po.doc') ?></label><input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.docx"></div>
+    </div>
+    <div class="btn-row"><button class="btn btn--sm" type="submit">💾 <?= tt('po.save_milestone') ?></button></div>
+  </form>
+  <script>document.querySelectorAll('[data-ms]').forEach(function(b){b.addEventListener('click',function(){var d=JSON.parse(b.getAttribute('data-ms'));var g=function(i,v){var el=document.getElementById(i);if(el)el.value=v==null?'':v;};g('ms-kind',d.kind);g('ms-planned',d.planned);g('ms-actual',d.actual);g('ms-carrier',d.carrier);g('ms-tracking',d.tracking);g('ms-ref',d.ref);g('ms-packages',d.packages);g('ms-weight',d.weight);g('ms-note',d.note);document.getElementById('ms-form').scrollIntoView({behavior:'smooth',block:'center'});});});</script>
+  <?php endif; ?>
+</div>
+
+<div class="card" id="costs">
+  <h2>🧾 <?= tt('po.lcosts') ?></h2><p class="hint"><?= tt('po.lcosts_lede') ?></p>
+  <table class="tbl tbl--wrap"><thead><tr><th><?= tt('po.c_date') ?></th><th><?= tt('po.c_kind') ?></th><th><?= tt('po.provider') ?></th><th><?= tt('po.ref') ?></th><th class="num"><?= tt('po.amount') ?></th><th></th></tr></thead><tbody>
+  <?php if (!$lcosts): ?><tr><td colspan="6" class="hint"><?= tt('po.no_lcosts') ?></td></tr><?php endif; ?>
+  <?php foreach ($lcosts as $c): ?><tr><td><?= fmt_date($c['cost_date']) ?></td><td><?= tt('po.c_' . $c['kind']) ?><?= $c['note'] ? '<br><small class="hint">' . e($c['note']) . '</small>' : '' ?></td><td><?= e($c['provider'] ?? '') ?></td><td><?= e($c['ref'] ?? '') ?><?= $c['file_id'] ? ' <a href="' . url('file', ['id' => (int)$c['file_id']]) . '" target="_blank">📎</a>' : '' ?></td><td class="num"><?= e(po_money((float)$c['amount'], $c['currency'])) ?></td><td class="num"><?php if ($admin && !in_array($o['status'], ['closed', 'cancelled'], true)): ?><form method="post" action="<?= $self ?>#costs" style="display:inline" data-lock onsubmit="return confirm(<?= e(json_encode(t('po.del_cost_q'))) ?>)"><?= csrf_field() ?><input type="hidden" name="action" value="po_cost_del"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="cost_id" value="<?= (int)$c['id'] ?>"><button class="btn btn--ghost btn--sm" type="submit">🗑</button></form><?php endif; ?></td></tr><?php endforeach; ?>
+  <?php if ($lcosts): ?><tr><td colspan="4" class="num"><b><?= tt('po.lcosts_total') ?></b></td><td class="num"><b><?= e($m((float)$o['logistics_total'])) ?></b></td><td></td></tr><tr><td colspan="4" class="num"><?= tt('po.landed_total') ?></td><td class="num"><?= e($m((float)$o['subtotal'] + (float)$o['logistics_total'])) ?></td><td></td></tr><?php endif; ?>
+  </tbody></table>
+  <?php if ($admin && !in_array($o['status'], ['closed', 'cancelled'], true)): ?>
+  <form method="post" action="<?= $self ?>#costs" enctype="multipart/form-data" data-lock style="margin-top:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="po_cost_add"><input type="hidden" name="id" value="<?= $id ?>">
+    <div class="form-grid">
+      <div class="field"><label><?= tt('po.c_kind') ?></label><select name="kind"><?php foreach (PO_COST_KINDS as $k): ?><option value="<?= $k ?>"><?= tt('po.c_' . $k) ?></option><?php endforeach; ?></select></div>
+      <div class="field"><label><?= tt('po.c_date') ?></label><input name="cost_date" type="date" value="<?= date('Y-m-d') ?>"></div>
+      <div class="field"><label><?= tt('po.amount') ?> *</label><input name="amount" type="number" step="0.01" required></div>
+      <div class="field"><label><?= tt('po.currency') ?></label><input name="currency" maxlength="3" value="<?= e($o['currency']) ?>" pattern="[A-Z]{3}"></div>
+      <div class="field"><label><?= tt('po.provider') ?></label><input name="provider" maxlength="120" placeholder="<?= tt('po.provider_ph') ?>"></div>
+      <div class="field"><label><?= tt('po.ref') ?></label><input name="ref" maxlength="80"></div>
+      <div class="field field--full"><label><?= tt('prq.note') ?></label><input name="note" maxlength="255"></div>
+      <div class="field field--full"><label><?= tt('po.doc') ?></label><input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.docx"></div>
+    </div>
+    <div class="btn-row"><button class="btn btn--sm" type="submit">+ <?= tt('po.add_cost') ?></button></div>
+  </form>
+  <?php endif; ?>
+</div>
+</div>
+
+<?php if ($wh && in_array($o['status'], ['sent', 'confirmed', 'partial'], true)): ?>
+<div class="card" id="receipt">
+  <h2>📥 <?= tt('po.receipt') ?></h2><p class="hint"><?= tt('po.receipt_lede') ?></p>
+  <form method="post" action="<?= $self ?>#receipt" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="po_receive"><input type="hidden" name="id" value="<?= $id ?>">
+    <div class="form-grid" style="margin-bottom:8px;">
+      <div class="field"><label><?= tt('po.received_on') ?></label><input name="received_at" type="date" value="<?= date('Y-m-d') ?>" required></div>
+      <div class="field"><label><?= tt('po.delivery_note') ?></label><input name="delivery_note" maxlength="80"></div>
+      <div class="field"><label><?= tt('po.ship_to') ?></label><select name="warehouse_id"><?php foreach ($whs as $w): ?><option value="<?= (int)$w['id'] ?>"<?= $sel($w['id'], $o['warehouse_id'] ?: stk_default_wh()) ?>><?= e($w['name']) ?></option><?php endforeach; ?></select></div>
+      <div class="field"><label><?= tt('po.doc') ?></label><input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png"></div>
+    </div>
+    <table class="tbl tbl--wrap"><thead><tr><th>#</th><th><?= tt('prq.desc') ?></th><th class="num"><?= tt('po.open_qty') ?></th><th class="num"><?= tt('po.recv_qty') ?></th><th class="num"><?= tt('po.rej_qty') ?></th><th><?= tt('po.ncr_action') ?></th><th><?= tt('po.ncr_reason') ?></th><th><?= tt('stk.location') ?></th></tr></thead><tbody>
+    <?php foreach ($lines as $l): if ($l['status'] === 'cancelled') continue; $openQ = max(0.0, (float)$l['qty'] - (float)$l['qty_received']); ?>
+      <tr><td><?= (int)$l['seq'] ?></td><td><?= e($l['item_code'] ? $l['item_code'] . ' · ' : '') . e($l['description']) ?></td><td class="num"><?= stk_qty($openQ) ?> <?= e($l['unit']) ?></td>
+        <td class="num"><input name="recv[<?= (int)$l['id'] ?>]" type="number" step="0.001" min="0" value="<?= $openQ > 0 ? $openQ : '' ?>" style="width:6em;"></td>
+        <td class="num"><input name="rej[<?= (int)$l['id'] ?>]" type="number" step="0.001" min="0" value="" style="width:5.5em;"></td>
+        <td><select name="ncr[<?= (int)$l['id'] ?>]"><?php foreach (PO_NCR_ACTIONS as $a): ?><option value="<?= $a ?>"><?= tt('po.ncr_' . $a) ?></option><?php endforeach; ?></select></td>
+        <td><input name="reason[<?= (int)$l['id'] ?>]" maxlength="400" placeholder="<?= tt('po.ncr_reason_ph') ?>"></td>
+        <td><input name="loc[<?= (int)$l['id'] ?>]" maxlength="40" style="width:6em;"></td></tr>
+    <?php endforeach; ?>
+    </tbody></table>
+    <div class="form-grid" style="margin-top:8px;"><div class="field field--full"><label><?= tt('prq.note') ?></label><input name="note" maxlength="400"></div></div>
+    <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit">📥 <?= tt('po.book_receipt') ?></button><label class="chk"><input type="checkbox" name="allow_over" value="1"> <?= tt('po.allow_over') ?></label></div>
+  </form>
+</div>
+<?php endif; ?>
+
+<?php if ($receipts || $ncrs): ?>
+<div class="card">
+  <h2><?= tt('po.receipts') ?> <span class="hint" style="font-weight:400;">(<?= count($receipts) ?>)</span></h2>
+  <table class="tbl tbl--wrap"><thead><tr><th><?= tt('po.receipt_no') ?></th><th><?= tt('po.received_on') ?></th><th><?= tt('po.delivery_note') ?></th><th><?= tt('prq.who') ?></th><th class="num"><?= tt('prq.lines') ?></th><th>NCR</th></tr></thead><tbody>
+  <?php foreach ($receipts as $r): ?><tr><td style="font-family:var(--mono);"><?= e($r['receipt_no']) ?><?= $r['file_id'] ? ' <a href="' . url('file', ['id' => (int)$r['file_id']]) . '" target="_blank">📎</a>' : '' ?></td><td><?= fmt_date($r['received_at']) ?></td><td><?= e($r['delivery_note'] ?? '') ?><?= $r['note'] ? '<br><small class="hint">' . e($r['note']) . '</small>' : '' ?></td><td><?= e($r['user_name'] ?? '') ?></td><td class="num"><?= (int)$r['n_lines'] ?></td><td><?= (int)$r['n_ncr'] ? pill('bad', (int)$r['n_ncr'] . ' ' . t('po.ncr_open')) : '—' ?></td></tr>
+    <?php foreach (po_receipt_lines((int)$r['id']) as $rl): ?><tr><td></td><td colspan="5"><small>#<?= (int)$rl['seq'] ?> <?= e($rl['item_code'] ? $rl['item_code'] . ' · ' : '') . e($rl['description']) ?> — <?= tt('po.recv_qty') ?> <b><?= stk_qty((float)$rl['qty_received']) ?></b><?= (float)$rl['qty_rejected'] > 0 ? ' · ' . tt('po.rej_qty') . ' <b style="color:var(--red)">' . stk_qty((float)$rl['qty_rejected']) . '</b> (' . tt('po.ncr_' . $rl['ncr_action']) . ($rl['ncr_reason'] ? ': ' . e($rl['ncr_reason']) : '') . ')' . ($rl['ncr_status'] === 'closed' ? ' ✓ ' . fmt_date($rl['ncr_closed_at']) . ($rl['ncr_closed_note'] ? ' · ' . e($rl['ncr_closed_note']) : '') : '') : '' ?><?= $rl['location'] ? ' · ' . e($rl['location']) : '' ?></small></td></tr><?php endforeach; ?>
+  <?php endforeach; ?>
+  </tbody></table>
+  <?php if ($ncrs && $admin): ?>
+  <h3 style="margin-top:12px;"><?= tt('po.ncr_open_title') ?></h3>
+  <?php foreach ($ncrs as $n): ?><form method="post" action="<?= $self ?>" data-lock class="btn-row" style="margin-bottom:6px;"><?= csrf_field() ?><input type="hidden" name="action" value="po_ncr_close"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="rl_id" value="<?= (int)$n['id'] ?>"><span><?= e($n['receipt_no']) ?> · #<?= (int)$n['seq'] ?> <?= e($n['description']) ?> · <b><?= stk_qty((float)$n['qty_rejected']) ?></b> · <?= tt('po.ncr_' . $n['ncr_action']) ?></span><input name="note" maxlength="400" placeholder="<?= tt('po.ncr_close_ph') ?>" style="width:16em;"><button class="btn btn--sm" type="submit">✓ <?= tt('po.ncr_close') ?></button></form><?php endforeach; ?>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+<?php endif; ?>
 
 <div class="card">
   <h2><?= tt('prq.log') ?></h2>

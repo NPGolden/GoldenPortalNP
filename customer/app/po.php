@@ -44,7 +44,7 @@ function po_events(int $oid): array { return all('SELECT * FROM po_events WHERE 
 function po_event(int $oid, string $ev, ?string $note = null): void { $u = current_user(); q('INSERT INTO po_events (order_id, event, user_id, user_name, ip, note) VALUES (?,?,?,?,?,?)', [$oid, $ev, $u['id'] ?? null, $u['full_name'] ?? null, substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 64), $note !== null ? mb_substr($note, 0, 600) : null]); }
 function po_counts(): array {
     if (!po_can()) return ['draft' => 0, 'open' => 0, 'rfq' => 0, 'late' => 0];
-    try { return ['draft' => (int) scalar("SELECT COUNT(*) FROM po_orders WHERE kind = 'po' AND status = 'draft'"), 'open' => (int) scalar("SELECT COUNT(*) FROM po_orders WHERE kind = 'po' AND status IN ('sent','confirmed','partial')"), 'rfq' => (int) scalar("SELECT COUNT(*) FROM po_orders WHERE kind = 'rfq' AND status IN ('draft','sent','quoted')"), 'late' => (int) scalar("SELECT COUNT(*) FROM po_orders WHERE kind = 'po' AND status IN ('sent','confirmed','partial') AND delivery_date IS NOT NULL AND delivery_date < CURDATE()")]; } catch (Throwable $e) { return ['draft' => 0, 'open' => 0, 'rfq' => 0, 'late' => 0]; }
+    try { return ['draft' => (int) scalar("SELECT COUNT(*) FROM po_orders WHERE kind = 'po' AND status = 'draft'"), 'open' => (int) scalar("SELECT COUNT(*) FROM po_orders WHERE kind = 'po' AND status IN ('sent','confirmed','partial')"), 'rfq' => (int) scalar("SELECT COUNT(*) FROM po_orders WHERE kind = 'rfq' AND status IN ('draft','sent','quoted')"), 'late' => (int) scalar("SELECT COUNT(*) FROM po_orders WHERE kind = 'po' AND status IN ('sent','confirmed','partial') AND COALESCE(expected_date, delivery_date) IS NOT NULL AND COALESCE(expected_date, delivery_date) < CURDATE()")]; } catch (Throwable $e) { return ['draft' => 0, 'open' => 0, 'rfq' => 0, 'late' => 0]; }
 }
 /** Approved requisition lines still to buy (qty − reserved − ordered), optionally of one sub-project — the input of a new RFQ / PO. */
 function po_to_buy(array $f = []): array {
@@ -166,21 +166,23 @@ function po_mark_sent(int $oid, array $to = []): void {
     }
     q('UPDATE po_orders SET status = ?, sent_at = COALESCE(sent_at, NOW()), sent_to = ? WHERE id = ?', [$first || $o['status'] === 'sent' ? 'sent' : $o['status'], $to ? mb_substr(implode(', ', $to), 0, 400) : $o['sent_to'], $oid]);
     po_event($oid, $first ? 'send' : 'resend', $to ? implode(', ', $to) : null);
+    if (function_exists('po_sp_cost_sync')) { po_sp_cost_sync($oid); if (function_exists('po_expected_update')) po_expected_update($oid); }
     if ($first && $o['subproject_id'] && function_exists('eng_rows_reset')) eng_rows_reset();
     cache_bump_later('inv'); cache_bump_later('eng');
 }
 function po_confirm(int $oid, string $ref, ?string $date, string $note): void {
     $o = po_load($oid); if (!$o || $o['kind'] !== 'po' || $o['status'] !== 'sent' || !po_admin()) throw new RuntimeException(t('err.noaccess'));
     q('UPDATE po_orders SET status = ?, confirmed_at = NOW(), supplier_ref = ?, delivery_date = COALESCE(?, delivery_date) WHERE id = ?', ['confirmed', mb_substr(trim($ref), 0, 80) ?: $o['supplier_ref'], $date, $oid]); po_event($oid, 'confirm', trim($ref . ' ' . $note) ?: null);
+    if (function_exists('po_promised_from_post')) po_promised_from_post($oid);
 }
 function po_cancel(int $oid, string $note): void {
     $o = po_load($oid); if (!$o || !po_admin() || in_array($o['status'], ['received', 'closed', 'cancelled'], true)) throw new RuntimeException(t('err.noaccess'));
     if ($note === '') throw new RuntimeException(t('prq.need_reason'));
     if ($o['kind'] === 'po' && $o['status'] !== 'draft') foreach (all('SELECT * FROM po_lines WHERE order_id = ? AND pr_line_id IS NOT NULL', [$oid]) as $l) { $rem = (float)$l['qty'] - (float)$l['qty_received']; q('UPDATE pr_lines SET qty_ordered = GREATEST(0, qty_ordered - ?), status = IF(qty_ordered - ? <= 0.0005 AND qty_received <= 0.0005, \'to_buy\', status) WHERE id = ?', [$rem, $rem, (int)$l['pr_line_id']]); }
     q("UPDATE po_lines SET status = 'cancelled' WHERE order_id = ? AND status IN ('open','partial')", [$oid]);
-    q('UPDATE po_orders SET status = ? WHERE id = ?', ['cancelled', $oid]); po_event($oid, 'cancel', $note); cache_bump_later('inv'); cache_bump_later('eng');
+    q('UPDATE po_orders SET status = ? WHERE id = ?', ['cancelled', $oid]); po_event($oid, 'cancel', $note); if (function_exists('po_sp_cost_sync')) po_sp_cost_sync($oid); cache_bump_later('inv'); cache_bump_later('eng');
 }
-function po_close(int $oid, string $note): void { $o = po_load($oid); if (!$o || !po_admin() || !in_array($o['status'], ['received', 'partial', 'confirmed', 'sent'], true)) throw new RuntimeException(t('err.noaccess')); q('UPDATE po_orders SET status = ? WHERE id = ?', ['closed', $oid]); po_event($oid, 'close', $note ?: null); cache_bump_later('eng'); }
+function po_close(int $oid, string $note): void { $o = po_load($oid); if (!$o || !po_admin() || !in_array($o['status'], ['received', 'partial', 'confirmed', 'sent'], true)) throw new RuntimeException(t('err.noaccess')); q('UPDATE po_orders SET status = ? WHERE id = ?', ['closed', $oid]); po_event($oid, 'close', $note ?: null); if (function_exists('po_progress_apply')) po_progress_apply($o['subproject_id'] ? (int)$o['subproject_id'] : null); cache_bump_later('eng'); }
 
 /* ------------------------------------------------------------------ people / e-mail */
 function po_people(array $o): array {
@@ -241,4 +243,129 @@ function po_sub_summary(int $sid): array {
     return ['n' => (int) scalar("SELECT COUNT(*) FROM po_orders WHERE kind = 'po' AND subproject_id = ? AND status <> 'cancelled'", [$sid]), 'open' => (int) scalar("SELECT COUNT(*) FROM po_orders WHERE kind = 'po' AND subproject_id = ? AND status IN ('sent','confirmed','partial')", [$sid]),
             'ordered' => (float) scalar("SELECT COALESCE(SUM(subtotal),0) FROM po_orders WHERE kind = 'po' AND subproject_id = ? AND status IN ('sent','confirmed','partial','received','closed')", [$sid]),
             'received' => (float) scalar("SELECT COALESCE(SUM(l.qty_accepted * COALESCE(l.unit_price,0) * (1 - l.discount_pct/100)),0) FROM po_lines l JOIN po_orders o ON o.id = l.order_id WHERE o.kind = 'po' AND o.subproject_id = ? AND o.status <> 'cancelled'", [$sid])];
+}
+
+/* ================================================================== R80-004: delivery timeline · goods receipts · logistic costs */
+const PO_MILESTONES = ['confirmed', 'ready', 'shipped', 'export', 'arrived', 'customs', 'delivered'];
+const PO_COST_KINDS = ['freight', 'insurance', 'customs', 'duties', 'import_vat', 'handling', 'other'];
+const PO_NCR_ACTIONS = ['none', 'return', 'replace', 'credit'];
+
+function po_r4(): bool { static $h = null; if ($h === null) { try { $h = po_has() && (bool) db()->query("SHOW TABLES LIKE 'po_receipts'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+/** Expected delivery of a line: promised date, else need date, else (confirmed / sent) + lead days. */
+function po_line_expected(array $o, array $l): ?string {
+    if (!empty($l['promised_date'])) return $l['promised_date'];
+    $base = $o['confirmed_at'] ?: $o['sent_at']; if ($l['lead_days'] !== null && $base) return date('Y-m-d', strtotime(substr((string)$base, 0, 10) . ' +' . (int)$l['lead_days'] . ' days'));
+    return $o['delivery_date'] ?: null;
+}
+/** Expected delivery of the order = the latest line expectation (or the header date); stored for the lists. */
+function po_expected_update(int $oid): ?string {
+    $o = po_load($oid); if (!$o) return null; $max = $o['delivery_date'];
+    foreach (all("SELECT * FROM po_lines WHERE order_id = ? AND status IN ('open','partial')", [$oid]) as $l) { $e = po_line_expected($o, $l); if ($e && (!$max || $e > $max)) $max = $e; }
+    q('UPDATE po_orders SET expected_date = ? WHERE id = ?', [$max, $oid]); return $max;
+}
+function po_milestones(int $oid): array { $rows = []; foreach (all('SELECT * FROM po_milestones WHERE order_id = ?', [$oid]) as $m) $rows[$m['kind']] = $m; return $rows; }
+function po_milestone_save_from_post(): void {
+    require_po_admin(); $oid = (int)($_POST['id'] ?? 0); $o = po_load($oid); if (!$o || $o['kind'] !== 'po' || in_array($o['status'], ['draft', 'cancelled'], true)) throw new RuntimeException(t('err.noaccess'));
+    $kind = in_array($_POST['kind'] ?? '', PO_MILESTONES, true) ? $_POST['kind'] : null; if (!$kind) throw new RuntimeException(t('err.notfound'));
+    $d = fn(string $k) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST[$k] ?? '')) ? $_POST[$k] : null; $u = current_user();
+    $fileId = null; if (!empty($_FILES['file']['tmp_name']) && $o['project_id']) $fileId = cp_store_file($_FILES['file'], (int)$o['project_id'], $o['subproject_id'] ? (int)$o['subproject_id'] : null, 'file', 'internal', $o['po_no'] . ' · ' . t('po.m_' . $kind));
+    $v = [$oid, $kind, $d('planned_date'), $d('actual_date'), mb_substr(trim((string)($_POST['carrier'] ?? '')), 0, 120) ?: null, mb_substr(trim((string)($_POST['tracking'] ?? '')), 0, 120) ?: null, mb_substr(trim((string)($_POST['ref'] ?? '')), 0, 120) ?: null, ($_POST['packages'] ?? '') !== '' ? max(0, (int)$_POST['packages']) : null, ($_POST['weight_kg'] ?? '') !== '' ? round((float) str_replace(',', '.', (string)$_POST['weight_kg']), 2) : null, mb_substr(trim((string)($_POST['note'] ?? '')), 0, 400) ?: null, $fileId, (int)$u['id'], $u['full_name']];
+    q('INSERT INTO po_milestones (order_id, kind, planned_date, actual_date, carrier, tracking, ref, packages, weight_kg, note, file_id, user_id, user_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE planned_date = VALUES(planned_date), actual_date = VALUES(actual_date), carrier = VALUES(carrier), tracking = VALUES(tracking), ref = VALUES(ref), packages = VALUES(packages), weight_kg = VALUES(weight_kg), note = VALUES(note), file_id = COALESCE(VALUES(file_id), file_id), user_id = VALUES(user_id), user_name = VALUES(user_name)', $v);
+    if ($kind === 'confirmed' && $v[3] && $o['status'] === 'sent') { q('UPDATE po_orders SET status = ?, confirmed_at = ? WHERE id = ?', ['confirmed', $v[3] . ' 00:00:00', $oid]); }
+    if ($kind === 'delivered' && $v[3]) q('UPDATE po_orders SET delivery_date = COALESCE(delivery_date, ?) WHERE id = ?', [$v[3], $oid]);
+    po_event($oid, 'milestone', t('po.m_' . $kind) . ($v[3] ? ' · ' . fmt_date($v[3]) : ($v[2] ? ' · ' . t('po.planned') . ' ' . fmt_date($v[2]) : '')) . ($v[5] ? ' · ' . $v[5] : ''));
+    po_expected_update($oid);
+}
+/** Per-line promised dates typed with the confirmation. */
+function po_promised_from_post(int $oid): void { foreach ((array)($_POST['promised'] ?? []) as $lid => $dv) { $d = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$dv) ? $dv : null; q('UPDATE po_lines SET promised_date = ? WHERE id = ? AND order_id = ?', [$d, (int)$lid, $oid]); } po_expected_update($oid); }
+/** The timeline rows for the view: kind, planned, actual, late, data. */
+function po_timeline(array $o): array {
+    $M = po_milestones((int)$o['id']); $out = []; $today = date('Y-m-d');
+    $out[] = ['kind' => 'sent', 'planned' => null, 'actual' => $o['sent_at'] ? substr($o['sent_at'], 0, 10) : null, 'late' => false, 'm' => null, 'fixed' => true];
+    foreach (PO_MILESTONES as $k) { $m = $M[$k] ?? null; $planned = $m['planned_date'] ?? ($k === 'delivered' ? ($o['expected_date'] ?: $o['delivery_date']) : ($k === 'confirmed' && $o['confirmed_at'] ? substr($o['confirmed_at'], 0, 10) : null)); $actual = $m['actual_date'] ?? ($k === 'confirmed' && $o['confirmed_at'] ? substr($o['confirmed_at'], 0, 10) : null); $out[] = ['kind' => $k, 'planned' => $planned, 'actual' => $actual, 'late' => !$actual && $planned && $planned < $today && in_array($o['status'], PO_OPEN, true), 'm' => $m, 'fixed' => false]; }
+    $rc = (int) scalar('SELECT COUNT(*) FROM po_receipts WHERE order_id = ?', [(int)$o['id']]); $last = $rc ? scalar('SELECT MAX(received_at) FROM po_receipts WHERE order_id = ?', [(int)$o['id']]) : null;
+    $out[] = ['kind' => 'received', 'planned' => null, 'actual' => $last, 'late' => false, 'm' => null, 'fixed' => true, 'n' => $rc];
+    return $out;
+}
+
+/* ---- logistic costs */
+function po_costs(int $oid): array { return all('SELECT c.*, f.original_name FROM po_costs c LEFT JOIN sp_files f ON f.id = c.file_id WHERE c.order_id = ? ORDER BY c.cost_date, c.id', [$oid]); }
+function po_cost_save_from_post(): int {
+    require_po_admin(); $oid = (int)($_POST['id'] ?? 0); $o = po_load($oid); if (!$o || $o['kind'] !== 'po' || in_array($o['status'], ['draft', 'cancelled'], true)) throw new RuntimeException(t('err.noaccess'));
+    $kind = in_array($_POST['kind'] ?? '', PO_COST_KINDS, true) ? $_POST['kind'] : 'freight'; $amt = round((float) str_replace(',', '.', (string)($_POST['amount'] ?? '0')), 2); if ($amt == 0.0) throw new RuntimeException(t('po.need_amount'));
+    $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['cost_date'] ?? '')) ? $_POST['cost_date'] : date('Y-m-d'); $cur = preg_match('/^[A-Z]{3}$/', (string)($_POST['currency'] ?? '')) ? $_POST['currency'] : $o['currency'];
+    $prov = mb_substr(trim((string)($_POST['provider'] ?? '')), 0, 120) ?: null; $ref = mb_substr(trim((string)($_POST['ref'] ?? '')), 0, 80) ?: null; $note = mb_substr(trim((string)($_POST['note'] ?? '')), 0, 255) ?: null; $u = current_user();
+    $fileId = null; if (!empty($_FILES['file']['tmp_name']) && $o['project_id']) $fileId = cp_store_file($_FILES['file'], (int)$o['project_id'], $o['subproject_id'] ? (int)$o['subproject_id'] : null, 'file', 'internal', $o['po_no'] . ' · ' . t('po.c_' . $kind));
+    $spc = null;
+    if ($o['subproject_id'] && function_exists('bg_has') && bg_has()) { q('INSERT INTO sp_costs (subproject_id, cost_date, kind, supplier, description, ref_no, amount, currency, file_id, created_by, created_name) VALUES (?,?,?,?,?,?,?,?,?,?,?)', [(int)$o['subproject_id'], $date, 'logistics', $prov ?: $o['supplier'], mb_substr(t('po.c_' . $kind) . ' · ' . $o['po_no'] . ($note ? ' · ' . $note : ''), 0, 255), mb_substr($ref ?: $o['po_no'], 0, 60), $amt, $cur, $fileId, (int)$u['id'], $u['full_name']]); $spc = (int) db()->lastInsertId(); if (function_exists('eng_rows_reset')) eng_rows_reset(); }
+    q('INSERT INTO po_costs (order_id, kind, cost_date, provider, ref, amount, currency, note, file_id, sp_cost_id, user_id, user_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', [$oid, $kind, $date, $prov, $ref, $amt, $cur, $note, $fileId, $spc, (int)$u['id'], $u['full_name']]);
+    $cid = (int) db()->lastInsertId(); po_logistics_recalc($oid); po_event($oid, 'cost', t('po.c_' . $kind) . ' · ' . po_money($amt, $cur) . ($prov ? ' · ' . $prov : ''));
+    cache_bump_later('eng'); return $cid;
+}
+function po_cost_delete(int $oid, int $cid): void { require_po_admin(); $c = one('SELECT * FROM po_costs WHERE id = ? AND order_id = ?', [$cid, $oid]); if (!$c) throw new RuntimeException(t('err.notfound')); if ($c['sp_cost_id']) q('DELETE FROM sp_costs WHERE id = ?', [(int)$c['sp_cost_id']]); q('DELETE FROM po_costs WHERE id = ?', [$cid]); po_logistics_recalc($oid); po_event($oid, 'cost_del', t('po.c_' . $c['kind']) . ' · ' . po_money((float)$c['amount'], $c['currency'])); if (function_exists('eng_rows_reset')) eng_rows_reset(); cache_bump_later('eng'); }
+function po_logistics_recalc(int $oid): void { q('UPDATE po_orders SET logistics_total = (SELECT COALESCE(SUM(amount),0) FROM po_costs WHERE order_id = ?) WHERE id = ?', [$oid, $oid]); }
+/** The committed cost of a PO on the sub-project (sp_costs kind 'order', one row per PO): written on send, refreshed on change, removed on cancel. */
+function po_sp_cost_sync(int $oid): void {
+    $o = po_load($oid); if (!$o || !function_exists('bg_has') || !bg_has()) return;
+    $u = current_user(); $want = $o['kind'] === 'po' && $o['subproject_id'] && !in_array($o['status'], ['draft', 'cancelled'], true);
+    if (!$want) { if ($o['cost_id']) { q('DELETE FROM sp_costs WHERE id = ?', [(int)$o['cost_id']]); q('UPDATE po_orders SET cost_id = NULL WHERE id = ?', [$oid]); } }
+    elseif ($o['cost_id'] && scalar('SELECT 1 FROM sp_costs WHERE id = ?', [(int)$o['cost_id']])) q('UPDATE sp_costs SET subproject_id = ?, supplier = ?, description = ?, ref_no = ?, amount = ?, currency = ? WHERE id = ?', [(int)$o['subproject_id'], $o['supplier'], mb_substr(t('po.sp_cost_desc', ['no' => $o['po_no'], 't' => $o['title'] ?: '']), 0, 255), mb_substr($o['po_no'], 0, 60), (float)$o['subtotal'], $o['currency'], (int)$o['cost_id']]);
+    else { q('INSERT INTO sp_costs (subproject_id, cost_date, kind, supplier, description, ref_no, amount, currency, created_by, created_name) VALUES (?,?,?,?,?,?,?,?,?,?)', [(int)$o['subproject_id'], substr((string)($o['sent_at'] ?: date('Y-m-d')), 0, 10), 'order', $o['supplier'], mb_substr(t('po.sp_cost_desc', ['no' => $o['po_no'], 't' => $o['title'] ?: '']), 0, 255), mb_substr($o['po_no'], 0, 60), (float)$o['subtotal'], $o['currency'], (int)($u['id'] ?? 0) ?: null, $u['full_name'] ?? null]); q('UPDATE po_orders SET cost_id = ? WHERE id = ?', [(int) db()->lastInsertId(), $oid]); }
+    if (function_exists('eng_rows_reset')) eng_rows_reset(); cache_bump_later('eng');
+}
+
+/* ---- goods receipt */
+function po_receipts(int $oid): array { return all('SELECT r.*, (SELECT COUNT(*) FROM po_receipt_lines l WHERE l.receipt_id = r.id) AS n_lines, (SELECT COUNT(*) FROM po_receipt_lines l WHERE l.receipt_id = r.id AND l.ncr_status = \'open\') AS n_ncr FROM po_receipts r WHERE r.order_id = ? ORDER BY r.id DESC', [$oid]); }
+function po_receipt_lines(int $rid): array { return all('SELECT rl.*, l.seq, l.description, l.unit, l.item_id, i.code AS item_code FROM po_receipt_lines rl JOIN po_lines l ON l.id = rl.po_line_id LEFT JOIN inv_items i ON i.id = l.item_id WHERE rl.receipt_id = ? ORDER BY l.seq', [$rid]); }
+function po_ncr_open(int $oid): array { return all('SELECT rl.*, r.receipt_no, r.received_at, l.seq, l.description, l.unit, i.code AS item_code FROM po_receipt_lines rl JOIN po_receipts r ON r.id = rl.receipt_id JOIN po_lines l ON l.id = rl.po_line_id LEFT JOIN inv_items i ON i.id = l.item_id WHERE r.order_id = ? AND rl.ncr_status = \'open\' ORDER BY r.id, l.seq', [$oid]); }
+/** Receipt per line: received / accepted / rejected (+ reason and action). Accepted goods go into stock at the PO price (price record), reserved for the requisition they were bought for; the PO and its lines move to partial / received. */
+function po_receive_from_post(): int {
+    require_pr_wh(); $oid = (int)($_POST['id'] ?? 0); $o = po_load($oid); if (!$o || $o['kind'] !== 'po' || !in_array($o['status'], ['sent', 'confirmed', 'partial'], true)) throw new RuntimeException(t('err.noaccess'));
+    $u = current_user(); $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['received_at'] ?? '')) ? $_POST['received_at'] : date('Y-m-d');
+    $wh = (int)($_POST['warehouse_id'] ?? 0) ?: (int)($o['warehouse_id'] ?: stk_default_wh()); $dn = mb_substr(trim((string)($_POST['delivery_note'] ?? '')), 0, 80) ?: null; $note = mb_substr(trim((string)($_POST['note'] ?? '')), 0, 400) ?: null;
+    $lines = po_lines($oid); $todo = [];
+    foreach ($lines as $l) { $lid = (int)$l['id']; $qr = (float) str_replace(',', '.', (string)($_POST['recv'][$lid] ?? '0')); if ($qr <= 0 || $l['status'] === 'cancelled') continue; $qrej = max(0.0, min($qr, (float) str_replace(',', '.', (string)($_POST['rej'][$lid] ?? '0')))); $qa = $qr - $qrej;
+        $open = (float)$l['qty'] - (float)$l['qty_received']; if ($qr > $open + 0.0005 && empty($_POST['allow_over'])) throw new RuntimeException(t('po.over_receipt', ['n' => (int)$l['seq'], 'q' => stk_qty(max(0.0, $open))]));
+        $reason = mb_substr(trim((string)($_POST['reason'][$lid] ?? '')), 0, 400); $action = in_array($_POST['ncr'][$lid] ?? '', PO_NCR_ACTIONS, true) ? $_POST['ncr'][$lid] : 'none'; if ($qrej > 0 && $reason === '') throw new RuntimeException(t('po.need_ncr_reason', ['n' => (int)$l['seq']])); if ($qrej > 0 && $action === 'none') $action = 'return';
+        $todo[] = [$l, $qr, $qa, $qrej, $reason ?: null, $action, mb_substr(trim((string)($_POST['loc'][$lid] ?? '')), 0, 40) ?: null]; }
+    if (!$todo) throw new RuntimeException(t('po.need_receipt_qty'));
+    $n = (int) scalar('SELECT COUNT(*) + 1 FROM po_receipts WHERE order_id = ?', [$oid]); $no = $o['po_no'] . '-GR' . $n;
+    $fileId = null; if (!empty($_FILES['file']['tmp_name']) && $o['project_id']) $fileId = cp_store_file($_FILES['file'], (int)$o['project_id'], $o['subproject_id'] ? (int)$o['subproject_id'] : null, 'file', 'internal', $no . ($dn ? ' · ' . $dn : ''));
+    q('INSERT INTO po_receipts (order_id, receipt_no, received_at, delivery_note, warehouse_id, note, file_id, user_id, user_name) VALUES (?,?,?,?,?,?,?,?,?)', [$oid, $no, $date, $dn, $wh, $note, $fileId, (int)$u['id'], $u['full_name']]); $rid = (int) db()->lastInsertId();
+    $ncr = 0;
+    foreach ($todo as [$l, $qr, $qa, $qrej, $reason, $action, $loc]) {
+        q('INSERT INTO po_receipt_lines (receipt_id, po_line_id, qty_received, qty_accepted, qty_rejected, ncr_reason, ncr_action, ncr_status, location) VALUES (?,?,?,?,?,?,?,?,?)', [$rid, (int)$l['id'], $qr, $qa, $qrej, $reason, $qrej > 0 ? $action : 'none', $qrej > 0 ? 'open' : 'none', $loc]); if ($qrej > 0) $ncr++;
+        $recvTot = (float)$l['qty_received'] + $qr; $accTot = (float)$l['qty_accepted'] + $qa; $st = $accTot >= (float)$l['qty'] - 0.0005 ? 'received' : 'partial';
+        q('UPDATE po_lines SET qty_received = ?, qty_accepted = ?, qty_rejected = qty_rejected + ?, status = ? WHERE id = ?', [$recvTot, $accTot, $qrej, $st, (int)$l['id']]);
+        if ($qa > 0 && $l['item_id']) {
+            $price = $l['unit_price'] !== null ? round((float)$l['unit_price'] * (1 - (float)$l['discount_pct'] / 100), 4) : null;
+            stk_move((int)$l['item_id'], $wh, 'in', $qa, ['unit_price' => $price, 'project_id' => $o['project_id'] ? (int)$o['project_id'] : null, 'subproject_id' => $o['subproject_id'] ? (int)$o['subproject_id'] : null, 'ref_kind' => 'po', 'ref_id' => $oid, 'reason' => 'receipt', 'note' => $no . ($dn ? ' · ' . $dn : ''), 'location' => $loc]);
+            if ($price !== null && $price > 0) stk_price_add((int)$l['item_id'], $price, ['priced_at' => $date, 'supplier_id' => (int)$o['supplier_id'], 'po_line_id' => (int)$l['id'], 'currency' => $o['currency'], 'qty' => $qa, 'source' => 'receipt', 'note' => $o['po_no']]);
+            if ($l['pr_line_id']) { q('UPDATE inv_stock SET qty_reserved = qty_reserved + ? WHERE item_id = ? AND warehouse_id = ?', [$qa, (int)$l['item_id'], $wh]); q("UPDATE pr_lines SET qty_received = qty_received + ?, qty_reserved = qty_reserved + ?, warehouse_id = COALESCE(warehouse_id, ?), status = IF(status IN ('to_buy','ordered'), 'received', status) WHERE id = ?", [$qa, $qa, $wh, (int)$l['pr_line_id']]); }
+        } elseif ($qa > 0 && $l['pr_line_id']) { q("UPDATE pr_lines SET qty_received = qty_received + ?, status = IF(status IN ('to_buy','ordered'), 'received', status) WHERE id = ?", [$qa, (int)$l['pr_line_id']]); }
+    }
+    $open = (int) scalar("SELECT COUNT(*) FROM po_lines WHERE order_id = ? AND status IN ('open','partial')", [$oid]);
+    q('UPDATE po_orders SET status = ? WHERE id = ?', [$open ? 'partial' : 'received', $oid]); po_event($oid, 'receive', $no . ' · ' . count($todo) . ' ' . t('prq.lines') . ($ncr ? ' · ' . $ncr . ' NCR' : '') . ($dn ? ' · ' . $dn : ''));
+    po_expected_update($oid); po_progress_apply($o['subproject_id'] ? (int)$o['subproject_id'] : null);
+    // notify the requesters whose lines arrived
+    $reqs = array_values(array_unique(array_map('intval', array_column(all('SELECT DISTINCT r.requester_id FROM po_lines l JOIN pr_lines pl ON pl.id = l.pr_line_id JOIN pr_requests r ON r.id = pl.request_id WHERE l.order_id = ?', [$oid]), 'requester_id'))));
+    if ($reqs && function_exists('nf_push')) { try { nf_push($reqs, 'work:po_received', 'po:' . $oid . ':gr:' . $rid, t('po.nf_received', ['no' => $o['po_no']]), $o['supplier'] . ($o['sub_code'] ? ' · ' . $o['sub_code'] : ''), url('purchase_order', ['id' => $oid]), (int)$u['id'], $u['full_name']); } catch (Throwable $e) {} }
+    cache_bump_later('inv'); cache_bump_later('eng'); return $rid;
+}
+/** NCR follow-up: closed with the outcome (returned / replaced — replacement received as a new receipt — / credited). */
+function po_ncr_close(int $oid, int $rlid, string $note): void {
+    require_po_admin(); $rl = one('SELECT rl.* FROM po_receipt_lines rl JOIN po_receipts r ON r.id = rl.receipt_id WHERE rl.id = ? AND r.order_id = ?', [$rlid, $oid]); if (!$rl || $rl['ncr_status'] !== 'open') throw new RuntimeException(t('err.notfound'));
+    q('UPDATE po_receipt_lines SET ncr_status = ?, ncr_closed_at = CURDATE(), ncr_closed_note = ? WHERE id = ?', ['closed', mb_substr(trim($note), 0, 400) ?: null, $rlid]);
+    if ($rl['ncr_action'] === 'credit') { /* the rejected quantity will not come: the line is complete at the accepted quantity */ q("UPDATE po_lines SET qty = qty_accepted, status = 'received' WHERE id = ? AND qty_accepted > 0", [(int)$rl['po_line_id']]); po_recalc($oid); po_sp_cost_sync($oid); }
+    po_event($oid, 'ncr_close', t('po.ncr_' . $rl['ncr_action']) . ' · ' . stk_qty((float)$rl['qty_rejected']) . ($note !== '' ? ' · ' . $note : ''));
+    $open = (int) scalar("SELECT COUNT(*) FROM po_lines WHERE order_id = ? AND status IN ('open','partial')", [$oid]); if (!$open) q("UPDATE po_orders SET status = 'received' WHERE id = ? AND status = 'partial'", [$oid]);
+}
+/** Procurement progress of a sub-project: received value / ordered value of its POs (0–100). Written to the process line when higher than the current value and the stage is not N/A. */
+function po_progress(int $sid): ?int {
+    $S = po_sub_summary($sid); if ($S['ordered'] <= 0) return null;
+    return (int) max(0, min(100, round($S['received'] / $S['ordered'] * 100)));
+}
+function po_progress_apply(?int $sid): void {
+    if (!$sid) return; $p = po_progress($sid); if ($p === null) return;
+    try { $cur = scalar('SELECT pct_procurement FROM subprojects WHERE id = ?', [$sid]); if ($cur === null || (int)$cur === PCT_NA || (int)$cur >= $p) return; q('UPDATE subprojects SET pct_procurement = ? WHERE id = ?', [$p, $sid]); } catch (Throwable $e) {}
 }

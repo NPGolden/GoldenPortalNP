@@ -35,7 +35,7 @@ layout_head(($r ? $r['pr_no'] : t('prq.new')) . ' · ' . t('prq.title'), 'requis
 </div>
 <?php endif; ?>
 
-<div class="grid-2">
+<div class="grid grid-2">
 <div class="card">
   <h2><?= tt('prq.header') ?></h2>
   <?php if ($edit): ?>

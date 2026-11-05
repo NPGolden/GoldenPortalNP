@@ -66,12 +66,12 @@ layout_head(t('po.title'), 'purchase_orders');
   <thead><tr><th><?= tt('po.no') ?></th><th><?= tt('po.supplier') ?></th><th><?= tt('prq.project') ?></th><th><?= tt('po.delivery') ?></th><th class="num"><?= tt('prq.lines') ?></th><?php if ($priced): ?><th class="num"><?= tt('po.net') ?></th><?php endif; ?><th><?= tt('prq.status') ?></th></tr></thead>
   <tbody>
   <?php if (!$rows): ?><tr><td colspan="7" class="hint"><?= tt('po.none') ?></td></tr><?php endif; ?>
-  <?php foreach ($rows as $r): $late = $r['delivery_date'] && in_array($r['status'], PO_OPEN, true) && $r['delivery_date'] < date('Y-m-d'); ?>
+  <?php foreach ($rows as $r): $exp = $r['expected_date'] ?? $r['delivery_date']; $late = $exp && in_array($r['status'], PO_OPEN, true) && $exp < date('Y-m-d'); ?>
     <tr>
       <td><a href="<?= url('purchase_order', ['id' => (int)$r['id']]) ?>" style="font-family:var(--mono);"><?= e($r['po_no']) ?></a><?= $r['title'] ? '<br><small class="hint">' . e($r['title']) . '</small>' : '' ?></td>
       <td><a href="<?= url('suppliers', ['id' => (int)$r['supplier_id']]) ?>"><?= e($r['supplier']) ?></a><?= $r['supplier_ref'] ? '<br><small class="hint">' . e($r['supplier_ref']) . '</small>' : '' ?></td>
       <td><?= $r['project_id'] ? pr_link((int)$r['project_id'], $r['project_code'], $r['project_name']) : '—' ?><?= $r['subproject_id'] ? '<br><small><a href="' . url('subproject', ['id' => (int)$r['subproject_id'], 'tab' => 'procurement']) . '">' . e($r['sub_code'] . ' · ' . $r['sub_name']) . '</a></small>' : '' ?></td>
-      <td<?= $late ? ' style="color:var(--red)"' : '' ?>><?= fmt_date($r['delivery_date']) ?></td>
+      <td<?= $late ? ' style="color:var(--red)"' : '' ?>><?= fmt_date($exp) ?></td>
       <td class="num"><?= (int)$r['n_lines'] ?><?= (int)$r['n_open'] && in_array($r['status'], ['partial'], true) ? ' <span class="pill pill--gold">' . (int)$r['n_open'] . '</span>' : '' ?></td>
       <?php if ($priced): ?><td class="num"><?= e(po_money((float)$r['subtotal'], $r['currency'])) ?></td><?php endif; ?>
       <td><?= po_pill($r['status']) ?></td>
