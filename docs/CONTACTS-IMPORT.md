@@ -1046,3 +1046,6 @@ No SQL. Cause of the "issue crashed, no PDF": `isr_generate_documents()` read ev
 
 ## 206. v1.87.3 — Audit trail folded on report pages (GAS-CP-R77-011)
 No SQL. `isr_view.php`, `fsr_view.php`, `fc_view.php`: the trail card is `<details class="card card--details" id="trail">` (existing collapsible-card style) with the entry count and `fsr.trail_hint` in the summary, closed by default. Key `fsr.trail_hint` ×5 (6517).
+
+## 207. v1.87.4 — HR dashboard heading order; ages HR-only (GAS-CP-R77-012)
+No SQL. `hr_dashboard.php`: the `#hr-contracts` `<h3>` moved below the HRA / off-boarding / certificate blocks, directly above the `$alerts` list. `cel.php` `cel_upcoming()` forces `$withAge = false` unless `hr_personal_can()`; `contacts.php` shows a contact's age only with `hr_personal_can()`. Community (`soc_events`) never carried ages — only years at the company on anniversaries.

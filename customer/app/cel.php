@@ -104,6 +104,7 @@ function cel_nameday(array $p, int $y): ?array {
 }
 /** Upcoming celebrations within $days from today (active employees): [['date','kind' => birthday|nameday,'person','age'|null,'name'|null], …] sorted by date. */
 function cel_upcoming(int $days = 7, bool $withAge = false): array {
+    if ($withAge && !(function_exists('hr_personal_can') && hr_personal_can())) $withAge = false;   // R77-012: a person's age is personal data — HR / Owner / CEO only, whoever calls
     if (!function_exists('hr_people')) return []; $today = date('Y-m-d'); $end = date('Y-m-d', strtotime("+$days days")); $y0 = (int) substr($today, 0, 4); $y1 = (int) substr($end, 0, 4); $out = [];
     foreach (hr_people(false) as $p) {
         if (empty($p['is_active'])) continue;

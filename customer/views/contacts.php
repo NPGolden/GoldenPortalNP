@@ -94,7 +94,7 @@ layout_head(t('ct.title'), 'contacts');
   <?php if (!$up): ?><div class="empty"><?= tt('ct.none_upcoming') ?></div><?php else: foreach (array_slice($up, 0, 25) as $x): $c = $x['contact']; ?>
     <a class="attrow <?= $x['days'] <= 3 ? 'att--gold' : 'att--mute' ?>" href="<?= url('contact', ['id' => $c['id']]) ?>">
       <span class="age"><?= $x['days'] === 0 ? tt('dash.today') : e(t('ct.in_days', ['n' => $x['days']])) ?></span>
-      <span><?= $x['kind'] === 'birthday' ? '🎂' : '🎉' ?> <b><?= e($c['full_name']) ?></b> — <?= $x['kind'] === 'birthday' ? tt('ct.birthday') . ($x['age'] ? ' (' . $x['age'] . ')' : '') : tt('ct.nameday') ?> · <?= e(fmt_date($x['date'])) ?><?= ($c['customer_name'] ?: $c['company']) ? '<br><span class="hint">' . e($c['customer_name'] ?: $c['company']) . '</span>' : '' ?></span>
+      <span><?= $x['kind'] === 'birthday' ? '🎂' : '🎉' ?> <b><?= e($c['full_name']) ?></b> — <?= $x['kind'] === 'birthday' ? tt('ct.birthday') . ($x['age'] && function_exists('hr_personal_can') && hr_personal_can() ? ' (' . $x['age'] . ')' : '') : tt('ct.nameday') ?> · <?= e(fmt_date($x['date'])) ?><?= ($c['customer_name'] ?: $c['company']) ? '<br><span class="hint">' . e($c['customer_name'] ?: $c['company']) . '</span>' : '' ?></span>
     </a>
   <?php endforeach; endif; ?>
 </div>
