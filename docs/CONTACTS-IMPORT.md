@@ -1061,3 +1061,6 @@ No SQL. `hr7.php` `hr_owner_ids()` now includes the role named CEO (`act_top` al
 
 ## 211. v1.87.8 — Owner / CEO winner entry hidden (GAS-CP-R77-016)
 No SQL. `soc_winner()` returns null when the stored winner is in `hr_owner_ids()` — the existing Oct 2026 entry disappears without a manual change; the next "Name the winner" overwrites it.
+
+## 212. v1.87.9 — Hotfix winner of the month (GAS-CP-R77-017)
+`soc_winner_set()`: the R77-015 guard was inserted with a trailing `//` comment on a one-line function body, which commented out the `$month` / `$uid` parsing → `month` NULL. Replaced by `/* */`. Rule (again): never append `//` to a line that continues with code.

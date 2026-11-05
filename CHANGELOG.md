@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.87.8** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.87.9** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.87.9 | GAS-CP-R77-017 | 2026-11-05 | Fix: naming the winner of the month failed with "Column month cannot be null" since 1.87.7. | — |
 | 1.87.8 | GAS-CP-R77-016 | 2026-11-05 | A winner-of-the-month entry naming an Owner / CEO account is no longer shown (the month reads as not yet named). | — |
 | 1.87.7 | GAS-CP-R77-015 | 2026-11-05 | Owner / CEO accounts excluded from the activity and kudos rankings and from the winner-of-the-month choice (the CEO role now counts as Owner everywhere). | — |
 | 1.87.6 | GAS-CP-R77-014 | 2026-11-05 | Opening taken days editable in the year Edit form on the person's Entitlements tab (logged in the audit). | — |
