@@ -1848,3 +1848,5 @@ html[data-theme="dark"] .pp-col { background: #16263A; } html[data-theme="dark"]
 .col-fu td { background: #FBF7EC; } .col-fu-form { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; } .col-fu-form .field { margin: 0; } .col-fu-form input[type=date] { min-width: 150px; }
 .col-hist { flex-basis: 100%; font-size: 12px; } .col-hist ul { margin: 4px 0 0 18px; padding: 0; } .col-hist li { margin: 2px 0; }
 @media print { .col-fu, .fltbar, .btn-row { display: none !important; } }
+/* R78-002 statement of account */
+.soa-vessels { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 14px; } .soa-v { margin: 0; } .soa-form .field { margin: 0; }

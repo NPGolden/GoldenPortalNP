@@ -63,6 +63,33 @@ layout_head(t('col.title'), 'collections');
   <div class="fltbar-actions"><button class="btn btn--sm" type="submit"><?= tt('btn.apply') ?></button><a class="btn btn--ghost btn--sm" href="<?= url('collections') ?>"><?= tt('btn.clear') ?></a></div>
 </form>
 
+<?php $svs = col_statement_vessels(); $selV = array_values(array_unique(array_map('intval', (array)($_GET['v'] ?? [])))); if (!$selV && $f['vessel']) $selV = [$f['vessel']];
+  $asOf = $d($_GET['asof'] ?? '', date('Y-m-d')); $soaFrom = $d($_GET['sfrom'] ?? '', '');
+  $stKey = $selV ? 'st:' . implode(',', $selV) . ':%s:' . $asOf . ($soaFrom ? ':' . $soaFrom : '') : null;
+  $selNames = array_map(fn($x) => (string)$x['name'], array_filter($svs, fn($x) => in_array((int)$x['id'], $selV, true)));
+  $cid = 0; foreach ($svs as $x) if (in_array((int)$x['id'], $selV, true)) { $cid = (int) scalar('SELECT customer_id FROM vessels WHERE id = ?', [(int)$x['id']]); break; } ?>
+<div class="card" id="col-soa">
+  <h2>📄 <?= tt('soa.title') ?></h2>
+  <p class="hint" style="margin-top:0;"><?= tt('soa.hint') ?></p>
+  <form method="get" action="index.php#col-soa" class="soa-form"><input type="hidden" name="p" value="collections"><?php foreach (array_filter($f) as $k => $v): ?><input type="hidden" name="<?= e($k) ?>" value="<?= e((string)$v) ?>"><?php endforeach; ?><input type="hidden" name="from" value="<?= e($from) ?>"><input type="hidden" name="to" value="<?= e($to) ?>">
+    <div class="soa-vessels"><?php if (!$svs): ?><p class="hint"><?= tt('pi.none') ?></p><?php endif; ?><?php foreach ($svs as $x): ?><label class="chk soa-v"><input type="checkbox" name="v[]" value="<?= (int)$x['id'] ?>"<?= in_array((int)$x['id'], $selV, true) ? ' checked' : '' ?>> <b><?= e($x['name']) ?></b> <span class="hint"><?= e($x['customer_name'] ?: '') ?> · <?= (int)$x['n'] ?> PI<?= (float)$x['gross_open'] > 0 ? ' · ' . e($m((float)$x['gross_open'])) . ' ' . tt('fr.open') : '' ?></span></label><?php endforeach; ?></div>
+    <div class="btn-row" style="align-items:flex-end;gap:10px;margin-top:8px;">
+      <div class="field"><label><?= tt('soa.as_of_lbl') ?></label><input type="date" name="asof" value="<?= e($asOf) ?>"></div>
+      <div class="field"><label><?= tt('soa.from_lbl') ?></label><input type="date" name="sfrom" value="<?= e($soaFrom) ?>"></div>
+      <button class="btn btn--sm" type="submit"><?= tt('soa.prepare') ?></button>
+      <?php if ($selV): $q = ['v' => $selV, 'asof' => $asOf] + ($soaFrom ? ['from' => $soaFrom] : []); ?>
+        <a class="btn btn--gold btn--sm" href="<?= url('statement', $q) ?>" target="_blank">⤓ PDF</a><a class="btn btn--ghost btn--sm" href="<?= url('statement', $q + ['format' => 'xlsx']) ?>">⤓ Excel</a>
+      <?php endif; ?>
+    </div>
+  </form>
+  <?php if ($selV && function_exists('em_card_html')):
+    $ctx = ['no' => 'SOA ' . fmt_date($asOf), 'title' => implode(', ', $selNames), 'vessel' => implode(', ', $selNames), 'customer' => '', 'project' => '', 'doc' => t('em.w_statement', ['v' => implode(', ', $selNames), 'd' => fmt_date($asOf)]), 'project_id' => 0, 'customer_id' => $cid, 'date' => fmt_date($asOf)];
+    $cRow = $cid ? one('SELECT name, email FROM customers WHERE id = ?', [$cid]) : null;
+    $people = em_people(count($selV) === 1 ? $selV[0] : null, $cid ?: null, $cRow && $cRow['email'] ? [[(string)$cRow['name'], $cRow['email'], t('soa.accounting_dept')]] : []);
+    echo em_card_html(['kind' => 'statement', 'ctx' => $ctx, 'people' => $people, 'atts' => [[sprintf($stKey, 'pdf'), t('soa.att_pdf', ['v' => implode(', ', $selNames)])], [sprintf($stKey, 'xlsx'), t('soa.att_xlsx')]], 'back' => url('collections', $keep)]);
+  endif; ?>
+</div>
+
 <div class="card" id="col-open">
   <h2>📋 <?= tt('col.open_items') ?> <span class="count"><?= count($open) ?></span></h2>
   <?php if (!$open): ?><p class="hint"><?= tt('col.none_open') ?></p><?php else: ?>

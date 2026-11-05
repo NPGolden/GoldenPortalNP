@@ -144,3 +144,126 @@ function col_xlsx(array $open, array $projects, array $paid, array $S, string $f
         ['name' => 'Collected ' . $from . ' ' . $to, 'header' => [t('th.date'), t('th.vessel'), t('pr.one'), t('nav.customers'), t('pi.no'), t('pi.invoice_no'), t('pt.amount'), t('pay.method'), t('pay.reference'), t('pd.note'), t('th.by')], 'rows' => $pa],
     ]);
 }
+
+/* ------------------------------------------------------------------ statement of account (R78-002) */
+/** Vessels that have proformas (for the picker): id, name, customer, open amount, count. */
+function col_statement_vessels(array $f = []): array {
+    [$sc, $sa] = scope_sql('p');
+    return all("SELECT v.id, v.name, c.name AS customer_name, COUNT(pi.id) n, COALESCE(SUM(CASE WHEN pi.status IN ('issued','sent','partly_paid') THEN pi.gross ELSE 0 END),0) gross_open
+                FROM proformas pi JOIN projects p ON p.id = pi.project_id JOIN vessels v ON v.id = pi.vessel_id LEFT JOIN customers c ON c.id = v.customer_id WHERE pi.status NOT IN ('draft','cancelled') AND {$sc} GROUP BY v.id, v.name, c.name ORDER BY c.name, v.name", $sa);
+}
+/** The statement: one block per vessel — every proforma (not draft / cancelled) up to $asOf with its payments, totals, aging; grand totals. */
+function col_statement(array $vesselIds, ?string $asOf = null, ?string $from = null): ?array {
+    $vesselIds = array_values(array_unique(array_filter(array_map('intval', $vesselIds)))); if (!$vesselIds) return null;
+    $asOf = ($asOf && preg_match('/^\d{4}-\d{2}-\d{2}$/', $asOf)) ? $asOf : date('Y-m-d'); $from = ($from && preg_match('/^\d{4}-\d{2}-\d{2}$/', $from)) ? $from : null;
+    [$sc, $sa] = scope_sql('p'); $in = implode(',', $vesselIds);
+    $vs = all("SELECT v.*, c.name AS customer_name, c.address AS c_address, c.city AS c_city, c.postal_code AS c_postal, c.country AS c_country, c.vat_no AS c_vat, c.email AS c_email FROM vessels v LEFT JOIN customers c ON c.id = v.customer_id WHERE v.id IN ({$in}) ORDER BY c.name, v.name");
+    if (!$vs) return null;
+    $rows = all(COL_SELECT . " WHERE pi.vessel_id IN ({$in}) AND pi.status NOT IN ('draft','cancelled') AND pi.issue_date <= ? AND {$sc}" . ($from ? ' AND pi.issue_date >= ?' : '') . ' ORDER BY pi.vessel_id, p.project_code, pi.issue_date, pi.id', array_merge([$asOf], $sa, $from ? [$from] : []));
+    $ids = array_map(fn($r) => (int)$r['id'], $rows); $pay = []; $inv = [];
+    if ($ids) {
+        $pin = implode(',', $ids);
+        foreach (all("SELECT pp.*, x.invoice_no FROM proforma_payments pp LEFT JOIN proforma_invoices x ON x.id = pp.invoice_id WHERE pp.proforma_id IN ({$pin}) AND pp.paid_on <= ? ORDER BY pp.paid_on, pp.id", [$asOf]) as $p) $pay[(int)$p['proforma_id']][] = $p;
+        foreach (all("SELECT x.* FROM proforma_invoices x WHERE x.proforma_id IN ({$pin}) ORDER BY x.invoice_date, x.id") as $x) $inv[(int)$x['proforma_id']][] = $x;
+    }
+    $t0 = strtotime($asOf); $G = ['invoiced' => 0.0, 'paid' => 0.0, 'open' => 0.0, 'overdue' => 0.0, 'n' => 0, 'n_open' => 0, 'buckets' => array_fill_keys(COL_BUCKETS, 0.0)]; $cur = 'EUR'; $out = [];
+    foreach ($vs as $v) {
+        $V = $v + ['items' => [], 'invoiced' => 0.0, 'paid' => 0.0, 'open' => 0.0, 'overdue' => 0.0, 'n' => 0, 'n_open' => 0, 'buckets' => array_fill_keys(COL_BUCKETS, 0.0), 'iv' => null, 'cur' => 'EUR'];
+        foreach ($rows as $r) {
+            if ((int)$r['vessel_id'] !== (int)$v['id']) continue;
+            $ps = $pay[(int)$r['id']] ?? []; $paidTo = 0.0; foreach ($ps as $p) $paidTo += (float)$p['amount'];
+            foreach ($inv[(int)$r['id']] ?? [] as $x) if ((float)$x['paid_amount'] > 0 && !array_filter($ps, fn($p) => (int)$p['invoice_id'] === (int)$x['id']) && (!$x['paid_at'] || $x['paid_at'] <= $asOf)) $paidTo += (float)$x['paid_amount'];   // paid invoices without a payment row
+            $gross = (float)$r['gross']; $open = max(0.0, round($gross - $paidTo, 2)); $age = $r['due_date'] ? (int) floor(($t0 - strtotime($r['due_date'])) / 86400) : 0; $od = $open > 0.005 && $r['due_date'] && $r['due_date'] < $asOf;
+            $r['payments'] = $ps; $r['invoices'] = $inv[(int)$r['id']] ?? []; $r['paid_to'] = $paidTo; $r['open'] = $open; $r['age'] = $age; $r['overdue'] = $od; $r['bucket'] = $open > 0.005 ? col_bucket($age) : null;
+            $V['items'][] = $r; $V['n']++; $V['invoiced'] += $gross; $V['paid'] += min($gross, $paidTo); $V['open'] += $open; if ($open > 0.005) { $V['n_open']++; $V['buckets'][$r['bucket']] += $open; } if ($od) $V['overdue'] += $open; $V['cur'] = $r['currency']; $cur = $r['currency'];
+            if (!$V['iv'] && $r['id']) { $ivId = (int) scalar('SELECT invoicing_id FROM proformas WHERE id = ?', [(int)$r['id']]); if ($ivId && function_exists('iv_load')) $V['iv'] = iv_load($ivId); }
+        }
+        foreach (['invoiced', 'paid', 'open', 'overdue', 'n', 'n_open'] as $k) $G[$k] += $V[$k]; foreach (COL_BUCKETS as $b) $G['buckets'][$b] += $V['buckets'][$b];
+        $out[] = $V;
+    }
+    $pid = $rows ? (int)$rows[0]['project_id'] : null;
+    $no = (function_exists('br_prefix') && $pid ? br_prefix($pid) : 'GAS') . '-SOA-' . str_replace('-', '', $asOf) . '-' . (count($vs) === 1 ? preg_replace('/[^A-Za-z0-9]+/', '', (string)$vs[0]['name']) : count($vs) . 'V');
+    return ['vessels' => $out, 'totals' => $G, 'cur' => $cur, 'as_of' => $asOf, 'from' => $from, 'doc_no' => $no, 'project_id' => $pid, 'customer_id' => (int)($vs[0]['customer_id'] ?? 0), 'customer_name' => (string)($vs[0]['customer_name'] ?? ''), 'single' => count($vs) === 1, 'multi_customer' => count(array_unique(array_column($vs, 'customer_id'))) > 1];
+}
+function col_statement_pdf(array $D): string {
+    require_once __DIR__ . '/pdf.php';
+    $cur = $D['cur']; $loc = function_exists('et_customer_locale') && $D['customer_id'] ? et_customer_locale($D['customer_id']) : locale(); $T = fn(string $k, array $v = []) => t_in($k, $loc, $v);
+    $m = fn(float $v) => number_format($v, 2, ',', '.') . ' ' . $cur;
+    $pdf = new PdfWriter(); $navy = '#0B1E2D'; $gold = '#C89B3C'; $ink = '#1F2933'; $line = '#C8CED6'; $head = '#EEF2F6'; $red = '#9B2C2C'; $green = '#2E7D32';
+    $L = 15.0; $R = 195.0; $W = $R - $L; $y = 0.0;
+    $bd = function_exists('br_doc') ? br_doc($D['project_id']) : ['logo' => null, 'name' => 'Golden Automation Systems', 'lines' => [], 'footer' => ''];
+    $header = function () use ($pdf, &$y, $navy, $gold, $L, $R, $D, $bd, $T) {
+        $pdf->addPage(); if (!empty($bd['logo'])) $pdf->image($bd['logo'], 150, 12, 45, 16);
+        $pdf->setColor($navy); $pdf->setFont('B', 15); $pdf->text($L, 20, mb_strtoupper($T('soa.doc_title')));
+        $pdf->setFont('R', 8.5); $pdf->setColor($gold); $pdf->text($L, 26, $D['doc_no'] . ' · ' . $T('soa.as_of', ['d' => fmt_date($D['as_of'])]));
+        $pdf->setLineWidth(0.6); $pdf->line($L, 30, $R, 30); $y = 36;
+    };
+    $footer = function () use ($pdf, $L, $R, $D, $bd) { $pdf->setFont('R', 7); $pdf->setColor('#6a7179'); $pdf->text($L, 290, ($bd['footer'] ?: $bd['name']) . ' · ' . $D['doc_no']); $pdf->text($R, 290, (string)$pdf->pageNo(), 'R'); };
+    $need = function (float $hh) use (&$y, $header, $footer) { if ($y + $hh > 276) { $footer(); $header(); } };
+    $h1 = function (string $s) use ($pdf, $navy, $gold, $L, $R, &$y, $need) { $y += 3; $need(20); $pdf->setColor($navy); $pdf->setFont('B', 10.5); $pdf->text($L, $y + 4.5, $s); $pdf->setColor($gold); $pdf->setLineWidth(0.4); $pdf->line($L, $y + 6.5, $R, $y + 6.5); $y += 10; };
+    $header(); $footer();
+    // issuer / addressee
+    $v0 = $D['vessels'][0];
+    $pdf->setFont('B', 8); $pdf->setColor($navy); $pdf->text($L, $y, mb_strtoupper($T('pi.from'))); $pdf->text(110, $y, mb_strtoupper($T('soa.to'))); $y += 4.5;
+    $pdf->setFont('R', 8.5); $pdf->setColor($ink); $yl = $y; foreach (array_merge([(string)$bd['name']], $bd['lines']) as $ln0) foreach ($pdf->wrap($ln0, 88) as $ln) { $pdf->text($L, $yl, $ln); $yl += 4; }
+    $addr = $D['multi_customer'] ? [$T('soa.several_owners')] : array_values(array_filter([(string)($v0['customer_name'] ?? ''), (string)($v0['c_address'] ?? ''), trim((string)($v0['c_postal'] ?? '') . ' ' . (string)($v0['c_city'] ?? '') . ' ' . (string)($v0['c_country'] ?? '')), $v0['c_vat'] ? 'VAT ' . $v0['c_vat'] : '', $T('soa.attn_accounting')]));
+    $yr = $y; foreach ($addr as $ln0) foreach ($pdf->wrap($ln0, 85) as $ln) { $pdf->text(110, $yr, $ln); $yr += 4; }
+    $y = max($yl, $yr) + 4;
+    $pdf->setFont('R', 8.5); $pdf->setColor($ink); $intro = $T('soa.intro', ['d' => fmt_date($D['as_of']), 'v' => implode(', ', array_map(fn($v) => (string)$v['name'], $D['vessels']))]) . ($D['from'] ? ' ' . $T('soa.from_note', ['d' => fmt_date($D['from'])]) : '');
+    $y += $pdf->paragraph($L, $y, $W, $intro, 4.2) + 3;
+    // summary when several vessels
+    if (!$D['single']) {
+        $h1($T('soa.summary'));
+        $cols = [[$T('v.one'), 70, 'L'], [$T('fs.invoiced'), 30, 'R'], [$T('pi.paid_lbl'), 30, 'R'], [$T('fr.open'), 25, 'R'], [$T('fs.overdue'), 25, 'R']];
+        $hrow = function () use ($pdf, $cols, $navy, $head, $L, &$y) { $pdf->setFont('B', 7.5); $pdf->setColor($head); $pdf->rect($L, $y, array_sum(array_column($cols, 1)), 6, 'F'); $pdf->setColor($navy); $x = $L; foreach ($cols as [$lab, $cw, $al]) { $pdf->text($x + 1.5, $y + 4.2, $lab, $al, $cw - 3); $x += $cw; } $y += 6; };
+        $need(14); $hrow();
+        foreach ($D['vessels'] as $V) { $need(6); $pdf->setFont('R', 8); $pdf->setColor($ink); $x = $L; foreach ([(string)$V['name'], $m($V['invoiced']), $m($V['paid']), $m($V['open']), $V['overdue'] > 0 ? $m($V['overdue']) : '—'] as $i => $val) { if ($i === 4 && $V['overdue'] > 0) $pdf->setColor($red); $pdf->text($x + 1.5, $y + 4.2, $val, $cols[$i][2], $cols[$i][1] - 3); $pdf->setColor($ink); $x += $cols[$i][1]; } $pdf->setColor($line); $pdf->setLineWidth(0.2); $pdf->line($L, $y + 5.6, $L + 180, $y + 5.6); $y += 5.8; }
+        $need(8); $pdf->setFont('B', 8.5); $pdf->setColor($navy); $x = $L; foreach ([$T('ob.c_total'), $m($D['totals']['invoiced']), $m($D['totals']['paid']), $m($D['totals']['open']), $D['totals']['overdue'] > 0 ? $m($D['totals']['overdue']) : '—'] as $i => $val) { $pdf->text($x + 1.5, $y + 4.5, $val, $cols[$i][2], $cols[$i][1] - 3); $x += $cols[$i][1]; } $y += 8;
+    }
+    // per vessel
+    foreach ($D['vessels'] as $V) {
+        $h1(($D['single'] ? $T('soa.account_of') . ' ' : '') . $V['name'] . ($V['imo'] ? ' · IMO ' . $V['imo'] : ''));
+        if (!$V['items']) { $pdf->setFont('R', 8.5); $pdf->setColor($ink); $pdf->text($L, $y + 3, $T('soa.nothing')); $y += 8; continue; }
+        $cols = [[$T('th.date'), 18, 'L'], [$T('pi.no'), 28, 'L'], [$T('pi.description'), 54, 'L'], [$T('pi.due'), 18, 'L'], [$T('fr.gross'), 22, 'R'], [$T('pi.paid_lbl'), 20, 'R'], [$T('fr.open'), 20, 'R']]; $cx = []; $xx = $L; foreach ($cols as $c) { $cx[] = $xx; $xx += $c[1]; }
+        $hrow = function () use ($pdf, $cols, $navy, $head, $L, &$y) { $pdf->setFont('B', 7.2); $pdf->setColor($head); $pdf->rect($L, $y, array_sum(array_column($cols, 1)), 6, 'F'); $pdf->setColor($navy); $x = $L; foreach ($cols as [$lab, $cw, $al]) { $pdf->text($x + 1.5, $y + 4.2, $lab, $al, $cw - 3); $x += $cw; } $y += 6; };
+        $need(16); $hrow(); $proj = null;
+        foreach ($V['items'] as $r) {
+            if ($r['project_id'] !== $proj) { $proj = $r['project_id']; $need(12); $pdf->setFont('B', 7.5); $pdf->setColor($navy); $pdf->text($L + 1.5, $y + 4, trim(($r['project_code'] ?: '') . ' — ' . $r['project_name'])); $y += 5.5; }
+            $desc = (string)$r['title'] . ($r['offer_no'] ? ' · ' . $r['offer_no'] : '') . ($r['invoice_nos'] ? ' · ' . $T('pi.invoice_no') . ' ' . $r['invoice_nos'] : '');
+            $pdf->setFont('R', 7.4); $lines = $pdf->wrap($desc, 50); $hh = max(5.2, count($lines) * 3.6 + 1.6); $need($hh + 4 * count($r['payments']) + 6);
+            $x = $L; $cells = [fmt_date($r['issue_date']), (string)$r['pi_no'], null, $r['due_date'] ? fmt_date($r['due_date']) : '—', $m((float)$r['gross']), $m($r['paid_to']), $r['open'] > 0.005 ? $m($r['open']) : '—'];
+            foreach ($cells as $i => $val) { $pdf->setColor($i === 3 && $r['overdue'] ? $red : $ink); if ($i === 2) foreach ($lines as $k => $ln) $pdf->text($x + 1.5, $y + 3.6 + $k * 3.6, $ln); else $pdf->text($x + 1.5, $y + 3.6, (string)$val, $cols[$i][2], $cols[$i][1] - 3); $x += $cols[$i][1]; }
+            if ($r['overdue']) { $pdf->setFont('B', 6.6); $pdf->setColor($red); $pdf->text($cx[1] + 1.5, $y + 3.6 + 3.4, $T('soa.overdue_days', ['n' => $r['age']])); $hh = max($hh, 8.4); }
+            $y += $hh;
+            foreach ($r['payments'] as $p) { $pdf->setFont('R', 7.2); $pdf->setColor($green); $pdf->text($L + 1.5, $y + 3.2, fmt_date($p['paid_on'])); $pdf->text($cx[1] + 1.5, $y + 3.2, '» ' . $T('soa.payment') . ' · ' . $T('pay.m_' . $p['method']) . ($p['reference'] ? ' · ' . $p['reference'] : '') . ($p['invoice_no'] ? ' · ' . $T('pi.invoice_no') . ' ' . $p['invoice_no'] : '')); $pdf->text($cx[5] + 1.5, $y + 3.2, '−' . $m((float)$p['amount']), 'R', 17); $y += 4; }
+            $pdf->setColor($line); $pdf->setLineWidth(0.2); $pdf->line($L, $y + 0.6, $L + 180, $y + 0.6); $y += 1.2;
+        }
+        $need(22); $pdf->setFont('B', 8); $pdf->setColor($navy);
+        $pdf->text($L + 1.5, $y + 4.5, $T('soa.vessel_total', ['n' => $V['n']])); foreach ([4 => $m($V['invoiced']), 5 => $m($V['paid']), 6 => $m($V['open'])] as $i => $val) $pdf->text($cx[$i] + 1.5, $y + 4.5, $val, 'R', $cols[$i][1] - 3); $y += 7;
+        $pdf->setFont('R', 7.8); $pdf->setColor($V['overdue'] > 0 ? $red : $ink); $pdf->text($L + 1.5, $y + 3.5, $T('soa.aging_line', ['o' => $m($V['overdue']), 'a' => $m($V['buckets']['current']), 'b' => $m($V['buckets']['d30']), 'c' => $m($V['buckets']['d60']), 'd' => $m($V['buckets']['d90'] + $V['buckets']['d90p'])])); $y += 7;
+        if ($V['iv'] && (($V['iv']['bank'] ?? '') || ($V['iv']['iban'] ?? ''))) { $need(16); $pdf->setFont('B', 8); $pdf->setColor($navy); $pdf->text($L, $y + 3, $T('pi.payment_to')); $y += 7; $pdf->setFont('R', 8); $pdf->setColor($ink); foreach (array_filter([(string)($V['iv']['legal_name'] ?? ''), ($V['iv']['bank'] ?? '') ? $T('iv.bank') . ': ' . $V['iv']['bank'] : '', ($V['iv']['iban'] ?? '') ? 'IBAN ' . $V['iv']['iban'] . (($V['iv']['swift'] ?? '') ? ' · SWIFT ' . $V['iv']['swift'] : '') : '']) as $ln) { $pdf->text($L, $y + 3, $ln); $y += 4; } $y += 2; }
+    }
+    $need(24); $y += 2; $pdf->setFont('R', 8.5); $pdf->setColor($ink); $y += $pdf->paragraph($L, $y, $W, $T('soa.closing', ['o' => $m($D['totals']['open'])]), 4.2) + 4;
+    $u = current_user(); $pdf->setFont('R', 8); $pdf->setColor('#6a7179'); $pdf->text($L, $y + 3, $T('ob.prepared_by') . ': ' . (string)($u['full_name'] ?? '') . ' · ' . $T('soa.accounting_dept') . ' · ' . $bd['name'] . ' · ' . fmt_date(date('Y-m-d')));
+    return $pdf->bytes($D['doc_no']);
+}
+function col_statement_sheets(array $D): array {
+    $cur = $D['cur'];
+    $sum = []; foreach ($D['vessels'] as $V) $sum[] = [(string)$V['name'], (string)($V['customer_name'] ?? ''), $V['n'], round($V['invoiced'], 2), round($V['paid'], 2), round($V['open'], 2), round($V['overdue'], 2), round($V['buckets']['current'], 2), round($V['buckets']['d30'], 2), round($V['buckets']['d60'], 2), round($V['buckets']['d90'], 2), round($V['buckets']['d90p'], 2)];
+    $sum[] = [t('ob.c_total'), '', $D['totals']['n'], round($D['totals']['invoiced'], 2), round($D['totals']['paid'], 2), round($D['totals']['open'], 2), round($D['totals']['overdue'], 2), round($D['totals']['buckets']['current'], 2), round($D['totals']['buckets']['d30'], 2), round($D['totals']['buckets']['d60'], 2), round($D['totals']['buckets']['d90'], 2), round($D['totals']['buckets']['d90p'], 2)];
+    $it = []; $pa = [];
+    foreach ($D['vessels'] as $V) foreach ($V['items'] as $r) { $it[] = [(string)$V['name'], (string)$r['project_code'], (string)$r['pi_no'], (string)$r['title'], (string)$r['offer_no'], (string)($r['invoice_nos'] ?? ''), (string)$r['issue_date'], (string)$r['due_date'], $r['overdue'] ? $r['age'] : 0, round((float)$r['gross'], 2), round($r['paid_to'], 2), round($r['open'], 2), t('pi.s_' . $r['status'])]; foreach ($r['payments'] as $p) $pa[] = [(string)$V['name'], (string)$r['pi_no'], (string)$p['paid_on'], round((float)$p['amount'], 2), t('pay.m_' . $p['method']), (string)($p['reference'] ?? ''), (string)($p['invoice_no'] ?? '')]; }
+    return [
+        ['name' => 'Summary', 'first' => true, 'header' => [t('v.one'), t('rp.customer'), 'PI', t('fs.invoiced') . ' ' . $cur, t('pi.paid_lbl'), t('fr.open'), t('fs.overdue'), t('col.b_current'), t('col.b_d30'), t('col.b_d60'), t('col.b_d90'), t('col.b_d90p')], 'rows' => $sum],
+        ['name' => 'Items', 'header' => [t('v.one'), t('pr.one'), t('pi.no'), t('pi.description'), t('of.no'), t('pi.invoice_no'), t('pi.issue_date'), t('pi.due'), t('soa.days_overdue'), t('fr.gross'), t('pi.paid_lbl'), t('fr.open'), t('th.status')], 'rows' => $it],
+        ['name' => 'Payments', 'header' => [t('v.one'), t('pi.no'), t('th.date'), t('pt.amount'), t('pay.method'), t('pay.reference'), t('pi.invoice_no')], 'rows' => $pa],
+    ];
+}
+function col_statement_xlsx(array $D): void { require_once __DIR__ . '/xlsxw.php'; xlsx_download($D['doc_no'] . '.xlsx', col_statement_sheets($D)); }
+/** E-mail attachment key st:<ids>:<pdf|xlsx>[:asof[:from]] — bytes + name + mime (R78-002). */
+function col_em_attachment(array $p): ?array {
+    if (!col_can()) return null;
+    $D = col_statement(explode(',', (string)($p[1] ?? '')), $p[3] ?? null, $p[4] ?? null); if (!$D) return null;
+    if (($p[2] ?? 'pdf') === 'xlsx') { require_once __DIR__ . '/xlsxw.php'; return [xlsx_bytes(col_statement_sheets($D)), $D['doc_no'] . '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']; }
+    return [col_statement_pdf($D), $D['doc_no'] . '.pdf', 'application/pdf'];
+}

@@ -95,6 +95,8 @@ function em_attachment(string $key): ?array {
             $f = wf_get((int)($p[1] ?? 0)); if (!$f) return null;
             $docx = ($p[2] ?? 'pdf') === 'docx';
             return [$docx ? wf_render_docx($f) : wf_render_pdf($f), $f['doc_no'] . ($docx ? '.docx' : '.pdf'), $docx ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf'];
+        case 'st':   // R78-002: statement of account (collections)
+            return function_exists('col_em_attachment') ? col_em_attachment($p) : null;
     }
     return null;
 }
