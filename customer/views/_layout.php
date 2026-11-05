@@ -37,7 +37,7 @@ function nav_groups(): array {
     if ($staff && function_exists('col_can') && col_can()) $acc['items'][] = ['collections', t('col.title'), '📥'];   // R78-001: accounting · sales · owner · CEO · GM
     if ($acc['items']) array_splice($g, 4, 0, [$acc]);
     // R79-001: Procurement group — inventory and suppliers (requisitions, POs, receipts follow in R80)
-    if ($staff && function_exists('pr_can') && (pr_can() || (function_exists('prq_can') && prq_can()))) { $prc = ['key' => 'procurement', 'label' => t('nav.g_procurement'), 'items' => []]; if (function_exists('prq_can') && prq_can()) $prc['items'][] = ['requisitions', t('prq.title'), '🧾']; if (pr_can()) { $prc['items'][] = ['inventory', t('stk.title'), '📦']; $prc['items'][] = ['suppliers', t('sup.title'), '🏭']; } array_splice($g, array_search('library', array_column($g, 'key'), true), 0, [$prc]); }
+    if ($staff && function_exists('pr_can') && (pr_can() || (function_exists('prq_can') && prq_can()))) { $prc = ['key' => 'procurement', 'label' => t('nav.g_procurement'), 'items' => []]; if (function_exists('prq_can') && prq_can()) $prc['items'][] = ['requisitions', t('prq.title'), '🧾']; if (pr_can()) { if (function_exists('po_can') && po_can()) $prc['items'][] = ['purchase_orders', t('po.title'), '🛒']; $prc['items'][] = ['inventory', t('stk.title'), '📦']; $prc['items'][] = ['suppliers', t('sup.title'), '🏭']; } array_splice($g, array_search('library', array_column($g, 'key'), true), 0, [$prc]); }
     // R62-002: HR is its own group in the left column, between Work and Commercial
     $hr = ['key' => 'hr', 'label' => t('nav.g_hr'), 'items' => []];
     if ($staff && function_exists('hr2_has') && hr2_has() && hr_can()) $hr['items'][] = ['hr_dashboard', t('hr.dashboard'), '📊'];

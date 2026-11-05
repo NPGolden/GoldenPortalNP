@@ -251,6 +251,9 @@ function prq_sub_summary(int $sid): array {
 /** Item picker (JSON): code · description · unit · on hand · free · last price. */
 function prq_item_search(string $q, int $limit = 15): array {
     $rows = stk_items(['q' => $q, 'status' => 'active'], $limit); $out = [];
-    foreach ($rows as $r) $out[] = ['id' => (int)$r['id'], 'code' => $r['code'], 'desc' => $r['description'], 'maker' => $r['maker'], 'pn' => $r['factory_code'], 'unit' => $r['unit'], 'on_hand' => (float)$r['on_hand'], 'free' => (float)$r['on_hand'] - (float)$r['reserved'], 'price' => stk_price_visible() && $r['last_price'] !== null ? (float)$r['last_price'] : null, 'cur' => $r['currency']];
+    $withAlts = !empty($_GET['alts']) && function_exists('stk_alternatives_of');
+    foreach ($rows as $r) { $alts = [];
+        if ($withAlts) foreach (stk_alternatives_of((int)$r['id']) as $a) { if ($a['status'] !== 'approved') continue; $ai = $a['alt_item_id'] ? stk_item((int)$a['alt_item_id']) : null; $alts[] = ['id' => $ai ? (int)$ai['id'] : 0, 'code' => $ai ? $ai['code'] : null, 'desc' => $ai ? $ai['description'] : ($a['description'] ?: trim(($a['maker'] ?? '') . ' ' . ($a['part_no'] ?? ''))), 'maker' => $ai ? $ai['maker'] : $a['maker'], 'pn' => $ai ? $ai['factory_code'] : $a['part_no'], 'unit' => $ai ? $ai['unit'] : $r['unit'], 'free' => $ai ? (float)$ai['on_hand'] - (float)$ai['reserved'] : 0, 'note' => $a['note']]; }
+        $out[] = ['alts' => $alts, 'id' => (int)$r['id'], 'code' => $r['code'], 'desc' => $r['description'], 'maker' => $r['maker'], 'pn' => $r['factory_code'], 'unit' => $r['unit'], 'on_hand' => (float)$r['on_hand'], 'free' => (float)$r['on_hand'] - (float)$r['reserved'], 'price' => stk_price_visible() && $r['last_price'] !== null ? (float)$r['last_price'] : null, 'cur' => $r['currency']]; }
     return $out;
 }

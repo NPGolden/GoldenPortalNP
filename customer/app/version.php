@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.92.0';
+const CP_VERSION = '1.93.0';
 const CP_BUILD   = '2026-11-05';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R80-003', 'version' => '1.93.0', 'date' => '2026-11-05', 'title' => 'Procurement R80-003 — RFQs and purchase orders per supplier: "To buy" basket of approved requisition lines (suggested supplier = preferred, else last bought from) → RFQ or PO with number series per branch (<prefix>-PO-<yy>-<nnnn>, <prefix>-RFQ-<yy>-<nnnn>), supplier defaults (currency, Incoterms, terms, advance) copied from the supplier card, lines from requisitions or the inventory picker with the approved alternatives of an item offered, prices from the pricing rule for that supplier or typed, VAT, PDF (branch letterhead), ✉ card to the supplier's contacts (marks the document sent), states draft → sent → confirmed → partly received → received → closed / cancelled (requisition lines back to "to buy"), RFQ quote typed per line (price, lead time) and awarded into a PO; Purchase orders block on the sub-project Procurement tab; Procurement menu entry.', 'db' => 'install/migrate_cp_r80_003_po.sql', 'check' => 'r80c'],
         ['ref' => 'GAS-CP-R80-002', 'version' => '1.92.0', 'date' => '2026-11-05', 'title' => 'Procurement R80-002 — Engineering BOM revisions per sub-project (R0, R1 … typed, uploaded from xlsx/csv with codes matched to the inventory, or copied from an earlier revision), stock coverage per line (covered · partly · no stock · not in inventory, quantity to buy, estimate from the pricing rule), Engineering issues → Procurement proposes changes with a reason (alternative part from the inventory or free text, quantity, remove, add) → Engineering accepts (applied to the line, "was …" kept) or rejects → Procurement approves when nothing is pending (current BOM; earlier approved revision superseded) or rejects back to Engineering; "Requisition for the uncovered lines" creates a draft purchase requisition linked to the BOM; Excel export; notifications and log; BOM block on the sub-project Procurement tab.', 'db' => 'install/migrate_cp_r80_002_bom.sql', 'check' => 'r80b'],
         ['ref' => 'GAS-CP-R80-001', 'version' => '1.91.0', 'date' => '2026-11-05', 'title' => 'Procurement R80-001 — Purchase requisitions: staff of the enabled disciplines, PMs, procurement and management ask for parts against a project / sub-project, stock or a service call (inventory picker or free text, needed-by date, estimate from the pricing rule); submit → Procurement checks the parts budget of the sub-project (budget − committed − spent) → within budget: approved, stock on hand reserved, rest marked to buy; over budget or no budget: Management approval with the reason; warehouse issues reserved lines (stock out + parts cost on the sub-project); PR number <project>.<sub>.PR.<n>; log and notifications; sub-project hub gains a Sales tab (offers, proformas) and a Procurement tab (parts budget line, requisitions); Procurement menu entry Requisitions.', 'db' => 'install/migrate_cp_r80_requisitions.sql', 'check' => 'r80'],
         ['ref' => 'GAS-CP-R79-002', 'version' => '1.90.1', 'date' => '2026-11-05', 'title' => 'Procurement assistant: Claude researches the online market with web search — replacement / equivalent parts (maker successor first, then other makers with approvals and differences) and current prices and availability at EU distributors, every proposal with its source page; results saved per item (or free query on Inventory › Research), "Keep as alternative" (proposed / approved / rejected) and "Record this price" into the price history; web-search cost and searches-per-research in Settings › Assistant.', 'db' => 'install/migrate_cp_r79_002_research.sql', 'check' => 'r79b'],
@@ -342,6 +343,7 @@ function cp_migration_state(): array {
         'r79b' => $has("SHOW TABLES LIKE 'inv_research'"),
         'r80' => $has("SHOW TABLES LIKE 'pr_requests'"),
         'r80b' => $has("SHOW TABLES LIKE 'bom_revisions'"),
+        'r80c' => $has("SHOW TABLES LIKE 'po_orders'"),
         'r70d' => $has("SHOW COLUMNS FROM customer_users LIKE 'clocks'"),
         'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),
         'r67' => $has("SHOW TABLES LIKE 'hr_flows'") && $has("SHOW TABLES LIKE 'hr_flow_templates'") && $has("SHOW TABLES LIKE 'hr_invitations'"),

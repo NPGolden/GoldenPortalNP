@@ -39,4 +39,13 @@ $S = prq_sub_summary($id);
   <?php foreach ($reqs as $r): ?><tr><td><a href="<?= url('requisition', ['id' => (int)$r['id']]) ?>" style="font-family:var(--mono);"><?= e($r['pr_no']) ?></a></td><td><?= e($r['title'] ?: tt('prq.p_' . $r['purpose'])) ?></td><td><?= e($r['requester_name'] ?? '') ?></td><td><?= fmt_date($r['need_date']) ?></td><td class="num"><?= (int)$r['n_lines'] ?><?= (int)$r['n_to_buy'] ? ' <span class="pill pill--gold">' . (int)$r['n_to_buy'] . '</span>' : '' ?></td><?php if ($priced): ?><td class="num"><?= e($mon($r['est_total'] !== null ? (float)$r['est_total'] : null)) ?></td><?php endif; ?><td><?= prq_pill($r['status']) ?><?= (int)$r['over_budget'] && in_array($r['status'], ['submitted', 'mgmt', 'approved'], true) ? ' ' . pill('warn', '!') : '' ?></td></tr><?php endforeach; ?>
   </tbody></table>
 </div>
-<div class="card"><h2><?= tt('prq.po_soon') ?></h2><p class="hint"><?= tt('prq.po_soon_hint') ?></p></div>
+<?php if (function_exists('po_has') && po_has()): $pos = po_list(['kind' => 'po', 'subproject_id' => $id, 'status' => '']); $PS = po_sub_summary($id); ?>
+<div class="card">
+  <div class="page-head" style="margin-bottom:6px;"><div><h2 style="margin:0;">🛒 <?= tt('po.pos') ?> <span class="hint" style="font-weight:400;">(<?= count($pos) ?>)</span></h2><p class="hint"><?= $priced ? e(t('po.sub_lede', ['o' => prq_money($PS['ordered']), 'r' => prq_money($PS['received'])])) : tt('po.sub_lede_np') ?></p></div>
+    <div class="btn-row"><?php if (po_admin()): ?><a class="btn btn--ghost btn--sm" href="<?= url('purchase_orders', ['tab' => 'tobuy']) ?>">🧺 <?= tt('po.tobuy') ?></a><a class="btn btn--gold btn--sm" href="<?= url('purchase_order', ['id' => 0, 'kind' => 'po', 'project_id' => $pid, 'subproject_id' => $id]) ?>">+ <?= tt('po.new_po') ?></a><?php endif; ?></div></div>
+  <table class="tbl tbl--wrap"><thead><tr><th><?= tt('po.no') ?></th><th><?= tt('po.supplier') ?></th><th><?= tt('po.delivery') ?></th><th class="num"><?= tt('prq.lines') ?></th><?php if ($priced): ?><th class="num"><?= tt('po.net') ?></th><?php endif; ?><th><?= tt('prq.status') ?></th></tr></thead><tbody>
+  <?php if (!$pos): ?><tr><td colspan="6" class="hint"><?= tt('po.none') ?></td></tr><?php endif; ?>
+  <?php foreach ($pos as $r): ?><tr><td><a href="<?= url('purchase_order', ['id' => (int)$r['id']]) ?>" style="font-family:var(--mono);"><?= e($r['po_no']) ?></a></td><td><?= e($r['supplier']) ?></td><td<?= $r['delivery_date'] && in_array($r['status'], PO_OPEN, true) && $r['delivery_date'] < date('Y-m-d') ? ' style="color:var(--red)"' : '' ?>><?= fmt_date($r['delivery_date']) ?></td><td class="num"><?= (int)$r['n_lines'] ?></td><?php if ($priced): ?><td class="num"><?= e(po_money((float)$r['subtotal'], $r['currency'])) ?></td><?php endif; ?><td><?= po_pill($r['status']) ?></td></tr><?php endforeach; ?>
+  </tbody></table>
+</div>
+<?php endif; ?>
