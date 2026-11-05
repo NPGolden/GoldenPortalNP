@@ -1850,3 +1850,9 @@ html[data-theme="dark"] .pp-col { background: #16263A; } html[data-theme="dark"]
 @media print { .col-fu, .fltbar, .btn-row { display: none !important; } }
 /* R78-002 statement of account */
 .soa-vessels { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 4px 14px; } .soa-v { margin: 0; } .soa-form .field { margin: 0; }
+/* R78-004 drop-down with check boxes */
+.msel { position: relative; } .msel > summary { list-style: none; cursor: pointer; border: 1px solid var(--line); border-radius: 8px; padding: 8px 32px 8px 10px; background: #fff; min-height: 38px; font-size: 14px; color: var(--ink-2); position: relative; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.msel > summary::-webkit-details-marker { display: none; } .msel > summary::after { content: '▾'; position: absolute; right: 10px; top: 8px; color: var(--ink-2); } .msel > summary.has { color: var(--ink); font-weight: 600; }
+.msel-pop { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; min-width: 100%; width: max(100%, 460px); background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(11,30,45,.14); padding: 8px; }
+.msel-q { width: 100%; margin-bottom: 6px; } .msel-list { max-height: 300px; overflow: auto; } .msel-i { display: flex; align-items: center; gap: 8px; margin: 0; padding: 5px 6px; border-radius: 6px; } .msel-i input { flex: 0 0 auto; margin: 0; } .msel-i:hover { background: #F3F5F8; } .msel-i[hidden] { display: none; }
+.msel-foot { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 6px; font-size: 12px; }

@@ -214,7 +214,7 @@ function col_statement_pdf(array $D): string {
     // summary when several vessels
     if (!$D['single']) {
         $h1($T('soa.summary'));
-        $cols = [[$T('v.one'), 70, 'L'], [$T('fs.invoiced'), 30, 'R'], [$T('pi.paid_lbl'), 30, 'R'], [$T('fr.open'), 25, 'R'], [$T('fs.overdue'), 25, 'R']];
+        $cols = [[$T('v.one'), 68, 'L'], [$T('fs.invoiced'), 28, 'R'], [$T('pi.paid_lbl'), 28, 'R'], [$T('fr.open'), 28, 'R'], [$T('fs.overdue'), 28, 'R']];
         $hrow = function () use ($pdf, $cols, $navy, $head, $L, &$y) { $pdf->setFont('B', 7.5); $pdf->setColor($head); $pdf->rect($L, $y, array_sum(array_column($cols, 1)), 6, 'F'); $pdf->setColor($navy); $x = $L; foreach ($cols as [$lab, $cw, $al]) { $pdf->text($x + 1.5, $y + 4.2, $lab, $al, $cw - 3); $x += $cw; } $y += 6; };
         $need(14); $hrow();
         foreach ($D['vessels'] as $V) { $need(6); $pdf->setFont('R', 8); $pdf->setColor($ink); $x = $L; foreach ([(string)$V['name'], $m($V['invoiced']), $m($V['paid']), $m($V['open']), $V['overdue'] > 0 ? $m($V['overdue']) : '—'] as $i => $val) { if ($i === 4 && $V['overdue'] > 0) $pdf->setColor($red); $pdf->text($x + 1.5, $y + 4.2, $val, $cols[$i][2], $cols[$i][1] - 3); $pdf->setColor($ink); $x += $cols[$i][1]; } $pdf->setColor($line); $pdf->setLineWidth(0.2); $pdf->line($L, $y + 5.6, $L + 180, $y + 5.6); $y += 5.8; }
@@ -224,23 +224,23 @@ function col_statement_pdf(array $D): string {
     foreach ($D['vessels'] as $V) {
         $h1(($D['single'] ? $T('soa.account_of') . ' ' : '') . $V['name'] . ($V['imo'] ? ' · IMO ' . $V['imo'] : ''));
         if (!$V['items']) { $pdf->setFont('R', 8.5); $pdf->setColor($ink); $pdf->text($L, $y + 3, $T('soa.nothing')); $y += 8; continue; }
-        $cols = [[$T('th.date'), 18, 'L'], [$T('pi.no'), 28, 'L'], [$T('pi.description'), 54, 'L'], [$T('pi.due'), 18, 'L'], [$T('fr.gross'), 22, 'R'], [$T('pi.paid_lbl'), 20, 'R'], [$T('fr.open'), 20, 'R']]; $cx = []; $xx = $L; foreach ($cols as $c) { $cx[] = $xx; $xx += $c[1]; }
+        $cols = [[$T('th.date'), 17, 'L'], [$T('pi.no'), 30, 'L'], [$T('pi.description'), 48, 'L'], [$T('pi.due'), 17, 'L'], [$T('fr.gross'), 24, 'R'], [$T('pi.paid_lbl'), 22, 'R'], [$T('fr.open'), 22, 'R']]; $cx = []; $xx = $L; foreach ($cols as $c) { $cx[] = $xx; $xx += $c[1]; }
         $hrow = function () use ($pdf, $cols, $navy, $head, $L, &$y) { $pdf->setFont('B', 7.2); $pdf->setColor($head); $pdf->rect($L, $y, array_sum(array_column($cols, 1)), 6, 'F'); $pdf->setColor($navy); $x = $L; foreach ($cols as [$lab, $cw, $al]) { $pdf->text($x + 1.5, $y + 4.2, $lab, $al, $cw - 3); $x += $cw; } $y += 6; };
         $need(16); $hrow(); $proj = null;
         foreach ($V['items'] as $r) {
             if ($r['project_id'] !== $proj) { $proj = $r['project_id']; $need(12); $pdf->setFont('B', 7.5); $pdf->setColor($navy); $pdf->text($L + 1.5, $y + 4, trim(($r['project_code'] ?: '') . ' — ' . $r['project_name'])); $y += 5.5; }
             $desc = (string)$r['title'] . ($r['offer_no'] ? ' · ' . $r['offer_no'] : '') . ($r['invoice_nos'] ? ' · ' . $T('pi.invoice_no') . ' ' . $r['invoice_nos'] : '');
-            $pdf->setFont('R', 7.4); $lines = $pdf->wrap($desc, 50); $hh = max(5.2, count($lines) * 3.6 + 1.6); $need($hh + 4 * count($r['payments']) + 6);
+            $pdf->setFont('R', 7.4); $lines = $pdf->wrap($desc, 44); $noLines = $pdf->wrap((string)$r['pi_no'], 26); $hh = max(5.2, max(count($lines), count($noLines) + ($r['overdue'] ? 1 : 0)) * 3.6 + 1.6); $need($hh + 4 * count($r['payments']) + 6);
             $x = $L; $cells = [fmt_date($r['issue_date']), (string)$r['pi_no'], null, $r['due_date'] ? fmt_date($r['due_date']) : '—', $m((float)$r['gross']), $m($r['paid_to']), $r['open'] > 0.005 ? $m($r['open']) : '—'];
-            foreach ($cells as $i => $val) { $pdf->setColor($i === 3 && $r['overdue'] ? $red : $ink); if ($i === 2) foreach ($lines as $k => $ln) $pdf->text($x + 1.5, $y + 3.6 + $k * 3.6, $ln); else $pdf->text($x + 1.5, $y + 3.6, (string)$val, $cols[$i][2], $cols[$i][1] - 3); $x += $cols[$i][1]; }
-            if ($r['overdue']) { $pdf->setFont('B', 6.6); $pdf->setColor($red); $pdf->text($cx[1] + 1.5, $y + 3.6 + 3.4, $T('soa.overdue_days', ['n' => $r['age']])); $hh = max($hh, 8.4); }
+            foreach ($cells as $i => $val) { $pdf->setColor($i === 3 && $r['overdue'] ? $red : $ink); if ($i === 2) foreach ($lines as $k => $ln) $pdf->text($x + 1.5, $y + 3.6 + $k * 3.6, $ln); elseif ($i === 1) foreach ($noLines as $k => $ln) $pdf->text($x + 1.5, $y + 3.6 + $k * 3.6, $ln); else $pdf->text($x + 1.5, $y + 3.6, (string)$val, $cols[$i][2], $cols[$i][1] - 3); $x += $cols[$i][1]; }
+            if ($r['overdue']) { $pdf->setFont('B', 6.6); $pdf->setColor($red); $pdf->text($cx[1] + 1.5, $y + 3.6 + 3.6 * count($noLines), $T('soa.overdue_days', ['n' => $r['age']])); }
             $y += $hh;
             foreach ($r['payments'] as $p) { $pdf->setFont('R', 7.2); $pdf->setColor($green); $pdf->text($L + 1.5, $y + 3.2, fmt_date($p['paid_on'])); $pdf->text($cx[1] + 1.5, $y + 3.2, '» ' . $T('soa.payment') . ' · ' . $T('pay.m_' . $p['method']) . ($p['reference'] ? ' · ' . $p['reference'] : '') . ($p['invoice_no'] ? ' · ' . $T('pi.invoice_no') . ' ' . $p['invoice_no'] : '')); $pdf->text($cx[5] + 1.5, $y + 3.2, '−' . $m((float)$p['amount']), 'R', 17); $y += 4; }
             $pdf->setColor($line); $pdf->setLineWidth(0.2); $pdf->line($L, $y + 0.6, $L + 180, $y + 0.6); $y += 1.2;
         }
-        $need(22); $pdf->setFont('B', 8); $pdf->setColor($navy);
+        $need(22); $pdf->setFont('B', 7.6); $pdf->setColor($navy);
         $pdf->text($L + 1.5, $y + 4.5, $T('soa.vessel_total', ['n' => $V['n']])); foreach ([4 => $m($V['invoiced']), 5 => $m($V['paid']), 6 => $m($V['open'])] as $i => $val) $pdf->text($cx[$i] + 1.5, $y + 4.5, $val, 'R', $cols[$i][1] - 3); $y += 7;
-        $pdf->setFont('R', 7.8); $pdf->setColor($V['overdue'] > 0 ? $red : $ink); $pdf->text($L + 1.5, $y + 3.5, $T('soa.aging_line', ['o' => $m($V['overdue']), 'a' => $m($V['buckets']['current']), 'b' => $m($V['buckets']['d30']), 'c' => $m($V['buckets']['d60']), 'd' => $m($V['buckets']['d90'] + $V['buckets']['d90p'])])); $y += 7;
+        $pdf->setFont('R', 7.4); $pdf->setColor($V['overdue'] > 0 ? $red : $ink); $pdf->text($L + 1.5, $y + 3.5, $T('soa.aging_line', ['o' => $m($V['overdue']), 'a' => $m($V['buckets']['current']), 'b' => $m($V['buckets']['d30']), 'c' => $m($V['buckets']['d60']), 'd' => $m($V['buckets']['d90'] + $V['buckets']['d90p'])])); $y += 7;
         if ($V['iv'] && (($V['iv']['bank'] ?? '') || ($V['iv']['iban'] ?? ''))) { $need(16); $pdf->setFont('B', 8); $pdf->setColor($navy); $pdf->text($L, $y + 3, $T('pi.payment_to')); $y += 7; $pdf->setFont('R', 8); $pdf->setColor($ink); foreach (array_filter([(string)($V['iv']['legal_name'] ?? ''), ($V['iv']['bank'] ?? '') ? $T('iv.bank') . ': ' . $V['iv']['bank'] : '', ($V['iv']['iban'] ?? '') ? 'IBAN ' . $V['iv']['iban'] . (($V['iv']['swift'] ?? '') ? ' · SWIFT ' . $V['iv']['swift'] : '') : '']) as $ln) { $pdf->text($L, $y + 3, $ln); $y += 4; } $y += 2; }
     }
     $need(24); $y += 2; $pdf->setFont('R', 8.5); $pdf->setColor($ink); $y += $pdf->paragraph($L, $y, $W, $T('soa.closing', ['o' => $m($D['totals']['open'])]), 4.2) + 4;

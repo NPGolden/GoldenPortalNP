@@ -72,8 +72,15 @@ layout_head(t('col.title'), 'collections');
   <h2>📄 <?= tt('soa.title') ?></h2>
   <p class="hint" style="margin-top:0;"><?= tt('soa.hint') ?></p>
   <form method="get" action="index.php#col-soa" class="soa-form"><input type="hidden" name="p" value="collections"><?php foreach (array_filter($f) as $k => $v): ?><input type="hidden" name="<?= e($k) ?>" value="<?= e((string)$v) ?>"><?php endforeach; ?><input type="hidden" name="from" value="<?= e($from) ?>"><input type="hidden" name="to" value="<?= e($to) ?>">
-    <div class="soa-vessels"><?php if (!$svs): ?><p class="hint"><?= tt('pi.none') ?></p><?php endif; ?><?php foreach ($svs as $x): ?><label class="chk soa-v"><input type="checkbox" name="v[]" value="<?= (int)$x['id'] ?>"<?= in_array((int)$x['id'], $selV, true) ? ' checked' : '' ?>> <b><?= e($x['name']) ?></b> <span class="hint"><?= e($x['customer_name'] ?: '') ?> · <?= (int)$x['n'] ?> PI<?= (float)$x['gross_open'] > 0 ? ' · ' . e($m((float)$x['gross_open'])) . ' ' . tt('fr.open') : '' ?></span></label><?php endforeach; ?></div>
-    <div class="btn-row" style="align-items:flex-end;gap:10px;margin-top:8px;">
+    <div class="btn-row" style="align-items:flex-end;gap:10px;">
+      <div class="field" style="min-width:320px;"><label><?= tt('soa.vessels_lbl') ?></label>
+        <details class="msel" data-msel data-empty="<?= tt('soa.pick_vessels') ?>" data-one="<?= tt('soa.n_vessels_1') ?>" data-many="<?= tt('soa.n_vessels') ?>"><summary class="msel-sum"><?= tt('soa.pick_vessels') ?></summary>
+          <div class="msel-pop"><input type="search" class="msel-q" placeholder="<?= tt('pr.search') ?>…" autocomplete="off">
+            <div class="msel-list"><?php if (!$svs): ?><p class="hint"><?= tt('pi.none') ?></p><?php endif; ?><?php foreach ($svs as $x): ?><label class="chk msel-i" data-text="<?= e(mb_strtolower($x['name'] . ' ' . ($x['customer_name'] ?: ''))) ?>"><input type="checkbox" name="v[]" value="<?= (int)$x['id'] ?>"<?= in_array((int)$x['id'], $selV, true) ? ' checked' : '' ?>> <b><?= e($x['name']) ?></b> <span class="hint"><?= e($x['customer_name'] ?: '') ?> · <?= (int)$x['n'] ?> PI<?= (float)$x['gross_open'] > 0 ? ' · ' . e($m((float)$x['gross_open'])) . ' ' . tt('fr.open') : '' ?></span></label><?php endforeach; ?></div>
+            <div class="msel-foot"><button type="button" class="linkbtn msel-none"><?= tt('soa.none_sel') ?></button></div>
+          </div>
+        </details>
+      </div>
       <div class="field"><label><?= tt('soa.as_of_lbl') ?></label><input type="date" name="asof" value="<?= e($asOf) ?>"></div>
       <div class="field"><label><?= tt('soa.from_lbl') ?></label><input type="date" name="sfrom" value="<?= e($soaFrom) ?>"></div>
       <button class="btn btn--sm" type="submit"><?= tt('soa.prepare') ?></button>

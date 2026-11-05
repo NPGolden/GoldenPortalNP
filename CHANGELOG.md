@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.89.2** (build 2026-11-05). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.89.3** (build 2026-11-05). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.89.3 | GAS-CP-R78-004 | 2026-11-05 | Statement of account: vessels chosen from a searchable drop-down with check boxes instead of a grid; PDF columns re-cut — long proforma numbers wrap, amounts no longer touch. | — |
 | 1.89.2 | GAS-CP-R78-003 | 2026-11-05 | Accounting is its own menu group after Commercial — Accounting register, Proforma invoices, Cash flow, Collections (each entry only for those who may open it); Commercial keeps offers, approvals, pipeline, sales and contacts. | — |
 | 1.89.1 | GAS-CP-R78-002 | 2026-11-05 | Statement of account per vessel or selected vessels (PDF + Excel): every proforma issued, payments received, open balance, aging and bank details, addressed to the owner's accounting — prepared from the Collections page and e-mailed with the ✉ card (Outlook draft with the statement attached; e-mail template kind "Statement of account"). | — |
 | 1.89.0 | GAS-CP-R78-001 | 2026-11-05 | Accounting › Collections: every open proforma per vessel and project with aging, promised date and next follow-up (history kept), financial status per project, collected in a period, projected collection of the next 30 days by week, Excel + print — for the accounting and sales departments, the Owner, the CEO and the General Manager only. Portal accounts (Settings) are now managed only by the Owner, the CEO and the General Manager, not by plain administrators. | `install/migrate_cp_r78_collections.sql` |

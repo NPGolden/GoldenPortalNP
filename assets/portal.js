@@ -576,3 +576,16 @@ document.addEventListener('click', function (ev) {
   /* R77-013: [data-toggle="#id"] shows / hides a row or block */
   document.querySelectorAll('[data-toggle]').forEach(function (b) { b.addEventListener('click', function () { var t = document.querySelector(b.dataset.toggle); if (t) t.classList.toggle('is-hidden'); }); });
 })();
+/* R78-004: [data-msel] — a drop-down with check boxes (several vessels): search, count in the summary, closes on outside click */
+(function () {
+  document.querySelectorAll('[data-msel]').forEach(function (d) {
+    var sum = d.querySelector('.msel-sum'), q = d.querySelector('.msel-q'), items = d.querySelectorAll('.msel-i');
+    var upd = function () { var on = Array.prototype.filter.call(d.querySelectorAll('input[type=checkbox]'), function (c) { return c.checked; }); var names = on.map(function (c) { return c.parentNode.querySelector('b').textContent; });
+      sum.textContent = !on.length ? d.dataset.empty : (on.length === 1 ? names[0] : (on.length <= 3 ? names.join(', ') : d.dataset.many.replace('{n}', on.length))); sum.classList.toggle('has', on.length > 0); };
+    d.addEventListener('change', upd); upd();
+    if (q) q.addEventListener('input', function () { var s = q.value.toLowerCase().trim(); items.forEach(function (i) { i.hidden = s !== '' && (i.dataset.text || '').indexOf(s) < 0; }); });
+    var none = d.querySelector('.msel-none'); if (none) none.addEventListener('click', function () { d.querySelectorAll('input[type=checkbox]').forEach(function (c) { c.checked = false; }); upd(); });
+    document.addEventListener('click', function (ev) { if (d.open && !d.contains(ev.target)) d.open = false; });
+    d.addEventListener('toggle', function () { if (d.open && q) q.focus(); });
+  });
+})();
