@@ -5,12 +5,12 @@ $u = require_staff(); if (!function_exists('pr_can') || !pr_can()) { http_respon
 $admin = pr_admin(); $priced = stk_price_visible(); $q = trim((string)($_GET['q'] ?? '')); $st = in_array($_GET['status'] ?? '', ['active', 'inactive', 'all'], true) ? $_GET['status'] : 'active';
 $id = (int)($_GET['id'] ?? 0); $sup = $id ? sup_load($id) : null; $edit = ($id === 0 && isset($_GET['new']) && $admin) || ($sup && isset($_GET['edit']) && $admin);
 $rows = sup_list(['q' => $q, 'status' => $st]); $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : ''; $v = fn(string $k) => e((string)($sup[$k] ?? ''));
-$prices = $sup && $priced ? sup_prices($id) : []; $contacts = $sup ? all('SELECT id, full_name, role, email, phone FROM contacts WHERE company_id = ? ORDER BY full_name', [$id]) : [];
+$prices = $sup && $priced ? sup_prices($id) : []; $contacts = $sup ? all('SELECT id, full_name, position AS role, email, phone FROM contacts WHERE company_id = ? ORDER BY full_name', [$id]) : [];
 layout_head(t('sup.title'), 'suppliers');
 ?>
 <div class="page-head">
   <div><h1>🏭 <?= tt('sup.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('sup.lede') ?></p></div>
-  <?php if ($admin): ?><div class="btn-row"><a class="btn btn--gold btn--sm" href="<?= url('suppliers', ['new' => 1]) ?>#sup-form">+ <?= tt('sup.new') ?></a></div><?php endif; ?>
+  <?php if ($admin): ?><div class="btn-row"><a class="btn btn--gold btn--sm" href="<?= url('suppliers', ['new' => 1]) ?>#sup-form">+ <?= tt('sup.new') ?></a><a class="btn btn--ghost btn--sm" href="<?= url('suppliers_import') ?>">⤒ <?= tt('sup.import') ?></a></div><?php endif; ?>
 </div>
 <div class="cols">
 <div>
@@ -35,7 +35,7 @@ layout_head(t('sup.title'), 'suppliers');
     <form method="post" action="<?= url('suppliers', $sup ? ['id' => $id] : []) ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sup_save"><input type="hidden" name="id" value="<?= $id ?>">
       <div class="field"><label><?= tt('sup.one') ?> *</label><input name="name" required maxlength="160" value="<?= $v('name') ?>"></div>
       <div class="grid grid-2">
-        <div class="field"><label><?= tt('sup.vat') ?></label><input name="vat_no" maxlength="40" value="<?= $v('vat_no') ?>"></div><div class="field"><label><?= tt('au.email') ?></label><input name="email" type="email" maxlength="190" value="<?= $v('email') ?>"></div>
+        <div class="field"><label><?= tt('sup.vat') ?></label><input name="vat_no" maxlength="40" value="<?= $v('vat_no') ?>"></div><div class="field"><label><?= tt('sup.erp_code') ?></label><input name="erp_code" maxlength="40" value="<?= $v('erp_code') ?>"></div><div class="field"><label><?= tt('au.email') ?></label><input name="email" type="email" maxlength="190" value="<?= $v('email') ?>"></div>
         <div class="field"><label><?= tt('ct.phone') ?></label><input name="phone" maxlength="60" value="<?= $v('phone') ?>"></div><div class="field"><label><?= tt('co.website') ?></label><input name="website" maxlength="190" value="<?= $v('website') ?>"></div>
         <div class="field" style="grid-column:1/-1;"><label><?= tt('sup.address') ?></label><input name="address" maxlength="200" value="<?= $v('address') ?>"></div>
         <div class="field"><label><?= tt('sup.postal') ?></label><input name="postal_code" maxlength="20" value="<?= $v('postal_code') ?>"></div><div class="field"><label><?= tt('co.city') ?></label><input name="city" maxlength="80" value="<?= $v('city') ?>"></div>
@@ -60,6 +60,13 @@ layout_head(t('sup.title'), 'suppliers');
       <div class="kv"><span><?= tt('ct.reach') ?></span><b><?= $sup['email'] ? '<a href="mailto:' . e($sup['email']) . '">' . e($sup['email']) . '</a>' : '' ?><?= $sup['phone'] ? ' · ' . e($sup['phone']) : '' ?><?= $sup['website'] ? ' · <a href="' . e(preg_match('#^https?://#', $sup['website']) ? $sup['website'] : 'https://' . $sup['website']) . '" target="_blank" rel="noopener">' . e($sup['website']) . '</a>' : '' ?></b></div>
       <?php if ($sup['sup_remarks']): ?><div class="kv" style="grid-column:1/-1;"><span><?= tt('sup.remarks') ?></span><b style="font-weight:400;"><?= nl2br(e($sup['sup_remarks'])) ?></b></div><?php endif; ?>
     </div>
+    <?php if (function_exists('sup_makers_has') && sup_makers_has()): $mk = sup_makers($id); ?>
+    <div style="margin-top:10px;"><b><?= tt('sup.makers') ?></b> <span class="hint"><?= tt('sup.makers_hint') ?></span><br>
+      <?php if (!$mk): ?><span class="hint">—</span><?php endif; ?>
+      <?php foreach ($mk as $m): ?><span class="pill <?= $m['is_primary'] ? 'pill--gold' : 'pill--mute' ?>" style="margin:2px 4px 2px 0;"><?= e($m['maker']) ?><?= $m['is_primary'] ? ' ★' : '' ?><?php if ($admin): ?> <form method="post" action="<?= url('suppliers', ['id' => $id]) ?>" style="display:inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sup_maker_primary"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="mid" value="<?= (int)$m['id'] ?>"><?php if (!$m['is_primary']): ?><button class="linkbtn" type="submit" title="<?= tt('sup.maker_primary') ?>">☆</button><?php endif; ?></form><form method="post" action="<?= url('suppliers', ['id' => $id]) ?>" style="display:inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sup_maker_del"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="mid" value="<?= (int)$m['id'] ?>"><button class="linkbtn" type="submit" title="<?= tt('btn.delete') ?>">×</button></form><?php endif; ?></span><?php endforeach; ?>
+      <?php if ($admin): ?><form method="post" action="<?= url('suppliers', ['id' => $id]) ?>" class="btn-row" style="margin-top:6px;" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sup_maker_add"><input type="hidden" name="id" value="<?= $id ?>"><input name="maker" list="makers-dl" maxlength="80" placeholder="<?= tt('sup.maker_ph') ?>" required style="max-width:16em;"><datalist id="makers-dl"><?php foreach (sup_all_makers() as $m0): ?><option value="<?= e($m0) ?>"><?php endforeach; ?></datalist><label class="chk"><input type="checkbox" name="primary" value="1"> <?= tt('sup.maker_primary') ?></label><button class="btn btn--sm" type="submit">+ <?= tt('sup.maker_add') ?></button></form><?php endif; ?>
+    </div>
+    <?php endif; ?>
     <p class="hint" style="margin-top:8px;">👤 <?= tt('ct.title') ?>: <?php if (!$contacts): ?>— <a href="<?= url('contact_edit', ['company' => $id]) ?>"><?= tt('ct.new') ?></a><?php else: foreach ($contacts as $c): ?><a href="<?= url('contact', ['id' => (int)$c['id']]) ?>"><?= e($c['full_name']) ?></a><?= $c['role'] ? ' <span class="hint">(' . e($c['role']) . ')</span>' : '' ?> · <?php endforeach; endif; ?></p>
   </div>
   <?php if ($priced): ?><div class="card"><h2>💶 <?= tt('sup.pricelist') ?> <span class="count"><?= count($prices) ?></span></h2>

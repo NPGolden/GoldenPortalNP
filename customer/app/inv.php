@@ -234,7 +234,7 @@ function sup_list(array $f = []): array {
                        (SELECT MAX(p.priced_at) FROM inv_prices p WHERE p.supplier_id = co.id) AS last_priced
                 FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE " . implode(' AND ', $w) . ' ORDER BY co.is_active DESC, co.name', $a);
 }
-function sup_load(int $id): ?array { $r = one("SELECT co.*, sd.vat_no, sd.address, sd.postal_code, sd.terms_days, sd.advance_pct, sd.currency AS sup_currency, sd.lead_days, sd.incoterms, sd.rating, sd.remarks AS sup_remarks FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE co.id = ?", [$id]); return $r ?: null; }
+function sup_load(int $id): ?array { $r = one("SELECT co.*, sd.erp_code, sd.vat_no, sd.address, sd.postal_code, sd.terms_days, sd.advance_pct, sd.currency AS sup_currency, sd.lead_days, sd.incoterms, sd.rating, sd.remarks AS sup_remarks FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE co.id = ?", [$id]); return $r ?: null; }
 function sup_prices(int $id): array { return all('SELECT p.*, i.code, i.description, i.unit, i.currency AS item_currency FROM inv_prices p JOIN inv_items i ON i.id = p.item_id WHERE p.supplier_id = ? AND p.id = (SELECT MAX(p2.id) FROM inv_prices p2 WHERE p2.item_id = p.item_id AND p2.supplier_id = p.supplier_id) ORDER BY i.code', [$id]); }
 function sup_save_from_post(int $id): int {
     require_pr_admin(); $s = fn(string $k, int $max) => ($v = trim((string)($_POST[$k] ?? ''))) === '' ? null : mb_substr($v, 0, $max);
@@ -246,6 +246,7 @@ function sup_save_from_post(int $id): int {
     $d = fn(string $k) => ($_POST[$k] ?? '') === '' ? null : (int)$_POST[$k];
     q('INSERT INTO supplier_details (company_id, vat_no, address, postal_code, terms_days, advance_pct, currency, lead_days, incoterms, rating, remarks) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE vat_no = VALUES(vat_no), address = VALUES(address), postal_code = VALUES(postal_code), terms_days = VALUES(terms_days), advance_pct = VALUES(advance_pct), currency = VALUES(currency), lead_days = VALUES(lead_days), incoterms = VALUES(incoterms), rating = VALUES(rating), remarks = VALUES(remarks)',
       [$id, $s('vat_no', 40), $s('address', 200), $s('postal_code', 20), $d('terms_days'), ($_POST['advance_pct'] ?? '') === '' ? null : round((float) str_replace(',', '.', (string)$_POST['advance_pct']), 2), strtoupper(mb_substr((string)($_POST['currency'] ?? 'EUR'), 0, 3)) ?: 'EUR', $d('lead_days'), $s('incoterms', 20), ($_POST['rating'] ?? '') === '' ? null : max(1, min(5, (int)$_POST['rating'])), $s('sup_remarks', 4000)]);
+    if (sup_makers_has()) q('UPDATE supplier_details SET erp_code = ? WHERE company_id = ?', [$s('erp_code', 40), $id]);   // R82-002
     return $id;
 }
 
@@ -368,3 +369,69 @@ function stk_alternative_add(int $itemId, array $a, ?int $researchId = null): in
 }
 function stk_alternative_status(int $id, string $status): void { require_pr_admin(); if (!in_array($status, ['proposed', 'approved', 'rejected'], true)) return; q('UPDATE inv_alternatives SET status = ? WHERE id = ?', [$status, $id]); }
 function stk_alternative_delete(int $id): void { require_pr_admin(); q('DELETE FROM inv_alternatives WHERE id = ?', [$id]); }
+
+/* ================================================================== R82-002: supplier ↔ makers · ERP supplier import */
+function sup_makers_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW TABLES LIKE 'supplier_makers'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+/** Makers a supplier sells (free text, matched case-insensitively to inv_items.maker). */
+function sup_makers(int $supplierId): array { return sup_makers_has() ? all('SELECT * FROM supplier_makers WHERE supplier_id = ? ORDER BY is_primary DESC, maker', [$supplierId]) : []; }
+function sup_maker_add(int $supplierId, string $maker, bool $primary = false, ?string $note = null): void {
+    $maker = mb_substr(trim($maker), 0, 80); if ($maker === '' || !sup_makers_has()) return;
+    q('INSERT INTO supplier_makers (supplier_id, maker, is_primary, note) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE is_primary = GREATEST(is_primary, VALUES(is_primary)), note = COALESCE(VALUES(note), note)', [$supplierId, $maker, $primary ? 1 : 0, $note]);
+}
+function sup_maker_delete(int $supplierId, int $id): void { require_pr_admin(); q('DELETE FROM supplier_makers WHERE id = ? AND supplier_id = ?', [$id, $supplierId]); }
+function sup_maker_primary(int $supplierId, int $id): void { require_pr_admin(); q('UPDATE supplier_makers SET is_primary = IF(id = ?, 1, 0) WHERE supplier_id = ?', [$id, $supplierId]); }
+/** Suppliers of a maker — primary ones first, then by name. */
+function sup_for_maker(?string $maker): array { if (!$maker || !sup_makers_has()) return []; return all('SELECT co.id, co.name, sm.is_primary FROM supplier_makers sm JOIN companies co ON co.id = sm.supplier_id WHERE LOWER(sm.maker) = LOWER(?) AND co.is_active = 1 ORDER BY sm.is_primary DESC, co.name', [trim($maker)]); }
+/** The supplier suggested for an item: preferred → last bought from → primary supplier of its maker → any supplier of its maker. */
+function sup_suggest_for_item(array $item): ?array {
+    if (!empty($item['preferred_supplier_id'])) return ['id' => (int)$item['preferred_supplier_id'], 'name' => $item['preferred_supplier'] ?? null, 'why' => 'preferred'];
+    if (!empty($item['last_supplier_id'])) return ['id' => (int)$item['last_supplier_id'], 'name' => $item['last_supplier'] ?? null, 'why' => 'last'];
+    $m = sup_for_maker($item['maker'] ?? null); if ($m) return ['id' => (int)$m[0]['id'], 'name' => $m[0]['name'], 'why' => 'maker'];
+    return null;
+}
+/** Makers known to the portal: from the inventory and from the suppliers. */
+function sup_all_makers(): array { $a = stk_makers(); if (sup_makers_has()) $a = array_merge($a, array_column(all('SELECT DISTINCT maker FROM supplier_makers ORDER BY maker'), 'maker')); $u = []; foreach ($a as $m) $u[mb_strtolower($m)] = $m; ksort($u); return array_values($u); }
+
+/* ---- ERP supplier import: Επωνυμία · ΑΦΜ · Κωδικός · Διεύθυνση · Τ.Κ. · Πόλη · Χώρα · Τηλέφωνο · Email · Website · Όροι (ημέρες) · Προκαταβολή % · Νόμισμα · Incoterms · Lead days · Κατασκευαστές (comma / ; separated) · Σημειώσεις */
+function sup_import_map(array $header): array {
+    $H = ['name' => ['επωνυμία', 'επωνυμια', 'name', 'supplier', 'προμηθευτής', 'company', 'εταιρεία'], 'vat_no' => ['αφμ', 'α.φ.μ.', 'vat', 'vat no', 'vat no.', 'vat number', 'p.iva', 'piva'], 'erp_code' => ['κωδικός', 'κωδ.', 'code', 'erp', 'erp code', 'κωδικός erp', 'supplier code'],
+          'address' => ['διεύθυνση', 'address', 'οδός'], 'postal_code' => ['τ.κ.', 'τκ', 'postal code', 'zip', 'postcode'], 'city' => ['πόλη', 'city'], 'country' => ['χώρα', 'country'], 'phone' => ['τηλέφωνο', 'τηλ.', 'phone', 'tel', 'telephone'], 'email' => ['email', 'e-mail', 'ηλ. ταχυδρομείο'], 'website' => ['website', 'web', 'site', 'ιστοσελίδα'],
+          'terms_days' => ['όροι', 'όροι πληρωμής', 'terms', 'payment terms', 'terms days', 'ημέρες πίστωσης', 'credit days'], 'advance_pct' => ['προκαταβολή', 'advance', 'advance %'], 'currency' => ['νόμισμα', 'currency'], 'incoterms' => ['incoterms', 'incoterm'], 'lead_days' => ['lead', 'lead days', 'lead time', 'χρόνος παράδοσης'], 'makers' => ['κατασκευαστές', 'κατασκευαστής', 'makers', 'maker', 'brands', 'brand', 'manufacturers'], 'notes' => ['σημειώσεις', 'notes', 'remarks', 'παρατηρήσεις']];
+    $map = []; foreach ($header as $i => $h) { $n = mb_strtolower(trim((string)$h)); if ($n === '') continue; foreach ($H as $k => $alts) if (!isset($map[$k]) && in_array($n, $alts, true)) { $map[$k] = $i; break; } }
+    return $map;
+}
+function sup_import_parse(string $path): array {
+    require_once __DIR__ . '/xlsx.php'; $rows = xlsx_rows($path); if (count($rows) < 2) throw new RuntimeException(t('stk.imp_empty'));
+    $map = sup_import_map($rows[0]); if (!isset($map['name'])) throw new RuntimeException(t('sup.imp_no_name'));
+    $byVat = []; $byErp = []; $byName = [];
+    foreach (all('SELECT co.id, co.name, sd.vat_no, sd.erp_code FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE co.kind = \'supplier\'') as $e) { if ($e['vat_no']) $byVat[preg_replace('/\D/', '', (string)$e['vat_no'])] = (int)$e['id']; if ($e['erp_code']) $byErp[mb_strtolower((string)$e['erp_code'])] = (int)$e['id']; $byName[mb_strtolower(trim((string)$e['name']))] = (int)$e['id']; }
+    $out = []; $warn = []; $seen = []; $nNew = 0; $nUpd = 0;
+    $num = function ($v): ?float { $v = str_replace(['%', ' '], '', trim((string)$v)); if ($v === '') return null; $v = str_replace(',', '.', $v); return is_numeric($v) ? (float)$v : null; };
+    foreach (array_slice($rows, 1) as $i => $r) {
+        $line = $i + 2; $g = fn(string $k) => isset($map[$k]) ? trim((string)($r[$map[$k]] ?? '')) : '';
+        $name = mb_substr($g('name'), 0, 160); if ($name === '') continue; $key = mb_strtolower($name); if (isset($seen[$key])) { $warn[] = t('sup.imp_w_dup', ['l' => $line, 'n' => $name]); continue; } $seen[$key] = true;
+        $vat = preg_replace('/\D/', '', $g('vat_no')) ?: null; $erp = mb_substr($g('erp_code'), 0, 40) ?: null;
+        $id = ($vat && isset($byVat[$vat])) ? $byVat[$vat] : (($erp && isset($byErp[mb_strtolower($erp)])) ? $byErp[mb_strtolower($erp)] : ($byName[$key] ?? 0));
+        $makers = array_values(array_unique(array_filter(array_map(fn($m) => mb_substr(trim($m), 0, 80), preg_split('/[;,\/|]+/', $g('makers')) ?: []))));
+        $email = mb_strtolower($g('email')); if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) { $warn[] = t('sup.imp_w_email', ['l' => $line, 'n' => $name]); $email = ''; }
+        $inc = strtoupper($g('incoterms')); $cur = strtoupper(mb_substr($g('currency'), 0, 3));
+        $out[] = ['line' => $line, 'id' => $id, 'name' => $name, 'vat_no' => $vat ? mb_substr($g('vat_no'), 0, 40) : null, 'erp_code' => $erp, 'address' => mb_substr($g('address'), 0, 200) ?: null, 'postal_code' => mb_substr($g('postal_code'), 0, 20) ?: null, 'city' => mb_substr($g('city'), 0, 80) ?: null, 'country' => mb_substr($g('country'), 0, 80) ?: null, 'phone' => mb_substr($g('phone'), 0, 60) ?: null, 'email' => $email ?: null, 'website' => mb_substr($g('website'), 0, 190) ?: null,
+                  'terms_days' => ($t = $num($g('terms_days'))) !== null ? (int)$t : null, 'advance_pct' => $num($g('advance_pct')), 'currency' => preg_match('/^[A-Z]{3}$/', $cur) ? $cur : null, 'incoterms' => preg_match('/^[A-Z]{3}$/', $inc) ? $inc : null, 'lead_days' => ($l = $num($g('lead_days'))) !== null ? (int)$l : null, 'makers' => $makers, 'notes' => mb_substr($g('notes'), 0, 4000) ?: null];
+        if ($id) $nUpd++; else $nNew++;
+    }
+    if (!$out) throw new RuntimeException(t('stk.imp_empty'));
+    return ['rows' => $out, 'map' => $map, 'warnings' => $warn, 'n_new' => $nNew, 'n_upd' => $nUpd];
+}
+/** Apply: new suppliers created, existing ones updated field by field (empty cells never erase), makers added (never removed). */
+function sup_import_apply(array $pv, bool $updateExisting = true): array {
+    require_pr_admin(); $created = 0; $updated = 0; $makersN = 0;
+    foreach ($pv['rows'] as $r) {
+        $id = (int)$r['id'];
+        if ($id) { if (!$updateExisting) continue; $set = []; $a = []; foreach (['country', 'city', 'website', 'email', 'phone'] as $k) if ($r[$k] !== null) { $set[] = "$k = ?"; $a[] = $r[$k]; } if ($r['notes'] !== null) { $set[] = 'notes = COALESCE(NULLIF(notes, \'\'), ?)'; $a[] = $r['notes']; } if ($set) { $a[] = $id; q('UPDATE companies SET ' . implode(', ', $set) . ' WHERE id = ?', $a); } $updated++; }
+        else { q("INSERT INTO companies (name, kind, country, city, website, email, phone, notes, is_active) VALUES (?,'supplier',?,?,?,?,?,?,1)", [$r['name'], $r['country'], $r['city'], $r['website'], $r['email'], $r['phone'], $r['notes']]); $id = (int) db()->lastInsertId(); $created++; }
+        q('INSERT INTO supplier_details (company_id, erp_code, vat_no, address, postal_code, terms_days, advance_pct, currency, lead_days, incoterms) VALUES (?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE erp_code = COALESCE(VALUES(erp_code), erp_code), vat_no = COALESCE(VALUES(vat_no), vat_no), address = COALESCE(VALUES(address), address), postal_code = COALESCE(VALUES(postal_code), postal_code), terms_days = COALESCE(VALUES(terms_days), terms_days), advance_pct = COALESCE(VALUES(advance_pct), advance_pct), currency = COALESCE(VALUES(currency), currency), lead_days = COALESCE(VALUES(lead_days), lead_days), incoterms = COALESCE(VALUES(incoterms), incoterms)',
+          [$id, $r['erp_code'], $r['vat_no'], $r['address'], $r['postal_code'], $r['terms_days'], $r['advance_pct'], $r['currency'], $r['lead_days'], $r['incoterms']]);
+        foreach ($r['makers'] as $k => $m) { sup_maker_add($id, $m, $k === 0 && !scalar('SELECT 1 FROM supplier_makers WHERE supplier_id = ? AND is_primary = 1', [$id])); $makersN++; }
+    }
+    cache_bump_later('inv'); return ['created' => $created, 'updated' => $updated, 'makers' => $makersN];
+}

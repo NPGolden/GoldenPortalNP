@@ -29,7 +29,7 @@ layout_head(t('po.title'), 'purchase_orders');
     <thead><tr><th></th><th><?= tt('prq.no') ?></th><th><?= tt('prq.project') ?></th><th><?= tt('prq.item') ?></th><th><?= tt('prq.desc') ?></th><th class="num"><?= tt('po.open_qty') ?></th><th><?= tt('prq.need') ?></th><th><?= tt('po.suggested') ?></th></tr></thead>
     <tbody>
     <?php if (!$rows): ?><tr><td colspan="8" class="hint"><?= tt('po.tobuy_none') ?></td></tr><?php endif; ?>
-    <?php foreach ($rows as $r): $sug = $r['preferred_supplier_id'] ?: $r['last_supplier_id']; ?>
+    <?php foreach ($rows as $r): $sug = $r['preferred_supplier_id'] ?: ($r['last_supplier_id'] ?: ($r['maker_supplier_id'] ?? 0)); ?>
       <tr><td><input type="checkbox" name="pr_line[]" value="<?= (int)$r['id'] ?>" data-sup="<?= (int)$sug ?>" data-p="<?= (int)$r['project_id'] ?>" data-s="<?= (int)$r['subproject_id'] ?>"></td>
         <td><a href="<?= url('requisition', ['id' => (int)$r['request_id']]) ?>" style="font-family:var(--mono);"><?= e($r['pr_no']) ?></a></td>
         <td><?= e($r['project_code'] . ($r['sub_code'] ? ' · ' . $r['sub_code'] : '')) ?></td>
@@ -37,7 +37,7 @@ layout_head(t('po.title'), 'purchase_orders');
         <td><?= e($r['description']) ?><?= $r['maker'] || $r['part_no'] ? '<br><small class="hint">' . e(trim(($r['maker'] ?? '') . ' ' . ($r['part_no'] ?? ''))) . '</small>' : '' ?></td>
         <td class="num"><?= stk_qty((float)$r['open_qty']) ?> <?= e($r['unit']) ?><?= (float)$r['qty_ordered'] > 0 ? '<br><small class="hint">' . e(t('po.already_ordered', ['q' => stk_qty((float)$r['qty_ordered'])])) . '</small>' : '' ?></td>
         <td><?= fmt_date($r['need_date'] ?: $r['r_need']) ?></td>
-        <td><?= e($r['preferred_supplier'] ?: $r['last_supplier'] ?: '—') ?></td></tr>
+        <td><?= e($r['preferred_supplier'] ?: $r['last_supplier'] ?: ($r['maker_supplier'] ?? '—')) ?><?= !$r['preferred_supplier'] && !$r['last_supplier'] && !empty($r['maker_supplier']) ? ' <small class="hint">(' . e($r['item_maker'] ?: $r['maker']) . ')</small>' : '' ?></td></tr>
     <?php endforeach; ?>
     </tbody>
   </table>

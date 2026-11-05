@@ -51,9 +51,10 @@ function po_to_buy(array $f = []): array {
     $w = ["r.status = 'approved'", "l.status IN ('to_buy','ordered')", 'l.qty - l.qty_reserved - l.qty_ordered > 0.0005']; $a = [];
     if (!empty($f['subproject_id'])) { $w[] = 'r.subproject_id = ?'; $a[] = (int)$f['subproject_id']; }
     if (!empty($f['project_id'])) { $w[] = 'r.project_id = ?'; $a[] = (int)$f['project_id']; }
-    $rows = all('SELECT l.*, r.pr_no, r.project_id, r.subproject_id, r.need_date AS r_need, p.project_code, s.code AS sub_code, i.code AS item_code, i.preferred_supplier_id, i.last_supplier_id, ps.name AS preferred_supplier, ls.name AS last_supplier, l.qty - l.qty_reserved - l.qty_ordered AS open_qty
+    $rows = all('SELECT l.*, r.pr_no, r.project_id, r.subproject_id, r.need_date AS r_need, p.project_code, s.code AS sub_code, i.code AS item_code, i.maker AS item_maker, i.preferred_supplier_id, i.last_supplier_id, ps.name AS preferred_supplier, ls.name AS last_supplier, l.qty - l.qty_reserved - l.qty_ordered AS open_qty
                  FROM pr_lines l JOIN pr_requests r ON r.id = l.request_id JOIN projects p ON p.id = r.project_id LEFT JOIN subprojects s ON s.id = r.subproject_id LEFT JOIN inv_items i ON i.id = l.item_id LEFT JOIN companies ps ON ps.id = i.preferred_supplier_id LEFT JOIN companies ls ON ls.id = i.last_supplier_id
                  WHERE ' . implode(' AND ', $w) . ' ORDER BY COALESCE(i.preferred_supplier_id, i.last_supplier_id, 0), r.id, l.seq', $a);
+    if (function_exists('sup_for_maker')) foreach ($rows as &$r) { if (!$r['preferred_supplier_id'] && !$r['last_supplier_id']) { $mk = sup_for_maker($r['item_maker'] ?: $r['maker']); if ($mk) { $r['maker_supplier_id'] = (int)$mk[0]['id']; $r['maker_supplier'] = $mk[0]['name']; } } } unset($r);   // R82-002: the supplier of the maker when nothing was bought yet
     return $rows;
 }
 
