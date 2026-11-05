@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.89.4** (build 2026-11-05). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.90.0** (build 2026-11-05). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.90.0 | GAS-CP-R79-001 | 2026-11-05 | Procurement R79 — Inventory (3 830 ERP codes imported with stock, location, category, maker, barcode, factory code and last buying price), categories, warehouses, stock movements (receipt, issue to sub-project → actual cost, adjustment / stocktake, transfer), price history kept to 100 records per code with a chart, pricing rule (last · mean of 2 · mean of n · weighted · lowest · same supplier · last + %) with overrides per category and supplier, suppliers with terms / lead time / rating / price list / bank details, Procurement menu group, Procurement and Warehouse account flags, Settings › Procurement. | `install/migrate_cp_r79_inventory.sql` |
 | 1.89.4 | GAS-CP-R78-005 | 2026-11-05 | Production order log (and the equipment timeline): the date column takes its own width and long entries wrap instead of overlapping; the log shows the last 10 entries with a "Show n older entries" button. | — |
 | 1.89.3 | GAS-CP-R78-004 | 2026-11-05 | Statement of account: vessels chosen from a searchable drop-down with check boxes instead of a grid; PDF columns re-cut — long proforma numbers wrap, amounts no longer touch. | — |
 | 1.89.2 | GAS-CP-R78-003 | 2026-11-05 | Accounting is its own menu group after Commercial — Accounting register, Proforma invoices, Cash flow, Collections (each entry only for those who may open it); Commercial keeps offers, approvals, pipeline, sales and contacts. | — |

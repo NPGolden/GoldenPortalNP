@@ -1858,3 +1858,6 @@ html[data-theme="dark"] .pp-col { background: #16263A; } html[data-theme="dark"]
 .msel-pop { position: absolute; z-index: 30; top: calc(100% + 4px); left: 0; min-width: 100%; width: max(100%, 460px); background: #fff; border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 8px 24px rgba(11,30,45,.14); padding: 8px; }
 .msel-q { width: 100%; margin-bottom: 6px; } .msel-list { max-height: 300px; overflow: auto; } .msel-i { display: flex; align-items: center; gap: 8px; margin: 0; padding: 5px 6px; border-radius: 6px; } .msel-i input { flex: 0 0 auto; margin: 0; } .msel-i:hover { background: #F3F5F8; } .msel-i[hidden] { display: none; }
 .msel-foot { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 6px; font-size: 12px; }
+/* GAS-CP-R79-001 — Inventory */
+.inv-list td.mono { white-space: nowrap; } .inv-move .field { margin: 0 0 8px; }
+.pr-disc { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 12px; } .pr-disc label { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; }

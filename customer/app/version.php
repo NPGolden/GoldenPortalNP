@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.89.4';
+const CP_VERSION = '1.90.0';
 const CP_BUILD   = '2026-11-05';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R79-001', 'version' => '1.90.0', 'date' => '2026-11-05', 'title' => 'Procurement R79 — Inventory (3 830 ERP codes imported with stock, location, category, maker, barcode, factory code and last buying price), categories, warehouses, stock movements (receipt, issue to sub-project → actual cost, adjustment / stocktake, transfer), price history kept to 100 records per code with a chart, pricing rule (last · mean of 2 · mean of n · weighted · lowest · same supplier · last + %) with overrides per category and supplier, suppliers with terms / lead time / rating / price list / bank details, Procurement menu group, Procurement and Warehouse account flags, Settings › Procurement.', 'db' => 'install/migrate_cp_r79_inventory.sql', 'check' => 'r79'],
         ['ref' => 'GAS-CP-R78-005', 'version' => '1.89.4', 'date' => '2026-11-05', 'title' => 'Production order log (and the equipment timeline): the date column takes its own width and long entries wrap instead of overlapping; the log shows the last 10 entries with a "Show n older entries" button.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R78-004', 'version' => '1.89.3', 'date' => '2026-11-05', 'title' => 'Statement of account: vessels chosen from a searchable drop-down with check boxes instead of a grid; PDF columns re-cut — long proforma numbers wrap, amounts no longer touch.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R78-003', 'version' => '1.89.2', 'date' => '2026-11-05', 'title' => 'Accounting is its own menu group after Commercial — Accounting register, Proforma invoices, Cash flow, Collections (each entry only for those who may open it); Commercial keeps offers, approvals, pipeline, sales and contacts.', 'db' => null, 'check' => null],
@@ -334,6 +335,7 @@ function cp_migration_state(): array {
         'r77' => $has("SHOW TABLES LIKE 'fc_reports'"),
         'r77b' => $has("SHOW COLUMNS FROM hr_requests LIKE 'reason_code'"),
         'r78' => $has("SHOW TABLES LIKE 'pi_followups'"),
+        'r79' => $has("SHOW TABLES LIKE 'inv_items'"),
         'r70d' => $has("SHOW COLUMNS FROM customer_users LIKE 'clocks'"),
         'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),
         'r67' => $has("SHOW TABLES LIKE 'hr_flows'") && $has("SHOW TABLES LIKE 'hr_flow_templates'") && $has("SHOW TABLES LIKE 'hr_invitations'"),

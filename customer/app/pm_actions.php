@@ -928,6 +928,19 @@ function pm_handle_action(string $action, string $page): bool {
         case 'pi_status': { require_staff(); $pid = (int)$_POST['id']; pi_set_status($pid, (string)($_POST['status'] ?? '')); flash('good', t('pi.status_saved')); redirect('proforma', ['id' => $pid, '_r' => uniqid()]); }
         case 'pinv_save': { require_staff(); $pid = (int)$_POST['id']; pinv_save_from_post($pid); flash('good', t('pi.inv_saved')); redirect('proforma', ['id' => $pid, '_r' => uniqid()], '#invoices'); }
         case 'pinv_delete': { require_staff(); $pid = pinv_delete((int)$_POST['inv_id']); flash('good', t('pi.inv_deleted')); redirect('proforma', ['id' => $pid, '_r' => uniqid()], '#invoices'); }
+        case 'inv_item_save': { require_pr_admin(); $id = stk_item_save_from_post((int)($_POST['id'] ?? 0)); flash('good', t('stk.saved')); redirect('inventory_item', ['id' => $id, '_r' => uniqid()]); }   // R79-001
+        case 'stk_move': { require_pr_wh(); stk_move_from_post(); flash('good', t('stk.move_saved')); redirect('inventory_item', ['id' => (int)($_POST['item_id'] ?? 0), '_r' => uniqid()]); }
+        case 'stk_price_add': { require_pr_admin(); $iid = (int)($_POST['item_id'] ?? 0); if (!stk_item($iid)) throw new RuntimeException(t('err.notfound')); stk_price_add($iid, (float) str_replace(',', '.', (string)($_POST['unit_price'] ?? '0')), ['priced_at' => (string)($_POST['priced_at'] ?? ''), 'supplier_id' => (int)($_POST['supplier_id'] ?? 0) ?: null, 'qty' => ($_POST['qty'] ?? '') !== '' ? (float)$_POST['qty'] : null, 'source' => 'manual', 'note' => (string)($_POST['note'] ?? '')]); flash('good', t('stk.saved')); redirect('inventory_item', ['id' => $iid, '_r' => uniqid()]); }
+        case 'inv_cat_save': { require_pr_admin(); stk_category_save_from_post((int)($_POST['id'] ?? 0)); flash('good', t('stk.saved')); redirect('inventory', ['tab' => 'categories', '_r' => uniqid()]); }
+        case 'inv_cat_merge': { require_pr_admin(); stk_category_merge((int)($_POST['from'] ?? 0), (int)($_POST['into'] ?? 0)); flash('good', t('stk.saved')); redirect('inventory', ['tab' => 'categories', '_r' => uniqid()]); }
+        case 'inv_wh_save': { require_pr_admin(); stk_warehouse_save_from_post((int)($_POST['id'] ?? 0)); flash('good', t('stk.saved')); redirect('admin_procurement', ['_r' => uniqid()], '#wh'); }
+        case 'stk_import_parse': { require_pr_admin(); if (empty($_FILES['file']['tmp_name'])) throw new RuntimeException(t('im.file')); $_SESSION['inv_import'] = stk_import_parse($_FILES['file']['tmp_name']); redirect('inventory_import', ['_r' => uniqid()]); }
+        case 'stk_import_apply': { require_pr_admin(); $pv = $_SESSION['inv_import'] ?? null; if (!$pv) throw new RuntimeException(t('stk.imp_empty')); $mode = in_array($_POST['mode'] ?? '', ['full', 'items', 'stock', 'prices'], true) ? $_POST['mode'] : 'full'; $pd = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['price_date'] ?? '')) ? $_POST['price_date'] : date('Y-m-d');
+            $_SESSION['inv_import_result'] = stk_import_apply($pv, $mode, (int)($_POST['warehouse_id'] ?? 0) ?: stk_default_wh(), $pd); unset($_SESSION['inv_import']); redirect('inventory_import', ['_r' => uniqid()]); }
+        case 'sup_save': { require_pr_admin(); $id = sup_save_from_post((int)($_POST['id'] ?? 0)); flash('good', t('stk.saved')); redirect('suppliers', ['id' => $id, '_r' => uniqid()]); }
+        case 'proc_settings': { require_pr_admin(); stk_settings_save_from_post(); flash('good', t('stk.saved')); redirect('admin_procurement', ['_r' => uniqid()]); }
+        case 'inv_rule_save': { require_pr_admin(); $_POST['ref_id'] = ($_POST['scope'] ?? '') === 'supplier' ? (int)($_POST['ref_id_sup'] ?? 0) : (int)($_POST['ref_id_cat'] ?? 0); stk_rule_save_from_post(); flash('good', t('stk.saved')); redirect('admin_procurement', ['_r' => uniqid()]); }
+        case 'stk_rule_delete': { require_pr_admin(); stk_rule_delete((int)($_POST['id'] ?? 0)); redirect('admin_procurement', ['_r' => uniqid()]); }
         case 'col_fu': { require_staff(); if (!function_exists('col_can') || !col_can()) throw new RuntimeException(t('err.noaccess')); col_followup_save((int)($_POST['id'] ?? 0), (string)($_POST['next'] ?? ''), (string)($_POST['promise'] ?? ''), (string)($_POST['note'] ?? '')); flash('good', t('col.fu_saved')); $qs = []; foreach (['vessel', 'project', 'customer', 'pm', 'bucket', 'q', 'from', 'to'] as $k) if (($v = (string)($_GET[$k] ?? '')) !== '') $qs[$k] = $v; redirect('collections', $qs + ['_r' => uniqid()], '#col-open'); }   // R78-001
         case 'ppay_save': { require_staff(); $pid = (int)$_POST['id']; ppay_save_from_post($pid); flash('good', t('pay.saved')); redirect('proforma', ['id' => $pid, '_r' => uniqid()], '#payments'); }
         case 'ppay_delete': { require_staff(); $pid = ppay_delete((int)$_POST['pay_id']); flash('good', t('pay.deleted')); redirect('proforma', ['id' => $pid, '_r' => uniqid()], '#payments'); }
@@ -1239,6 +1252,7 @@ function pm_handle_action(string $action, string $page): bool {
             if (array_key_exists('is_production', $x)) q('UPDATE customer_users SET is_production = ? WHERE id = ?', [$role === 'customer' ? 0 : (int)!empty($_POST['is_production']), $id]);   // R41-001
             if (array_key_exists('can_sales', $x)) q('UPDATE customer_users SET can_sales = ? WHERE id = ?', [$role === 'customer' ? 0 : (int)!empty($_POST['can_sales']), $id]);   // R44-003
             if (array_key_exists('can_cashflow', $x)) q('UPDATE customer_users SET can_cashflow = ? WHERE id = ?', [$role === 'customer' ? 0 : (int)!empty($_POST['can_cashflow']), $id]);   // R45-001
+            if (array_key_exists('can_procurement', $x)) q('UPDATE customer_users SET can_procurement = ?, can_warehouse = ? WHERE id = ?', [$role === 'customer' ? 0 : (int)!empty($_POST['can_procurement']), $role === 'customer' ? 0 : (int)!empty($_POST['can_warehouse']), $id]);   // R79-001
             if (array_key_exists('can_management', $x)) q('UPDATE customer_users SET can_management = ? WHERE id = ?', [$role === 'customer' ? 0 : (int)!empty($_POST['can_management']), $id]);   // R47-001
             if (array_key_exists('can_ai', $x)) q('UPDATE customer_users SET can_ai = ? WHERE id = ?', [$role === 'customer' ? 0 : (int)!empty($_POST['can_ai']), $id]);   // R50-001
             if (array_key_exists('can_accounting', $x)) q('UPDATE customer_users SET can_accounting = ?, is_accounting = ? WHERE id = ?', [$role === 'customer' ? 0 : (int)!empty($_POST['can_accounting']), $role === 'customer' ? 0 : (int)!empty($_POST['is_accounting']), $id]);   // R38-001
@@ -1409,7 +1423,7 @@ function cu_save_discipline(int $uid, string $role): void {
 
 /** Invoicing fields from the form (ignored until R10 has run). */
 function pm_save_invoicing(int $subId): void {
-    if (!inv_has() || !isset($_POST['invoicing'])) return;
+    if (!stk_has() || !isset($_POST['invoicing'])) return;
     $st  = array_key_exists((string)$_POST['invoicing'], inv_states()) ? (string)$_POST['invoicing'] : 'none';
     $pct = max(0, min(100, (int)($_POST['invoiced_pct'] ?? 0)));
     if ($st === 'full') $pct = 100; elseif ($st === 'none') $pct = 0; elseif ($pct === 100) $st = 'full';
@@ -1694,7 +1708,7 @@ function pm_import_projects(string $path, bool $dry): array {
                 $v = pm_norm_pct($g($r, 'pct_' . $slug));
                 if ($v !== null) $pcts[$d['col']] = $v;
             }
-            if (inv_has()) {                                              // Invoicing / Invoiced % columns (R10)
+            if (stk_has()) {                                              // Invoicing / Invoiced % columns (R10)
                 $inv = inv_norm($g($r, 'inv')); $ipct = pm_norm_pct($g($r, 'invpct'));
                 if ($inv === null && $ipct !== null) $inv = $ipct >= 100 ? 'full' : ($ipct > 0 ? 'partial' : 'none');
                 if ($inv !== null) { $pcts['invoicing'] = $inv; $pcts['invoiced_pct'] = $inv === 'full' ? 100 : ($inv === 'none' ? 0 : ($ipct ?? (int)($s['invoiced_pct'] ?? 0))); }

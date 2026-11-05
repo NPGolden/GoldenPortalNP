@@ -36,6 +36,8 @@ function nav_groups(): array {
     if ($staff && function_exists('cf_can') && cf_can()) $acc['items'][] = ['cashflow', t('cf.title'), '💰'];
     if ($staff && function_exists('col_can') && col_can()) $acc['items'][] = ['collections', t('col.title'), '📥'];   // R78-001: accounting · sales · owner · CEO · GM
     if ($acc['items']) array_splice($g, 4, 0, [$acc]);
+    // R79-001: Procurement group — inventory and suppliers (requisitions, POs, receipts follow in R80)
+    if ($staff && function_exists('pr_can') && pr_can()) { $prc = ['key' => 'procurement', 'label' => t('nav.g_procurement'), 'items' => [['inventory', t('stk.title'), '📦'], ['suppliers', t('sup.title'), '🏭']]]; array_splice($g, array_search('library', array_column($g, 'key'), true), 0, [$prc]); }
     // R62-002: HR is its own group in the left column, between Work and Commercial
     $hr = ['key' => 'hr', 'label' => t('nav.g_hr'), 'items' => []];
     if ($staff && function_exists('hr2_has') && hr2_has() && hr_can()) $hr['items'][] = ['hr_dashboard', t('hr.dashboard'), '📊'];
@@ -79,6 +81,7 @@ function settings_tab_groups(): array {
     if ($mgmt && !$admin) $G[] = [t('stg.org'), [['admin_users', t('nav.users')]]];   // R78-001: the Owner / CEO / General Manager manage the portal accounts even without administrator rights
     if ($admin) {
         $org = [['admin_roles', t('nav.roles')], ['admin_disciplines', t('nav.disciplines')]]; if ($mgmt) array_unshift($org, ['admin_users', t('nav.users')]);   // R78-001: accounts — management only
+        if (function_exists('pr_admin') && pr_admin()) $org[] = ['admin_procurement', t('stk.settings')];   // R79-001
         if (function_exists('wc_has') && wc_has()) $org[] = ['admin_calendars', t('wc.title')];
         if (function_exists('br_has') && br_has()) $org[] = ['admin_branches', t('br.title')];
         if (function_exists('eng_has') && eng_has()) $org[] = ['admin_engineering', t('eng.settings')];   // R47-002
