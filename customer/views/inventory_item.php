@@ -134,5 +134,6 @@ layout_head(($it['code'] ?? t('stk.new_item')) . ' — ' . t('stk.title'), 'inve
   <?php endif; ?>
 </div>
 </div>
+<?php if ($it && function_exists('stk_research_has') && stk_research_has() && pr_admin()) { $back = url('inventory_item', ['id' => $id]); require __DIR__ . '/_stk_research.php'; } ?>
 <script nonce="<?= csp_nonce() ?>">(function(){var k=document.getElementById('mv-kind');if(!k)return;var f=function(){var v=k.value;document.querySelectorAll('.inv-move .mv-in,.inv-move .mv-out,.inv-move .mv-adj,.inv-move .mv-xfer').forEach(function(el){var on=el.classList.contains('mv-'+v);el.style.display=on?'':'none';});};k.addEventListener('change',f);f();})();</script>
 <?php layout_foot(); ?>

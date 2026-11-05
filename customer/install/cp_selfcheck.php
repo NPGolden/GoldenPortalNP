@@ -203,6 +203,8 @@ $r77 = (bool)$pdo->query("SHOW TABLES LIKE 'fc_reports'")->fetch();
 printf("%s R77-001 migration (function checks)  %s\n", $r77 ? '[ OK ]' : '[WARN]', $r77 ? '' : '— run install/migrate_cp_r77_fc.sql');
 $r77b = (bool)$pdo->query("SHOW COLUMNS FROM hr_requests LIKE 'reason_code'")->fetch();
 printf("%s R77-007 migration (request reasons)  %s\n", $r77b ? '[ OK ]' : '[WARN]', $r77b ? '' : '— run install/migrate_cp_r77_reasons.sql');
+$r79b = (bool)$pdo->query("SHOW TABLES LIKE 'inv_research'")->fetch();
+printf("%s R79-002 migration (procurement assistant)  %s\n", $r79b ? '[ OK ]' : '[WARN]', $r79b ? '' : '— run install/migrate_cp_r79_002_research.sql');
 $r79 = (bool)$pdo->query("SHOW TABLES LIKE 'inv_items'")->fetch();
 printf("%s R79-001 migration (inventory · suppliers · pricing)  %s\n", $r79 ? '[ OK ]' : '[WARN]', $r79 ? '' : '— run install/migrate_cp_r79_inventory.sql');
 $r78 = (bool)$pdo->query("SHOW TABLES LIKE 'pi_followups'")->fetch();

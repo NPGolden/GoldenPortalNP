@@ -32,7 +32,7 @@ function ai_can(?string $page = null): bool {
     return in_array($page, ai_pages(), true);
 }
 function ai_pages(): array { return array_values(array_filter(array_map('trim', explode(',', ai_setting('ai_pages'))))); }
-function ai_all_pages(): array { return ['fsr_edit' => 'fsr.title', 'ticket_edit' => 'nav.tickets', 'ticket' => 'nav.tickets', 'timesheet_edit' => 'nav.timesheets', 'weekly_vessel' => 'wk.title', 'weekly' => 'wk.title', 'offer_edit' => 'nav.offers', 'subproject' => 'bg.tab', 'planning' => 'pl.title', 'isr_edit' => 'isr.plural', 'equipment_edit' => 'eq.title', 'production_edit' => 'pd.title', 'jo_edit' => 'nav.joborders', 'rs_edit' => 'rs.title', 'hr_leaves' => 'hr.leaves', 'hr_eval' => 'hr.evaluations', 'hr_targets' => 'hr.targets', 'hra' => 'hra.title']; }   // R64-002 / R67-001
+function ai_all_pages(): array { return ['fsr_edit' => 'fsr.title', 'ticket_edit' => 'nav.tickets', 'ticket' => 'nav.tickets', 'timesheet_edit' => 'nav.timesheets', 'weekly_vessel' => 'wk.title', 'weekly' => 'wk.title', 'offer_edit' => 'nav.offers', 'subproject' => 'bg.tab', 'planning' => 'pl.title', 'isr_edit' => 'isr.plural', 'equipment_edit' => 'eq.title', 'production_edit' => 'pd.title', 'inventory_item' => 'stk.title', 'jo_edit' => 'nav.joborders', 'rs_edit' => 'rs.title', 'hr_leaves' => 'hr.leaves', 'hr_eval' => 'hr.evaluations', 'hr_targets' => 'hr.targets', 'hra' => 'hra.title']; }   // R64-002 / R67-001
 
 /* ------------------------------------------------------------------ key at rest */
 function ai_crypt_key(): string { return sodium_crypto_generichash('gascp-ai|' . lic_instance_id() . '|' . (string) cfg('app.session_name', 'GASCP'), '', SODIUM_CRYPTO_SECRETBOX_KEYBYTES); }
@@ -113,10 +113,10 @@ function ai_run(string $kind, array $ctx, string $prompt, ?array $image, string 
     return $outp;
 }
 function ai_json(string $s): array { $s = trim($s); if (preg_match('/```(?:json)?\s*(.*?)```/s', $s, $m)) $s = $m[1]; $i = strpos($s, '{'); $j = strrpos($s, '}'); if ($i === false || $j === false) return []; $d = json_decode(substr($s, $i, $j - $i + 1), true); return is_array($d) ? $d : []; }
-function ai_http(array $body): array {
+function ai_http(array $body, int $timeout = 60): array {   // R79-002: longer timeout for web-search research
     $base = rtrim((string) cfg('ai.base_url', 'https://api.anthropic.com'), '/');
     $ch = curl_init($base . '/v1/messages');
-    curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => json_encode($body, JSON_UNESCAPED_UNICODE), CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 60, CURLOPT_CONNECTTIMEOUT => 10,
+    curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => json_encode($body, JSON_UNESCAPED_UNICODE), CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_HTTPHEADER => array_merge(['content-type: application/json', 'anthropic-version: 2023-06-01', 'x-api-key: ' . ai_key()], ai_setting('ai_workspace') !== '' ? ['anthropic-workspace-id: ' . ai_setting('ai_workspace')] : []), CURLOPT_SSL_VERIFYPEER => true]);   // R50-003: organisation-scoped keys need the workspace id
     $raw = curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE); $err = curl_error($ch); curl_close($ch);
     if ($raw === false) return ['_error' => 'network: ' . $err];
@@ -206,6 +206,8 @@ function ai_settings_save_from_post(): void {
     cp_setting_set('ai_cap_eur', (string) max(0, min(100000, (float) str_replace(',', '.', (string)($_POST['cap'] ?? '100')))));
     cp_setting_set('ai_price_in', (string) max(0, (float) str_replace(',', '.', (string)($_POST['price_in'] ?? '3'))));
     cp_setting_set('ai_price_out', (string) max(0, (float) str_replace(',', '.', (string)($_POST['price_out'] ?? '15'))));
+    cp_setting_set('ai_price_search', (string) max(0, (float) str_replace(',', '.', (string)($_POST['price_search'] ?? '0.01'))));   // R79-002: € per web search
+    cp_setting_set('ai_web_max', (string) max(3, min(12, (int)($_POST['web_max'] ?? 8))));
     $ws = trim((string)($_POST['workspace'] ?? '')); if ($ws !== '' && !preg_match('/^[A-Za-z0-9_\-]{6,80}$/', $ws)) throw new RuntimeException(t('ai.ws_bad')); cp_setting_set('ai_workspace', $ws);
     $pages = array_values(array_intersect(array_keys(ai_all_pages()), array_map('strval', (array)($_POST['pages'] ?? [])))); cp_setting_set('ai_pages', implode(',', $pages));
     if (!empty($_POST['key_clear'])) ai_key_set(''); elseif (trim((string)($_POST['key'] ?? '')) !== '') ai_key_set((string)$_POST['key']);

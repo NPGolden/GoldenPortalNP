@@ -7,7 +7,7 @@ if (!function_exists('pr_can') || !pr_can()) { http_response_code(403); layout_h
 $f = ['q' => trim((string)($_GET['q'] ?? '')), 'cat' => (int)($_GET['cat'] ?? 0), 'maker' => (string)($_GET['maker'] ?? ''), 'status' => in_array($_GET['status'] ?? '', ['active', 'obsolete', 'blocked', 'all'], true) ? $_GET['status'] : 'active', 'stock' => in_array($_GET['stock'] ?? '', ['instock', 'zero', 'below', 'reserved'], true) ? $_GET['stock'] : 'any', 'slow' => (int)($_GET['slow'] ?? 0), 'loc' => trim((string)($_GET['loc'] ?? '')), 'sort' => (string)($_GET['sort'] ?? '')];
 $items = stk_items($f); $priced = stk_price_visible(); $admin = pr_admin();
 if (($_GET['format'] ?? '') === 'xlsx') { stk_export_xlsx($items); exit; }
-$tab = in_array($_GET['tab'] ?? '', ['items', 'valuation', 'categories'], true) ? $_GET['tab'] : 'items';
+$tab = in_array($_GET['tab'] ?? '', ['items', 'valuation', 'categories', 'research'], true) ? $_GET['tab'] : 'items';
 $cats = stk_categories(false); $makers = stk_makers(); $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : ''; $keep = array_filter($f);
 $V = $tab === 'valuation' ? stk_valuation() : null; $cur = 'EUR'; $m = fn(?float $v) => stk_money($v, $cur);
 $sumVal = 0.0; foreach ($items as $i) $sumVal += (float)$i['on_hand'] * (float)($i['last_price'] ?? 0);
@@ -21,7 +21,7 @@ layout_head(t('stk.title'), 'inventory');
     <?php if ($admin): ?><a class="btn btn--ghost btn--sm" href="<?= url('admin_procurement') ?>">⚙ <?= tt('stk.settings') ?></a><?php endif; ?>
   </div>
 </div>
-<nav class="tabs" style="margin-bottom:12px;"><?php $T = fn($k, $lbl) => '<a class="tab' . ($tab === $k ? ' is-on' : '') . '" href="' . url('inventory', array_filter($keep) + ['tab' => $k]) . '">' . $lbl . '</a>'; echo $T('items', '📦 ' . t('stk.items')) . $T('valuation', '📊 ' . t('stk.valuation')) . ($admin ? $T('categories', '🏷 ' . t('stk.categories')) : ''); ?></nav>
+<nav class="tabs" style="margin-bottom:12px;"><?php $T = fn($k, $lbl) => '<a class="tab' . ($tab === $k ? ' is-on' : '') . '" href="' . url('inventory', array_filter($keep) + ['tab' => $k]) . '">' . $lbl . '</a>'; echo $T('items', '📦 ' . t('stk.items')) . $T('valuation', '📊 ' . t('stk.valuation')) . ($admin ? $T('categories', '🏷 ' . t('stk.categories')) : '') . ($admin && function_exists('stk_research_has') && stk_research_has() ? $T('research', '✨ ' . t('stk.ai_tab')) : ''); ?></nav>
 
 <?php if ($tab === 'items'): ?>
 <form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1.6fr 1fr 1fr .8fr .9fr .7fr auto;">
@@ -94,5 +94,5 @@ layout_head(t('stk.title'), 'inventory');
       <button class="btn btn--ghost" type="submit"><?= tt('stk.cat_merge') ?></button></form></div><?php endif; ?>
 </div>
 </div>
-<?php endif; ?>
+<?php elseif ($tab === 'research' && $admin): $it = null; $back = url('inventory', ['tab' => 'research']); require __DIR__ . '/_stk_research.php'; endif; ?>
 <?php layout_foot(); ?>

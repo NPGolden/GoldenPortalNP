@@ -27,6 +27,8 @@ layout_head(t('ai.settings'), 'admin_ai');
       <div class="field"><label><?= tt('ai.model') ?></label><input name="model" list="ai-models" value="<?= e($model) ?>" maxlength="60"><datalist id="ai-models"><?php foreach (AI_MODELS as $mm): ?><option value="<?= $mm ?>"><?php endforeach; ?></datalist><p class="hint"><?= tt('ai.model_hint') ?></p></div>
       <div class="field"><label><?= tt('ai.cap') ?> (€)</label><input name="cap" inputmode="decimal" value="<?= e(rtrim(rtrim(number_format($cap, 2, '.', ''), '0'), '.')) ?>"><p class="hint"><?= tt('ai.cap_hint') ?></p></div>
       <div class="field"><label><?= tt('ai.price_in') ?></label><input name="price_in" inputmode="decimal" value="<?= e(ai_setting('ai_price_in', '3')) ?>"></div>
+      <div class="field"><label><?= tt('ai.price_search') ?></label><input name="price_search" inputmode="decimal" value="<?= e(ai_setting('ai_price_search', '0.01')) ?>"><p class="hint"><?= tt('ai.price_search_hint') ?></p></div>
+      <div class="field"><label><?= tt('ai.web_max') ?></label><input name="web_max" type="number" min="3" max="12" value="<?= e(ai_setting('ai_web_max', '8')) ?>"></div>
       <div class="field"><label><?= tt('ai.price_out') ?></label><input name="price_out" inputmode="decimal" value="<?= e(ai_setting('ai_price_out', '15')) ?>"><p class="hint"><?= tt('ai.price_hint') ?></p></div>
     </div>
     <div class="field"><label><?= tt('ai.pages') ?></label><div class="ai-pages"><?php foreach (ai_all_pages() as $slug => $k): ?><label class="chk"><input type="checkbox" name="pages[]" value="<?= $slug ?>"<?= in_array($slug, $pages, true) ? ' checked' : '' ?>> <?= e(t($k)) ?> <span class="hint"><?= $slug ?></span></label><?php endforeach; ?></div><p class="hint"><?= tt('ai.pages_hint') ?></p></div>
