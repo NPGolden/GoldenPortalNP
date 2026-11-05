@@ -6657,4 +6657,11 @@ Best regards,
 'hr.opening_hint' => 'Days already taken before the portal counted this year (paper records, cut-over) — subtracted from the available days; the change is logged.',
 // ---- GAS-CP-R77-015
 'soc.winner_owner' => 'The Owner / CEO is not in the rankings and cannot be winner of the month.',
+// ---- GAS-CP-R77-020 payment schedule in the offer document
+'pt.schedule' => 'Payment schedule',
+'pt.instalment_c' => 'Instalment',
+'pt.due' => 'Due',
+'pt.due_in' => '{n} days after',
+'pt.due_now' => 'on the trigger',
+'pt.schedule_note' => 'Amounts on the net value of this offer; each instalment is invoiced by proforma when its trigger occurs.',
 ];

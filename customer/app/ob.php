@@ -110,6 +110,14 @@ function ob_vars(array $o): array {
             '{rate_list}' => $rl ? $rl['doc_ref'] . ' ' . $rl['revision'] : ''];
 }
 function ob_fill(string $s, array $vars): string { return strtr($s, $vars); }
+/** R77-020: the instalments of the offer (offer_terms) as document rows — seeded from the branch defaults when the offer has none yet. */
+function ob_schedule_rows(array $o, string $loc): array {
+    if (!function_exists('pt_of') || !function_exists('pi_has') || !pi_has()) return [];
+    if (!pt_of((int)$o['id']) && function_exists('pt_seed')) pt_seed((int)$o['id'], $o);
+    $rows = []; $cur = (string)$o['currency']; $T = fn(string $k, array $v = []) => t_in($k, $loc, $v);
+    foreach (pt_of((int)$o['id']) as $tm) { $amt = pt_amount($tm, $o); $rows[] = [(string)(int)$tm['n'], $T('pt.instalment', ['n' => (int)$tm['n']]), $tm['amount'] === null ? rtrim(rtrim(number_format((float)$tm['pct'], 2, '.', ''), '0'), '.') . ' %' : '—', number_format($amt, 2, ',', '.') . ' ' . $cur, (string)$tm['trigger_text'], (int)$tm['due_days'] > 0 ? $T('pt.due_in', ['n' => (int)$tm['due_days']]) : $T('pt.due_now')]; }
+    return $rows;
+}
 function ob_locale(array $o): string { return function_exists('et_customer_locale') ? et_customer_locale((int)($o['customer_id'] ?? 0) ?: null) : locale(); }
 
 /* ---------------------------------------------------------------- blocks of one offer */
@@ -248,7 +256,13 @@ function ob_render_pdf(array $o): string {
     foreach ($tot as [$k, $v, $b]) { $pdf->setFont($b ? 'B' : 'R', 8.5); $pdf->setColor($b ? $navy : $ink); $pdf->text($R - 100, $y + 4, $k, 'R', 60); $pdf->text($R - 40, $y + 4, $v, 'R', 38.5); $y += 5.5; }
     $y += 2;
     if (trim((string)($o['notes'] ?? '')) !== '') { $n++; $h1($n . '. ' . $T('of.notes')); $para((string)$o['notes']); }   // R72-005: the offer's Notes field goes into the document
-    foreach ($after as $k) $block($k);
+    foreach ($after as $k) { $block($k); if ($k === 'payment' && ($sch = ob_schedule_rows($o, $loc))) {   // R77-020: payment schedule right after the payment text
+        $n++; $h1($n . '. ' . $T('pt.schedule'));
+        $sc = [[$T('ob.c_no'), 8, 'C'], [$T('pt.instalment_c'), 30, 'L'], ['%', 14, 'R'], [$T('pt.amount'), 30, 'R'], [$T('pt.trigger'), 68, 'L'], [$T('pt.due'), 30, 'L']]; $sc = function_exists('rc_fit_cols') ? rc_fit_cols($sc, $W) : $sc;
+        $need(14); $pdf->setFont('B', 7.2); $x = $L; $pdf->setColor($head); $pdf->rect($x, $y, array_sum(array_column($sc, 1)), 6, 'F'); foreach ($sc as [$lab, $cw, $al]) { $pdf->setColor($line); $pdf->setLineWidth(0.25); $pdf->rect($x, $y, $cw, 6); $pdf->setColor($navy); $pdf->text($x + 1.5, $y + 4, $lab, $al, $cw - 3); $x += $cw; } $y += 6;
+        foreach ($sch as $v) { $pdf->setFont('R', 7.6); $lines = []; $nl = 1; foreach ($sc as $ci => [$lab, $cw, $al]) { $lines[$ci] = $pdf->wrap($v[$ci], $cw - 3); $nl = max($nl, count($lines[$ci])); } $hh = $nl * 3.8 + 1.6; $need($hh); $x = $L; foreach ($sc as $ci => [$lab, $cw, $al]) { $pdf->setColor($line); $pdf->rect($x, $y, $cw, $hh); $pdf->setColor($ink); foreach ($lines[$ci] as $k2 => $s2) $pdf->text($x + 1.5, $y + 3.5 + 3.8 * $k2, $s2, $al, $cw - 3); $x += $cw; } $y += $hh; }
+        $y += 2; $pdf->setFont('R', 7); $pdf->setColor('#6a7179'); $pdf->text($L, $y + 3, $T('pt.schedule_note'), 'L', $W); $y += 5;
+    } }
     $footer();
     return $pdf->bytes($o['offer_no'] . ' ' . $o['revision']);
 }
@@ -272,7 +286,7 @@ function ob_render_docx(array $o): string {
     else $rows[] = ['', '', $T('ob.vat_excl'), '', '', '', '', ''];
     $d->table([$T('ob.c_no'), $T('ob.c_code'), $T('ob.c_desc'), $T('ob.c_unit'), $T('ob.c_qty'), $T('ob.c_price') . ' (' . $cur . ')', $T('ob.c_disc'), $T('ob.c_total') . ' (' . $cur . ')'], $rows);
     if (trim((string)($o['notes'] ?? '')) !== '') { $n++; $d->heading($n . '. ' . $T('of.notes'), 2); foreach (preg_split('/\n{2,}/', trim((string)$o['notes'])) as $p) if (trim($p) !== '') $d->para(trim($p)); }   // R72-005
-    foreach (['exclusions', 'validity', 'payment', 'terms', 'closing'] as $k) $block($k);
+    foreach (['exclusions', 'validity', 'payment', 'terms', 'closing'] as $k) { $block($k); if ($k === 'payment' && ($sch = ob_schedule_rows($o, $loc))) { $n++; $d->heading($n . '. ' . $T('pt.schedule'), 2); $d->table([$T('ob.c_no'), $T('pt.instalment_c'), '%', $T('pt.amount'), $T('pt.trigger'), $T('pt.due')], $sch); $d->para($T('pt.schedule_note')); } }   // R77-020
     return $d->bytes($o['offer_no'] . ' ' . $o['revision'], (string)($bd['footer'] ?? $bd['name'] ?? ''));
 }
 

@@ -6657,4 +6657,11 @@ Cordiali saluti,
 'hr.opening_hint' => 'Giorni già goduti prima che il portale contasse l\'anno (registri cartacei, passaggio) — sottratti dai disponibili; la modifica è registrata.',
 // ---- GAS-CP-R77-015
 'soc.winner_owner' => 'Il titolare / CEO non partecipa alle classifiche e non può essere vincitore del mese.',
+// ---- GAS-CP-R77-020 payment schedule in the offer document
+'pt.schedule' => 'Piano dei pagamenti',
+'pt.instalment_c' => 'Rata',
+'pt.due' => 'Scadenza',
+'pt.due_in' => '{n} giorni dopo',
+'pt.due_now' => 'all\'evento',
+'pt.schedule_note' => 'Importi sul valore netto dell\'offerta; ogni rata è fatturata con proforma al verificarsi del suo evento.',
 ];

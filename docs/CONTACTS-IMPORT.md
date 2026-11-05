@@ -1070,3 +1070,6 @@ No SQL. HR feedback #18: the dashboard tile counted pending requests of all year
 
 ## 214. v1.88.1 — Auto-links in rich text (GAS-CP-R77-019)
 No SQL. `rt.php` `rt_inline()`: `https?://…` runs become `<a class="rt-link" target=_blank rel=noopener>` (display shortened over 90 chars: 60 … 20) through placeholders (`\x01n\x02`) so `__` / `_` inside URLs are not italicised; placeholders restored last. CSS `.msg { min-width:0; overflow-wrap:anywhere }`, `.rt-link { word-break: break-all }`.
+
+## 215. v1.88.2 — Payment schedule in the offer document (GAS-CP-R77-020)
+No SQL. `ob.php` `ob_schedule_rows($o,$loc)` (seeds `pt_seed` when empty; rows n · instalment · % · amount via `pt_amount` · trigger · due); `ob_render_pdf` / `ob_render_docx` print section "Payment schedule" after the `payment` block with the note `pt.schedule_note`. Keys `pt.schedule`, `pt.instalment_c`, `pt.due`, `pt.due_in`, `pt.due_now`, `pt.schedule_note` ×5 (6535). Re-issue an offer to get the schedule into its archived document.

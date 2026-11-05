@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.88.1';
+const CP_VERSION = '1.88.2';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R77-020', 'version' => '1.88.2', 'date' => '2026-11-05', 'title' => 'Offer document (PDF + Word): the payment schedule — the instalments of the offer with %, amount, trigger and due — printed right after the Prices and payment section; default terms seeded when the offer has none.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-019', 'version' => '1.88.1', 'date' => '2026-11-05', 'title' => 'Rich text everywhere (requests, tickets, notes, comments): web addresses become clickable links (long ones shortened on screen, never pushing a bubble out of the card) and are no longer mangled by the italic / bold markers.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-018', 'version' => '1.88.0', 'date' => '2026-11-05', 'title' => 'HR requests: the Open filter (and the dashboard tile) lists open requests of every year — a request for next January was hidden by the year filter, leaving the page on the "New request for…" form.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-017', 'version' => '1.87.9', 'date' => '2026-11-05', 'title' => 'Fix: naming the winner of the month failed with "Column month cannot be null" since 1.87.7.', 'db' => null, 'check' => null],

@@ -166,6 +166,7 @@ return [
       ['tip' => 'Never shown to the owner, never in the owner\'s reports. Keep the Disciplines rates current (Settings › Disciplines) — they cost the actual hours; the budget keeps the rate of the day it was saved.'],
     ]],
     ['id' => 'offers', 'title' => 'Offers and offer statuses', 'body' => [
+      'Payment schedule in the offer document (v1.88.2): the instalments recorded under Payment terms (n · % or amount · trigger · due days) are printed in the offer PDF and Word as a numbered section right after "Prices and payment" — instalment, %, amount in the offer currency, trigger, due — with the note that each instalment is invoiced by proforma when its trigger occurs. An offer issued without terms gets the branch\'s default terms first.',
       'Commercial › Offers lists every offer with number, revision, subject, amount, status and aging; offers are shown on top of their project in the tree and on the sub-project page, with the offer document for download. Owners approve or reject from their side; staff set the later statuses (In progress, To be invoiced, Finished, or any status the administrator defined in Settings › Offer statuses).',
       ['fig' => 'g-offers.jpg', 'cap' => 'The offer list for staff'],
       'Drawing tracker (v1.80.10): when a request is saved with System left empty it takes the system of the chosen sub-project, so it is grouped under that system instead of "— none —"; a system switched off in Settings › Systems remains selectable on the rows that already use it.',
