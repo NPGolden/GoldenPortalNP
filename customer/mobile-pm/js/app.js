@@ -115,6 +115,7 @@ window.UI = (() => {
     [/^#\/projects(\?.*)?$/, (m, q) => SCREENS.projects(q)], [/^#\/project\/(\d+)$/, (m) => SCREENS.project(m[1])], [/^#\/sub\/(\d+)(\?.*)?$/, (m, q) => SCREENS.sub(m[1], q)],
     [/^#\/team(\?.*)?$/, (m, q) => HR.team(q)], [/^#\/approvals(\?.*)?$/, (m, q) => SCREENS.approvals(q)],
     [/^#\/notes(\?.*)?$/, (m, q) => SCREENS.notes(q)], [/^#\/docs$/, () => SCREENS.docs()], [/^#\/inbox$/, () => SCREENS.inbox()], [/^#\/synclog$/, () => SCREENS.synclog()],
+    [/^#\/parts$/, () => PARTS.list({})], [/^#\/parts\?(.*)$/, (m) => PARTS.list(query("#/parts?" + m[1]))], [/^#\/parts\/new$/, () => PARTS.create()], [/^#\/parts\/(\d+)$/, (m) => PARTS.one(+m[1])],   // R82-003
     [/^#\/more$/, () => SCREENS.more()], [/^#\/hr(\?.*)?$/, (m, q) => HR.page(q)],
   ];
   const query = (h) => { const q = {}; const i = h.indexOf("?"); if (i < 0) return q; new URLSearchParams(h.slice(i + 1)).forEach((v, k) => { q[k] = v; }); return q; };

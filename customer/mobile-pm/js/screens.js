@@ -73,6 +73,7 @@ window.SCREENS = (() => {
     ];
     return { html: `
       <div class="greet">${esc(t("home.hello", { name: firstName(me.name) }))}<small>${esc(t("home.sub", { n: nSub, p: ctx.projects.length }))} • ${fmt(today())}</small></div>
+      <button class="btn line" data-go="#/parts">🧾 ${t("parts.title")}</button>
       <div class="kpi">
         <div data-go="#/projects"><b>${nSub}</b><span>${t("home.kpi_sub")}</span></div>
         <div data-go="#/approvals?tab=drawings&f=overdue"><b class="${overdue.length ? "red" : ""}">${c.drawings_overdue != null ? c.drawings_overdue : overdue.length}</b><span>${t("home.kpi_dr")}</span></div>

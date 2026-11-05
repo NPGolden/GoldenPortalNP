@@ -37,13 +37,20 @@ try {
     if (str_starts_with($path, '/pm/') && !$isPm) Response::error(403, 'Golden PM app only');
     if (str_starts_with($path, '/cu/') && !$isCu) Response::error(403, 'Customer app only');
     if (str_starts_with($path, '/hr/app/') && !$isHr) Response::error(403, 'Golden HR app only');
-    if ($isHr) { PortalHR::allowed($u); if (!str_starts_with($path, '/hr/app/') && !in_array($path, ['/me', '/auth/logout', '/devices/push-token', '/me/passkeys', '/me/passkeys/options', '/sync'], true) && !preg_match('#^/me/passkeys/\d+$#', $path)) Response::error(403, 'Not available in Golden HR'); }   // R74-001: the HR app sees only its own routes
+    if ($isHr) { PortalHR::allowed($u); if (!str_starts_with($path, '/hr/app/') && !str_starts_with($path, '/requisitions') && $path !== '/items' && !in_array($path, ['/me', '/auth/logout', '/devices/push-token', '/me/passkeys', '/me/passkeys/options', '/sync'], true) && !preg_match('#^/me/passkeys/\d+$#', $path)) Response::error(403, 'Not available in Golden HR'); }   // R82-003: part ordering is open to every staff app   // R74-001: the HR app sees only its own routes
     if ($isCu) { PortalCustomer::allowed($u); if (!str_starts_with($path, '/cu/') && !in_array($path, ['/me', '/auth/logout', '/devices/push-token', '/me/passkeys', '/me/passkeys/options'], true) && !preg_match('#^/me/passkeys/\d+$#', $path)) Response::error(403, 'Not available in the customer app'); }   // CS-03: staff routes never serve a customer token
     if ($isCu && !str_starts_with($path, '/me/passkeys')) { $u['device_id'] = (int)$u['device_id']; require __DIR__ . '/endpoints/customer.php'; customer_routes($u, $method, $path, $body); }
     if ($isPm) PortalPM::allowed($u);                                                                                            // rights may change while a token lives
     switch (true) {
         case $method === 'POST' && $path === '/auth/logout': q('UPDATE mob_refresh_tokens SET revoked_at = NOW() WHERE device_id = ? AND revoked_at IS NULL', [$u['device_id']]); Response::json([], 204);
         case $method === 'GET' && $path === '/me': Response::json($me($u));
+        /* R82-003: part ordering from the apps — requisitions (app/prq.php rules) */
+        case $method === 'GET' && $path === '/requisitions': Response::json(PortalParts::list((string)($_GET['status'] ?? 'open')));
+        case $method === 'GET' && $path === '/requisitions/options': Response::json(PortalParts::options());
+        case $method === 'GET' && preg_match('#^/requisitions/(\d+)$#', $path, $m): Response::json(PortalParts::one((int)$m[1]));
+        case $method === 'POST' && $path === '/requisitions': RateLimit::check('api', 'prq' . $u['id'], 30); Response::json(PortalParts::create($body));
+        case $method === 'POST' && preg_match('#^/requisitions/(\d+)/cancel$#', $path, $m): Response::json(PortalParts::cancel((int)$m[1], (string)($body['note'] ?? '')));
+        case $method === 'POST' && preg_match('#^/requisitions/(\d+)/decide$#', $path, $m): Response::json(PortalParts::decide((int)$m[1], (string)($body['decision'] ?? 'approve'), (string)($body['note'] ?? '')));
         /* R82-001: inventory lookup for the parts of a service report — code / description / barcode search, no prices */
         case $method === 'GET' && $path === '/items': { if (!function_exists('stk_has') || !stk_has()) Response::json(['items' => []]); $q = mb_substr(trim((string)($_GET['q'] ?? '')), 0, 60); if (mb_strlen($q) < 2) Response::json(['items' => []]);
             $rows = stk_items(['q' => $q, 'status' => 'active'], 12);

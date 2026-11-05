@@ -30,6 +30,7 @@ require_once API_ROOT . '/lib/portal.php';
 require_once API_ROOT . '/lib/portal_pm.php';
 require_once API_ROOT . '/lib/portal_customer.php';
 require_once API_ROOT . '/lib/portal_hr.php';
+require_once API_ROOT . '/lib/portal_parts.php';   // R82-003 part ordering from the apps
 
 /** Act as a portal user for the rest of this request (the portal reads $_SESSION['cu_id']). */
 function api_act_as(int $uid): array {

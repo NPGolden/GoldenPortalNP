@@ -74,7 +74,7 @@ window.SCREENS = (() => {
       ${await (async () => { const hr = await DB.get("meta", "hr"); if (!hr) return ""; const pend = hr.requests.filter((r) => r.status.startsWith("pending")).length; const un = hr.messages.filter((m) => m.from_hr && !m.seen).length; const ann = hr.balances.find((b) => b.code === "ANN"); return `<div class="card tap c-grey" data-go="#/hr"><div class="t">🏖 ${t("hr.title")} <small>${ann ? `ANN ${ann.available} ${t("hr.days")}` : ""}</small></div><div class="s muted">${pend} ${t("hr.pending_n")}${un ? ` • ${un} ${t("hr.new_msgs")}` : ""}${hr.evaluations.some((e) => e.status === "final") ? ` • ${t("hr.eval_waiting")}` : ""}</div></div>`; })()}
       <h2>${t("home.quick")}</h2>
       <button class="btn gold" data-go="#/fsr/new">${t("home.newfsr")}</button><button class="btn line" data-go="#/fsr/new?kind=inspection">${t("rep.newins")}</button>
-      <button class="btn navy" data-go="#/hours">${t("home.hours")}</button>`, bind: UI.goLinks };
+      <button class="btn navy" data-go="#/hours">${t("home.hours")}</button>${ctx.me.parts !== false ? `<button class="btn line" data-go="#/parts">🧾 ${t("parts.title")}</button>` : ""}`, bind: UI.goLinks };
   }
 
   // ---------------------------------------------------------------- assignment → sub-project selection

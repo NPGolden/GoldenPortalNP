@@ -76,6 +76,7 @@ window.UI = (() => {
     [/^#\/inbox(\?.*)?$/, (m, q) => SCREENS.inbox(q)], [/^#\/people$/, () => SCREENS.people()], [/^#\/person\/(\d+)$/, (m) => SCREENS.person(m[1])],
     [/^#\/messages$/, () => SCREENS.messages()], [/^#\/thread\/(\d+)$/, (m) => SCREENS.thread(m[1])],
     [/^#\/calendar(\?.*)?$/, (m, q) => SCREENS.calendar(q)], [/^#\/balances$/, () => SCREENS.balances()], [/^#\/more$/, () => SCREENS.more()],
+    [/^#\/parts$/, () => PARTS.list({})], [/^#\/parts\?(.*)$/, (m) => PARTS.list(query("#/parts?" + m[1]))], [/^#\/parts\/new$/, () => PARTS.create()], [/^#\/parts\/(\d+)$/, (m) => PARTS.one(+m[1])],   // R82-003
   ];
   const query = (h) => { const q = {}; const i = h.indexOf("?"); if (i < 0) return q; new URLSearchParams(h.slice(i + 1)).forEach((v, k) => { q[k] = v; }); return q; };
   async function render() {

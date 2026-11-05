@@ -103,6 +103,7 @@ window.UI = (() => {
     [/^#\/fsr$/, () => SCREENS.fsrList()], [/^#\/fsr\/([^?]+)(\?.*)?$/, (m, q) => SCREENS.fsrEdit(m[1], q)],
     [/^#\/hours(\?.*)?$/, (m, q) => SCREENS.hours(q)], [/^#\/notes(\?.*)?$/, (m, q) => SCREENS.notes(q)], [/^#\/docs$/, () => SCREENS.docs()],
     [/^#\/equipment(\?.*)?$/, (m, q) => SCREENS.equipment(q)], [/^#\/more$/, () => SCREENS.more()], [/^#\/hr(\?.*)?$/, (m, q) => HR.page(q)],
+    [/^#\/parts$/, () => PARTS.list({})], [/^#\/parts\?(.*)$/, (m) => PARTS.list(query("#/parts?" + m[1]))], [/^#\/parts\/new$/, () => PARTS.create()], [/^#\/parts\/(\d+)$/, (m) => PARTS.one(+m[1])],   // R82-003
   ];
   const query = (h) => { const q = {}; const i = h.indexOf("?"); if (i < 0) return q; new URLSearchParams(h.slice(i + 1)).forEach((v, k) => { q[k] = v; }); return q; };
   async function render() {
