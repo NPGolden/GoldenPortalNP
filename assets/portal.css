@@ -1841,3 +1841,10 @@ html[data-theme="dark"] .pp-col { background: #16263A; } html[data-theme="dark"]
 .fc-m-ok { color: #2E7D32; } .fc-m-na { color: #6B7280; } .fc-na { text-decoration: line-through; color: var(--ink-2); }
 .fc-ro { padding: 6px 0; border-bottom: 1px solid var(--line); font-weight: 600; }
 .fc-extra { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; }
+/* GAS-CP-R78-001 — Accounting › Collections */
+.is-hidden { display: none !important; }
+.col-proj td.bar { width: 45%; } .col-open td.mono { white-space: nowrap; } .col-bar { display: block; height: 14px; border-radius: 3px; background: #C89B3C; min-width: 2px; } .col-bar--late { background: #9B2C2C; } .col-bar--ok { background: #2E7D32; }
+.col-group td { background: #EEF1F4; font-weight: 500; border-top: 2px solid #0B1E2D; } .col-gsum td { background: #F7F8FA; }
+.col-fu td { background: #FBF7EC; } .col-fu-form { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; } .col-fu-form .field { margin: 0; } .col-fu-form input[type=date] { min-width: 150px; }
+.col-hist { flex-basis: 100%; font-size: 12px; } .col-hist ul { margin: 4px 0 0 18px; padding: 0; } .col-hist li { margin: 2px 0; }
+@media print { .col-fu, .fltbar, .btn-row { display: none !important; } }

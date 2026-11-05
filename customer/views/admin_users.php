@@ -5,7 +5,7 @@
  * language and password inline; enable / disable.
  */
 require __DIR__ . '/_layout.php';
-$u = require_cp_admin();
+$u = require_mgmt();   // R78-001: Owner / CEO / General Manager only
 $customers = all('SELECT id, name FROM customers WHERE is_active = 1 ORDER BY name');
 $roles     = all('SELECT id, name FROM staff_roles WHERE is_active = 1 ORDER BY sort_order, name');
 $f = ['q' => trim((string)($_GET['q'] ?? '')), 'access' => (string)($_GET['access'] ?? ''), 'customer' => (string)($_GET['customer'] ?? ''), 'grole' => (string)($_GET['grole'] ?? ''), 'disc' => (string)($_GET['disc'] ?? ''), 'status' => (string)($_GET['status'] ?? ''), 'twofa' => (string)($_GET['twofa'] ?? ''), 'locale' => (string)($_GET['locale'] ?? ''), 'login' => (string)($_GET['login'] ?? '')];
@@ -38,7 +38,7 @@ layout_head(t('au.title'), 'admin_users');
 ?>
 <?php settings_tabs('admin_users'); ?>
 <h2 class="settings-h"><?= tt('au.title') ?></h2>
-<p class="lede"><?= tt('au.lede') ?></p>
+<p class="lede"><?= tt('au.lede') ?> <?= tt('au.mgmt_only') ?></p>
 <div class="btn-row" style="margin:-6px 0 14px;"><a class="btn btn--ghost btn--sm" href="<?= url('users_export', array_filter(['q' => $f['q'], 'role' => $f['access']])) ?>">⤓ <?= tt('au.export') ?></a><a class="btn btn--ghost btn--sm" href="<?= url('settings', ['tab' => 'import']) ?>#users">⤒ <?= tt('im.title') ?></a><span class="hint"><?= tt('au.export_hint') ?></span></div>
 <?php if (function_exists('cr_has') && cr_has()): ?><form method="post" action="<?= url('admin_users') ?>" class="card" style="padding:12px 16px;margin-bottom:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="cr_dev">
   <b>💡 <?= tt('cr.dev_setting') ?></b><select name="user_id" data-nosearch style="min-width:220px;"><?php foreach (all("SELECT id, full_name FROM customer_users WHERE role IN ('staff','admin') AND is_active = 1 ORDER BY full_name") as $dvu): ?><option value="<?= (int)$dvu['id'] ?>"<?= (int)$dvu['id'] === cr_dev_id() ? ' selected' : '' ?>><?= e($dvu['full_name']) ?></option><?php endforeach; ?></select><span class="hint" style="flex:1;min-width:240px;"><?= tt('cr.dev_setting_hint') ?></span><button class="btn btn--ghost btn--sm" type="submit"><?= tt('btn.save') ?></button></form><?php endif; ?>

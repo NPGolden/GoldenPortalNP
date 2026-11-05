@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.88.3';
+const CP_VERSION = '1.89.0';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R78-001', 'version' => '1.89.0', 'date' => '2026-11-05', 'title' => 'Accounting › Collections: every open proforma per vessel and project with aging, promised date and next follow-up (history kept), financial status per project, collected in a period, projected collection of the next 30 days by week, Excel + print — for the accounting and sales departments, the Owner, the CEO and the General Manager only. Portal accounts (Settings) are now managed only by the Owner, the CEO and the General Manager, not by plain administrators.', 'db' => 'install/migrate_cp_r78_collections.sql', 'check' => 'r78'],
         ['ref' => 'GAS-CP-R77-021', 'version' => '1.88.3', 'date' => '2026-11-05', 'title' => 'Performance: the project tree reads each sub-project once (engineering rows memoised per request), engineering alerts and financial pills cached 3 min and dropped after every related save, offers read once per project — thousands of queries fewer on a full tree; PHP warnings fixed (offer status "draft" label, issued-report notification stamp).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-020', 'version' => '1.88.2', 'date' => '2026-11-05', 'title' => 'Offer document (PDF + Word): the payment schedule — the instalments of the offer with %, amount, trigger and due — printed right after the Prices and payment section; default terms seeded when the offer has none.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-019', 'version' => '1.88.1', 'date' => '2026-11-05', 'title' => 'Rich text everywhere (requests, tickets, notes, comments): web addresses become clickable links (long ones shortened on screen, never pushing a bubble out of the card) and are no longer mangled by the italic / bold markers.', 'db' => null, 'check' => null],
@@ -328,6 +329,7 @@ function cp_migration_state(): array {
         'r76b' => $has("SHOW COLUMNS FROM acc_lines LIKE 'offer_id'"),
         'r77' => $has("SHOW TABLES LIKE 'fc_reports'"),
         'r77b' => $has("SHOW COLUMNS FROM hr_requests LIKE 'reason_code'"),
+        'r78' => $has("SHOW TABLES LIKE 'pi_followups'"),
         'r70d' => $has("SHOW COLUMNS FROM customer_users LIKE 'clocks'"),
         'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),
         'r67' => $has("SHOW TABLES LIKE 'hr_flows'") && $has("SHOW TABLES LIKE 'hr_flow_templates'") && $has("SHOW TABLES LIKE 'hr_invitations'"),

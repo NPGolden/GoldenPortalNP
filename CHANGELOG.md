@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.88.3** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.89.0** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.89.0 | GAS-CP-R78-001 | 2026-11-05 | Accounting › Collections: every open proforma per vessel and project with aging, promised date and next follow-up (history kept), financial status per project, collected in a period, projected collection of the next 30 days by week, Excel + print — for the accounting and sales departments, the Owner, the CEO and the General Manager only. Portal accounts (Settings) are now managed only by the Owner, the CEO and the General Manager, not by plain administrators. | `install/migrate_cp_r78_collections.sql` |
 | 1.88.3 | GAS-CP-R77-021 | 2026-11-05 | Performance: the project tree reads each sub-project once (engineering rows memoised per request), engineering alerts and financial pills cached 3 min and dropped after every related save, offers read once per project — thousands of queries fewer on a full tree; PHP warnings fixed (offer status "draft" label, issued-report notification stamp). | — |
 | 1.88.2 | GAS-CP-R77-020 | 2026-11-05 | Offer document (PDF + Word): the payment schedule — the instalments of the offer with %, amount, trigger and due — printed right after the Prices and payment section; default terms seeded when the offer has none. | — |
 | 1.88.1 | GAS-CP-R77-019 | 2026-11-05 | Rich text everywhere (requests, tickets, notes, comments): web addresses become clickable links (long ones shortened on screen, never pushing a bubble out of the card) and are no longer mangled by the italic / bold markers. | — |

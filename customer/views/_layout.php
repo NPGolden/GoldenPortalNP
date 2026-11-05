@@ -29,6 +29,7 @@ function nav_groups(): array {
     if ($staff && function_exists('sl_can') && sl_can()) $g[3]['items'][] = ['sales', t('sl.title'), '📈'];
     if ($staff && function_exists('pi_can_view') && pi_can_view()) $g[3]['items'][] = ['proformas', t('pi.title'), '💶'];
     if ($staff && function_exists('cf_can') && cf_can()) $g[3]['items'][] = ['cashflow', t('cf.title'), '💰'];
+    if ($staff && function_exists('col_can') && col_can()) $g[3]['items'][] = ['collections', t('col.title'), '📥'];   // R78-001: accounting · sales · owner · CEO · GM
     if ($staff && function_exists('eng_is_management') && eng_has() && (eng_is_management() || eng_is_pm())) $g[2]['items'][] = ['eng_requests', t('eng.requests'), '📐'];   // R47-001 / R48-001
     if (function_exists('kb_has') && kb_has()) $g[4]['items'][] = ['kb', t('kb.title'), '💬'];
     if ($staff && function_exists('td_has') && td_has()) $g[2]['items'][] = ['tasks', t('td.title'), '📅'];
@@ -70,10 +71,11 @@ function nav_badges_compute(): array {
  *  everybody; vessel systems, Golden A/S roles, portal accounts and the login
  *  history for administrators. Each tab keeps its own ?p= address.     R9 */
 function settings_tab_groups(): array {
-    $admin = function_exists('is_cp_admin') && is_cp_admin(); $staff = function_exists('is_staff') && is_staff();
+    $admin = function_exists('is_cp_admin') && is_cp_admin(); $staff = function_exists('is_staff') && is_staff(); $mgmt = function_exists('mgmt_can') && mgmt_can();
     $G = [[t('stg.me'), [['account', t('nav.account')]]]];
+    if ($mgmt && !$admin) $G[] = [t('stg.org'), [['admin_users', t('nav.users')]]];   // R78-001: the Owner / CEO / General Manager manage the portal accounts even without administrator rights
     if ($admin) {
-        $org = [['admin_users', t('nav.users')], ['admin_roles', t('nav.roles')], ['admin_disciplines', t('nav.disciplines')]];
+        $org = [['admin_roles', t('nav.roles')], ['admin_disciplines', t('nav.disciplines')]]; if ($mgmt) array_unshift($org, ['admin_users', t('nav.users')]);   // R78-001: accounts — management only
         if (function_exists('wc_has') && wc_has()) $org[] = ['admin_calendars', t('wc.title')];
         if (function_exists('br_has') && br_has()) $org[] = ['admin_branches', t('br.title')];
         if (function_exists('eng_has') && eng_has()) $org[] = ['admin_engineering', t('eng.settings')];   // R47-002

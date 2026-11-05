@@ -194,7 +194,7 @@ function cu_account_refs(int $uid): array {
 }
 /** Delete an account that has no history at all (created by mistake); everything else is deactivated, never deleted. */
 function cu_account_delete(int $uid): void {
-    $me = require_cp_admin(); if ($uid === (int)$me['id']) throw new RuntimeException(t('err.noaccess'));
+    $me = require_mgmt(); if ($uid === (int)$me['id']) throw new RuntimeException(t('err.noaccess'));   // R78-001
     $u = one('SELECT id, email, full_name FROM customer_users WHERE id = ?', [$uid]); if (!$u) throw new RuntimeException(t('err.notfound'));
     $refs = cu_account_refs($uid); if ($refs) throw new RuntimeException(t('au.delete_refs', ['l' => implode(', ', array_map(fn($k, $n) => $k . ' ' . $n, array_keys($refs), $refs))]));
     foreach (['notifications' => 'user_id', 'mob_devices' => 'user_id', 'mob_refresh_tokens' => 'user_id', 'login_log' => 'user_id', 'ai_log' => 'user_id', 'sales_targets' => 'user_id', 'hr_entitlements' => 'user_id'] as $t => $c) { try { q("DELETE FROM `$t` WHERE `$c` = ?", [$uid]); } catch (Throwable $e) {} }

@@ -928,6 +928,7 @@ function pm_handle_action(string $action, string $page): bool {
         case 'pi_status': { require_staff(); $pid = (int)$_POST['id']; pi_set_status($pid, (string)($_POST['status'] ?? '')); flash('good', t('pi.status_saved')); redirect('proforma', ['id' => $pid, '_r' => uniqid()]); }
         case 'pinv_save': { require_staff(); $pid = (int)$_POST['id']; pinv_save_from_post($pid); flash('good', t('pi.inv_saved')); redirect('proforma', ['id' => $pid, '_r' => uniqid()], '#invoices'); }
         case 'pinv_delete': { require_staff(); $pid = pinv_delete((int)$_POST['inv_id']); flash('good', t('pi.inv_deleted')); redirect('proforma', ['id' => $pid, '_r' => uniqid()], '#invoices'); }
+        case 'col_fu': { require_staff(); if (!function_exists('col_can') || !col_can()) throw new RuntimeException(t('err.noaccess')); col_followup_save((int)($_POST['id'] ?? 0), (string)($_POST['next'] ?? ''), (string)($_POST['promise'] ?? ''), (string)($_POST['note'] ?? '')); flash('good', t('col.fu_saved')); $qs = []; foreach (['vessel', 'project', 'customer', 'pm', 'bucket', 'q', 'from', 'to'] as $k) if (($v = (string)($_GET[$k] ?? '')) !== '') $qs[$k] = $v; redirect('collections', $qs + ['_r' => uniqid()], '#col-open'); }   // R78-001
         case 'ppay_save': { require_staff(); $pid = (int)$_POST['id']; ppay_save_from_post($pid); flash('good', t('pay.saved')); redirect('proforma', ['id' => $pid, '_r' => uniqid()], '#payments'); }
         case 'ppay_delete': { require_staff(); $pid = ppay_delete((int)$_POST['pay_id']); flash('good', t('pay.deleted')); redirect('proforma', ['id' => $pid, '_r' => uniqid()], '#payments'); }
         case 'pi_delete': { $oid = pi_delete((int)$_POST['id']); flash('good', t('pi.deleted')); redirect('offer', ['id' => $oid, '_r' => uniqid()], '#proformas'); }
@@ -971,7 +972,7 @@ function pm_handle_action(string $action, string $page): bool {
             flash('good', t('tm.saved')); redirect('subproject', ['id' => $sid, 'tab' => 'process', '_r' => uniqid()]);
         }
         case 'wf_opacity_save': { require_cp_admin(); cp_setting_set('wf_photo_opacity', (string) max(10, min(100, (int)($_POST['opacity'] ?? 60)))); flash('good', t('wf.opacity_saved')); redirect('admin_systems', ['_r' => uniqid()], '#wf-opacity'); }
-        case 'tm_strict': { require_cp_admin(); cp_setting_set('tm_strict', !empty($_POST['strict']) ? '1' : '0'); flash('good', t('tm.mode_saved')); redirect('admin_users', ['_r' => uniqid()]); }
+        case 'tm_strict': { require_mgmt(); cp_setting_set('tm_strict', !empty($_POST['strict']) ? '1' : '0'); flash('good', t('tm.mode_saved')); redirect('admin_users', ['_r' => uniqid()]); }
         /* ------------------------------- branches (R24-001) */
         case 'br_save':   { br_save(); flash('good', t('br.saved')); redirect('admin_branches', ['_r' => uniqid()]); }
         case 'br_delete': { br_delete((int)$_POST['id']); flash('good', t('br.deleted')); redirect('admin_branches', ['_r' => uniqid()]); }
@@ -1217,7 +1218,7 @@ function pm_handle_action(string $action, string $page): bool {
             redirect('admin_roles', ['_r' => uniqid()]);
         }
         case 'cu_update': {
-            $me = require_cp_admin();
+            $me = require_mgmt();
             $id = (int)$_POST['id'];
             $x = one('SELECT * FROM customer_users WHERE id = ?', [$id]);
             if (!$x) throw new RuntimeException(t('err.notfound'));
@@ -1249,7 +1250,7 @@ function pm_handle_action(string $action, string $page): bool {
 
         /* ---------------------------------------------- admin: users */
         case 'cu_save': {
-            require_cp_admin();
+            require_mgmt();
             $role = in_array($_POST['role'] ?? '', ['customer','staff','admin'], true) ? $_POST['role'] : 'customer';
             $cid  = (int)($_POST['customer_id'] ?? 0) ?: null;
             if ($role === 'customer' && !$cid) throw new RuntimeException(t('au.need_customer'));
@@ -1272,7 +1273,7 @@ function pm_handle_action(string $action, string $page): bool {
         case 'mob_revoke': { mob_revoke((int)($_POST['dev'] ?? 0)); flash('good', t('mob.revoked_done')); redirect('admin_users', ['_r' => uniqid()]); }   // R53-002
         case 'mob_settings_save': { require_cp_admin(); if (!lic_has()) throw new RuntimeException(t('err.noaccess')); $app = in_array($_POST['app'] ?? '', ['engineer', 'pm', 'customer', 'hr'], true) ? $_POST['app'] : 'engineer'; /* R74-001: customer + hr (customer was silently saved as engineer before) */ $v = trim((string)($_POST['min_version'] ?? '')); if (!preg_match('/^\d+\.\d+\.\d+$/', $v)) throw new RuntimeException(t('mob.bad_version')); cp_setting_set('api_min_version_' . $app, $v); flash('good', t('mob.saved')); redirect('admin_log', ['_r' => uniqid()], '#mob'); }   // R66-001: one minimum version per app (engineer | pm)
         case 'cu_revoke': {   // R49-001: sign a person out of every browser
-            require_cp_admin(); $id = (int)($_POST['id'] ?? 0); if (!$id || !function_exists('sec_revoke_all')) throw new RuntimeException(t('err.notfound'));
+            require_mgmt(); $id = (int)($_POST['id'] ?? 0); if (!$id || !function_exists('sec_revoke_all')) throw new RuntimeException(t('err.notfound'));
             sec_revoke_all($id); $em = (string) scalar('SELECT email FROM customer_users WHERE id = ?', [$id]); login_log($id, $em, 'revoked');
             flash('good', t('sec.revoked_done')); redirect('admin_users', ['_r' => uniqid()]);
         }
@@ -1289,14 +1290,14 @@ function pm_handle_action(string $action, string $page): bool {
             flash('good', t('sec.saved')); redirect('admin_log', ['_r' => uniqid()]);
         }
         case 'cu_twofa_reset': {
-            require_cp_admin();
+            require_mgmt();
             $id = (int)$_POST['id'];
             q('UPDATE customer_users SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?', [$id]);
             flash('good', t('au.twofa_reset_done'));
             redirect('admin_users', au_keep() + ['_r' => uniqid()]);
         }
         case 'cu_unlock': {                                   // GAS-CP-R36-001: clear a lock-out after too many wrong passwords
-            require_cp_admin();
+            require_mgmt();
             $id = (int)$_POST['id'];
             q('UPDATE customer_users SET failed_logins = 0, locked_until = NULL WHERE id = ?', [$id]);
             if (function_exists('nf_mark_ref_read')) nf_mark_ref_read('sec:locked:' . $id);
@@ -1306,9 +1307,9 @@ function pm_handle_action(string $action, string $page): bool {
         case 'diag_cache_flush': { diag_cache_flush(); flash('good', t('dg.cache_flushed')); redirect('admin_about', ['diag' => 1, '_r' => uniqid()], '#diag'); }   // R69-002
         case 'diag_slowlog_clear': { diag_slowlog_clear(); flash('good', t('dg.slowlog_cleared')); redirect('admin_about', ['diag' => 1, '_r' => uniqid()], '#diag'); }
         case 'diag_errlog_clear': { diag_errlog_clear(); flash('good', t('dg.errlog_cleared')); redirect('admin_about', ['diag' => 1, '_r' => uniqid()], '#diag'); }   // R69-001
-        case 'cu_delete': { $u = require_cp_admin(); cu_account_delete((int)($_POST['id'] ?? 0)); flash('good', t('au.deleted')); redirect('admin_users', au_keep() + ['_r' => uniqid()]); }   // R64-005
+        case 'cu_delete': { $u = require_mgmt(); cu_account_delete((int)($_POST['id'] ?? 0)); flash('good', t('au.deleted')); redirect('admin_users', au_keep() + ['_r' => uniqid()]); }   // R64-005
         case 'cu_toggle': {
-            $u = require_cp_admin();
+            $u = require_mgmt();
             $id = (int)$_POST['id'];
             if ($id !== (int)$u['id']) q('UPDATE customer_users SET is_active = 1 - is_active WHERE id = ?', [$id]);
             redirect('admin_users', au_keep() + ['_r' => uniqid()]);

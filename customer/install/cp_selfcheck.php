@@ -203,6 +203,8 @@ $r77 = (bool)$pdo->query("SHOW TABLES LIKE 'fc_reports'")->fetch();
 printf("%s R77-001 migration (function checks)  %s\n", $r77 ? '[ OK ]' : '[WARN]', $r77 ? '' : '— run install/migrate_cp_r77_fc.sql');
 $r77b = (bool)$pdo->query("SHOW COLUMNS FROM hr_requests LIKE 'reason_code'")->fetch();
 printf("%s R77-007 migration (request reasons)  %s\n", $r77b ? '[ OK ]' : '[WARN]', $r77b ? '' : '— run install/migrate_cp_r77_reasons.sql');
+$r78 = (bool)$pdo->query("SHOW TABLES LIKE 'pi_followups'")->fetch();
+printf("%s R78-001 migration (collections follow-ups)  %s\n", $r78 ? '[ OK ]' : '[WARN]', $r78 ? '' : '— run install/migrate_cp_r78_collections.sql');
 printf("%s R71-001 openssl extension (passkey signatures)  %s\n", function_exists('openssl_verify') ? '[ OK ]' : '[FAIL]', function_exists('openssl_verify') ? '' : '— enable ext-openssl');
 $r70d = (bool)$pdo->query("SHOW COLUMNS FROM customer_users LIKE 'clocks'")->fetch();
 printf("%s R70-004 migration (world clocks per user)  %s\n", $r70d ? '[ OK ]' : '[WARN]', $r70d ? '' : '— run install/migrate_cp_r70_clocks.sql');

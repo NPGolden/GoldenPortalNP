@@ -60,7 +60,7 @@ function sec_end_session(string $outcome, string $msgKey): void {
 /** Mobile devices of a person (R52 tables), newest first; [] when the mobile module is not installed. R53-002 */
 function mob_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'mob_devices'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function mob_devices(int $uid): array { return mob_has() ? all('SELECT * FROM mob_devices WHERE user_id = ? ORDER BY revoked_at IS NULL DESC, last_seen_at DESC, id DESC', [$uid]) : []; }
-function mob_revoke(int $deviceId): void { require_cp_admin(); if (!mob_has()) return; q('UPDATE mob_devices SET revoked_at = NOW() WHERE id = ? AND revoked_at IS NULL', [$deviceId]); q('UPDATE mob_refresh_tokens SET revoked_at = NOW() WHERE device_id = ? AND revoked_at IS NULL', [$deviceId]); }
+function mob_revoke(int $deviceId): void { require_mgmt();   /* R78-001 */ if (!mob_has()) return; q('UPDATE mob_devices SET revoked_at = NOW() WHERE id = ? AND revoked_at IS NULL', [$deviceId]); q('UPDATE mob_refresh_tokens SET revoked_at = NOW() WHERE device_id = ? AND revoked_at IS NULL', [$deviceId]); }
 /** ?p=relock — the browser was closed and reopened (window marker lost): the page asks the server to drop the session. R49-001 */
 function sec_relock(): void {
     header('Cache-Control: no-store'); if (empty($_SESSION['cu_id']) || !sec_cfg('sec_close_signout')) { http_response_code(204); exit; }
