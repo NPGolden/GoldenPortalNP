@@ -6642,4 +6642,15 @@ Best regards,
 'isr.regen_ok' => 'PDF and Word rebuilt and archived.',
 // ---- GAS-CP-R77-011
 'fsr.trail_hint' => 'click to unfold',
+// ---- GAS-CP-R77-013 balance breakdown
+'hr.bd_title' => 'Balance breakdown',
+'hr.bd_hint' => 'every figure behind the available days — greyed lines are not counted and say why',
+'hr.bd_cutover' => 'records up to {d} are inside the opening figure',
+'hr.bd_other_year' => 'starts in another year — counted there',
+'hr.bd_history' => 'history only — flagged not counted at import',
+'hr.bd_before_cutover' => 'before the cut-over date — inside the opening figure',
+'hr.bd_board' => 'Days typed on the planning board without a request',
+'hr.bd_board_hint' => 'board entries without a request count as taken',
+'hr.bd_hours' => 'hour type consuming annual leave (8 h = 1 day)',
+'hr.bd_formula' => '{t} total − {o} opening − {k} taken − {p} pending',
 ];

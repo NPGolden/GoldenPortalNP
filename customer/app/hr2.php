@@ -160,6 +160,23 @@ function hr_balance_compute(array $p, int $tid, int $year): array {
     if ($t && $t['unit'] === 'hour' && $t['consumes_annual'] && ($ann = hr_annual_type_id()) && $ann !== $tid) { $ab = hr_balance($p, $ann, $year); $via = true; $counts = true; $total = 0.0; $avail = $ab['available'] === null ? null : round($ab['available'] * HR_HOURS_PER_DAY, 2); }   // early leave: the annual balance expressed in hours
     return ['type' => $t, 'entitled' => $ent, 'carry' => $carry, 'opening' => $open, 'taken' => $taken, 'pending' => $pend, 'counts' => $counts, 'total' => $total, 'available' => $avail, 'unit' => $t['unit'] ?? 'day', 'via_annual' => $via, 'mode' => $mode, 'statutory' => $st, 'acc_hours' => $accH];
 }
+/** R77-013: every figure behind a balance — so HR can see why the available days are what they are. */
+function hr_balance_breakdown(array $p, int $tid, int $year): array {
+    $pid = (int)$p['id']; $uid = (int)($p['user_id'] ?? 0); $b = hr_balance($p, $tid, $year); $t = hr_type($tid) ?: [];
+    $e = one('SELECT * FROM hr_entitlements WHERE year = ? AND type_id = ? AND (person_id = ? OR (user_id = ? AND ? > 0)) LIMIT 1', [$year, $tid, $pid, $uid, $uid]);
+    $cf = !empty($e['counted_from']) ? (string)$e['counted_from'] : null; $hasC = hr_counted_sql() !== '';
+    $reqs = all("SELECT r.*, " . ($hasC ? 'r.counted' : '1 AS counted') . " FROM hr_requests r WHERE r.person_id = ? AND r.type_id = ? AND (YEAR(r.date_from) = ? OR YEAR(r.date_to) = ?) AND r.status IN ('approved','pending_mgr','pending_hr') ORDER BY r.date_from", [$pid, $tid, $year, $year]);
+    $items = []; foreach ($reqs as $r) {
+        $why = null; $counts = true;
+        if ((int)substr((string)$r['date_from'], 0, 4) !== $year) { $why = 'other_year'; $counts = false; }
+        elseif ($hasC && !(int)$r['counted']) { $why = 'history'; $counts = false; }
+        elseif ($cf && $r['date_from'] <= $cf) { $why = 'before_cutover'; $counts = false; }
+        $items[] = ['id' => (int)$r['id'], 'from' => $r['date_from'], 'to' => $r['date_to'], 'days' => (float)$r['days'], 'hours' => (float)$r['hours'], 'status' => $r['status'], 'counts' => $counts, 'why' => $why, 'reason' => $r['reason_code'] ?? null];
+    }
+    $board = $uid && ($t['unit'] ?? 'day') === 'day' ? all('SELECT plan_date FROM plan_entries WHERE user_id = ? AND leave_type_id = ? AND YEAR(plan_date) = ? AND request_id IS NULL' . ($cf ? " AND plan_date > '" . $cf . "'" : '') . ' GROUP BY plan_date ORDER BY plan_date', [$uid, $tid, $year]) : [];
+    $hourTypes = []; if (($t['rule_key'] ?? '') === 'annual') foreach (hr_types() as $x) if ($x['consumes_annual'] && $x['unit'] === 'hour') { $h = hr_req_sum($pid, (int)$x['id'], $year, 'approved', 'hours', true, $cf ? " AND date_from > '" . $cf . "'" : ''); if ($h > 0) $hourTypes[] = ['code' => $x['code'], 'hours' => $h, 'days' => floor($h / HR_HOURS_PER_DAY)]; }
+    return ['balance' => $b, 'entitlement' => $e, 'counted_from' => $cf, 'requests' => $items, 'board' => array_column($board, 'plan_date'), 'hour_types' => $hourTypes];
+}
 function hr_balances(array $p, int $year): array { $o = []; foreach (hr_types() as $tid => $t) { if (function_exists('hr_type_enabled') && !hr_type_enabled($p, $t)) continue; $b = hr_balance($p, $tid, $year); if ($b['counts'] || $b['taken'] > 0 || $b['pending'] > 0) $o[$tid] = $b; } return $o; }
 
 /* ------------------------------------------------------------ requests */

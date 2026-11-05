@@ -6642,4 +6642,15 @@ Cordiali saluti,
 'isr.regen_ok' => 'PDF e Word rigenerati e archiviati.',
 // ---- GAS-CP-R77-011
 'fsr.trail_hint' => 'clic per aprire',
+// ---- GAS-CP-R77-013 balance breakdown
+'hr.bd_title' => 'Dettaglio del saldo',
+'hr.bd_hint' => 'ogni cifra dietro i giorni disponibili — le righe in grigio non contano e dicono perché',
+'hr.bd_cutover' => 'le registrazioni fino al {d} sono nel valore iniziale',
+'hr.bd_other_year' => 'inizia in un altro anno — conteggiata lì',
+'hr.bd_history' => 'solo storico — segnata come non conteggiata all\'importazione',
+'hr.bd_before_cutover' => 'prima della data di passaggio — nel valore iniziale',
+'hr.bd_board' => 'Giorni inseriti nel planning senza richiesta',
+'hr.bd_board_hint' => 'le voci del planning senza richiesta contano come godute',
+'hr.bd_hours' => 'tipo a ore che consuma ferie (8 h = 1 giorno)',
+'hr.bd_formula' => '{t} totale − {o} iniziale − {k} godute − {p} in attesa',
 ];

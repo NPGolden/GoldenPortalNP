@@ -572,4 +572,7 @@ document.addEventListener('click', function (ev) {
       });
     });
   })();
+
+  /* R77-013: [data-toggle="#id"] shows / hides a row or block */
+  document.querySelectorAll('[data-toggle]').forEach(function (b) { b.addEventListener('click', function () { var t = document.querySelector(b.dataset.toggle); if (t) t.classList.toggle('is-hidden'); }); });
 })();

@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.87.4** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.87.5** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.87.5 | GAS-CP-R77-013 | 2026-11-05 | HR card: Σ balance breakdown per annual-leave year — entitled, carry-over, opening, every request with its days, board-only days, hour conversions, formula; lines that are not counted say why (other year, history only, before cut-over). | — |
 | 1.87.4 | GAS-CP-R77-012 | 2026-11-05 | HR dashboard: "Contracts expiring" heading back above its list (it had drifted above the review / off-boarding / certificate blocks). Ages only for HR / Owner / CEO wherever birthdays are listed (central guard in the celebrations helper; contacts page). | — |
 | 1.87.3 | GAS-CP-R77-011 | 2026-11-05 | Audit trail card folded by default on inspection, service and function-check report pages (entry count on the summary; click to unfold). | — |
 | 1.87.2 | GAS-CP-R77-010 | 2026-11-05 | Big inspection / service reports: documents built from cached 1200-px photo copies, PDF stored before the Word and kept if the Word fails, 300 s / 512 MB build budget; ⟳ Rebuild PDF / Word on an issued report whose documents are missing. | — |

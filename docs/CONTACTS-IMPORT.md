@@ -1049,3 +1049,6 @@ No SQL. `isr_view.php`, `fsr_view.php`, `fc_view.php`: the trail card is `<detai
 
 ## 207. v1.87.4 — HR dashboard heading order; ages HR-only (GAS-CP-R77-012)
 No SQL. `hr_dashboard.php`: the `#hr-contracts` `<h3>` moved below the HRA / off-boarding / certificate blocks, directly above the `$alerts` list. `cel.php` `cel_upcoming()` forces `$withAge = false` unless `hr_personal_can()`; `contacts.php` shows a contact's age only with `hr_personal_can()`. Community (`soc_events`) never carried ages — only years at the company on anniversaries.
+
+## 208. v1.87.5 — Balance breakdown (GAS-CP-R77-013)
+No SQL. `hr2.php` `hr_balance_breakdown($p,$tid,$year)` → balance, entitlement row, counted_from, requests of the type touching the year (approved / pending) each with `counts` and `why` ∈ other_year · history (counted = 0) · before_cutover, board-only plan dates, annual-consuming hour types. `hr_person.php` Entitlements tab: Σ button per year row toggles a `#bd-<year>` row (`[data-toggle]` helper added to portal.js). Keys `hr.bd_*` ×10 ×5 (6527).
