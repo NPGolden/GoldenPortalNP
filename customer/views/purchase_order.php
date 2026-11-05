@@ -272,6 +272,17 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
 <?php endif; ?>
 <?php endif; ?>
 
+<?php if ($o && !$isRfq && function_exists('si_can') && si_can() && $o['status'] !== 'draft'): $sis = si_list(['order_id' => $id, 'status' => '']); ?>
+<div class="card" id="invoices">
+  <div class="page-head" style="margin-bottom:6px;"><div><h2 style="margin:0;">💸 <?= tt('si.invoices') ?> <span class="hint" style="font-weight:400;">(<?= count($sis) ?>)</span></h2><p class="hint"><?= tt('si.po_block_lede') ?></p></div>
+    <div class="btn-row"><?php if (in_array($o['status'], ['partial', 'received', 'closed', 'confirmed', 'sent'], true)): ?><a class="btn btn--gold btn--sm" href="<?= url('payable', ['id' => 0, 'order_id' => $id]) ?>">+ <?= tt('si.register') ?></a><?php endif; ?></div></div>
+  <table class="tbl tbl--wrap"><thead><tr><th><?= tt('si.no') ?></th><th><?= tt('si.inv_no') ?></th><th><?= tt('si.issue') ?></th><th><?= tt('si.due') ?></th><th class="num"><?= tt('po.net') ?></th><th class="num"><?= tt('po.gross') ?></th><th class="num"><?= tt('si.paid') ?></th><th><?= tt('si.match') ?></th><th><?= tt('prq.status') ?></th></tr></thead><tbody>
+  <?php if (!$sis): ?><tr><td colspan="9" class="hint"><?= tt('si.none') ?></td></tr><?php endif; ?>
+  <?php foreach ($sis as $si): ?><tr><td><a href="<?= url('payable', ['id' => (int)$si['id']]) ?>" style="font-family:var(--mono);"><?= e($si['si_no']) ?></a><?= $si['kind'] === 'credit' ? ' ' . pill('gold', t('si.credit')) : '' ?></td><td><?= e($si['inv_no']) ?></td><td><?= fmt_date($si['issue_date']) ?></td><td><?= fmt_date($si['due_date']) ?></td><td class="num"><?= e(si_money((float)$si['net'], $si['currency'])) ?></td><td class="num"><?= e(si_money((float)$si['gross'], $si['currency'])) ?></td><td class="num"><?= e(si_money((float)$si['paid'], $si['currency'])) ?></td><td><?= si_m_pill($si['match_status']) ?></td><td><?= si_pill($si['status']) ?></td></tr><?php endforeach; ?>
+  </tbody></table>
+</div>
+<?php endif; ?>
+
 <div class="card">
   <h2><?= tt('prq.log') ?></h2>
   <table class="tbl tbl--wrap"><thead><tr><th><?= tt('prq.when') ?></th><th><?= tt('prq.who') ?></th><th><?= tt('prq.event') ?></th><th><?= tt('prq.note') ?></th></tr></thead><tbody>

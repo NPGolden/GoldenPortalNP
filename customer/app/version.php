@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.94.1';
+const CP_VERSION = '1.95.0';
 const CP_BUILD   = '2026-11-05';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R81-001', 'version' => '1.95.0', 'date' => '2026-11-05', 'title' => 'Payables (release R81 of GAS-2026-PORTAL-PRC-001): supplier invoices and credit notes registered against a purchase order (received lines pulled in, invoice PDF attached), three-way check per line — PO price within 2 % and quantity within the goods accepted and not yet invoiced — with disputed invoices that can be corrected or accepted with a reason; payment requests per supplier from checked invoices, approved by Accounting or, over the threshold of Settings › Procurement, by Management; payments recorded by Accounting / Management (partial allowed, proof attached), supplier statement with running balance (Excel), payables aging (not due · 1–30 · 31–60 · 61–90 · 90+), invoices on the sub-project costs (kind Invoice, the PO commitment reduced accordingly) and in the cash flow (payments actual, open invoices forecast by due date); Accounting › Payables menu, invoices block on every purchase order.', 'db' => 'install/migrate_cp_r81_payables.sql', 'check' => 'r81'],
         ['ref' => 'GAS-CP-R80-005', 'version' => '1.94.1', 'date' => '2026-11-05', 'title' => 'Budget & actual: the disciplines shown on the manhour budget form are chosen in Settings › Disciplines › Budget (nothing ticked = all active; a discipline with hours in the current budget stays visible).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R80-004', 'version' => '1.94.0', 'date' => '2026-11-05', 'title' => 'Procurement R80-004 — Goods receipt per PO line (received / rejected with reason and NCR action: return · replacement · credit; accepted goods into stock at the order price with a price-history record, reserved for the requisition they were bought for; open NCRs closed with the outcome), delivery timeline per PO (order sent → confirmed → ready → shipped with carrier / AWB / B-L / packages / weight → export cleared → arrived → customs cleared → delivered → goods receipt; planned vs actual, late steps red, documents attached) and per line (promised date typed with the confirmation, expected = promised or lead time; the expected date of the order follows the latest line), logistic costs typed by Procurement on receipt or closing (freight, insurance, customs brokerage, duties, import VAT, handling; landed cost = net + logistics; mirrored to the sub-project costs as kind Logistics), PO committed cost on the sub-project (sp_costs kind Order per PO: Budget & actual, financial statement, project reports), Procurement % of the process line from received / ordered value, late KPI by expected date.', 'db' => 'install/migrate_cp_r80_004_receipts.sql', 'check' => 'r80d'],
         ['ref' => 'GAS-CP-R80-003', 'version' => '1.93.0', 'date' => '2026-11-05', 'title' => 'Procurement R80-003 — RFQs and purchase orders per supplier: "To buy" basket of approved requisition lines (suggested supplier = preferred, else last bought from) → RFQ or PO with number series per branch (<prefix>-PO-<yy>-<nnnn>, <prefix>-RFQ-<yy>-<nnnn>), supplier defaults (currency, Incoterms, terms, advance) copied from the supplier card, lines from requisitions or the inventory picker with the approved alternatives of an item offered, prices from the pricing rule for that supplier or typed, VAT, PDF (branch letterhead), ✉ card to the supplier\'s contacts (marks the document sent), states draft → sent → confirmed → partly received → received → closed / cancelled (requisition lines back to "to buy"), RFQ quote typed per line (price, lead time) and awarded into a PO; Purchase orders block on the sub-project Procurement tab; Procurement menu entry.', 'db' => 'install/migrate_cp_r80_003_po.sql', 'check' => 'r80c'],
@@ -347,6 +348,7 @@ function cp_migration_state(): array {
         'r80b' => $has("SHOW TABLES LIKE 'bom_revisions'"),
         'r80c' => $has("SHOW TABLES LIKE 'po_orders'"),
         'r80d' => $has("SHOW TABLES LIKE 'po_receipts'"),
+        'r81' => $has("SHOW TABLES LIKE 'si_invoices'"),
         'r70d' => $has("SHOW COLUMNS FROM customer_users LIKE 'clocks'"),
         'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),
         'r67' => $has("SHOW TABLES LIKE 'hr_flows'") && $has("SHOW TABLES LIKE 'hr_flow_templates'") && $has("SHOW TABLES LIKE 'hr_invitations'"),

@@ -35,6 +35,7 @@ function nav_groups(): array {
     if ($staff && function_exists('pi_can_view') && pi_can_view()) $acc['items'][] = ['proformas', t('pi.title'), '💶'];
     if ($staff && function_exists('cf_can') && cf_can()) $acc['items'][] = ['cashflow', t('cf.title'), '💰'];
     if ($staff && function_exists('col_can') && col_can()) $acc['items'][] = ['collections', t('col.title'), '📥'];   // R78-001: accounting · sales · owner · CEO · GM
+    if ($staff && function_exists('si_can') && si_can()) $acc['items'][] = ['payables', t('si.title'), '💸'];   // R81-001: accounting · procurement · management
     if ($acc['items']) array_splice($g, 4, 0, [$acc]);
     // R79-001: Procurement group — inventory and suppliers (requisitions, POs, receipts follow in R80)
     if ($staff && function_exists('pr_can') && (pr_can() || (function_exists('prq_can') && prq_can()))) { $prc = ['key' => 'procurement', 'label' => t('nav.g_procurement'), 'items' => []]; if (function_exists('prq_can') && prq_can()) $prc['items'][] = ['requisitions', t('prq.title'), '🧾']; if (pr_can()) { if (function_exists('po_can') && po_can()) $prc['items'][] = ['purchase_orders', t('po.title'), '🛒']; $prc['items'][] = ['inventory', t('stk.title'), '📦']; $prc['items'][] = ['suppliers', t('sup.title'), '🏭']; } array_splice($g, array_search('library', array_column($g, 'key'), true), 0, [$prc]); }

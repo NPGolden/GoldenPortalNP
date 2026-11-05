@@ -203,6 +203,8 @@ $r77 = (bool)$pdo->query("SHOW TABLES LIKE 'fc_reports'")->fetch();
 printf("%s R77-001 migration (function checks)  %s\n", $r77 ? '[ OK ]' : '[WARN]', $r77 ? '' : '— run install/migrate_cp_r77_fc.sql');
 $r77b = (bool)$pdo->query("SHOW COLUMNS FROM hr_requests LIKE 'reason_code'")->fetch();
 printf("%s R77-007 migration (request reasons)  %s\n", $r77b ? '[ OK ]' : '[WARN]', $r77b ? '' : '— run install/migrate_cp_r77_reasons.sql');
+$r81 = (bool)$pdo->query("SHOW TABLES LIKE 'si_invoices'")->fetch();
+printf("%s R81-001 migration (payables: supplier invoices · payment requests · payments)  %s\n", $r81 ? '[ OK ]' : '[WARN]', $r81 ? '' : '— run install/migrate_cp_r81_payables.sql');
 $r80d = (bool)$pdo->query("SHOW TABLES LIKE 'po_receipts'")->fetch();
 printf("%s R80-004 migration (goods receipts · delivery timeline · logistic costs)  %s\n", $r80d ? '[ OK ]' : '[WARN]', $r80d ? '' : '— run install/migrate_cp_r80_004_receipts.sql');
 $r80c = (bool)$pdo->query("SHOW TABLES LIKE 'po_orders'")->fetch();
