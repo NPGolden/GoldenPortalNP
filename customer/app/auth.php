@@ -91,7 +91,7 @@ const HR_ACTIONS = ['pl_assign', 'pl_clear', 'pl_delete', 'pl_import', 'hr_type_
 function hr_owner(): bool {
     static $v = null; if ($v !== null) return $v; $u = current_user();
     if (!$u || !is_staff() || empty($u['staff_role_id'])) return $v = false;
-    try { return $v = (string) scalar('SELECT scope FROM staff_roles WHERE id = ?', [(int)$u['staff_role_id']]) === 'owner'; } catch (Throwable $e) { return $v = false; }
+    try { $r = one('SELECT scope, name FROM staff_roles WHERE id = ?', [(int)$u['staff_role_id']]); return $v = $r && ((string)$r['scope'] === 'owner' || strcasecmp(trim((string)$r['name']), 'CEO') === 0); } catch (Throwable $e) { return $v = false; }   // R77-005: the CEO role counts as Owner for HR
 }
 function hr_only(): bool {
     static $v = null; if ($v !== null) return $v; $u = current_user();

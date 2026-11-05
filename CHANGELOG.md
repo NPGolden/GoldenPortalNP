@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.86.3** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.86.4** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.86.4 | GAS-CP-R77-005 | 2026-11-05 | HR management restricted to the HR role, Owner and CEO (the CEO role counts as Owner for HR) — administrators keep only their own data; HR dashboard search box and Employed / Left / All switch on the balances table, People button. | — |
 | 1.86.3 | GAS-CP-R77-004 | 2026-11-04 | Apps sync error "Refresh token invalid / Too many requests" fixed: single-flight token refresh in all four apps (Service 0.6.13, PM 1.0.9, HR 1.0.1, Customer 1.0.6) and a 60-second grace on the API for a retry with the token just rotated (a later replay still signs the device out). | — |
 | 1.86.2 | GAS-CP-R77-003 | 2026-11-04 | Service app 0.6.12: the sync chip and More show the real reason of a sync error (message + failing call). Whole-project service / inspection reports accepted from a restricted engineer who is on a sub-project of that project (the app was refused with "the sub-project is not assigned to you"). | — |
 | 1.86.1 | GAS-CP-R77-002 | 2026-11-04 | Service app 0.6.11: photos per task (service report) and per inspected system (inspection report) — a strip under every block, filed under that task / system on the portal; removing a block removes its photos. | — |

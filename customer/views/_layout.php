@@ -78,7 +78,7 @@ function settings_tab_groups(): array {
         if (function_exists('br_has') && br_has()) $org[] = ['admin_branches', t('br.title')];
         if (function_exists('eng_has') && eng_has()) $org[] = ['admin_engineering', t('eng.settings')];   // R47-002
         if (function_exists('ai_has') && ai_has()) $org[] = ['admin_ai', t('ai.settings')];   // R50-001
-        if (function_exists('hr_has') && hr_has()) $org[] = ['admin_hr', t('hr.settings')];   // R51-001
+        if (function_exists('hr_has') && hr_has() && hr_can()) $org[] = ['admin_hr', t('hr.settings')];   // R51-001 · R77-005: HR / Owner only
         $G[] = [t('stg.org'), $org];
         $fleet = [['admin_customers', t('nav.customers')]];
         if (function_exists('vm_has') && vm_has()) $fleet[] = ['admin_vessel_merge', t('vm.title')];
