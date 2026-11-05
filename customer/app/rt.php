@@ -18,11 +18,13 @@ function rt_has_marks(string $s): bool { return (bool) preg_match('/\*\*|__|(?<!
 
 /** Inline marks → tags, on an already-escaped string. */
 function rt_inline(string $e): string {
+    // R77-019: URLs become links first and are shielded from the bold / italic markers (underscores in a SharePoint link are not italics)
+    $links = []; $e = preg_replace_callback('~(?<![\w"=])(https?://[^\s<]+?)(?=[\s<]|$|[.,;:!?)]+(?=[\s<]|$))~u', function ($m) use (&$links) { $k = "\x01" . count($links) . "\x02"; $u = $m[1]; $links[$k] = '<a href="' . $u . '" target="_blank" rel="noopener" class="rt-link">' . (mb_strlen($u) > 90 ? mb_substr($u, 0, 60) . '…' . mb_substr($u, -20) : $u) . '</a>'; return $k; }, $e);
     $e = preg_replace('/\*\*(.+?)\*\*/su', '<b>$1</b>', $e);
     $e = preg_replace('/__(.+?)__/su', '<u>$1</u>', $e);
     $e = preg_replace('/(?<![\w\/:])_([^_\n]+?)_(?![\w])/u', '<i>$1</i>', $e);
     $e = preg_replace('/(?<![\w*])\*([^*\n]+?)\*(?![\w*])/u', '<i>$1</i>', $e);
-    return $e;
+    return $links ? strtr($e, $links) : $e;
 }
 
 /** Safe HTML for the screen. $mt: a callback applied to each escaped line (e.g. the @mention highlighter). */

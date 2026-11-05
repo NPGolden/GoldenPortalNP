@@ -1067,3 +1067,6 @@ No SQL. `soc_winner()` returns null when the stored winner is in `hr_owner_ids()
 
 ## 213. v1.88.0 — Open requests across years (GAS-CP-R77-018)
 No SQL. HR feedback #18: the dashboard tile counted pending requests of all years (`hr_requests_for('hr', 0)`) while `hr_requests.php` filtered by the current year — a request dated January 2027 made the tile say 1 and the page show nothing but the creation form. `hr_requests.php`: with `st=open` (and no person) `$open` comes from all years; the tile links with `st=open`.
+
+## 214. v1.88.1 — Auto-links in rich text (GAS-CP-R77-019)
+No SQL. `rt.php` `rt_inline()`: `https?://…` runs become `<a class="rt-link" target=_blank rel=noopener>` (display shortened over 90 chars: 60 … 20) through placeholders (`\x01n\x02`) so `__` / `_` inside URLs are not italicised; placeholders restored last. CSS `.msg { min-width:0; overflow-wrap:anywhere }`, `.rt-link { word-break: break-all }`.
