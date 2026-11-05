@@ -56,6 +56,14 @@ layout_head(t('hr.dashboard'), 'hr_dashboard');
 </div>
 </div>
 
+<?php if (function_exists('hr_doc_due_rows') && ($dueRows = hr_doc_due_rows())): ?>
+<div class="card" id="hr-doc-due">
+  <h2>📄 <?= tt('hr.doc_due_title') ?> <span class="count"><?= count($dueRows) ?></span></h2><p class="hint"><?= tt('hr.doc_due_hint') ?></p>
+  <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('ll.who') ?></th><th><?= tt('hr.type') ?></th><th><?= tt('pl.from') ?></th><th><?= tt('hr.reason') ?></th><th><?= tt('hr.doc_due_by') ?></th><th></th></tr></thead><tbody>
+  <?php foreach ($dueRows as $r): ?><tr class="<?= (int)$r['days_left'] < 0 ? 'is-late' : '' ?>"><td><a href="<?= url('hr_person', ['id' => (int)$r['person_id']]) ?>#hr-req"><b><?= e($r['name_en']) ?></b></a></td><td><b><?= e($r['code']) ?></b> <?= e($r['type_name']) ?></td><td class="date"><?= e(fmt_date($r['date_from'])) ?></td><td class="hint"><?= e(hr_reason_label($r['reason_code'])) ?></td><td><?= pill((int)$r['days_left'] < 0 ? 'bad' : ((int)$r['days_left'] <= 1 ? 'gold' : 'mute'), fmt_date($r['doc_due']) . ((int)$r['days_left'] < 0 ? ' · ' . t('hr.doc_overdue') : '')) ?></td><td class="row-actions"><a class="btn btn--ghost btn--sm" href="<?= url('hr_requests', ['st' => 'all']) ?>"><?= tt('hr.requests') ?> ›</a></td></tr><?php endforeach; ?>
+  </tbody></table></div>
+</div>
+<?php endif; ?>
 <div class="card" id="hr-balances">
   <div class="card-head"><h2>🗓 <?= tt('hr.d_balances') ?> <?= $year ?></h2><a class="btn btn--ghost btn--sm" href="<?= url('planning', ['hy' => $year]) ?>#hr-report">📈 <?= tt('hr.report') ?> ›</a> <a class="btn btn--ghost btn--sm" href="<?= url('hr_export', ['year' => $year]) ?>">⬇ Excel</a></div>
   <p class="hint"><?= tt('hr.d_balances_hint') ?></p>

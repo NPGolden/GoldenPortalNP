@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.86.5';
+const CP_VERSION = '1.87.0';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R77-007', 'version' => '1.87.0', 'date' => '2026-11-05', 'title' => 'Leave requests: a reason must be chosen from a list that follows the leave type ("Other" needs a description); the manager may correct it at approval and HR at any time; medical reasons may be sent without the certificate, which is due 5 working days after the first day of absence — pill with upload on My leave / Service app / HR side, reminders the day before and when overdue, HR dashboard list. Service app 0.6.15, Golden HR 1.0.3.', 'db' => 'install/migrate_cp_r77_reasons.sql', 'check' => 'r77b'],
         ['ref' => 'GAS-CP-R77-006', 'version' => '1.86.5', 'date' => '2026-11-05', 'title' => 'Special leaves (parental, paternity / maternity, marriage, carer, force majeure, child illness, study, school hours, sick, L.104) shown as "Allowed by law — on request" with the legal ceiling and what was taken, apart from the entitlements and without an "available" figure — My leave, Service app 0.6.14 My HR, Golden HR 1.0.2.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-005', 'version' => '1.86.4', 'date' => '2026-11-05', 'title' => 'HR management restricted to the HR role, Owner and CEO (the CEO role counts as Owner for HR) — administrators keep only their own data; HR dashboard search box and Employed / Left / All switch on the balances table, People button.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-004', 'version' => '1.86.3', 'date' => '2026-11-04', 'title' => 'Apps sync error "Refresh token invalid / Too many requests" fixed: single-flight token refresh in all four apps (Service 0.6.13, PM 1.0.9, HR 1.0.1, Customer 1.0.6) and a 60-second grace on the API for a retry with the token just rotated (a later replay still signs the device out).', 'db' => null, 'check' => null],
@@ -312,6 +313,7 @@ function cp_migration_state(): array {
         'r76' => $has("SHOW TABLES LIKE 'proforma_payments'"),
         'r76b' => $has("SHOW COLUMNS FROM acc_lines LIKE 'offer_id'"),
         'r77' => $has("SHOW TABLES LIKE 'fc_reports'"),
+        'r77b' => $has("SHOW COLUMNS FROM hr_requests LIKE 'reason_code'"),
         'r70d' => $has("SHOW COLUMNS FROM customer_users LIKE 'clocks'"),
         'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),
         'r67' => $has("SHOW TABLES LIKE 'hr_flows'") && $has("SHOW TABLES LIKE 'hr_flow_templates'") && $has("SHOW TABLES LIKE 'hr_invitations'"),

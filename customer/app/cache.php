@@ -57,6 +57,7 @@ function hk_tick(): void {
         $n = 0; $cut = time() - 7 * 86400; foreach ((array) @glob($storage . '/sessions/sess_*') as $f) if (@filemtime($f) < $cut && @unlink($f)) $n++; $log[] = 'sessions ' . $n;
         $log[] = 'cache ' . cache_sweep();
         try { if (function_exists('pp_daily')) $log[] = pp_daily(); } catch (Throwable $e) { $log[] = 'pipeline err'; }   // R75-001
+        try { if (function_exists('hr_doc_daily')) $log[] = hr_doc_daily(); } catch (Throwable $e) { $log[] = 'hr-doc err'; }   // R77-007
         $dirs = (array) @glob($storage . '/backups/*', GLOB_ONLYDIR); rsort($dirs); $n = 0; foreach (array_slice($dirs, 3) as $d) { foreach ((array) @glob($d . '/*') as $f) @unlink($f); if (@rmdir($d)) $n++; } $log[] = 'backups ' . $n;
         foreach (['/slow-pages.log' => 2, '/php-errors.log' => 20, '/gate_debug.log' => 2] as $f => $mb) { $p = $storage . $f; if (is_file($p) && filesize($p) > $mb * 1048576) { $tail = (string) @file_get_contents($p, false, null, max(0, filesize($p) - 512 * 1024)); @file_put_contents($p, $tail); $log[] = basename($f) . ' trimmed'; } }
         cp_setting_set('hk_last', $day . ' ' . implode(' · ', $log));

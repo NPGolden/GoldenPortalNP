@@ -2,7 +2,7 @@
  * and a MOCK mode (built-in sample data in the same shape the portal returns) for the demo and the UI tests.
  * Mock mode: localStorage gas.mock = "1", or ?mock=1 on the URL. */
 window.API = (() => {
-  const VERSION = "0.6.14";
+  const VERSION = "0.6.15";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   try { MOCK = localStorage.getItem("gas.mock") === "1" || /[?&]mock=1/.test(location.search); if (/[?&]mock=1/.test(location.search)) localStorage.setItem("gas.mock", "1"); } catch (e) {}
@@ -69,6 +69,7 @@ window.API = (() => {
     assist: (body) => call("POST", "/assist", body),
     hr: (year) => call("GET", `/hr?year=${year || new Date().getFullYear()}`),
     hrRequest: (p, file) => { const f = new FormData(); Object.keys(p).forEach((k) => f.append(k, p[k] == null ? "" : p[k])); if (file) f.append("doc", file, file.name); return call("POST", "/hr/request", f, true); },
+    hrRequestDoc: (id, file) => { const fd = new FormData(); fd.append("request_id", String(id)); fd.append("doc", file, file.name); return call("POST", "/hr/request/doc", fd, true); },   // R77-007
     hrDocUrl: (id) => `${BASE}/hr/doc/${id}`,
     documentUrl: (id) => `${BASE}/documents/${id}`,
     async fetchDocument(id, kind) { const go = () => fetch(kind === "hr" ? `${BASE}/hr/doc/${id}` : `${BASE}/documents/${id}`, { headers: { Authorization: `Bearer ${tok.access}`, "X-App": "engineer", "X-App-Version": VERSION }, cache: "no-store" }); let r = await go(); if (r.status === 401 && tok.refresh) { const x = await raw("POST", "/auth/refresh", { refresh_token: tok.refresh }); tok.access = x.access_token; tok.refresh = x.refresh_token; r = await go(); } if (!r.ok) { const e = new Error(`HTTP ${r.status}`); e.status = r.status; throw e; } return r; },

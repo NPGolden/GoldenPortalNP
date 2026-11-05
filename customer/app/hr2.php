@@ -13,7 +13,7 @@ function hr2_has(): bool { static $h = null; if ($h === null) { try { $h = hr_ha
 /** Employee scope: a staff role with scope "employee" sees My leave and the account only. */
 function emp_only(): bool { static $v = null; if ($v !== null) return $v; $u = current_user(); if (!$u || !is_staff() || is_cp_admin() || empty($u['staff_role_id'])) return $v = false; try { return $v = (string) scalar('SELECT scope FROM staff_roles WHERE id = ?', [(int)$u['staff_role_id']]) === 'employee'; } catch (Throwable $e) { return $v = false; } }
 const EMP_PAGES = ['community', 'socphoto', 'my_leave', 'hr_doc', 'planning', 'hr_pdoc', 'account', 'manual', 'notifications', 'nf_open', 'kb', 'kb_q', 'kbfile', 'avatar', 'logout', 'login', 'twofa', 'ping', 'relock', '404', 'hra', 'hra_flow', 'hra_doc'];
-const EMP_ACTIONS = ['hra_start', 'hra_consent', 'hra_step', 'hra_doc', 'hra_doc_del', 'hra_assist', 'hra_submit', 'hra_withdraw', 'soc_wish', 'soc_kudos', 'soc_post', 'soc_react', 'soc_comment', 'soc_vote', 'soc_onboard_tick', 'hr_req_new', 'hr_req_cancel', 'hr_period_join', 'hr_tr_apply', 'hr_ev_ack', 'hr_tg_progress', 'hr_msg_send', 'account_save', 'account_revoke', 'twofa_begin', 'twofa_confirm', 'twofa_off', 'theme_save', 'avatar_save', 'avatar_remove', 'logout', 'nf_seen', 'nf_seen_all', 'kb_ask', 'kb_answer', 'flt_reset'];
+const EMP_ACTIONS = ['hra_start', 'hra_consent', 'hra_step', 'hra_doc', 'hra_doc_del', 'hra_assist', 'hra_submit', 'hra_withdraw', 'soc_wish', 'soc_kudos', 'soc_post', 'soc_react', 'soc_comment', 'soc_vote', 'soc_onboard_tick', 'hr_req_new', 'hr_req_cancel', 'hr_period_join', 'hr_tr_apply', 'hr_ev_ack', 'hr_tg_progress', 'hr_msg_send', 'account_save', 'account_revoke', 'twofa_begin', 'twofa_confirm', 'twofa_off', 'theme_save', 'avatar_save', 'avatar_remove', 'logout', 'nf_seen', 'nf_seen_all', 'kb_ask', 'kb_answer', 'flt_reset', 'hr_req_reason', 'hr_req_doc'];
 function emp_gate(string $page): void { if (emp_only() && !in_array($page, EMP_PAGES, true)) { flash('warn', t('hr.emp_only')); redirect('my_leave'); } }
 
 /* ------------------------------------------------------------ registry */
@@ -163,6 +163,69 @@ function hr_balance_compute(array $p, int $tid, int $year): array {
 function hr_balances(array $p, int $year): array { $o = []; foreach (hr_types() as $tid => $t) { if (function_exists('hr_type_enabled') && !hr_type_enabled($p, $t)) continue; $b = hr_balance($p, $tid, $year); if ($b['counts'] || $b['taken'] > 0 || $b['pending'] > 0) $o[$tid] = $b; } return $o; }
 
 /* ------------------------------------------------------------ requests */
+/* ------------------------------------------------------------ R77-007: reasons and the medical certificate */
+const HR_REASONS = [
+    'leave'    => ['vacation', 'rest', 'personal', 'family', 'bereavement', 'wedding', 'moving', 'legal', 'exam_study', 'religious', 'public_duty', 'force_majeure', 'other'],
+    'sick'     => ['illness', 'accident', 'medical_appointment', 'surgery', 'hospitalisation', 'other'],
+    'parental' => ['birth', 'child_care', 'child_illness', 'school', 'prenatal', 'other'],
+    'strike'   => ['strike'],
+    'other'    => ['personal', 'family', 'illness', 'legal', 'force_majeure', 'other'],
+];
+const HR_MEDICAL_REASONS = ['illness', 'accident', 'medical_appointment', 'surgery', 'hospitalisation', 'child_illness', 'prenatal'];
+const HR_DOC_WORKDAYS = 5;
+function hr_reasons_for(array $t): array { return HR_REASONS[(string)($t['kind'] ?? 'leave')] ?? HR_REASONS['leave']; }
+function hr_reason_label(?string $code): string { return $code ? t('hr.rs_' . $code) : ''; }
+function hr_reason_medical(array $t, ?string $code): bool { return (string)($t['kind'] ?? '') === 'sick' || in_array((string)$code, HR_MEDICAL_REASONS, true); }
+function hr_req_has_reasons(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM hr_requests LIKE 'reason_code'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** The last day to hand in the certificate: HR_DOC_WORKDAYS working days after the first day of absence. */
+function hr_doc_due(array $p, string $from): string { $d = $from; $n = 0; for ($i = 0; $i < 40 && $n < HR_DOC_WORKDAYS; $i++) { $d = date('Y-m-d', strtotime($d . ' +1 day')); if (hr_working_days($p, $d, $d) > 0) $n++; } return $d; }
+/** Validate the reason selection (+ text) from a POST for a type; returns [code, text]. */
+function hr_reason_from_post(array $t, bool $required = true): array {
+    $code = trim((string)($_POST['reason_code'] ?? '')); $text = mb_substr(trim((string)($_POST['reason'] ?? '')), 0, 300) ?: null;
+    if (!hr_req_has_reasons()) return [null, $text];
+    if ($code === '' && !$required) return [null, $text];
+    if (!in_array($code, hr_reasons_for($t), true)) throw new RuntimeException(t('hr.need_reason_code'));
+    if (($code === 'other' || $t['needs_reason']) && $text === null) throw new RuntimeException(t('hr.need_reason', ['t' => $t['name']]));
+    return [$code, $text];
+}
+/** Manager at decision or HR at any time may correct the reason. */
+function hr_request_reason_set(int $id, string $code, ?string $text, bool $bySelfAllowed = false): void {
+    $r = one('SELECT r.*, t.kind, t.needs_reason, t.name FROM hr_requests r JOIN hr_leave_types t ON t.id = r.type_id WHERE r.id = ?', [$id]); $u = current_user(); if (!$r || !$u || !hr_req_has_reasons()) throw new RuntimeException(t('err.notfound'));
+    $t = ['kind' => $r['kind'], 'needs_reason' => $r['needs_reason'], 'name' => $r['name']];
+    $isMgr = (int)$r['manager_user_id'] === (int)$u['id'] && $r['status'] === 'pending_mgr';
+    if (!(hr_can() || $isMgr || ($bySelfAllowed && (int)$r['user_id'] === (int)$u['id']))) throw new RuntimeException(t('err.noaccess'));
+    if (!in_array($code, hr_reasons_for($t), true)) throw new RuntimeException(t('hr.need_reason_code'));
+    $text = mb_substr(trim((string)$text), 0, 300) ?: null; if ($code === 'other' && $text === null) throw new RuntimeException(t('hr.need_reason', ['t' => $r['name']]));
+    if ($code === (string)$r['reason_code'] && $text === $r['reason']) return;
+    $due = $r['doc_path'] ? null : (hr_reason_medical($t, $code) ? ($r['doc_due'] ?: hr_doc_due(hr_person((int)$r['person_id']) ?: [], (string)$r['date_from'])) : null);
+    q('UPDATE hr_requests SET reason_code = ?, reason = ?, reason_by = ?, reason_at = NOW(), doc_due = ? WHERE id = ?', [$code, $text, (int)$u['id'], $due, $id]);
+}
+/** The employee (or HR) hands in the certificate later. */
+function hr_request_doc_upload(int $id, ?array $file): void {
+    $r = one('SELECT * FROM hr_requests WHERE id = ?', [$id]); $u = current_user(); if (!$r || !$u) throw new RuntimeException(t('err.notfound'));
+    if (!(hr_can() || (int)$r['user_id'] === (int)$u['id'])) throw new RuntimeException(t('err.noaccess'));
+    if (in_array($r['status'], ['cancelled', 'rejected'], true)) throw new RuntimeException(t('hr.req_closed'));
+    $doc = hr_store_doc($file); if (!$doc) throw new RuntimeException(t('hr.doc_fail'));
+    if ($r['doc_path']) @unlink(dirname(__DIR__) . '/storage/hr/' . $r['doc_path']);
+    q('UPDATE hr_requests SET doc_name = ?, doc_path = ?, doc_sha = ?, doc_due = NULL WHERE id = ?', [$doc['name'], $doc['path'], $doc['sha'], $id]);
+    if ((int)$r['user_id'] === (int)$u['id']) hr_notify($id, 'doc');
+}
+/** Certificates still due (for the HR dashboard and the daily reminder). */
+function hr_doc_due_rows(?int $personId = null): array {
+    if (!hr_req_has_reasons()) return []; $w = "r.doc_path IS NULL AND r.doc_due IS NOT NULL AND r.status IN ('pending_mgr','pending_hr','approved')"; $a = []; if ($personId) { $w .= ' AND r.person_id = ?'; $a[] = $personId; }
+    return all("SELECT r.*, p.name_en, t.code, t.name AS type_name, DATEDIFF(r.doc_due, CURDATE()) AS days_left FROM hr_requests r JOIN hr_people p ON p.id = r.person_id JOIN hr_leave_types t ON t.id = r.type_id WHERE {$w} ORDER BY r.doc_due, r.id", $a);
+}
+/** Daily (hk_tick): remind the employee the day before the certificate is due and HR + employee when it is overdue — once each. */
+function hr_doc_daily(): string {
+    if (!hr_req_has_reasons() || !function_exists('nf_push')) return 'hr-doc off'; $n = 0;
+    foreach (hr_doc_due_rows() as $r) {
+        $left = (int)$r['days_left']; $title = $r['name_en'] . ' · ' . $r['code'] . ' ' . fmt_date($r['date_from']);
+        if ($left <= 1 && $left >= 0 && (int)$r['doc_reminded'] < 1 && $r['user_id']) { nf_push([(int)$r['user_id']], 'hrq:doc_due', 'hrq:doc:' . $r['id'], t('hr.nf_doc_due', ['d' => fmt_date($r['doc_due'])]) . ' — ' . $title, null, url('my_leave'), null, null); q('UPDATE hr_requests SET doc_reminded = 1 WHERE id = ?', [(int)$r['id']]); $n++; }
+        elseif ($left < 0 && (int)$r['doc_reminded'] < 2) { $to = hr_hr_user_ids(); if ($r['user_id']) $to[] = (int)$r['user_id']; nf_push(array_values(array_unique(array_filter($to))), 'hrq:doc_late', 'hrq:doc:' . $r['id'], t('hr.nf_doc_late', ['d' => fmt_date($r['doc_due'])]) . ' — ' . $title, null, url('hr_requests'), null, null); q('UPDATE hr_requests SET doc_reminded = 2 WHERE id = ?', [(int)$r['id']]); $n++; }
+    }
+    return 'hr-doc ' . $n;
+}
+
 function hr_request_create_from_post(?array $forPerson = null): int {
     $u = current_user(); if (!$u || !is_staff() || !hr2_has()) throw new RuntimeException(t('err.noaccess'));
     $p = $forPerson ?: hr_person_of_user((int)$u['id']); if (!$p) throw new RuntimeException(t('hr.no_person'));
@@ -170,7 +233,7 @@ function hr_request_create_from_post(?array $forPerson = null): int {
     $t = hr_type((int)($_POST['type_id'] ?? 0)); if (!$t || !$t['is_active']) throw new RuntimeException(t('err.notfound')); if (function_exists('hr_type_enabled') && !hr_type_enabled($p, $t)) throw new RuntimeException(t('hr.type_off', ['t' => $t['name']]));
     $from = (string)($_POST['date_from'] ?? ''); $to = (string)($_POST['date_to'] ?? '') ?: $from;
     if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to) || $to < $from || (strtotime($to) - strtotime($from)) > 370 * 86400) throw new RuntimeException(t('pl.bad_dates'));
-    $reason = mb_substr(trim((string)($_POST['reason'] ?? '')), 0, 300) ?: null; if ($t['needs_reason'] && $reason === null) throw new RuntimeException(t('hr.need_reason', ['t' => $t['name']]));
+    [$rcode, $reason] = hr_reason_from_post($t); if (!hr_req_has_reasons() && $t['needs_reason'] && $reason === null) throw new RuntimeException(t('hr.need_reason', ['t' => $t['name']]));   // R77-007
     $hours = null; $tf = null; $tt = null; $days = 0.0;
     if ($t['unit'] === 'hour') {
         $hours = round((float) str_replace(',', '.', (string)($_POST['hours'] ?? '0')), 2); if ($hours <= 0 || $hours > 12) throw new RuntimeException(t('hr.need_hours'));
@@ -183,11 +246,14 @@ function hr_request_create_from_post(?array $forPerson = null): int {
     // overlap with existing requests of the person
     if (scalar("SELECT COUNT(*) FROM hr_requests WHERE person_id = ? AND status IN ('pending_mgr','pending_hr','approved') AND date_from <= ? AND date_to >= ? AND type_id = ?", [(int)$p['id'], $to, $from, (int)$t['id']])) throw new RuntimeException(t('hr.overlap'));
     // document
-    $doc = hr_store_doc($_FILES['doc'] ?? null); if ($t['needs_doc'] && !$doc && !hr_can()) throw new RuntimeException(t('hr.need_doc', ['t' => $t['name']]));
+    $doc = hr_store_doc($_FILES['doc'] ?? null); $medical = hr_req_has_reasons() && hr_reason_medical($t, $rcode);
+    if ($t['needs_doc'] && !$doc && !hr_can() && !$medical) throw new RuntimeException(t('hr.need_doc', ['t' => $t['name']]));   // R77-007: a medical certificate may follow within 5 working days
+    $docDue = $medical && !$doc ? hr_doc_due($p, $from) : null;
     $mgr = $t['hr_only'] && !(function_exists('hr_is_contractor') && hr_is_contractor($p)) ? null : hr_manager_of($p); $status = $mgr ? 'pending_mgr' : 'pending_hr';
     q('INSERT INTO hr_requests (person_id, user_id, type_id, date_from, date_to, time_from, time_to, hours, days, reason, doc_name, doc_path, doc_sha, status, manager_user_id, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       [(int)$p['id'], (int)($p['user_id'] ?? 0) ?: null, (int)$t['id'], $from, $to, $tf, $tt, $hours, $days, $reason, $doc['name'] ?? null, $doc['path'] ?? null, $doc['sha'] ?? null, $status, $mgr, (int)$u['id']]);
     $id = (int) db()->lastInsertId();
+    if (hr_req_has_reasons()) q('UPDATE hr_requests SET reason_code = ?, doc_due = ? WHERE id = ?', [$rcode, $docDue, $id]);
     hr_notify($id, 'new'); return $id;
 }
 function hr_annual_type_id(): ?int { foreach (hr_types() as $id => $t) if ($t['rule_key'] === 'annual') return $id; return null; }
@@ -210,6 +276,8 @@ function hr_doc_stream(int $reqId): void {
 /** Decide a request at its current stage; writes the board entries on final approval. */
 function hr_request_decide(int $id, bool $approve, string $note): void {
     $r = one('SELECT * FROM hr_requests WHERE id = ?', [$id]); $u = current_user(); if (!$r || !$u) throw new RuntimeException(t('err.notfound'));
+    if (hr_req_has_reasons() && trim((string)($_POST['reason_code'] ?? '')) !== '') hr_request_reason_set($id, trim((string)$_POST['reason_code']), (string)($_POST['reason'] ?? ($r['reason'] ?? '')));   // R77-007: corrected at the approval stage
+    $r = one('SELECT * FROM hr_requests WHERE id = ?', [$id]);
     $me = (int)$u['id']; $note = mb_substr(trim($note), 0, 300) ?: null;
     if ($r['status'] === 'pending_mgr') {
         if (!((int)$r['manager_user_id'] === $me || hr_can())) throw new RuntimeException(t('err.noaccess'));
@@ -246,7 +314,7 @@ function hr_notify(int $id, string $ev): void {
     $me = (int)(current_user()['id'] ?? 0); $title = $r['name_en'] . ' · ' . $r['code'] . ' ' . fmt_date($r['date_from']) . ($r['date_to'] !== $r['date_from'] ? ' – ' . fmt_date($r['date_to']) : '') . ($r['hours'] ? ' · ' . $r['hours'] . ' h' : '');
     $to = []; $url = url('hr_requests');
     if ($ev === 'new') { $to = $r['status'] === 'pending_mgr' ? [(int)$r['manager_user_id']] : hr_hr_user_ids(); }
-    elseif ($ev === 'mgr_ok') { $to = hr_hr_user_ids(); }
+    elseif ($ev === 'mgr_ok' || $ev === 'doc') { $to = hr_hr_user_ids(); }
     else { $to = [(int)$r['user_id']]; $url = url('my_leave'); }
     $to = array_values(array_filter(array_unique(array_map('intval', $to)), fn($i) => $i && $i !== $me)); if (!$to) return;
     nf_push($to, 'hrq:' . $ev, 'hrq:' . $id, t('hr.nf_' . $ev) . ' — ' . $title, $r['reason'] ?: null, $url, $me ?: null, current_user()['full_name'] ?? null);

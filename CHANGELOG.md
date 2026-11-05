@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.86.5** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.87.0** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.87.0 | GAS-CP-R77-007 | 2026-11-05 | Leave requests: a reason must be chosen from a list that follows the leave type ("Other" needs a description); the manager may correct it at approval and HR at any time; medical reasons may be sent without the certificate, which is due 5 working days after the first day of absence — pill with upload on My leave / Service app / HR side, reminders the day before and when overdue, HR dashboard list. Service app 0.6.15, Golden HR 1.0.3. | `install/migrate_cp_r77_reasons.sql` |
 | 1.86.5 | GAS-CP-R77-006 | 2026-11-05 | Special leaves (parental, paternity / maternity, marriage, carer, force majeure, child illness, study, school hours, sick, L.104) shown as "Allowed by law — on request" with the legal ceiling and what was taken, apart from the entitlements and without an "available" figure — My leave, Service app 0.6.14 My HR, Golden HR 1.0.2. | — |
 | 1.86.4 | GAS-CP-R77-005 | 2026-11-05 | HR management restricted to the HR role, Owner and CEO (the CEO role counts as Owner for HR) — administrators keep only their own data; HR dashboard search box and Employed / Left / All switch on the balances table, People button. | — |
 | 1.86.3 | GAS-CP-R77-004 | 2026-11-04 | Apps sync error "Refresh token invalid / Too many requests" fixed: single-flight token refresh in all four apps (Service 0.6.13, PM 1.0.9, HR 1.0.1, Customer 1.0.6) and a 60-second grace on the API for a retry with the token just rotated (a later replay still signs the device out). | — |
