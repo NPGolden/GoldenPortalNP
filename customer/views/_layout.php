@@ -23,16 +23,19 @@ function nav_groups(): array {
     if ($staff && function_exists('pl_has') && pl_has()) $g[2]['items'][] = ['planning', t('pl.title'), '🗓'];
     if ($staff && function_exists('wp_has') && wp_has()) { $g[2]['items'][] = ['myworks', t('wp.my'), '🔧']; if (wp_can_manage(0) || (function_exists('bg_can') && bg_can())) $g[2]['items'][] = ['workload', t('wp.workload'), '📊']; }
     if ($staff && function_exists('ct_has') && ct_has()) $g[3]['items'][] = ['contacts', t('nav.contacts'), '☎'];
-    if ($staff && function_exists('acc_visible') && acc_visible()) $g[3]['items'][] = ['acc_reports', t('acc.title'), '🧾'];
     if ($staff && function_exists('kpi_can') && kpi_can()) $g[2]['items'][] = ['kpis', t('kpi.title'), '🎯'];
     if ($staff && function_exists('pp_can') && pp_can()) $g[3]['items'][] = ['pipeline', t('pp.title'), '🎯'];   // R75-001
     if ($staff && function_exists('sl_can') && sl_can()) $g[3]['items'][] = ['sales', t('sl.title'), '📈'];
-    if ($staff && function_exists('pi_can_view') && pi_can_view()) $g[3]['items'][] = ['proformas', t('pi.title'), '💶'];
-    if ($staff && function_exists('cf_can') && cf_can()) $g[3]['items'][] = ['cashflow', t('cf.title'), '💰'];
-    if ($staff && function_exists('col_can') && col_can()) $g[3]['items'][] = ['collections', t('col.title'), '📥'];   // R78-001: accounting · sales · owner · CEO · GM
     if ($staff && function_exists('eng_is_management') && eng_has() && (eng_is_management() || eng_is_pm())) $g[2]['items'][] = ['eng_requests', t('eng.requests'), '📐'];   // R47-001 / R48-001
     if (function_exists('kb_has') && kb_has()) $g[4]['items'][] = ['kb', t('kb.title'), '💬'];
     if ($staff && function_exists('td_has') && td_has()) $g[2]['items'][] = ['tasks', t('td.title'), '📅'];
+    // R78-003: Accounting is its own group after Commercial — register, proformas, cash flow, collections
+    $acc = ['key' => 'accounting', 'label' => t('nav.g_accounting'), 'items' => []];
+    if ($staff && function_exists('acc_visible') && acc_visible()) $acc['items'][] = ['acc_reports', t('acc.title'), '🧾'];
+    if ($staff && function_exists('pi_can_view') && pi_can_view()) $acc['items'][] = ['proformas', t('pi.title'), '💶'];
+    if ($staff && function_exists('cf_can') && cf_can()) $acc['items'][] = ['cashflow', t('cf.title'), '💰'];
+    if ($staff && function_exists('col_can') && col_can()) $acc['items'][] = ['collections', t('col.title'), '📥'];   // R78-001: accounting · sales · owner · CEO · GM
+    if ($acc['items']) array_splice($g, 4, 0, [$acc]);
     // R62-002: HR is its own group in the left column, between Work and Commercial
     $hr = ['key' => 'hr', 'label' => t('nav.g_hr'), 'items' => []];
     if ($staff && function_exists('hr2_has') && hr2_has() && hr_can()) $hr['items'][] = ['hr_dashboard', t('hr.dashboard'), '📊'];
@@ -43,7 +46,7 @@ function nav_groups(): array {
     if ($staff && function_exists('hr_targets_has') && hr_targets_has() && (hr_can() || (function_exists('hr_is_manager') && hr_is_manager()))) $hr['items'][] = ['hr_targets', t('hr.targets'), '🎯'];   // R64-001
     if ($staff && function_exists('hra_has') && hra_has() && (hra_can_manage() || hra_can_use())) $hr['items'][] = ['hra', t('hra.title'), '🤖'];   // R67-001
     if ($staff && function_exists('hr_can') && hr_can()) $hr['items'][] = ['admin_hr', t('hr.settings'), '🗂'];                                        // R61-001: Owner / HR / admin
-    if ($hr['items']) array_splice($g, 4, 0, [$hr]);   // R75-004: HR group after Commercial, before Library
+    if ($hr['items']) array_splice($g, array_search('library', array_column($g, 'key'), true), 0, [$hr]);   // R75-004: HR group after Commercial (and Accounting), before Library
     if ($staff && function_exists('hr_only') && hr_only()) $g = [['key' => 'top', 'label' => '', 'items' => [['hr_dashboard', t('hr.dashboard'), '📊'], ['community', t('soc.title'), '🤝'], ['planning', t('pl.title'), '🗓'], ['hr_requests', t('hr.requests'), '📝'], ['hr_leaves', t('hr.leaves'), '🏖'], ['hr_training', t('hr.training'), '🎓'], ['hr_targets', t('hr.targets'), '🎯'], ['hra', t('hra.title'), '🤖'], ['admin_hr', t('hr.settings'), '🗂'], ['support', t('nav.support'), '?']]]];   // R51-001 / R55-005 / R61-001: HR sees the board and its settings only
     if ($staff && function_exists('pa_only') && pa_only()) $g = [['key' => 'top', 'label' => '', 'items' => array_values(array_filter([['vessels', t('nav.vessels'), '⚓'], ['contacts', t('nav.contacts'), '☎'], function_exists('co_has') && co_has() ? ['companies', t('co.title'), '🏢'] : null, ['admin_customers', t('cu.title'), '🏛'], ['import', t('nav.import'), '⤒'], function_exists('soc_has') && soc_has() ? ['community', t('soc.title'), '🤝'] : null]))]];   // R75-005
     if ($staff && function_exists('emp_only') && emp_only()) $g = [['key' => 'top', 'label' => '', 'items' => [['planning', t('hr.my_program'), '🗓'], ['my_leave', t('hr.my_leave'), '🏖'], ['hra', t('hra.title'), '🤖'], ['community', t('soc.title'), '🤝']]]];   // R54-001 / R56-002 / R67-001: employee scope
