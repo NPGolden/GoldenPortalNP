@@ -19,6 +19,9 @@ function hr_has_names(): bool { static $h = null; if ($h === null) { try { $h = 
 function hr_can(): bool { return hr_has() && is_staff() && ((function_exists('hr_only') && hr_only()) || (function_exists('hr_owner') && hr_owner())); }
 function hr_types(bool $activeOnly = true): array { static $c = []; $k = (int)$activeOnly; if (!isset($c[$k])) { $c[$k] = []; if (hr_has()) foreach (all('SELECT * FROM hr_leave_types' . ($activeOnly ? ' WHERE is_active = 1' : '') . ' ORDER BY is_active DESC, sort_order, name') as $t) { $t['name_en'] = $t['name']; $t['name'] = hr_type_name($t); $c[$k][(int)$t['id']] = $t; } } return $c[$k]; }
 /** The type's name in the current portal language (R54-002: name_el / name_it / name_bg / name_uk columns), English when not translated. */
+/** R77-006: leaves the law allows when the event occurs (birth, marriage, child illness, force majeure …) — a ceiling on request, not an entitlement to be used up. */
+const HR_BY_LAW_RULES = ['sick', 'parental', 'paternity', 'maternity', 'marriage', 'carer', 'force_majeure', 'single_parent', 'child_illness', 'study', 'school_hours', 'law104'];
+function hr_type_by_law(array $t): bool { return in_array((string)($t['rule_key'] ?? ''), HR_BY_LAW_RULES, true); }
 function hr_type_name(array $t, ?string $lc = null): string { $lc = $lc ?: (function_exists('locale') ? locale() : 'en'); $v = $lc !== 'en' ? trim((string)($t['name_' . $lc] ?? '')) : ''; return $v !== '' ? $v : (string)($t['name_en'] ?? $t['name']); }
 const HR_NAME_LANGS = ['el', 'it', 'bg', 'uk'];
 function hr_type(?int $id): ?array { return $id ? (hr_types(false)[$id] ?? null) : null; }

@@ -6575,4 +6575,11 @@ Cordiali saluti,
 'fc.ev_accepted' => 'Accettata dal cliente',
 'fc.ev_disputed' => 'Contestata',
 'fc.ev_reopened' => 'Riaperta',
+// ---- GAS-CP-R77-006 by-law leaves
+'hr.entitlements' => 'Spettanze',
+'hr.by_law_title' => 'Consentiti dalla legge — su richiesta',
+'hr.by_law_hint' => 'Questi permessi non sono una spettanza da esaurire. La legge li consente al verificarsi dell\'evento (nascita, matrimonio, malattia del figlio, forza maggiore, studio …) — fino al limite indicato, su richiesta e con il documento giustificativo ove richiesto.',
+'hr.by_law_cap' => 'Consentito dalla legge',
+'hr.up_to' => 'fino a {n}',
+'hr.per_event' => 'per evento, come previsto dalla legge',
 ];

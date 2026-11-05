@@ -89,7 +89,7 @@ final class PortalHR {
         if ($year < 2000 || $year > 2100) $year = (int) date('Y');
         $types = function_exists('hr_types') ? array_values(hr_types(true)) : []; $out = [];
         foreach (self::rows(true) as $p) { $full = hr_person((int)$p['id']); if (!$full) continue; $bal = [];
-            foreach ($types as $t) { $b = hr_balance($full, (int)$t['id'], $year); if (empty($b['counts'])) continue; $bal[] = ['type_id' => (int)$t['id'], 'code' => (string)$t['code'], 'type' => (string)(function_exists('hr_type_name') ? hr_type_name($t) : $t['name']), 'unit' => (string)($t['unit'] ?? 'days'), 'entitled' => self::num($b['total']), 'opening' => self::num($b['opening']), 'taken' => self::num($b['taken']), 'pending' => self::num($b['pending']), 'available' => self::num($b['available'])]; }
+            foreach ($types as $t) { $b = hr_balance($full, (int)$t['id'], $year); if (empty($b['counts'])) continue; $bal[] = ['type_id' => (int)$t['id'], 'code' => (string)$t['code'], 'type' => (string)(function_exists('hr_type_name') ? hr_type_name($t) : $t['name']), 'unit' => (string)($t['unit'] ?? 'days'), 'by_law' => function_exists('hr_type_by_law') && hr_type_by_law($t), 'entitled' => self::num($b['total']), 'opening' => self::num($b['opening']), 'taken' => self::num($b['taken']), 'pending' => self::num($b['pending']), 'available' => self::num($b['available'])]; }
             $out[] = ['person_id' => (int)$p['id'], 'name' => (string)$p['name_en'], 'department' => (string)($p['department'] ?? ''), 'balances' => $bal]; }
         return ['year' => $year, 'people' => $out];
     }

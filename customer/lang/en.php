@@ -6575,4 +6575,11 @@ Best regards,
 'fc.ev_accepted' => 'Accepted by the customer',
 'fc.ev_disputed' => 'Disputed',
 'fc.ev_reopened' => 'Re-opened',
+// ---- GAS-CP-R77-006 by-law leaves
+'hr.entitlements' => 'Entitlements',
+'hr.by_law_title' => 'Allowed by law — on request',
+'hr.by_law_hint' => 'These leaves are not an entitlement to be used up. The law allows them when the event occurs (birth, marriage, illness of a child, force majeure, study …) — up to the limit shown, on request and with the supporting document where required.',
+'hr.by_law_cap' => 'Allowed by law',
+'hr.up_to' => 'up to {n}',
+'hr.per_event' => 'per event, as the law provides',
 ];
