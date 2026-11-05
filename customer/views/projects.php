@@ -117,7 +117,7 @@ layout_head(t('pr.title'), 'projects');
 <?= process_legend() ?>
 <?php $vg = vg_on('projects'); if ($vg) $tree = vg_sort($tree, 'vessel'); $vgCounts = []; foreach ($tree as $p) { $vgCounts[(string)($p['vessel'] ?? '')] = ($vgCounts[(string)($p['vessel'] ?? '')] ?? 0) + 1; } $vgLast = null; ?>
 <div class="ptree vg-root">
-  <?php foreach ($tree as $i => $p): $pinv = project_inv_summary($p['subs']); $pof = of_has() ? of_project_summary((int)$p['id']) : null; $ofBySub = of_has() ? of_by_sub((int)$p['id']) : []; $vgV = (string)($p['vessel'] ?? '');
+  <?php foreach ($tree as $i => $p): $pinv = project_inv_summary($p['subs']); $pof = of_has() ? of_project_summary((int)$p['id']) : null; $ofBySub = []; if ($pof) foreach ($pof['rows'] as $o) $ofBySub[(int)($o['subproject_id'] ?? 0)][] = $o;   /* R77-021: one offers query per project */ $vgV = (string)($p['vessel'] ?? '');
     if ($vg && $vgV !== $vgLast) { $vgLast = $vgV; echo '<div class="vg-hdr vg-h" data-vg-h="' . e(vg_slug($vgV)) . '"><button type="button" class="vg-btn"><span class="vg-tw">▾</span> ' . ($vgV !== '' ? e($vgV) : tt('vg.no_vessel')) . ' <span class="hint">' . $vgCounts[$vgV] . '</span></button></div>'; } ?>
     <details id="pr<?= (int)$p['id'] ?>" <?= ($openId ? $openId === (int)$p['id'] : ($i === 0 || $q !== '')) ? 'open' : '' ?><?= $vg ? ' data-vg="' . e(vg_slug($vgV)) . '"' : '' ?>>
       <summary>

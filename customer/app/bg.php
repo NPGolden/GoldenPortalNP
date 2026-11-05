@@ -35,6 +35,10 @@ function bg_h(float $h): string { return rtrim(rtrim(number_format($h, 1, '.', '
 /* ------------------------------------------------------------------ budget revisions */
 function bg_current(int $sid): ?array {
     if (!bg_has()) return null;
+    if (array_key_exists($sid, $GLOBALS['_bg_cur'] ?? [])) return $GLOBALS['_bg_cur'][$sid];   // R77-021: per-request memo (the tree asks several times per sub-project)
+    return $GLOBALS['_bg_cur'][$sid] = bg_current_build($sid);
+}
+function bg_current_build(int $sid): ?array {
     $b = one('SELECT * FROM sp_budgets WHERE subproject_id = ? ORDER BY revision DESC, id DESC LIMIT 1', [$sid]); if (!$b) return null;
     $b['hours'] = []; $b['sections'] = [];
     foreach (all('SELECT * FROM sp_budget_hours WHERE budget_id = ?', [(int)$b['id']]) as $h) {   // R48-001: a discipline may have one row per section; 'hours' stays the discipline total
@@ -48,7 +52,7 @@ function bg_history(int $sid): array {
     $rows = all('SELECT b.*, (SELECT SUM(hours) FROM sp_budget_hours h WHERE h.budget_id = b.id) AS total_hours, (SELECT SUM(hours * rate) FROM sp_budget_hours h WHERE h.budget_id = b.id) AS hours_cost FROM sp_budgets b WHERE b.subproject_id = ? ORDER BY b.revision DESC, b.id DESC', [$sid]);
     return $rows;
 }
-function bg_save_from_post(int $sid): int {
+function bg_save_from_post(int $sid): int { $GLOBALS['_bg_cur'] = []; if (function_exists('eng_rows_reset')) eng_rows_reset(); cache_bump_later('eng');
     $sp = load_subproject($sid); if (!$sp) throw new RuntimeException(t('err.notfound'));
     if (!bg_can_edit($sp)) throw new RuntimeException(t('err.noaccess'));
     $u = current_user(); $rev = (int) scalar('SELECT COALESCE(MAX(revision), -1) + 1 FROM sp_budgets WHERE subproject_id = ?', [$sid]);

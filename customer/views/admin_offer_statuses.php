@@ -36,7 +36,7 @@ layout_head(t('ofs.title'), 'admin_offer_statuses');
         <td><?= of_status_pill($k) ?><?= $d['is_builtin'] ? '<br><span class="hint">' . tt('ofs.builtin') . '</span>' : '' ?></td>
         <td><?php if ($d['is_builtin']): ?><?= e($d['label']) ?><?php else: ?><input form="<?= $f ?>" name="label" maxlength="80" value="<?= e($d['label']) ?>" required><?php endif; ?></td>
         <td><select form="<?= $f ?>" name="tone"><?php foreach ($tones as $tk => $tl): ?><option value="<?= $tk ?>"<?= $sel($tk, $d['tone']) ?>><?= e($tl) ?></option><?php endforeach; ?></select></td>
-        <td><?php if ($d['is_builtin']): ?><?= e($behaves[$d['behaves']]) ?><?php else: ?><select form="<?= $f ?>" name="behaves"><?php foreach ($behaves as $bk => $bl): ?><option value="<?= $bk ?>"<?= $sel($bk, $d['behaves']) ?>><?= e($bl) ?></option><?php endforeach; ?></select><?php endif; ?></td>
+        <td><?php if ($d['is_builtin']): ?><?= e($behaves[$d['behaves']] ?? $d['behaves']) ?><?php else: ?><select form="<?= $f ?>" name="behaves"><?php foreach ($behaves as $bk => $bl): ?><option value="<?= $bk ?>"<?= $sel($bk, $d['behaves']) ?>><?= e($bl) ?></option><?php endforeach; ?></select><?php endif; ?></td>
         <td class="num"><?= (int)($inUse[$k] ?? 0) ?></td>
         <td><?php if ($k === 'sent'): ?><?= pill('green', t('au.active')) ?><?php else: ?><label class="chk"><input form="<?= $f ?>" type="checkbox" name="is_active" value="1"<?= $d['is_active'] ? ' checked' : '' ?>> <?= tt('au.active') ?></label><?php endif; ?></td>
         <td class="row-actions"><button form="<?= $f ?>" class="btn btn--ghost btn--sm" type="submit"><?= tt('btn.save') ?></button>

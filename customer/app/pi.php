@@ -157,7 +157,7 @@ function pi_create(int $offerId, ?int $termN): int {
     $id = (int) db()->lastInsertId(); of_event($offerId, 'proforma', $no);
     return $id;
 }
-function pi_save_from_post(int $id): void {
+function pi_save_from_post(int $id): void { cache_bump_later('fs');
     $r = pi_get($id); if (!$r || !pi_is_sales()) throw new RuntimeException(t('err.noaccess'));
     if (in_array($r['status'], ['paid', 'cancelled'], true)) throw new RuntimeException(t('pi.locked'));
     $s = fn(string $k, int $n) => mb_substr(trim((string)($_POST[$k] ?? '')), 0, $n);
@@ -172,13 +172,13 @@ function pi_save_from_post(int $id): void {
     pi_refresh_status($id);
 }
 /** Issue: status issued, PDF generated and stored unless an uploaded file exists. */
-function pi_issue(int $id): void {
+function pi_issue(int $id): void { cache_bump_later('fs');
     $r = pi_get($id); if (!$r || !pi_is_sales()) throw new RuntimeException(t('err.noaccess')); if ($r['status'] !== 'draft') return;
     if (!$r['file_id']) { $bytes = pi_render_pdf($r); $fid = cp_store_bytes($bytes, $r['pi_no'] . '.pdf', 'application/pdf', (int)$r['project_id'], $r['subproject_id'] ? (int)$r['subproject_id'] : null, 'other', 'external', null, $r['pi_no'], ['doc_no' => $r['pi_no'], 'label' => $r['pi_no']]); q('UPDATE proformas SET file_id = ? WHERE id = ?', [$fid, $id]); }
     q("UPDATE proformas SET status = 'issued', issue_date = COALESCE(issue_date, CURDATE()) WHERE id = ?", [$id]);
     of_event((int)$r['offer_id'], 'proforma_issued', $r['pi_no']); pi_notify($r, 'issued');
 }
-function pi_set_status(int $id, string $st): void {
+function pi_set_status(int $id, string $st): void { cache_bump_later('fs');
     $r = pi_get($id); if (!$r || !pi_is_sales() || !in_array($st, PI_STATUSES, true)) throw new RuntimeException(t('err.noaccess'));
     if ($st === 'issued') { pi_issue($id); return; }
     if ($st === 'draft' && $r['status'] !== 'issued') throw new RuntimeException(t('pi.locked'));
@@ -187,7 +187,7 @@ function pi_set_status(int $id, string $st): void {
     if (in_array($st, ['paid', 'cancelled'], true)) pi_notify($r, $st);
 }
 /** Mark sent when the e-mail card is used (hidden field proforma=<id>). */
-function pi_mark_sent(int $id): void { $r = pi_get($id); if ($r && in_array($r['status'], ['issued'], true)) { q("UPDATE proformas SET status = 'sent', sent_at = NOW() WHERE id = ?", [$id]); of_event((int)$r['offer_id'], 'proforma_sent', $r['pi_no']); } }
+function pi_mark_sent(int $id): void { cache_bump_later('fs'); $r = pi_get($id); if ($r && in_array($r['status'], ['issued'], true)) { q("UPDATE proformas SET status = 'sent', sent_at = NOW() WHERE id = ?", [$id]); of_event((int)$r['offer_id'], 'proforma_sent', $r['pi_no']); } }
 /** Status from what is paid: paid when Σ paid ≥ gross, partly_paid when > 0, else the issued/sent state. */
 function pi_refresh_status(int $id): void {
     $r = one("SELECT pi.*, " . PI_PAID_SQL . " AS paid_sum FROM proformas pi WHERE pi.id = ?", [$id]); if (!$r || in_array($r['status'], ['draft', 'cancelled'], true)) return;
@@ -195,7 +195,7 @@ function pi_refresh_status(int $id): void {
     $st = $paid > 0 && $paid + 0.005 >= $gross ? 'paid' : ($paid > 0 ? 'partly_paid' : ($r['sent_at'] ? 'sent' : 'issued'));
     if ($st !== $r['status']) { q('UPDATE proformas SET status = ?, paid_at = CASE WHEN ? = "paid" THEN COALESCE(paid_at, CURDATE()) ELSE NULL END WHERE id = ?', [$st, $st, $id]); if ($st === 'paid') { $rr = pi_get($id); if ($rr) pi_notify($rr, 'paid'); } }
 }
-function pinv_save_from_post(int $piId): void {
+function pinv_save_from_post(int $piId): void { cache_bump_later('fs');
     $r = pi_get($piId); if (!$r || !pi_can_invoices()) throw new RuntimeException(t('err.noaccess'));
     $id = (int)($_POST['inv_id'] ?? 0); $s = fn(string $k, int $n) => mb_substr(trim((string)($_POST[$k] ?? '')), 0, $n);
     $d = fn(string $k) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST[$k] ?? '')) ? $_POST[$k] : null;
@@ -209,8 +209,8 @@ function pinv_save_from_post(int $piId): void {
     of_event((int)$r['offer_id'], 'invoice', $no . ' · ' . pi_money($amt, $r['currency']) . ($paid > 0 ? ' · ' . t('pi.paid_lbl') . ' ' . pi_money($paid, $r['currency']) : ''));
     pi_refresh_status($piId);
 }
-function pinv_delete(int $invId): int { $x = one('SELECT * FROM proforma_invoices WHERE id = ?', [$invId]); if (!$x || !pi_can_invoices()) throw new RuntimeException(t('err.noaccess')); q('DELETE FROM proforma_invoices WHERE id = ?', [$invId]); pi_refresh_status((int)$x['proforma_id']); return (int)$x['proforma_id']; }
-function pi_delete(int $id): int { require_cp_admin(); $r = pi_get($id); if (!$r) throw new RuntimeException(t('err.notfound')); q('DELETE FROM proforma_invoices WHERE proforma_id = ?', [$id]); q('DELETE FROM proformas WHERE id = ?', [$id]); return (int)$r['offer_id']; }
+function pinv_delete(int $invId): int { cache_bump_later('fs'); $x = one('SELECT * FROM proforma_invoices WHERE id = ?', [$invId]); if (!$x || !pi_can_invoices()) throw new RuntimeException(t('err.noaccess')); q('DELETE FROM proforma_invoices WHERE id = ?', [$invId]); pi_refresh_status((int)$x['proforma_id']); return (int)$x['proforma_id']; }
+function pi_delete(int $id): int { cache_bump_later('fs'); require_cp_admin(); $r = pi_get($id); if (!$r) throw new RuntimeException(t('err.notfound')); q('DELETE FROM proforma_invoices WHERE proforma_id = ?', [$id]); q('DELETE FROM proformas WHERE id = ?', [$id]); return (int)$r['offer_id']; }
 function pi_notify(array $r, string $kind): void {
     if (!function_exists('nf_push')) return; $me = (int)(current_user()['id'] ?? 0);
     $ids = array_values(array_filter(array_unique([(int)($r['pm_user_id'] ?? 0), (int)($r['created_by'] ?? 0)]), fn($i) => $i && $i !== $me));
@@ -222,6 +222,10 @@ function pi_notify(array $r, string $kind): void {
 function fs_totals(int $pid, ?int $sid = null): array {
     $z = ['offered' => 0.0, 'invoiced' => 0.0, 'collected' => 0.0, 'outstanding' => 0.0, 'overdue' => 0.0, 'n_pi' => 0, 'n_overdue' => 0, 'cur' => 'EUR'];
     if (!pi_has() || !fin_visible()) return $z;
+    if (function_exists('cache_remember')) return cache_remember('fs:' . cache_ver('fs') . ':' . $pid . ':' . (int)$sid, 180, fn() => fs_totals_build($pid, $sid, $z));   // R77-021
+    return fs_totals_build($pid, $sid, $z);
+}
+function fs_totals_build(int $pid, ?int $sid, array $z): array {
     $w = $sid ? 'o.subproject_id = ?' : 'o.project_id = ?'; $arg = [$sid ?: $pid];
     $defs = of_status_defs(); $appr = array_keys(array_filter($defs, fn($d) => in_array($d['behaves'], ['approved', 'closed_won'], true))); if (!$appr) $appr = ['approved'];
     $z['offered'] = (float) scalar("SELECT COALESCE(SUM(o.amount),0) FROM offers o WHERE {$w} AND o.status IN (" . implode(',', array_fill(0, count($appr), '?')) . ") AND (o.converted_to IS NULL)", array_merge($arg, $appr));
@@ -287,7 +291,7 @@ function ppay_list(int $piId): array { return ppay_has() ? all('SELECT pp.*, cu.
 function ppay_offer_cap(array $o): float { $g = (float)($o['gross_total'] ?? 0); if ($g > 0) return $g; $net = (float)($o['amount'] ?? 0); $vat = (float)($o['vat_pct'] ?? 0); return round($net * (1 + $vat / 100), 2); }
 /** Σ paid on every proforma of the offer (cancelled ones excluded). */
 function ppay_offer_paid(int $offerId): float { return (float) scalar('SELECT COALESCE(SUM(' . PI_PAID_SQL . "),0) FROM proformas pi WHERE pi.offer_id = ? AND pi.status <> 'cancelled'", [$offerId]); }
-function ppay_save_from_post(int $piId): void {
+function ppay_save_from_post(int $piId): void { cache_bump_later('fs');
     $r = pi_get($piId); if (!$r || !pi_can_invoices() || !ppay_has()) throw new RuntimeException(t('err.noaccess'));
     if (in_array($r['status'], ['draft', 'cancelled'], true)) throw new RuntimeException(t('pay.not_issued'));
     $id = (int)($_POST['pay_id'] ?? 0); $d = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['paid_on'] ?? '')) ? $_POST['paid_on'] : date('Y-m-d');
@@ -301,7 +305,7 @@ function ppay_save_from_post(int $piId): void {
     of_event((int)$r['offer_id'], 'payment', $r['pi_no'] . ' · ' . pi_money($amt, $r['currency']) . ' · ' . t('pay.m_' . $method) . ($ref ? ' · ' . $ref : ''));
     pi_refresh_status($piId);
 }
-function ppay_delete(int $payId): int { $x = one('SELECT pp.*, pi.offer_id, pi.pi_no, pi.currency FROM proforma_payments pp JOIN proformas pi ON pi.id = pp.proforma_id WHERE pp.id = ?', [$payId]); if (!$x || !pi_can_invoices()) throw new RuntimeException(t('err.noaccess')); q('DELETE FROM proforma_payments WHERE id = ?', [$payId]); of_event((int)$x['offer_id'], 'payment_removed', $x['pi_no'] . ' · ' . pi_money((float)$x['amount'], $x['currency'])); pi_refresh_status((int)$x['proforma_id']); return (int)$x['proforma_id']; }
+function ppay_delete(int $payId): int { cache_bump_later('fs'); $x = one('SELECT pp.*, pi.offer_id, pi.pi_no, pi.currency FROM proforma_payments pp JOIN proformas pi ON pi.id = pp.proforma_id WHERE pp.id = ?', [$payId]); if (!$x || !pi_can_invoices()) throw new RuntimeException(t('err.noaccess')); q('DELETE FROM proforma_payments WHERE id = ?', [$payId]); of_event((int)$x['offer_id'], 'payment_removed', $x['pi_no'] . ' · ' . pi_money((float)$x['amount'], $x['currency'])); pi_refresh_status((int)$x['proforma_id']); return (int)$x['proforma_id']; }
 /** An invoice settles payments: link the chosen uninvoiced payments of the proforma to it. */
 function ppay_link(int $piId, int $invId, array $payIds): void { if (!ppay_has()) return; $ids = array_values(array_filter(array_map('intval', $payIds))); q('UPDATE proforma_payments SET invoice_id = NULL WHERE proforma_id = ? AND invoice_id = ?', [$piId, $invId]); if ($ids) q('UPDATE proforma_payments SET invoice_id = ? WHERE proforma_id = ? AND id IN (' . implode(',', $ids) . ')', [$invId, $piId]); }
 

@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.88.2** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.88.3** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.88.3 | GAS-CP-R77-021 | 2026-11-05 | Performance: the project tree reads each sub-project once (engineering rows memoised per request), engineering alerts and financial pills cached 3 min and dropped after every related save, offers read once per project — thousands of queries fewer on a full tree; PHP warnings fixed (offer status "draft" label, issued-report notification stamp). | — |
 | 1.88.2 | GAS-CP-R77-020 | 2026-11-05 | Offer document (PDF + Word): the payment schedule — the instalments of the offer with %, amount, trigger and due — printed right after the Prices and payment section; default terms seeded when the offer has none. | — |
 | 1.88.1 | GAS-CP-R77-019 | 2026-11-05 | Rich text everywhere (requests, tickets, notes, comments): web addresses become clickable links (long ones shortened on screen, never pushing a bubble out of the card) and are no longer mangled by the italic / bold markers. | — |
 | 1.88.0 | GAS-CP-R77-018 | 2026-11-05 | HR requests: the Open filter (and the dashboard tile) lists open requests of every year — a request for next January was hidden by the year filter, leaving the page on the "New request for…" form. | — |

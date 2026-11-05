@@ -83,6 +83,12 @@ function eng_actual(int $sid, ?int $excludeTs = null): array {
 function eng_rows(int $sid): array {
     if (!eng_has()) return [];
     if (!eng_has2()) return [];
+    if (isset($GLOBALS['_eng_rows'][$sid])) return $GLOBALS['_eng_rows'][$sid];   // R77-021: the tree asks for the same sub-project many times (alerts, stage %, feed)
+    return $GLOBALS['_eng_rows'][$sid] = eng_rows_build($sid);
+}
+/** After every write that moves hours, budgets, requests or deliverables: drop the per-request rows and the cached alerts. */
+function eng_rows_reset(): void { $GLOBALS['_eng_rows'] = []; if (function_exists('cache_bump')) cache_bump('eng'); }
+function eng_rows_build(int $sid): array {
     $sec = eng_sections(); $B = []; foreach (all('SELECT * FROM eng_budgets WHERE subproject_id = ?', [$sid]) as $b) $B[(int)$b['section_id']] = $b;
     $X = []; foreach (all("SELECT section_id, SUM(hours) h FROM eng_requests WHERE subproject_id = ? AND status = 'approved' GROUP BY section_id", [$sid]) as $r) $X[(int)$r['section_id']] = (float)$r['h'];
     $P = []; foreach (all("SELECT section_id, COUNT(*) n, SUM(hours) h FROM eng_requests WHERE subproject_id = ? AND status = 'pending' GROUP BY section_id", [$sid]) as $r) $P[(int)$r['section_id']] = ['n' => (int)$r['n'], 'h' => (float)$r['h']];
@@ -124,13 +130,17 @@ function eng_is_pm(): bool { static $v = null; if ($v === null) { $me = (int)(cu
 /** Sub-projects with an engineering section exceeded or a request pending (for the project tree / dashboard). */
 function eng_alerts(?int $pid = null): array {
     if (!eng_has2() || !is_staff()) return [];
+    if (function_exists('cache_remember')) return cache_remember('eng_alerts:' . cache_ver('eng') . ':' . (int)$pid, 180, fn() => eng_alerts_build($pid));   // R77-021
+    return eng_alerts_build($pid);
+}
+function eng_alerts_build(?int $pid): array {
     $sids = array_map('intval', array_column(all('SELECT DISTINCT b.subproject_id FROM eng_budgets b JOIN subprojects s ON s.id = b.subproject_id' . ($pid ? ' WHERE s.project_id = ?' : " WHERE s.status <> 'completed'") . ' UNION SELECT DISTINCT r.subproject_id FROM eng_requests r JOIN subprojects s ON s.id = r.subproject_id' . ($pid ? ' WHERE s.project_id = ?' : " WHERE s.status <> 'completed'"), $pid ? [$pid, $pid] : []), 'subproject_id'));
     $out = []; foreach ($sids as $sid) { $st = eng_sub_state($sid); if (in_array($st, ['exceeded', 'pending', 'warn', 'extended'], true)) $out[$sid] = $st; } return $out;
 }
 
 /* ------------------------------------------------------------------ writing */
 /** Section leads (and, only when the budget module is absent, manual section hours). The hours otherwise come from Budget & actual. */
-function eng_budget_save_from_post(int $sid): void {
+function eng_budget_save_from_post(int $sid): void { eng_rows_reset(); cache_bump_later('eng');
     $sp = load_subproject($sid); if (!$sp || !eng_can_edit($sp, true)) throw new RuntimeException(t('err.noaccess'));
     $manual = !(function_exists('bg_has') && bg_has());
     foreach (eng_sections() as $did => $d) {
@@ -151,7 +161,7 @@ function eng_sections_save_from_post(): void {
     try { if ($id) q('UPDATE eng_sections SET code = ?, name = ?, stage = ?, sort_order = ? WHERE id = ?', [$code, $name, $stage, $ord, $id]); else q('INSERT INTO eng_sections (code, name, stage, sort_order) VALUES (?,?,?,?)', [$code, $name, $stage, $ord]); }
     catch (PDOException $e) { if ((int)$e->errorInfo[1] === 1062) throw new RuntimeException(t('sys.dup', ['v' => $code])); throw $e; }
 }
-function eng_mapping_save_from_post(): void {
+function eng_mapping_save_from_post(): void { eng_rows_reset(); cache_bump_later('eng');
     require_cp_admin(); if (!eng_has2()) throw new RuntimeException(t('err.noaccess'));
     $valid = array_map('intval', array_column(all('SELECT id FROM eng_sections'), 'id')); $M = $_POST['map'] ?? [];   // map[discipline][section] = 1 (matrix of checkboxes)
     foreach (all('SELECT id FROM disciplines') as $d) {
@@ -161,7 +171,7 @@ function eng_mapping_save_from_post(): void {
     }
 }
 function eng_first_engineering(array $secIds): ?int { $all = all('SELECT id, stage FROM eng_sections'); foreach ($all as $s) if ($s['stage'] === 'engineering' && in_array((int)$s['id'], $secIds, true)) return (int)$s['id']; return null; }
-function eng_deliverable_save_from_post(int $sid): void {
+function eng_deliverable_save_from_post(int $sid): void { eng_rows_reset(); cache_bump_later('eng');
     $sp = load_subproject($sid); if (!$sp || !eng_can_edit($sp)) throw new RuntimeException(t('err.noaccess'));
     $id = (int)($_POST['dl_id'] ?? 0); $did = (int)($_POST['section_id'] ?? 0); if (!eng_is_section($did)) throw new RuntimeException(t('err.notfound'));
     $title = mb_substr(trim((string)($_POST['title'] ?? '')), 0, 160); if ($title === '') throw new RuntimeException(t('eng.need_title'));
@@ -170,7 +180,7 @@ function eng_deliverable_save_from_post(int $sid): void {
     else { q('INSERT INTO eng_deliverables (subproject_id, section_id, title, weight_h, sort_order, created_by) VALUES (?,?,?,?,?,?)', [$sid, $did, $title, $w, (int)($_POST['sort_order'] ?? 0), (int)(current_user()['id'] ?? 0)]); q('INSERT IGNORE INTO eng_budgets (subproject_id, section_id, hours) VALUES (?,?,0)', [$sid, $did]); }
     eng_feed_subproject($sid);
 }
-function eng_deliverable_toggle(int $sid, int $dlId): void {
+function eng_deliverable_toggle(int $sid, int $dlId): void { eng_rows_reset(); cache_bump_later('eng');
     $sp = load_subproject($sid); if (!$sp || !eng_can_edit($sp)) throw new RuntimeException(t('err.noaccess'));
     $d = one('SELECT * FROM eng_deliverables WHERE id = ? AND subproject_id = ?', [$dlId, $sid]); if (!$d) throw new RuntimeException(t('err.notfound'));
     $done = $d['status'] !== 'done'; q('UPDATE eng_deliverables SET status = ?, done_at = ?, done_by = ? WHERE id = ?', [$done ? 'done' : 'pending', $done ? date('Y-m-d H:i:s') : null, $done ? (int)(current_user()['id'] ?? 0) : null, $dlId]);
@@ -187,7 +197,7 @@ function eng_section_done(int $sid, int $did, bool $done, string $note): void {
     eng_feed_subproject($sid);
     if ($done) eng_notify($sp, $did, 'done', t('eng.nf_done', ['s' => eng_sections()[$did]['name']]), $note ?: null, [(int)($sp['pm_user_id'] ?? 0)]);
 }
-function eng_request_save_from_post(int $sid): int {
+function eng_request_save_from_post(int $sid): int { eng_rows_reset(); cache_bump_later('eng');
     $sp = load_subproject($sid); if (!$sp || !is_staff() || !eng_has()) throw new RuntimeException(t('err.noaccess'));
     $did = (int)($_POST['section_id'] ?? 0); if (!eng_is_section($did)) throw new RuntimeException(t('err.notfound'));
     $h = (float) str_replace(',', '.', (string)($_POST['hours'] ?? '0')); if ($h <= 0 || $h > 10000 || !is_finite($h)) throw new RuntimeException(t('eng.need_hours'));
@@ -200,7 +210,7 @@ function eng_request_save_from_post(int $sid): int {
     eng_notify($sp, $did, 'request', t('eng.nf_request', ['s' => eng_sections()[$did]['name'], 'h' => rtrim(rtrim(number_format($h, 2, '.', ''), '0'), '.')]), t('eng.r_' . $kind) . ' — ' . $reason, array_merge($mgmt, [(int)($sp['pm_user_id'] ?? 0)]));
     return $id;
 }
-function eng_request_decide(int $reqId, bool $approve, string $note): void {
+function eng_request_decide(int $reqId, bool $approve, string $note): void { eng_rows_reset(); cache_bump_later('eng');
     $r = one('SELECT * FROM eng_requests WHERE id = ?', [$reqId]); if (!$r || $r['status'] !== 'pending') throw new RuntimeException(t('err.notfound'));
     $sp0 = load_subproject((int)$r['subproject_id']); if (!$sp0 || !eng_can_decide($sp0, (string)(eng_sections()[(int)$r['section_id']]['stage'] ?? 'engineering'))) throw new RuntimeException(t('err.noaccess'));
     $u = current_user(); q('UPDATE eng_requests SET status = ?, decided_by = ?, decided_name = ?, decided_at = NOW(), decision_note = ? WHERE id = ?', [$approve ? 'approved' : 'rejected', (int)$u['id'], (string)$u['full_name'], mb_substr(trim($note), 0, 500) ?: null, $reqId]);

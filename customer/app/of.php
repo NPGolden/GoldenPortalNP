@@ -140,7 +140,7 @@ function of_parse_amount(string $s): float {
     elseif ($lastDot !== false) { if (substr_count($s, '.') > 1 || strlen($s) - $lastDot - 1 === 3) $s = str_replace('.', '', $s); }
     return round((float)$s, 2);
 }
-function of_save_from_post(int $id): int {
+function of_save_from_post(int $id): int { cache_bump_later('fs');
     require_staff(); $u = current_user();
     $pid = (int)($_POST['project_id'] ?? 0); $ob = function_exists('ob_has') && ob_has();
     $vid = $ob ? ((int)($_POST['vessel_id'] ?? 0) ?: null) : null;
@@ -185,7 +185,7 @@ function of_save_from_post(int $id): int {
     return $id;
 }
 /** The owner's decision on a sent offer (or an administrator recording it on the owner's behalf). */
-function of_decide(int $id, string $decision, string $note): void {
+function of_decide(int $id, string $decision, string $note): void { cache_bump_later('fs');
     $o = of_load($id); $u = current_user();
     if (!$o || !of_is_pending($o) || !in_array($decision, ['approved', 'rejected'], true)) throw new RuntimeException(t('of.not_pending'));
     if (is_staff() && !is_cp_admin()) throw new RuntimeException(t('err.noaccess'));
@@ -198,7 +198,7 @@ function of_decide(int $id, string $decision, string $note): void {
     of_sync_project((int)$o['project_id']);                                                                           // R57-001
 }
 /** Golden A/S moves the offer along: cancelled, in_progress, to_be_invoiced, finished, or back to sent (a new revision). */
-function of_set_status(int $id, string $status, string $note = ''): void {
+function of_set_status(int $id, string $status, string $note = ''): void { cache_bump_later('fs');
     require_staff();
     $o = of_load($id); if (!$o || !in_array($status, of_statuses(), true)) throw new RuntimeException(t('err.notfound'));
     $allowed = of_next_statuses($o); if (of_is_pending($o)) array_push($allowed, 'approved', 'rejected');
@@ -226,7 +226,7 @@ function of_att_delete(int $offerId, int $fileId): void {
     require_staff(); $f = one("SELECT id FROM sp_files WHERE id = ? AND offer_id = ? AND kind = 'offer_att'", [$fileId, $offerId]); if (!$f) throw new RuntimeException(t('err.notfound'));
     cp_delete_file($fileId); of_event($offerId, 'file_removed', null);
 }
-function of_delete(int $id): void { require_cp_admin(); $o = of_load($id); if (!$o) throw new RuntimeException(t('err.notfound')); foreach (of_attachments($id) as $af) cp_delete_file((int)$af['id']); q('DELETE FROM offers WHERE id = ?', [$id]); if (!empty($o['file_id'])) cp_delete_file((int)$o['file_id']); of_sync_project((int)$o['project_id']); }
+function of_delete(int $id): void { cache_bump_later('fs'); require_cp_admin(); $o = of_load($id); if (!$o) throw new RuntimeException(t('err.notfound')); foreach (of_attachments($id) as $af) cp_delete_file((int)$af['id']); q('DELETE FROM offers WHERE id = ?', [$id]); if (!empty($o['file_id'])) cp_delete_file((int)$o['file_id']); of_sync_project((int)$o['project_id']); }
 
 /* ---------------------------------------------------- R15: deadlines */
 /** Save the deadline posted with a project / sub-project form (column exists from R15). */

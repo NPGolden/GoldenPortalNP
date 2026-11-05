@@ -198,7 +198,7 @@ function nf_src_isr_events(array $rows): int {
     foreach ($rows as $r) {
         if (in_array($r['event'], NF_FSR_SKIP, true)) continue;
         $f = one('SELECT id, report_no, vessel_name, project_id, created_by, submitted_by, status FROM isr_reports WHERE id = ?', [(int)$r['report_id']]); if (!$f) continue;
-        $n += nf_push(nf_people((int)$f['project_id'], $r['event'] === 'issued', [(int)$f['created_by'], (int)$f['submitted_by']]), 'isr:' . $r['event'], 'isr:' . $f['id'], $f['report_no'] . ($f['vessel_name'] ? ' · ' . $f['vessel_name'] : ''), $r['note'], url('isr', ['id' => $f['id']]), (int)$r['user_id'] ?: null, $r['user_name'], $r['created_at']);
+        $n += nf_push(nf_people((int)$f['project_id'], $r['event'] === 'issued', [(int)$f['created_by'], (int)$f['submitted_by']]), 'isr:' . $r['event'], 'isr:' . $f['id'], $f['report_no'] . ($f['vessel_name'] ? ' · ' . $f['vessel_name'] : ''), $r['note'], url('isr', ['id' => $f['id']]), (int)$r['user_id'] ?: null, $r['user_name'], ($r['created_at'] ?? $r['at'] ?? null));
     }
     return $n;
 }

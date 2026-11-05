@@ -134,7 +134,7 @@ function ts_number(string $name): string {
     return sprintf('%s-%03d', $base, $n);
 }
 /** Create or update a draft from the form. Returns the id. */
-function ts_save_from_post(int $id, array $u): int {
+function ts_save_from_post(int $id, array $u): int { if (function_exists('eng_rows_reset')) eng_rows_reset(); cache_bump_later('eng');
     $pid = (int)($_POST['project_id'] ?? 0);
     $p = one('SELECT id FROM projects WHERE id = ?', [$pid]);
     if (!$p) throw new RuntimeException(t('err.notfound'));
@@ -203,7 +203,7 @@ function ts_save_from_post(int $id, array $u): int {
 
 /* -------------------------------------------------------- workflow */
 
-function ts_submit(int $id): void {
+function ts_submit(int $id): void { if (function_exists('eng_rows_reset')) eng_rows_reset(); cache_bump_later('eng');
     $t = ts_load($id); $u = current_user();
     if (!$t || ((int)$t['user_id'] !== (int)$u['id'] && !is_cp_admin())) throw new RuntimeException(t('err.notfound'));
     if (!in_array($t['status'], ['draft', 'rejected'], true)) throw new RuntimeException(t('ts.locked'));
@@ -216,7 +216,7 @@ function ts_submit(int $id): void {
       [$mgr['id'] ?? null, $id]);
     ts_event($id, 'submitted', $mgr ? t('ts.ev_to', ['name' => $mgr['full_name']]) : null);
 }
-function ts_decide(int $id, bool $approve, string $note): void {
+function ts_decide(int $id, bool $approve, string $note): void { if (function_exists('eng_rows_reset')) eng_rows_reset(); cache_bump_later('eng');
     $t = ts_load($id); $u = current_user();
     if (!$t) throw new RuntimeException(t('err.notfound'));
     if ($t['status'] !== 'submitted') throw new RuntimeException(t('ts.locked'));
@@ -248,13 +248,13 @@ function ts_uninvoice(int $id): void {
     q('UPDATE timesheets SET status = "approved", invoice_ref = NULL, invoiced_by = NULL, invoiced_name = NULL, invoiced_at = NULL WHERE id = ?', [$id]);
     ts_event($id, 'uninvoiced', $t['invoice_ref']);
 }
-function ts_withdraw(int $id): void {                  // engineer takes a submitted sheet back
+function ts_withdraw(int $id): void { if (function_exists('eng_rows_reset')) eng_rows_reset(); cache_bump_later('eng');                  // engineer takes a submitted sheet back
     $t = ts_load($id); $u = current_user();
     if (!$t || $t['status'] !== 'submitted' || ((int)$t['user_id'] !== (int)$u['id'] && !is_cp_admin())) throw new RuntimeException(t('err.notfound'));
     q('UPDATE timesheets SET status = "draft", submitted_at = NULL WHERE id = ?', [$id]);
     ts_event($id, 'withdrawn');
 }
-function ts_delete(int $id): void {
+function ts_delete(int $id): void { if (function_exists('eng_rows_reset')) eng_rows_reset(); cache_bump_later('eng');
     $t = ts_load($id); $u = current_user();
     if (!$t) throw new RuntimeException(t('err.notfound'));
     if (!is_cp_admin() && (!in_array($t['status'], ['draft', 'rejected'], true) || (int)$t['user_id'] !== (int)$u['id'])) throw new RuntimeException(t('err.notfound'));

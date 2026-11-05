@@ -22,6 +22,11 @@ function cache_set(string $k, $v, int $ttl): void {
 function cache_forget(string $k): void { $key = cache_key($k); if (cache_backend() === 'apcu') { apcu_delete($key); return; } @unlink(cache_dir() . '/' . sha1($key) . '.cache'); }
 /** Compute once, keep for $ttl seconds. */
 function cache_remember(string $k, int $ttl, callable $fn) { $v = cache_get($k); if ($v !== null) return $v; $v = $fn(); cache_set($k, $v, $ttl); return $v; }
+/** Namespace versions (R77-021): a key built with cache_ver('fs') is dropped for good by cache_bump('fs') — cheaper than remembering every key written. */
+function cache_ver(string $ns): int { static $m = []; if (!isset($m[$ns])) $m[$ns] = (int) (cache_get('ver:' . $ns) ?? 1); return $m[$ns]; }
+/** Bump once the request is over (after the write and its redirect have been decided) — call at the top of every write path. */
+function cache_bump_later(string $ns): void { static $seen = []; if (isset($seen[$ns])) return; $seen[$ns] = true; register_shutdown_function(fn() => cache_bump($ns)); }
+function cache_bump(string $ns): void { $v = cache_ver($ns) + 1; cache_set('ver:' . $ns, $v, 86400 * 30); }
 /** Drop everything (admin button, after imports). */
 function cache_flush(): int { if (cache_backend() === 'apcu') { apcu_clear_cache(); return 0; } $n = 0; foreach ((array) @glob(cache_dir() . '/*.cache') as $f) if (@unlink($f)) $n++; return $n; }
 /** Remove expired files (house-keeping). */
