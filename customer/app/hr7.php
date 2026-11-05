@@ -9,7 +9,7 @@ declare(strict_types=1);
 function hr_files_can(): bool { return hr_personal_can(); }
 function hr_personal_can(): bool { return is_staff() && ((function_exists('hr_only') && hr_only()) || (function_exists('hr_owner') && hr_owner())); }
 /** Accounts with the Owner scope — kept out of the activity rankings, the most-active lists and the winner of the month. */
-function hr_owner_ids(): array { static $c = null; if ($c === null) { try { $c = array_map('intval', array_column(all("SELECT cu.id FROM customer_users cu JOIN staff_roles r ON r.id = cu.staff_role_id WHERE r.scope = 'owner'"), 'id')); } catch (Throwable $e) { $c = []; } } return $c; }
+function hr_owner_ids(): array { static $c = null; if ($c === null) { try { $c = array_map('intval', array_column(all("SELECT cu.id FROM customer_users cu JOIN staff_roles r ON r.id = cu.staff_role_id WHERE r.scope = 'owner' OR LOWER(TRIM(r.name)) = 'ceo'"), 'id')); } catch (Throwable $e) { $c = []; } } return $c; }   // R77-015: the CEO role counts as Owner (rankings, winner, HR)
 function hr_targets_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'hr_targets'"); } catch (Throwable $e) { $h = false; } } return $h; }
 
 /* ------------------------------------------------------------------ who is online */

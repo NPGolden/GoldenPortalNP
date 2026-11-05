@@ -1055,3 +1055,6 @@ No SQL. `hr2.php` `hr_balance_breakdown($p,$tid,$year)` → balance, entitlement
 
 ## 209. v1.87.6 — Opening days on the card (GAS-CP-R77-014)
 No SQL. `hr4.php` `hr_entitlement_override_from_post()` accepts `opening` (when hr2 columns exist), writes `opening_taken`, audits field `opening`. `hr_person.php` year Edit form: Opening field (grid-5; CSS `.grid-5` added). Key `hr.opening_hint` ×5 (6528).
+
+## 210. v1.87.7 — Owner / CEO out of the rankings (GAS-CP-R77-015)
+No SQL. `hr7.php` `hr_owner_ids()` now includes the role named CEO (`act_top` already skipped it); `soc.php` `soc_kudos_top()` excludes those ids, `soc_winner_set()` refuses them (`soc.winner_owner`); `community.php` winner select hides them. Key ×5 (6529).

@@ -6655,4 +6655,6 @@ Cordiali saluti,
 'hr.bd_formula' => '{t} totale − {o} iniziale − {k} godute − {p} in attesa',
 // ---- GAS-CP-R77-014
 'hr.opening_hint' => 'Giorni già goduti prima che il portale contasse l\'anno (registri cartacei, passaggio) — sottratti dai disponibili; la modifica è registrata.',
+// ---- GAS-CP-R77-015
+'soc.winner_owner' => 'Il titolare / CEO non partecipa alle classifiche e non può essere vincitore del mese.',
 ];

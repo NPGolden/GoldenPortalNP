@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.87.6** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.87.7** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.87.7 | GAS-CP-R77-015 | 2026-11-05 | Owner / CEO accounts excluded from the activity and kudos rankings and from the winner-of-the-month choice (the CEO role now counts as Owner everywhere). | — |
 | 1.87.6 | GAS-CP-R77-014 | 2026-11-05 | Opening taken days editable in the year Edit form on the person's Entitlements tab (logged in the audit). | — |
 | 1.87.5 | GAS-CP-R77-013 | 2026-11-05 | HR card: Σ balance breakdown per annual-leave year — entitled, carry-over, opening, every request with its days, board-only days, hour conversions, formula; lines that are not counted say why (other year, history only, before cut-over). | — |
 | 1.87.4 | GAS-CP-R77-012 | 2026-11-05 | HR dashboard: "Contracts expiring" heading back above its list (it had drifted above the review / off-boarding / certificate blocks). Ages only for HR / Owner / CEO wherever birthdays are listed (central guard in the celebrations helper; contacts page). | — |

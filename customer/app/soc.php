@@ -66,7 +66,8 @@ function soc_kudos_give(): void {
     soc_badges_refresh($to); soc_badges_refresh(soc_me());
 }
 function soc_kudos_recent(int $n = 12): array { return soc_has() ? all('SELECT k.*, a.full_name AS to_name, b.full_name AS from_name FROM soc_kudos k JOIN customer_users a ON a.id = k.to_user_id JOIN customer_users b ON b.id = k.from_user_id ORDER BY k.created_at DESC LIMIT ' . (int)$n) : []; }
-function soc_kudos_top(string $from, string $to, int $n = 5): array { return soc_has() ? all('SELECT k.to_user_id uid, cu.full_name, COUNT(*) n FROM soc_kudos k JOIN customer_users cu ON cu.id = k.to_user_id WHERE k.created_at BETWEEN ? AND ? GROUP BY k.to_user_id, cu.full_name ORDER BY n DESC, cu.full_name LIMIT ' . (int)$n, [$from, $to . ' 23:59:59']) : []; }
+function soc_kudos_top(string $from, string $to, int $n = 5): array { $skip = function_exists('hr_owner_ids') ? hr_owner_ids() : []; $ex = $skip ? ' AND k.to_user_id NOT IN (' . implode(',', array_map('intval', $skip)) . ')' : '';   // R77-015: Owner / CEO out of the rankings
+    return soc_has() ? all('SELECT k.to_user_id uid, cu.full_name, COUNT(*) n FROM soc_kudos k JOIN customer_users cu ON cu.id = k.to_user_id WHERE k.created_at BETWEEN ? AND ?' . $ex . ' GROUP BY k.to_user_id, cu.full_name ORDER BY n DESC, cu.full_name LIMIT ' . (int)$n, [$from, $to . ' 23:59:59']) : []; }
 
 /* ------------------------------------------------------------------ noticeboard: posts, polls, photos */
 function soc_post_create(): int {
@@ -128,7 +129,8 @@ function soc_badges_html(int $uid, int $max = 6): string { $b = soc_badges($uid)
 
 /* ------------------------------------------------------------------ winner of the month */
 function soc_winner(?string $month = null): ?array { $month = $month ?: date('Y-m', strtotime('first day of last month')); return soc_has() ? one('SELECT w.*, cu.full_name FROM soc_winners w JOIN customer_users cu ON cu.id = w.user_id WHERE w.month = ?', [$month]) : null; }
-function soc_winner_set(): void { if (!is_cp_admin() && !(function_exists('hr_can') && hr_can())) throw new RuntimeException(t('err.noaccess')); $month = preg_match('/^\d{4}-\d{2}$/', (string)($_POST['month'] ?? '')) ? $_POST['month'] : date('Y-m', strtotime('first day of last month')); $uid = (int)($_POST['user_id'] ?? 0); if (!$uid) { q('DELETE FROM soc_winners WHERE month = ?', [$month]); return; } if (!isset(soc_staff()[$uid])) throw new RuntimeException(t('err.notfound'));
+function soc_winner_set(): void { if (!is_cp_admin() && !(function_exists('hr_can') && hr_can())) throw new RuntimeException(t('err.noaccess'));
+    if (function_exists('hr_owner_ids') && in_array((int)($_POST['user_id'] ?? 0), hr_owner_ids(), true)) throw new RuntimeException(t('soc.winner_owner'));   // R77-015 $month = preg_match('/^\d{4}-\d{2}$/', (string)($_POST['month'] ?? '')) ? $_POST['month'] : date('Y-m', strtotime('first day of last month')); $uid = (int)($_POST['user_id'] ?? 0); if (!$uid) { q('DELETE FROM soc_winners WHERE month = ?', [$month]); return; } if (!isset(soc_staff()[$uid])) throw new RuntimeException(t('err.notfound'));
     q('INSERT INTO soc_winners (month, user_id, prize, note, set_by) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE user_id = VALUES(user_id), prize = VALUES(prize), note = VALUES(note), set_by = VALUES(set_by), set_at = NOW()', [$month, $uid, mb_substr(trim((string)($_POST['prize'] ?? '')), 0, 200) ?: cp_setting('soc_prize'), mb_substr(trim((string)($_POST['note'] ?? '')), 0, 300) ?: null, soc_me()]);
     soc_notify(array_keys(soc_staff()), 'soc:winner', 'soc:winner:' . $month, '🏆 ' . t('soc.nf_winner', ['u' => soc_name($uid), 'm' => $month]), (string)($_POST['note'] ?? ''), url('community') . '#winner'); }
 

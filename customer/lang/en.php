@@ -6655,4 +6655,6 @@ Best regards,
 'hr.bd_formula' => '{t} total − {o} opening − {k} taken − {p} pending',
 // ---- GAS-CP-R77-014
 'hr.opening_hint' => 'Days already taken before the portal counted this year (paper records, cut-over) — subtracted from the available days; the change is logged.',
+// ---- GAS-CP-R77-015
+'soc.winner_owner' => 'The Owner / CEO is not in the rankings and cannot be winner of the month.',
 ];
