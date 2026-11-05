@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.87.2** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.87.3** (build 2026-10-31). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.87.3 | GAS-CP-R77-011 | 2026-11-05 | Audit trail card folded by default on inspection, service and function-check report pages (entry count on the summary; click to unfold). | — |
 | 1.87.2 | GAS-CP-R77-010 | 2026-11-05 | Big inspection / service reports: documents built from cached 1200-px photo copies, PDF stored before the Word and kept if the Word fails, 300 s / 512 MB build budget; ⟳ Rebuild PDF / Word on an issued report whose documents are missing. | — |
 | 1.87.1 | GAS-CP-R77-009 | 2026-11-05 | Inspection report editor: systems folded with an index strip (open one, fold the others, expand / collapse all); 480-px lazy thumbnails for photo grids (file&thumb=1, cached) on inspection and service report pages. | — |
 | 1.87.1 | GAS-CP-R77-008 | 2026-11-05 | Missing supporting documents: notice on My leave with upload per request, Service app 0.6.16 notice + home badge, pill on the person's card; leave reasons translated in all languages. | — |

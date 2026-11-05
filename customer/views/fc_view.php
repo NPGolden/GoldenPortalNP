@@ -66,5 +66,5 @@ layout_head($r['report_no'] . ' · ' . $tpl['short'], 'reports');
 </div>
 <?php endif; ?>
 
-<?php if ($staff): ?><div class="card"><h2><?= tt('td.history') ?></h2><ul class="tk-events"><?php foreach ($r['events'] as $ev): ?><li><span class="when"><?= e(fmt_datetime($ev['created_at'])) ?></span> <b><?= e(t('fc.ev_' . $ev['event'])) ?></b> · <?= e($ev['user_name'] ?: '') ?><?= $ev['note'] ? ' <span class="hint">— ' . e($ev['note']) . '</span>' : '' ?></li><?php endforeach; ?></ul></div><?php endif; ?>
+<?php if ($staff): ?><details class="card card--details" id="trail"><summary><h2><?= tt('td.history') ?></h2> <span class="count"><?= count($r['events']) ?></span></summary><ul class="tk-events" style="margin-top:8px;"><?php foreach ($r['events'] as $ev): ?><li><span class="when"><?= e(fmt_datetime($ev['created_at'])) ?></span> <b><?= e(t('fc.ev_' . $ev['event'])) ?></b> · <?= e($ev['user_name'] ?: '') ?><?= $ev['note'] ? ' <span class="hint">— ' . e($ev['note']) . '</span>' : '' ?></li><?php endforeach; ?></ul></details><?php endif; ?>
 <?php layout_foot(); ?>

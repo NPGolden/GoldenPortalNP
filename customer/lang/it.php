@@ -6640,4 +6640,6 @@ Cordiali saluti,
 'isr.regen_busy' => 'Creazione dei documenti — con molte foto serve un minuto…',
 'isr.regen_hint' => 'I documenti di questo rapporto emesso mancano — la creazione è stata interrotta. Rigenerarli qui.',
 'isr.regen_ok' => 'PDF e Word rigenerati e archiviati.',
+// ---- GAS-CP-R77-011
+'fsr.trail_hint' => 'clic per aprire',
 ];

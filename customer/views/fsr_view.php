@@ -106,15 +106,15 @@ layout_head(t('fsr.title') . ' ' . $r['report_no'], $staff ? 'projects' : 'repor
   <?php endforeach; if (!$r['works']): ?><p class="hint">—</p><?php endif; ?>
 </div>
 
-<div class="card">
-  <h2><?= tt('fsr.trail') ?></h2>
-  <div class="table-scroll"><table>
+<details class="card card--details" id="trail"><!-- R77-011: the audit trail stays folded; it grows with every save -->
+  <summary><h2><?= tt('fsr.trail') ?></h2> <span class="count"><?= count($r['events']) ?></span> <span class="hint"><?= tt('fsr.trail_hint') ?></span></summary>
+  <div class="table-scroll" style="margin-top:8px;"><table>
     <thead><tr><th><?= tt('ll.when') ?></th><th><?= tt('fsr.event') ?></th><th><?= tt('ll.who') ?></th><th><?= tt('ll.ip') ?></th><th><?= tt('th.remarks') ?></th></tr></thead>
     <tbody><?php foreach (array_reverse($r['events']) as $ev): ?>
       <tr><td class="date"><?= e(fmt_datetime($ev['created_at'])) ?></td><td><?= pill($tone[$ev['event']] ?? 'mute', t('fsr.ev_' . $ev['event'])) ?></td><td><?= e($ev['user_name'] ?: '—') ?></td><td class="num"><?= e($ev['ip'] ?: '—') ?></td><td><?= e($ev['note'] ?: '') ?></td></tr>
     <?php endforeach; ?></tbody>
   </table></div>
-</div>
+</details>
 <?php if ($staff && ($r['kind'] ?? 'internal') === 'external' && function_exists('fsr_ext_relink')): [$rlScope, $rlArgs] = scope_sql('p'); $rlProjects = all("SELECT p.id, p.project_code, p.name, v.name AS vessel FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id WHERE {$rlScope} AND (p.status <> 'completed' OR p.id = ?) ORDER BY p.vessel_id = ? DESC, p.status = 'active' DESC, p.project_code", array_merge($rlArgs, [(int)$r['project_id'], (int)(scalar('SELECT vessel_id FROM projects WHERE id = ?', [(int)$r['project_id']]) ?: 0)])); $rlSubs = all("SELECT s.id, s.project_id, s.code, s.name FROM subprojects s JOIN projects p ON p.id = s.project_id WHERE {$rlScope} ORDER BY s.project_id, s.code", $rlArgs); ?>
 <details class="card pd-add" id="relink"<?= str_starts_with((string)($r['project_code'] ?? ''), 'GEN-') ? ' open' : '' ?>><summary class="btn btn--ghost btn--sm">🔗 <?= tt('fsr.relink') ?></summary>
   <form method="post" action="<?= url('fsr', ['id' => $id]) ?>" class="fltbar" style="grid-template-columns: 1.4fr 1fr auto; margin-top:10px;" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="fsr_ext_relink"><input type="hidden" name="id" value="<?= $id ?>">

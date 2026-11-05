@@ -6640,4 +6640,6 @@ Best regards,
 'isr.regen_busy' => 'Building the documents — a report with many photos takes a minute…',
 'isr.regen_hint' => 'The documents of this issued report are missing — the build was interrupted. Rebuild them here.',
 'isr.regen_ok' => 'PDF and Word rebuilt and archived.',
+// ---- GAS-CP-R77-011
+'fsr.trail_hint' => 'click to unfold',
 ];

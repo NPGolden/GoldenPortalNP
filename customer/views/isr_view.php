@@ -106,15 +106,15 @@ layout_head(t('isr.title') . ' ' . $r['report_no'], $staff ? 'projects' : 'repor
 </div>
 
 <?php if ($staff): ?>
-<div class="card">
-  <h2><?= tt('fsr.trail') ?></h2>
-  <div class="table-scroll"><table>
+<details class="card card--details" id="trail"><!-- R77-011: the audit trail stays folded; it grows with every save -->
+  <summary><h2><?= tt('fsr.trail') ?></h2> <span class="count"><?= count($r['events']) ?></span> <span class="hint"><?= tt('fsr.trail_hint') ?></span></summary>
+  <div class="table-scroll" style="margin-top:8px;"><table>
     <thead><tr><th><?= tt('ll.when') ?></th><th><?= tt('fsr.event') ?></th><th><?= tt('ll.who') ?></th><th><?= tt('th.remarks') ?></th></tr></thead>
     <tbody><?php foreach (array_reverse($r['events']) as $ev): ?>
       <tr><td class="date"><?= e(fmt_datetime($ev['at'] ?? $ev['created_at'] ?? null)) ?></td><td><?= pill($tone[$ev['event']] ?? 'mute', t('isr.ev_' . $ev['event'])) ?></td><td><?= e($ev['user_name'] ?: '—') ?></td><td><?= e($ev['note'] ?: '') ?></td></tr>
     <?php endforeach; ?></tbody>
   </table></div>
-</div>
+</details>
 <?php if ($staff && function_exists('em_card_html') && in_array($r['status'], ['issued', 'checking'], true)): $emAtts = [];
   if ($r['pdf_file_id']) $emAtts[] = ['f:' . (int)$r['pdf_file_id'], $r['report_no'] . '.pdf']; if ($r['docx_file_id']) $emAtts[] = ['f:' . (int)$r['docx_file_id'], $r['report_no'] . '.docx'];
   $emVid = (int) (scalar('SELECT vessel_id FROM projects WHERE id = ?', [(int)$r['project_id']]) ?: 0);
