@@ -7535,4 +7535,10 @@ Cordiali saluti,
 'po.sp_cost_desc' => 'Ordine d\'acquisto {no} {t}',
 'po.progress_hint' => '(valore ricevuto / ordinato — scritto nella linea di processo quando è maggiore)',
 'po.sub_logistics' => 'logistica {v}',
+// ---- GAS-CP-R80-005 budget disciplines setting
+'bg.discs_title' => 'Budget & consuntivo — discipline nel modulo di budget',
+'bg.discs_hint' => 'Spuntare le discipline che compaiono nel budget ore di un sottoprogetto (Budget & consuntivo). Nulla spuntato = tutte le discipline attive. Una disciplina con ore nel budget corrente resta visibile.',
+'bg.discs_n' => '{n} discipline nel modulo di budget',
+'bg.discs_all' => 'Tutte le discipline attive sono mostrate',
+'bg.discs_saved' => 'Discipline di budget salvate.',
 ];

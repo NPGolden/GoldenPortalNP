@@ -7535,4 +7535,10 @@ Best regards,
 'po.sp_cost_desc' => 'Purchase order {no} {t}',
 'po.progress_hint' => '(received / ordered value — written to the process line when higher)',
 'po.sub_logistics' => 'logistics {v}',
+// ---- GAS-CP-R80-005 budget disciplines setting
+'bg.discs_title' => 'Budget & actual — disciplines on the budget form',
+'bg.discs_hint' => 'Tick the disciplines that appear in the manhour budget of a sub-project (Budget & actual). Nothing ticked = every active discipline. A discipline that already has hours in the current budget stays visible.',
+'bg.discs_n' => '{n} disciplines on the budget form',
+'bg.discs_all' => 'All active disciplines are shown',
+'bg.discs_saved' => 'Budget disciplines saved.',
 ];

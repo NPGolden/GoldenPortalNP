@@ -1,7 +1,7 @@
 <?php
 /** Partial: Sub-project › Budget & actual tab (Option A of GAS-CP-R34-001). expects $sp, $id, $backTo */
 if (!function_exists('bg_can') || !bg_can()) return;
-$C = bg_calc($id, $sp); $canE = bg_can_edit($sp); $B = $C['budget']; $hist = bg_history($id); $disc = bg_disciplines();
+$C = bg_calc($id, $sp); $canE = bg_can_edit($sp); $B = $C['budget']; $hist = bg_history($id); $disc = bg_disciplines_form($B);
 $pre = !$B ? bg_prefill_from_offers($id) : [];
 $m = fn(float $v) => number_format($v, 0, ',', '.'); $sg = fn(float $v) => ($v >= 0 ? '+ ' : '− ') . number_format(abs($v), 0, ',', '.');
 $ov = $C['offer_value']; $cur = 'EUR';

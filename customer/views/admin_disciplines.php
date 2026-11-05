@@ -74,4 +74,16 @@ layout_head(t('disc.title'), 'admin_disciplines');
   </form>
 </div>
 <?php endif; ?>
+<?php if (function_exists('bg_has') && bg_has() && is_cp_admin()): $bgSel = bg_disc_setting(); $allDiscB = all('SELECT id, name, is_active FROM disciplines WHERE is_active = 1 ORDER BY sort_order, name'); ?>
+<div class="card" id="budget-discs">
+  <h2><?= tt('bg.discs_title') ?></h2>
+  <p class="hint"><?= tt('bg.discs_hint') ?></p>
+  <form method="post" action="<?= url('admin_disciplines') ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="bg_discs_save">
+    <div class="tm-grid">
+      <?php foreach ($allDiscB as $d): ?><label class="chk"><input type="checkbox" name="bg_disc[]" value="<?= (int)$d['id'] ?>"<?= in_array((int)$d['id'], $bgSel, true) ? ' checked' : '' ?>> <?= e($d['name']) ?></label><?php endforeach; ?>
+    </div>
+    <div class="btn-row" style="margin-top:10px;"><button class="btn btn--gold" type="submit"><?= tt('btn.save') ?></button><span class="hint"><?= $bgSel ? e(t('bg.discs_n', ['n' => count($bgSel)])) : tt('bg.discs_all') ?></span></div>
+  </form>
+</div>
+<?php endif; ?>
 <?php layout_foot(); ?>

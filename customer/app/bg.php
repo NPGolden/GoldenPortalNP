@@ -29,6 +29,10 @@ function bg_can_edit(array $sp): bool {
     return false;
 }
 function bg_disciplines(): array { static $c = null; if ($c === null) $c = all('SELECT * FROM disciplines WHERE is_active = 1 ORDER BY sort_order, name'); return $c; }
+/** R80-005: the disciplines shown on the budget form — those ticked in Settings › Disciplines › Budget; nothing ticked = every active discipline. A discipline that already has hours in the current budget always stays. */
+function bg_disc_setting(): array { $v = function_exists('cp_setting') ? (string) cp_setting('bg_disciplines', '') : ''; return $v === '' ? [] : array_values(array_unique(array_map('intval', array_filter(explode(',', $v), fn($x) => $x !== '')))); }
+function bg_disciplines_form(?array $B = null): array { $sel = bg_disc_setting(); if (!$sel) return bg_disciplines(); $keep = $B ? array_keys($B['hours'] ?? []) : []; return array_values(array_filter(bg_disciplines(), fn($d) => in_array((int)$d['id'], $sel, true) || in_array((int)$d['id'], $keep, true))); }
+function bg_disc_setting_save(array $ids): void { if (!is_cp_admin()) throw new RuntimeException(t('err.noaccess')); cp_setting_set('bg_disciplines', implode(',', array_values(array_unique(array_map('intval', $ids))))); }
 function bg_money(float $v, string $cur = 'EUR'): string { return number_format($v, 0, ',', '.') . ' ' . $cur; }
 function bg_h(float $h): string { return rtrim(rtrim(number_format($h, 1, '.', ''), '0'), '.') ?: '0'; }
 
@@ -62,7 +66,7 @@ function bg_save_from_post(int $sid): int { $GLOBALS['_bg_cur'] = []; if (functi
     q('INSERT INTO sp_budgets (subproject_id, revision, parts_budget, offer_value, notes, created_by, created_name) VALUES (?,?,?,?,?,?,?)', [$sid, $rev, $parts, $ovv, $notes, (int)$u['id'], (string)$u['full_name']]);
     $bid = (int) db()->lastInsertId();
     $split = function_exists('eng_split_disciplines') && eng_has() ? eng_split_disciplines() : []; $hasSec = bg_has_sections();
-    foreach (bg_disciplines() as $d) {
+    foreach (bg_disciplines_form(bg_current($sid)) as $d) {
         $k = (int)$d['id']; $rate = (float) str_replace(',', '.', (string)($_POST['r'][$k] ?? '')); if ($rate <= 0) $rate = function_exists('br_hour_cost') ? br_hour_cost($d, 'normal', null, $sid) : (float)($d['rate_normal'] ?? 0);   // R40-002: branch mean cost fallback
         if ($hasSec && isset($split[$k])) {   // R48-001: one row per section for a discipline that feeds several sections
             foreach ($split[$k] as $sec => $nm) { $hs = max(0, (float) str_replace(',', '.', (string)($_POST['hs'][$k][$sec] ?? '0'))); if ($hs > 0) q('INSERT INTO sp_budget_hours (budget_id, discipline_id, hours, rate, section_id) VALUES (?,?,?,?,?)', [$bid, $k, $hs, $rate, (int)$sec]); }
