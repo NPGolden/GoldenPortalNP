@@ -998,6 +998,7 @@ function pm_handle_action(string $action, string $page): bool {
             redirect('isr', ['id' => $id, '_r' => uniqid()]);
         }
         case 'isr_submit': { $id = (int)$_POST['id']; isr_submit($id); flash('good', t('isr.submitted')); redirect('isr', ['id' => $id, '_r' => uniqid()]); }
+        case 'isr_regen':  { $id = (int)$_POST['id']; $r = isr_load($id); if (!$r || $r['status'] !== 'issued' || !is_staff()) throw new RuntimeException(t('err.noaccess')); isr_generate_documents($id); flash('good', t('isr.regen_ok')); redirect('isr', ['id' => $id, '_r' => uniqid()]); }   // R77-010
         case 'isr_issue':  { $id = (int)$_POST['id']; isr_issue($id); flash('good', t('isr.issued')); redirect('isr', ['id' => $id, '_r' => uniqid()]); }
         case 'isr_reopen': { $id = (int)$_POST['id']; isr_reopen($id); redirect('isr_edit', ['id' => $id, '_r' => uniqid()]); }
         case 'isr_delete': {

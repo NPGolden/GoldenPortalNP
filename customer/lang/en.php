@@ -6635,4 +6635,9 @@ Best regards,
 'isr.systems_fold_hint' => 'Systems start folded: use the index strip to open one for editing — opening one folds the others; ▾ / ▸ expand or collapse all.',
 'isr.expand_all' => 'Expand all systems',
 'isr.collapse_all' => 'Collapse all systems',
+// ---- GAS-CP-R77-010 regenerate documents
+'isr.regen' => 'Rebuild PDF / Word',
+'isr.regen_busy' => 'Building the documents — a report with many photos takes a minute…',
+'isr.regen_hint' => 'The documents of this issued report are missing — the build was interrupted. Rebuild them here.',
+'isr.regen_ok' => 'PDF and Word rebuilt and archived.',
 ];

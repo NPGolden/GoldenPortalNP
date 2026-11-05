@@ -265,6 +265,7 @@ function fsr_customer_decide(int $id, string $decision, string $remark, ?string 
 
 /** Render both files and store them (replacing the previous version). */
 function fsr_generate_documents(int $id): void {
+    if (function_exists('cp_doc_budget')) cp_doc_budget();   // R77-010
     $r = fsr_load($id);
     if (!$r) return;
     cp_delete_file($r['docx_file_id'] ? (int)$r['docx_file_id'] : null);
@@ -491,7 +492,7 @@ function fsr_render_docx(array $r): string {
         $d->grid($trows, [2800, 2440, 1000, 1000, 1000, 1400], ['border' => '9AA5B1']);
         if ($wk['photos']) {
             $cells = [];
-            foreach ($wk['photos'] as $ph) { $bytes = cp_file_bytes((int)$ph['id']); $cells[] = $bytes ? ['img' => [$bytes, 5.2, 4.0], 'lines' => ['Figure ' . $ph['figure'] . ($ph['title'] ? ' — ' . $ph['title'] : '')], 'sz' => 7, 'b' => true, 'align' => 'center'] : ''; }
+            foreach ($wk['photos'] as $ph) { $bytes = cp_photo_bytes((int)$ph['id']); $cells[] = $bytes ? ['img' => [$bytes, 5.2, 4.0], 'lines' => ['Figure ' . $ph['figure'] . ($ph['title'] ? ' — ' . $ph['title'] : '')], 'sz' => 7, 'b' => true, 'align' => 'center'] : ''; }
             while (count($cells) % 3) $cells[] = '';
             $d->grid(array_chunk($cells, 3), [3213, 3213, 3214], ['border' => 'D9D9D9']);
         }

@@ -355,14 +355,23 @@ function files_list(string $field): array {
     return $out;
 }
 
+/** R77-010: a photo at document size — 1200 px JPEG from the thumbnail cache — so a report with dozens of phone photos renders in seconds within memory; falls back to the original. */
+function cp_photo_bytes(int $fileId): ?string {
+    $f = one('SELECT id, stored_name, mime_type FROM sp_files WHERE id = ?', [$fileId]); if (!$f) return null;
+    $path = cp_storage() . '/' . $f['stored_name']; if (!is_file($path)) return null;
+    if (str_starts_with((string)$f['mime_type'], 'image/') && ($tp = cp_thumb_path($f, $path, 1200))) return (string) file_get_contents($tp);
+    return (string) file_get_contents($path);
+}
+/** Generous limits for building a document: many photos take time and RAM on shared hosting. */
+function cp_doc_budget(): void { @set_time_limit(300); $cur = ini_get('memory_limit'); if ($cur !== '-1' && up_bytes((string)$cur) < 512 * 1048576) @ini_set('memory_limit', '512M'); ignore_user_abort(true); }
 /** R77-009: a cached 480 px JPEG of an image (storage/thumbs/<id>.jpg); null when GD cannot read it — the caller then streams the original. */
 function cp_thumb_path(array $f, string $path, int $max = 480): ?string {
     if (!function_exists('imagecreatefromstring') || filesize($path) > 40 * 1048576) return null;
-    $dir = cp_storage() . '/thumbs'; if (!is_dir($dir)) @mkdir($dir, 0750, true); $tp = $dir . '/' . (int)$f['id'] . '.jpg';
+    $dir = cp_storage() . '/thumbs'; if (!is_dir($dir)) @mkdir($dir, 0750, true); $tp = $dir . '/' . (int)$f['id'] . ($max === 480 ? '' : '-' . $max) . '.jpg';
     if (is_file($tp) && filemtime($tp) >= filemtime($path)) return $tp;
     try {
         $info = @getimagesize($path); if (!$info || $info[0] <= 0) return null; [$w, $h] = $info;
-        if ($w <= $max && $h <= $max && filesize($path) < 300000) return null;   // small enough already
+        if ($w <= $max && $h <= $max && filesize($path) < ($max > 480 ? 900000 : 300000)) return null;   // small enough already
         $src = @imagecreatefromstring((string)file_get_contents($path)); if (!$src) return null;
         $r = min(1, $max / max($w, $h)); $nw = max(1, (int)round($w * $r)); $nh = max(1, (int)round($h * $r));
         $dst = imagecreatetruecolor($nw, $nh); imagefill($dst, 0, 0, imagecolorallocate($dst, 255, 255, 255)); imagecopyresampled($dst, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);

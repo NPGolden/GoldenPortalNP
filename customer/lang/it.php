@@ -6635,4 +6635,9 @@ Cordiali saluti,
 'isr.systems_fold_hint' => 'I sistemi partono chiusi: dalla barra indice aprirne uno per la modifica — aprirne uno chiude gli altri; ▾ / ▸ apri o chiudi tutti.',
 'isr.expand_all' => 'Apri tutti i sistemi',
 'isr.collapse_all' => 'Chiudi tutti i sistemi',
+// ---- GAS-CP-R77-010 regenerate documents
+'isr.regen' => 'Rigenera PDF / Word',
+'isr.regen_busy' => 'Creazione dei documenti — con molte foto serve un minuto…',
+'isr.regen_hint' => 'I documenti di questo rapporto emesso mancano — la creazione è stata interrotta. Rigenerarli qui.',
+'isr.regen_ok' => 'PDF e Word rigenerati e archiviati.',
 ];

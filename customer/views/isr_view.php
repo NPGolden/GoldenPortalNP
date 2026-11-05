@@ -23,6 +23,7 @@ layout_head(t('isr.title') . ' ' . $r['report_no'], $staff ? 'projects' : 'repor
   </div>
   <div class="actions">
     <?php if ($r['pdf_file_id']): ?><a class="btn btn--gold" href="<?= url('file', ['id' => $r['pdf_file_id']]) ?>" target="_blank">⤓ PDF</a><?php endif; ?>
+    <?php if ($staff && $r['status'] === 'issued' && (!$r['pdf_file_id'] || !$r['docx_file_id'])): ?><form method="post" action="<?= url('isr', ['id' => $id]) ?>" class="inline" data-lock data-busy="<?= tt('isr.regen_busy') ?>"><?= csrf_field() ?><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="action" value="isr_regen"><button class="btn btn--gold" type="submit">⟳ <?= tt('isr.regen') ?></button></form><span class="hint"><?= tt('isr.regen_hint') ?></span><?php endif; ?>
     <?php if ($staff && function_exists('em_card_html') && in_array($r['status'], ['issued', 'checking'], true)): ?><button class="btn" type="button" data-open-email>✉ <?= tt('em.send') ?></button><?php endif; ?>
     <?php if ($r['docx_file_id']): ?><a class="btn" href="<?= url('file', ['id' => $r['docx_file_id']]) ?>">⤓ Word</a><?php endif; ?>
     <?php if ($staff && $r['status'] !== 'issued'): ?><a class="btn btn--ghost" href="<?= url('isr_edit', ['id' => $id]) ?>">✎ <?= tt('isr.edit') ?></a><?php endif; ?>

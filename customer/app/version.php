@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.87.1';
+const CP_VERSION = '1.87.2';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R77-010', 'version' => '1.87.2', 'date' => '2026-11-05', 'title' => 'Big inspection / service reports: documents built from cached 1200-px photo copies, PDF stored before the Word and kept if the Word fails, 300 s / 512 MB build budget; ⟳ Rebuild PDF / Word on an issued report whose documents are missing.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-009', 'version' => '1.87.1', 'date' => '2026-11-05', 'title' => 'Inspection report editor: systems folded with an index strip (open one, fold the others, expand / collapse all); 480-px lazy thumbnails for photo grids (file&thumb=1, cached) on inspection and service report pages.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-008', 'version' => '1.87.1', 'date' => '2026-11-05', 'title' => 'Missing supporting documents: notice on My leave with upload per request, Service app 0.6.16 notice + home badge, pill on the person\'s card; leave reasons translated in all languages.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-007', 'version' => '1.87.0', 'date' => '2026-11-05', 'title' => 'Leave requests: a reason must be chosen from a list that follows the leave type ("Other" needs a description); the manager may correct it at approval and HR at any time; medical reasons may be sent without the certificate, which is due 5 working days after the first day of absence — pill with upload on My leave / Service app / HR side, reminders the day before and when overdue, HR dashboard list. Service app 0.6.15, Golden HR 1.0.3.', 'db' => 'install/migrate_cp_r77_reasons.sql', 'check' => 'r77b'],

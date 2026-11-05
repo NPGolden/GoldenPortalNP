@@ -208,10 +208,13 @@ function isr_generate_documents(int $id): void {
     cp_delete_file($r['docx_file_id'] ? (int)$r['docx_file_id'] : null); cp_delete_file($r['pdf_file_id'] ? (int)$r['pdf_file_id'] : null);
     $base = $r['report_no'] . '-R' . (int)$r['version'];
     $meta = ['doc_no' => $r['report_no'], 'revision' => 'R' . (int)$r['version'], 'isr_id' => $id];
+    cp_doc_budget();   // R77-010: big reports — more time and memory, PDF saved first, a DOCX failure never loses the PDF
     $pdfId  = cp_store_bytes(isr_render_pdf($r), $base . '.pdf', 'application/pdf', (int)$r['project_id'], $r['subproject_id'] ? (int)$r['subproject_id'] : null, 'isr_doc', 'external', null, $base . '.pdf', $meta);
-    $docxId = cp_store_bytes(isr_render_docx($r), $base . '.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', (int)$r['project_id'], $r['subproject_id'] ? (int)$r['subproject_id'] : null, 'isr_doc', 'external', null, $base . '.docx', $meta);
-    q('UPDATE sp_files SET isr_id = ? WHERE id IN (?, ?)', [$id, $pdfId, $docxId]);
-    q('UPDATE isr_reports SET pdf_file_id = ?, docx_file_id = ? WHERE id = ?', [$pdfId, $docxId, $id]);
+    q('UPDATE sp_files SET isr_id = ? WHERE id = ?', [$id, $pdfId]); q('UPDATE isr_reports SET pdf_file_id = ?, docx_file_id = NULL WHERE id = ?', [$pdfId, $id]);
+    try {
+        $docxId = cp_store_bytes(isr_render_docx($r), $base . '.docx', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', (int)$r['project_id'], $r['subproject_id'] ? (int)$r['subproject_id'] : null, 'isr_doc', 'external', null, $base . '.docx', $meta);
+        q('UPDATE sp_files SET isr_id = ? WHERE id = ?', [$id, $docxId]); q('UPDATE isr_reports SET docx_file_id = ? WHERE id = ?', [$docxId, $id]);
+    } catch (Throwable $e) { error_log('isr docx ' . $id . ': ' . $e->getMessage()); }
 }
 function isr_cover_rows(array $r): array {
     return [['Date:', date('d.m.Y', strtotime($r['report_date'])), 'Report No:', $r['report_no'] . ' · R' . (int)$r['version']],
@@ -280,7 +283,7 @@ function isr_render_pdf(array $r): string {
         $imgs = array_values(array_filter($it['files'], fn($f) => $f['is_image'])); $docs = array_values(array_filter($it['files'], fn($f) => !$f['is_image']));
         if ($imgs) {
             $h2('Figures'); $cw = ($W - 6) / 3; $ch = $cw * 0.75;
-            foreach (array_chunk($imgs, 3) as $row) { $need($ch + 9); $x = $L; foreach ($row as $ph) { $b = cp_file_bytes((int)$ph['id']); if ($b) $pdf->image($b, $x, $y, $cw, $ch); $pdf->setColor($mute); $pdf->setFont('B', 7); $pdf->text($x, $y + $ch + 3.5, mb_strimwidth('Figure ' . $ph['figure'] . ($ph['title'] ? ' — ' . $ph['title'] : ''), 0, 48, '…'), 'C', $cw); $x += $cw + 3; } $y += $ch + 7; }
+            foreach (array_chunk($imgs, 3) as $row) { $need($ch + 9); $x = $L; foreach ($row as $ph) { $b = cp_photo_bytes((int)$ph['id']); if ($b) $pdf->image($b, $x, $y, $cw, $ch); $pdf->setColor($mute); $pdf->setFont('B', 7); $pdf->text($x, $y + $ch + 3.5, mb_strimwidth('Figure ' . $ph['figure'] . ($ph['title'] ? ' — ' . $ph['title'] : ''), 0, 48, '…'), 'C', $cw); $x += $cw + 3; } $y += $ch + 7; }
         }
         if ($docs) { $h2('Attachments'); foreach ($docs as $f) $para('• ' . ($f['title'] ?: $f['original_name']) . ' (' . $f['original_name'] . ')', 8); }
     }
@@ -320,7 +323,7 @@ function isr_render_docx(array $r): string {
         $d->heading('Risk analysis — level: ' . (isr_risk_levels()[$it['risk_level']] ?? ''), 2); $d->para((string)$it['risk_analysis'] ?: '—');
         $d->heading('Proposed corrective actions', 2); $d->para((string)$it['actions'] ?: '—');
         $imgs = array_values(array_filter($it['files'], fn($f) => $f['is_image'])); $docs = array_values(array_filter($it['files'], fn($f) => !$f['is_image']));
-        if ($imgs) { $cells = []; foreach ($imgs as $ph) { $b = cp_file_bytes((int)$ph['id']); $cells[] = $b ? ['img' => [$b, 5.2, 4.0], 'lines' => ['Figure ' . $ph['figure'] . ($ph['title'] ? ' — ' . $ph['title'] : '')], 'sz' => 7, 'b' => true, 'align' => 'center'] : ''; } while (count($cells) % 3) $cells[] = ''; $d->grid(array_chunk($cells, 3), [3213, 3213, 3214], ['border' => 'D9D9D9']); }
+        if ($imgs) { $cells = []; foreach ($imgs as $ph) { $b = cp_photo_bytes((int)$ph['id']); $cells[] = $b ? ['img' => [$b, 5.2, 4.0], 'lines' => ['Figure ' . $ph['figure'] . ($ph['title'] ? ' — ' . $ph['title'] : '')], 'sz' => 7, 'b' => true, 'align' => 'center'] : ''; } while (count($cells) % 3) $cells[] = ''; $d->grid(array_chunk($cells, 3), [3213, 3213, 3214], ['border' => 'D9D9D9']); }
         if ($docs) { $d->heading('Attachments', 2); foreach ($docs as $f) $d->bullet(($f['title'] ?: $f['original_name']) . ' (' . $f['original_name'] . ')'); }
     }
     $d->pageBreak();
