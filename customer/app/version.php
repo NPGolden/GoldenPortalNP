@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.87.7';
+const CP_VERSION = '1.87.8';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R77-016', 'version' => '1.87.8', 'date' => '2026-11-05', 'title' => 'A winner-of-the-month entry naming an Owner / CEO account is no longer shown (the month reads as not yet named).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-015', 'version' => '1.87.7', 'date' => '2026-11-05', 'title' => 'Owner / CEO accounts excluded from the activity and kudos rankings and from the winner-of-the-month choice (the CEO role now counts as Owner everywhere).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-014', 'version' => '1.87.6', 'date' => '2026-11-05', 'title' => 'Opening taken days editable in the year Edit form on the person\'s Entitlements tab (logged in the audit).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-013', 'version' => '1.87.5', 'date' => '2026-11-05', 'title' => 'HR card: Σ balance breakdown per annual-leave year — entitled, carry-over, opening, every request with its days, board-only days, hour conversions, formula; lines that are not counted say why (other year, history only, before cut-over).', 'db' => null, 'check' => null],

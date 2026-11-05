@@ -1058,3 +1058,6 @@ No SQL. `hr4.php` `hr_entitlement_override_from_post()` accepts `opening` (when 
 
 ## 210. v1.87.7 — Owner / CEO out of the rankings (GAS-CP-R77-015)
 No SQL. `hr7.php` `hr_owner_ids()` now includes the role named CEO (`act_top` already skipped it); `soc.php` `soc_kudos_top()` excludes those ids, `soc_winner_set()` refuses them (`soc.winner_owner`); `community.php` winner select hides them. Key ×5 (6529).
+
+## 211. v1.87.8 — Owner / CEO winner entry hidden (GAS-CP-R77-016)
+No SQL. `soc_winner()` returns null when the stored winner is in `hr_owner_ids()` — the existing Oct 2026 entry disappears without a manual change; the next "Name the winner" overwrites it.
