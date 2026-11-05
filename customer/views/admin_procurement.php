@@ -21,6 +21,7 @@ layout_head(t('stk.settings'), 'admin_procurement');
       </div>
       <h3 style="margin-top:12px;"><?= tt('stk.disciplines') ?></h3><p class="hint"><?= tt('stk.disciplines_hint') ?></p>
       <div class="pr-disc"><?php foreach ($disc as $d): ?><label><input type="checkbox" name="disciplines[]" value="<?= (int)$d['id'] ?>"<?= in_array((int)$d['id'], $on, true) ? ' checked' : '' ?>> <?= e($d['name']) ?></label><?php endforeach; ?></div>
+      <div class="field" style="margin-top:12px;max-width:260px;"><label><?= tt('stk.offer_margin') ?> %</label><input name="offer_margin" type="number" step="0.01" min="-100" max="1000" value="<?= e(cp_setting('proc_offer_margin', '25') ?? '25') ?>"><p class="hint"><?= tt('stk.offer_margin_hint') ?></p></div>
       <div class="field" style="margin-top:12px;max-width:260px;"><label><?= tt('stk.pay_threshold') ?> (EUR)</label><input name="pay_threshold" type="number" step="0.01" min="0" value="<?= e(cp_setting('proc_pay_threshold', '5000') ?? '5000') ?>"><p class="hint"><?= tt('stk.pay_threshold_hint') ?></p></div>
       <button class="btn btn--gold" type="submit"><?= tt('btn.save') ?></button>
     </form>

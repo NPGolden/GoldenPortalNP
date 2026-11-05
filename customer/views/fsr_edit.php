@@ -108,7 +108,7 @@ layout_head($title, 'projects');
           <div>
             <div class="field"><label><?= tt('fsr.parts') ?></label>
               <?php for ($j = 0; $j < FSR_MAX_PARTS; $j++): $pt = $parts[$j] ?? ['d' => '', 't' => 'I']; ?>
-                <div class="fsr-part"><input name="wk_part[<?= $i ?>][<?= $j ?>]" maxlength="120" value="<?= e($pt['d']) ?>" placeholder="<?= tt('fsr.part_ph') ?>">
+                <div class="fsr-part"><input name="wk_part[<?= $i ?>][<?= $j ?>]" maxlength="120" value="<?= e($pt['d']) ?>" placeholder="<?= tt('fsr.part_ph') ?>"><?php if (function_exists('stk_has') && stk_has()): ?><input name="wk_pcode[<?= $i ?>][<?= $j ?>]" maxlength="60" value="<?= e($pt['c'] ?? '') ?>" placeholder="<?= tt('fsr.part_code_ph') ?>" style="max-width:9em;font-family:var(--mono);" title="<?= tt('fsr.part_code_hint') ?>"<?= !empty($pt['m']) ? ' readonly' : '' ?>><input name="wk_pqty[<?= $i ?>][<?= $j ?>]" type="number" step="0.001" min="0.001" value="<?= e((string)($pt['q'] ?? 1)) ?>" style="max-width:5em;"<?= !empty($pt['m']) ? ' readonly' : '' ?>><input type="hidden" name="wk_pmove[<?= $i ?>][<?= $j ?>]" value="<?= (int)($pt['m'] ?? 0) ?: '' ?>"><?= !empty($pt['m']) ? ' <span class="pill pill--ok" title="' . tt('fsr.part_issued') . '">📦</span>' : '' ?><?php endif; ?>
                   <select name="wk_ptype[<?= $i ?>][<?= $j ?>]" title="<?= tt('fsr.legend_w') ?>"><?php foreach (fsr_part_types() as $k => $l): ?><option value="<?= $k ?>"<?= $sel($k, $pt['t']) ?>><?= $l ?></option><?php endforeach; ?></select></div>
               <?php endfor; ?>
               <p class="hint"><?= tt('fsr.legend_w') ?></p></div>

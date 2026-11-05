@@ -212,6 +212,7 @@ function stk_settings_save_from_post(): void {
     cp_setting_set('proc_price_rule', $rule); cp_setting_set('proc_price_n', (string) max(2, min(10, (int)($_POST['n'] ?? 3)))); cp_setting_set('proc_price_pct', (string) round((float) str_replace(',', '.', (string)($_POST['pct'] ?? '0')), 2));
     $disc = array_values(array_unique(array_map('intval', (array)($_POST['disciplines'] ?? [])))); cp_setting_set('proc_disciplines', json_encode($disc));
     cp_setting_set('proc_pay_threshold', (string) round((float) str_replace(',', '.', (string)($_POST['pay_threshold'] ?? '0')), 2));
+    cp_setting_set('proc_offer_margin', (string) round(max(-100.0, min(1000.0, (float) str_replace(',', '.', (string)($_POST['offer_margin'] ?? '25')))), 2));   // R82-001
     cache_bump_later('inv');
 }
 function stk_rule_save_from_post(): void {

@@ -214,3 +214,17 @@ function bom_sub_summary(int $sid): array {
     $cur = bom_current($sid);
     return ['n' => (int) scalar('SELECT COUNT(*) FROM bom_revisions WHERE subproject_id = ?', [$sid]), 'current' => $cur, 'issued' => (int) scalar("SELECT COUNT(*) FROM bom_revisions WHERE subproject_id = ? AND status = 'issued'", [$sid]), 'pending' => (int) scalar("SELECT COUNT(*) FROM bom_changes c JOIN bom_revisions b ON b.id = c.bom_rev_id WHERE b.subproject_id = ? AND c.status = 'proposed'", [$sid])];
 }
+/** R82-001: production kit — a requisition with every line of the approved BOM (full quantities), submitted at once: Procurement approves, the stock is reserved and the warehouse picks the kit; what is missing is bought as usual. */
+function bom_to_kit(int $bid): int {
+    $b = bom_load($bid); if (!$b || $b['status'] !== 'approved' || !(bom_pr_can() || bom_eng_can((int)$b['subproject_id'])) || !prq_can()) throw new RuntimeException(t('err.noaccess'));
+    $u = current_user(); $lines = array_filter(bom_lines($bid), fn($l) => $l['status'] !== 'removed'); if (!$lines) throw new RuntimeException(t('prq.need_lines'));
+    $br = null; try { $br = (int) scalar('SELECT branch_id FROM projects WHERE id = ?', [(int)$b['project_id']]) ?: null; } catch (Throwable $e) {}
+    q('INSERT INTO pr_requests (pr_no, branch_id, project_id, subproject_id, bom_rev_id, purpose, title, requester_id, requester_name, discipline_id) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      [prq_number((int)$b['project_id'], (int)$b['subproject_id']), $br, (int)$b['project_id'], (int)$b['subproject_id'], $bid, 'project', mb_substr(t('bom.kit_title', ['r' => 'R' . $b['revision'], 't' => $b['title'] ?: $b['sub_name']]), 0, 160), (int)$u['id'], $u['full_name'], (int)($u['discipline_id'] ?? 0) ?: null]);
+    $rid = (int) db()->lastInsertId(); $seq = 0;
+    foreach ($lines as $l) q('INSERT INTO pr_lines (request_id, seq, item_id, description, maker, part_no, unit, qty, est_price, note) VALUES (?,?,?,?,?,?,?,?,?,?)', [$rid, ++$seq, $l['item_id'], $l['description'], $l['maker'], $l['part_no'], $l['unit'], (float)$l['qty'], $l['item_id'] ? null : $l['est_price'], $l['section'] ? mb_substr($l['section'], 0, 255) : null]);
+    prq_recalc($rid); prq_event($rid, 'create', t('bom.kit_from', ['r' => 'R' . $b['revision']])); bom_event($bid, 'to_kit', (string) scalar('SELECT pr_no FROM pr_requests WHERE id = ?', [$rid]));
+    prq_submit($rid);
+    return $rid;
+}
+

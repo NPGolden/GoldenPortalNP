@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.95.0';
+const CP_VERSION = '1.96.0';
 const CP_BUILD   = '2026-11-05';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R82-001', 'version' => '1.96.0', 'date' => '2026-11-05', 'title' => 'Procurement R82 — the inventory meets sales, production and service: offer lines of kind "Inventory item" picked from the inventory, priced cost (pricing rule) × (1 + margin %) with the default margin in Settings › Procurement and the cost / margin shown to finance; production kits — one click on an approved BOM makes and submits a requisition with every line, stock reserved and the rest bought; service-report parts carry the inventory code and quantity (web form and Service app 0.6.17 with camera barcode scanning and inventory lookup), the part leaves the stock when the report is saved (movement with the report number, parts cost on the sub-project unless under warranty), never twice; API GET /items for the apps. The employee portal (POMS) is no longer needed for requisitions, orders and parts — switch it off at your convenience, no accounts or data were migrated.', 'db' => 'install/migrate_cp_r82_integration.sql', 'check' => 'r82'],
         ['ref' => 'GAS-CP-R81-001', 'version' => '1.95.0', 'date' => '2026-11-05', 'title' => 'Payables (release R81 of GAS-2026-PORTAL-PRC-001): supplier invoices and credit notes registered against a purchase order (received lines pulled in, invoice PDF attached), three-way check per line — PO price within 2 % and quantity within the goods accepted and not yet invoiced — with disputed invoices that can be corrected or accepted with a reason; payment requests per supplier from checked invoices, approved by Accounting or, over the threshold of Settings › Procurement, by Management; payments recorded by Accounting / Management (partial allowed, proof attached), supplier statement with running balance (Excel), payables aging (not due · 1–30 · 31–60 · 61–90 · 90+), invoices on the sub-project costs (kind Invoice, the PO commitment reduced accordingly) and in the cash flow (payments actual, open invoices forecast by due date); Accounting › Payables menu, invoices block on every purchase order.', 'db' => 'install/migrate_cp_r81_payables.sql', 'check' => 'r81'],
         ['ref' => 'GAS-CP-R80-005', 'version' => '1.94.1', 'date' => '2026-11-05', 'title' => 'Budget & actual: the disciplines shown on the manhour budget form are chosen in Settings › Disciplines › Budget (nothing ticked = all active; a discipline with hours in the current budget stays visible).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R80-004', 'version' => '1.94.0', 'date' => '2026-11-05', 'title' => 'Procurement R80-004 — Goods receipt per PO line (received / rejected with reason and NCR action: return · replacement · credit; accepted goods into stock at the order price with a price-history record, reserved for the requisition they were bought for; open NCRs closed with the outcome), delivery timeline per PO (order sent → confirmed → ready → shipped with carrier / AWB / B-L / packages / weight → export cleared → arrived → customs cleared → delivered → goods receipt; planned vs actual, late steps red, documents attached) and per line (promised date typed with the confirmation, expected = promised or lead time; the expected date of the order follows the latest line), logistic costs typed by Procurement on receipt or closing (freight, insurance, customs brokerage, duties, import VAT, handling; landed cost = net + logistics; mirrored to the sub-project costs as kind Logistics), PO committed cost on the sub-project (sp_costs kind Order per PO: Budget & actual, financial statement, project reports), Procurement % of the process line from received / ordered value, late KPI by expected date.', 'db' => 'install/migrate_cp_r80_004_receipts.sql', 'check' => 'r80d'],
@@ -349,6 +350,7 @@ function cp_migration_state(): array {
         'r80c' => $has("SHOW TABLES LIKE 'po_orders'"),
         'r80d' => $has("SHOW TABLES LIKE 'po_receipts'"),
         'r81' => $has("SHOW TABLES LIKE 'si_invoices'"),
+        'r82' => $has("SHOW COLUMNS FROM offer_lines LIKE 'item_id'"),
         'r70d' => $has("SHOW COLUMNS FROM customer_users LIKE 'clocks'"),
         'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),
         'r67' => $has("SHOW TABLES LIKE 'hr_flows'") && $has("SHOW TABLES LIKE 'hr_flow_templates'") && $has("SHOW TABLES LIKE 'hr_invitations'"),

@@ -156,7 +156,7 @@ function ob_recalc(int $offerId): void {
 function ob_line_save_from_post(array $o): int {
     if (!ob_can()) throw new RuntimeException(t('err.noaccess'));
     $oid = (int)$o['id']; $id = (int)($_POST['line_id'] ?? 0);
-    $kind = in_array($_POST['kind'] ?? '', ['rate', 'free', 'text'], true) ? $_POST['kind'] : 'free';
+    $kind = in_array($_POST['kind'] ?? '', ['rate', 'free', 'text', 'item'], true) ? $_POST['kind'] : 'free';
     $zone = ($_POST['zone'] ?? 'local') === 'overseas' ? 'overseas' : 'local';
     $qty = max(0, (float) str_replace(',', '.', (string)($_POST['qty'] ?? '1'))); $disc = max(0, min(100, (float) str_replace(',', '.', (string)($_POST['discount_pct'] ?? '0'))));
     $price = of_parse_amount((string)($_POST['unit_price'] ?? '0'));
@@ -167,11 +167,19 @@ function ob_line_save_from_post(array $o): int {
         $itemId = $rid; $erp = $erp ?: (string)$it['erp_code']; $desc = $desc ?: (string)$it['description']; $unit = $unit ?: (string)$it['unit'];
         if (empty($_POST['unit_price']) || $price <= 0) $price = (float)(rl_price($it, $zone) ?? 0);
     }
+    $invId = null; $cost = null; $margin = null;
+    if ($kind === 'item') {   // R82-001: a line from the inventory — cost by the pricing rule, sale = cost × (1 + margin)
+        $invId = (int)($_POST['item_id'] ?? 0); $it = $invId && function_exists('stk_item') ? stk_item($invId) : null; if (!$it) throw new RuntimeException(t('ob.need_item'));
+        $erp = (string)$it['code']; $desc = $desc ?: (string)$it['description']; $unit = $unit ?: (string)$it['unit'];
+        $pp = stk_price_proposal($it); $cost = $pp['price'] !== null ? (float)$pp['price'] : ($it['last_price'] !== null ? (float)$it['last_price'] : null);
+        $margin = ($_POST['margin_pct'] ?? '') !== '' ? max(-100.0, min(1000.0, (float) str_replace(',', '.', (string)$_POST['margin_pct']))) : (float) cp_setting('proc_offer_margin', '25');
+        if ((empty($_POST['unit_price']) || $price <= 0) && $cost !== null) $price = round($cost * (1 + $margin / 100), 2);
+    }
     if ($desc === '') throw new RuntimeException(t('ob.need_desc'));
     if ($kind === 'text') { $qty = 0; $price = 0; $disc = 0; }
     $total = $kind === 'text' ? 0 : ob_line_total($qty, $price, $disc);
-    if ($id) q('UPDATE offer_lines SET kind=?, rate_item_id=?, erp_code=?, description=?, unit=?, zone=?, qty=?, unit_price=?, discount_pct=?, line_total=?, notes=? WHERE id=? AND offer_id=?', [$kind, $itemId, $erp, $desc, $unit, $zone, $qty, $price, $disc, $total, $notes, $id, $oid]);
-    else { $seq = (int) scalar('SELECT COALESCE(MAX(seq), 0) + 10 FROM offer_lines WHERE offer_id = ?', [$oid]); q('INSERT INTO offer_lines (offer_id, seq, kind, rate_item_id, erp_code, description, unit, zone, qty, unit_price, discount_pct, line_total, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)', [$oid, $seq, $kind, $itemId, $erp, $desc, $unit, $zone, $qty, $price, $disc, $total, $notes]); $id = (int) db()->lastInsertId(); }
+    if ($id) q('UPDATE offer_lines SET kind=?, rate_item_id=?, item_id=?, cost_price=?, margin_pct=?, erp_code=?, description=?, unit=?, zone=?, qty=?, unit_price=?, discount_pct=?, line_total=?, notes=? WHERE id=? AND offer_id=?', [$kind, $itemId, $invId, $cost, $margin, $erp, $desc, $unit, $zone, $qty, $price, $disc, $total, $notes, $id, $oid]);
+    else { $seq = (int) scalar('SELECT COALESCE(MAX(seq), 0) + 10 FROM offer_lines WHERE offer_id = ?', [$oid]); q('INSERT INTO offer_lines (offer_id, seq, kind, rate_item_id, item_id, cost_price, margin_pct, erp_code, description, unit, zone, qty, unit_price, discount_pct, line_total, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [$oid, $seq, $kind, $itemId, $invId, $cost, $margin, $erp, $desc, $unit, $zone, $qty, $price, $disc, $total, $notes]); $id = (int) db()->lastInsertId(); }
     ob_recalc($oid); of_event($oid, 'edited', t('ob.ev_lines'));
     return $id;
 }

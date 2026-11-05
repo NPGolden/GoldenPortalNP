@@ -165,7 +165,10 @@ function fsr_save_from_post(?int $id): int {
             $pd = trim((string)($_POST['wk_part'][$i][$j] ?? ''));
             if ($pd === '') continue;
             $pt = in_array($_POST['wk_ptype'][$i][$j] ?? '', ['W', 'G', 'I'], true) ? $_POST['wk_ptype'][$i][$j] : 'I';
-            $parts[] = ['d' => mb_substr($pd, 0, 120), 't' => $pt];
+            $part = ['d' => mb_substr($pd, 0, 120), 't' => $pt];   // R82-001: inventory code + quantity (+ the stock movement once issued)
+            $pc = mb_substr(trim((string)($_POST['wk_pcode'][$i][$j] ?? '')), 0, 60); $pq = (float) str_replace(',', '.', (string)($_POST['wk_pqty'][$i][$j] ?? '1'));
+            if ($pc !== '') { $part['c'] = $pc; $part['q'] = $pq > 0 ? round($pq, 3) : 1.0; $prev = $_POST['wk_pmove'][$i][$j] ?? ''; if ($prev !== '' && ctype_digit((string)$prev)) $part['m'] = (int)$prev; }
+            $parts[] = $part;
         }
         $lines = [];
         for ($k = 0; $k < FSR_MAX_LINES; $k++) {
@@ -190,6 +193,7 @@ function fsr_save_from_post(?int $id): int {
               [$id, $wid, ++$lineSeq, $ln['specialty'], $ln['engineer'], $ln['start'], $ln['end'], $ln['type'], fsr_hours($ln['start'], $ln['end']), $ln['engineer']]);
         }
     }
+    if (function_exists('fsr_parts_issue')) fsr_parts_issue($id);   // R82-001
     // stored photos follow their task: removed tasks lose theirs, the rest are renumbered
     foreach (all("SELECT id, fsr_task FROM sp_files WHERE fsr_id = ? AND kind = 'fsr_photo'", [$id]) as $ph) {
         if (!isset($keep[(int)$ph['fsr_task']])) cp_delete_file((int)$ph['id']);
@@ -575,3 +579,23 @@ function fsr_ext_pending(): array {
     if (!fsr_ext_has()) return [];
     return all("SELECT f.id, f.report_no, f.report_date, f.ext_engineers, f.location, f.submitted_name, p.project_code, p.name AS project_name, v.name AS vessel, v.id AS vessel_id FROM fsr_reports f JOIN projects p ON p.id = f.project_id LEFT JOIN vessels v ON v.id = p.vessel_id WHERE f.kind = 'external' AND f.converted_id IS NULL ORDER BY f.report_date, f.id");
 }
+
+/* ------------------------------------------------------------------ R82-001: parts used on site leave the stock */
+/** Every part with an inventory code and no movement yet is issued from the default warehouse (negative stock allowed — the van stock is counted later); the movement id is kept in the part so a re-save never issues twice. Parts cost on the sub-project when the report has one. */
+function fsr_parts_issue(int $reportId): void {
+    if (!function_exists('stk_has') || !stk_has()) return;
+    $r = one('SELECT id, report_no, project_id, subproject_id FROM fsr_reports WHERE id = ?', [$reportId]); if (!$r) return; $u = current_user();
+    foreach (all('SELECT id, parts FROM fsr_works WHERE report_id = ?', [$reportId]) as $w) {
+        $parts = $w['parts'] ? (json_decode((string)$w['parts'], true) ?: []) : []; $changed = false;
+        foreach ($parts as &$p) {
+            if (empty($p['c']) || !empty($p['m'])) continue; $it = stk_item_by_code((string)$p['c']); if (!$it) continue; $qty = (float)($p['q'] ?? 1) ?: 1.0;
+            try { $mid = stk_move((int)$it['id'], stk_default_wh(), 'out', $qty, ['unit_price' => $it['last_price'], 'project_id' => $r['project_id'] ? (int)$r['project_id'] : null, 'subproject_id' => $r['subproject_id'] ? (int)$r['subproject_id'] : null, 'reason' => 'issue', 'ref_kind' => 'fsr', 'ref_id' => $reportId, 'note' => (string)$r['report_no'], 'allow_negative' => true]); } catch (Throwable $e) { continue; }
+            $p['m'] = $mid; $changed = true;
+            if ($r['subproject_id'] && function_exists('bg_has') && bg_has() && $it['last_price'] && ($p['t'] ?? 'I') !== 'W') { q('INSERT INTO sp_costs (subproject_id, cost_date, kind, supplier, description, ref_no, amount, currency, created_by, created_name) VALUES (?,CURDATE(),?,?,?,?,?,?,?,?)', [(int)$r['subproject_id'], 'parts', t('stk.stock'), mb_substr($it['code'] . ' · ' . $it['description'] . ' × ' . stk_qty($qty), 0, 255), mb_substr((string)$r['report_no'], 0, 60), round($qty * (float)$it['last_price'], 2), $it['currency'], (int)($u['id'] ?? 0) ?: null, $u['full_name'] ?? null]); if (function_exists('eng_rows_reset')) eng_rows_reset(); }
+        }
+        unset($p);
+        if ($changed) q('UPDATE fsr_works SET parts = ? WHERE id = ?', [json_encode($parts, JSON_UNESCAPED_UNICODE), (int)$w['id']]);
+    }
+    cache_bump_later('inv');
+}
+

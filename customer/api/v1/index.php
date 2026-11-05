@@ -44,6 +44,10 @@ try {
     switch (true) {
         case $method === 'POST' && $path === '/auth/logout': q('UPDATE mob_refresh_tokens SET revoked_at = NOW() WHERE device_id = ? AND revoked_at IS NULL', [$u['device_id']]); Response::json([], 204);
         case $method === 'GET' && $path === '/me': Response::json($me($u));
+        /* R82-001: inventory lookup for the parts of a service report — code / description / barcode search, no prices */
+        case $method === 'GET' && $path === '/items': { if (!function_exists('stk_has') || !stk_has()) Response::json(['items' => []]); $q = mb_substr(trim((string)($_GET['q'] ?? '')), 0, 60); if (mb_strlen($q) < 2) Response::json(['items' => []]);
+            $rows = stk_items(['q' => $q, 'status' => 'active'], 12);
+            Response::json(['items' => array_map(fn($r) => ['id' => (int)$r['id'], 'code' => $r['code'], 'desc' => $r['description'], 'maker' => $r['maker'], 'pn' => $r['factory_code'], 'unit' => $r['unit'], 'barcode' => $r['barcode'], 'free' => (float)$r['on_hand'] - (float)$r['reserved']], $rows)]); }
         /* R71-001: passkeys of the signed-in account (enrolment needs a fresh authenticator code when the account has one) */
         case $method === 'GET' && $path === '/me/passkeys': Response::json(['enabled' => pk_enabled(), 'items' => pk_list((int)$u['id'])]);
         case $method === 'POST' && $path === '/me/passkeys/options': if (!pk_enabled()) Response::error(403, 'Passkeys are switched off'); if (!pk_stepup_ok($u, isset($body['totp']) ? (string)$body['totp'] : null)) Response::error(401, 'Authenticator code required', ['totp' => true]);
