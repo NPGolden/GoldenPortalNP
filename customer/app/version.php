@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.87.9';
+const CP_VERSION = '1.88.0';
 const CP_BUILD   = '2026-10-31';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R77-018', 'version' => '1.88.0', 'date' => '2026-11-05', 'title' => 'HR requests: the Open filter (and the dashboard tile) lists open requests of every year — a request for next January was hidden by the year filter, leaving the page on the "New request for…" form.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-017', 'version' => '1.87.9', 'date' => '2026-11-05', 'title' => 'Fix: naming the winner of the month failed with "Column month cannot be null" since 1.87.7.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-016', 'version' => '1.87.8', 'date' => '2026-11-05', 'title' => 'A winner-of-the-month entry naming an Owner / CEO account is no longer shown (the month reads as not yet named).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R77-015', 'version' => '1.87.7', 'date' => '2026-11-05', 'title' => 'Owner / CEO accounts excluded from the activity and kudos rankings and from the winner-of-the-month choice (the CEO role now counts as Owner everywhere).', 'db' => null, 'check' => null],

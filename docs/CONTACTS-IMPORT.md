@@ -1064,3 +1064,6 @@ No SQL. `soc_winner()` returns null when the stored winner is in `hr_owner_ids()
 
 ## 212. v1.87.9 — Hotfix winner of the month (GAS-CP-R77-017)
 `soc_winner_set()`: the R77-015 guard was inserted with a trailing `//` comment on a one-line function body, which commented out the `$month` / `$uid` parsing → `month` NULL. Replaced by `/* */`. Rule (again): never append `//` to a line that continues with code.
+
+## 213. v1.88.0 — Open requests across years (GAS-CP-R77-018)
+No SQL. HR feedback #18: the dashboard tile counted pending requests of all years (`hr_requests_for('hr', 0)`) while `hr_requests.php` filtered by the current year — a request dated January 2027 made the tile say 1 and the page show nothing but the creation form. `hr_requests.php`: with `st=open` (and no person) `$open` comes from all years; the tile links with `st=open`.

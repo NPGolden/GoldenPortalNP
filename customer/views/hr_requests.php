@@ -8,7 +8,7 @@ $st = (string)($_GET['st'] ?? 'open'); $me = (int)$u['id'];
 $pid = $isHr ? (int)($_GET['pid'] ?? 0) : 0; $pp = $pid ? hr_person($pid) : null; if ($pp) { $st = $st === 'open' && !isset($_GET['st']) ? 'all' : $st; if (isset($_GET['year']) && (int)$_GET['year'] === 0) $year = 0; }   // R54-005: per-person history for HR
 $fh = fn($v) => $v === null ? '—' : rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.');
 $all = $isHr ? hr_requests_for('hr', $year) : hr_requests_for('manager', $year); if ($pp) $all = array_values(array_filter($all, fn($r) => (int)$r['person_id'] === $pid));
-$open = array_filter($all, fn($r) => in_array($r['status'], ['pending_mgr', 'pending_hr'], true));
+$open = array_filter($st === 'open' && !$pp ? ($isHr ? hr_requests_for('hr', 0) : hr_requests_for('manager', 0)) : $all, fn($r) => in_array($r['status'], ['pending_mgr', 'pending_hr'], true));   // R77-018: open requests of every year — a request for next January must not vanish behind the year filter
 $rows = $st === 'open' ? $open : ($st === 'all' ? $all : array_filter($all, fn($r) => $r['status'] === $st));
 $people = $isHr ? hr_people() : [];
 layout_head(t('hr.requests'), 'hr_requests');

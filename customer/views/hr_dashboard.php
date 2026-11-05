@@ -23,7 +23,7 @@ layout_head(t('hr.dashboard'), 'hr_dashboard');
 
 <div class="kpi kpi--4" style="margin-bottom:14px;">
   <a class="stat" href="#hr-today"><b><?= count($todayAway) ?></b><span class="s"><?= tt('hr.d_away_today') ?></span></a>
-  <a class="stat<?= $pending ? ' gold' : '' ?>" href="<?= url('hr_requests') ?>"><b><?= count($pending) ?></b><span class="s"><?= tt('hr.d_pending') ?></span></a>
+  <a class="stat<?= $pending ? ' gold' : '' ?>" href="<?= url('hr_requests', ['st' => 'open']) ?>"><b><?= count($pending) ?></b><span class="s"><?= tt('hr.d_pending') ?></span></a>
   <a class="stat<?= array_filter($alerts, fn($a) => (int)$a['left_days'] < 0) ? ' red' : ($alerts ? ' gold' : '') ?>" href="#hr-contracts"><b><?= count($alerts) ?></b><span class="s"><?= tt('hr.d_contracts') ?></span></a>
   <a class="stat<?= $unread ? ' gold' : '' ?>" href="<?= url('admin_hr', ['tab' => 'people']) ?>"><b><?= $unread ?></b><span class="s"><?= tt('hr.d_unread') ?></span></a>
 </div>
