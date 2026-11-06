@@ -7855,5 +7855,7 @@ Cordiali saluti,
 'po.new_item' => 'Nuovo articolo di magazzino',
 'po.new_item_hint' => 'creato al salvataggio della riga, con costruttore e part no. qui sotto, collegato a questo fornitore',
 'po.new_code_ph' => 'es. SIE-3RT2015',
+'prq.item_pick_hint' => 'clic per gli articoli recenti, digita per cercare in magazzino — o lascia vuoto e descrivi la parte',
+'prq.new_item_hint' => 'creato in magazzino al salvataggio della riga, con costruttore e part no. qui sotto',
 'org.new_inline' => 'Nuova organizzazione…',
 ];

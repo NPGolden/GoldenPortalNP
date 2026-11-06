@@ -1,7 +1,7 @@
 /* Golden HR — API client for the portal module /customer/api/v1 (JWT access + rotating refresh), app "hr" (GAS-CP-R74-001).
  * Same transport as Golden PM (customer/mobile-pm/js/api.js); routes under /hr/app/*. No mock mode: HR data is never faked. */
 window.API = (() => {
-  const VERSION = "1.0.4";
+  const VERSION = "1.0.5";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   const tok = { get access() { try { return sessionStorage.getItem("ghr.at"); } catch (e) { return null; } }, set access(v) { try { v ? sessionStorage.setItem("ghr.at", v) : sessionStorage.removeItem("ghr.at"); } catch (e) {} },
     get refresh() { try { return localStorage.getItem("ghr.rt"); } catch (e) { return null; } }, set refresh(v) { try { v ? localStorage.setItem("ghr.rt", v) : localStorage.removeItem("ghr.rt"); } catch (e) {} } };
@@ -53,7 +53,7 @@ window.API = (() => {
     passkeys: () => call("GET", "/me/passkeys"), passkeyRemove: (id) => call("DELETE", `/me/passkeys/${id}`),
 
     me: () => call("GET", "/me"),
-    items: (q) => call("GET", `/items?q=${encodeURIComponent(q)}`),
+    items: (q) => call("GET", `/items?q=${encodeURIComponent(q)}${q.length < 2 ? "&recent=1" : ""}`),
     requisitions: (status) => call("GET", `/requisitions?status=${encodeURIComponent(status || "open")}`), requisition: (id) => call("GET", `/requisitions/${id}`), requisitionOptions: () => call("GET", "/requisitions/options"), requisitionCreate: (body) => call("POST", "/requisitions", body), requisitionCancel: (id, note) => call("POST", `/requisitions/${id}/cancel`, { note }), requisitionDecide: (id, decision, note) => call("POST", `/requisitions/${id}/decide`, { decision, note }),   // R82-003 part ordering
 
     inbox: () => call("GET", "/hr/app/inbox"), history: (year) => call("GET", `/hr/app/history?year=${year}`),

@@ -52,8 +52,8 @@ try {
         case $method === 'POST' && preg_match('#^/requisitions/(\d+)/cancel$#', $path, $m): Response::json(PortalParts::cancel((int)$m[1], (string)($body['note'] ?? '')));
         case $method === 'POST' && preg_match('#^/requisitions/(\d+)/decide$#', $path, $m): Response::json(PortalParts::decide((int)$m[1], (string)($body['decision'] ?? 'approve'), (string)($body['note'] ?? '')));
         /* R82-001: inventory lookup for the parts of a service report — code / description / barcode search, no prices */
-        case $method === 'GET' && $path === '/items': { if (!function_exists('stk_has') || !stk_has()) Response::json(['items' => []]); $q = mb_substr(trim((string)($_GET['q'] ?? '')), 0, 60); if (mb_strlen($q) < 2) Response::json(['items' => []]);
-            $rows = stk_items(['q' => $q, 'status' => 'active'], 12);
+        case $method === 'GET' && $path === '/items': { if (!function_exists('stk_has') || !stk_has()) Response::json(['items' => []]); $q = mb_substr(trim((string)($_GET['q'] ?? '')), 0, 60); if (mb_strlen($q) < 2 && empty($_GET['recent'])) Response::json(['items' => []]);
+            $rows = mb_strlen($q) < 2 ? (function_exists('prq_recent_items') ? prq_recent_items(12) : []) : stk_items(['q' => $q, 'status' => 'active'], 12);   // R86-003: recent items when the box is empty
             Response::json(['items' => array_map(fn($r) => ['id' => (int)$r['id'], 'code' => $r['code'], 'desc' => $r['description'], 'maker' => $r['maker'], 'pn' => $r['factory_code'], 'unit' => $r['unit'], 'barcode' => $r['barcode'], 'free' => (float)$r['on_hand'] - (float)$r['reserved']], $rows)]); }
         /* R71-001: passkeys of the signed-in account (enrolment needs a fresh authenticator code when the account has one) */
         case $method === 'GET' && $path === '/me/passkeys': Response::json(['enabled' => pk_enabled(), 'items' => pk_list((int)$u['id'])]);

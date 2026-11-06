@@ -134,6 +134,7 @@ function prq_line_save_from_post(): int {
     require_prq(); $rid = (int)($_POST['request_id'] ?? 0); $r = prq_load($rid); if (!$r || !prq_can_edit($r)) throw new RuntimeException(t('err.noaccess'));
     $lid = (int)($_POST['line_id'] ?? 0);
     $qty = (float) str_replace(',', '.', (string)($_POST['qty'] ?? '0')); if ($qty <= 0) throw new RuntimeException(t('prq.need_qty'));
+    if (!empty($_POST['new_item']) && pr_admin() && function_exists('stk_item_quick_create')) $_POST['item_id'] = stk_item_quick_create(['code' => $_POST['new_code'] ?? '', 'description' => $_POST['description'] ?? '', 'maker' => $_POST['maker'] ?? '', 'part_no' => $_POST['part_no'] ?? '', 'unit' => $_POST['unit'] ?? 'pcs', 'category_id' => $_POST['new_category_id'] ?? 0]);   // R86-003: "+ New item" from the requisition line (Procurement)
     $itemId = (int)($_POST['item_id'] ?? 0) ?: null; $it = $itemId ? stk_item($itemId) : null; if ($itemId && !$it) throw new RuntimeException(t('err.notfound'));
     $desc = mb_substr(trim((string)($_POST['description'] ?? '')), 0, 255); if ($it) $desc = $desc ?: (string)$it['description'];
     if ($desc === '') throw new RuntimeException(t('prq.need_desc'));
@@ -250,8 +251,14 @@ function prq_sub_summary(int $sid): array {
             'to_buy' => (int) scalar("SELECT COUNT(*) FROM pr_lines l JOIN pr_requests r ON r.id = l.request_id WHERE r.subproject_id = ? AND l.status = 'to_buy'", [$sid])];
 }
 /** Item picker (JSON): code · description · unit · on hand · free · last price. */
-function prq_item_search(string $q, int $limit = 15, int $supplier = 0): array {
-    $rows = stk_items(array_filter(['q' => $q, 'status' => 'active', 'supplier' => $supplier ?: null]), $limit); $out = [];
+/** Items most recently requested or moved (the drop-down of the requisition line when nothing is typed).   R86-003 */
+function prq_recent_items(int $limit = 20): array {
+    $ids = array_map('intval', array_column(all('SELECT item_id, MAX(t) AS t FROM (SELECT item_id, MAX(id) AS t FROM pr_lines WHERE item_id IS NOT NULL GROUP BY item_id UNION ALL SELECT item_id, MAX(id) FROM inv_moves GROUP BY item_id) x GROUP BY item_id ORDER BY t DESC LIMIT ' . (int)$limit), 'item_id'));
+    $rows = $ids ? stk_items(['status' => 'active', 'ids' => $ids], $limit) : []; if (count($rows) < $limit) $rows = array_merge($rows, stk_items(['status' => 'active', 'stock' => 'in'], $limit));
+    $seen = []; return array_values(array_filter($rows, function ($r) use (&$seen) { if (isset($seen[$r['id']])) return false; return $seen[$r['id']] = true; }));
+}
+function prq_item_search(string $q, int $limit = 15, int $supplier = 0, bool $recent = false): array {
+    $rows = $q === '' && $recent && !$supplier ? prq_recent_items($limit) : stk_items(array_filter(['q' => $q, 'status' => 'active', 'supplier' => $supplier ?: null]), $limit); $out = [];
     if ($q === '' && $supplier && count($rows) < $limit) $rows = array_merge($rows, array_slice(stk_items(['status' => 'active'], $limit * 2), 0, $limit - count($rows)));   // R86-002: dropdown on focus — the supplier's items first, then the rest
     $seen = []; $rows = array_values(array_filter($rows, function ($r) use (&$seen) { if (isset($seen[$r['id']])) return false; return $seen[$r['id']] = true; }));
     $withAlts = !empty($_GET['alts']) && function_exists('stk_alternatives_of');

@@ -7855,5 +7855,7 @@ Best regards,
 'po.new_item' => 'New inventory item',
 'po.new_item_hint' => 'created when the line is saved, with the maker and part no. below, linked to this supplier',
 'po.new_code_ph' => 'e.g. SIE-3RT2015',
+'prq.item_pick_hint' => 'click for recently used items, type to search the inventory — or leave empty and describe the part',
+'prq.new_item_hint' => 'created in the inventory when the line is saved, with the maker and part no. below',
 'org.new_inline' => 'New organisation…',
 ];

@@ -82,6 +82,7 @@ function stk_items(array $f = [], ?int $limit = null): array {
     if (!empty($f['cat'])) { $w[] = '(i.category_id = ? OR i.category_id IN (SELECT id FROM inv_categories WHERE parent_id = ?))'; $a[] = (int)$f['cat']; $a[] = (int)$f['cat']; }
     if (!empty($f['maker'])) { $w[] = 'i.maker = ?'; $a[] = (string)$f['maker']; }
     if (!empty($f['loc'])) { $w[] = 'i.location LIKE ?'; $a[] = $f['loc'] . '%'; }
+    if (!empty($f['ids'])) { $ids = array_values(array_filter(array_map('intval', (array)$f['ids']))); $w[] = $ids ? 'i.id IN (' . implode(',', $ids) . ')' : '0'; }   // R86-003
     if (!empty($f['supplier'])) { $w[] = '(i.preferred_supplier_id = ? OR i.last_supplier_id = ? OR EXISTS (SELECT 1 FROM inv_prices p WHERE p.item_id = i.id AND p.supplier_id = ?) OR EXISTS (SELECT 1 FROM supplier_makers sm WHERE sm.supplier_id = ? AND sm.maker <> \'\' AND sm.maker = i.maker))'; array_push($a, (int)$f['supplier'], (int)$f['supplier'], (int)$f['supplier'], (int)$f['supplier']); }   // R86-002: items of a supplier (bought, preferred, or of a maker it represents)
     if (!empty($f['q'])) { $q = trim((string)$f['q']); $l = '%' . $q . '%'; $w[] = '(i.code LIKE ? OR i.description LIKE ? OR i.description_en LIKE ? OR i.factory_code LIKE ? OR i.barcode = ? OR i.maker LIKE ? OR i.location LIKE ?)'; array_push($a, $l, $l, $l, $l, $q, $l, $l); }
     $stock = $f['stock'] ?? 'any';

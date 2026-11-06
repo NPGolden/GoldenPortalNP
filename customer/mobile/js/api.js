@@ -2,7 +2,7 @@
  * and a MOCK mode (built-in sample data in the same shape the portal returns) for the demo and the UI tests.
  * Mock mode: localStorage gas.mock = "1", or ?mock=1 on the URL. */
 window.API = (() => {
-  const VERSION = "0.6.18";
+  const VERSION = "0.6.19";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   try { MOCK = localStorage.getItem("gas.mock") === "1" || /[?&]mock=1/.test(location.search); if (/[?&]mock=1/.test(location.search)) localStorage.setItem("gas.mock", "1"); } catch (e) {}
@@ -67,7 +67,7 @@ window.API = (() => {
     photo: (recordId, blob, name, task, caption) => { const f = new FormData(); f.append("record_id", recordId); f.append("task", String(task || 1)); if (caption) f.append("caption", caption); f.append("photo", blob, name || "photo.jpg"); return call("POST", "/files/photo", f, true); },
     pushToken: (token, service) => call("POST", "/devices/push-token", { token, service }),
     assist: (body) => call("POST", "/assist", body),
-    items: (q) => call("GET", `/items?q=${encodeURIComponent(q)}`),
+    items: (q) => call("GET", `/items?q=${encodeURIComponent(q)}${q.length < 2 ? "&recent=1" : ""}`),
     requisitions: (status) => call("GET", `/requisitions?status=${encodeURIComponent(status || "open")}`), requisition: (id) => call("GET", `/requisitions/${id}`), requisitionOptions: () => call("GET", "/requisitions/options"), requisitionCreate: (body) => call("POST", "/requisitions", body), requisitionCancel: (id, note) => call("POST", `/requisitions/${id}/cancel`, { note }), requisitionDecide: (id, decision, note) => call("POST", `/requisitions/${id}/decide`, { decision, note }),   // R82-003 part ordering
    // R82-001: inventory lookup for the parts of a report
     hr: (year) => call("GET", `/hr?year=${year || new Date().getFullYear()}`),
