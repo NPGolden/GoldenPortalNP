@@ -78,7 +78,7 @@ function po_editable(array $o): bool { return po_admin() && in_array($o['status'
 /** Header create / update. */
 function po_save_from_post(): int {
     require_po_admin(); $id = (int)($_POST['id'] ?? 0); $u = current_user();
-    $sup = (int)($_POST['supplier_id'] ?? 0); $S = $sup ? sup_load($sup) : null; if (!$S || $S['kind'] !== 'supplier') throw new RuntimeException(t('po.need_supplier'));
+    $sup = (int)($_POST['supplier_id'] ?? 0); $S = $sup ? sup_load($sup) : null; if (!$S || !($S['kind'] === 'supplier' || !empty($S['is_supplier']))) throw new RuntimeException(t('po.need_supplier'));
     $pid = (int)($_POST['project_id'] ?? 0) ?: null; $sid = (int)($_POST['subproject_id'] ?? 0) ?: null;
     if ($sid) { $pp = (int) scalar('SELECT project_id FROM subprojects WHERE id = ?', [$sid]); if (!$pp) $sid = null; elseif (!$pid) $pid = $pp; elseif ($pp !== $pid) $sid = null; }
     $v = ['supplier_id' => $sup, 'project_id' => $pid, 'subproject_id' => $sid, 'title' => mb_substr(trim((string)($_POST['title'] ?? '')), 0, 160) ?: null,

@@ -9,7 +9,7 @@ $q = trim((string)($_GET['q'] ?? '')); $fk = (string)($_GET['kind'] ?? ''); $edi
 $edit = $editId ? co_load($editId) : null;
 $w = []; $b = [];
 if ($q !== '') { $l = '%' . $q . '%'; $w[] = '(co.name LIKE ? OR co.country LIKE ? OR co.city LIKE ? OR c.name LIKE ?)'; array_push($b, $l, $l, $l, $l); }
-if ($fk !== '' && isset(co_kinds()[$fk])) { $w[] = 'co.kind = ?'; $b[] = $fk; }
+if ($fk === 'is_supplier' && function_exists('sup_flag_has') && sup_flag_has()) $w[] = 'co.is_supplier = 1'; elseif ($fk !== '' && isset(co_kinds()[$fk])) { $w[] = 'co.kind = ?'; $b[] = $fk; }   // R84-003
 $rows = all('SELECT co.*, c.name AS customer_name, (SELECT COUNT(*) FROM contacts ct WHERE ct.company_id = co.id) AS n_contacts FROM companies co LEFT JOIN customers c ON c.id = co.customer_id ' . ($w ? 'WHERE ' . implode(' AND ', $w) : '') . ' ORDER BY co.is_active DESC, co.name', $b);
 $customers = all('SELECT id, name FROM customers WHERE is_active = 1 ORDER BY name');
 $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : '';
@@ -28,7 +28,7 @@ layout_head(t('co.title'), 'contacts');
     <form method="get" action="index.php" class="fltbar" style="grid-template-columns: 2fr 1fr auto;">
       <input type="hidden" name="p" value="companies">
       <div class="field"><label for="q"><?= tt('pr.search') ?></label><input id="q" name="q" value="<?= e($q) ?>"></div>
-      <div class="field"><label for="kind"><?= tt('co.kind') ?></label><select id="kind" name="kind"><option value=""><?= tt('flt.any') ?></option><?php foreach (co_kinds() as $k => $lab): ?><option value="<?= $k ?>"<?= $sel($k, $fk) ?>><?= e($lab) ?></option><?php endforeach; ?></select></div>
+      <div class="field"><label for="kind"><?= tt('co.kind') ?></label><select id="kind" name="kind"><option value=""><?= tt('flt.any') ?></option><?php foreach (co_kinds() as $k => $lab): ?><option value="<?= $k ?>"<?= $sel($k, $fk) ?>><?= e($lab) ?></option><?php endforeach; ?><?php if (function_exists('sup_flag_has') && sup_flag_has()): ?><option value="is_supplier"<?= $fk === 'is_supplier' ? ' selected' : '' ?>>★ <?= tt('co.suppliers_all') ?></option><?php endif; ?></select></div>
       <div class="fltbar-actions"><button class="btn" type="submit"><?= tt('btn.apply') ?></button><a class="btn btn--ghost" href="<?= url('companies', ['reset' => 1, 'reset' => 1]) ?>"><?= tt('btn.clear') ?></a></div>
     </form>
   </div>
@@ -40,7 +40,7 @@ layout_head(t('co.title'), 'contacts');
       <tbody><?php [$pageRows, $pager] = page_list($rows, 'companies', ['q' => $q, 'kind' => $fk]); foreach ($pageRows as $r): ?>
         <tr<?= $r['is_active'] ? '' : ' class="is-retired"' ?>>
           <td><a href="<?= url('contacts', ['company' => $r['id'], 'status' => 'all']) ?>"><b><?= e($r['name']) ?></b></a><?= $r['website'] ? '<br><a class="hint" href="' . e(preg_match('#^https?://#', $r['website']) ? $r['website'] : 'https://' . $r['website']) . '" target="_blank" rel="noopener">' . e($r['website']) . '</a>' : '' ?></td>
-          <td><?= co_kind_pill($r['kind']) ?></td>
+          <td><?= co_kind_pill($r['kind']) ?><?= !empty($r['is_supplier']) && $r['kind'] !== 'supplier' ? ' <a href="' . url('suppliers', ['id' => (int)$r['id']]) . '">' . pill('gold', t('co.kind_supplier')) . '</a>' : '' ?></td>
           <td><?= $r['customer_name'] ? e($r['customer_name']) : '<span class="hint">—</span>' ?></td>
           <td><?= e(implode(', ', array_filter([$r['city'], $r['country']]))) ?: '<span class="hint">—</span>' ?></td>
           <td class="ct-reach"><?= $r['email'] ? '<a href="mailto:' . e($r['email']) . '">' . e($r['email']) . '</a><br>' : '' ?><?= e($r['phone'] ?? '') ?></td>
@@ -72,6 +72,7 @@ layout_head(t('co.title'), 'contacts');
         <div class="field"><label for="phone"><?= tt('ct.phone') ?></label><input id="phone" name="phone" maxlength="60" value="<?= $v('phone') ?>"></div>
       </div>
       <div class="field"><label for="notes"><?= tt('ct.notes') ?></label><textarea id="notes" name="notes" rows="3"><?= $v('notes') ?></textarea></div>
+      <?php if (function_exists('sup_flag_has') && sup_flag_has()): ?><label class="chk"><input type="checkbox" name="is_supplier" value="1"<?= !empty($edit['is_supplier']) ? ' checked' : '' ?>> <?= tt('co.also_supplier') ?></label><?php endif; ?>
       <?php if ($edit): ?><label class="chk"><input type="checkbox" name="is_active" value="1"<?= $edit['is_active'] ? ' checked' : '' ?>> <?= tt('au.active') ?></label><?php endif; ?>
       <div class="btn-row"><button class="btn btn--gold" type="submit"><?= $edit ? tt('btn.save') : tt('co.create') ?></button><?php if ($edit): ?><a class="btn btn--ghost" href="<?= url('companies') ?>"><?= tt('btn.cancel') ?></a><?php endif; ?></div>
     </form>

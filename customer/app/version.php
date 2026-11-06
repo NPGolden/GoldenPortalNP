@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.99.1';
+const CP_VERSION = '1.99.2';
 const CP_BUILD   = '2026-11-06';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R84-003', 'version' => '1.99.2', 'date' => '2026-11-06', 'title' => 'A company can be a customer / owner / yard and a supplier at once: independent "supplier" flag on the company (Contacts › Companies: "Also a supplier" tick, ★ filter, gold pill linking to the supplier card); the supplier list, the ERP import and the purchase orders use the flag, and never change the kind of an existing company.', 'db' => 'install/migrate_cp_r84_003_is_supplier.sql', 'check' => 'r84c'],
         ['ref' => 'GAS-CP-R84-002', 'version' => '1.99.1', 'date' => '2026-11-06', 'title' => 'Suppliers › Import from ERP: a company already in the Contacts module under another kind (the name is unique) is matched by VAT, code or name and becomes a supplier instead of failing the whole import; a row that cannot be saved is reported and the rest go through.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R84-001', 'version' => '1.99.0', 'date' => '2026-11-06', 'title' => 'Procurement e-mail: five supplier templates (request for quotation, purchase order, expediting, non-conformance, remittance advice) under Settings › E-mail templates, chosen inside the ✉ card of the order / RFQ and of the paid supplier invoice; every ✉ card finds any person of the Contacts module by name, e-mail or company and adds him to the recipients. Suppliers › Import from ERP: downloadable template (sheets Suppliers + Contacts); the Contacts sheet creates or updates the people of each supplier in the Contacts module (category Supplier), so they are offered in the e-mail card; the supplier card lists its people with e-mail and phone.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R83-001', 'version' => '1.98.0', 'date' => '2026-11-06', 'title' => 'HR › Utilization: hours on projects against the working time of every portal user — capacity from the working calendar while employed, project hours from the timesheets, internal work and absences from the planning board, idle hours and whole idle days computed day by day; per month, per project and per activity for one person, team table per year or any period with discipline and technical-only filters, CSV and print; for HR, management, administrators and the managers of a discipline.', 'db' => null, 'check' => null],
@@ -357,6 +358,7 @@ function cp_migration_state(): array {
         'r81' => $has("SHOW TABLES LIKE 'si_invoices'"),
         'r82' => $has("SHOW COLUMNS FROM offer_lines LIKE 'item_id'"),
         'r82b' => $has("SHOW TABLES LIKE 'supplier_makers'"),
+        'r84c' => $has("SHOW COLUMNS FROM companies LIKE 'is_supplier'"),
         'r70d' => $has("SHOW COLUMNS FROM customer_users LIKE 'clocks'"),
         'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),
         'r67' => $has("SHOW TABLES LIKE 'hr_flows'") && $has("SHOW TABLES LIKE 'hr_flow_templates'") && $has("SHOW TABLES LIKE 'hr_invitations'"),

@@ -225,7 +225,7 @@ function stk_enabled_disciplines(): array { $v = json_decode((string) cp_setting
 
 /* ------------------------------------------------------------------ suppliers */
 function sup_list(array $f = []): array {
-    if (!stk_has() || !co_has()) return []; $w = ["co.kind = 'supplier'"]; $a = [];
+    if (!stk_has() || !co_has()) return []; $w = [sup_where()]; $a = [];
     if (($f['status'] ?? 'active') !== 'all') { $w[] = 'co.is_active = ?'; $a[] = ($f['status'] ?? 'active') === 'active' ? 1 : 0; }
     if (!empty($f['q'])) { $l = '%' . $f['q'] . '%'; $w[] = '(co.name LIKE ? OR co.city LIKE ? OR co.country LIKE ? OR co.email LIKE ?)'; array_push($a, $l, $l, $l, $l); }
     return all("SELECT co.*, sd.vat_no, sd.terms_days, sd.advance_pct, sd.currency AS sup_currency, sd.lead_days, sd.incoterms, sd.rating, sd.remarks AS sup_remarks,
@@ -241,8 +241,8 @@ function sup_save_from_post(int $id): int {
     $name = $s('name', 160); if (!$name) throw new RuntimeException(t('co.need_name'));
     $dup = scalar('SELECT id FROM companies WHERE LOWER(name) = LOWER(?) AND id <> ?', [$name, $id]); if ($dup) throw new RuntimeException(t('co.dup', ['v' => $name]));
     $vals = [$name, $s('country', 80), $s('city', 80), $s('website', 190), $s('email', 190), $s('phone', 60), $s('notes', 4000), $id ? (int)!empty($_POST['is_active']) : 1];
-    if ($id) { $vals[] = $id; q("UPDATE companies SET name = ?, kind = 'supplier', country = ?, city = ?, website = ?, email = ?, phone = ?, notes = ?, is_active = ? WHERE id = ?", $vals); }
-    else { q("INSERT INTO companies (name, kind, country, city, website, email, phone, notes, is_active) VALUES (?,'supplier',?,?,?,?,?,?,?)", $vals); $id = (int) db()->lastInsertId(); }
+    if ($id) { $vals[] = $id; q("UPDATE companies SET name = ?, kind = IF(kind IN ('other', 'supplier', ''), 'supplier', kind), " . (sup_flag_has() ? 'is_supplier = 1, ' : '') . "country = ?, city = ?, website = ?, email = ?, phone = ?, notes = ?, is_active = ? WHERE id = ?", $vals); }
+    else { q("INSERT INTO companies (name, kind, " . (sup_flag_has() ? 'is_supplier, ' : '') . "country, city, website, email, phone, notes, is_active) VALUES (?,'supplier'," . (sup_flag_has() ? '1,' : '') . "?,?,?,?,?,?,?)", $vals); $id = (int) db()->lastInsertId(); }
     $d = fn(string $k) => ($_POST[$k] ?? '') === '' ? null : (int)$_POST[$k];
     q('INSERT INTO supplier_details (company_id, vat_no, address, postal_code, terms_days, advance_pct, currency, lead_days, incoterms, rating, remarks) VALUES (?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE vat_no = VALUES(vat_no), address = VALUES(address), postal_code = VALUES(postal_code), terms_days = VALUES(terms_days), advance_pct = VALUES(advance_pct), currency = VALUES(currency), lead_days = VALUES(lead_days), incoterms = VALUES(incoterms), rating = VALUES(rating), remarks = VALUES(remarks)',
       [$id, $s('vat_no', 40), $s('address', 200), $s('postal_code', 20), $d('terms_days'), ($_POST['advance_pct'] ?? '') === '' ? null : round((float) str_replace(',', '.', (string)$_POST['advance_pct']), 2), strtoupper(mb_substr((string)($_POST['currency'] ?? 'EUR'), 0, 3)) ?: 'EUR', $d('lead_days'), $s('incoterms', 20), ($_POST['rating'] ?? '') === '' ? null : max(1, min(5, (int)$_POST['rating'])), $s('sup_remarks', 4000)]);
@@ -371,6 +371,9 @@ function stk_alternative_status(int $id, string $status): void { require_pr_admi
 function stk_alternative_delete(int $id): void { require_pr_admin(); q('DELETE FROM inv_alternatives WHERE id = ?', [$id]); }
 
 /* ================================================================== R82-002: supplier ↔ makers · ERP supplier import */
+/** R84-003: companies.is_supplier — a company may be a customer / owner / yard and a supplier at once. */
+function sup_flag_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW COLUMNS FROM companies LIKE 'is_supplier'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function sup_where(): string { return sup_flag_has() ? 'co.is_supplier = 1' : "co.kind = 'supplier'"; }
 function sup_makers_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW TABLES LIKE 'supplier_makers'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Makers a supplier sells (free text, matched case-insensitively to inv_items.maker). */
 function sup_makers(int $supplierId): array { return sup_makers_has() ? all('SELECT * FROM supplier_makers WHERE supplier_id = ? ORDER BY is_primary DESC, maker', [$supplierId]) : []; }
@@ -465,8 +468,8 @@ function sup_import_apply(array $pv, bool $updateExisting = true): array {
     foreach ($pv['rows'] as $i => $r) {
         $id = (int)$r['id'];
         try {
-        if ($id) { if (!$updateExisting) continue; $set = ["kind = 'supplier'", 'is_active = 1']; $a = []; foreach (['country', 'city', 'website', 'email', 'phone'] as $k) if ($r[$k] !== null) { $set[] = "$k = ?"; $a[] = $r[$k]; } if ($r['notes'] !== null) { $set[] = 'notes = COALESCE(NULLIF(notes, \'\'), ?)'; $a[] = $r['notes']; } if ($set) { $a[] = $id; q('UPDATE companies SET ' . implode(', ', $set) . ' WHERE id = ?', $a); } $updated++; }
-        else { q("INSERT INTO companies (name, kind, country, city, website, email, phone, notes, is_active) VALUES (?,'supplier',?,?,?,?,?,?,1)", [$r['name'], $r['country'], $r['city'], $r['website'], $r['email'], $r['phone'], $r['notes']]); $id = (int) db()->lastInsertId(); $created++; }
+        if ($id) { if (!$updateExisting) continue; $set = ["kind = IF(kind IN ('other', 'supplier', ''), 'supplier', kind)", 'is_active = 1']; if (sup_flag_has()) $set[] = 'is_supplier = 1'; $a = []; foreach (['country', 'city', 'website', 'email', 'phone'] as $k) if ($r[$k] !== null) { $set[] = "$k = ?"; $a[] = $r[$k]; } if ($r['notes'] !== null) { $set[] = 'notes = COALESCE(NULLIF(notes, \'\'), ?)'; $a[] = $r['notes']; } if ($set) { $a[] = $id; q('UPDATE companies SET ' . implode(', ', $set) . ' WHERE id = ?', $a); } $updated++; }
+        else { q("INSERT INTO companies (name, kind, " . (sup_flag_has() ? 'is_supplier, ' : '') . "country, city, website, email, phone, notes, is_active) VALUES (?,'supplier'," . (sup_flag_has() ? '1,' : '') . "?,?,?,?,?,?,1)", [$r['name'], $r['country'], $r['city'], $r['website'], $r['email'], $r['phone'], $r['notes']]); $id = (int) db()->lastInsertId(); $created++; }
         q('INSERT INTO supplier_details (company_id, erp_code, vat_no, address, postal_code, terms_days, advance_pct, currency, lead_days, incoterms) VALUES (?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE erp_code = COALESCE(VALUES(erp_code), erp_code), vat_no = COALESCE(VALUES(vat_no), vat_no), address = COALESCE(VALUES(address), address), postal_code = COALESCE(VALUES(postal_code), postal_code), terms_days = COALESCE(VALUES(terms_days), terms_days), advance_pct = COALESCE(VALUES(advance_pct), advance_pct), currency = COALESCE(VALUES(currency), currency), lead_days = COALESCE(VALUES(lead_days), lead_days), incoterms = COALESCE(VALUES(incoterms), incoterms)',
           [$id, $r['erp_code'], $r['vat_no'], $r['address'], $r['postal_code'], $r['terms_days'], $r['advance_pct'], $r['currency'], $r['lead_days'], $r['incoterms']]);
         foreach ($r['makers'] as $k => $m) { sup_maker_add($id, $m, $k === 0 && !scalar('SELECT 1 FROM supplier_makers WHERE supplier_id = ? AND is_primary = 1', [$id])); $makersN++; }

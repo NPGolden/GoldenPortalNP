@@ -82,6 +82,10 @@ function co_save_from_post(int $id): int {
     $vals = [$name, $kind, $cid, $str('country', 80), $str('city', 80), $str('website', 190), $str('email', 190), $str('phone', 60), $str('notes', 4000), isset($_POST['is_active']) ? (int)!empty($_POST['is_active']) : 1];
     if ($id) { $vals[] = $id; q('UPDATE companies SET name = ?, kind = ?, customer_id = ?, country = ?, city = ?, website = ?, email = ?, phone = ?, notes = ?, is_active = ? WHERE id = ?', $vals); }
     else { q('INSERT INTO companies (name, kind, customer_id, country, city, website, email, phone, notes, is_active) VALUES (?,?,?,?,?,?,?,?,?,?)', $vals); $id = (int) db()->lastInsertId(); }
+    if (function_exists('sup_flag_has') && sup_flag_has()) {   // R84-003: "also a supplier" — the flag is independent of the kind; a supplier card appears under Procurement
+        $isSup = $kind === 'supplier' || !empty($_POST['is_supplier']); q('UPDATE companies SET is_supplier = ? WHERE id = ?', [(int)$isSup, $id]);
+        if ($isSup) q('INSERT IGNORE INTO supplier_details (company_id) VALUES (?)', [$id]);
+    }
     if ($cid) q('UPDATE contacts SET customer_id = ? WHERE company_id = ? AND customer_id IS NULL', [$cid, $id]);
     return $id;
 }
