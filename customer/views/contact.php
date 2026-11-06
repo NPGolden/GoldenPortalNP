@@ -29,7 +29,7 @@ layout_head($c['full_name'], 'contacts');
     <h2><?= tt('ct.details') ?></h2>
     <div class="oa-facts ct-facts">
       <div><span><?= tt('rp.customer') ?></span><b><?= e($c['customer_name'] ?: '—') ?></b></div>
-      <div><span><?= tt('co.one') ?></span><b><?= $c['company_name'] ? e($c['company_name']) . ' ' . ($c['company_kind'] ? co_kind_pill($c['company_kind']) : '') : '—' ?></b></div>
+      <div><span><?= tt('co.one') ?></span><b><?php $orgs = function_exists('ct_companies') ? ct_companies((int)$c['id']) : []; if ($orgs): foreach ($orgs as $i => $o): ?><?= $i ? '<br>' : '' ?><a href="<?= url('companies', ['edit' => (int)$o['id']]) ?>"><?= e($o['name']) ?></a> <?= co_role_pills($o) ?><?= $o['position'] && $o['position'] !== $c['position'] ? ' <span class="hint">' . e($o['position']) . '</span>' : '' ?><?php endforeach; else: ?><?= $c['company_name'] ? e($c['company_name']) . ' ' . ($c['company_kind'] ? co_kind_pill($c['company_kind']) : '') : '—' ?><?php endif; ?></b></div>
       <div><span><?= tt('ct.position') ?></span><b><?= e($c['position'] ?: '—') ?></b></div>
       <div><span><?= tt('ct.category') ?></span><b><?= ct_cat_pill($c['category']) ?></b></div>
       <div><span><?= tt('au.email') ?></span><b><?= $c['email'] ? '<a href="mailto:' . e($c['email']) . '">' . e($c['email']) . '</a>' : '—' ?></b></div>

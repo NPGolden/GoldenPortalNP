@@ -190,7 +190,7 @@ function po_people(array $o): array {
     $out = []; $seen = [];
     $add = function (string $n, ?string $e, string $r, bool $on) use (&$out, &$seen) { $e = strtolower(trim((string)$e)); if ($e === '' || !filter_var($e, FILTER_VALIDATE_EMAIL) || isset($seen[$e])) return; $seen[$e] = true; $out[] = ['name' => $n ?: $e, 'email' => $e, 'role' => $r, 'on' => $on]; };
     if ($o['supplier_email']) $add((string)($o['supplier_contact'] ?: $o['supplier']), $o['supplier_email'], t('po.supplier'), true);
-    try { foreach (all('SELECT full_name, email, position FROM contacts WHERE company_id = ? AND is_active = 1 AND email IS NOT NULL ORDER BY full_name', [(int)$o['supplier_id']]) as $c) $add((string)$c['full_name'], $c['email'], (string)($c['position'] ?? ''), !$out); } catch (Throwable $e) {}
+    try { foreach (function_exists('co_people') ? co_people((int)$o['supplier_id']) : all('SELECT full_name, email, position FROM contacts WHERE company_id = ? AND is_active = 1 ORDER BY full_name', [(int)$o['supplier_id']]) as $c) if ($c['email']) $add((string)$c['full_name'], $c['email'], (string)($c['position'] ?? ''), !$out); } catch (Throwable $e) {}
     if ($o['supplier_co_email']) $add((string)$o['supplier'], $o['supplier_co_email'], t('po.supplier'), !$out);
     return $out;
 }

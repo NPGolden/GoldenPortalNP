@@ -21,7 +21,7 @@ layout_head(t('cu.title'), 'admin_customers');
 <?php settings_tabs('admin_customers'); ?>
 <div class="page-head">
   <div><h2 class="settings-h"><?= tt('cu.title') ?></h2><p class="lede"><?= tt('cu.lede') ?></p></div>
-  <div class="btn-row"><a class="btn btn--ghost" href="<?= url('settings', ['tab' => 'import']) ?>#customers">⤒ <?= tt('im.title') ?></a><a class="btn btn--ghost" href="<?= url('customers_export', $keep) ?>">⤓ <?= tt('ct.export') ?></a><a class="btn btn--gold" href="<?= url('admin_customers', $keep + ['edit' => 0]) ?>#form">+ <?= tt('cu.new') ?></a></div>
+  <div class="btn-row"><?php if (function_exists('co_roles_has') && co_roles_has()): ?><a class="btn btn--gold" href="<?= url('companies', ['role' => 'customer']) ?>#form">+ <?= tt('co.new_customer_org') ?></a><a class="btn btn--ghost" href="<?= url('organisations') ?>">🏛 <?= tt('org.title') ?></a><?php endif; ?><a class="btn btn--ghost" href="<?= url('settings', ['tab' => 'import']) ?>#customers">⤒ <?= tt('im.title') ?></a><a class="btn btn--ghost" href="<?= url('customers_export', $keep) ?>">⤓ <?= tt('ct.export') ?></a><a class="btn btn--gold" href="<?= url('admin_customers', $keep + ['edit' => 0]) ?>#form">+ <?= tt('cu.new') ?></a></div>
 </div>
 <?php if (!$ext || !$ivOk): ?><div class="flash flash--warn"><?= tt('cu.need_r19') ?></div><?php endif; ?>
 

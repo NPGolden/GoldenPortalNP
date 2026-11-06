@@ -124,6 +124,7 @@ function cu_save_from_post(int $id): int {
     $active = $id ? (int)!empty($_POST['is_active']) : 1;
     if ($cu_ext = cu_cols_ok()) {
         $vals = [$name, $erp, $str('country', 80), $str('address', 200), $str('city', 80), $str('postal_code', 20), $str('vat_no', 40), $str('email', 190), $str('phone', 60), $str('website', 190), $str('notes', 4000), $active];
+        if ($id && function_exists('co_roles_has') && co_roles_has()) q('UPDATE companies SET name = ?, vat_no = ?, erp_code = ?, address = ?, postal_code = ?, country = COALESCE(NULLIF(?, \'\'), country), city = COALESCE(NULLIF(?, \'\'), city) WHERE customer_id = ? AND NOT EXISTS (SELECT 1 FROM (SELECT id FROM companies WHERE LOWER(name) = LOWER(?) AND customer_id <> ?) x)', [$name, $str('vat_no', 40), $erp, $str('address', 200), $str('postal_code', 20), $str('country', 80), $str('city', 80), $id, $name, $id]);   // R85-002: the organisation follows its customer record
         if ($id) { $vals[] = $id; q('UPDATE customers SET name = ?, erp_code = ?, country = ?, address = ?, city = ?, postal_code = ?, vat_no = ?, email = ?, phone = ?, website = ?, notes = ?, is_active = ? WHERE id = ?', $vals); }
         else { q('INSERT INTO customers (name, erp_code, country, address, city, postal_code, vat_no, email, phone, website, notes, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', $vals); $id = (int) db()->lastInsertId(); }
     } else {

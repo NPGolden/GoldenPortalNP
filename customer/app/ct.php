@@ -50,6 +50,49 @@ function co_norm_kind(string $v): ?string {
     foreach (['en', 'el', 'it', 'uk', 'bg'] as $loc) { $tbl = lang_table($loc); foreach (array_keys(co_kinds()) as $k) if (isset($tbl['co.kind_' . $k]) && mb_strtolower($tbl['co.kind_' . $k]) === $n) return $k; }
     return ['customer' => 'owner', 'shipowner' => 'owner', 'owners' => 'owner', 'shipyard' => 'yard', 'classification' => 'class', 'class society' => 'class', 'vendor' => 'supplier', 'manufacturer' => 'supplier', 'management company' => 'management', 'manager' => 'management', 'designer' => 'consultant', 'naval architect' => 'consultant', 'brokerage' => 'broker', 'port agent' => 'agent'][$n] ?? null;
 }
+/* ---- R85-002: roles — an organisation may be several things at once; `kind` stays the main role for old code, `roles` is the full list. */
+function co_roles_has(): bool { static $h = null; if ($h === null) { try { $h = co_has() && (bool) db()->query("SHOW COLUMNS FROM companies LIKE 'roles'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function cc_has(): bool { static $h = null; if ($h === null) { try { $h = co_has() && (bool) db()->query("SHOW TABLES LIKE 'contact_companies'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+/** Role → label; 'customer' is the billing role, the rest are the kinds. */
+function co_role_list(): array { return ['customer' => t('co.role_customer')] + array_diff_key(co_kinds(), ['other' => 1]) + ['other' => t('co.kind_other')]; }
+function co_roles(array $co): array {
+    $r = co_roles_has() ? array_values(array_filter(explode(',', (string)($co['roles'] ?? '')))) : [];
+    if (!$r) { $r = [(string)($co['kind'] ?? 'other')]; if (!empty($co['is_supplier']) && !in_array('supplier', $r, true)) $r[] = 'supplier'; if (!empty($co['customer_id'])) $r[] = 'customer'; }
+    return array_values(array_unique($r));
+}
+/** The main kind of a role set (what the old single pill shows). */
+function co_main_kind(array $roles): string { foreach (['owner', 'management', 'yard', 'class', 'agent', 'broker', 'consultant', 'supplier', 'other'] as $k) if (in_array($k, $roles, true)) return $k; return 'other'; }
+function co_role_pills(array $co): string {
+    $h = []; foreach (co_roles($co) as $r) {
+        if ($r === 'customer') $h[] = $co['customer_id'] ? '<a href="' . url('admin_customers', ['edit' => (int)$co['customer_id']]) . '">' . pill('navy', '★ ' . t('co.role_customer')) . '</a>' : pill('navy', '★ ' . t('co.role_customer'));
+        elseif ($r === 'supplier') $h[] = '<a href="' . url('suppliers', ['id' => (int)$co['id']]) . '">' . pill('gold', t('co.kind_supplier')) . '</a>';
+        else $h[] = co_kind_pill($r);
+    }
+    return implode(' ', $h);
+}
+/** Keep the billing customer and the supplier card in step with the organisation's roles and master data.   R85-002 */
+function co_sync_roles(int $id): void {
+    $co = co_load($id); if (!$co) return; $roles = co_roles($co);
+    if (in_array('customer', $roles, true) && function_exists('cu_cols_ok')) {
+        $cid = (int)($co['customer_id'] ?? 0);
+        if (!$cid && ($x = scalar('SELECT id FROM customers WHERE LOWER(name) = LOWER(?)', [$co['name']]))) $cid = (int)$x;
+        if ($cid) { q('UPDATE customers SET name = ?, vat_no = COALESCE(NULLIF(?, \'\'), vat_no), erp_code = COALESCE(?, erp_code), country = COALESCE(NULLIF(?, \'\'), country), address = COALESCE(?, address), city = COALESCE(NULLIF(?, \'\'), city), postal_code = COALESCE(?, postal_code), email = COALESCE(NULLIF(?, \'\'), email), phone = COALESCE(NULLIF(?, \'\'), phone), website = COALESCE(NULLIF(?, \'\'), website), is_active = 1 WHERE id = ?',
+                       [$co['name'], $co['vat_no'] ?? null, $co['erp_code'] ?? null, $co['country'], $co['address'] ?? null, $co['city'], $co['postal_code'] ?? null, $co['email'], $co['phone'], $co['website'], $cid]); }
+        else { q('INSERT INTO customers (name, erp_code, country, address, city, postal_code, vat_no, email, phone, website, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,1)', [$co['name'], $co['erp_code'] ?? null, $co['country'], $co['address'] ?? null, $co['city'], $co['postal_code'] ?? null, $co['vat_no'] ?? null, $co['email'], $co['phone'], $co['website']]); $cid = (int) db()->lastInsertId(); }
+        if ($cid !== (int)($co['customer_id'] ?? 0)) { q('UPDATE companies SET customer_id = ? WHERE id = ?', [$cid, $id]); q('UPDATE contacts SET customer_id = ? WHERE company_id = ? AND customer_id IS NULL', [$cid, $id]); }
+    }
+    $sup = in_array('supplier', $roles, true);
+    if (function_exists('sup_flag_has') && sup_flag_has()) q('UPDATE companies SET is_supplier = ? WHERE id = ?', [(int)$sup, $id]);
+    if ($sup) q('INSERT INTO supplier_details (company_id, vat_no, erp_code, address, postal_code) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE vat_no = COALESCE(NULLIF(VALUES(vat_no), \'\'), vat_no), erp_code = COALESCE(VALUES(erp_code), erp_code), address = COALESCE(VALUES(address), address), postal_code = COALESCE(VALUES(postal_code), postal_code)', [$id, $co['vat_no'] ?? null, $co['erp_code'] ?? null, $co['address'] ?? null, $co['postal_code'] ?? null]);
+}
+/** All organisations of a person (primary first). */
+function ct_companies(int $cid): array { return cc_has() ? all('SELECT co.id, co.name, co.kind, co.roles, co.is_supplier, co.customer_id, cc.position, (co.id = ct.company_id) AS is_primary FROM contact_companies cc JOIN companies co ON co.id = cc.company_id JOIN contacts ct ON ct.id = cc.contact_id WHERE cc.contact_id = ? ORDER BY is_primary DESC, co.name', [$cid]) : []; }
+/** People of an organisation — primary or additional membership. */
+function co_people(int $coId, bool $activeOnly = true): array {
+    $w = $activeOnly ? ' AND ct.is_active = 1' : '';
+    return cc_has() ? all("SELECT DISTINCT ct.id, ct.full_name, COALESCE(NULLIF(cc.position, ''), ct.position) AS position, ct.email, ct.phone, ct.mobile, ct.category, (ct.company_id = ?) AS is_primary FROM contacts ct LEFT JOIN contact_companies cc ON cc.contact_id = ct.id AND cc.company_id = ? WHERE (ct.company_id = ? OR cc.company_id IS NOT NULL){$w} ORDER BY is_primary DESC, ct.full_name", [$coId, $coId, $coId])
+                     : all("SELECT ct.id, ct.full_name, ct.position, ct.email, ct.phone, ct.mobile, ct.category, 1 AS is_primary FROM contacts ct WHERE ct.company_id = ?{$w} ORDER BY ct.full_name", [$coId]);
+}
 /** All companies (active first) for pick-lists. */
 function co_all(bool $activeOnly = true): array {
     if (!co_has()) return [];
@@ -62,7 +105,7 @@ function co_find(string $name, ?string $kind = null, bool $create = false, ?arra
     if (!$id) { $cid = scalar('SELECT id FROM customers WHERE LOWER(name) = LOWER(?) OR erp_code = ? LIMIT 1', [$name, $name]); if ($cid) $id = scalar('SELECT id FROM companies WHERE customer_id = ? LIMIT 1', [$cid]); }
     if ($id) return (int)$id;
     if (!$create) return null;
-    q('INSERT INTO companies (name, kind) VALUES (?, ?)', [mb_substr($name, 0, 160), $kind ?: 'other']);
+    q('INSERT INTO companies (name, kind' . (co_roles_has() ? ', roles' : '') . ') VALUES (?, ?' . (co_roles_has() ? ', ?' : '') . ')', array_merge([mb_substr($name, 0, 160), $kind ?: 'other'], co_roles_has() ? [$kind ?: 'other'] : []));
     if ($res !== null) $res['companies_new'] = ($res['companies_new'] ?? 0) + 1;
     return (int) db()->lastInsertId();
 }
@@ -76,12 +119,14 @@ function co_save_from_post(int $id): int {
     $str = fn(string $k, int $max) => ($v = trim((string)($_POST[$k] ?? ''))) === '' ? null : mb_substr($v, 0, $max);
     $name = $str('name', 160); if (!$name) throw new RuntimeException(t('co.need_name'));
     $dup = scalar('SELECT id FROM companies WHERE LOWER(name) = LOWER(?) AND id <> ?', [$name, $id]); if ($dup) throw new RuntimeException(t('co.dup', ['v' => $name]));
-    $kind = co_norm_kind((string)($_POST['kind'] ?? '')) ?? 'other';
-    $cid = (int)($_POST['customer_id'] ?? 0) ?: null;
+    $roles = []; if (co_roles_has()) { foreach ((array)($_POST['roles'] ?? []) as $r) if (isset(co_role_list()[$r])) $roles[] = (string)$r; if (!empty($_POST['is_supplier']) && !in_array('supplier', $roles, true)) $roles[] = 'supplier'; }
+    $kind = $roles ? co_main_kind($roles) : (co_norm_kind((string)($_POST['kind'] ?? '')) ?? 'other'); if (!$roles) { $roles = [$kind]; if (!empty($_POST['is_supplier'])) $roles[] = 'supplier'; }
+    $cid = (int)($_POST['customer_id'] ?? 0) ?: null; if ($cid && !in_array('customer', $roles, true)) $roles[] = 'customer';
     if ($cid && !scalar('SELECT COUNT(*) FROM customers WHERE id = ?', [$cid])) $cid = null;
     $vals = [$name, $kind, $cid, $str('country', 80), $str('city', 80), $str('website', 190), $str('email', 190), $str('phone', 60), $str('notes', 4000), isset($_POST['is_active']) ? (int)!empty($_POST['is_active']) : 1];
     if ($id) { $vals[] = $id; q('UPDATE companies SET name = ?, kind = ?, customer_id = ?, country = ?, city = ?, website = ?, email = ?, phone = ?, notes = ?, is_active = ? WHERE id = ?', $vals); }
     else { q('INSERT INTO companies (name, kind, customer_id, country, city, website, email, phone, notes, is_active) VALUES (?,?,?,?,?,?,?,?,?,?)', $vals); $id = (int) db()->lastInsertId(); }
+    if (co_roles_has()) { q('UPDATE companies SET roles = ?, vat_no = ?, erp_code = ?, address = ?, postal_code = ? WHERE id = ?', [implode(',', array_unique($roles)), $str('vat_no', 40), $str('erp_code', 40), $str('address', 200), $str('postal_code', 20), $id]); co_sync_roles($id); return $id; }   // R85-002
     if (function_exists('sup_flag_has') && sup_flag_has()) {   // R84-003: "also a supplier" — the flag is independent of the kind; a supplier card appears under Procurement
         $isSup = $kind === 'supplier' || !empty($_POST['is_supplier']); q('UPDATE companies SET is_supplier = ? WHERE id = ?', [(int)$isSup, $id]);
         if ($isSup) q('INSERT IGNORE INTO supplier_details (company_id) VALUES (?)', [$id]);
@@ -194,7 +239,7 @@ function ct_list(array $f, int $per = 50): array {
     $w = []; $b = [];
     $co = co_has();
     if (($f['q'] ?? '') !== '') { $l = '%' . $f['q'] . '%'; $w[] = '(ct.full_name LIKE ? OR ct.email LIKE ? OR ' . ($co ? 'co.name' : 'ct.company') . ' LIKE ? OR ct.position LIKE ? OR c.name LIKE ? OR ct.interests LIKE ? OR ct.phone LIKE ? OR ct.mobile LIKE ?)'; array_push($b, $l, $l, $l, $l, $l, $l, $l, $l); }
-    if ($co && ctype_digit((string)($f['company'] ?? ''))) { $w[] = 'ct.company_id = ?'; $b[] = (int)$f['company']; } elseif ($co && ($f['company'] ?? '') === 'none') $w[] = 'ct.company_id IS NULL';
+    if ($co && ctype_digit((string)($f['company'] ?? ''))) { if (cc_has()) { $w[] = '(ct.company_id = ? OR EXISTS (SELECT 1 FROM contact_companies cc WHERE cc.contact_id = ct.id AND cc.company_id = ?))'; $b[] = (int)$f['company']; $b[] = (int)$f['company']; } else { $w[] = 'ct.company_id = ?'; $b[] = (int)$f['company']; } } elseif ($co && ($f['company'] ?? '') === 'none') $w[] = 'ct.company_id IS NULL';
     if ($co && ($f['channel'] ?? '') !== '' && isset(ct_channels()[$f['channel']])) { $w[] = 'FIND_IN_SET(?, ct.channels)'; $b[] = $f['channel']; }
     if ($co && ($f['sub'] ?? '') !== '' && isset(ct_subscriptions()[$f['sub']])) { $w[] = 'FIND_IN_SET(?, ct.subscriptions)'; $b[] = $f['sub']; }
     if (!empty($f['ids'])) { $ids = array_values(array_filter(array_map('intval', (array)$f['ids']))); if ($ids) { $w[] = 'ct.id IN (' . implode(',', $ids) . ')'; } else $w[] = '0'; }
@@ -313,6 +358,7 @@ function ct_save_from_post(int $id): int {
         q('INSERT INTO contacts (customer_id, company, full_name, position, category, email, phone, mobile, birthday, nameday_md, interests, user_id, is_active, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)', $vals);
         $id = (int) db()->lastInsertId();
     }
+    if (cc_has()) { $others = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['other_companies'] ?? []))))); q('DELETE FROM contact_companies WHERE contact_id = ?', [$id]); foreach (array_unique(array_merge($coid ? [$coid] : [], $others)) as $oc) if (scalar('SELECT 1 FROM companies WHERE id = ?', [$oc])) q('INSERT IGNORE INTO contact_companies (contact_id, company_id) VALUES (?, ?)', [$id, $oc]); }   // R85-002: a person may belong to several organisations
     if (co_has()) q('UPDATE contacts SET company_id = ?, channels = ?, subscriptions = ? WHERE id = ?', [$coid, $channels ?: null, $subs ?: null, $id]);
     // vessels: vessel[] with role[vid] and primary
     if (isset($_POST['vessel'])) {

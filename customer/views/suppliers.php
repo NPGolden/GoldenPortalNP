@@ -5,7 +5,7 @@ $u = require_staff(); if (!function_exists('pr_can') || !pr_can()) { http_respon
 $admin = pr_admin(); $priced = stk_price_visible(); $q = trim((string)($_GET['q'] ?? '')); $st = in_array($_GET['status'] ?? '', ['active', 'inactive', 'all'], true) ? $_GET['status'] : 'active';
 $id = (int)($_GET['id'] ?? 0); $sup = $id ? sup_load($id) : null; $edit = ($id === 0 && isset($_GET['new']) && $admin) || ($sup && isset($_GET['edit']) && $admin);
 $rows = sup_list(['q' => $q, 'status' => $st]); $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : ''; $v = fn(string $k) => e((string)($sup[$k] ?? ''));
-$prices = $sup && $priced ? sup_prices($id) : []; $contacts = $sup ? all('SELECT id, full_name, position AS role, email, phone FROM contacts WHERE company_id = ? ORDER BY full_name', [$id]) : [];
+$prices = $sup && $priced ? sup_prices($id) : []; $contacts = $sup ? array_map(fn($c) => $c + ['role' => $c['position']], co_people($id)) : [];
 layout_head(t('sup.title'), 'suppliers');
 ?>
 <div class="page-head">

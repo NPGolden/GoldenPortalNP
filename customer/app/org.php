@@ -17,7 +17,7 @@ function org_vat(?string $v): string { $d = preg_replace('/\D/', '', (string)$v)
 
 /** Every customer with its linked / suggested company. status: linked | match | none. */
 function org_matches(): array {
-    $cos = all('SELECT co.id, co.name, co.kind, co.is_supplier, co.customer_id, co.country, co.city, co.email, co.phone, co.website, sd.vat_no, sd.erp_code FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE co.is_active = 1');
+    $cos = all('SELECT co.id, co.name, co.kind, co.is_supplier, co.customer_id, co.country, co.city, co.email, co.phone, co.website, ' . (co_roles_has() ? 'COALESCE(NULLIF(co.vat_no, \'\'), sd.vat_no) AS vat_no, COALESCE(co.erp_code, sd.erp_code) AS erp_code' : 'sd.vat_no, sd.erp_code') . ' FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE co.is_active = 1');
     $byCust = []; $byVat = []; $byErp = []; $byKey = [];
     foreach ($cos as $c) { if ($c['customer_id']) $byCust[(int)$c['customer_id']][] = $c; if ($v = org_vat($c['vat_no'])) $byVat[$v][] = $c; if ($c['erp_code']) $byErp[mb_strtolower((string)$c['erp_code'])][] = $c; $byKey[org_key($c['name'])][] = $c; }
     $out = ['linked' => [], 'match' => [], 'none' => []];
@@ -47,6 +47,8 @@ function org_link(int $coId, int $cuId): void {
         q('UPDATE supplier_details SET vat_no = COALESCE(NULLIF(vat_no, \'\'), ?), erp_code = COALESCE(erp_code, ?), address = COALESCE(NULLIF(address, \'\'), ?), postal_code = COALESCE(NULLIF(postal_code, \'\'), ?) WHERE company_id = ?', [$cu['vat_no'] ?: null, $cu['erp_code'] ?: null, $cu['address'] ?: null, $cu['postal_code'] ?: null, $coId]);
     q('UPDATE contacts SET customer_id = ? WHERE company_id = ? AND customer_id IS NULL', [$cuId, $coId]);
     q('UPDATE contacts SET company_id = ?, company = ? WHERE customer_id = ? AND company_id IS NULL', [$coId, $co['name'], $cuId]);
+    if (co_roles_has()) q('UPDATE companies SET roles = TRIM(BOTH \',\' FROM CONCAT_WS(\',\', NULLIF(roles, \'\'), IF(FIND_IN_SET(\'customer\', roles), NULL, \'customer\'))), vat_no = COALESCE(NULLIF(vat_no, \'\'), ?), erp_code = COALESCE(erp_code, ?), address = COALESCE(address, ?), postal_code = COALESCE(postal_code, ?) WHERE id = ?', [$cu['vat_no'] ?: null, $cu['erp_code'] ?: null, $cu['address'] ?: null, $cu['postal_code'] ?: null, $coId]);   // R85-002
+    if (function_exists('cc_has') && cc_has()) q('INSERT IGNORE INTO contact_companies (contact_id, company_id) SELECT id, company_id FROM contacts WHERE company_id = ?', [$coId]);
 }
 /** Create the company of a customer that has none (kind owner by default) and link it. */
 function org_create_for_customer(int $cuId, string $kind = 'owner'): int {
@@ -55,7 +57,7 @@ function org_create_for_customer(int $cuId, string $kind = 'owner'): int {
     if ($id = scalar('SELECT id FROM companies WHERE customer_id = ?', [$cuId])) return (int)$id;
     $kind = isset(co_kinds()[$kind]) ? $kind : 'owner';
     if ($id = scalar('SELECT id FROM companies WHERE LOWER(name) = LOWER(?)', [$cu['name']])) { org_link((int)$id, $cuId); return (int)$id; }
-    q('INSERT INTO companies (name, kind, customer_id, country, city, website, email, phone, is_active) VALUES (?,?,?,?,?,?,?,?,1)', [mb_substr((string)$cu['name'], 0, 160), $kind, $cuId, $cu['country'] ?: null, $cu['city'] ?: null, $cu['website'] ?: null, $cu['email'] ?: null, $cu['phone'] ?: null]);
+    q('INSERT INTO companies (name, kind, customer_id, country, city, website, email, phone, is_active' . (co_roles_has() ? ', roles, vat_no, erp_code, address, postal_code' : '') . ') VALUES (?,?,?,?,?,?,?,?,1' . (co_roles_has() ? ',?,?,?,?,?' : '') . ')', array_merge([mb_substr((string)$cu['name'], 0, 160), $kind, $cuId, $cu['country'] ?: null, $cu['city'] ?: null, $cu['website'] ?: null, $cu['email'] ?: null, $cu['phone'] ?: null], co_roles_has() ? [$kind . ',customer', $cu['vat_no'] ?: null, $cu['erp_code'] ?: null, $cu['address'] ?: null, $cu['postal_code'] ?: null] : []));
     $id = (int) db()->lastInsertId(); q('UPDATE contacts SET company_id = ?, company = ? WHERE customer_id = ? AND company_id IS NULL', [$id, $cu['name'], $cuId]); return $id;
 }
 /** Link every suggested match at once; returns the number linked. */
@@ -74,7 +76,7 @@ function org_counts(): array {
 
 /** Companies that are duplicates of each other (same VAT, ERP code or normalised name): [[keep, drop], …]. The kept one is the linked / supplier / older record. */
 function org_dupes(): array {
-    $cos = all('SELECT co.id, co.name, co.kind, co.is_supplier, co.customer_id, sd.vat_no, sd.erp_code, (SELECT COUNT(*) FROM contacts ct WHERE ct.company_id = co.id) AS n_people FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE co.is_active = 1 ORDER BY co.id');
+    $cos = all('SELECT co.id, co.name, co.kind, co.is_supplier, co.customer_id, ' . (co_roles_has() ? 'co.roles, COALESCE(NULLIF(co.vat_no, \'\'), sd.vat_no) AS vat_no, COALESCE(co.erp_code, sd.erp_code) AS erp_code' : 'sd.vat_no, sd.erp_code') . ', (SELECT COUNT(*) FROM contacts ct WHERE ct.company_id = co.id) AS n_people FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE co.is_active = 1 ORDER BY co.id');
     $groups = []; $seen = [];
     $add = function (string $p, string $k, array $c) use (&$groups) { if ($k === '' || ($p === 'v' && strlen($k) < 6) || ($p === 'n' && mb_strlen($k) < 4)) return; $groups[$p . ':' . $k][$c['id']] = $c; };
     foreach ($cos as $c) { $add('v', org_vat($c['vat_no']), $c); $add('e', mb_strtolower((string)$c['erp_code']), $c); $add('n', org_key($c['name']), $c); }
@@ -92,6 +94,8 @@ function org_merge(int $keep, int $drop): void {
     $K = one('SELECT * FROM companies WHERE id = ?', [$keep]); $D = one('SELECT * FROM companies WHERE id = ?', [$drop]); if (!$K || !$D) throw new RuntimeException(t('err.notfound'));
     if ($D['customer_id'] && $K['customer_id'] && (int)$D['customer_id'] !== (int)$K['customer_id']) throw new RuntimeException(t('org.already_linked'));
     q('UPDATE contacts SET company_id = ?, company = ? WHERE company_id = ?', [$keep, $K['name'], $drop]);
+    if (function_exists('cc_has') && cc_has()) { q('UPDATE IGNORE contact_companies SET company_id = ? WHERE company_id = ?', [$keep, $drop]); q('DELETE FROM contact_companies WHERE company_id = ?', [$drop]); }
+    if (co_roles_has()) { $r = array_values(array_unique(array_merge(co_roles($K), co_roles($D)))); q('UPDATE companies SET roles = ?, vat_no = COALESCE(NULLIF(vat_no, \'\'), ?), erp_code = COALESCE(erp_code, ?), address = COALESCE(address, ?), postal_code = COALESCE(postal_code, ?) WHERE id = ?', [implode(',', $r), $D['vat_no'] ?? null, $D['erp_code'] ?? null, $D['address'] ?? null, $D['postal_code'] ?? null, $keep]); }
     foreach (['po_orders.supplier_id', 'si_invoices.supplier_id', 'si_requests.supplier_id', 'inv_prices.supplier_id', 'production_subs.company_id'] as $tc) { [$t, $c] = explode('.', $tc); try { q("UPDATE {$t} SET {$c} = ? WHERE {$c} = ?", [$keep, $drop]); } catch (Throwable $e) {} }
     try { q('UPDATE IGNORE supplier_makers SET supplier_id = ? WHERE supplier_id = ?', [$keep, $drop]); q('DELETE FROM supplier_makers WHERE supplier_id = ?', [$drop]); } catch (Throwable $e) {}
     if (scalar('SELECT 1 FROM supplier_details WHERE company_id = ?', [$drop])) { if (!scalar('SELECT 1 FROM supplier_details WHERE company_id = ?', [$keep])) q('UPDATE supplier_details SET company_id = ? WHERE company_id = ?', [$keep, $drop]); else { q('UPDATE supplier_details k JOIN supplier_details d ON d.company_id = ? SET k.vat_no = COALESCE(NULLIF(k.vat_no, \'\'), d.vat_no), k.erp_code = COALESCE(k.erp_code, d.erp_code), k.address = COALESCE(NULLIF(k.address, \'\'), d.address), k.postal_code = COALESCE(NULLIF(k.postal_code, \'\'), d.postal_code), k.terms_days = COALESCE(k.terms_days, d.terms_days), k.incoterms = COALESCE(k.incoterms, d.incoterms), k.lead_days = COALESCE(k.lead_days, d.lead_days) WHERE k.company_id = ?', [$drop, $keep]); q('DELETE FROM supplier_details WHERE company_id = ?', [$drop]); } }
