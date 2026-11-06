@@ -404,7 +404,7 @@ function sup_import_parse(string $path): array {
     require_once __DIR__ . '/xlsx.php'; $rows = xlsx_rows($path); if (count($rows) < 2) throw new RuntimeException(t('stk.imp_empty'));
     $map = sup_import_map($rows[0]); if (!isset($map['name'])) throw new RuntimeException(t('sup.imp_no_name'));
     $byVat = []; $byErp = []; $byName = [];
-    foreach (all('SELECT co.id, co.name, sd.vat_no, sd.erp_code FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE co.kind = \'supplier\'') as $e) { if ($e['vat_no']) $byVat[preg_replace('/\D/', '', (string)$e['vat_no'])] = (int)$e['id']; if ($e['erp_code']) $byErp[mb_strtolower((string)$e['erp_code'])] = (int)$e['id']; $byName[mb_strtolower(trim((string)$e['name']))] = (int)$e['id']; }
+    foreach (all('SELECT co.id, co.name, sd.vat_no, sd.erp_code FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id ORDER BY (co.kind = \'supplier\') DESC, co.id') as $e) { /* R84-002: any company of the Contacts module (name is unique) — it becomes a supplier on apply */ if ($e['vat_no']) $byVat[preg_replace('/\D/', '', (string)$e['vat_no'])] = (int)$e['id']; if ($e['erp_code']) $byErp[mb_strtolower((string)$e['erp_code'])] = (int)$e['id']; $byName[mb_strtolower(trim((string)$e['name']))] = (int)$e['id']; }
     $out = []; $warn = []; $seen = []; $nNew = 0; $nUpd = 0;
     $num = function ($v): ?float { $v = str_replace(['%', ' '], '', trim((string)$v)); if ($v === '') return null; $v = str_replace(',', '.', $v); return is_numeric($v) ? (float)$v : null; };
     foreach (array_slice($rows, 1) as $i => $r) {
@@ -461,15 +461,17 @@ function sup_import_template(): void {
 }
 /** Apply: new suppliers created, existing ones updated field by field (empty cells never erase), makers added (never removed). */
 function sup_import_apply(array $pv, bool $updateExisting = true): array {
-    require_pr_admin(); $created = 0; $updated = 0; $makersN = 0;
+    require_pr_admin(); $created = 0; $updated = 0; $makersN = 0; $errors = [];
     foreach ($pv['rows'] as $i => $r) {
         $id = (int)$r['id'];
-        if ($id) { if (!$updateExisting) continue; $set = []; $a = []; foreach (['country', 'city', 'website', 'email', 'phone'] as $k) if ($r[$k] !== null) { $set[] = "$k = ?"; $a[] = $r[$k]; } if ($r['notes'] !== null) { $set[] = 'notes = COALESCE(NULLIF(notes, \'\'), ?)'; $a[] = $r['notes']; } if ($set) { $a[] = $id; q('UPDATE companies SET ' . implode(', ', $set) . ' WHERE id = ?', $a); } $updated++; }
+        try {
+        if ($id) { if (!$updateExisting) continue; $set = ["kind = 'supplier'", 'is_active = 1']; $a = []; foreach (['country', 'city', 'website', 'email', 'phone'] as $k) if ($r[$k] !== null) { $set[] = "$k = ?"; $a[] = $r[$k]; } if ($r['notes'] !== null) { $set[] = 'notes = COALESCE(NULLIF(notes, \'\'), ?)'; $a[] = $r['notes']; } if ($set) { $a[] = $id; q('UPDATE companies SET ' . implode(', ', $set) . ' WHERE id = ?', $a); } $updated++; }
         else { q("INSERT INTO companies (name, kind, country, city, website, email, phone, notes, is_active) VALUES (?,'supplier',?,?,?,?,?,?,1)", [$r['name'], $r['country'], $r['city'], $r['website'], $r['email'], $r['phone'], $r['notes']]); $id = (int) db()->lastInsertId(); $created++; }
         q('INSERT INTO supplier_details (company_id, erp_code, vat_no, address, postal_code, terms_days, advance_pct, currency, lead_days, incoterms) VALUES (?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE erp_code = COALESCE(VALUES(erp_code), erp_code), vat_no = COALESCE(VALUES(vat_no), vat_no), address = COALESCE(VALUES(address), address), postal_code = COALESCE(VALUES(postal_code), postal_code), terms_days = COALESCE(VALUES(terms_days), terms_days), advance_pct = COALESCE(VALUES(advance_pct), advance_pct), currency = COALESCE(VALUES(currency), currency), lead_days = COALESCE(VALUES(lead_days), lead_days), incoterms = COALESCE(VALUES(incoterms), incoterms)',
           [$id, $r['erp_code'], $r['vat_no'], $r['address'], $r['postal_code'], $r['terms_days'], $r['advance_pct'], $r['currency'], $r['lead_days'], $r['incoterms']]);
         foreach ($r['makers'] as $k => $m) { sup_maker_add($id, $m, $k === 0 && !scalar('SELECT 1 FROM supplier_makers WHERE supplier_id = ? AND is_primary = 1', [$id])); $makersN++; }
         $pv['rows'][$i]['id'] = $id;
+        } catch (Throwable $e) { $errors[] = $r['line'] . ': ' . $r['name'] . ' — ' . $e->getMessage(); if (count($errors) > 50) break; }   // R84-002: one bad row never aborts the import
     }
     $ctN = 0; $me = (int)(current_user()['id'] ?? 0);
     foreach ($pv['contacts'] ?? [] as $c) {   // R84-001: people of the suppliers into the Contacts module, category "supplier"
@@ -480,5 +482,5 @@ function sup_import_apply(array $pv, bool $updateExisting = true): array {
         else q("INSERT INTO contacts (company_id, company, full_name, position, category, email, phone, mobile, is_active, created_by) VALUES (?,?,?,?,'supplier',?,?,?,1,?)", [$cid, $coName, $c['full_name'], $c['position'], $c['email'], $c['phone'], $c['mobile'], $me ?: null]);
         $ctN++;
     }
-    cache_bump_later('inv'); return ['created' => $created, 'updated' => $updated, 'makers' => $makersN, 'contacts' => $ctN];
+    cache_bump_later('inv'); return ['created' => $created, 'updated' => $updated, 'makers' => $makersN, 'contacts' => $ctN, 'errors' => $errors];
 }
