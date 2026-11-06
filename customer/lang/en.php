@@ -6437,7 +6437,7 @@ Best regards,
 'vg.expand_all' => 'Expand all vessels',
 'vg.collapse_all' => 'Collapse all vessels',
 // ---- GAS-CP-R75-005 personal assistant scope
-'pa.only' => 'Your account handles the address book — vessels, contacts, companies and customers.',
+'pa.only' => 'Your account handles the address book — vessels, contacts, organisations and customers — and the HR leaves console.',
 'hr.scope_assistant' => 'Personal assistant (address book + vessels)',
 // ---- GAS-CP-R76-001 proforma payments
 'pay.title' => 'Payments',

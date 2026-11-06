@@ -99,10 +99,11 @@ function hr_only(): bool {
     try { return $v = (string) scalar('SELECT scope FROM staff_roles WHERE id = ?', [(int)$u['staff_role_id']]) === 'hr'; } catch (Throwable $e) { return $v = false; }
 }
 /* ---------------------------------------------------------- R75-005: Personal Assistant scope */
-const PA_PAGES = ['vessels', 'vessel', 'vessel_view', 'vessel_new', 'vessel_edit', 'contacts', 'contact', 'contact_edit', 'companies', 'admin_customers', 'import', 'vessel_duplicates', 'admin_vessel_merge', 'file', 'community', 'socphoto', 'account', 'manual', 'notifications', 'nf_open', 'kb', 'kb_q', 'kbfile', 'avatar', 'logout', 'login', 'twofa', 'ping', 'privacy', 'pk', 'clocks'];
-const PA_ACTIONS = ['ct_save', 'ct_delete', 'ct_note', 'ct_note_delete', 'ct_vessel_link', 'ct_vessel_unlink', 'ct_bulk', 'co_save', 'co_delete', 'cu_customer_save', 'cu_customer_delete', 'vessel_save', 'vessel_delete', 'vm_merge', 'ct_import', 'co_import', 'cu_import', 'vessel_import',
+const PA_PAGES = ['vessels', 'vessel', 'vessel_view', 'vessel_new', 'vessel_edit', 'contacts', 'contact', 'contact_edit', 'companies', 'admin_customers', 'import', 'vessel_duplicates', 'admin_vessel_merge', 'organisations', 'contacts_json', 'hr_leaves', 'file', 'community', 'socphoto', 'account', 'manual', 'notifications', 'nf_open', 'kb', 'kb_q', 'kbfile', 'avatar', 'logout', 'login', 'twofa', 'ping', 'privacy', 'pk', 'clocks'];
+const PA_ACTIONS = ['ct_save', 'ct_delete', 'ct_note', 'ct_note_delete', 'ct_vessel_link', 'ct_vessel_unlink', 'ct_bulk', 'co_save', 'co_delete', 'cu_customer_save', 'cu_customer_delete', 'vessel_save', 'vessel_delete', 'vm_merge', 'vm_related_set', 'vm_related_remove', 'org_link', 'org_link_all', 'org_create_co', 'org_merge', 'org_derive_people', 'ct_import', 'co_import', 'cu_import', 'vessel_import',
+                    'hr_period_save', 'hr_period_apply', 'hr_period_undo', 'hr_period_recount', 'hr_period_delete', 'hr_leaves_ask',   // R87-002: the leaves console
                     'account_save', 'avatar_save', 'theme_save', 'clocks_save', 'twofa_enable', 'twofa_disable', 'twofa_setup', 'pk_remove', 'logout', 'nf_read', 'nf_read_all', 'kb_ask', 'soc_wish', 'soc_kudos', 'soc_post', 'soc_react', 'soc_comment', 'soc_vote', 'soc_delete', 'soc_photo'];
-/** A staff account whose role is scoped "Personal assistant": companies, contacts, customers and vessels — nothing else, no money. Administrators are never scoped. */
+/** A staff account whose role is scoped "Personal assistant": organisations, contacts, customers, vessels and the HR leaves console (R87-002) — nothing else, no money, no personal data. Administrators are never scoped. */
 function pa_only(): bool {
     static $v = null; if ($v !== null) return $v; $u = current_user();
     if (!$u || !is_staff() || is_cp_admin() || empty($u['staff_role_id'])) return $v = false;
