@@ -420,18 +420,65 @@ function sup_import_parse(string $path): array {
         if ($id) $nUpd++; else $nNew++;
     }
     if (!$out) throw new RuntimeException(t('stk.imp_empty'));
-    return ['rows' => $out, 'map' => $map, 'warnings' => $warn, 'n_new' => $nNew, 'n_upd' => $nUpd];
+    $contacts = sup_import_contacts($path, $out, $byVat, $byErp, $byName, $warn);   // R84-001: the "Contacts" sheet → people of the suppliers in the Contacts module
+    return ['rows' => $out, 'map' => $map, 'warnings' => $warn, 'n_new' => $nNew, 'n_upd' => $nUpd, 'contacts' => $contacts];
+}
+/** The optional "Contacts" sheet of the workbook: Supplier code · Supplier VAT · Supplier · Full name · Position · Email · Phone · Mobile.   GAS-CP-R84-001
+ *  Each person is tied to a supplier of the first sheet (by code, VAT or name) or to an existing supplier; existing people (same company + e-mail, else same name) are updated. */
+function sup_import_contacts(string $path, array $rows, array $byVat, array $byErp, array $byName, array &$warn): array {
+    try { $cr = xlsx_rows($path, 'Contacts'); } catch (Throwable $e) { $cr = []; }
+    if (count($cr) < 2) return [];
+    $H = ['sup_code' => ['supplier code', 'code', 'erp code', 'κωδικός', 'κωδικός προμηθευτή'], 'sup_vat' => ['supplier vat', 'vat', 'vat no.', 'αφμ', 'αφμ προμηθευτή'], 'sup_name' => ['supplier', 'company', 'επωνυμία', 'προμηθευτής'],
+          'full_name' => ['full name', 'name', 'contact', 'ονοματεπώνυμο', 'όνομα'], 'position' => ['position', 'role', 'θέση'], 'email' => ['email', 'e-mail'], 'phone' => ['phone', 'tel', 'τηλέφωνο'], 'mobile' => ['mobile', 'κινητό', 'cell']];
+    $map = []; foreach ($cr[0] as $i => $h) { $n = mb_strtolower(trim((string)$h)); foreach ($H as $k => $alts) if (!isset($map[$k]) && in_array($n, $alts, true)) { $map[$k] = $i; break; } }
+    if (!isset($map['full_name'])) { $warn[] = t('sup.imp_w_ct_cols'); return []; }
+    $rowByVat = []; $rowByErp = []; $rowByName = []; foreach ($rows as $i => $r) { if ($r['vat_no']) $rowByVat[preg_replace('/\D/', '', (string)$r['vat_no'])] = $i; if ($r['erp_code']) $rowByErp[mb_strtolower((string)$r['erp_code'])] = $i; $rowByName[mb_strtolower($r['name'])] = $i; }
+    $out = [];
+    foreach (array_slice($cr, 1) as $i => $r) {
+        $line = $i + 2; $g = fn(string $k) => isset($map[$k]) ? trim((string)($r[$map[$k]] ?? '')) : '';
+        $name = mb_substr($g('full_name'), 0, 120); if ($name === '') continue;
+        $vat = preg_replace('/\D/', '', $g('sup_vat')); $erp = mb_strtolower($g('sup_code')); $sn = mb_strtolower($g('sup_name'));
+        $row = ($vat && isset($rowByVat[$vat])) ? $rowByVat[$vat] : (($erp && isset($rowByErp[$erp])) ? $rowByErp[$erp] : (($sn && isset($rowByName[$sn])) ? $rowByName[$sn] : null));
+        $cid = $row !== null ? (int)$rows[$row]['id'] : (($vat && isset($byVat[$vat])) ? $byVat[$vat] : (($erp && isset($byErp[$erp])) ? $byErp[$erp] : ($byName[$sn] ?? 0)));
+        if ($row === null && !$cid) { $warn[] = t('sup.imp_w_ct_sup', ['l' => $line, 'n' => $name]); continue; }
+        $email = mb_strtolower($g('email')); if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) { $warn[] = t('sup.imp_w_email', ['l' => $line, 'n' => $name]); $email = ''; }
+        $exists = 0; if ($cid) $exists = (int) (scalar('SELECT id FROM contacts WHERE company_id = ? AND ' . ($email !== '' ? 'email = ?' : 'full_name = ?') . ' LIMIT 1', [$cid, $email !== '' ? $email : $name]) ?: 0);
+        $out[] = ['line' => $line, 'row' => $row, 'company_id' => $cid, 'supplier' => $row !== null ? $rows[$row]['name'] : ($g('sup_name') ?: '#' . $cid), 'id' => $exists, 'full_name' => $name, 'position' => mb_substr($g('position'), 0, 120) ?: null, 'email' => $email ?: null, 'phone' => mb_substr($g('phone'), 0, 60) ?: null, 'mobile' => mb_substr($g('mobile'), 0, 60) ?: null];
+    }
+    return $out;
+}
+/** The import template: both sheets with the expected headers and one example line.   GAS-CP-R84-001 */
+function sup_import_template(): void {
+    require_pr_admin(); require_once __DIR__ . '/xlsxw.php';
+    xlsx_download('GAS-suppliers-import-template.xlsx', [
+        ['name' => 'Suppliers', 'first' => true, 'header' => ['ERP code', 'Name', 'VAT No.', 'Address', 'Postal code', 'City', 'Country', 'Phone', 'Email', 'Website', 'Terms days', 'Advance %', 'Currency', 'Incoterms', 'Lead days', 'Makers', 'Notes'],
+         'rows' => [['SUP-0001', 'Example Marine Electric S.A.', 'EL123456789', 'Akti Miaouli 10', '18535', 'Piraeus', 'GR', '+30 210 0000000', 'sales@example.com', 'https://www.example.com', 60, 30, 'EUR', 'EXW', 21, 'Siemens; Schneider Electric', 'Price list 2026']],
+         'widths' => [12, 34, 14, 28, 10, 14, 8, 18, 26, 26, 10, 10, 9, 10, 9, 30, 30]],
+        ['name' => 'Contacts', 'header' => ['Supplier code', 'Supplier VAT', 'Supplier', 'Full name', 'Position', 'Email', 'Phone', 'Mobile'],
+         'rows' => [['SUP-0001', 'EL123456789', 'Example Marine Electric S.A.', 'Maria Example', 'Sales engineer', 'maria@example.com', '+30 210 0000001', '+30 69 0000 0000']],
+         'widths' => [14, 14, 34, 26, 20, 28, 18, 18]],
+    ]);
 }
 /** Apply: new suppliers created, existing ones updated field by field (empty cells never erase), makers added (never removed). */
 function sup_import_apply(array $pv, bool $updateExisting = true): array {
     require_pr_admin(); $created = 0; $updated = 0; $makersN = 0;
-    foreach ($pv['rows'] as $r) {
+    foreach ($pv['rows'] as $i => $r) {
         $id = (int)$r['id'];
         if ($id) { if (!$updateExisting) continue; $set = []; $a = []; foreach (['country', 'city', 'website', 'email', 'phone'] as $k) if ($r[$k] !== null) { $set[] = "$k = ?"; $a[] = $r[$k]; } if ($r['notes'] !== null) { $set[] = 'notes = COALESCE(NULLIF(notes, \'\'), ?)'; $a[] = $r['notes']; } if ($set) { $a[] = $id; q('UPDATE companies SET ' . implode(', ', $set) . ' WHERE id = ?', $a); } $updated++; }
         else { q("INSERT INTO companies (name, kind, country, city, website, email, phone, notes, is_active) VALUES (?,'supplier',?,?,?,?,?,?,1)", [$r['name'], $r['country'], $r['city'], $r['website'], $r['email'], $r['phone'], $r['notes']]); $id = (int) db()->lastInsertId(); $created++; }
         q('INSERT INTO supplier_details (company_id, erp_code, vat_no, address, postal_code, terms_days, advance_pct, currency, lead_days, incoterms) VALUES (?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE erp_code = COALESCE(VALUES(erp_code), erp_code), vat_no = COALESCE(VALUES(vat_no), vat_no), address = COALESCE(VALUES(address), address), postal_code = COALESCE(VALUES(postal_code), postal_code), terms_days = COALESCE(VALUES(terms_days), terms_days), advance_pct = COALESCE(VALUES(advance_pct), advance_pct), currency = COALESCE(VALUES(currency), currency), lead_days = COALESCE(VALUES(lead_days), lead_days), incoterms = COALESCE(VALUES(incoterms), incoterms)',
           [$id, $r['erp_code'], $r['vat_no'], $r['address'], $r['postal_code'], $r['terms_days'], $r['advance_pct'], $r['currency'], $r['lead_days'], $r['incoterms']]);
         foreach ($r['makers'] as $k => $m) { sup_maker_add($id, $m, $k === 0 && !scalar('SELECT 1 FROM supplier_makers WHERE supplier_id = ? AND is_primary = 1', [$id])); $makersN++; }
+        $pv['rows'][$i]['id'] = $id;
     }
-    cache_bump_later('inv'); return ['created' => $created, 'updated' => $updated, 'makers' => $makersN];
+    $ctN = 0; $me = (int)(current_user()['id'] ?? 0);
+    foreach ($pv['contacts'] ?? [] as $c) {   // R84-001: people of the suppliers into the Contacts module, category "supplier"
+        $cid = $c['row'] !== null ? (int)($pv['rows'][$c['row']]['id'] ?? 0) : (int)$c['company_id']; if (!$cid) continue;
+        $coName = (string) (scalar('SELECT name FROM companies WHERE id = ?', [$cid]) ?: '');
+        $ex = (int)($c['id'] ?: (scalar('SELECT id FROM contacts WHERE company_id = ? AND ' . ($c['email'] ? 'email = ?' : 'full_name = ?') . ' LIMIT 1', [$cid, $c['email'] ?: $c['full_name']]) ?: 0));
+        if ($ex) q('UPDATE contacts SET position = COALESCE(?, position), email = COALESCE(?, email), phone = COALESCE(?, phone), mobile = COALESCE(?, mobile), company = ?, is_active = 1 WHERE id = ?', [$c['position'], $c['email'], $c['phone'], $c['mobile'], $coName, $ex]);
+        else q("INSERT INTO contacts (company_id, company, full_name, position, category, email, phone, mobile, is_active, created_by) VALUES (?,?,?,?,'supplier',?,?,?,1,?)", [$cid, $coName, $c['full_name'], $c['position'], $c['email'], $c['phone'], $c['mobile'], $me ?: null]);
+        $ctN++;
+    }
+    cache_bump_later('inv'); return ['created' => $created, 'updated' => $updated, 'makers' => $makersN, 'contacts' => $ctN];
 }

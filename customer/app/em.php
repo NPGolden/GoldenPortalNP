@@ -51,11 +51,16 @@ function em_mailto(array $emails, array $ctx): string {
 function em_card_html(array $o): string {
     if (!em_has()) return '';
     $u = current_user(); $tx = em_text($o['kind'], $o['ctx']); $id = 'em' . substr(md5($o['kind'] . $tx['subject']), 0, 6);
+    $kinds = $o['kinds'] ?? [];   // R84-001: several templates in one card — [kind => label]; the choice swaps subject and text
+    $txs = []; foreach ($kinds as $k => $label) $txs[$k] = $k === $o['kind'] ? ['s' => $tx['subject'], 'b' => $tx['body']] : (function () use ($k, $o) { $t = em_text($k, $o['ctx']); return ['s' => $t['subject'], 'b' => $t['body']]; })();
     $h = '<details class="card em-card" id="' . $id . '"><summary class="btn btn--ghost btn--sm">✉ ' . tt('em.title') . '</summary>';
-    $h .= '<form method="post" action="' . e($o['back']) . '" class="em-form">' . csrf_field() . '<input type="hidden" name="action" value="em_draft">' . (string)($o['hidden'] ?? '');
+    $h .= '<form method="post" action="' . e($o['back']) . '" class="em-form"' . ($txs ? ' data-em-tx="' . e(json_encode($txs, JSON_UNESCAPED_UNICODE)) . '"' : '') . '>' . csrf_field() . '<input type="hidden" name="action" value="em_draft">' . (string)($o['hidden'] ?? '');
+    if (count($kinds) > 1) { $h .= '<div class="field" style="margin-bottom:8px;"><label>' . tt('em.template') . '</label><select name="em_kind" class="js-em-kind" data-nosearch>'; foreach ($kinds as $k => $label) $h .= '<option value="' . e($k) . '"' . ($k === $o['kind'] ? ' selected' : '') . '>' . e($label) . '</option>'; $h .= '</select></div>'; }
     $h .= '<div class="em-people"><label class="em-l">' . tt('em.to') . '</label>';
     if (!$o['people']) $h .= '<p class="hint" style="margin:0;">' . tt('em.no_people') . '</p>';
     foreach ($o['people'] as $p) $h .= '<label class="chk em-p"><input type="checkbox" name="to[]" value="' . e($p['email']) . '"' . ($p['on'] ? ' checked' : '') . '> <b>' . e($p['name']) . '</b> <span class="hint">' . e($p['email']) . ($p['role'] !== '' ? ' · ' . e($p['role']) : '') . '</span></label>';
+    $h .= '<div class="em-added"></div>';
+    if (function_exists('ct_has') && ct_has() && is_staff()) $h .= '<div class="field em-find-wrap" style="margin:6px 0 0; position:relative;"><input class="em-find" autocomplete="off" placeholder="' . tt('em.find_ph') . '" data-src="' . e(url('contacts_json', ['company' => (int)($o['company_id'] ?? 0) ?: null])) . '"><div class="em-find-list prq-list" hidden></div></div>';   // R84-001: pick any person of the Contacts module
     $h .= '<div class="field" style="margin:6px 0 0;"><input name="to_more" placeholder="' . tt('em.more_ph') . '"></div></div>';
     $h .= '<div class="grid grid-2"><div class="field"><label>' . tt('em.cc') . '</label><input name="cc" value="' . e((string)($u['email'] ?? '')) . '"></div>';
     $h .= '<div class="field"><label>' . tt('em.subject') . '</label><input name="subject" required value="' . e($tx['subject']) . '"></div></div>';

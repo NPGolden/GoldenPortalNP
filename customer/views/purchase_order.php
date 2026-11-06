@@ -93,7 +93,8 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
   <?php if ($o && function_exists('em_card_html') && $admin && in_array($o['status'], ['draft', 'sent', 'quoted', 'confirmed', 'partial'], true)): ?>
     <h2><?= tt('po.send_title') ?></h2>
     <p class="hint"><?= $o['status'] === 'draft' ? tt('po.send_hint_draft') : tt('po.send_hint') ?></p>
-    <?= em_card_html(['kind' => 'po', 'ctx' => ['no' => $o['po_no'], 'title' => (string)($o['title'] ?: ''), 'vessel' => '', 'customer' => (string)$o['supplier'], 'project' => (string)($o['project_code'] ?? ''), 'doc' => t($isRfq ? 'em.w_rfq' : 'em.w_po', ['no' => $o['po_no']]), 'project_id' => (int)($o['project_id'] ?? 0)], 'people' => po_people($o), 'atts' => [['po:' . $id, $o['po_no'] . '.pdf']], 'back' => $self, 'hidden' => '<input type="hidden" name="po_id" value="' . $id . '">']) ?>
+    <?php $emKinds = $isRfq ? ['rfq' => t('et.k_rfq')] : (in_array($o['status'], ['confirmed', 'partial'], true) ? ['po_chase' => t('et.k_po_chase'), 'po' => t('et.k_po')] : ['po' => t('et.k_po')]); if ($ncrs) $emKinds['ncr'] = t('et.k_ncr');   // R84-001: procurement templates
+    ?><?= em_card_html(['kind' => array_key_first($emKinds), 'kinds' => $emKinds, 'company_id' => (int)$o['supplier_id'], 'ctx' => ['no' => $o['po_no'], 'title' => (string)($o['title'] ?: ''), 'vessel' => '', 'customer' => (string)$o['supplier'], 'project' => (string)($o['project_code'] ?? ''), 'doc' => t($isRfq ? 'em.w_rfq' : 'em.w_po', ['no' => $o['po_no']]), 'project_id' => (int)($o['project_id'] ?? 0)], 'people' => po_people($o), 'atts' => [['po:' . $id, $o['po_no'] . '.pdf']], 'back' => $self, 'hidden' => '<input type="hidden" name="po_id" value="' . $id . '">']) ?>
   <?php else: ?>
     <h2><?= tt('prq.flow') ?></h2>
     <p class="hint"><?= $isRfq ? tt('po.flow_rfq') : tt('po.flow_po') ?></p>

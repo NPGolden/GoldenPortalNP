@@ -591,3 +591,35 @@ document.addEventListener('click', function (ev) {
 })();
 /* R78-005: [data-tl-more="#list"] shows the folded entries of a timeline (.eq-tl.is-folded keeps the first 10) */
 document.querySelectorAll('[data-tl-more]').forEach(function (b) { var more = b.textContent; b.addEventListener('click', function () { var l = document.querySelector(b.dataset.tlMore); if (!l) return; l.classList.toggle('is-folded'); b.textContent = l.classList.contains('is-folded') ? more : b.dataset.less; }); });
+
+/* ---- E-mail card (R84-001): template switch and the Contacts finder ---- */
+(function () {
+  document.addEventListener('change', function (e) {
+    var sel = e.target.closest('.js-em-kind'); if (!sel) return;
+    var f = sel.closest('form'); var tx = {}; try { tx = JSON.parse(f.getAttribute('data-em-tx') || '{}'); } catch (x) {}
+    var t = tx[sel.value]; if (!t) return;
+    var s = f.querySelector('[name="subject"]'); var b = f.querySelector('[name="body"]'); if (s) s.value = t.s; if (b) b.value = t.b;
+  });
+  var timer = null;
+  document.addEventListener('input', function (e) {
+    var inp = e.target.closest('.em-find'); if (!inp) return;
+    var list = inp.parentNode.querySelector('.em-find-list'); var q = inp.value.trim();
+    clearTimeout(timer); if (q.length < 2) { list.hidden = true; list.innerHTML = ''; return; }
+    timer = setTimeout(function () {
+      fetch(inp.getAttribute('data-src') + '&q=' + encodeURIComponent(q), { credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (rows) {
+        list.innerHTML = rows.length ? rows.map(function (r) { return '<div class="prq-opt" data-email="' + r.email.replace(/"/g, '&quot;') + '" data-name="' + r.name.replace(/"/g, '&quot;') + '" data-role="' + (r.role || '').replace(/"/g, '&quot;') + '"><b>' + r.name.replace(/</g, '&lt;') + '</b> <span class="hint">' + r.email.replace(/</g, '&lt;') + (r.role ? ' · ' + r.role.replace(/</g, '&lt;') : '') + '</span></div>'; }).join('') : '<div class="prq-opt hint">—</div>';
+        list.hidden = false;
+      }).catch(function () { list.hidden = true; });
+    }, 250);
+  });
+  document.addEventListener('click', function (e) {
+    var opt = e.target.closest('.em-find-list .prq-opt'); if (opt && opt.getAttribute('data-email')) {
+      var wrap = opt.closest('.em-people'); var f = opt.closest('form'); var email = opt.getAttribute('data-email');
+      var dup = Array.prototype.some.call(f.querySelectorAll('input[name="to[]"]'), function (i) { if (i.value.toLowerCase() === email.toLowerCase()) { i.checked = true; return true; } return false; });
+      if (!dup) { var l = document.createElement('label'); l.className = 'chk em-p'; l.innerHTML = '<input type="checkbox" name="to[]" checked> <b></b> <span class="hint"></span>'; l.querySelector('input').value = email; l.querySelector('b').textContent = opt.getAttribute('data-name'); l.querySelector('.hint').textContent = email + (opt.getAttribute('data-role') ? ' · ' + opt.getAttribute('data-role') : ''); wrap.querySelector('.em-added').appendChild(l); }
+      var inp = wrap.querySelector('.em-find'); inp.value = ''; var list = wrap.querySelector('.em-find-list'); list.hidden = true; list.innerHTML = '';
+      e.preventDefault(); return;
+    }
+    if (!e.target.closest('.em-find-wrap')) document.querySelectorAll('.em-find-list').forEach(function (l) { l.hidden = true; });
+  });
+})();

@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.98.0';
+const CP_VERSION = '1.99.0';
 const CP_BUILD   = '2026-11-06';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R84-001', 'version' => '1.99.0', 'date' => '2026-11-06', 'title' => 'Procurement e-mail: five supplier templates (request for quotation, purchase order, expediting, non-conformance, remittance advice) under Settings › E-mail templates, chosen inside the ✉ card of the order / RFQ and of the paid supplier invoice; every ✉ card finds any person of the Contacts module by name, e-mail or company and adds him to the recipients. Suppliers › Import from ERP: downloadable template (sheets Suppliers + Contacts); the Contacts sheet creates or updates the people of each supplier in the Contacts module (category Supplier), so they are offered in the e-mail card; the supplier card lists its people with e-mail and phone.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R83-001', 'version' => '1.98.0', 'date' => '2026-11-06', 'title' => 'HR › Utilization: hours on projects against the working time of every portal user — capacity from the working calendar while employed, project hours from the timesheets, internal work and absences from the planning board, idle hours and whole idle days computed day by day; per month, per project and per activity for one person, team table per year or any period with discipline and technical-only filters, CSV and print; for HR, management, administrators and the managers of a discipline.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R82-003', 'version' => '1.97.0', 'date' => '2026-11-06', 'title' => 'Purchase orders and RFQs: ✉ E-mail button in the header opens the e-mail card (Outlook draft with the PDF, marks the document as sent — no SMTP, as everywhere in the portal). Parts from the phone: the Service (0.6.18), Golden PM (1.0.10) and Golden HR (1.0.4) apps raise and follow purchase requisitions — project / sub-project / purpose / needed-by, lines from the inventory (search or barcode) or free text, submit, follow the state per line (reserved · ordered · received · issued), log, cancel; Procurement approves / rejects from the phone. API /requisitions.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R82-002', 'version' => '1.96.1', 'date' => '2026-11-06', 'title' => 'Suppliers: import from the ERP (xlsx with Επωνυμία · ΑΦΜ · Κωδικός · address · phone · e-mail · terms · advance · currency · Incoterms · lead days · makers; preview, match by VAT / ERP code / name, empty cells never erase) and makers / brands per supplier (several makers per supplier, several suppliers per maker, one primary ★) — the "To buy" basket suggests the supplier of the maker for items never bought before; ERP code on the supplier card; supplier contacts list fixed.', 'db' => 'install/migrate_cp_r82_002_supplier_makers.sql', 'check' => 'r82b'],

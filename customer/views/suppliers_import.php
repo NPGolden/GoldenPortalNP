@@ -3,6 +3,7 @@
 require __DIR__ . '/_layout.php';
 $u = require_staff(); if (!function_exists('pr_admin') || !pr_admin()) { http_response_code(403); exit(t('err.noaccess')); }
 if (isset($_GET['discard'])) unset($_SESSION['sup_import']);
+if (isset($_GET['template'])) { sup_import_template(); return; }
 $prev = $_SESSION['sup_import'] ?? null; $res = $_SESSION['sup_import_result'] ?? null; unset($_SESSION['sup_import_result']);
 layout_head(t('sup.import'), 'suppliers');
 ?>
@@ -16,6 +17,7 @@ layout_head(t('sup.import'), 'suppliers');
     <form method="post" action="<?= url('suppliers_import') ?>" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sup_import_parse">
       <div class="field"><label><?= tt('im.file') ?> (.xlsx)</label><input type="file" name="file" accept=".xlsx" required></div>
       <p class="hint"><?= tt('sup.imp_cols') ?></p>
+      <p class="hint">⤓ <a href="<?= url('suppliers_import', ['template' => 1]) ?>"><?= tt('sup.imp_template') ?></a> — <?= tt('sup.imp_template_h') ?></p>
       <button class="btn btn--gold" type="submit"><?= tt('stk.imp_preview') ?></button>
     </form>
   </div>
@@ -28,6 +30,10 @@ layout_head(t('sup.import'), 'suppliers');
     <div class="table-scroll" style="max-height:380px;"><table class="tbl"><thead><tr><th>#</th><th><?= tt('sup.one') ?></th><th><?= tt('sup.vat') ?></th><th><?= tt('sup.erp_code') ?></th><th><?= tt('co.place') ?></th><th><?= tt('sup.terms') ?></th><th><?= tt('sup.makers') ?></th><th></th></tr></thead><tbody>
       <?php foreach (array_slice($prev['rows'], 0, 80) as $r): ?><tr><td class="hint"><?= (int)$r['line'] ?></td><td><b><?= e($r['name']) ?></b><?= $r['email'] ? '<br><small class="hint">' . e($r['email']) . '</small>' : '' ?></td><td class="mono"><?= e($r['vat_no'] ?? '') ?></td><td class="mono"><?= e($r['erp_code'] ?? '') ?></td><td><?= e(implode(', ', array_filter([$r['city'], $r['country']]))) ?></td><td><?= $r['terms_days'] !== null ? e(t('sup.days_n', ['n' => $r['terms_days']])) : '' ?><?= $r['currency'] ? ' · ' . e($r['currency']) : '' ?><?= $r['incoterms'] ? ' · ' . e($r['incoterms']) : '' ?></td><td><?= e(implode(', ', $r['makers'])) ?></td><td><?= $r['id'] ? pill('navy', t('sup.imp_update')) : pill('ok', t('stk.imp_new')) ?></td></tr><?php endforeach; ?>
       <?php if (count($prev['rows']) > 80): ?><tr><td colspan="8" class="hint"><?= e(t('stk.imp_more', ['n' => count($prev['rows']) - 80])) ?></td></tr><?php endif; ?></tbody></table></div>
+    <?php if (!empty($prev['contacts'])): ?><p class="hint" style="margin:10px 0 4px;"><b>👤 <?= e(t('sup.imp_ct_n', ['n' => count($prev['contacts']), 'u' => count(array_filter($prev['contacts'], fn($c) => $c['id']))])) ?></b></p>
+    <div class="table-scroll" style="max-height:260px;"><table class="tbl"><thead><tr><th>#</th><th><?= tt('sup.one') ?></th><th><?= tt('wc.name') ?></th><th><?= tt('ct.position') ?></th><th><?= tt('ct.ch_email') ?></th><th><?= tt('ct.phone') ?></th><th></th></tr></thead><tbody>
+      <?php foreach (array_slice($prev['contacts'], 0, 80) as $c): ?><tr><td class="hint"><?= (int)$c['line'] ?></td><td><?= e($c['supplier']) ?></td><td><b><?= e($c['full_name']) ?></b></td><td><?= e((string)$c['position']) ?></td><td><?= e((string)$c['email']) ?></td><td><?= e((string)($c['mobile'] ?: $c['phone'])) ?></td><td><?= $c['id'] ? pill('mute', t('sup.imp_ct_upd')) : pill('ok', t('sup.imp_ct_new')) ?></td></tr><?php endforeach; ?>
+    </tbody></table></div><?php endif; ?>
   </div>
   <div class="card">
     <h2>3 · <?= tt('stk.imp_apply') ?></h2>

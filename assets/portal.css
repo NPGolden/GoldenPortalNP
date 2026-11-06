@@ -1872,3 +1872,5 @@ html[data-theme="dark"] .pp-col { background: #16263A; } html[data-theme="dark"]
 .ut-bar span { display: block; height: 100%; } .ut-p { background: #2F7D5C; } .ut-i { background: #1F3A5F; } .ut-a { background: #B9C3CF; } .ut-x { background: #9B2C2C; }
 .ut-key { display: inline-block; width: 10px; height: 10px; border-radius: 2px; vertical-align: middle; margin: 0 2px 0 8px; }
 :root[data-theme="dark"] .ut-bar { background: rgba(255, 255, 255, .1); }
+/* R84-001 e-mail card finder */
+.em-find-list { position: absolute; left: 0; right: 0; top: 100%; z-index: 30; max-height: 240px; overflow: auto; }
