@@ -623,3 +623,22 @@ document.querySelectorAll('[data-tl-more]').forEach(function (b) { var more = b.
     if (!e.target.closest('.em-find-wrap')) document.querySelectorAll('.em-find-list').forEach(function (l) { l.hidden = true; });
   });
 })();
+
+/* ---- R86-002: data-prompt — a form that needs a typed reason before it goes (replaces inline onsubmit prompts, which CSP blocks) ---- */
+(function () {
+  document.addEventListener('submit', function (e) {
+    var f = e.target; if (!f.matches || !f.matches('form[data-prompt]') || f.dataset.promptDone === '1') return;
+    e.preventDefault(); var r = window.prompt(f.getAttribute('data-prompt') || '', '');
+    if (r === null || !r.trim()) return;
+    var name = f.getAttribute('data-prompt-field') || 'note'; var inp = f.querySelector('[name="' + name + '"]');
+    if (!inp) { inp = document.createElement('input'); inp.type = 'hidden'; inp.name = name; f.appendChild(inp); }
+    inp.value = r.trim(); f.dataset.promptDone = '1'; if (f.requestSubmit) f.requestSubmit(); else f.submit();
+  }, true);
+})();
+
+/* ---- R86-002: data-js-open — tiny helper that replace inline onclick (blocked by CSP) ---- */
+(function () {
+  document.addEventListener('click', function (e) {
+    var o = e.target.closest('[data-js-open]'); if (o) { var d = document.getElementById(o.getAttribute('data-js-open')); if (d) d.open = true; }
+  });
+})();

@@ -250,11 +250,14 @@ function prq_sub_summary(int $sid): array {
             'to_buy' => (int) scalar("SELECT COUNT(*) FROM pr_lines l JOIN pr_requests r ON r.id = l.request_id WHERE r.subproject_id = ? AND l.status = 'to_buy'", [$sid])];
 }
 /** Item picker (JSON): code · description · unit · on hand · free · last price. */
-function prq_item_search(string $q, int $limit = 15): array {
-    $rows = stk_items(['q' => $q, 'status' => 'active'], $limit); $out = [];
+function prq_item_search(string $q, int $limit = 15, int $supplier = 0): array {
+    $rows = stk_items(array_filter(['q' => $q, 'status' => 'active', 'supplier' => $supplier ?: null]), $limit); $out = [];
+    if ($q === '' && $supplier && count($rows) < $limit) $rows = array_merge($rows, array_slice(stk_items(['status' => 'active'], $limit * 2), 0, $limit - count($rows)));   // R86-002: dropdown on focus — the supplier's items first, then the rest
+    $seen = []; $rows = array_values(array_filter($rows, function ($r) use (&$seen) { if (isset($seen[$r['id']])) return false; return $seen[$r['id']] = true; }));
     $withAlts = !empty($_GET['alts']) && function_exists('stk_alternatives_of');
     foreach ($rows as $r) { $alts = [];
         if ($withAlts) foreach (stk_alternatives_of((int)$r['id']) as $a) { if ($a['status'] !== 'approved') continue; $ai = $a['alt_item_id'] ? stk_item((int)$a['alt_item_id']) : null; $alts[] = ['id' => $ai ? (int)$ai['id'] : 0, 'code' => $ai ? $ai['code'] : null, 'desc' => $ai ? $ai['description'] : ($a['description'] ?: trim(($a['maker'] ?? '') . ' ' . ($a['part_no'] ?? ''))), 'maker' => $ai ? $ai['maker'] : $a['maker'], 'pn' => $ai ? $ai['factory_code'] : $a['part_no'], 'unit' => $ai ? $ai['unit'] : $r['unit'], 'free' => $ai ? (float)$ai['on_hand'] - (float)$ai['reserved'] : 0, 'note' => $a['note']]; }
-        $out[] = ['alts' => $alts, 'id' => (int)$r['id'], 'code' => $r['code'], 'desc' => $r['description'], 'maker' => $r['maker'], 'pn' => $r['factory_code'], 'unit' => $r['unit'], 'on_hand' => (float)$r['on_hand'], 'free' => (float)$r['on_hand'] - (float)$r['reserved'], 'price' => stk_price_visible() && $r['last_price'] !== null ? (float)$r['last_price'] : null, 'cur' => $r['currency']]; }
+        $codes = array_values(array_filter([['k' => 'pn', 'v' => (string)($r['factory_code'] ?? '')], ['k' => 'barcode', 'v' => (string)($r['barcode'] ?? '')], ['k' => 'code', 'v' => (string)$r['code']]], fn($c) => $c['v'] !== ''));
+        $out[] = ['codes' => $codes, 'alts' => $alts, 'id' => (int)$r['id'], 'code' => $r['code'], 'desc' => $r['description'], 'maker' => $r['maker'], 'pn' => $r['factory_code'], 'unit' => $r['unit'], 'on_hand' => (float)$r['on_hand'], 'free' => (float)$r['on_hand'] - (float)$r['reserved'], 'price' => stk_price_visible() && $r['last_price'] !== null ? (float)$r['last_price'] : null, 'cur' => $r['currency']]; }
     return $out;
 }

@@ -82,6 +82,7 @@ function stk_items(array $f = [], ?int $limit = null): array {
     if (!empty($f['cat'])) { $w[] = '(i.category_id = ? OR i.category_id IN (SELECT id FROM inv_categories WHERE parent_id = ?))'; $a[] = (int)$f['cat']; $a[] = (int)$f['cat']; }
     if (!empty($f['maker'])) { $w[] = 'i.maker = ?'; $a[] = (string)$f['maker']; }
     if (!empty($f['loc'])) { $w[] = 'i.location LIKE ?'; $a[] = $f['loc'] . '%'; }
+    if (!empty($f['supplier'])) { $w[] = '(i.preferred_supplier_id = ? OR i.last_supplier_id = ? OR EXISTS (SELECT 1 FROM inv_prices p WHERE p.item_id = i.id AND p.supplier_id = ?) OR EXISTS (SELECT 1 FROM supplier_makers sm WHERE sm.supplier_id = ? AND sm.maker <> \'\' AND sm.maker = i.maker))'; array_push($a, (int)$f['supplier'], (int)$f['supplier'], (int)$f['supplier'], (int)$f['supplier']); }   // R86-002: items of a supplier (bought, preferred, or of a maker it represents)
     if (!empty($f['q'])) { $q = trim((string)$f['q']); $l = '%' . $q . '%'; $w[] = '(i.code LIKE ? OR i.description LIKE ? OR i.description_en LIKE ? OR i.factory_code LIKE ? OR i.barcode = ? OR i.maker LIKE ? OR i.location LIKE ?)'; array_push($a, $l, $l, $l, $l, $q, $l, $l); }
     $stock = $f['stock'] ?? 'any';
     if ($stock === 'instock') $w[] = '(SELECT COALESCE(SUM(s.qty_on_hand),0) FROM inv_stock s WHERE s.item_id = i.id) > 0';
@@ -95,6 +96,18 @@ function stk_items(array $f = [], ?int $limit = null): array {
 function stk_item(int $id): ?array { return stk_has() && $id ? one(STK_SELECT . ' WHERE i.id = ?', [$id]) ?: null : null; }
 function stk_item_by_code(string $code): ?array { return stk_has() && $code !== '' ? one(STK_SELECT . ' WHERE i.code = ?', [$code]) ?: null : null; }
 function stk_makers(): array { return stk_has() ? array_column(all('SELECT DISTINCT maker FROM inv_items WHERE maker IS NOT NULL AND maker <> "" ORDER BY maker'), 'maker') : []; }
+/** Create an inventory item from a procurement line (code · description · maker · maker part no · unit · category) — R86-002. */
+function stk_item_quick_create(array $d): int {
+    require_pr_admin(); $code = mb_substr(trim((string)($d['code'] ?? '')), 0, 60); $desc = mb_substr(trim((string)($d['description'] ?? '')), 0, 255);
+    if ($code === '' || $desc === '') throw new RuntimeException(t('stk.need_code_desc'));
+    if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._\-\/+]*$/u', $code)) throw new RuntimeException(t('stk.bad_code'));
+    if ($dup = scalar('SELECT id FROM inv_items WHERE code = ?', [$code])) return (int)$dup;
+    $u = current_user();
+    q('INSERT INTO inv_items (code, description, category_id, unit, maker, factory_code, status, currency, preferred_supplier_id, created_by) VALUES (?,?,?,?,?,?,\'active\',\'EUR\',?,?)',
+      [$code, $desc, (int)($d['category_id'] ?? 0) ?: null, stk_unit_norm((string)($d['unit'] ?? 'pcs')), mb_substr(trim((string)($d['maker'] ?? '')), 0, 80) ?: null, mb_substr(trim((string)($d['part_no'] ?? '')), 0, 80) ?: null, (int)($d['supplier_id'] ?? 0) ?: null, (int)($u['id'] ?? 0) ?: null]);
+    $id = (int) db()->lastInsertId(); if (function_exists('sup_maker_add') && !empty($d['supplier_id']) && !empty($d['maker'])) { try { sup_maker_add((int)$d['supplier_id'], (string)$d['maker'], false); } catch (Throwable $e) {} }
+    cache_bump_later('inv'); return $id;
+}
 function stk_item_save_from_post(int $id): int {
     require_pr_admin(); $s = fn(string $k, int $max) => ($v = trim((string)($_POST[$k] ?? ''))) === '' ? null : mb_substr($v, 0, $max);
     $code = $s('code', 60); $desc = $s('description', 255); if (!$code || !$desc) throw new RuntimeException(t('stk.need_code_desc'));

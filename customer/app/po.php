@@ -123,6 +123,7 @@ function po_line_from_pr(int $oid, int $plid): ?int {
 function po_line_save_from_post(): int {
     $oid = (int)($_POST['order_id'] ?? 0); $o = po_load($oid); if (!$o || !po_editable($o)) throw new RuntimeException(t('err.noaccess'));
     $lid = (int)($_POST['line_id'] ?? 0); $qty = (float) str_replace(',', '.', (string)($_POST['qty'] ?? '0')); if ($qty <= 0) throw new RuntimeException(t('prq.need_qty'));
+    if (!empty($_POST['new_item']) && function_exists('stk_item_quick_create')) $_POST['item_id'] = stk_item_quick_create(['code' => $_POST['new_code'] ?? '', 'description' => $_POST['description'] ?? '', 'maker' => $_POST['maker'] ?? '', 'part_no' => $_POST['part_no'] ?? '', 'unit' => $_POST['unit'] ?? 'pcs', 'category_id' => $_POST['new_category_id'] ?? 0, 'supplier_id' => $o['supplier_id']]);   // R86-002: "+ New item" from the line form
     $itemId = (int)($_POST['item_id'] ?? 0) ?: null; $it = $itemId ? stk_item($itemId) : null; if ($itemId && !$it) throw new RuntimeException(t('err.notfound'));
     $altOf = (int)($_POST['alt_of_item_id'] ?? 0) ?: null;
     $desc = mb_substr(trim((string)($_POST['description'] ?? '')), 0, 255); if ($it) $desc = $desc ?: (string)$it['description']; if ($desc === '') throw new RuntimeException(t('prq.need_desc'));

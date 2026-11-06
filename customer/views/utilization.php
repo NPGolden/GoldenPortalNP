@@ -32,7 +32,7 @@ if (($_GET['export'] ?? '') === 'csv') {
 layout_head(t('ut.title') . ($person ? ' · ' . $person['full_name'] : ''), 'utilization');
 ?>
 <div class="page-head"><div><h1><?= tt('ut.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('ut.lede') ?></p></div>
-  <div class="actions"><a class="btn btn--ghost btn--sm" href="<?= url('utilization', $keep + ['export' => 'csv']) ?>">⤓ CSV</a> <button class="btn btn--ghost btn--sm" type="button" onclick="window.print()">🖨 <?= tt('btn.print') ?></button></div></div>
+  <div class="actions"><a class="btn btn--ghost btn--sm" href="<?= url('utilization', $keep + ['export' => 'csv']) ?>">⤓ CSV</a> <button class="btn btn--ghost btn--sm" type="button" data-js-print>🖨 <?= tt('btn.print') ?></button></div></div>
 <div class="card card--tight">
   <form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1.4fr 1fr .8fr 1fr 1fr auto;">
     <input type="hidden" name="p" value="utilization">

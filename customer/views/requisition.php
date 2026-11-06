@@ -21,8 +21,8 @@ layout_head(($r ? $r['pr_no'] : t('prq.new')) . ' · ' . t('prq.title'), 'requis
   <div><h1>🧾 <?= $r ? e($r['pr_no']) : tt('prq.new') ?> <?= $r ? prq_pill($r['status']) : '' ?><?= $r && (int)$r['over_budget'] && in_array($r['status'], ['submitted', 'mgmt', 'approved'], true) ? ' ' . pill('warn', t('prq.over')) : '' ?></h1>
     <?php if ($r): ?><p class="lede" style="margin-bottom:0;"><?= pr_link((int)$r['project_id'], $r['project_code'], $r['project_name']) ?><?= $r['subproject_id'] ? ' › <a href="' . url('subproject', ['id' => (int)$r['subproject_id'], 'tab' => 'procurement']) . '">' . e($r['sub_code'] . ' · ' . $r['sub_name']) . '</a>' : '' ?> · <?= tt('prq.p_' . $r['purpose']) ?> · <?= e($r['requester_name'] ?? '') ?><?= $r['discipline'] ? ' (' . e($r['discipline']) . ')' : '' ?></p><?php endif; ?></div>
   <div class="btn-row">
-    <?php if ($r && $r['status'] === 'draft' && $edit): ?><form method="post" action="<?= url('requisition', ['id' => $id]) ?>" data-lock onsubmit="return confirm(<?= e(json_encode(t('prq.submit_q'))) ?>)"><?= csrf_field() ?><input type="hidden" name="action" value="prq_submit"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--gold btn--sm" type="submit"<?= $lines ? '' : ' disabled' ?>>➤ <?= tt('prq.submit') ?></button></form><?php endif; ?>
-    <?php if ($r && (($r['requester_id'] == $u['id'] && in_array($r['status'], ['draft', 'submitted'], true)) || ($admin && in_array($r['status'], ['draft', 'submitted', 'mgmt', 'approved'], true)))): ?><form method="post" action="<?= url('requisition', ['id' => $id]) ?>" data-lock onsubmit="return confirm(<?= e(json_encode(t('prq.cancel_q'))) ?>)"><?= csrf_field() ?><input type="hidden" name="action" value="prq_cancel"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost btn--sm" type="submit">✕ <?= tt('prq.cancel') ?></button></form><?php endif; ?>
+    <?php if ($r && $r['status'] === 'draft' && $edit): ?><form method="post" action="<?= url('requisition', ['id' => $id]) ?>" data-lock data-confirm="<?= e(t('prq.submit_q')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="prq_submit"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--gold btn--sm" type="submit"<?= $lines ? '' : ' disabled' ?>>➤ <?= tt('prq.submit') ?></button></form><?php endif; ?>
+    <?php if ($r && (($r['requester_id'] == $u['id'] && in_array($r['status'], ['draft', 'submitted'], true)) || ($admin && in_array($r['status'], ['draft', 'submitted', 'mgmt', 'approved'], true)))): ?><form method="post" action="<?= url('requisition', ['id' => $id]) ?>" data-lock data-confirm="<?= e(t('prq.cancel_q')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="prq_cancel"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost btn--sm" type="submit">✕ <?= tt('prq.cancel') ?></button></form><?php endif; ?>
   </div>
 </div>
 
@@ -50,7 +50,7 @@ layout_head(($r ? $r['pr_no'] : t('prq.new')) . ' · ' . t('prq.title'), 'requis
     </div>
     <div class="btn-row"><button class="btn btn--sm" type="submit"><?= $r ? tt('prq.save') : tt('prq.create') ?></button><?php if (!$r): ?><span class="hint"><?= tt('prq.create_hint') ?></span><?php endif; ?></div>
   </form>
-  <script>(function(){var p=document.getElementById('prq-p'),s=document.getElementById('prq-s');if(!p||!s)return;function f(){var v=p.value;Array.prototype.forEach.call(s.options,function(o){if(!o.value)return;var on=!v||o.getAttribute('data-p')===v;o.hidden=!on;o.disabled=!on;});if(s.selectedOptions[0]&&s.selectedOptions[0].disabled)s.value='';}p.addEventListener('change',f);f();})();</script>
+  <script nonce="<?= csp_nonce() ?>">(function(){var p=document.getElementById('prq-p'),s=document.getElementById('prq-s');if(!p||!s)return;function f(){var v=p.value;Array.prototype.forEach.call(s.options,function(o){if(!o.value)return;var on=!v||o.getAttribute('data-p')===v;o.hidden=!on;o.disabled=!on;});if(s.selectedOptions[0]&&s.selectedOptions[0].disabled)s.value='';}p.addEventListener('change',f);f();})();</script>
   <?php else: ?>
   <div class="kv-grid">
     <div class="kv"><span><?= tt('prq.purpose') ?></span><b><?= tt('prq.p_' . $r['purpose']) ?></b></div><div class="kv"><span><?= tt('prq.need') ?></span><b><?= fmt_date($r['need_date']) ?></b></div>
@@ -69,14 +69,14 @@ layout_head(($r ? $r['pr_no'] : t('prq.new')) . ' · ' . t('prq.title'), 'requis
   <p class="hint"><?= $overNow ? ($B && $B['parts_budget'] !== null && $B['parts_budget'] > 0 ? tt('prq.decide_over') : ($r['purpose'] === 'project' ? tt('prq.decide_nobudget') : tt('prq.decide_nonproject'))) : tt('prq.decide_ok') ?></p>
   <form method="post" action="<?= url('requisition', ['id' => $id]) ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="prq_decide"><input type="hidden" name="id" value="<?= $id ?>">
     <div class="field"><label><?= tt('prq.reason') ?><?= $overNow && $r['purpose'] === 'project' ? ' *' : '' ?></label><textarea name="note" rows="2" maxlength="400" placeholder="<?= tt('prq.reason_ph') ?>"></textarea></div>
-    <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit" name="decision" value="approve">✓ <?= $overNow && $r['purpose'] === 'project' ? tt('prq.to_mgmt') : tt('prq.approve') ?></button><button class="btn btn--ghost btn--sm" type="submit" name="decision" value="reject" onclick="return confirm(<?= e(json_encode(t('prq.reject_q'))) ?>)">✕ <?= tt('prq.reject') ?></button></div>
+    <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit" name="decision" value="approve">✓ <?= $overNow && $r['purpose'] === 'project' ? tt('prq.to_mgmt') : tt('prq.approve') ?></button><button class="btn btn--ghost btn--sm" type="submit" name="decision" value="reject" data-confirm="<?= e(t('prq.reject_q')) ?>">✕ <?= tt('prq.reject') ?></button></div>
   </form>
   <?php elseif ($r && $r['status'] === 'mgmt' && $mgmt): ?>
   <h2><?= tt('prq.mgmt_decide') ?></h2>
   <p class="hint"><?= e(t('prq.mgmt_lede', ['who' => $r['approved_name'] ?? '', 'why' => $r['approval_note'] ?? ''])) ?></p>
   <form method="post" action="<?= url('requisition', ['id' => $id]) ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="prq_mgmt"><input type="hidden" name="id" value="<?= $id ?>">
     <div class="field"><label><?= tt('prq.reason') ?></label><textarea name="note" rows="2" maxlength="400"></textarea></div>
-    <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit" name="decision" value="approve">✓ <?= tt('prq.approve') ?></button><button class="btn btn--ghost btn--sm" type="submit" name="decision" value="reject" onclick="return confirm(<?= e(json_encode(t('prq.reject_q'))) ?>)">✕ <?= tt('prq.reject') ?></button></div>
+    <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit" name="decision" value="approve">✓ <?= tt('prq.approve') ?></button><button class="btn btn--ghost btn--sm" type="submit" name="decision" value="reject" data-confirm="<?= e(t('prq.reject_q')) ?>">✕ <?= tt('prq.reject') ?></button></div>
   </form>
   <?php else: ?>
   <h2><?= tt('prq.flow') ?></h2>
@@ -113,7 +113,7 @@ layout_head(($r ? $r['pr_no'] : t('prq.new')) . ' · ' . t('prq.title'), 'requis
         <td><?= prq_line_pill($l['status']) ?></td>
         <td class="num" style="white-space:nowrap;">
           <?php if ($edit): ?><button class="btn btn--ghost btn--sm" type="button" data-edit-line='<?= e(json_encode(['id' => (int)$l['id'], 'item_id' => (int)$l['item_id'], 'code' => $l['item_code'], 'description' => $l['description'], 'maker' => $l['maker'], 'part_no' => $l['part_no'], 'unit' => $l['unit'], 'qty' => (float)$l['qty'], 'est_price' => $l['est_price'], 'need_date' => $l['need_date'], 'note' => $l['note']])) ?>'>✎</button>
-            <form method="post" action="<?= url('requisition', ['id' => $id]) ?>" style="display:inline" data-lock onsubmit="return confirm(<?= e(json_encode(t('prq.del_line_q'))) ?>)"><?= csrf_field() ?><input type="hidden" name="action" value="prq_line_del"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="line_id" value="<?= (int)$l['id'] ?>"><button class="btn btn--ghost btn--sm" type="submit">🗑</button></form><?php endif; ?>
+            <form method="post" action="<?= url('requisition', ['id' => $id]) ?>" style="display:inline" data-lock data-confirm="<?= e(t('prq.del_line_q')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="prq_line_del"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="line_id" value="<?= (int)$l['id'] ?>"><button class="btn btn--ghost btn--sm" type="submit">🗑</button></form><?php endif; ?>
           <?php if ($wh && $r['status'] === 'approved' && $l['item_id'] && $left > 0.0005 && in_array($l['status'], ['reserved', 'to_buy', 'received'], true)): ?>
             <form method="post" action="<?= url('requisition', ['id' => $id]) ?>" style="display:inline-flex;gap:4px;align-items:center;" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="prq_issue"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="line_id" value="<?= (int)$l['id'] ?>"><input name="qty" type="number" step="0.001" min="0.001" max="<?= $left ?>" value="<?= $left ?>" style="width:5.5em;" title="<?= tt('prq.issue_qty') ?>"><button class="btn btn--sm" type="submit" title="<?= tt('prq.issue_hint') ?>">📤 <?= tt('prq.issue') ?></button></form>
           <?php endif; ?>
@@ -139,7 +139,7 @@ layout_head(($r ? $r['pr_no'] : t('prq.new')) . ' · ' . t('prq.title'), 'requis
     </div>
     <div class="btn-row"><button class="btn btn--sm" type="submit" id="lf-btn"><?= tt('prq.add_line') ?></button><button class="btn btn--ghost btn--sm" type="button" id="lf-reset"><?= tt('prq.clear') ?></button></div>
   </form>
-  <script>
+  <script nonce="<?= csp_nonce() ?>">
   (function(){
     var q=document.getElementById('lf-q'),list=document.getElementById('lf-list'),ch=document.getElementById('lf-chosen'),item=document.getElementById('lf-item'),desc=document.getElementById('lf-desc'),mk=document.getElementById('lf-maker'),pn=document.getElementById('lf-pn'),un=document.getElementById('lf-unit'),pr=document.getElementById('lf-price'),t=null,url=<?= json_encode(url('prq_items')) ?>;
     function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}

@@ -10,7 +10,7 @@ $fh = fn($v) => rtrim(rtrim(number_format((float)$v, 1, '.', ''), '0'), '.');
 layout_head(t('soc.title'), 'community');
 ?>
 <div class="page-head"><div><h1>🤝 <?= tt('soc.title') ?></h1><p class="lede"><?= tt('soc.lede') ?></p></div>
-  <div class="btn-row"><a class="btn btn--gold" href="#compose" onclick="document.getElementById('compose').open=true"><?= $canPost ? '+ ' . tt('soc.new_post') : '📷 ' . tt('soc.new_photo') ?></a></div></div>
+  <div class="btn-row"><a class="btn btn--gold" href="#compose" data-js-open="compose"><?= $canPost ? '+ ' . tt('soc.new_post') : '📷 ' . tt('soc.new_photo') ?></a></div></div>
 
 <div class="cols" style="grid-template-columns: 3fr 2fr;">
 <div>
