@@ -1526,7 +1526,7 @@ function pm_find_vessel(?int $cid, string $name, array &$res, bool $create = tru
         if ($id) {
             $v = one('SELECT customer_id FROM vessels WHERE id = ?', [$id]);
             if ($cid && !$v['customer_id']) { q('UPDATE vessels SET customer_id = ? WHERE id = ?', [$cid, $id]); $res['vessels_upd'] = ($res['vessels_upd'] ?? 0) + 1; }
-            elseif ($cid && (int)$v['customer_id'] !== $cid) { vm_related_set($id, $cid, 'other', t('vm.from_import')); $res['vessels_related'] = ($res['vessels_related'] ?? 0) + 1; }
+            elseif ($cid && (int)$v['customer_id'] !== $cid) { vm_related_set_customer($id, $cid, 'other', t('vm.from_import')); $res['vessels_related'] = ($res['vessels_related'] ?? 0) + 1; }
             if (vm_norm($name) !== '' && $name !== (string) scalar('SELECT name FROM vessels WHERE id = ?', [$id])) vm_alias_add($id, $name, 'import');
             return $id;
         }

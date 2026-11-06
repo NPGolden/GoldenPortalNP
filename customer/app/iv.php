@@ -183,9 +183,10 @@ function cu_import(string $path, bool $dry): array {
             $res['rows']++; $line = $i + 1;
             $name = mb_substr($g($r, 'name'), 0, 160); $erp = mb_substr($g($r, 'erp'), 0, 32);
             if ($name === '' && $erp === '') { $res['skipped'][] = [$line, t('cu.im_noname')]; continue; }
-            $id = null;
-            if ($erp !== '') $id = scalar('SELECT id FROM customers WHERE erp_code = ? LIMIT 1', [$erp]);
-            if (!$id && $name !== '') $id = scalar('SELECT id FROM customers WHERE LOWER(name) = LOWER(?) ORDER BY is_active DESC LIMIT 1', [$name]);
+            $id = null; $vatKey = preg_replace('/\D/', '', $g($r, 'vat_no'));
+            if (strlen($vatKey) >= 6 && !preg_match('/^(\d)\1+$/', $vatKey)) $id = scalar('SELECT id FROM customers WHERE REGEXP_REPLACE(COALESCE(vat_no, \'\'), \'[^0-9]\', \'\') = ? ORDER BY is_active DESC LIMIT 1', [$vatKey]);   // R85-004: VAT first (one VAT = one organisation)
+            if (!$id && $erp !== '') $id = scalar('SELECT id FROM customers WHERE erp_code = ? LIMIT 1', [$erp]);
+            if (!$id && $name !== '' && $vatKey === '') $id = scalar('SELECT id FROM customers WHERE LOWER(name) = LOWER(?) ORDER BY is_active DESC LIMIT 1', [$name]);
             if (!$id && $name === '') { $res['skipped'][] = [$line, t('cu.im_unknown_erp', ['v' => $erp])]; continue; }
             $activeRaw = $g($r, 'active'); $active = $activeRaw === '' ? null : ($no($activeRaw) ? 0 : 1);
             $f = ['erp_code' => $erp ?: null, 'country' => mb_substr($g($r, 'country'), 0, 80) ?: null, 'is_active' => $active];
@@ -206,6 +207,7 @@ function cu_import(string $path, bool $dry): array {
                 $id = (int) db()->lastInsertId(); $res['customers_new']++;
             }
             $id = (int)$id;
+            if (function_exists('org_ensure_for_customer') && function_exists('co_roles_has') && co_roles_has()) { try { org_ensure_for_customer($id); $res['organisations'] = ($res['organisations'] ?? 0) + 1; } catch (Throwable $e) { $res['warnings'][] = [$line, $e->getMessage()]; } }   // R85-004: the organisation behind every imported customer
             /* invoicing identity on the same row */
             $legal = mb_substr($g($r, 'iv_legal_name'), 0, 200);
             if ($legal === '') continue;

@@ -209,6 +209,8 @@ $r84c = (bool)$pdo->query("SHOW COLUMNS FROM companies LIKE 'is_supplier'")->fet
 printf("%s R84-003 migration (company is_supplier flag)  %s\n", $r84c ? '[ OK ]' : '[WARN]', $r84c ? '' : '— run install/migrate_cp_r84_003_is_supplier.sql');
 $r85b = (bool)$pdo->query("SHOW TABLES LIKE 'contact_companies'")->fetch();
 printf("%s R85-002 migration (organisation roles · people in several organisations)  %s\n", $r85b ? '[ OK ]' : '[WARN]', $r85b ? '' : '— run install/migrate_cp_r85_002_org_roles.sql');
+$r85c = (bool)$pdo->query("SHOW COLUMNS FROM vessel_companies LIKE 'company_id'")->fetch();
+printf("%s R85-004 migration (vessel related companies on organisations)  %s\n", $r85c ? '[ OK ]' : '[WARN]', $r85c ? '' : '— run install/migrate_cp_r85_004_vessel_orgs.sql');
 $r82 = (bool)$pdo->query("SHOW COLUMNS FROM offer_lines LIKE 'item_id'")->fetch();
 printf("%s R82-001 migration (offer lines from the inventory)  %s\n", $r82 ? '[ OK ]' : '[WARN]', $r82 ? '' : '— run install/migrate_cp_r82_integration.sql');
 $r81 = (bool)$pdo->query("SHOW TABLES LIKE 'si_invoices'")->fetch();

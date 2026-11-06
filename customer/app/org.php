@@ -103,3 +103,14 @@ function org_merge(int $keep, int $drop): void {
     if ($K['customer_id'] || $D['customer_id']) q('UPDATE contacts SET customer_id = ? WHERE company_id = ? AND customer_id IS NULL', [(int)($K['customer_id'] ?: $D['customer_id']), $keep]);
     cache_bump_later('inv');
 }
+
+/* ---- R85-004: step 3 — the organisation behind every imported customer, and the organisations of a vessel */
+/** Make sure a customer has its organisation: linked → master data and Customer role refreshed; same VAT → linked; else created (kind owner). Returns the company id. */
+function org_ensure_for_customer(int $cuId): int {
+    $cu = one('SELECT * FROM customers WHERE id = ?', [$cuId]); if (!$cu) return 0;
+    $id = (int) (scalar('SELECT id FROM companies WHERE customer_id = ?', [$cuId]) ?: 0);
+    if (!$id) return org_create_for_customer($cuId, 'owner');
+    q('UPDATE companies SET name = ?, country = COALESCE(NULLIF(?, \'\'), country), city = COALESCE(NULLIF(?, \'\'), city), website = COALESCE(NULLIF(?, \'\'), website), email = COALESCE(NULLIF(?, \'\'), email), phone = COALESCE(NULLIF(?, \'\'), phone)' . (co_roles_has() ? ', vat_no = COALESCE(NULLIF(?, \'\'), vat_no), erp_code = COALESCE(?, erp_code), address = COALESCE(?, address), postal_code = COALESCE(?, postal_code), roles = TRIM(BOTH \',\' FROM CONCAT_WS(\',\', NULLIF(roles, \'\'), IF(FIND_IN_SET(\'customer\', roles), NULL, \'customer\')))' : '') . ' WHERE id = ? AND NOT EXISTS (SELECT 1 FROM (SELECT id FROM companies WHERE LOWER(name) = LOWER(?) AND id <> ?) x)',
+      array_merge([$cu['name'], $cu['country'], $cu['city'], $cu['website'], $cu['email'], $cu['phone']], co_roles_has() ? [$cu['vat_no'], $cu['erp_code'], $cu['address'], $cu['postal_code']] : [], [$id, $cu['name'], $id]));
+    return $id;
+}

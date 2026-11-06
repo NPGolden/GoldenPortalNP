@@ -10,7 +10,7 @@ declare(strict_types=1);
  */
 
 const VM_PREFIXES = ['M/Y', 'S/Y', 'M/V', 'M/T', 'P/S', 'HSC', 'M/S', 'C/F', 'F/B', 'R/V', 'TUG'];
-const VM_ROLES    = ['owner', 'manager', 'yard', 'agent', 'contractor', 'charterer', 'other'];
+const VM_ROLES    = ['owner', 'manager', 'yard', 'class', 'agent', 'contractor', 'charterer', 'other'];   // R85-004: + class
 
 function vm_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'vessel_aliases'"); } catch (Throwable $e) { $h = false; } } return $h; }
 
@@ -88,14 +88,28 @@ function vm_aliases(int $vid): array { return vm_has() ? all('SELECT id, alias, 
 function vm_alias_remove(int $id): void { if (vm_has()) q('DELETE FROM vessel_aliases WHERE id = ?', [$id]); }
 
 /** Related companies of a vessel (management company, yard, agent …) — customer records with a role. */
+function vm_orgs_has(): bool { static $h = null; if ($h === null) { try { $h = vm_has() && (bool) db()->query("SHOW COLUMNS FROM vessel_companies LIKE 'company_id'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+/** R85-004: the related companies are organisations of the Contacts module (old rows that only carry a customer are shown through the customer's organisation or name). */
 function vm_related(int $vid): array {
     if (!vm_has()) return [];
-    return all('SELECT vc.id, vc.customer_id, vc.role, vc.note, c.name FROM vessel_companies vc JOIN customers c ON c.id = vc.customer_id WHERE vc.vessel_id = ? ORDER BY FIELD(vc.role, ' . implode(',', array_map(fn($r) => "'$r'", VM_ROLES)) . '), c.name', [$vid]);
+    if (!vm_orgs_has()) return all('SELECT vc.id, vc.customer_id, vc.role, vc.note, c.name FROM vessel_companies vc JOIN customers c ON c.id = vc.customer_id WHERE vc.vessel_id = ? ORDER BY FIELD(vc.role, ' . implode(',', array_map(fn($r) => "'$r'", VM_ROLES)) . '), c.name', [$vid]);
+    return all('SELECT vc.id, vc.customer_id, vc.role, vc.note, COALESCE(co.id, co2.id) AS company_id, COALESCE(co.name, co2.name, c.name) AS name, COALESCE(co.kind, co2.kind) AS kind, COALESCE(co.roles, co2.roles) AS roles, COALESCE(co.is_supplier, co2.is_supplier) AS is_supplier, COALESCE(co.customer_id, co2.customer_id, vc.customer_id) AS org_customer_id, COALESCE(co.email, co2.email) AS email, COALESCE(co.city, co2.city) AS city, COALESCE(co.country, co2.country) AS country
+                FROM vessel_companies vc LEFT JOIN companies co ON co.id = vc.company_id LEFT JOIN companies co2 ON vc.company_id IS NULL AND co2.customer_id = vc.customer_id LEFT JOIN customers c ON c.id = vc.customer_id
+                WHERE vc.vessel_id = ? ORDER BY FIELD(vc.role, ' . implode(',', array_map(fn($r) => "'$r'", VM_ROLES)) . '), name', [$vid]);
 }
-function vm_related_set(int $vid, int $customerId, string $role, ?string $note = null): void {
-    if (!vm_has() || !$customerId) return;
-    $role = in_array($role, VM_ROLES, true) ? $role : 'other';
-    q('INSERT INTO vessel_companies (vessel_id, customer_id, role, note) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE role = VALUES(role), note = COALESCE(VALUES(note), note)', [$vid, $customerId, $role, $note !== null ? mb_substr($note, 0, 255) : null]);
+/** $who = company id (organisations) — or, before the R85-004 migration, a customer id. */
+function vm_related_set(int $vid, int $who, string $role, ?string $note = null): void {
+    if (!vm_has() || !$who) return;
+    $role = in_array($role, VM_ROLES, true) ? $role : 'other'; $note = $note !== null ? mb_substr($note, 0, 255) : null;
+    if (!vm_orgs_has()) { q('INSERT INTO vessel_companies (vessel_id, customer_id, role, note) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE role = VALUES(role), note = COALESCE(VALUES(note), note)', [$vid, $who, $role, $note]); return; }
+    $cu = scalar('SELECT customer_id FROM companies WHERE id = ?', [$who]);
+    if ($x = scalar('SELECT id FROM vessel_companies WHERE vessel_id = ? AND company_id = ?', [$vid, $who])) q('UPDATE vessel_companies SET role = ?, note = COALESCE(?, note) WHERE id = ?', [$role, $note, (int)$x]);
+    else q('INSERT INTO vessel_companies (vessel_id, customer_id, company_id, role, note) VALUES (?,?,?,?,?)', [$vid, $cu ?: null, $who, $role, $note]);
+}
+/** From an import that knows only the customer: resolve the organisation (creating it) and link. */
+function vm_related_set_customer(int $vid, int $customerId, string $role, ?string $note = null): void {
+    if (vm_orgs_has() && function_exists('org_ensure_for_customer') && ($co = org_ensure_for_customer($customerId))) { vm_related_set($vid, $co, $role, $note); return; }
+    vm_related_set($vid, $customerId, $role, $note);
 }
 function vm_related_remove(int $id): void { if (vm_has()) q('DELETE FROM vessel_companies WHERE id = ?', [$id]); }
 function vm_role_label(string $r): string { return t('vm.role_' . (in_array($r, VM_ROLES, true) ? $r : 'other')); }

@@ -82,6 +82,11 @@ layout_head(t('co.title'), 'contacts');
       <div class="btn-row"><button class="btn btn--gold" type="submit"><?= $edit ? tt('btn.save') : tt('co.create') ?></button><?php if ($edit): ?><a class="btn btn--ghost" href="<?= url('companies') ?>"><?= tt('btn.cancel') ?></a><?php endif; ?></div>
     </form>
   </div>
+  <?php if ($edit && function_exists('vm_orgs_has') && vm_orgs_has()): $coVessels = all('SELECT vc.role, v.id, v.name, v.imo FROM vessel_companies vc JOIN vessels v ON v.id = vc.vessel_id WHERE vc.company_id = ? AND v.is_active = 1 ORDER BY v.name', [(int)$edit['id']]); $coOwn = $edit['customer_id'] ? all('SELECT id, name, imo FROM vessels WHERE customer_id = ? AND is_active = 1 ORDER BY name', [(int)$edit['customer_id']]) : []; if ($coVessels || $coOwn): ?>
+  <div class="card"><div class="card-head"><h2>⚓ <?= tt('nav.vessels') ?> <span class="count"><?= count($coVessels) + count($coOwn) ?></span></h2></div><table class="tbl tbl--wrap"><tbody>
+    <?php foreach ($coOwn as $vv): ?><tr><td><a href="<?= url('vessel', ['id' => (int)$vv['id']]) ?>"><b><?= e($vv['name']) ?></b></a><?= $vv['imo'] ? ' <span class="hint">IMO ' . e($vv['imo']) . '</span>' : '' ?></td><td><?= pill('gold', t('vm.role_owner')) ?> <span class="hint">(<?= tt('rp.customer') ?>)</span></td></tr><?php endforeach; ?>
+    <?php foreach ($coVessels as $vv): ?><tr><td><a href="<?= url('vessel', ['id' => (int)$vv['id']]) ?>"><b><?= e($vv['name']) ?></b></a><?= $vv['imo'] ? ' <span class="hint">IMO ' . e($vv['imo']) . '</span>' : '' ?></td><td><?= pill($vv['role'] === 'owner' ? 'gold' : 'navy', vm_role_label($vv['role'])) ?></td></tr><?php endforeach; ?>
+  </tbody></table></div><?php endif; endif; ?>
   <?php if ($edit && function_exists('iv_section')) iv_section('company', (int)$edit['id'], url('companies', array_filter(['edit' => $edit['id'], 'q' => $q, 'kind' => $fk])), (int)($_GET['iv'] ?? 0)); ?>
 </div>
 <?php endif; ?>

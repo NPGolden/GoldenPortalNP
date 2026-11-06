@@ -121,16 +121,16 @@ layout_head($v['name'], 'vessels');
   <?php if (!$rsAll): ?><p class="hint"><?= tt('rs.none_vessel') ?></p><?php else: foreach (($rsLive ?: array_slice($rsAll, 0, 2)) as $c) { echo rs_card_html($c); } endif; ?>
 </div>
 <?php endif; ?>
-<?php if ($staff && function_exists('vm_has') && vm_has()): $rel = vm_related($id); $als = vm_aliases($id); $allCust = all('SELECT id, name FROM customers WHERE is_active = 1 ORDER BY name'); ?>
+<?php if ($staff && function_exists('vm_has') && vm_has()): $rel = vm_related($id); $als = vm_aliases($id); $vmOrgs = function_exists('vm_orgs_has') && vm_orgs_has(); $allCust = $vmOrgs ? co_all() : all('SELECT id, name FROM customers WHERE is_active = 1 ORDER BY name'); ?>
 <div class="card" id="vm-related">
   <div class="card-head"><h2><?= tt('vm.related') ?> <span class="count"><?= count($rel) ?></span></h2></div>
   <p class="hint"><?= tt('vm.related_hint') ?></p>
   <?php if ($rel): ?><table class="tbl" data-nosort><thead><tr><th><?= tt('vm.company') ?></th><th><?= tt('vm.role') ?></th><th><?= tt('th.remarks') ?></th><th></th></tr></thead><tbody>
-    <?php foreach ($rel as $r): ?><tr><td><a href="<?= url('admin_customers', ['q' => $r['name']]) ?>"><?= e($r['name']) ?></a></td><td><?= pill($r['role'] === 'owner' ? 'gold' : 'navy', vm_role_label($r['role'])) ?></td><td class="hint"><?= e($r['note'] ?? '') ?></td>
+    <?php foreach ($rel as $r): ?><tr><td><?php if ($vmOrgs && !empty($r['company_id'])): ?><a href="<?= url('companies', ['edit' => (int)$r['company_id']]) ?>"><b><?= e($r['name']) ?></b></a> <?= co_role_pills(['id' => (int)$r['company_id'], 'kind' => $r['kind'], 'roles' => $r['roles'], 'is_supplier' => $r['is_supplier'], 'customer_id' => $r['org_customer_id']]) ?><?= $r['email'] ? '<br><a class="hint" href="mailto:' . e($r['email']) . '">' . e($r['email']) . '</a>' : '' ?><?php else: ?><a href="<?= url('admin_customers', ['q' => $r['name']]) ?>"><?= e($r['name']) ?></a><?php endif; ?></td><td><?= pill($r['role'] === 'owner' ? 'gold' : 'navy', vm_role_label($r['role'])) ?></td><td class="hint"><?= e($r['note'] ?? '') ?></td>
       <td style="text-align:right;"><form method="post" action="<?= url('vessel', ['id' => $id]) ?>" class="inline"><?= csrf_field() ?><input type="hidden" name="action" value="vm_related_remove"><input type="hidden" name="id" value="<?= $r['id'] ?>"><input type="hidden" name="vessel_id" value="<?= $id ?>"><button class="btn btn--ghost btn--sm" type="submit">×</button></form></td></tr><?php endforeach; ?>
   </tbody></table><?php endif; ?>
   <form method="post" action="<?= url('vessel', ['id' => $id]) ?>" class="grid grid-4" style="align-items:end;margin-top:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="vm_related_set"><input type="hidden" name="vessel_id" value="<?= $id ?>">
-    <div class="field" style="margin:0;"><label><?= tt('vm.company') ?></label><select name="customer_id" required><option value=""><?= tt('vm.choose') ?></option><?php foreach ($allCust as $c): ?><option value="<?= $c['id'] ?>"><?= e($c['name']) ?></option><?php endforeach; ?></select></div>
+    <div class="field" style="margin:0;"><label><?= tt('vm.company') ?></label><select name="<?= $vmOrgs ? 'company_id' : 'customer_id' ?>" required><option value=""><?= tt('vm.choose') ?></option><?php foreach ($allCust as $c): ?><option value="<?= $c['id'] ?>"><?= e($c['name']) ?></option><?php endforeach; ?></select></div>
     <div class="field" style="margin:0;"><label><?= tt('vm.role') ?></label><select name="role"><?php foreach (VM_ROLES as $r): ?><option value="<?= $r ?>"<?= $r === 'manager' ? ' selected' : '' ?>><?= e(vm_role_label($r)) ?></option><?php endforeach; ?></select></div>
     <div class="field" style="margin:0;"><label><?= tt('th.remarks') ?></label><input name="note" maxlength="255"></div>
     <div class="btn-row"><button class="btn btn--sm" type="submit">+ <?= tt('vm.add') ?></button></div>

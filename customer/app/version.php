@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.101.1';
+const CP_VERSION = '1.102.0';
 const CP_BUILD   = '2026-11-06';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R85-004', 'version' => '1.102.0', 'date' => '2026-11-06', 'title' => 'Organisations, step 3 (last): the customer import (Settings › Import › Customers) recognises a customer by VAT first, then ERP code, and creates or completes the organisation behind every imported customer (Customer role, master data); the related companies of a vessel (owner, manager, yard, class, agent, contractor, charterer) are organisations of the Contacts module instead of customer records — picked from the organisations, shown with their role pills, listed back on the organisation card; old rows are carried over.', 'db' => 'install/migrate_cp_r85_004_vessel_orgs.sql', 'check' => 'r85c'],
         ['ref' => 'GAS-CP-R85-003', 'version' => '1.101.1', 'date' => '2026-11-06', 'title' => 'Organisations are recognised by VAT number only: the Organisations page proposes links and duplicates by VAT, the supplier import matches an existing organisation by VAT (then by the ERP\'s own code, never by name), the Customer role links an existing customer by VAT — ERP code and name never match (two legal entities may share a name; one VAT is one entity).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R85-002', 'version' => '1.101.0', 'date' => '2026-11-06', 'title' => 'Organisations, step 2: roles instead of a single kind — an organisation is ticked Customer · Supplier · Owner · Management · Yard · Class · Agent · Broker · Consultant at once; VAT, ERP code, address and postal code live on the organisation. The ★ Customer role creates or updates the billing record (projects, vessels, logins keep working) and the Supplier role opens the supplier card — both kept in step on every save, in either direction. A person may belong to several organisations (main one plus "Also belongs to"); supplier people, the e-mail card and the Contacts filters follow all memberships. Settings › Customers gets "New customer" = organisation with the Customer role.', 'db' => 'install/migrate_cp_r85_002_org_roles.sql', 'check' => 'r85b'],
         ['ref' => 'GAS-CP-R85-001', 'version' => '1.100.0', 'date' => '2026-11-06', 'title' => 'Organisations (option A, step 1): one register behind customers, companies and suppliers. Contacts gains the Suppliers button and the 🏛 Organisations page — every billing customer linked to its company of the Contacts module (matched by VAT, ERP code or name, confirmed one by one or all at once; master data completed both ways; the company created from the customer when none exists), duplicate companies merged (people, orders, invoices, prices, makers and the supplier card move, the duplicate is retired), people completed with the customer of their organisation. The person form creates a new organisation inline; Companies shows the ★ Customer and Supplier roles.', 'db' => null, 'check' => null],
@@ -363,6 +364,7 @@ function cp_migration_state(): array {
         'r82b' => $has("SHOW TABLES LIKE 'supplier_makers'"),
         'r84c' => $has("SHOW COLUMNS FROM companies LIKE 'is_supplier'"),
         'r85b' => $has("SHOW TABLES LIKE 'contact_companies'"),
+        'r85c' => $has("SHOW COLUMNS FROM vessel_companies LIKE 'company_id'"),
         'r70d' => $has("SHOW COLUMNS FROM customer_users LIKE 'clocks'"),
         'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),
         'r67' => $has("SHOW TABLES LIKE 'hr_flows'") && $has("SHOW TABLES LIKE 'hr_flow_templates'") && $has("SHOW TABLES LIKE 'hr_invitations'"),

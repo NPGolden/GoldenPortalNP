@@ -221,7 +221,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if (empty($_POST['dry'])) flash('good', t('vm.map_done'));
                 redirect('admin_vessel_merge', ['_r' => uniqid()]);
             }
-            case 'vm_related_set': { require_staff(); vm_related_set((int)$_POST['vessel_id'], (int)($_POST['customer_id'] ?? 0), (string)($_POST['role'] ?? 'other'), trim((string)($_POST['note'] ?? '')) ?: null); flash('good', t('vm.related_saved')); redirect('vessel', ['id' => (int)$_POST['vessel_id'], '_r' => uniqid()], '#vm-related'); }
+            case 'vm_related_set': { require_staff(); vm_related_set((int)$_POST['vessel_id'], (int)($_POST['company_id'] ?? ($_POST['customer_id'] ?? 0)), (string)($_POST['role'] ?? 'other'), trim((string)($_POST['note'] ?? '')) ?: null); flash('good', t('vm.related_saved')); redirect('vessel', ['id' => (int)$_POST['vessel_id'], '_r' => uniqid()], '#vm-related'); }
             case 'vm_related_remove': { require_staff(); vm_related_remove((int)$_POST['id']); flash('good', t('vm.related_removed')); redirect('vessel', ['id' => (int)$_POST['vessel_id'], '_r' => uniqid()], '#vm-related'); }
             case 'isc_save': { iss_cat_save(); flash('good', t('isc.saved')); redirect('admin_issue_cats', ['_r' => uniqid()]); }
             case 'isc_delete': { iss_cat_delete((string)($_POST['skey'] ?? '')); flash('good', t('isc.deleted')); redirect('admin_issue_cats', ['_r' => uniqid()]); }

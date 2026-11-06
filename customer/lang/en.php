@@ -7840,5 +7840,6 @@ Best regards,
 'ct.other_orgs' => 'Also belongs to',
 'ct.other_orgs_h' => 'Other organisations of this person (Ctrl-click for several) — the first field above is the main one.',
 'co.new_customer_org' => 'New customer (organisation with the Customer role)',
+'vm.role_class' => 'Class society',
 'org.new_inline' => 'New organisation…',
 ];

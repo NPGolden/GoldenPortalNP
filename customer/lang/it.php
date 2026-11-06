@@ -7840,5 +7840,6 @@ Cordiali saluti,
 'ct.other_orgs' => 'Appartiene anche a',
 'ct.other_orgs_h' => 'Altre organizzazioni della persona (Ctrl-clic per più) — il primo campo sopra è quella principale.',
 'co.new_customer_org' => 'Nuovo cliente (organizzazione con ruolo Cliente)',
+'vm.role_class' => 'Registro di classe',
 'org.new_inline' => 'Nuova organizzazione…',
 ];
