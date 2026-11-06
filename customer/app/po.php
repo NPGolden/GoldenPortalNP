@@ -180,8 +180,16 @@ function po_cancel(int $oid, string $note): void {
     $o = po_load($oid); if (!$o || !po_admin() || in_array($o['status'], ['received', 'closed', 'cancelled'], true)) throw new RuntimeException(t('err.noaccess'));
     if ($note === '') throw new RuntimeException(t('prq.need_reason'));
     if ($o['kind'] === 'po' && $o['status'] !== 'draft') foreach (all('SELECT * FROM po_lines WHERE order_id = ? AND pr_line_id IS NOT NULL', [$oid]) as $l) { $rem = (float)$l['qty'] - (float)$l['qty_received']; q('UPDATE pr_lines SET qty_ordered = GREATEST(0, qty_ordered - ?), status = IF(qty_ordered - ? <= 0.0005 AND qty_received <= 0.0005, \'to_buy\', status) WHERE id = ?', [$rem, $rem, (int)$l['pr_line_id']]); }
-    q("UPDATE po_lines SET status = 'cancelled' WHERE order_id = ? AND status IN ('open','partial')", [$oid]);
-    q('UPDATE po_orders SET status = ? WHERE id = ?', ['cancelled', $oid]); po_event($oid, 'cancel', $note); if (function_exists('po_sp_cost_sync')) po_sp_cost_sync($oid); cache_bump_later('inv'); cache_bump_later('eng');
+    $received = (float) scalar('SELECT COALESCE(SUM(qty_accepted), 0) FROM po_lines WHERE order_id = ?', [$oid]);
+    if ($received > 0.0005) {   // R86-001: goods already accepted — only the open balance is cancelled; the order stays as received (and can be closed), its receipts and invoices untouched
+        q("UPDATE po_lines SET qty = qty_accepted, status = 'received' WHERE order_id = ? AND status IN ('open','partial') AND qty_accepted > 0.0005", [$oid]);
+        q("UPDATE po_lines SET status = 'cancelled' WHERE order_id = ? AND status IN ('open','partial')", [$oid]);
+        q('UPDATE po_orders SET status = ? WHERE id = ?', ['received', $oid]); po_event($oid, 'cancel', t('po.cancel_balance') . ' · ' . $note); po_recalc($oid);
+    } else {
+        q("UPDATE po_lines SET status = 'cancelled' WHERE order_id = ? AND status IN ('open','partial')", [$oid]);
+        q('UPDATE po_orders SET status = ? WHERE id = ?', ['cancelled', $oid]); po_event($oid, 'cancel', $note);
+    }
+    if (function_exists('po_sp_cost_sync')) po_sp_cost_sync($oid); cache_bump_later('inv'); cache_bump_later('eng');
 }
 function po_close(int $oid, string $note): void { $o = po_load($oid); if (!$o || !po_admin() || !in_array($o['status'], ['received', 'partial', 'confirmed', 'sent'], true)) throw new RuntimeException(t('err.noaccess')); q('UPDATE po_orders SET status = ? WHERE id = ?', ['closed', $oid]); po_event($oid, 'close', $note ?: null); if (function_exists('po_progress_apply')) po_progress_apply($o['subproject_id'] ? (int)$o['subproject_id'] : null); cache_bump_later('eng'); }
 
@@ -326,7 +334,8 @@ function po_receive_from_post(): int {
     $wh = (int)($_POST['warehouse_id'] ?? 0) ?: (int)($o['warehouse_id'] ?: stk_default_wh()); $dn = mb_substr(trim((string)($_POST['delivery_note'] ?? '')), 0, 80) ?: null; $note = mb_substr(trim((string)($_POST['note'] ?? '')), 0, 400) ?: null;
     $lines = po_lines($oid); $todo = [];
     foreach ($lines as $l) { $lid = (int)$l['id']; $qr = (float) str_replace(',', '.', (string)($_POST['recv'][$lid] ?? '0')); if ($qr <= 0 || $l['status'] === 'cancelled') continue; $qrej = max(0.0, min($qr, (float) str_replace(',', '.', (string)($_POST['rej'][$lid] ?? '0')))); $qa = $qr - $qrej;
-        $open = (float)$l['qty'] - (float)$l['qty_received']; if ($qr > $open + 0.0005 && empty($_POST['allow_over'])) throw new RuntimeException(t('po.over_receipt', ['n' => (int)$l['seq'], 'q' => stk_qty(max(0.0, $open))]));
+        $open = (float)$l['qty'] - (float)$l['qty_accepted'];   // R86-001: what is still owed — rejected goods (NCR replacement / repair) can be received again
+        if ($qr > $open + 0.0005 && empty($_POST['allow_over'])) throw new RuntimeException(t('po.over_receipt', ['n' => (int)$l['seq'], 'q' => stk_qty(max(0.0, $open))]));
         $reason = mb_substr(trim((string)($_POST['reason'][$lid] ?? '')), 0, 400); $action = in_array($_POST['ncr'][$lid] ?? '', PO_NCR_ACTIONS, true) ? $_POST['ncr'][$lid] : 'none'; if ($qrej > 0 && $reason === '') throw new RuntimeException(t('po.need_ncr_reason', ['n' => (int)$l['seq']])); if ($qrej > 0 && $action === 'none') $action = 'return';
         $todo[] = [$l, $qr, $qa, $qrej, $reason ?: null, $action, mb_substr(trim((string)($_POST['loc'][$lid] ?? '')), 0, 40) ?: null]; }
     if (!$todo) throw new RuntimeException(t('po.need_receipt_qty'));

@@ -183,7 +183,7 @@ function prq_decide(int $rid, string $decision, string $note): void {
     $over = $r['purpose'] === 'project' && ($b['parts_budget'] === null || $b['parts_budget'] <= 0 || $est > $b['available']);
     q('UPDATE pr_requests SET approved_by = ?, approved_name = ?, approved_at = NOW(), approval_note = ?, budget_parts = ?, budget_committed = ?, budget_actual = ?, over_budget = ? WHERE id = ?', [$u['id'], $u['full_name'], $note ?: null, $b['parts_budget'], $b['committed'], $b['actual'], $over ? 1 : 0, $rid]);
     if ($over) {
-        if ($note === '') throw new RuntimeException(t('prq.need_reason'));
+        if ($note === '') throw new RuntimeException(t('prq.need_note_over'));
         q('UPDATE pr_requests SET status = ? WHERE id = ?', ['mgmt', $rid]); prq_event($rid, 'to_mgmt', $note);
         prq_notify(prq_mgmt_ids(), $rid, 'prq_mgmt', t('prq.nf_mgmt', ['no' => $r['pr_no']]), t('prq.over_by', ['v' => prq_money(max(0.0, $est - (float)($b['available'] ?? 0)))]) . ' · ' . $note);
     } else { prq_approve_apply($rid, 'approve', $note); }
@@ -234,6 +234,7 @@ function prq_cancel(int $rid, string $note): void {
     require_prq(); $r = prq_load($rid); $u = current_user();
     $own = (int)$r['requester_id'] === (int)$u['id'] && in_array($r['status'], ['draft', 'submitted'], true);
     if (!$r || !($own || (pr_admin() && in_array($r['status'], ['draft', 'submitted', 'mgmt', 'approved'], true)))) throw new RuntimeException(t('err.noaccess'));
+    if ((float) scalar('SELECT COALESCE(SUM(qty_issued), 0) + COALESCE(SUM(qty_received), 0) FROM pr_lines WHERE request_id = ?', [$rid]) > 0.0005) throw new RuntimeException(t('prq.cannot_cancel_issued'));   // R86-001: goods already issued or received — close it instead
     foreach (all("SELECT * FROM pr_lines WHERE request_id = ? AND qty_reserved > 0", [$rid]) as $l) q('UPDATE inv_stock SET qty_reserved = GREATEST(0, qty_reserved - ?) WHERE item_id = ? AND warehouse_id = ?', [(float)$l['qty_reserved'], (int)$l['item_id'], (int)$l['warehouse_id']]);
     q("UPDATE pr_lines SET qty_reserved = 0, status = 'cancelled' WHERE request_id = ? AND status NOT IN ('issued')", [$rid]);
     q('UPDATE pr_requests SET status = ? WHERE id = ?', ['cancelled', $rid]); prq_event($rid, 'cancel', $note ?: null);

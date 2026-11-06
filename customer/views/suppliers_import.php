@@ -9,7 +9,7 @@ layout_head(t('sup.import'), 'suppliers');
 ?>
 <p class="eyebrow"><a href="<?= url('suppliers') ?>"><?= tt('sup.title') ?></a></p>
 <div class="page-head"><div><h1>⤒ <?= tt('sup.import') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('sup.import_lede') ?></p></div></div>
-<?php if ($res): ?><div class="flash flash--good"><b><?= tt('stk.imp_done') ?></b> — <?= e(t('sup.imp_done_s', $res)) ?> <a href="<?= url('suppliers') ?>"><?= tt('sup.title') ?> →</a></div>
+<?php if ($res): ?><div class="flash flash--good"><b><?= tt('stk.imp_done') ?></b> — <?= e(t('sup.imp_done_s', array_filter($res, 'is_scalar'))) ?> <a href="<?= url('suppliers') ?>"><?= tt('sup.title') ?> →</a></div>
 <?php if (!empty($res['errors'])): ?><details class="flash flash--warn"><summary><b><?= e(t('sup.imp_err_n', ['n' => count($res['errors'])])) ?></b></summary><ul style="margin:6px 0 0 18px;"><?php foreach ($res['errors'] as $x): ?><li><?= e($x) ?></li><?php endforeach; ?></ul></details><?php endif; ?><?php endif; ?>
 <div class="cols">
 <div>
