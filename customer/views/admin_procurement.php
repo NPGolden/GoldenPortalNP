@@ -22,6 +22,8 @@ layout_head(t('stk.settings'), 'admin_procurement');
       <h3 style="margin-top:12px;"><?= tt('stk.disciplines') ?></h3><p class="hint"><?= tt('stk.disciplines_hint') ?></p>
       <div class="pr-disc"><?php foreach ($disc as $d): ?><label><input type="checkbox" name="disciplines[]" value="<?= (int)$d['id'] ?>"<?= in_array((int)$d['id'], $on, true) ? ' checked' : '' ?>> <?= e($d['name']) ?></label><?php endforeach; ?></div>
       <div class="field" style="margin-top:12px;max-width:260px;"><label><?= tt('stk.offer_margin') ?> %</label><input name="offer_margin" type="number" step="0.01" min="-100" max="1000" value="<?= e(cp_setting('proc_offer_margin', '25') ?? '25') ?>"><p class="hint"><?= tt('stk.offer_margin_hint') ?></p></div>
+      <?php if (function_exists('stc_has') && stc_has()): $ssub = stc_stock_sub(); $allSubs = all('SELECT s.id, s.code, s.name, p.project_code FROM subprojects s JOIN projects p ON p.id = s.project_id WHERE p.status <> \'closed\' ORDER BY p.project_code, s.code'); ?>
+      <div class="field" style="margin-top:12px;max-width:520px;" id="stock"><label>📦 <?= tt('stk.stock_project') ?></label><select name="stock_subproject_id"><option value="0">—</option><?php foreach ($allSubs as $ss): ?><option value="<?= (int)$ss['id'] ?>"<?= $ssub && (int)$ssub['id'] === (int)$ss['id'] ? ' selected' : '' ?>><?= e($ss['project_code'] . ' · ' . ($ss['code'] ?: '') . ' ' . $ss['name']) ?></option><?php endforeach; ?></select><p class="hint"><?= tt('stk.stock_project_hint') ?></p></div><?php endif; ?>
       <div class="field" style="margin-top:12px;max-width:260px;"><label><?= tt('stk.pay_threshold') ?> (EUR)</label><input name="pay_threshold" type="number" step="0.01" min="0" value="<?= e(cp_setting('proc_pay_threshold', '5000') ?? '5000') ?>"><p class="hint"><?= tt('stk.pay_threshold_hint') ?></p></div>
       <button class="btn btn--gold" type="submit"><?= tt('btn.save') ?></button>
     </form>
@@ -55,6 +57,13 @@ layout_head(t('stk.settings'), 'admin_procurement');
         <div class="field" style="align-self:end;"><label class="chk"><input type="checkbox" name="is_default" value="1"<?= !empty($ewr['is_default']) ? ' checked' : '' ?>> <?= tt('stk.default') ?></label><?php if ($ewr): ?><label class="chk"><input type="checkbox" name="is_active" value="1"<?= $ewr['is_active'] ? ' checked' : '' ?>> <?= tt('au.active') ?></label><?php endif; ?></div></div>
       <div class="btn-row"><button class="btn btn--ghost btn--sm" type="submit"><?= tt('btn.save') ?></button><?php if ($ewr): ?><a class="btn btn--ghost btn--sm" href="<?= url('admin_procurement') ?>#wh"><?= tt('btn.cancel') ?></a><?php endif; ?></div>
     </form>
+<?php if (function_exists('stc_has') && stc_has() && !stc_stock_sub()): ?>
+<div class="card" style="margin-top:12px;"><div class="card-head"><h2>➕ <?= tt('stk.stock_project_create') ?></h2><span class="hint"><?= tt('stk.stock_project_create_h') ?></span></div>
+  <form method="post" action="<?= url('admin_procurement') ?>" class="fltbar" data-lock style="grid-template-columns: 2fr 1fr auto;"><?= csrf_field() ?><input type="hidden" name="action" value="stc_stock_project">
+    <div class="field"><label><?= tt('rp.customer') ?></label><select name="customer_id" required><option value=""><?= tt('vm.choose') ?></option><?php foreach (all('SELECT id, name FROM customers WHERE is_active = 1 ORDER BY name') as $cu): ?><option value="<?= (int)$cu['id'] ?>"><?= e($cu['name']) ?></option><?php endforeach; ?></select></div>
+    <div class="field"><label><?= tt('pr.code') ?></label><input name="code" value="STOCK" maxlength="30"></div>
+    <div class="fltbar-actions"><button class="btn btn--gold btn--sm" type="submit"><?= tt('stk.stock_project_create') ?></button></div></form></div>
+<?php endif; ?>
   </div>
   <div class="card"><h2>ℹ <?= tt('stk.rules_explained') ?></h2><table class="tbl"><tbody><?php foreach (STK_RULES as $r): ?><tr><td><b><?= e(t('stk.rule_' . $r)) ?></b></td><td class="hint"><?= e(t('stk.rule_x_' . $r)) ?></td></tr><?php endforeach; ?></tbody></table></div>
 </div>

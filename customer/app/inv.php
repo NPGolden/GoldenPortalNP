@@ -121,6 +121,7 @@ function stk_item_save_from_post(int $id): int {
     $vals = [$code, $desc, $s('description_en', 255), $cat, $unit, $pack, $s('maker', 80), $s('factory_code', 80), $s('barcode', 64), $s('location', 60), $min, $status, $cur, $pref, $s('notes', 4000)];
     if ($id) { $vals[] = $id; q('UPDATE inv_items SET code=?, description=?, description_en=?, category_id=?, unit=?, pack_qty=?, maker=?, factory_code=?, barcode=?, location=?, min_stock=?, status=?, currency=?, preferred_supplier_id=?, notes=? WHERE id=?', $vals); }
     else { $u = current_user(); $vals[] = (int)$u['id']; q('INSERT INTO inv_items (code, description, description_en, category_id, unit, pack_qty, maker, factory_code, barcode, location, min_stock, status, currency, preferred_supplier_id, notes, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', $vals); $id = (int) db()->lastInsertId(); }
+    if (function_exists('stc_has') && stc_has()) q('UPDATE inv_items SET is_consumable = ?, alert_low = ?, reorder_qty = ? WHERE id = ?', [(int)!empty($_POST['is_consumable']), (int)!empty($_POST['alert_low']), ($_POST['reorder_qty'] ?? '') !== '' ? (float) str_replace(',', '.', (string)$_POST['reorder_qty']) : null, $id]);   // R87-001
     if (!empty($_FILES['photo']['name']) && function_exists('cp_store_file')) { $fid = cp_store_file($_FILES['photo'], 0, null, 'photo', 'internal', $code); if ($fid) q('UPDATE inv_items SET file_id = ? WHERE id = ?', [$fid, $id]); }
     cache_bump_later('inv');
     return $id;
@@ -140,10 +141,14 @@ function stk_move(int $itemId, int $whId, string $kind, float $qty, array $o = [
     q('UPDATE inv_stock SET qty_on_hand = qty_on_hand + ? WHERE item_id = ? AND warehouse_id = ?', [$delta, $itemId, $whId]);
     if (!empty($o['location'])) q('UPDATE inv_stock SET location = ? WHERE item_id = ? AND warehouse_id = ?', [mb_substr((string)$o['location'], 0, 60), $itemId, $whId]);
     $u = current_user();
-    q('INSERT INTO inv_moves (item_id, warehouse_id, kind, qty, unit_price, project_id, subproject_id, ref_kind, ref_id, reason, note, user_id, user_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
-      [$itemId, $whId, $kind, $delta, $o['unit_price'] ?? null, $o['project_id'] ?? null, $o['subproject_id'] ?? null, $o['ref_kind'] ?? null, $o['ref_id'] ?? null, $o['reason'] ?? null, isset($o['note']) ? mb_substr((string)$o['note'], 0, 255) : null, $u['id'] ?? null, $u['full_name'] ?? null]);
-    cache_bump_later('inv');
-    return (int) db()->lastInsertId();
+    $stc = function_exists('stc_has') && stc_has();   // R87-001: typed reasons with a reference and a customer organisation
+    $reason = $o['reason'] ?? null; if ($stc && $reason === null) $reason = in_array($kind, ['in', 'out'], true) ? 'manual' : null;
+    if ($stc && $kind === 'out' && $reason === 'issue' && !empty($o['item_consumable'])) $reason = 'consumption';
+    q('INSERT INTO inv_moves (item_id, warehouse_id, kind, qty, unit_price, project_id, subproject_id, ref_kind, ref_id, reason, note, user_id, user_name' . ($stc ? ', ref_no, company_id' : '') . ') VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?' . ($stc ? ',?,?' : '') . ')',
+      array_merge([$itemId, $whId, $kind, $delta, $o['unit_price'] ?? null, $o['project_id'] ?? null, $o['subproject_id'] ?? null, $o['ref_kind'] ?? null, $o['ref_id'] ?? null, $reason, isset($o['note']) ? mb_substr((string)$o['note'], 0, 255) : null, $u['id'] ?? null, $u['full_name'] ?? null], $stc ? [isset($o['ref_no']) ? mb_substr(trim((string)$o['ref_no']), 0, 40) ?: null : null, (int)($o['company_id'] ?? 0) ?: null] : []));
+    cache_bump_later('inv'); $mid = (int) db()->lastInsertId();
+    if ($stc && $delta < 0 && function_exists('stc_after_out')) stc_after_out($itemId);
+    return $mid;
 }
 /** Manual movement from the item card: in (with price → history), out (to a sub-project), adj (stocktake / damaged …), xfer (between warehouses). */
 function stk_move_from_post(): void {
@@ -152,10 +157,15 @@ function stk_move_from_post(): void {
     $sid = (int)($_POST['subproject_id'] ?? 0) ?: null; $pid = $sid ? (int) scalar('SELECT project_id FROM subprojects WHERE id = ?', [$sid]) : ((int)($_POST['project_id'] ?? 0) ?: null);
     switch ($kind) {
         case 'in': $price = ($_POST['unit_price'] ?? '') !== '' ? (float) str_replace(',', '.', (string)$_POST['unit_price']) : null; $sup = (int)($_POST['supplier_id'] ?? 0) ?: null;
-            stk_move((int)$item['id'], $wh, 'in', $qty, ['unit_price' => $price, 'note' => $note, 'project_id' => $pid, 'subproject_id' => $sid, 'location' => $_POST['location'] ?? null]);
+            $rin = in_array($_POST['reason_in'] ?? '', STK_IN_REASONS, true) ? $_POST['reason_in'] : 'manual'; if ($rin === 'return_project' && !$sid && !$pid) throw new RuntimeException(t('stk.need_sub')); if ($rin === 'return_customer' && empty($_POST['company_id'])) throw new RuntimeException(t('stk.need_company'));
+            stk_move((int)$item['id'], $wh, 'in', $qty, ['unit_price' => $price, 'note' => $note, 'project_id' => $pid, 'subproject_id' => $sid, 'location' => $_POST['location'] ?? null, 'reason' => $rin, 'ref_no' => $_POST['ref_no'] ?? null, 'company_id' => (int)($_POST['company_id'] ?? 0) ?: null]);
             if ($price !== null && $price > 0 && pr_admin()) stk_price_add((int)$item['id'], $price, ['supplier_id' => $sup, 'qty' => $qty, 'source' => 'manual', 'note' => $note ?: t('stk.mv_in')]);
             break;
-        case 'out': if (!$sid && !$pid) throw new RuntimeException(t('stk.need_sub')); stk_move((int)$item['id'], $wh, 'out', $qty, ['unit_price' => $item['last_price'], 'note' => $note, 'project_id' => $pid, 'subproject_id' => $sid, 'reason' => 'issue']);
+        case 'out': $rout = in_array($_POST['reason_out'] ?? '', STK_OUT_REASONS, true) ? $_POST['reason_out'] : 'issue';
+            if (in_array($rout, ['delivery_production', 'issue', 'consumption'], true) && !$sid && !$pid) throw new RuntimeException(t('stk.need_sub'));
+            if ($rout === 'delivery_customer' && empty($_POST['company_id'])) throw new RuntimeException(t('stk.need_company'));
+            if (in_array($rout, ['manual', 'scrap'], true) && $note === '') throw new RuntimeException(t('stk.need_note'));
+            stk_move((int)$item['id'], $wh, 'out', $qty, ['unit_price' => $item['last_price'], 'note' => $note, 'project_id' => $pid, 'subproject_id' => $sid, 'reason' => $rout, 'ref_no' => $_POST['ref_no'] ?? null, 'company_id' => (int)($_POST['company_id'] ?? 0) ?: null, 'item_consumable' => !empty($item['is_consumable'])]);
             if ($sid && function_exists('bg_has') && bg_has() && $item['last_price']) { $u = current_user(); q('INSERT INTO sp_costs (subproject_id, cost_date, kind, supplier, description, ref_no, amount, currency, created_by, created_name) VALUES (?,CURDATE(),?,?,?,?,?,?,?,?)', [$sid, 'parts', t('stk.stock'), mb_substr($item['code'] . ' · ' . $item['description'] . ' × ' . stk_qty(abs($qty)), 0, 255), 'INV', round(abs($qty) * (float)$item['last_price'], 2), $item['currency'], $u['id'], $u['full_name']]); if (function_exists('eng_rows_reset')) eng_rows_reset(); }
             break;
         case 'adj': $reason = in_array($_POST['reason'] ?? '', STK_MOVE_REASONS, true) ? $_POST['reason'] : 'correction'; if ($note === '' && $reason !== 'stocktake') throw new RuntimeException(t('stk.need_note'));
@@ -227,6 +237,7 @@ function stk_settings_save_from_post(): void {
     $disc = array_values(array_unique(array_map('intval', (array)($_POST['disciplines'] ?? [])))); cp_setting_set('proc_disciplines', json_encode($disc));
     cp_setting_set('proc_pay_threshold', (string) round((float) str_replace(',', '.', (string)($_POST['pay_threshold'] ?? '0')), 2));
     cp_setting_set('proc_offer_margin', (string) round(max(-100.0, min(1000.0, (float) str_replace(',', '.', (string)($_POST['offer_margin'] ?? '25')))), 2));   // R82-001
+    if (isset($_POST['stock_subproject_id'])) { $ssid = (int)$_POST['stock_subproject_id']; $spid = $ssid ? (int) scalar('SELECT project_id FROM subprojects WHERE id = ?', [$ssid]) : 0; cp_setting_set('proc_stock_subproject_id', (string)($spid ? $ssid : 0)); cp_setting_set('proc_stock_project_id', (string)$spid); }   // R87-001
     cache_bump_later('inv');
 }
 function stk_rule_save_from_post(): void {

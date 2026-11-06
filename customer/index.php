@@ -18,6 +18,7 @@ require __DIR__ . '/app/bom.php';    // R80-002 engineering BOM revisions
 require __DIR__ . '/app/po.php';     // R80-003 RFQs and purchase orders
 require __DIR__ . '/app/ut.php';   // R83-001 utilization
 require __DIR__ . '/app/org.php';  // R85-001 organisations
+require __DIR__ . '/app/stc.php';  // R87-001 stock control
 require __DIR__ . '/app/si.php';     // R81-001 supplier invoices · payment requests · payments    // R79-001 inventory · suppliers · pricing rules  // R69-002 block cache, query meter, house-keeping
 require __DIR__ . '/app/i18n.php';
 require __DIR__ . '/app/helpers.php';

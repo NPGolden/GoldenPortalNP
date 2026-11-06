@@ -642,3 +642,6 @@ document.querySelectorAll('[data-tl-more]').forEach(function (b) { var more = b.
     var o = e.target.closest('[data-js-open]'); if (o) { var d = document.getElementById(o.getAttribute('data-js-open')); if (d) d.open = true; }
   });
 })();
+
+/* ---- R87-001: [data-check-all="name"] ticks / unticks every checkbox of that name in the same form ---- */
+document.addEventListener('change', function (e) { var c = e.target; if (!c.matches || !c.matches('input[type=checkbox][data-check-all]')) return; var f = c.closest('form') || document; f.querySelectorAll('input[type=checkbox][name="' + c.getAttribute('data-check-all') + '"]').forEach(function (x) { x.checked = c.checked; }); });

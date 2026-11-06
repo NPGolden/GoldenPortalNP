@@ -7,7 +7,7 @@ if (!function_exists('pr_can') || !pr_can()) { http_response_code(403); layout_h
 $f = ['q' => trim((string)($_GET['q'] ?? '')), 'cat' => (int)($_GET['cat'] ?? 0), 'maker' => (string)($_GET['maker'] ?? ''), 'status' => in_array($_GET['status'] ?? '', ['active', 'obsolete', 'blocked', 'all'], true) ? $_GET['status'] : 'active', 'stock' => in_array($_GET['stock'] ?? '', ['instock', 'zero', 'below', 'reserved'], true) ? $_GET['stock'] : 'any', 'slow' => (int)($_GET['slow'] ?? 0), 'loc' => trim((string)($_GET['loc'] ?? '')), 'sort' => (string)($_GET['sort'] ?? '')];
 $items = stk_items($f); $priced = stk_price_visible(); $admin = pr_admin();
 if (($_GET['format'] ?? '') === 'xlsx') { stk_export_xlsx($items); exit; }
-$tab = in_array($_GET['tab'] ?? '', ['items', 'valuation', 'categories', 'research'], true) ? $_GET['tab'] : 'items';
+$tab = in_array($_GET['tab'] ?? '', ['items', 'valuation', 'categories', 'research', 'shortages'], true) ? $_GET['tab'] : 'items';
 $cats = stk_categories(false); $makers = stk_makers(); $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : ''; $keep = array_filter($f);
 $V = $tab === 'valuation' ? stk_valuation() : null; $cur = 'EUR'; $m = fn(?float $v) => stk_money($v, $cur);
 $sumVal = 0.0; foreach ($items as $i) $sumVal += (float)$i['on_hand'] * (float)($i['last_price'] ?? 0);
@@ -21,7 +21,7 @@ layout_head(t('stk.title'), 'inventory');
     <?php if ($admin): ?><a class="btn btn--ghost btn--sm" href="<?= url('admin_procurement') ?>">⚙ <?= tt('stk.settings') ?></a><?php endif; ?>
   </div>
 </div>
-<nav class="tabs" style="margin-bottom:12px;"><?php $T = fn($k, $lbl) => '<a class="tab' . ($tab === $k ? ' is-on' : '') . '" href="' . url('inventory', array_filter($keep) + ['tab' => $k]) . '">' . $lbl . '</a>'; echo $T('items', '📦 ' . t('stk.items')) . $T('valuation', '📊 ' . t('stk.valuation')) . ($admin ? $T('categories', '🏷 ' . t('stk.categories')) : '') . ($admin && function_exists('stk_research_has') && stk_research_has() ? $T('research', '✨ ' . t('stk.ai_tab')) : ''); ?></nav>
+<nav class="tabs" style="margin-bottom:12px;"><?php $T = fn($k, $lbl) => '<a class="tab' . ($tab === $k ? ' is-on' : '') . '" href="' . url('inventory', array_filter($keep) + ['tab' => $k]) . '">' . $lbl . '</a>'; echo $T('items', '📦 ' . t('stk.items')) . $T('valuation', '📊 ' . t('stk.valuation')) . (function_exists('stc_has') && stc_has() ? $T('shortages', '🔔 ' . t('stk.shortages') . (($sc = stc_shortage_count()) ? ' <span class="count">' . $sc . '</span>' : '')) : '') . ($admin ? $T('categories', '🏷 ' . t('stk.categories')) : '') . ($admin && function_exists('stk_research_has') && stk_research_has() ? $T('research', '✨ ' . t('stk.ai_tab')) : ''); ?></nav>
 
 <?php if ($tab === 'items'): ?>
 <form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1.6fr 1fr 1fr .8fr .9fr .7fr auto;">
@@ -54,6 +54,19 @@ layout_head(t('stk.title'), 'inventory');
   <?php endif; ?>
 </div>
 
+<?php elseif ($tab === 'shortages' && function_exists('stc_has') && stc_has()): $sh = stc_shortages($f['cat'] ?: null); $ssub = stc_stock_sub(); $open = array_filter($sh, fn($r) => !$r['covered']); ?>
+<div class="kpi kpi--4" style="margin-bottom:10px;"><div class="stat<?= $open ? ' red' : ' ok' ?>"><b><?= count($open) ?></b><?= tt('stk.k_short') ?></div><div class="stat"><b><?= count($sh) - count($open) ?></b><?= tt('stk.k_covered') ?></div><div class="stat"><b><?= $ssub ? e($ssub['project_code']) : '—' ?></b><?= tt('stk.stock_project') ?><span class="s"><?= $ssub ? e($ssub['code'] . ' · ' . $ssub['name']) : '<a href="' . url('admin_procurement') . '#stock">' . tt('stk.set_stock_project') . '</a>' ?></span></div><div class="stat"><b><?= (int) scalar("SELECT COUNT(*) FROM inv_items WHERE status = 'active' AND alert_low = 1 AND min_stock > 0") ?></b><?= tt('stk.k_watched') ?></div></div>
+<div class="card"><div class="card-head"><h2>🔔 <?= tt('stk.shortages') ?></h2><span class="hint"><?= tt('stk.shortages_hint') ?></span></div>
+<?php if (!$sh): ?><p class="hint"><?= tt('stk.no_shortage') ?></p><?php else: ?>
+<form method="post" action="<?= url('inventory', ['tab' => 'shortages']) ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="stc_raise">
+<div class="table-scroll"><table class="tbl"><thead><tr><th><input type="checkbox" data-check-all="items[]"></th><th><?= tt('stk.item') ?></th><th class="num"><?= tt('stk.on_hand') ?></th><th class="num"><?= tt('stk.reserved') ?></th><th class="num"><?= tt('stk.free') ?></th><th class="num"><?= tt('stk.min_stock') ?></th><th class="num"><?= tt('stk.incoming') ?></th><th class="num"><?= tt('stk.gap') ?></th><th class="num"><?= tt('stk.order_qty') ?></th><th><?= tt('stk.pref_supplier') ?></th></tr></thead><tbody>
+<?php foreach ($sh as $r): ?><tr class="<?= $r['covered'] ? 'is-muted' : '' ?>"><td><?php if (!$r['covered'] && $admin): ?><input type="checkbox" name="items[]" value="<?= (int)$r['id'] ?>" checked><?php endif; ?></td>
+  <td><a href="<?= url('inventory_item', ['id' => (int)$r['id']]) ?>"><b class="mono"><?= e($r['code']) ?></b></a> <?= e($r['description']) ?><?= $r['is_consumable'] ? ' ♻' : '' ?><br><span class="hint"><?= e(trim(($r['maker'] ?? '') . ' ' . ($r['factory_code'] ?? ''))) ?><?= $r['category'] ? ' · ' . e($r['category']) : '' ?></span></td>
+  <td class="num"><?= e(stk_qty((float)$r['on_hand'])) ?></td><td class="num"><?= e(stk_qty((float)$r['reserved'])) ?></td><td class="num"><b class="<?= $r['free'] <= 0 ? 'is-late' : '' ?>"><?= e(stk_qty($r['free'])) ?></b></td><td class="num"><?= e(stk_qty((float)$r['min_stock'])) ?></td><td class="num"><?= e(stk_qty($r['incoming'])) ?><?= (float)$r['on_order'] > 0 ? ' <span class="hint">PO ' . e(stk_qty((float)$r['on_order'])) . '</span>' : '' ?></td><td class="num"><?= $r['covered'] ? pill('ok', t('stk.covered')) : '<b class="is-late">' . e(stk_qty($r['gap'])) . '</b>' ?></td>
+  <td class="num"><?php if (!$r['covered'] && $admin): ?><input name="qty[<?= (int)$r['id'] ?>]" type="number" step="0.001" min="0" value="<?= e(stk_qty($r['suggested'])) ?>" style="width:90px;"><?php else: ?><?= e(stk_qty($r['suggested'])) ?><?php endif; ?> <span class="hint"><?= e($r['unit']) ?></span></td><td class="hint"><?= e((string)($r['preferred_supplier'] ?? '')) ?></td></tr><?php endforeach; ?>
+</tbody></table></div>
+<?php if ($admin && $open): ?><div class="btn-row" style="margin-top:8px;"><input name="note" placeholder="<?= tt('pd.note') ?>" maxlength="255" style="max-width:360px;"><button class="btn btn--gold" type="submit"<?= $ssub ? '' : ' disabled title="' . tt('stk.need_stock_project') . '"' ?>>🧾 <?= tt('stk.raise_stock_req') ?></button></div><?php endif; ?>
+</form><?php endif; ?></div>
 <?php elseif ($tab === 'valuation'): ?>
 <div class="kpi kpi--4" style="margin-bottom:10px;">
   <div class="stat"><b><?= (int)$V['items'] ?></b><?= tt('stk.items') ?><span class="s"><?= e(t('stk.with_stock', ['n' => $V['with_stock']])) ?></span></div>

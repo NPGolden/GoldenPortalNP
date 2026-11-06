@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.103.1';
+const CP_VERSION = '1.104.0';
 const CP_BUILD   = '2026-11-06';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R87-001', 'version' => '1.104.0', 'date' => '2026-11-06', 'title' => 'Stock control: every inventory movement carries a typed reason — in: PO receipt, manual entry, return from project, return from customer; out: delivery note to customer, delivery to production / project, consumption (consumables), issue on requisition, manual, scrap — with the document reference and the customer organisation; consumable items book their issues as consumption. Low-stock alarm per part (tick, minimum, reorder quantity; Procurement notified once a day when a part falls below), Inventory › Shortages console (free vs minimum, incoming from open orders and stock requisitions, gap, suggested order) raising one stock requisition on the Stock project; Settings › Procurement chooses or creates the Stock project.', 'db' => 'install/migrate_cp_r87_001_stock_control.sql', 'check' => 'r87a'],
         ['ref' => 'GAS-CP-R86-003', 'version' => '1.103.1', 'date' => '2026-11-06', 'title' => 'Requisition lines: the item box opens a drop-down of the recently requested / moved items on click, searches the inventory as you type, and (for Procurement) offers "➕ New inventory item" created when the line is saved; the Service (0.6.19), Golden PM (1.0.11) and Golden HR (1.0.5) apps show the recent items when the box is tapped.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R86-002', 'version' => '1.103.0', 'date' => '2026-11-06', 'title' => 'Purchase order / RFQ lines: the item box opens a drop-down of the supplier\'s items on click (bought before, preferred, or of a maker it represents), searches the whole inventory as you type, and offers "➕ New inventory item" — the item is created when the line is saved (code suggested from maker + part no., category, linked to the supplier); the maker is offered from the supplier\'s makers and the part no. from the item\'s codes (maker part no., barcode, code). Fix: the inline scripts and confirmations of the requisition, purchase order, BOM and payables pages were blocked by the Content-Security-Policy in browsers (no nonce) — pickers, filters, selection buttons and the "are you sure" questions did not run; all moved to nonce-tagged scripts and data-confirm / data-prompt.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R86-001', 'version' => '1.102.1', 'date' => '2026-11-06', 'title' => 'Procurement module end-to-end test (308 automated checks across requisitions, RFQ / PO, receipts and NCR, logistics, payables, BOM, inventory, apps API, five languages, three roles) — seven corrections: on a sent RFQ the line-delete buttons were nested inside the quotation form and could delete a line when saving prices; rejected goods (NCR replacement) could not be received again; cancelling a partially received order cancelled everything (now only the open balance, the order stays received); a requisition could be cancelled after goods were issued; a service report could push stock below zero silently (Procurement is now notified); four event labels missing in the PO log; a PHP warning after the supplier import. Over-budget approval now says why a note is needed.', 'db' => null, 'check' => null],
@@ -368,6 +369,7 @@ function cp_migration_state(): array {
         'r84c' => $has("SHOW COLUMNS FROM companies LIKE 'is_supplier'"),
         'r85b' => $has("SHOW TABLES LIKE 'contact_companies'"),
         'r85c' => $has("SHOW COLUMNS FROM vessel_companies LIKE 'company_id'"),
+        'r87a' => $has("SHOW COLUMNS FROM inv_items LIKE 'alert_low'"),
         'r70d' => $has("SHOW COLUMNS FROM customer_users LIKE 'clocks'"),
         'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),
         'r67' => $has("SHOW TABLES LIKE 'hr_flows'") && $has("SHOW TABLES LIKE 'hr_flow_templates'") && $has("SHOW TABLES LIKE 'hr_invitations'"),
