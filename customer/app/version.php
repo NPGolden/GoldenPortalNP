@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.99.2';
+const CP_VERSION = '1.100.0';
 const CP_BUILD   = '2026-11-06';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R85-001', 'version' => '1.100.0', 'date' => '2026-11-06', 'title' => 'Organisations (option A, step 1): one register behind customers, companies and suppliers. Contacts gains the Suppliers button and the 🏛 Organisations page — every billing customer linked to its company of the Contacts module (matched by VAT, ERP code or name, confirmed one by one or all at once; master data completed both ways; the company created from the customer when none exists), duplicate companies merged (people, orders, invoices, prices, makers and the supplier card move, the duplicate is retired), people completed with the customer of their organisation. The person form creates a new organisation inline; Companies shows the ★ Customer and Supplier roles.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R84-003', 'version' => '1.99.2', 'date' => '2026-11-06', 'title' => 'A company can be a customer / owner / yard and a supplier at once: independent "supplier" flag on the company (Contacts › Companies: "Also a supplier" tick, ★ filter, gold pill linking to the supplier card); the supplier list, the ERP import and the purchase orders use the flag, and never change the kind of an existing company.', 'db' => 'install/migrate_cp_r84_003_is_supplier.sql', 'check' => 'r84c'],
         ['ref' => 'GAS-CP-R84-002', 'version' => '1.99.1', 'date' => '2026-11-06', 'title' => 'Suppliers › Import from ERP: a company already in the Contacts module under another kind (the name is unique) is matched by VAT, code or name and becomes a supplier instead of failing the whole import; a row that cannot be saved is reported and the rest go through.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R84-001', 'version' => '1.99.0', 'date' => '2026-11-06', 'title' => 'Procurement e-mail: five supplier templates (request for quotation, purchase order, expediting, non-conformance, remittance advice) under Settings › E-mail templates, chosen inside the ✉ card of the order / RFQ and of the paid supplier invoice; every ✉ card finds any person of the Contacts module by name, e-mail or company and adds him to the recipients. Suppliers › Import from ERP: downloadable template (sheets Suppliers + Contacts); the Contacts sheet creates or updates the people of each supplier in the Contacts module (category Supplier), so they are offered in the e-mail card; the supplier card lists its people with e-mail and phone.', 'db' => null, 'check' => null],

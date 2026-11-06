@@ -40,7 +40,7 @@ layout_head(t('co.title'), 'contacts');
       <tbody><?php [$pageRows, $pager] = page_list($rows, 'companies', ['q' => $q, 'kind' => $fk]); foreach ($pageRows as $r): ?>
         <tr<?= $r['is_active'] ? '' : ' class="is-retired"' ?>>
           <td><a href="<?= url('contacts', ['company' => $r['id'], 'status' => 'all']) ?>"><b><?= e($r['name']) ?></b></a><?= $r['website'] ? '<br><a class="hint" href="' . e(preg_match('#^https?://#', $r['website']) ? $r['website'] : 'https://' . $r['website']) . '" target="_blank" rel="noopener">' . e($r['website']) . '</a>' : '' ?></td>
-          <td><?= co_kind_pill($r['kind']) ?><?= !empty($r['is_supplier']) && $r['kind'] !== 'supplier' ? ' <a href="' . url('suppliers', ['id' => (int)$r['id']]) . '">' . pill('gold', t('co.kind_supplier')) . '</a>' : '' ?></td>
+          <td><?= co_kind_pill($r['kind']) ?><?= !empty($r['is_supplier']) && $r['kind'] !== 'supplier' ? ' <a href="' . url('suppliers', ['id' => (int)$r['id']]) . '">' . pill('gold', t('co.kind_supplier')) . '</a>' : '' ?><?= $r['customer_id'] ? ' <a href="' . url('admin_customers', ['edit' => (int)$r['customer_id']]) . '">' . pill('navy', '★ ' . t('rp.customer')) . '</a>' : '' ?></td>
           <td><?= $r['customer_name'] ? e($r['customer_name']) : '<span class="hint">—</span>' ?></td>
           <td><?= e(implode(', ', array_filter([$r['city'], $r['country']]))) ?: '<span class="hint">—</span>' ?></td>
           <td class="ct-reach"><?= $r['email'] ? '<a href="mailto:' . e($r['email']) . '">' . e($r['email']) . '</a><br>' : '' ?><?= e($r['phone'] ?? '') ?></td>

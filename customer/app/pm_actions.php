@@ -580,6 +580,11 @@ function pm_handle_action(string $action, string $page): bool {
         }
         case 'ofs_save': { of_status_save(); flash('good', t('ofs.saved')); redirect('admin_offer_statuses', ['_r' => uniqid()]); }
         case 'ofs_delete': { of_status_delete((string)($_POST['skey'] ?? '')); flash('good', t('ofs.deleted')); redirect('admin_offer_statuses', ['_r' => uniqid()]); }
+        case 'org_link': { org_link((int)($_POST['company_id'] ?? 0), (int)($_POST['customer_id'] ?? 0)); flash('good', t('org.linked_ok')); redirect('organisations'); }
+        case 'org_link_all': { $n = org_link_all(); flash('good', t('org.linked_n', ['n' => $n])); redirect('organisations'); }
+        case 'org_create_co': { org_create_for_customer((int)($_POST['customer_id'] ?? 0), (string)($_POST['kind'] ?? 'owner')); flash('good', t('org.created_ok')); redirect('organisations'); }
+        case 'org_merge': { org_merge((int)($_POST['keep'] ?? 0), (int)($_POST['drop'] ?? 0)); flash('good', t('org.merged_ok')); redirect('organisations'); }
+        case 'org_derive_people': { if (!org_can()) throw new RuntimeException(t('err.noaccess')); $n = org_derive_people(); flash('good', t('org.derived_n', ['n' => $n])); redirect('organisations'); }
         case 'co_save': {
             $id = (int)($_POST['id'] ?? 0); $new = !$id;
             $id = co_save_from_post($id);

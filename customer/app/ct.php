@@ -291,6 +291,7 @@ function ct_save_from_post(int $id): int {
     $coid = null; $coName = null;
     if (co_has()) {
         $coid = (int)($_POST['company_id'] ?? 0) ?: null;
+        if (($_POST['company_id'] ?? '') === 'new' && ($nn = trim((string)($_POST['new_company'] ?? ''))) !== '' && ct_manage()) { $coid = co_find($nn, co_norm_kind((string)($_POST['new_company_kind'] ?? '')) ?? 'owner', true); }   // R85-001: new organisation from the person form
         if ($coid) { $co = co_load($coid); if (!$co) $coid = null; else { $coName = $co['name']; if (!$cid && $co['customer_id']) $cid = (int)$co['customer_id']; } }
         if (!$coid && $cid) { $coid = scalar('SELECT id FROM companies WHERE customer_id = ? LIMIT 1', [$cid]) ?: null; if ($coid) $coName = scalar('SELECT name FROM companies WHERE id = ?', [$coid]); }
     } else $coName = $str('company', 160);

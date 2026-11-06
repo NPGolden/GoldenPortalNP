@@ -17,7 +17,7 @@ layout_head(t('ct.title'), 'contacts');
 ?>
 <div class="page-head">
   <div><h1><?= tt('ct.title') ?></h1><p class="lede"><?= tt('ct.lede') ?></p></div>
-  <div class="btn-row"><?php if ($co): ?><a class="btn btn--ghost" href="<?= url('companies') ?>">🏢 <?= tt('co.title') ?></a><?php endif; ?><a class="btn btn--ghost" href="<?= url('settings', ['tab' => 'import']) ?>#contacts">⤒ <?= tt('im.title') ?></a><?php if ($admin): ?><a class="btn btn--ghost" href="<?= url('contacts_export', $qs) ?>">⤓ <?= tt('ct.export') ?></a><?php endif; ?><a class="btn btn--gold" href="<?= url('contact_edit') ?>">+ <?= tt('ct.new') ?></a></div>
+  <div class="btn-row"><?php if ($co): ?><a class="btn btn--ghost" href="<?= url('companies') ?>">🏢 <?= tt('co.title') ?></a><?php if (function_exists('sup_has') && sup_has() && function_exists('pr_can') && pr_can()): ?><a class="btn btn--ghost" href="<?= url('suppliers') ?>">🏭 <?= tt('sup.title') ?></a><?php endif; ?><?php if (function_exists('org_can') && org_can()): ?><a class="btn btn--ghost" href="<?= url('organisations') ?>">🏛 <?= tt('org.title') ?><?php $oc = org_counts(); $od = count(org_dupes()); if ($oc['match'] + $od + $oc['people_fix']): ?> <span class="count"><?= $oc['match'] + $od + $oc['people_fix'] ?></span><?php endif; ?></a><?php endif; ?><?php endif; ?><a class="btn btn--ghost" href="<?= url('settings', ['tab' => 'import']) ?>#contacts">⤒ <?= tt('im.title') ?></a><?php if ($admin): ?><a class="btn btn--ghost" href="<?= url('contacts_export', $qs) ?>">⤓ <?= tt('ct.export') ?></a><?php endif; ?><a class="btn btn--gold" href="<?= url('contact_edit') ?>">+ <?= tt('ct.new') ?></a></div>
 </div>
 
 <div class="kpi kpi--5">
