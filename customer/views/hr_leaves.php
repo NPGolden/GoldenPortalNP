@@ -3,7 +3,7 @@
  *  ?p=hr_leaves[&from=&to=&disc=] */
 require __DIR__ . '/_layout.php';
 $u = require_staff();
-if (!function_exists('hr_lv_has') || !hr_lv_has() || !hr_lv_can()) { http_response_code(403); layout_head(t('hr.leaves'), 'hr_leaves'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
+if (!function_exists('hr_lv_has') || !hr_lv_has() || !hr_can()) { http_response_code(403); layout_head(t('hr.leaves'), 'hr_leaves'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
 $from = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['from'] ?? '')) ? $_GET['from'] : date('Y-m-01'); $to = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['to'] ?? '')) ? $_GET['to'] : date('Y-m-t', strtotime($from));
 if ($to < $from) $to = $from; if ((strtotime($to) - strtotime($from)) > 92 * 86400) $to = date('Y-m-d', strtotime($from) + 92 * 86400);
 $disc = (int)($_GET['disc'] ?? 0); $year = (int) substr($from, 0, 4);

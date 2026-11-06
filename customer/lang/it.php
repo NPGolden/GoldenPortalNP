@@ -6437,7 +6437,7 @@ Cordiali saluti,
 'vg.expand_all' => 'Espandi tutte le navi',
 'vg.collapse_all' => 'Comprimi tutte le navi',
 // ---- GAS-CP-R75-005 personal assistant scope
-'pa.only' => 'Il tuo account gestisce la rubrica — navi, contatti, organizzazioni e clienti — e la console ferie HR.',
+'pa.only' => 'Il tuo account gestisce la rubrica — navi, contatti, organizzazioni e clienti — oltre alle tue ferie e al Supporto.',
 'hr.scope_assistant' => 'Assistente personale (rubrica + navi)',
 // ---- GAS-CP-R76-001 proforma payments
 'pay.title' => 'Pagamenti',

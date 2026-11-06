@@ -2,8 +2,6 @@
 /** HR › Leaves — company-wide leave view per period, collective leave periods (groups), assistant questions.   GAS-CP-R61-001 */
 declare(strict_types=1);
 
-/** Who runs the leaves console: HR and the Owner (hr_can) — and the Personal Assistant, who keeps the company calendar (R87-002). */
-function hr_lv_can(): bool { return hr_has() && is_staff() && (hr_can() || (function_exists('pa_only') && pa_only())); }
 function hr_lv_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'hr_leave_periods'"); } catch (Throwable $e) { $h = false; } } return $h; }
 
 /** Everybody's absences in a date range: [person_id][date] => ['code','kind','status','hours'] from requests (approved + pending) and board-only entries. */
@@ -42,7 +40,7 @@ function hr_period_people(array $lp): array {
     return $all;
 }
 function hr_period_save_from_post(): int {
-    if (!hr_lv_can() || !hr_lv_has()) throw new RuntimeException(t('err.noaccess'));
+    if (!hr_can() || !hr_lv_has()) throw new RuntimeException(t('err.noaccess'));
     $id = (int)($_POST['id'] ?? 0); $name = mb_substr(trim((string)($_POST['name'] ?? '')), 0, 120); if ($name === '') throw new RuntimeException(t('hr.period_need_name'));
     $tid = (int)($_POST['type_id'] ?? 0); if (!hr_type($tid)) throw new RuntimeException(t('err.notfound'));
     $from = (string)($_POST['date_from'] ?? ''); $to = (string)($_POST['date_to'] ?? '') ?: $from;
@@ -57,7 +55,7 @@ function hr_period_save_from_post(): int {
 }
 /** Apply: one HR-approved request per person (working days only, skipping people who already have a request overlapping the period for the same type); written to the board. */
 function hr_period_apply(int $id): array {
-    if (!hr_lv_can() || !hr_lv_has()) throw new RuntimeException(t('err.noaccess')); $lp = one('SELECT * FROM hr_leave_periods WHERE id = ?', [$id]); if (!$lp) throw new RuntimeException(t('err.notfound'));
+    if (!hr_can() || !hr_lv_has()) throw new RuntimeException(t('err.noaccess')); $lp = one('SELECT * FROM hr_leave_periods WHERE id = ?', [$id]); if (!$lp) throw new RuntimeException(t('err.notfound'));
     if ($lp['status'] === 'applied') throw new RuntimeException(t('hr.period_applied_lock')); $t = hr_type((int)$lp['type_id']); $me = (int)(current_user()['id'] ?? 0); $n = 0; $skipped = [];
     db()->beginTransaction();
     try {
@@ -75,13 +73,13 @@ function hr_period_apply(int $id): array {
 }
 /** Undo: remove the leave "Assign to all" created (not what employees joined themselves); the period goes back to closed. */
 function hr_period_undo(int $id): int {
-    if (!hr_lv_can() || !hr_lv_has()) throw new RuntimeException(t('err.noaccess')); $n = 0;
+    if (!hr_can() || !hr_lv_has()) throw new RuntimeException(t('err.noaccess')); $n = 0;
     foreach (all('SELECT id FROM hr_requests WHERE period_id = ? AND created_by <> COALESCE(user_id, 0)', [$id]) as $r) { q('DELETE FROM plan_entries WHERE request_id = ?', [(int)$r['id']]); q('DELETE FROM hr_requests WHERE id = ?', [(int)$r['id']]); $n++; }
     q("UPDATE hr_leave_periods SET status = 'closed', applied_n = 0, applied_at = NULL WHERE id = ?", [$id]); return $n;
 }
 /** R62-003: recount the days of every request of a period (after the weekend / holiday fix) and rewrite their board entries. */
 function hr_period_recount(int $id): int {
-    if (!hr_lv_can() || !hr_lv_has()) throw new RuntimeException(t('err.noaccess')); $n = 0;
+    if (!hr_can() || !hr_lv_has()) throw new RuntimeException(t('err.noaccess')); $n = 0;
     foreach (all('SELECT r.id, r.person_id, r.date_from, r.date_to, r.days, t.unit FROM hr_requests r JOIN hr_leave_types t ON t.id = r.type_id WHERE r.period_id = ? AND r.status <> "rejected"', [$id]) as $r) {
         if ($r['unit'] !== 'day') continue; $p = hr_person((int)$r['person_id']); if (!$p) continue; $days = (float) hr_working_days($p, $r['date_from'], $r['date_to']);
         if (abs($days - (float)$r['days']) > 0.001) { q('UPDATE hr_requests SET days = ? WHERE id = ?', [$days, (int)$r['id']]); $n++; }
@@ -116,10 +114,10 @@ function hr_period_join(array $p, int $periodId, string $from, string $to): int 
     $_POST = ['type_id' => (int)$lp['type_id'], 'date_from' => $from, 'date_to' => $to, 'reason' => $lp['name']] + $_POST;
     $id = hr_request_create_from_post(null); q('UPDATE hr_requests SET period_id = ? WHERE id = ?', [$periodId, $id]); return $id;
 }
-function hr_period_delete(int $id): void { if (!hr_lv_can() || !hr_lv_has()) throw new RuntimeException(t('err.noaccess')); if (scalar('SELECT status FROM hr_leave_periods WHERE id = ?', [$id]) === 'applied') hr_period_undo($id); q('UPDATE hr_requests SET period_id = NULL WHERE period_id = ?', [$id]); q('DELETE FROM hr_leave_periods WHERE id = ?', [$id]); }   // joined leave stays as ordinary requests
+function hr_period_delete(int $id): void { if (!hr_can() || !hr_lv_has()) throw new RuntimeException(t('err.noaccess')); if (scalar('SELECT status FROM hr_leave_periods WHERE id = ?', [$id]) === 'applied') hr_period_undo($id); q('UPDATE hr_requests SET period_id = NULL WHERE period_id = ?', [$id]); q('DELETE FROM hr_leave_periods WHERE id = ?', [$id]); }   // joined leave stays as ordinary requests
 /** Ask the assistant about the period shown (server-side: the summary is the page data, the question the input). */
 function hr_leaves_ask(string $from, string $to, int $disc, string $q): array {
-    if (!hr_lv_can() || !function_exists('ai_run')) throw new RuntimeException(t('err.noaccess'));
+    if (!hr_can() || !function_exists('ai_run')) throw new RuntimeException(t('err.noaccess'));
     $people = hr_lv_people($disc); $m = hr_lv_matrix($from, $to, $people);
     return ai_run('ask', ['title' => t('hr.leaves'), 'headline' => hr_lv_summary($from, $to, $people, $m, (int) substr($from, 0, 4))], $q, null, 'hr_leaves');
 }
