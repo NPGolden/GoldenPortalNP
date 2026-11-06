@@ -102,8 +102,10 @@ function em_attachment(string $key): ?array {
             return [$docx ? wf_render_docx($f) : wf_render_pdf($f), $f['doc_no'] . ($docx ? '.docx' : '.pdf'), $docx ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf'];
         case 'st':   // R78-002: statement of account (collections)
             return function_exists('col_em_attachment') ? col_em_attachment($p) : null;
-        case 'po':   // R80-003: purchase order / RFQ PDF
+        case 'po':   // R80-003: purchase order / RFQ PDF (R88-001: po:<id>:<supplier_id> addresses the RFQ to one invited supplier)
             return function_exists('po_em_attachment') ? po_em_attachment($p) : null;
+        case 'dn':   // R88-001: delivery note PDF
+            return function_exists('dn_em_attachment') ? dn_em_attachment($p) : null;
     }
     return null;
 }
@@ -139,7 +141,8 @@ function em_draft_from_post(): void {
     foreach ((array)($_POST['att'] ?? []) as $k) { $a = em_attachment((string)$k); if ($a) $atts[] = $a; }
     $eml = em_build($to, array_values($cc), $subject, $body, $atts);
     if (!empty($_POST['proforma']) && function_exists('pi_mark_sent')) pi_mark_sent((int)$_POST['proforma']);   // R44-003
-    if (!empty($_POST['po_id']) && function_exists('po_mark_sent') && po_admin()) { try { po_mark_sent((int)$_POST['po_id'], $to); } catch (Throwable $e) {} }   // R80-003: the PO / RFQ counts as sent once the draft is prepared
+    if (!empty($_POST['po_id']) && !empty($_POST['rfq_sup']) && function_exists('rfo_mark_sent') && po_admin()) { try { rfo_mark_sent((int)$_POST['po_id'], (int)$_POST['rfq_sup'], $to); } catch (Throwable $e) {} }   // R88-001: RFO to this invited supplier
+    elseif (!empty($_POST['po_id']) && function_exists('po_mark_sent') && po_admin()) { try { po_mark_sent((int)$_POST['po_id'], $to); } catch (Throwable $e) {} }   // R80-003: the PO / RFQ counts as sent once the draft is prepared
     if (!empty($_POST['acc_report']) && function_exists('acc_mark_sent')) acc_mark_sent((int)$_POST['acc_report'], implode(', ', $to));   // R38-001: the accounting report is now with accounting
     $fn = preg_replace('/[^A-Za-z0-9._-]+/', '_', $subject); $fn = trim(mb_substr($fn, 0, 80), '_') ?: 'message';
     header('Content-Type: message/rfc822'); header('Content-Length: ' . strlen($eml)); header('Cache-Control: private, no-store');

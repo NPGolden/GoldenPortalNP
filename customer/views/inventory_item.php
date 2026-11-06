@@ -14,7 +14,7 @@ layout_head(($it['code'] ?? t('stk.new_item')) . ' — ' . t('stk.title'), 'inve
 ?>
 <p class="eyebrow"><a href="<?= url('inventory') ?>"><?= tt('stk.title') ?></a><?= $it && $it['category'] ? ' › <a href="' . url('inventory', ['cat' => (int)$it['category_id']]) . '">' . e($it['category']) . '</a>' : '' ?></p>
 <div class="page-head">
-  <div><h1><?= $it ? '📦 ' . e($it['code']) : '📦 ' . tt('stk.new_item') ?> <?= $it && $it['status'] !== 'active' ? pill('mute', t('stk.s_' . $it['status'])) : '' ?></h1><?php if ($it): ?><p class="lede" style="margin-bottom:0;"><?= e($it['description']) ?><?= $it['description_en'] ? ' <span class="hint">· ' . e($it['description_en']) . '</span>' : '' ?></p><?php endif; ?></div>
+  <div><h1><?= $it ? '📦 ' . e($it['code']) : '📦 ' . tt('stk.new_item') ?> <?= $it && $it['status'] !== 'active' ? pill('mute', t('stk.s_' . $it['status'])) : '' ?><?= $it && function_exists('swl_item_is_software') && swl_item_is_software($it) ? ' ' . pill('navy', '🔑 ' . t('stk.t_software')) : '' ?></h1><?php if ($it): ?><p class="lede" style="margin-bottom:0;"><?= e($it['description']) ?><?= $it['description_en'] ? ' <span class="hint">· ' . e($it['description_en']) . '</span>' : '' ?></p><?php endif; ?></div>
   <?php if ($it && $admin && !$edit): ?><div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('inventory_item', ['id' => $id, 'edit' => 1]) ?>">✎ <?= tt('btn.edit') ?></a></div><?php endif; ?>
 </div>
 
@@ -39,6 +39,7 @@ layout_head(($it['code'] ?? t('stk.new_item')) . ' — ' . t('stk.title'), 'inve
         <div class="field"><label><?= tt('stk.code') ?> *</label><input name="code" required maxlength="60" value="<?= $v('code') ?>" class="mono"></div>
         <div class="field"><label><?= tt('stk.category') ?></label><select name="category_id"><option value="">—</option><?php foreach ($cats as $c): ?><option value="<?= (int)$c['id'] ?>"<?= $sel($c['id'], $it['category_id'] ?? 0) ?>><?= e($c['name']) ?></option><?php endforeach; ?></select><input name="new_category" maxlength="120" placeholder="<?= tt('stk.or_new_cat') ?>" style="margin-top:4px;"></div>
       </div>
+      <?php if (function_exists('swl_has') && swl_has()): ?><div class="field"><label><?= tt('stk.item_type') ?></label><select name="item_type" data-nosearch><?php foreach (ITEM_TYPES as $ty): ?><option value="<?= $ty ?>"<?= $sel($ty, $it['item_type'] ?? 'part') ?>><?= e(t('stk.t_' . $ty)) ?></option><?php endforeach; ?></select><span class="hint"><?= tt('stk.item_type_hint') ?></span></div><?php endif; ?>
       <div class="field"><label><?= tt('stk.desc') ?> *</label><input name="description" required maxlength="255" value="<?= $v('description') ?>"></div>
       <div class="field"><label><?= tt('stk.desc_en') ?></label><input name="description_en" maxlength="255" value="<?= $v('description_en') ?>"></div>
       <div class="grid grid-3">
@@ -60,7 +61,7 @@ layout_head(($it['code'] ?? t('stk.new_item')) . ' — ' . t('stk.title'), 'inve
       <div class="btn-row"><button class="btn btn--gold" type="submit"><?= tt('btn.save') ?></button><?php if ($it): ?><a class="btn btn--ghost" href="<?= url('inventory_item', ['id' => $id]) ?>"><?= tt('btn.cancel') ?></a><?php endif; ?></div>
     </form>
   </div>
-  <?php elseif ($it): ?>
+  <?php elseif ($it): $isSw = function_exists('swl_item_is_software') && swl_item_is_software($it); ?>
   <div class="card">
     <h2>ℹ <?= tt('stk.details') ?></h2>
     <div class="kv-grid">
@@ -72,6 +73,7 @@ layout_head(($it['code'] ?? t('stk.new_item')) . ' — ' . t('stk.title'), 'inve
       <?php if ($it['file_id']): ?><div class="kv" style="grid-column:1/-1;"><span><?= tt('stk.photo') ?></span><a href="<?= url('file', ['id' => (int)$it['file_id']]) ?>" target="_blank"><img src="<?= url('file', ['id' => (int)$it['file_id'], 'thumb' => 1]) ?>" alt="" style="max-height:120px;border-radius:6px;"></a></div><?php endif; ?>
     </div>
   </div>
+  <?php if ($isSw): $extra = "licences"; require __DIR__ . "/_inv_extras.php"; else: ?>
   <div class="card">
     <h2>🏬 <?= tt('stk.stock') ?></h2>
     <?php if (!$stock): ?><p class="hint"><?= tt('stk.no_stock') ?></p><?php else: ?><table class="tbl"><thead><tr><th><?= tt('stk.warehouse') ?></th><th><?= tt('stk.location') ?></th><th class="num"><?= tt('stk.on_hand') ?></th><th class="num"><?= tt('stk.reserved') ?></th><th class="num"><?= tt('stk.available') ?></th></tr></thead><tbody>
@@ -102,6 +104,7 @@ layout_head(($it['code'] ?? t('stk.new_item')) . ' — ' . t('stk.title'), 'inve
     <?php endif; ?>
   </div>
   <?php endif; ?>
+  <?php endif; ?>
 
   <?php if ($it && $moves): ?>
   <div class="card"><h2>🧾 <?= tt('stk.moves') ?> <span class="count"><?= count($moves) ?></span></h2>
@@ -111,6 +114,7 @@ layout_head(($it['code'] ?? t('stk.new_item')) . ' — ' . t('stk.title'), 'inve
 </div>
 
 <div>
+  <?php if ($it) { $extra = 'links'; require __DIR__ . '/_inv_extras.php'; } /* R88-001: links (licences sit in the left column for software) */ ?>
   <?php if ($it && $priced): ?>
   <div class="card">
     <h2>💶 <?= tt('stk.price_history') ?> <span class="count"><?= count(array_filter($prices, fn($p) => $p['source'] !== 'rollup')) ?></span></h2>

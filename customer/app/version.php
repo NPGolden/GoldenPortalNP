@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.104.2';
+const CP_VERSION = '1.105.0';
 const CP_BUILD   = '2026-11-06';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R88-001', 'version' => '1.105.0', 'date' => '2026-11-06', 'title' => 'Inventory: document web links on every item (datasheet, manual, drawing, certificate, software, supplier page); software inventoried as licences (item type Software — key, serial, seats, kind, expiry, assigned to project / vessel / user / organisation; keys visible to procurement administrators only; a goods receipt creates a pending licence; expiring licences in Inventory › Software and in the Shortages console). Procurement: Request for Offer to several suppliers — invited suppliers, ✉ / PDF per supplier, quotation typed per supplier, comparison (lowest per line, cheapest / fastest), award to one. Goods receipt: each line goes to stock or straight to the project on a delivery note; Inventory › Delivery notes register (to project / vessel, to customer, to production, return to supplier) with numbered PDF, ✉ card, cancellation returning the goods to stock.', 'db' => 'migrate_cp_r88_001_links_software_rfo_dn.sql', 'check' => 'r88a'],
         ['ref' => 'GAS-CP-R87-003', 'version' => '1.104.2', 'date' => '2026-11-06', 'title' => 'Organisations: saving a company whose VAT number or ERP code already belongs to another organisation (or whose ERP code belongs to a customer record linked elsewhere) is refused with a message naming that organisation — no more "Duplicate entry … erp_code" database error; a company given the Customer role links to the existing customer record by VAT, then by ERP code, instead of inserting a second one.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R87-002', 'version' => '1.104.1', 'date' => '2026-11-06', 'title' => 'Personal assistant scope: the Organisations wizard (link, create, merge, derive people), the related companies of a vessel and the Contacts finder are now hers, and My leave (her own requests, leave periods to join, training, targets) and Support are back on her menu; everything else stays closed (no projects, money, no other people\'s HR data).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R87-001', 'version' => '1.104.0', 'date' => '2026-11-06', 'title' => 'Stock control: every inventory movement carries a typed reason — in: PO receipt, manual entry, return from project, return from customer; out: delivery note to customer, delivery to production / project, consumption (consumables), issue on requisition, manual, scrap — with the document reference and the customer organisation; consumable items book their issues as consumption. Low-stock alarm per part (tick, minimum, reorder quantity; Procurement notified once a day when a part falls below), Inventory › Shortages console (free vs minimum, incoming from open orders and stock requisitions, gap, suggested order) raising one stock requisition on the Stock project; Settings › Procurement chooses or creates the Stock project.', 'db' => 'install/migrate_cp_r87_001_stock_control.sql', 'check' => 'r87a'],
@@ -371,6 +372,7 @@ function cp_migration_state(): array {
         'r84c' => $has("SHOW COLUMNS FROM companies LIKE 'is_supplier'"),
         'r85b' => $has("SHOW TABLES LIKE 'contact_companies'"),
         'r85c' => $has("SHOW COLUMNS FROM vessel_companies LIKE 'company_id'"),
+        'r88a' => $has("SHOW COLUMNS FROM po_receipt_lines LIKE 'dest'"),
         'r87a' => $has("SHOW COLUMNS FROM inv_items LIKE 'alert_low'"),
         'r70d' => $has("SHOW COLUMNS FROM customer_users LIKE 'clocks'"),
         'r69b' => $has("SHOW INDEX FROM tickets WHERE Key_name = 'ix_tk_created'") && $has("SHOW INDEX FROM hr_requests WHERE Key_name = 'ix_hrq_type'"),

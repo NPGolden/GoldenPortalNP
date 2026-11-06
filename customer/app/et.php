@@ -9,7 +9,7 @@
  * {customer} {project} {week} {doc} {user} {branch} {date} {signature}.
  */
 
-const ET_KINDS = ['offer', 'weekly', 'fsr', 'isr', 'wf', 'contacts', 'welcome', 'accounting', 'proforma', 'statement', 'rfq', 'po', 'po_chase', 'ncr', 'remittance', 'signature'];   // R84-001: procurement set
+const ET_KINDS = ['offer', 'weekly', 'fsr', 'isr', 'wf', 'contacts', 'welcome', 'accounting', 'proforma', 'statement', 'rfq', 'po', 'po_chase', 'ncr', 'remittance', 'dn', 'signature'];   // R88-001: dn = delivery note   // R84-001: procurement set
 const ET_PLACEHOLDERS = ['no', 'title', 'vessel', 'customer', 'project', 'week', 'doc', 'user', 'branch', 'date', 'name', 'email', 'url', 'signature'];   // name / email / url: the account the welcome e-mail is for (GAS-CP-R36-001)
 
 function et_has(): bool {
@@ -23,8 +23,8 @@ function et_kind_label(string $k): string { return t('et.k_' . $k); }
 function et_builtin(string $kind, string $locale): array {
     $tr = fn(string $k) => t_in($k, $locale);
     $subject = match ($kind) {
-        'offer' => $tr('et.d_s_offer'), 'weekly' => $tr('et.d_s_weekly'), 'fsr' => $tr('et.d_s_fsr'), 'isr' => $tr('et.d_s_isr'), 'wf' => $tr('et.d_s_wf'), 'contacts' => $tr('et.d_s_contacts'), 'welcome' => $tr('et.d_s_welcome'), 'accounting' => $tr('et.d_s_accounting'), 'proforma' => $tr('et.d_s_proforma'), 'statement' => $tr('et.d_s_statement'), 'po' => $tr('et.d_s_po'), 'rfq' => $tr('et.d_s_rfq'), 'po_chase' => $tr('et.d_s_po_chase'), 'ncr' => $tr('et.d_s_ncr'), 'remittance' => $tr('et.d_s_remittance'), default => '' };
-    $body = $kind === 'signature' ? $tr('et.d_signature') : ($kind === 'contacts' ? $tr('et.d_b_contacts') : ($kind === 'welcome' ? $tr('et.d_b_welcome') : ($kind === 'accounting' ? $tr('et.d_b_accounting') : ($kind === 'proforma' ? $tr('et.d_b_proforma') : ($kind === 'statement' ? $tr('et.d_b_statement') : (in_array($kind, ['po', 'rfq', 'po_chase', 'ncr', 'remittance'], true) ? $tr('et.d_b_' . $kind) : $tr('et.d_body')))))));
+        'offer' => $tr('et.d_s_offer'), 'weekly' => $tr('et.d_s_weekly'), 'fsr' => $tr('et.d_s_fsr'), 'isr' => $tr('et.d_s_isr'), 'wf' => $tr('et.d_s_wf'), 'contacts' => $tr('et.d_s_contacts'), 'welcome' => $tr('et.d_s_welcome'), 'accounting' => $tr('et.d_s_accounting'), 'proforma' => $tr('et.d_s_proforma'), 'statement' => $tr('et.d_s_statement'), 'po' => $tr('et.d_s_po'), 'rfq' => $tr('et.d_s_rfq'), 'po_chase' => $tr('et.d_s_po_chase'), 'ncr' => $tr('et.d_s_ncr'), 'remittance' => $tr('et.d_s_remittance'), 'dn' => $tr('et.d_s_dn'), default => '' };
+    $body = $kind === 'signature' ? $tr('et.d_signature') : ($kind === 'contacts' ? $tr('et.d_b_contacts') : ($kind === 'welcome' ? $tr('et.d_b_welcome') : ($kind === 'accounting' ? $tr('et.d_b_accounting') : ($kind === 'proforma' ? $tr('et.d_b_proforma') : ($kind === 'statement' ? $tr('et.d_b_statement') : (in_array($kind, ['po', 'rfq', 'po_chase', 'ncr', 'remittance', 'dn'], true) ? $tr('et.d_b_' . $kind) : $tr('et.d_body')))))));
     return ['subject' => $subject, 'body' => $body];
 }
 

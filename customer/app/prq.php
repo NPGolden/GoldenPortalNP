@@ -216,20 +216,22 @@ function prq_approve_apply(int $rid, string $ev, string $note): void {
     prq_notify(array_values(array_unique($to)), $rid, 'prq_approved', t('prq.nf_approved', ['no' => $r['pr_no']]), $note ?: null);
 }
 /** Warehouse issues a reserved line (part or whole): stock out, reservation released, parts cost on the sub-project. */
-function prq_issue(int $rid, int $lid, float $qty, string $note = ''): void {
+function prq_issue(int $rid, int $lid, float $qty, string $note = '', array $o = []): ?int {   // R88-001: $o = ref_no / ref_kind / ref_id of a delivery note; returns the movement id
     require_pr_wh(); $r = prq_load($rid); $l = one('SELECT * FROM pr_lines WHERE id = ? AND request_id = ?', [$lid, $rid]);
     if (!$r || !$l || $r['status'] !== 'approved' || !in_array($l['status'], ['reserved', 'to_buy', 'received'], true) || empty($l['item_id'])) throw new RuntimeException(t('err.noaccess'));
     $left = (float)$l['qty_reserved']; if ($qty <= 0 || $qty > $left + 0.0005) throw new RuntimeException(t('prq.issue_max', ['q' => stk_qty(max(0.0, $left))]));
     $wh = (int)($l['warehouse_id'] ?: stk_default_wh()); $it = stk_item((int)$l['item_id']); $u = current_user();
     q('UPDATE inv_stock SET qty_reserved = GREATEST(0, qty_reserved - ?) WHERE item_id = ? AND warehouse_id = ?', [min($qty, (float)$l['qty_reserved']), (int)$l['item_id'], $wh]);
-    stk_move((int)$l['item_id'], $wh, 'out', $qty, ['unit_price' => $it['last_price'], 'note' => $r['pr_no'] . ($note !== '' ? ' · ' . $note : ''), 'project_id' => (int)$r['project_id'], 'subproject_id' => $r['subproject_id'] ? (int)$r['subproject_id'] : null, 'reason' => 'issue', 'ref_kind' => 'pr', 'ref_id' => $rid, 'item_consumable' => !empty($it['is_consumable'])]);
+    $mid = stk_move((int)$l['item_id'], $wh, 'out', $qty, ['unit_price' => $it['last_price'], 'note' => $r['pr_no'] . ($note !== '' ? ' · ' . $note : ''), 'project_id' => (int)$r['project_id'], 'subproject_id' => $r['subproject_id'] ? (int)$r['subproject_id'] : null, 'reason' => 'issue', 'ref_kind' => $o['ref_kind'] ?? 'pr', 'ref_id' => $o['ref_id'] ?? $rid, 'ref_no' => $o['ref_no'] ?? null, 'company_id' => $o['company_id'] ?? null, 'item_consumable' => !empty($it['is_consumable'])]);
     if ($r['subproject_id'] && function_exists('bg_has') && bg_has() && $it['last_price'] && (float)$l['qty_received'] <= 0.0005) { /* goods bought on a PO for this sub-project already carry their cost on the PO row (R80-004) */ q('INSERT INTO sp_costs (subproject_id, cost_date, kind, supplier, description, ref_no, amount, currency, created_by, created_name) VALUES (?,CURDATE(),?,?,?,?,?,?,?,?)', [(int)$r['subproject_id'], 'parts', t('stk.stock'), mb_substr($it['code'] . ' · ' . $it['description'] . ' × ' . stk_qty($qty), 0, 255), mb_substr($r['pr_no'], 0, 60), round($qty * (float)$it['last_price'], 2), $it['currency'], $u['id'], $u['full_name']]); if (function_exists('eng_rows_reset')) eng_rows_reset(); }
     $issued = (float)$l['qty_issued'] + $qty; $done = $issued >= (float)$l['qty'] - 0.0005;
     q('UPDATE pr_lines SET qty_issued = ?, qty_reserved = GREATEST(0, qty_reserved - ?), status = ? WHERE id = ?', [$issued, $qty, $done ? 'issued' : $l['status'], $lid]);
     prq_event($rid, 'issue', ($it['code'] ?? '') . ' × ' . stk_qty($qty) . ($note !== '' ? ' · ' . $note : ''));
     if (!(int) scalar("SELECT COUNT(*) FROM pr_lines WHERE request_id = ? AND status NOT IN ('issued','cancelled')", [$rid])) { q('UPDATE pr_requests SET status = ? WHERE id = ?', ['closed', $rid]); prq_event($rid, 'close'); prq_notify([(int)$r['requester_id']], $rid, 'prq_closed', t('prq.nf_closed', ['no' => $r['pr_no']])); }
-    cache_bump_later('inv'); cache_bump_later('eng');
+    cache_bump_later('inv'); cache_bump_later('eng'); return $mid;
 }
+/** Issue a requisition line against a delivery note (R88-001): the request id comes from the line. */
+function prq_issue_dn(int $lid, float $qty, string $dnNo, int $dnId, ?int $companyId = null): ?int { $rid = (int) scalar('SELECT request_id FROM pr_lines WHERE id = ?', [$lid]); if (!$rid) throw new RuntimeException(t('err.notfound')); return prq_issue($rid, $lid, $qty, $dnNo, ['ref_kind' => 'dn', 'ref_id' => $dnId, 'ref_no' => $dnNo, 'company_id' => $companyId]); }
 /** Cancel (requester on draft/submitted, procurement any open): reservations released. */
 function prq_cancel(int $rid, string $note): void {
     require_prq(); $r = prq_load($rid); $u = current_user();

@@ -81,6 +81,7 @@ function stk_items(array $f = [], ?int $limit = null): array {
     $st = $f['status'] ?? 'active'; if ($st !== 'all') { $w[] = 'i.status = ?'; $a[] = in_array($st, ['active', 'obsolete', 'blocked'], true) ? $st : 'active'; }
     if (!empty($f['cat'])) { $w[] = '(i.category_id = ? OR i.category_id IN (SELECT id FROM inv_categories WHERE parent_id = ?))'; $a[] = (int)$f['cat']; $a[] = (int)$f['cat']; }
     if (!empty($f['maker'])) { $w[] = 'i.maker = ?'; $a[] = (string)$f['maker']; }
+    if (!empty($f['type']) && function_exists('swl_has') && swl_has() && in_array($f['type'], ITEM_TYPES, true)) { $w[] = 'i.item_type = ?'; $a[] = $f['type']; }   // R88-001
     if (!empty($f['loc'])) { $w[] = 'i.location LIKE ?'; $a[] = $f['loc'] . '%'; }
     if (!empty($f['ids'])) { $ids = array_values(array_filter(array_map('intval', (array)$f['ids']))); $w[] = $ids ? 'i.id IN (' . implode(',', $ids) . ')' : '0'; }   // R86-003
     if (!empty($f['supplier'])) { $w[] = '(i.preferred_supplier_id = ? OR i.last_supplier_id = ? OR EXISTS (SELECT 1 FROM inv_prices p WHERE p.item_id = i.id AND p.supplier_id = ?) OR EXISTS (SELECT 1 FROM supplier_makers sm WHERE sm.supplier_id = ? AND sm.maker <> \'\' AND sm.maker = i.maker))'; array_push($a, (int)$f['supplier'], (int)$f['supplier'], (int)$f['supplier'], (int)$f['supplier']); }   // R86-002: items of a supplier (bought, preferred, or of a maker it represents)
@@ -121,6 +122,7 @@ function stk_item_save_from_post(int $id): int {
     $vals = [$code, $desc, $s('description_en', 255), $cat, $unit, $pack, $s('maker', 80), $s('factory_code', 80), $s('barcode', 64), $s('location', 60), $min, $status, $cur, $pref, $s('notes', 4000)];
     if ($id) { $vals[] = $id; q('UPDATE inv_items SET code=?, description=?, description_en=?, category_id=?, unit=?, pack_qty=?, maker=?, factory_code=?, barcode=?, location=?, min_stock=?, status=?, currency=?, preferred_supplier_id=?, notes=? WHERE id=?', $vals); }
     else { $u = current_user(); $vals[] = (int)$u['id']; q('INSERT INTO inv_items (code, description, description_en, category_id, unit, pack_qty, maker, factory_code, barcode, location, min_stock, status, currency, preferred_supplier_id, notes, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', $vals); $id = (int) db()->lastInsertId(); }
+    if (function_exists('swl_has') && swl_has()) q('UPDATE inv_items SET item_type = ? WHERE id = ?', [in_array($_POST['item_type'] ?? '', ITEM_TYPES, true) ? $_POST['item_type'] : 'part', $id]);   // R88-001
     if (function_exists('stc_has') && stc_has()) q('UPDATE inv_items SET is_consumable = ?, alert_low = ?, reorder_qty = ? WHERE id = ?', [(int)!empty($_POST['is_consumable']), (int)!empty($_POST['alert_low']), ($_POST['reorder_qty'] ?? '') !== '' ? (float) str_replace(',', '.', (string)$_POST['reorder_qty']) : null, $id]);   // R87-001
     if (!empty($_FILES['photo']['name']) && function_exists('cp_store_file')) { $fid = cp_store_file($_FILES['photo'], 0, null, 'photo', 'internal', $code); if ($fid) q('UPDATE inv_items SET file_id = ? WHERE id = ?', [$fid, $id]); }
     cache_bump_later('inv');

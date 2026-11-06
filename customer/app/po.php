@@ -146,7 +146,8 @@ function po_quote_from_post(): void {
     po_recalc($oid); po_event($oid, 'quote', trim((string)($_POST['note'] ?? '')) ?: null);
 }
 /** Award an RFQ: a PO is created from its lines (quoted prices become price records on receipt, R80-004). */
-function po_award(int $rfqId): int {
+function po_award(int $rfqId, int $rsId = 0): int {
+    if (function_exists('rfo_has') && rfo_has()) { if (!$rsId) { $r = po_load($rfqId); $rs = $r ? rfo_supplier_by_company($rfqId, (int)$r['supplier_id']) : null; $rsId = $rs ? (int)$rs['id'] : 0; } return rfo_award($rfqId, $rsId); }   // R88-001
     $r = po_load($rfqId); if (!$r || $r['kind'] !== 'rfq' || $r['status'] !== 'quoted' || !po_admin()) throw new RuntimeException(t('err.noaccess')); $u = current_user();
     $no = po_number('po', $r['branch_id'] ? (int)$r['branch_id'] : null);
     q('INSERT INTO po_orders (kind, po_no, branch_id, supplier_id, project_id, subproject_id, rfq_id, title, currency, incoterms, terms_days, advance_pct, delivery_date, warehouse_id, supplier_ref, supplier_contact, supplier_email, vat_pct, note, created_by, created_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
@@ -203,7 +204,7 @@ function po_people(array $o): array {
     if ($o['supplier_co_email']) $add((string)$o['supplier'], $o['supplier_co_email'], t('po.supplier'), !$out);
     return $out;
 }
-function po_em_attachment(array $p): ?array { if (!po_can()) return null; $o = po_load((int)($p[1] ?? 0)); if (!$o) return null; return [po_pdf($o), $o['po_no'] . '.pdf', 'application/pdf']; }
+function po_em_attachment(array $p): ?array { if (!po_can()) return null; $o = po_load((int)($p[1] ?? 0)); if (!$o) return null; if (!empty($p[2]) && function_exists('rfo_order_for')) $o = rfo_order_for($o, (int)$p[2]); return [po_pdf($o), $o['po_no'] . '.pdf', 'application/pdf']; }
 
 /* ------------------------------------------------------------------ PDF */
 function po_pdf(array $o): string {
@@ -338,23 +339,29 @@ function po_receive_from_post(): int {
         $open = (float)$l['qty'] - (float)$l['qty_accepted'];   // R86-001: what is still owed — rejected goods (NCR replacement / repair) can be received again
         if ($qr > $open + 0.0005 && empty($_POST['allow_over'])) throw new RuntimeException(t('po.over_receipt', ['n' => (int)$l['seq'], 'q' => stk_qty(max(0.0, $open))]));
         $reason = mb_substr(trim((string)($_POST['reason'][$lid] ?? '')), 0, 400); $action = in_array($_POST['ncr'][$lid] ?? '', PO_NCR_ACTIONS, true) ? $_POST['ncr'][$lid] : 'none'; if ($qrej > 0 && $reason === '') throw new RuntimeException(t('po.need_ncr_reason', ['n' => (int)$l['seq']])); if ($qrej > 0 && $action === 'none') $action = 'return';
-        $todo[] = [$l, $qr, $qa, $qrej, $reason ?: null, $action, mb_substr(trim((string)($_POST['loc'][$lid] ?? '')), 0, 40) ?: null]; }
+        $dest = function_exists('dn_has') && dn_has() && ($_POST['dest'][$lid] ?? 'stock') === 'project' && $o['project_id'] ? 'project' : 'stock';   // R88-001: per line, to stock or straight to the project on a delivery note
+        $todo[] = [$l, $qr, $qa, $qrej, $reason ?: null, $action, mb_substr(trim((string)($_POST['loc'][$lid] ?? '')), 0, 40) ?: null, $dest]; }
     if (!$todo) throw new RuntimeException(t('po.need_receipt_qty'));
     $n = (int) scalar('SELECT COUNT(*) + 1 FROM po_receipts WHERE order_id = ?', [$oid]); $no = $o['po_no'] . '-GR' . $n;
     $fileId = null; if (!empty($_FILES['file']['tmp_name']) && $o['project_id']) $fileId = cp_store_file($_FILES['file'], (int)$o['project_id'], $o['subproject_id'] ? (int)$o['subproject_id'] : null, 'file', 'internal', $no . ($dn ? ' · ' . $dn : ''));
     q('INSERT INTO po_receipts (order_id, receipt_no, received_at, delivery_note, warehouse_id, note, file_id, user_id, user_name) VALUES (?,?,?,?,?,?,?,?,?)', [$oid, $no, $date, $dn, $wh, $note, $fileId, (int)$u['id'], $u['full_name']]); $rid = (int) db()->lastInsertId();
-    $ncr = 0;
-    foreach ($todo as [$l, $qr, $qa, $qrej, $reason, $action, $loc]) {
-        q('INSERT INTO po_receipt_lines (receipt_id, po_line_id, qty_received, qty_accepted, qty_rejected, ncr_reason, ncr_action, ncr_status, location) VALUES (?,?,?,?,?,?,?,?,?)', [$rid, (int)$l['id'], $qr, $qa, $qrej, $reason, $qrej > 0 ? $action : 'none', $qrej > 0 ? 'open' : 'none', $loc]); if ($qrej > 0) $ncr++;
+    $ncr = 0; $dnL = []; $dnHas = function_exists('dn_has') && dn_has();
+    foreach ($todo as [$l, $qr, $qa, $qrej, $reason, $action, $loc, $dest]) {
+        q('INSERT INTO po_receipt_lines (receipt_id, po_line_id, qty_received, qty_accepted, qty_rejected, ncr_reason, ncr_action, ncr_status, location' . ($dnHas ? ', dest' : '') . ') VALUES (?,?,?,?,?,?,?,?,?' . ($dnHas ? ',?' : '') . ')', array_merge([$rid, (int)$l['id'], $qr, $qa, $qrej, $reason, $qrej > 0 ? $action : 'none', $qrej > 0 ? 'open' : 'none', $loc], $dnHas ? [$dest] : [])); $rlId = (int) db()->lastInsertId(); if ($qrej > 0) $ncr++;
         $recvTot = (float)$l['qty_received'] + $qr; $accTot = (float)$l['qty_accepted'] + $qa; $st = $accTot >= (float)$l['qty'] - 0.0005 ? 'received' : 'partial';
         q('UPDATE po_lines SET qty_received = ?, qty_accepted = ?, qty_rejected = qty_rejected + ?, status = ? WHERE id = ?', [$recvTot, $accTot, $qrej, $st, (int)$l['id']]);
-        if ($qa > 0 && $l['item_id']) {
+        if ($qa > 0 && $l['item_id'] && function_exists('swl_from_receipt') && swl_from_receipt($l, $qa, $o, $rid)) {   // R88-001: software — a licence record instead of stock
+            if ($l['pr_line_id']) q("UPDATE pr_lines SET qty_received = qty_received + ?, status = IF(status IN ('to_buy','ordered'), 'received', status) WHERE id = ?", [$qa, (int)$l['pr_line_id']]);
+        } elseif ($qa > 0 && $l['item_id']) {
+            if ($dest === 'project') $dnL[] = ['rl_id' => $rlId, 'item_id' => (int)$l['item_id'], 'description' => $l['description'], 'unit' => $l['unit'], 'qty' => $qa, 'po_line_id' => (int)$l['id'], 'pr_line_id' => $l['pr_line_id'] ? (int)$l['pr_line_id'] : null];
             $price = $l['unit_price'] !== null ? round((float)$l['unit_price'] * (1 - (float)$l['discount_pct'] / 100), 4) : null;
             stk_move((int)$l['item_id'], $wh, 'in', $qa, ['unit_price' => $price, 'project_id' => $o['project_id'] ? (int)$o['project_id'] : null, 'subproject_id' => $o['subproject_id'] ? (int)$o['subproject_id'] : null, 'ref_kind' => 'po', 'ref_id' => $oid, 'reason' => 'receipt', 'note' => $no . ($dn ? ' · ' . $dn : ''), 'location' => $loc]);
             if ($price !== null && $price > 0) stk_price_add((int)$l['item_id'], $price, ['priced_at' => $date, 'supplier_id' => (int)$o['supplier_id'], 'po_line_id' => (int)$l['id'], 'currency' => $o['currency'], 'qty' => $qa, 'source' => 'receipt', 'note' => $o['po_no']]);
             if ($l['pr_line_id']) { q('UPDATE inv_stock SET qty_reserved = qty_reserved + ? WHERE item_id = ? AND warehouse_id = ?', [$qa, (int)$l['item_id'], $wh]); q("UPDATE pr_lines SET qty_received = qty_received + ?, qty_reserved = qty_reserved + ?, warehouse_id = COALESCE(warehouse_id, ?), status = IF(status IN ('to_buy','ordered'), 'received', status) WHERE id = ?", [$qa, $qa, $wh, (int)$l['pr_line_id']]); }
         } elseif ($qa > 0 && $l['pr_line_id']) { q("UPDATE pr_lines SET qty_received = qty_received + ?, status = IF(status IN ('to_buy','ordered'), 'received', status) WHERE id = ?", [$qa, (int)$l['pr_line_id']]); }
+        if ($qa > 0 && !$l['item_id'] && $dest === 'project') $dnL[] = ['rl_id' => $rlId, 'item_id' => null, 'description' => $l['description'], 'unit' => $l['unit'], 'qty' => $qa, 'po_line_id' => (int)$l['id'], 'skip_move' => true];   // free-text goods go on the note without a stock movement
     }
+    $dnId = null; if ($dnL) { $dnId = dn_create(['kind' => 'project', 'warehouse_id' => $wh, 'project_id' => (int)$o['project_id'], 'subproject_id' => $o['subproject_id'] ? (int)$o['subproject_id'] : null, 'receipt_id' => $rid, 'order_id' => $oid, 'issued_at' => $date, 'ref_no' => $dn, 'note' => $note], $dnL); foreach ($dnL as $x) q('UPDATE po_receipt_lines SET dn_id = ? WHERE id = ?', [$dnId, $x['rl_id']]); $dnNo = (string) scalar('SELECT dn_no FROM inv_delivery_notes WHERE id = ?', [$dnId]); po_event($oid, 'dn', $dnNo . ' · ' . count($dnL) . ' ' . t('prq.lines')); }
     $open = (int) scalar("SELECT COUNT(*) FROM po_lines WHERE order_id = ? AND status IN ('open','partial')", [$oid]);
     q('UPDATE po_orders SET status = ? WHERE id = ?', [$open ? 'partial' : 'received', $oid]); po_event($oid, 'receive', $no . ' · ' . count($todo) . ' ' . t('prq.lines') . ($ncr ? ' · ' . $ncr . ' NCR' : '') . ($dn ? ' · ' . $dn : ''));
     po_expected_update($oid); po_progress_apply($o['subproject_id'] ? (int)$o['subproject_id'] : null);
