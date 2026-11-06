@@ -75,7 +75,7 @@ function co_sync_roles(int $id): void {
     $co = co_load($id); if (!$co) return; $roles = co_roles($co);
     if (in_array('customer', $roles, true) && function_exists('cu_cols_ok')) {
         $cid = (int)($co['customer_id'] ?? 0);
-        if (!$cid && ($x = scalar('SELECT id FROM customers WHERE LOWER(name) = LOWER(?)', [$co['name']]))) $cid = (int)$x;
+        if (!$cid && ($v = preg_replace('/\D/', '', (string)($co['vat_no'] ?? ''))) !== '' && strlen($v) >= 6 && ($x = scalar('SELECT id FROM customers WHERE REGEXP_REPLACE(COALESCE(vat_no, \'\'), \'[^0-9]\', \'\') = ? LIMIT 1', [$v]))) $cid = (int)$x;   // R85-003: by VAT only
         if ($cid) { q('UPDATE customers SET name = ?, vat_no = COALESCE(NULLIF(?, \'\'), vat_no), erp_code = COALESCE(?, erp_code), country = COALESCE(NULLIF(?, \'\'), country), address = COALESCE(?, address), city = COALESCE(NULLIF(?, \'\'), city), postal_code = COALESCE(?, postal_code), email = COALESCE(NULLIF(?, \'\'), email), phone = COALESCE(NULLIF(?, \'\'), phone), website = COALESCE(NULLIF(?, \'\'), website), is_active = 1 WHERE id = ?',
                        [$co['name'], $co['vat_no'] ?? null, $co['erp_code'] ?? null, $co['country'], $co['address'] ?? null, $co['city'], $co['postal_code'] ?? null, $co['email'], $co['phone'], $co['website'], $cid]); }
         else { q('INSERT INTO customers (name, erp_code, country, address, city, postal_code, vat_no, email, phone, website, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,1)', [$co['name'], $co['erp_code'] ?? null, $co['country'], $co['address'] ?? null, $co['city'], $co['postal_code'] ?? null, $co['vat_no'] ?? null, $co['email'], $co['phone'], $co['website']]); $cid = (int) db()->lastInsertId(); }

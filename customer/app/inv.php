@@ -415,7 +415,7 @@ function sup_import_parse(string $path): array {
         $line = $i + 2; $g = fn(string $k) => isset($map[$k]) ? trim((string)($r[$map[$k]] ?? '')) : '';
         $name = mb_substr($g('name'), 0, 160); if ($name === '') continue; $key = mb_strtolower($name); if (isset($seen[$key])) { $warn[] = t('sup.imp_w_dup', ['l' => $line, 'n' => $name]); continue; } $seen[$key] = true;
         $vat = preg_replace('/\D/', '', $g('vat_no')) ?: null; $erp = mb_substr($g('erp_code'), 0, 40) ?: null;
-        $id = ($vat && isset($byVat[$vat])) ? $byVat[$vat] : (($erp && isset($byErp[mb_strtolower($erp)])) ? $byErp[mb_strtolower($erp)] : ($byName[$key] ?? 0));
+        $id = ($vat && isset($byVat[$vat])) ? $byVat[$vat] : (($erp && isset($byErp[mb_strtolower($erp)])) ? $byErp[mb_strtolower($erp)] : 0);   // R85-003: VAT first, then the ERP's own code (same source system) — never the name
         $makers = array_values(array_unique(array_filter(array_map(fn($m) => mb_substr(trim($m), 0, 80), preg_split('/[;,\/|]+/', $g('makers')) ?: []))));
         $email = mb_strtolower($g('email')); if ($email !== '' && !filter_var($email, FILTER_VALIDATE_EMAIL)) { $warn[] = t('sup.imp_w_email', ['l' => $line, 'n' => $name]); $email = ''; }
         $inc = strtoupper($g('incoterms')); $cur = strtoupper(mb_substr($g('currency'), 0, 3));

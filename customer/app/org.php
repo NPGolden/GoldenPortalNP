@@ -25,9 +25,7 @@ function org_matches(): array {
         $cid = (int)$cu['id'];
         if (!empty($byCust[$cid])) { $out['linked'][] = ['customer' => $cu, 'company' => $byCust[$cid][0], 'how' => 'linked']; continue; }
         $hit = null; $how = '';
-        if (($v = org_vat($cu['vat_no'])) && !empty($byVat[$v])) { $hit = $byVat[$v][0]; $how = 'vat'; }
-        elseif ($cu['erp_code'] && !empty($byErp[mb_strtolower((string)$cu['erp_code'])])) { $hit = $byErp[mb_strtolower((string)$cu['erp_code'])][0]; $how = 'erp'; }
-        elseif (($k = org_key($cu['name'])) !== '' && !empty($byKey[$k])) { $hit = $byKey[$k][0]; $how = 'name'; }
+        if (($v = org_vat($cu['vat_no'])) && !empty($byVat[$v])) { $hit = $byVat[$v][0]; $how = 'vat'; }   // R85-003: VAT only — ERP code and name never propose a match (decision of 06/11/2026)
         if ($hit && $hit['customer_id'] && (int)$hit['customer_id'] !== $cid) $hit = null;   // already someone else's
         if ($hit) $out['match'][] = ['customer' => $cu, 'company' => $hit, 'how' => $how]; else $out['none'][] = ['customer' => $cu, 'company' => null, 'how' => ''];
     }
@@ -56,7 +54,7 @@ function org_create_for_customer(int $cuId, string $kind = 'owner'): int {
     $cu = one('SELECT * FROM customers WHERE id = ?', [$cuId]); if (!$cu) throw new RuntimeException(t('err.notfound'));
     if ($id = scalar('SELECT id FROM companies WHERE customer_id = ?', [$cuId])) return (int)$id;
     $kind = isset(co_kinds()[$kind]) ? $kind : 'owner';
-    if ($id = scalar('SELECT id FROM companies WHERE LOWER(name) = LOWER(?)', [$cu['name']])) { org_link((int)$id, $cuId); return (int)$id; }
+    if (($v = org_vat($cu['vat_no'])) && ($id = scalar('SELECT co.id FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE REGEXP_REPLACE(COALESCE(NULLIF(co.vat_no, \'\'), sd.vat_no, \'\'), \'[^0-9]\', \'\') = ? LIMIT 1', [$v]))) { org_link((int)$id, $cuId); return (int)$id; }   // R85-003: same VAT only
     q('INSERT INTO companies (name, kind, customer_id, country, city, website, email, phone, is_active' . (co_roles_has() ? ', roles, vat_no, erp_code, address, postal_code' : '') . ') VALUES (?,?,?,?,?,?,?,?,1' . (co_roles_has() ? ',?,?,?,?,?' : '') . ')', array_merge([mb_substr((string)$cu['name'], 0, 160), $kind, $cuId, $cu['country'] ?: null, $cu['city'] ?: null, $cu['website'] ?: null, $cu['email'] ?: null, $cu['phone'] ?: null], co_roles_has() ? [$kind . ',customer', $cu['vat_no'] ?: null, $cu['erp_code'] ?: null, $cu['address'] ?: null, $cu['postal_code'] ?: null] : []));
     $id = (int) db()->lastInsertId(); q('UPDATE contacts SET company_id = ?, company = ? WHERE customer_id = ? AND company_id IS NULL', [$id, $cu['name'], $cuId]); return $id;
 }
@@ -79,7 +77,7 @@ function org_dupes(): array {
     $cos = all('SELECT co.id, co.name, co.kind, co.is_supplier, co.customer_id, ' . (co_roles_has() ? 'co.roles, COALESCE(NULLIF(co.vat_no, \'\'), sd.vat_no) AS vat_no, COALESCE(co.erp_code, sd.erp_code) AS erp_code' : 'sd.vat_no, sd.erp_code') . ', (SELECT COUNT(*) FROM contacts ct WHERE ct.company_id = co.id) AS n_people FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE co.is_active = 1 ORDER BY co.id');
     $groups = []; $seen = [];
     $add = function (string $p, string $k, array $c) use (&$groups) { if ($k === '' || ($p === 'v' && strlen($k) < 6) || ($p === 'n' && mb_strlen($k) < 4)) return; $groups[$p . ':' . $k][$c['id']] = $c; };
-    foreach ($cos as $c) { $add('v', org_vat($c['vat_no']), $c); $add('e', mb_strtolower((string)$c['erp_code']), $c); $add('n', org_key($c['name']), $c); }
+    foreach ($cos as $c) $add('v', org_vat($c['vat_no']), $c);   // R85-003: duplicates by VAT only
     $out = [];
     foreach ($groups as $k => $g) {
         if (count($g) < 2) continue; $g = array_values($g);
