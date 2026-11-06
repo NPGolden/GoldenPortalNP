@@ -7901,5 +7901,7 @@ Cordiali saluti,
 'stk.low_body' => 'Libero {f} sotto il minimo {m} — vedi Magazzino › Mancanze.',
 'stk.item' => 'Articolo',
 'stk.free' => 'Libero',
+'co.dup_vat' => 'Esiste già un\'organizzazione con partita IVA {v}: "{name}" — aprila e aggiungi il ruolo invece di crearne una nuova.',
+'co.dup_erp' => 'Esiste già un\'organizzazione con codice ERP {v}: "{name}" — aprila e aggiungi il ruolo invece di crearne una nuova.',
 'org.new_inline' => 'Nuova organizzazione…',
 ];

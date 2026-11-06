@@ -7901,5 +7901,7 @@ Best regards,
 'stk.low_body' => 'Free {f} below the minimum {m} — see Inventory › Shortages.',
 'stk.item' => 'Item',
 'stk.free' => 'Free',
+'co.dup_vat' => 'An organisation with VAT no. {v} already exists: "{name}" — open it and add the role instead of creating a new one.',
+'co.dup_erp' => 'An organisation with ERP code {v} already exists: "{name}" — open it and add the role instead of creating a new one.',
 'org.new_inline' => 'New organisation…',
 ];

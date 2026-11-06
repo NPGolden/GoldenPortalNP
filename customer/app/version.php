@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.104.1';
+const CP_VERSION = '1.104.2';
 const CP_BUILD   = '2026-11-06';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R87-003', 'version' => '1.104.2', 'date' => '2026-11-06', 'title' => 'Organisations: saving a company whose VAT number or ERP code already belongs to another organisation (or whose ERP code belongs to a customer record linked elsewhere) is refused with a message naming that organisation — no more "Duplicate entry … erp_code" database error; a company given the Customer role links to the existing customer record by VAT, then by ERP code, instead of inserting a second one.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R87-002', 'version' => '1.104.1', 'date' => '2026-11-06', 'title' => 'Personal assistant scope: the Organisations wizard (link, create, merge, derive people), the related companies of a vessel and the Contacts finder are now hers, and My leave (her own requests, leave periods to join, training, targets) and Support are back on her menu; everything else stays closed (no projects, money, no other people\'s HR data).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R87-001', 'version' => '1.104.0', 'date' => '2026-11-06', 'title' => 'Stock control: every inventory movement carries a typed reason — in: PO receipt, manual entry, return from project, return from customer; out: delivery note to customer, delivery to production / project, consumption (consumables), issue on requisition, manual, scrap — with the document reference and the customer organisation; consumable items book their issues as consumption. Low-stock alarm per part (tick, minimum, reorder quantity; Procurement notified once a day when a part falls below), Inventory › Shortages console (free vs minimum, incoming from open orders and stock requisitions, gap, suggested order) raising one stock requisition on the Stock project; Settings › Procurement chooses or creates the Stock project.', 'db' => 'install/migrate_cp_r87_001_stock_control.sql', 'check' => 'r87a'],
         ['ref' => 'GAS-CP-R86-003', 'version' => '1.103.1', 'date' => '2026-11-06', 'title' => 'Requisition lines: the item box opens a drop-down of the recently requested / moved items on click, searches the inventory as you type, and (for Procurement) offers "➕ New inventory item" created when the line is saved; the Service (0.6.19), Golden PM (1.0.11) and Golden HR (1.0.5) apps show the recent items when the box is tapped.', 'db' => null, 'check' => null],

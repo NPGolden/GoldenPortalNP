@@ -76,6 +76,7 @@ function co_sync_roles(int $id): void {
     if (in_array('customer', $roles, true) && function_exists('cu_cols_ok')) {
         $cid = (int)($co['customer_id'] ?? 0);
         if (!$cid && ($v = preg_replace('/\D/', '', (string)($co['vat_no'] ?? ''))) !== '' && strlen($v) >= 6 && ($x = scalar('SELECT id FROM customers WHERE REGEXP_REPLACE(COALESCE(vat_no, \'\'), \'[^0-9]\', \'\') = ? LIMIT 1', [$v]))) $cid = (int)$x;   // R85-003: by VAT only
+        if (!$cid && ($ec = trim((string)($co['erp_code'] ?? ''))) !== '' && ($x = scalar('SELECT id FROM customers WHERE erp_code = ? LIMIT 1', [$ec]))) $cid = (int)$x;   // R87-003: then by ERP code — customers.erp_code is unique
         if ($cid) { q('UPDATE customers SET name = ?, vat_no = COALESCE(NULLIF(?, \'\'), vat_no), erp_code = COALESCE(?, erp_code), country = COALESCE(NULLIF(?, \'\'), country), address = COALESCE(?, address), city = COALESCE(NULLIF(?, \'\'), city), postal_code = COALESCE(?, postal_code), email = COALESCE(NULLIF(?, \'\'), email), phone = COALESCE(NULLIF(?, \'\'), phone), website = COALESCE(NULLIF(?, \'\'), website), is_active = 1 WHERE id = ?',
                        [$co['name'], $co['vat_no'] ?? null, $co['erp_code'] ?? null, $co['country'], $co['address'] ?? null, $co['city'], $co['postal_code'] ?? null, $co['email'], $co['phone'], $co['website'], $cid]); }
         else { q('INSERT INTO customers (name, erp_code, country, address, city, postal_code, vat_no, email, phone, website, is_active) VALUES (?,?,?,?,?,?,?,?,?,?,1)', [$co['name'], $co['erp_code'] ?? null, $co['country'], $co['address'] ?? null, $co['city'], $co['postal_code'] ?? null, $co['vat_no'] ?? null, $co['email'], $co['phone'], $co['website']]); $cid = (int) db()->lastInsertId(); }
@@ -119,6 +120,11 @@ function co_save_from_post(int $id): int {
     $str = fn(string $k, int $max) => ($v = trim((string)($_POST[$k] ?? ''))) === '' ? null : mb_substr($v, 0, $max);
     $name = $str('name', 160); if (!$name) throw new RuntimeException(t('co.need_name'));
     $dup = scalar('SELECT id FROM companies WHERE LOWER(name) = LOWER(?) AND id <> ?', [$name, $id]); if ($dup) throw new RuntimeException(t('co.dup', ['v' => $name]));
+    if (co_roles_has()) {   // R87-003: one organisation per VAT number / ERP code — point to the existing one instead of a database error
+        if (($v = function_exists('org_vat') ? org_vat($str('vat_no', 40)) : '') !== '' && ($d = one('SELECT id, name FROM companies WHERE REGEXP_REPLACE(COALESCE(vat_no, \'\'), \'[^0-9]\', \'\') = ? AND id <> ? LIMIT 1', [$v, $id]))) throw new RuntimeException(t('co.dup_vat', ['v' => $v, 'name' => $d['name']]));
+        if (($ec = $str('erp_code', 40)) !== null && ($d = one('SELECT id, name FROM companies WHERE erp_code = ? AND id <> ? LIMIT 1', [$ec, $id]))) throw new RuntimeException(t('co.dup_erp', ['v' => $ec, 'name' => $d['name']]));
+        if ($ec !== null && ($d = one('SELECT co.name FROM customers c JOIN companies co ON co.customer_id = c.id WHERE c.erp_code = ? AND co.id <> ? LIMIT 1', [$ec, $id]))) throw new RuntimeException(t('co.dup_erp', ['v' => $ec, 'name' => $d['name']]));   // the customer record with that code already belongs to another organisation
+    }
     $roles = []; if (co_roles_has()) { foreach ((array)($_POST['roles'] ?? []) as $r) if (isset(co_role_list()[$r])) $roles[] = (string)$r; if (!empty($_POST['is_supplier']) && !in_array('supplier', $roles, true)) $roles[] = 'supplier'; }
     $kind = $roles ? co_main_kind($roles) : (co_norm_kind((string)($_POST['kind'] ?? '')) ?? 'other'); if (!$roles) { $roles = [$kind]; if (!empty($_POST['is_supplier'])) $roles[] = 'supplier'; }
     $cid = (int)($_POST['customer_id'] ?? 0) ?: null; if ($cid && !in_array('customer', $roles, true)) $roles[] = 'customer';
