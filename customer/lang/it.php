@@ -8311,6 +8311,8 @@ Cordiali saluti,
 'rc.ai_applied' => 'Bozza applicata al modulo — controlla e salva.',
 'rc.ai_prefilled' => 'La bozza dell\'assistente è nel modulo; nulla viene salvato finché non premi Salva.',
 'rc.ai_discard' => 'Scarta la bozza',
+'rc.job_title' => 'Titolo della posizione',
+'rc.code_auto' => 'Codice assegnato automaticamente: VAC-anno-numero, al primo salvataggio.',
 'rc.key_once_hint' => 'Copiala ora nel secret PORTAL_RC_KEY (o PORTAL_STATS_KEY) del repository del sito — al prossimo caricamento è mascherata.',
 // R91-003 outgoing mail
 'web.mail' => 'Posta in uscita',

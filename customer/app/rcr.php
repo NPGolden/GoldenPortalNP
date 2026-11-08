@@ -310,7 +310,7 @@ function rcr_vacancy_ai_fields(array $cur): array {
     $depts = function_exists('hr_departments') ? hr_departments() : []; $brs = function_exists('br_all') ? br_all(true) : [];
     $f = fn(string $n, string $label, string $type, string $val, array $opts = []) => ['name' => $n, 'label' => $label, 'type' => $type, 'value' => mb_substr($val, 0, 600), 'options' => $opts];
     return [
-        $f('title', t('rc.vacancy'), 'text', (string)($cur['title'] ?? '')),
+        $f('title', t('rc.job_title'), 'text', (string)($cur['title'] ?? '')),
         $f('department_id', t('hr.department'), 'select', (string)($cur['department_id'] ?? ''), $sel($depts, 'id', 'name')),
         $f('branch_id', t('rc.branch'), 'select', (string)($cur['branch_id'] ?? ''), $sel($brs, 'id', 'name')),
         $f('location', t('rc.location') . ' (city, country code)', 'text', (string)($cur['location'] ?? '')),

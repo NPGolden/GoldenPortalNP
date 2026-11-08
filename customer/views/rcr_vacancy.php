@@ -27,7 +27,8 @@ if ($aiOn): ?>
 </div>
 <?php endif; ?>
 <form method="post" class="card form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="rcr_vacancy_save"><input type="hidden" name="id" value="<?= $id ?>">
-  <div class="field span2"><label><?= tt('rc.vacancy') ?> *</label><input name="title" required maxlength="190" value="<?= e((string)($v['title'] ?? '')) ?>"></div>
+  <div class="field"><label><?= tt('rc.code') ?></label><input value="<?= e($v['code'] ?? rcr_code('VAC', 'rc_vacancies')) ?>" readonly class="mono" title="<?= e(t('rc.code_auto')) ?>"><p class="hint"><?= tt('rc.code_auto') ?></p></div>
+  <div class="field"><label><?= tt('rc.job_title') ?> *</label><input name="title" required maxlength="190" value="<?= e((string)($v['title'] ?? '')) ?>"></div>
   <div class="field"><label><?= tt('hr.department') ?></label><select name="department_id"><option value=""></option><?php foreach ($depts as $d): ?><option value="<?= (int)$d['id'] ?>"<?= (int)($v['department_id'] ?? 0) === (int)$d['id'] ? ' selected' : '' ?>><?= e($d['name']) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label><?= tt('rc.branch') ?></label><select name="branch_id"><option value=""></option><?php foreach ($brs as $b): ?><option value="<?= (int)$b['id'] ?>"<?= (int)($v['branch_id'] ?? 0) === (int)$b['id'] ? ' selected' : '' ?>><?= e($b['name']) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label><?= tt('rc.location') ?></label><input name="location" maxlength="120" value="<?= e((string)($v['location'] ?? '')) ?>"></div>

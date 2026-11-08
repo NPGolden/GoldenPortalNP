@@ -8311,6 +8311,8 @@ Best regards,
 'rc.ai_applied' => 'Draft applied to the form — review and save.',
 'rc.ai_prefilled' => 'The assistant\'s draft is in the form; nothing is saved until you press Save.',
 'rc.ai_discard' => 'Discard the draft',
+'rc.job_title' => 'Job title',
+'rc.code_auto' => 'Code assigned automatically: VAC-year-number, on first save.',
 'rc.key_once_hint' => 'Copy it now into the website repository secret PORTAL_RC_KEY (or PORTAL_STATS_KEY) — on the next page load it is masked again.',
 // R91-003 outgoing mail
 'web.mail' => 'Outgoing e-mail',
