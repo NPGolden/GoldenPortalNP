@@ -11,7 +11,8 @@ layout_head($ev['title'] ?? t('rc.new_event'), 'rcr_dashboard');
 <?php if ($edit): $vacs = rcr_vacancies(['status' => 'open']); $sel = json_decode((string)($ev['for_vacancies'] ?? '[]'), true) ?: []; ?>
 <h1><?= $ev ? tt('btn.edit') . ' — ' . e($ev['code']) : '＋ ' . tt('rc.new_event') ?></h1>
 <form method="post" class="card form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="rcr_event_save"><input type="hidden" name="id" value="<?= $id ?>">
-  <div class="field span2"><label><?= tt('rc.event') ?> *</label><input name="title" required maxlength="190" value="<?= e((string)($ev['title'] ?? '')) ?>"></div>
+  <div class="field"><label><?= tt('rc.code') ?></label><input value="<?= e($ev['code'] ?? rcr_code('EVT', 'rc_events')) ?>" readonly class="mono"><p class="hint"><?= tt('rc.code_auto_evt') ?></p></div>
+  <div class="field"><label><?= tt('rc.event_title') ?> *</label><input name="title" required maxlength="190" value="<?= e((string)($ev['title'] ?? '')) ?>"></div>
   <div class="field"><label><?= tt('rc.kind') ?></label><select name="kind" data-nosearch><?php foreach (RCR_EVT_KIND as $k): ?><option value="<?= $k ?>"<?= ($ev['kind'] ?? 'assessment') === $k ? ' selected' : '' ?>><?= tt('rc.kind_' . $k) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label><?= tt('rc.starts') ?> *</label><input type="datetime-local" name="starts_at" required value="<?= e($ev ? date('Y-m-d\TH:i', strtotime($ev['starts_at'])) : '') ?>"></div>
   <div class="field"><label><?= tt('rc.duration') ?></label><input type="number" name="duration_min" min="15" step="15" value="<?= (int)($ev['duration_min'] ?? 90) ?>"></div>

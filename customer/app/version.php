@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.110.0';
+const CP_VERSION = '1.110.1';
 const CP_BUILD   = '2026-11-08';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R92-007', 'version' => '1.110.1', 'date' => '2026-11-08', 'title' => 'Event form shows the automatic code (EVT-year-number, previewed before the first save, fixed afterwards) in a read-only field; the title field is named Event title.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R92-006', 'version' => '1.110.0', 'date' => '2026-11-08', 'title' => 'Recruiting: e-mail to the candidate through the portal e-mail card (To = candidate, five templates — message, shortlisted, interview invitation, offer, not selected — in Settings › E-mail templates, Outlook draft or mail app, logged on the application); notifications get an HR group (leave requests, HR messages, trainings, evaluations, HR assistant, recruiting) instead of Work; application page on the standard field layout.', 'db' => 'install/migrate_cp_r92_005_hr_notification_group.sql', 'check' => 'r92e'],
         ['ref' => 'GAS-CP-R92-005', 'version' => '1.109.4', 'date' => '2026-11-08', 'title' => 'CV retention controls: per-application Keep (6 / 12 / 24 / 36 months) with a recorded reason and optional talent-pool consent — kept applications and their CV are skipped by the retention job until the date passes; the talent pool has its own, longer retention (rc_pool_retention_months, default 24); on hire the CV is copied into the employee\'s HR documents (kind hire) and so survives the recruiting retention.', 'db' => 'install/migrate_cp_r92_005_cv_retention_controls.sql', 'check' => 'r92f'],
         ['ref' => 'GAS-CP-R92-004', 'version' => '1.109.3', 'date' => '2026-11-08', 'title' => 'Recruiting: ten role screening sets — IT engineers (IT-STD-8), mechanical (MEC-STD-8), automation (AUT-STD-8), service (SRV-STD-8), accounting (ACC-STD-8), UI/UX designers (UX-STD-8), product designers (PRD-STD-8), sales engineers (SAL-STD-8), procurement (PRC-STD-8), sales assistants (SAS-STD-8); six role situations plus the two loyalty knock-outs each, pass 7 of 8; editable under Recruiting › Screening sets.', 'db' => 'install/migrate_cp_r92_004_role_screening_sets.sql', 'check' => 'r92d'],
