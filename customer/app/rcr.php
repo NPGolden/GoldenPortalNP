@@ -85,11 +85,11 @@ function rcr_vacancies(array $f = []): array {
         (SELECT COUNT(*) FROM rc_applications a WHERE a.vacancy_id = v.id) AS n_apps,
         (SELECT COUNT(*) FROM rc_applications a WHERE a.vacancy_id = v.id AND a.passed = 1) AS n_passed,
         (SELECT COUNT(*) FROM rc_applications a WHERE a.vacancy_id = v.id AND a.status IN ("shortlisted","interview","offer")) AS n_active
-        FROM rc_vacancies v LEFT JOIN hr_departments d ON d.id = v.department_id LEFT JOIN branches b ON b.id = v.branch_id
+        FROM rc_vacancies v LEFT JOIN disciplines d ON d.id = v.department_id LEFT JOIN branches b ON b.id = v.branch_id
         JOIN rc_screening_sets s ON s.id = v.screening_set_id LEFT JOIN customer_users cu ON cu.id = v.hiring_manager_id
         WHERE ' . implode(' AND ', $w) . ' ORDER BY FIELD(v.status,"open","draft","closed","filled"), v.published_at DESC, v.id DESC', $p);
 }
-function rcr_vacancy(int $id): ?array { return one('SELECT v.*, d.name AS department, b.name AS branch, s.code AS set_code FROM rc_vacancies v LEFT JOIN hr_departments d ON d.id = v.department_id LEFT JOIN branches b ON b.id = v.branch_id JOIN rc_screening_sets s ON s.id = v.screening_set_id WHERE v.id = ?', [$id]); }
+function rcr_vacancy(int $id): ?array { return one('SELECT v.*, d.name AS department, b.name AS branch, s.code AS set_code FROM rc_vacancies v LEFT JOIN disciplines d ON d.id = v.department_id LEFT JOIN branches b ON b.id = v.branch_id JOIN rc_screening_sets s ON s.id = v.screening_set_id WHERE v.id = ?', [$id]); }
 function rcr_vacancy_save(array $in): int {
     if (!rcr_can()) throw new RuntimeException(t('err.noaccess'));
     $id = (int) ($in['id'] ?? 0); $title = mb_substr(trim((string) $in['title']), 0, 190); if ($title === '') throw new RuntimeException('Title is required');
@@ -160,7 +160,7 @@ function rcr_cv_stream(int $id): void {
 
 /* ------------------------------------------------------------------ public website feed (called by rc_feed.php) */
 function rcr_pub_vacancies(string $lang): array {
-    $rows = all('SELECT v.code AS id, v.title, d.name AS department, v.location, b.name AS branch, v.emp_type, v.seniority, v.summary, v.description_html, v.requirements, v.tags, s.code AS screening_set, v.published_at, v.closes_at FROM rc_vacancies v LEFT JOIN hr_departments d ON d.id = v.department_id LEFT JOIN branches b ON b.id = v.branch_id JOIN rc_screening_sets s ON s.id = v.screening_set_id WHERE v.status = "open" AND v.publish_web = 1 AND (v.closes_at IS NULL OR v.closes_at >= CURDATE()) ORDER BY v.published_at DESC');
+    $rows = all('SELECT v.code AS id, v.title, d.name AS department, v.location, b.name AS branch, v.emp_type, v.seniority, v.summary, v.description_html, v.requirements, v.tags, s.code AS screening_set, v.published_at, v.closes_at FROM rc_vacancies v LEFT JOIN disciplines d ON d.id = v.department_id LEFT JOIN branches b ON b.id = v.branch_id JOIN rc_screening_sets s ON s.id = v.screening_set_id WHERE v.status = "open" AND v.publish_web = 1 AND (v.closes_at IS NULL OR v.closes_at >= CURDATE()) ORDER BY v.published_at DESC');
     $type = ['full_time' => 'Full-time', 'part_time' => 'Part-time', 'contract' => 'Contract', 'internship' => 'Internship'];
     foreach ($rows as &$r) { $r['type'] = $type[$r['emp_type']] ?? $r['emp_type']; unset($r['emp_type']); $r['seniority'] = ucfirst((string) $r['seniority']); $r['requirements'] = json_decode((string) $r['requirements']) ?: []; $r['tags'] = json_decode((string) $r['tags']) ?: []; }
     return $rows;

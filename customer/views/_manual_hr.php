@@ -71,7 +71,8 @@ return [
       ]],
       ['tip' => 'Ask the staff to complete their cards before the payroll import: HR › People shows who has no personal data, and every employee sees the completeness of his card on My leave with the button to start.'],
     ]],
-    ['id' => 'recruiting', 'title' => 'Recruiting — careers website, screening, evaluation (v1.106.0 – v1.108.1)', 'body' => [
+    ['id' => 'recruiting', 'title' => 'Recruiting — careers website, screening, evaluation (v1.106.0 – v1.108.3)', 'body' => [
+      'Departments on vacancies are the portal Disciplines (Settings › Disciplines) — the same structure the HR registry uses since v1.62.0; there is no separate HR department list (v1.108.3).',
       'HR › Recruiting is the system of record behind goldenas.com.gr/careers. The website stores no HR data: it renders what you publish here and posts everything candidates submit back to the portal through its own server-side proxy (the browser never reaches the portal and never sees the site key).',
       ['ul' => [
         'Vacancies: title, department, branch, location, type, seniority, summary, description, requirements (one per line), tags, hiring manager, screening set, closing date; Draft → Open → Closed / Filled. "Publish on goldenas.com.gr/careers" puts an open vacancy on the website within five minutes (the site caches reads). The hiring manager may read the vacancy, its applications and CVs without being HR.',

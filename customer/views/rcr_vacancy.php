@@ -8,7 +8,7 @@ if (!function_exists('rcr_has') || !rcr_has() || ($id && !rcr_can_view($id)) || 
 layout_head(($v['title'] ?? t('rc.new_vacancy')), 'rcr_dashboard');
 ?>
 <p class="eyebrow"><a href="<?= url('rcr_dashboard') ?>"><?= tt('rc.title') ?></a> › <?= $v ? e($v['code']) : tt('rc.new_vacancy') ?></p>
-<?php if ($edit): $depts = all('SELECT id, name FROM hr_departments WHERE is_active = 1 ORDER BY sort_order, name'); $brs = function_exists('br_all') ? br_all(true) : []; $sets = rcr_sets(); $mgrs = all("SELECT id, full_name FROM customer_users WHERE role IN ('staff','admin') AND is_active = 1 ORDER BY full_name"); ?>
+<?php if ($edit): $depts = hr_departments(); $brs = function_exists('br_all') ? br_all(true) : []; $sets = rcr_sets(); $mgrs = all("SELECT id, full_name FROM customer_users WHERE role IN ('staff','admin') AND is_active = 1 ORDER BY full_name"); ?>
 <h1><?= $v ? tt('btn.edit') . ' — ' . e($v['code']) : '＋ ' . tt('rc.new_vacancy') ?></h1>
 <form method="post" class="card form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="rcr_vacancy_save"><input type="hidden" name="id" value="<?= $id ?>">
   <label class="span2"><?= tt('rc.vacancy') ?> *<input name="title" required maxlength="190" value="<?= e((string)($v['title'] ?? '')) ?>"></label>

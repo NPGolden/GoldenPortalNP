@@ -12,8 +12,8 @@ layout_head(t('web.inbox'), 'web_inbox');
 <p class="eyebrow"><?= tt('nav.g_work') ?></p>
 <div class="page-head"><div><h1>🌐 <?= tt('web.inbox') ?></h1><p class="lede"><?= tt('web.inbox_hint') ?></p></div></div>
 <form method="get" class="filters"><input type="hidden" name="p" value="web_inbox">
-  <select name="kind" data-nosearch onchange="this.form.submit()"><option value=""><?= tt('web.all_kinds') ?></option><option value="ticket"<?= $fk === 'ticket' ? ' selected' : '' ?>><?= tt('web.kind_ticket') ?></option><option value="access"<?= $fk === 'access' ? ' selected' : '' ?>><?= tt('web.kind_access') ?></option></select>
-  <select name="status" data-nosearch onchange="this.form.submit()"><?php foreach (['open', 'new', 'in_progress', 'done', 'spam', 'all'] as $s): ?><option value="<?= $s ?>"<?= $fs === $s ? ' selected' : '' ?>><?= tt('web.st_' . $s) ?></option><?php endforeach; ?></select>
+  <select name="kind" data-nosearch data-js-submit="1"><option value=""><?= tt('web.all_kinds') ?></option><option value="ticket"<?= $fk === 'ticket' ? ' selected' : '' ?>><?= tt('web.kind_ticket') ?></option><option value="access"<?= $fk === 'access' ? ' selected' : '' ?>><?= tt('web.kind_access') ?></option></select>
+  <select name="status" data-nosearch data-js-submit="1"><?php foreach (['open', 'new', 'in_progress', 'done', 'spam', 'all'] as $s): ?><option value="<?= $s ?>"<?= $fs === $s ? ' selected' : '' ?>><?= tt('web.st_' . $s) ?></option><?php endforeach; ?></select>
 </form>
 <?php if ($cur): ?>
 <div class="card" id="inq">

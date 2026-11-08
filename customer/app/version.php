@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.108.2';
+const CP_VERSION = '1.108.3';
 const CP_BUILD   = '2026-11-08';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R91-004', 'version' => '1.108.3', 'date' => '2026-11-08', 'title' => 'Recruiting on the live schema: vacancy lists, the vacancy form and the public careers feed joined the hr_departments table that R56-002 merged into Disciplines (and dropped) — they now use Disciplines, so HR › Recruiting and goldenas.com.gr/careers work on live; Website inbox filters no longer use inline handlers blocked by the CSP.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R91-003', 'version' => '1.108.2', 'date' => '2026-11-08', 'title' => 'Outgoing e-mail through Microsoft 365 authenticated SMTP (customer/app/mailer.php, config.php smtp block: smtp.office365.com:587, STARTTLS, AUTH LOGIN) with PHP mail() fallback — goldenas.com.gr SPF allows only Microsoft, so host-sent mail was junked. Recruiting candidate messages (invitations, shortlisted / offer / rejected) use it; HR address stays as Reply-To. Settings › System › Website shows the mail transport status.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R91-002', 'version' => '1.108.1', 'date' => '2026-11-08', 'title' => 'Release hygiene for the website integration: the four R89–R91 migrations and the R88-001 migration (whose file path was wrong, so the live schema had no item links / licences / RFO / delivery-note tables) are now applied by the updater through cp_migration_state checks; site keys are shown in full once right after creation; Greek, Italian, Bulgarian and Ukrainian texts for Recruiting, Website and evaluation; recruiting GDPR retention runs daily from the portal itself; rate-limit files under customer/storage; manuals and guide.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R91-001', 'version' => '1.108.0', 'date' => '2026-11-08', 'title' => 'HR › Recruiting › Applicant evaluation: weighted scorecards per interview stage (CV review, phone, technical, practical, final) — every interviewer scores the criteria 1–5 (technical knowledge, marine / shipyard experience, problem solving, learning attitude, loyalty & long-term commitment, teamwork; weights editable in Recruiting settings), total 0–100 with a recommendation (strong hire / hire / hold / no hire), per-criterion averages and recommendation mix on the candidate card, candidate ranking on the vacancy. Interviews planned per stage (online / on site / phone, interviewers, link) with done / no-show / cancelled; planning moves the application to Interview and can e-mail the invitation; status changes to shortlisted / offer / rejected can e-mail the candidate (needs the HR From address).', 'db' => 'install/migrate_cp_r91_001_applicant_evaluation.sql', 'check' => 'r91a'],
