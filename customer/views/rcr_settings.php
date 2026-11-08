@@ -21,5 +21,10 @@ layout_head(t('rc.settings'), 'rcr_dashboard');
   <label><?= tt('rc.mail_from') ?><input name="rc_mail_from" value="<?= e((string)cp_setting('rc_mail_from', '')) ?>" placeholder="hr@goldenas.com.gr"><span class="hint"><?= tt('rc.mail_from_hint') ?></span></label>
   <div class="btn-row span2"><button class="btn btn--gold"><?= tt('btn.save') ?></button></div>
 </form>
+<?php if (rcr_eval_has()): $crit = rcr_eval_criteria(); ?><form method="post" class="card" data-lock id="eval"><?= csrf_field() ?><input type="hidden" name="action" value="rcr_eval_criteria_save">
+  <h2>🧭 <?= tt('rc.ev_criteria') ?></h2><p class="hint"><?= tt('rc.ev_criteria_hint') ?></p>
+  <table class="tbl"><thead><tr><th style="width:120px;"><?= tt('rc.code') ?></th><th><?= tt('rc.ev_criterion') ?></th><th style="width:120px;" class="num"><?= tt('rc.ev_weight') ?></th></tr></thead><tbody>
+  <?php for ($i = 0; $i < 8; $i++): $c = $crit[$i] ?? ['key' => '', 'label' => '', 'weight' => '']; ?><tr><td><input name="crit[<?= $i ?>][key]" value="<?= e((string)$c['key']) ?>" maxlength="20" pattern="[a-z0-9_]*"></td><td><input name="crit[<?= $i ?>][label]" value="<?= e((string)$c['label']) ?>" maxlength="120"></td><td><input name="crit[<?= $i ?>][weight]" value="<?= e((string)$c['weight']) ?>" inputmode="decimal" style="text-align:right;"></td></tr><?php endfor; ?>
+  </tbody></table><div class="btn-row" style="margin-top:10px;"><button class="btn btn--gold"><?= tt('btn.save') ?></button></div></form><?php endif; ?>
 <form method="post" class="card" data-lock data-confirm="<?= tt('rc.retention_confirm') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="rcr_retention_now"><button class="btn btn--ghost"><?= tt('rc.retention_now') ?></button></form>
 <?php layout_foot();

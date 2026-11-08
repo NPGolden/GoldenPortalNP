@@ -15,6 +15,9 @@ const RCR_ACTIVE_STATUS = ['shortlisted', 'interview', 'offer'];               /
 const RCR_EVT_KIND = ['assessment', 'webinar', 'qna'];
 const RCR_EMP_TYPE = ['full_time', 'part_time', 'contract', 'internship'];
 const RCR_SENIORITY = ['junior', 'mid', 'senior', 'lead'];
+const RCR_EVAL_STAGE = ['cv_review', 'phone', 'technical', 'practical', 'final'];          // R91-001
+const RCR_EVAL_RECO = ['strong_hire', 'hire', 'hold', 'no_hire'];
+const RCR_INT_STAGE = ['phone', 'technical', 'practical', 'final'];
 
 function rcr_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'rc_vacancies'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function rcr_can(): bool { return rcr_has() && function_exists('hr_can') && hr_can(); }
@@ -141,7 +144,8 @@ function rcr_application_decide(int $id, array $in): void {
     $st = in_array($in['status'] ?? '', RCR_APP_STATUS, true) ? $in['status'] : $a['status'];
     q('UPDATE rc_applications SET status = ?, rating = ?, hr_notes = ?, owner_user_id = ?, status_changed_at = IF(status <> ?, NOW(), status_changed_at) WHERE id = ?',
       [$st, (int) ($in['rating'] ?? 0) ?: null, mb_substr(trim((string) ($in['hr_notes'] ?? '')), 0, 4000) ?: null, (int) ($in['owner_user_id'] ?? 0) ?: null, $st, $id]);
-    if ($st !== $a['status']) rcr_log('status', ['application_id' => $id, 'vacancy_id' => (int) $a['vacancy_id']], $a['status'] . ' → ' . $st);
+    if ($st !== $a['status']) { rcr_log('status', ['application_id' => $id, 'vacancy_id' => (int) $a['vacancy_id']], $a['status'] . ' → ' . $st);
+        if (!empty($in['notify_candidate']) && in_array($st, ['shortlisted', 'offer', 'rejected'], true)) rcr_mail((string) $a['email'], 'Golden A/S — ' . t('rc.st_' . $st) . ' · ' . $a['vacancy_code'], ($a['name'] ?: $a['email']) . ",\n\n" . t('rc.ev_mail_' . $st, ['vacancy' => $a['vacancy']]) . "\n\nGolden Automation Systems — HR"); }   // R91-001
     if ($st === 'hired' && empty($a['hired_person_id']) && function_exists('hr2_has') && hr2_has()) {   // onboarding handshake: a person card in HR › People
         q('INSERT INTO hr_people (name_en, is_technical, hire_date) VALUES (?, 1, CURDATE())', [(string) ($a['name'] ?: $a['email'])]); $pid = (int) db()->lastInsertId();
         q('UPDATE rc_applications SET hired_person_id = ? WHERE id = ?', [$pid, $id]); rcr_log('person_created', ['application_id' => $id], 'hr_people #' . $pid);
@@ -229,3 +233,71 @@ function rcr_retention_run(): array {
     } catch (Throwable $e) { db()->rollBack(); throw $e; }
     return $n;
 }
+
+/* ------------------------------------------------------------------ applicant evaluation (GAS-CP-R91-001) */
+function rcr_eval_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'rc_evaluations'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** Weighted criteria from Settings › Recruiting (JSON [{key,label,weight}]); weights are normalised to 100. */
+function rcr_eval_criteria(): array {
+    $c = json_decode((string) cp_setting('rc_eval_criteria', '[]'), true) ?: [];
+    $c = array_values(array_filter($c, fn($x) => !empty($x['key']) && !empty($x['label']) && (float) ($x['weight'] ?? 0) > 0));
+    $sum = array_sum(array_map(fn($x) => (float) $x['weight'], $c)) ?: 1;
+    foreach ($c as &$x) { $x['key'] = preg_replace('/[^a-z0-9_]/', '', strtolower((string) $x['key'])); $x['weight'] = round((float) $x['weight'] * 100 / $sum, 2); } unset($x);
+    return $c;
+}
+function rcr_eval_criteria_save(array $rows): void {
+    $out = []; foreach ($rows as $r) { $l = trim((string) ($r['label'] ?? '')); $w = (float) ($r['weight'] ?? 0); if ($l === '' || $w <= 0) continue; $k = preg_replace('/[^a-z0-9_]/', '', strtolower((string) ($r['key'] ?? ''))) ?: 'c' . (count($out) + 1); $out[] = ['key' => $k, 'label' => mb_substr($l, 0, 120), 'weight' => $w]; }
+    if (!$out) throw new RuntimeException(t('rc.ev_need_criteria'));
+    cp_setting_set('rc_eval_criteria', json_encode($out, JSON_UNESCAPED_UNICODE));
+}
+/** Weighted total 0–100 from 1–5 scores. */
+function rcr_eval_total(array $scores): float { $t = 0.0; foreach (rcr_eval_criteria() as $c) { $v = (int) ($scores[$c['key']] ?? 0); if ($v >= 1 && $v <= 5) $t += ($v / 5) * $c['weight']; } return round($t, 2); }
+function rcr_evaluations(int $appId): array { return rcr_eval_has() ? all('SELECT e.*, cu.full_name AS by_name FROM rc_evaluations e LEFT JOIN customer_users cu ON cu.id = e.evaluator_id WHERE e.application_id = ? ORDER BY e.created_at DESC', [$appId]) : []; }
+function rcr_eval_save(int $appId, array $in): int {
+    $a = rcr_application($appId); if (!$a || !rcr_can_view((int) $a['vacancy_id'])) throw new RuntimeException(t('err.noaccess'));
+    $u = current_user(); $scores = []; $missing = [];
+    foreach (rcr_eval_criteria() as $c) { $v = (int) ($in['score'][$c['key']] ?? 0); if ($v < 1 || $v > 5) $missing[] = $c['label']; else $scores[$c['key']] = $v; }
+    if ($missing) throw new RuntimeException(t('rc.ev_score_all'));
+    $stage = in_array($in['stage'] ?? '', RCR_EVAL_STAGE, true) ? $in['stage'] : 'technical'; $reco = in_array($in['recommendation'] ?? '', RCR_EVAL_RECO, true) ? $in['recommendation'] : 'hold';
+    q('INSERT INTO rc_evaluations (application_id, stage, evaluator_id, evaluator_name, scores, total, recommendation, strengths, concerns, notes) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      [$appId, $stage, (int) $u['id'], (string) $u['full_name'], json_encode($scores), rcr_eval_total($scores), $reco, mb_substr(trim((string) ($in['strengths'] ?? '')), 0, 2000) ?: null, mb_substr(trim((string) ($in['concerns'] ?? '')), 0, 2000) ?: null, mb_substr(trim((string) ($in['notes'] ?? '')), 0, 4000) ?: null]);
+    $id = (int) db()->lastInsertId();
+    rcr_eval_refresh($appId); rcr_log('evaluation', ['application_id' => $appId, 'vacancy_id' => (int) $a['vacancy_id']], t('rc.ev_stage_' . $stage) . ' · ' . t('rc.ev_reco_' . $reco));
+    return $id;
+}
+function rcr_eval_delete(int $evalId): void {
+    $e = one('SELECT * FROM rc_evaluations WHERE id = ?', [$evalId]); if (!$e) return; $u = current_user();
+    if ((int) $e['evaluator_id'] !== (int) $u['id'] && !is_cp_admin()) throw new RuntimeException(t('err.noaccess'));
+    q('DELETE FROM rc_evaluations WHERE id = ?', [$evalId]); rcr_eval_refresh((int) $e['application_id']); rcr_log('evaluation_deleted', ['application_id' => (int) $e['application_id']], (string) $e['stage']);
+}
+function rcr_eval_refresh(int $appId): void { $r = one('SELECT AVG(total) a, COUNT(*) n FROM rc_evaluations WHERE application_id = ?', [$appId]); q('UPDATE rc_applications SET eval_avg = ?, eval_count = ? WHERE id = ?', [$r && $r['n'] ? round((float) $r['a'], 2) : null, (int) ($r['n'] ?? 0), $appId]); }
+/** Per-criterion averages and the recommendation mix for one application. */
+function rcr_eval_summary(array $evals): array {
+    $crit = rcr_eval_criteria(); $sum = []; $n = count($evals); $reco = array_fill_keys(RCR_EVAL_RECO, 0);
+    foreach ($evals as $e) { $sc = json_decode((string) $e['scores'], true) ?: []; foreach ($crit as $c) $sum[$c['key']] = ($sum[$c['key']] ?? 0) + (int) ($sc[$c['key']] ?? 0); $reco[$e['recommendation']] = ($reco[$e['recommendation']] ?? 0) + 1; }
+    $avg = []; foreach ($crit as $c) $avg[$c['key']] = $n ? round($sum[$c['key']] / $n, 1) : null;
+    return ['n' => $n, 'avg' => $avg, 'total' => $n ? round(array_sum(array_map(fn($e) => (float) $e['total'], $evals)) / $n, 1) : null, 'reco' => $reco];
+}
+/** Candidates of a vacancy ranked: evaluation average first, then screening score. */
+function rcr_vacancy_ranking(int $vacancyId): array {
+    return all("SELECT a.id, a.code, a.name, a.email, a.status, a.score, a.max_score, a.passed, a.rating, a.eval_avg, a.eval_count, a.cv_path IS NOT NULL AS has_cv,
+                       (SELECT GROUP_CONCAT(DISTINCT e.recommendation) FROM rc_evaluations e WHERE e.application_id = a.id) AS recos
+                FROM rc_applications a WHERE a.vacancy_id = ? AND a.status NOT IN ('withdrawn') ORDER BY (a.eval_avg IS NULL), a.eval_avg DESC, a.passed DESC, a.score DESC, a.created_at", [$vacancyId]);
+}
+/* interviews */
+function rcr_interviews(int $appId): array { return rcr_eval_has() ? all('SELECT * FROM rc_interviews WHERE application_id = ? ORDER BY scheduled_at DESC', [$appId]) : []; }
+function rcr_interview_save(int $appId, array $in): int {
+    $a = rcr_application($appId); if (!$a || !rcr_can_view((int) $a['vacancy_id'])) throw new RuntimeException(t('err.noaccess'));
+    $when = trim((string) ($in['scheduled_at'] ?? '')); if (!$when || !strtotime($when)) throw new RuntimeException(t('rc.ev_need_date'));
+    $stage = in_array($in['stage'] ?? '', RCR_INT_STAGE, true) ? $in['stage'] : 'technical'; $mode = in_array($in['mode'] ?? '', ['online', 'onsite', 'phone'], true) ? $in['mode'] : 'online';
+    q('INSERT INTO rc_interviews (application_id, stage, scheduled_at, duration_min, mode, location, interviewers, created_by) VALUES (?,?,?,?,?,?,?,?)',
+      [$appId, $stage, date('Y-m-d H:i:s', strtotime($when)), max(15, min(480, (int) ($in['duration_min'] ?? 60))), $mode, mb_substr(trim((string) ($in['location'] ?? '')), 0, 200) ?: null, mb_substr(trim((string) ($in['interviewers'] ?? '')), 0, 300) ?: null, (int) current_user()['id']]);
+    $id = (int) db()->lastInsertId();
+    if ($a['status'] !== 'interview' && !in_array($a['status'], ['offer', 'hired', 'rejected', 'withdrawn'], true)) { q("UPDATE rc_applications SET status = 'interview', status_changed_at = NOW() WHERE id = ?", [$appId]); rcr_log('status', ['application_id' => $appId, 'vacancy_id' => (int) $a['vacancy_id']], $a['status'] . ' → interview'); }
+    rcr_log('interview_planned', ['application_id' => $appId, 'vacancy_id' => (int) $a['vacancy_id']], t('rc.ev_stage_' . $stage) . ' · ' . date('d/m/Y H:i', strtotime($when)));
+    if (!empty($in['notify'])) {
+        $body = sprintf("%s,\n\n%s\n\n%s: %s\n%s: %s\n%s: %s\n\n%s\n\nGolden Automation Systems — HR", $a['name'] ?: $a['email'], t('rc.ev_mail_intro', ['vacancy' => $a['vacancy']]), t('rc.ev_stage'), t('rc.ev_stage_' . $stage), t('rc.ev_when'), date('d/m/Y H:i', strtotime($when)) . ' (Athens)', t('rc.ev_mode'), t('rc.ev_mode_' . $mode) . ($in['location'] ? ' · ' . trim((string) $in['location']) : ''), t('rc.ev_mail_outro'));
+        if (rcr_mail((string) $a['email'], 'Golden A/S — ' . t('rc.ev_interview') . ' · ' . $a['vacancy_code'], $body)) q('UPDATE rc_interviews SET candidate_notified_at = NOW() WHERE id = ?', [$id]);
+    }
+    return $id;
+}
+function rcr_interview_status(int $id, string $st): void { if (!in_array($st, ['planned', 'done', 'no_show', 'cancelled'], true)) return; $i = one('SELECT * FROM rc_interviews WHERE id = ?', [$id]); if (!$i) return; $a = rcr_application((int) $i['application_id']); if (!$a || !rcr_can_view((int) $a['vacancy_id'])) throw new RuntimeException(t('err.noaccess')); q('UPDATE rc_interviews SET status = ? WHERE id = ?', [$st, $id]); rcr_log('interview_' . $st, ['application_id' => (int) $i['application_id']], (string) $i['stage']); }
