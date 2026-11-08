@@ -63,6 +63,15 @@ layout_head($a['code'], 'rcr_dashboard');
 </form></details></div>
 <?php endif; ?>
 </div><div>
+<div class="card" id="keep"><h2>🗄 <?= tt('rc.keep_title') ?></h2>
+<?php if (!empty($a['keep_until']) && $a['keep_until'] >= date('Y-m-d')): ?><p><?= pill('green', t('rc.keep_active', ['date' => date('d/m/Y', strtotime($a['keep_until']))])) ?></p><p class="hint"><?= e((string)$a['keep_reason']) ?><?= !empty($a['pool_consent_at']) ? ' · ' . tt('rc.keep_pool_yes') : '' ?></p>
+<?php else: ?><p class="hint"><?= t('rc.keep_hint', ['months' => (int)cp_setting('rc_retention_months', '6')]) ?></p><?php endif; ?>
+<form method="post" class="form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="rcr_keep"><input type="hidden" name="id" value="<?= $id ?>">
+  <label><?= tt('rc.keep_for') ?><select name="months" data-nosearch><option value="12"><?= t('rc.keep_months', ['n' => 12]) ?></option><option value="6"><?= t('rc.keep_months', ['n' => 6]) ?></option><option value="24"><?= t('rc.keep_months', ['n' => 24]) ?></option><option value="36"><?= t('rc.keep_months', ['n' => 36]) ?></option><option value="0"><?= tt('rc.keep_clear') ?></option></select></label>
+  <label><?= tt('rc.keep_reason') ?><input name="reason" maxlength="200" value="<?= e((string)$a['keep_reason']) ?>" placeholder="<?= tt('rc.keep_reason_ph') ?>"></label>
+  <label class="check span2"><input type="checkbox" name="pool_consent" value="1"<?= !empty($a['pool_consent_at']) ? ' checked' : '' ?>> <?= tt('rc.keep_pool_consent') ?></label>
+  <div class="btn-row span2"><button class="btn btn--ghost"><?= tt('btn.save') ?></button></div>
+</form></div>
 <form method="post" class="card form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="rcr_app_decide"><input type="hidden" name="id" value="<?= $id ?>"><h2><?= tt('rc.decision') ?></h2>
   <label><?= tt('th.status') ?><select name="status" data-nosearch><?php foreach (RCR_APP_STATUS as $s): ?><option value="<?= $s ?>"<?= $a['status'] === $s ? ' selected' : '' ?>><?= tt('rc.st_' . $s) ?></option><?php endforeach; ?></select></label>
   <label><?= tt('rc.rating') ?><select name="rating" data-nosearch><option value=""></option><?php for ($i = 1; $i <= 5; $i++): ?><option value="<?= $i ?>"<?= (int)$a['rating'] === $i ? ' selected' : '' ?>><?= str_repeat('★', $i) ?></option><?php endfor; ?></select></label>

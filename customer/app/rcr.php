@@ -151,6 +151,7 @@ function rcr_application_decide(int $id, array $in): void {
     if ($st === 'hired' && empty($a['hired_person_id']) && function_exists('hr2_has') && hr2_has()) {   // onboarding handshake: a person card in HR › People
         q('INSERT INTO hr_people (name_en, is_technical, hire_date) VALUES (?, 1, CURDATE())', [(string) ($a['name'] ?: $a['email'])]); $pid = (int) db()->lastInsertId();
         q('UPDATE rc_applications SET hired_person_id = ? WHERE id = ?', [$pid, $id]); rcr_log('person_created', ['application_id' => $id], 'hr_people #' . $pid);
+        rcr_cv_to_person($id);   // R91-004
     }
 }
 function rcr_cv_stream(int $id): void {
@@ -222,14 +223,15 @@ function rcr_retention_run(): array {
     if (!rcr_has()) return []; $months = max(1, (int) cp_setting('rc_retention_months', '6')); $cut = date('Y-m-d H:i:s', strtotime("-$months months")); $n = ['apps_deleted' => 0, 'apps_anonymised' => 0, 'cvs_deleted' => 0, 'events_deleted' => 0, 'pool_deleted' => 0];
     db()->beginTransaction();
     try {
-        $rows = all('SELECT id, cv_path FROM rc_applications WHERE status IN ("screened","cv_received","rejected","withdrawn") AND COALESCE(status_changed_at, created_at) < ?', [$cut]);
+        $rows = all('SELECT id, cv_path FROM rc_applications WHERE status IN ("screened","cv_received","rejected","withdrawn") AND COALESCE(status_changed_at, created_at) < ? AND (keep_until IS NULL OR keep_until < CURDATE())', [$cut]);   // R91-004: kept applications are skipped until keep_until passes
         foreach ($rows as $r) { if ($r['cv_path'] && is_file($r['cv_path'])) { @unlink($r['cv_path']); $n['cvs_deleted']++; } }
         if ($rows) { $ids = array_column($rows, 'id'); $in = implode(',', array_map('intval', $ids)); q("DELETE FROM rc_event_registrations WHERE application_id IN ($in)"); q("DELETE FROM rc_log WHERE application_id IN ($in)"); $n['apps_deleted'] = q("DELETE FROM rc_applications WHERE id IN ($in)")->rowCount(); }
-        foreach (all('SELECT id, cv_path FROM rc_applications WHERE status = "hired" AND COALESCE(status_changed_at, created_at) < ? AND email NOT LIKE "anon-%"', [$cut]) as $r) {
-            if ($r['cv_path'] && is_file($r['cv_path'])) { @unlink($r['cv_path']); $n['cvs_deleted']++; }
+        foreach (all('SELECT id, cv_path, cv_name, hired_person_id FROM rc_applications WHERE status = "hired" AND COALESCE(status_changed_at, created_at) < ? AND email NOT LIKE "anon-%"', [$cut]) as $r) {
+            if ($r['cv_path'] && is_file($r['cv_path'])) { if (!rcr_cv_to_person((int) $r['id'])) @unlink($r['cv_path']); $n['cvs_deleted']++; }   // R91-004: the CV moves to the employee file instead of being destroyed
             q('UPDATE rc_applications SET email = CONCAT("anon-", code, "@retired.local"), name = NULL, phone = NULL, answers = NULL, cv_path = NULL, cv_name = NULL, cover_note = NULL, hr_notes = NULL, ip = NULL, user_agent = NULL WHERE id = ?', [(int) $r['id']]); $n['apps_anonymised']++; }
         $n['events_deleted'] = q('DELETE r FROM rc_event_registrations r JOIN rc_events e ON e.id = r.event_id WHERE e.starts_at < ?', [$cut])->rowCount();
-        $n['pool_deleted'] = q('DELETE FROM rc_talent_pool WHERE created_at < ?', [$cut])->rowCount();
+        $poolCut = date('Y-m-d H:i:s', strtotime('-' . max(1, (int) cp_setting('rc_pool_retention_months', '24')) . ' months'));   // R91-004: the pool is consent-based and has its own retention
+        $n['pool_deleted'] = q('DELETE FROM rc_talent_pool WHERE created_at < ?', [$poolCut])->rowCount();
         q('INSERT INTO rc_retention_log (cutoff, apps_deleted, apps_anonymised, cvs_deleted, events_deleted, pool_deleted) VALUES (?,?,?,?,?,?)', [$cut, $n['apps_deleted'], $n['apps_anonymised'], $n['cvs_deleted'], $n['events_deleted'], $n['pool_deleted']]);
         db()->commit();
     } catch (Throwable $e) { db()->rollBack(); throw $e; }
@@ -337,4 +339,27 @@ function rcr_vacancy_ai_draft(int $id, string $brief, array $form): array {
         $_SESSION['rc_vac_ai'][$id] = ['fields' => $f, 'notes' => (string)($r['notes'] ?? ''), 'at' => time()];
     }
     return $r;
+}
+
+/* ------------------------------------------------------------------ CV retention controls (GAS-CP-R91-004) */
+/** Keep an application (and its CV) beyond the standard retention: candidate consent to stay available, or an ongoing process. */
+function rcr_keep(int $id, int $months, string $reason, bool $poolConsent): void {
+    $a = rcr_application($id); if (!$a || !rcr_can_view((int) $a['vacancy_id'])) throw new RuntimeException(t('err.noaccess'));
+    $months = in_array($months, [0, 6, 12, 24, 36], true) ? $months : 12; $reason = mb_substr(trim($reason), 0, 200);
+    if ($months > 0 && $reason === '') throw new RuntimeException(t('rc.keep_need_reason'));
+    if ($months === 0) { q('UPDATE rc_applications SET keep_until = NULL, keep_reason = NULL, keep_by = NULL WHERE id = ?', [$id]); rcr_log('keep_cleared', ['application_id' => $id, 'vacancy_id' => (int) $a['vacancy_id']], ''); return; }
+    q('UPDATE rc_applications SET keep_until = DATE_ADD(CURDATE(), INTERVAL ? MONTH), keep_reason = ?, keep_by = ?, pool_consent_at = IF(?, COALESCE(pool_consent_at, NOW()), pool_consent_at) WHERE id = ?', [$months, $reason, (int) current_user()['id'], $poolConsent ? 1 : 0, $id]);
+    if ($poolConsent && $a['email'] && !one('SELECT id FROM rc_talent_pool WHERE email = ?', [$a['email']])) q('INSERT INTO rc_talent_pool (email, name, area, message, consent_at) VALUES (?,?,?,?,NOW())', [$a['email'], $a['name'], (string) ($a['department_interest'] ?? ''), 'From application ' . $a['code']]);
+    rcr_log('keep', ['application_id' => $id, 'vacancy_id' => (int) $a['vacancy_id']], $months . ' months · ' . $reason . ($poolConsent ? ' · talent pool consent' : ''));
+}
+/** Copies the application CV into the hired person's HR documents (kind "hire") so it survives the recruiting retention. */
+function rcr_cv_to_person(int $appId): bool {
+    $a = rcr_application($appId); if (!$a || !$a['hired_person_id'] || !$a['cv_path'] || !is_file($a['cv_path'])) return false;
+    try { if (!(bool) scalar("SHOW TABLES LIKE 'hr_docs'")) return false;
+        if (one('SELECT id FROM hr_docs WHERE person_id = ? AND note = ?', [(int) $a['hired_person_id'], 'CV ' . $a['code']])) return true;
+        $pid = (int) $a['hired_person_id']; $dir = dirname(__DIR__) . '/storage/hr/people/' . $pid; if (!is_dir($dir)) @mkdir($dir, 0700, true);
+        $ext = strtolower(pathinfo($a['cv_path'], PATHINFO_EXTENSION)) ?: 'pdf'; $fn = bin2hex(random_bytes(12)) . '.' . $ext; if (!copy($a['cv_path'], $dir . '/' . $fn)) return false;
+        q('INSERT INTO hr_docs (person_id, employment_id, kind, name, path, sha, size, note, uploaded_by) VALUES (?,?,?,?,?,?,?,?,?)', [$pid, null, 'hire', mb_substr((string) ($a['cv_name'] ?: 'CV.' . $ext), 0, 160), 'people/' . $pid . '/' . $fn, hash_file('sha256', $dir . '/' . $fn), filesize($dir . '/' . $fn), 'CV ' . $a['code'], (int) (current_user()['id'] ?? 0) ?: null]);
+        rcr_log('cv_to_person', ['application_id' => $appId], 'hr_docs for person #' . $pid); return true;
+    } catch (Throwable $e) { error_log('[rcr] cv_to_person: ' . $e->getMessage()); return false; }
 }

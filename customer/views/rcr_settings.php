@@ -15,6 +15,7 @@ layout_head(t('rc.settings'), 'rcr_dashboard');
   <p class="hint span2"><?= tt('rc.feed_url') ?>: <code><?= e(rtrim((string)cfg('app.url', ''), '/')) ?>/customer/rcr_feed.php</code></p>
   <h2 class="span2">GDPR</h2>
   <div class="field"><label><?= tt('rc.retention') ?></label><input type="number" name="rc_retention_months" min="1" max="36" value="<?= (int)cp_setting('rc_retention_months', '6') ?>"></div>
+  <div class="field"><label><?= tt('rc.pool_retention') ?></label><input type="number" name="rc_pool_retention_months" min="6" max="60" value="<?= (int)cp_setting('rc_pool_retention_months', '24') ?>"><span class="hint"><?= tt('rc.pool_retention_hint') ?></span></div>
   <div class="field"><label><?= tt('rc.cv_max') ?></label><input type="number" name="rc_cv_max_mb" min="1" max="25" value="<?= (int)cp_setting('rc_cv_max_mb', '8') ?>"></div>
   <p class="hint span2"><?= tt('rc.retention_hint') ?> <?= $last ? '· ' . tt('rc.last_run') . ' ' . e(fmt_datetime($last['ran_at'])) . ' (' . (int)$last['apps_deleted'] . ' / ' . (int)$last['apps_anonymised'] . ' / ' . (int)$last['cvs_deleted'] . ' / ' . (int)$last['events_deleted'] . ' / ' . (int)$last['pool_deleted'] . ')' : '· ' . tt('rc.never_run') ?></p>
   <h2 class="span2"><?= tt('rc.notifications') ?></h2>
