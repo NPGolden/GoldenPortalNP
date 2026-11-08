@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.110.1** (build 2026-11-08). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.110.2** (build 2026-11-08). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.110.2 | GAS-CP-R92-008 | 2026-11-08 | Careers website kept current: saving a vacancy or event tells the website to drop its read cache (same site key), and the public feeds now carry the Athens time offset on event times (they ran in UTC outside index.php — an 11:00 event showed as 13:00 on the site). | — |
 | 1.110.1 | GAS-CP-R92-007 | 2026-11-08 | Event form shows the automatic code (EVT-year-number, previewed before the first save, fixed afterwards) in a read-only field; the title field is named Event title. | — |
 | 1.110.0 | GAS-CP-R92-006 | 2026-11-08 | Recruiting: e-mail to the candidate through the portal e-mail card (To = candidate, five templates — message, shortlisted, interview invitation, offer, not selected — in Settings › E-mail templates, Outlook draft or mail app, logged on the application); notifications get an HR group (leave requests, HR messages, trainings, evaluations, HR assistant, recruiting) instead of Work; application page on the standard field layout. | `install/migrate_cp_r92_005_hr_notification_group.sql` |
 | 1.109.4 | GAS-CP-R92-005 | 2026-11-08 | CV retention controls: per-application Keep (6 / 12 / 24 / 36 months) with a recorded reason and optional talent-pool consent — kept applications and their CV are skipped by the retention job until the date passes; the talent pool has its own, longer retention (rc_pool_retention_months, default 24); on hire the CV is copied into the employee's HR documents (kind hire) and so survives the recruiting retention. | `install/migrate_cp_r92_005_cv_retention_controls.sql` |

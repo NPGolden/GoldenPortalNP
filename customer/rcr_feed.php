@@ -10,6 +10,7 @@
 declare(strict_types=1);
 define('CP_ROOT', __DIR__); ini_set('session.use_cookies', '0'); ini_set('session.use_only_cookies', '0'); ini_set('session.cache_limiter', '');
 foreach (['version', 'db', 'cache', 'i18n', 'helpers', 'auth', 'lic', 'mailer', 'nf', 'br', 'hr', 'hr2', 'rcr'] as $m) { $f = __DIR__ . '/app/' . $m . '.php'; if (is_file($f)) require_once $f; }
+if (function_exists('tz_app')) date_default_timezone_set(tz_app());   // R92-008: event times carry the Athens offset, as in index.php
 $origin = (string) cp_setting('rc_site_origin', 'https://goldenas.com.gr'); $key = (string) cp_setting('rc_site_key', '');
 header('Access-Control-Allow-Origin: ' . $origin); header('Vary: Origin'); header('Access-Control-Allow-Headers: Content-Type, X-Site-Key, Authorization'); header('Access-Control-Allow-Methods: GET, POST, OPTIONS');
 header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store'); header('X-Content-Type-Options: nosniff');

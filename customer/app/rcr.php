@@ -100,10 +100,10 @@ function rcr_vacancy_save(array $in): int {
         mb_substr(trim((string) ($in['summary'] ?? '')), 0, 600) ?: null, (string) ($in['description_html'] ?? '') ?: null, json_encode($req, JSON_UNESCAPED_UNICODE), json_encode($tags, JSON_UNESCAPED_UNICODE),
         (int) $in['screening_set_id'], $status, !empty($in['publish_web']) ? 1 : 0, ($in['closes_at'] ?? '') ?: null, (int) ($in['hiring_manager_id'] ?? 0) ?: null];
     if ($id) { $old = rcr_vacancy($id); q('UPDATE rc_vacancies SET title=?, department_id=?, branch_id=?, location=?, emp_type=?, seniority=?, summary=?, description_html=?, requirements=?, tags=?, screening_set_id=?, status=?, publish_web=?, closes_at=?, hiring_manager_id=?' . ($status === 'open' && ($old['status'] ?? '') !== 'open' ? ', published_at = CURDATE()' : '') . ' WHERE id=?', [...$p, $id]);
-        rcr_log('vacancy_saved', ['vacancy_id' => $id], ($old['status'] ?? '') . ' → ' . $status); return $id; }
+        rcr_log('vacancy_saved', ['vacancy_id' => $id], ($old['status'] ?? '') . ' → ' . $status); rcr_site_purge(); return $id; }
     q('INSERT INTO rc_vacancies (title, department_id, branch_id, location, emp_type, seniority, summary, description_html, requirements, tags, screening_set_id, status, publish_web, closes_at, hiring_manager_id, code, published_at, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       [...$p, rcr_code('VAC', 'rc_vacancies'), $status === 'open' ? date('Y-m-d') : null, current_user()['id']]);
-    $id = (int) db()->lastInsertId(); rcr_log('vacancy_created', ['vacancy_id' => $id]); return $id;
+    $id = (int) db()->lastInsertId(); rcr_log('vacancy_created', ['vacancy_id' => $id]); rcr_site_purge(); return $id;
 }
 
 /* ------------------------------------------------------------------ events */
@@ -120,9 +120,9 @@ function rcr_event_save(array $in): int {
     $p = [$title, in_array($in['kind'] ?? '', RCR_EVT_KIND, true) ? $in['kind'] : 'assessment', str_replace('T', ' ', (string) $in['starts_at']), max(15, (int) ($in['duration_min'] ?? 90)), mb_substr(trim((string) ($in['platform'] ?? 'Microsoft Teams')), 0, 60), mb_substr(trim((string) ($in['join_url'] ?? '')), 0, 500) ?: null,
         (int) ($in['capacity'] ?? 0) ?: null, (string) ($in['description_html'] ?? '') ?: null, json_encode($fv), ($in['registration_closes_at'] ?? '') ? str_replace('T', ' ', (string) $in['registration_closes_at']) : null,
         in_array($in['status'] ?? 'draft', ['draft', 'upcoming', 'closed', 'done', 'cancelled'], true) ? $in['status'] : 'draft', !empty($in['publish_web']) ? 1 : 0];
-    if ($id) { q('UPDATE rc_events SET title=?, kind=?, starts_at=?, duration_min=?, platform=?, join_url=?, capacity=?, description_html=?, for_vacancies=?, registration_closes_at=?, status=?, publish_web=? WHERE id=?', [...$p, $id]); rcr_log('event_saved', ['event_id' => $id]); return $id; }
+    if ($id) { q('UPDATE rc_events SET title=?, kind=?, starts_at=?, duration_min=?, platform=?, join_url=?, capacity=?, description_html=?, for_vacancies=?, registration_closes_at=?, status=?, publish_web=? WHERE id=?', [...$p, $id]); rcr_log('event_saved', ['event_id' => $id]); rcr_site_purge(); return $id; }
     q('INSERT INTO rc_events (title, kind, starts_at, duration_min, platform, join_url, capacity, description_html, for_vacancies, registration_closes_at, status, publish_web, code, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [...$p, rcr_code('EVT', 'rc_events'), current_user()['id']]);
-    $id = (int) db()->lastInsertId(); rcr_log('event_created', ['event_id' => $id]); return $id;
+    $id = (int) db()->lastInsertId(); rcr_log('event_created', ['event_id' => $id]); rcr_site_purge(); return $id;
 }
 function rcr_event_reg_save(int $regId, array $in): void {
     if (!rcr_can()) throw new RuntimeException(t('err.noaccess'));
@@ -363,3 +363,15 @@ function rcr_cv_to_person(int $appId): bool {
         rcr_log('cv_to_person', ['application_id' => $appId], 'hr_docs for person #' . $pid); return true;
     } catch (Throwable $e) { error_log('[rcr] cv_to_person: ' . $e->getMessage()); return false; }
 }
+
+/* ---- R92-008: ask the careers website to drop its 5-minute read cache after a vacancy / event change. Same shared key as the feed (X-Site-Key); 2 s budget, never blocks or fails the save. ---- */
+function rcr_site_purge(): void {
+    $origin = rtrim((string) cp_setting('rc_site_origin', ''), '/'); $key = (string) cp_setting('rc_site_key', '');
+    if ($origin === '' || $key === '' || !preg_match('~^https://[a-z0-9.-]+$|^http://127\.0\.0\.1(:[0-9]+)?$~i', $origin) || !function_exists('curl_init')) return;
+    try {
+        $ch = curl_init($origin . '/api/hr.php?r=purge');
+        curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => '', CURLOPT_HTTPHEADER => ['X-Site-Key: ' . $key, 'Content-Length: 0'], CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 2, CURLOPT_CONNECTTIMEOUT => 2, CURLOPT_SSL_VERIFYPEER => true]);
+        curl_exec($ch); curl_close($ch);
+    } catch (Throwable $e) {}
+}
+
