@@ -11,7 +11,16 @@ layout_head($a['code'], 'rcr_dashboard');
 ?>
 <p class="eyebrow"><a href="<?= url('rcr_dashboard') ?>"><?= tt('rc.title') ?></a> › <a href="<?= url('rcr_vacancy', ['id' => (int)$a['vacancy_id']]) ?>"><?= e($a['vacancy_code']) ?></a> › <?= e($a['code']) ?></p>
 <div class="page-head"><div><h1><?= e((string)($a['name'] ?: $a['email'])) ?></h1><p class="lede" style="margin-bottom:0;"><?= e($a['code']) ?> · <?= e($a['vacancy']) ?> · <?= pill(in_array($a['status'], ['hired', 'offer'], true) ? 'gold' : (in_array($a['status'], ['rejected', 'withdrawn'], true) ? 'grey' : 'navy'), t('rc.st_' . $a['status'])) ?> · <?= $a['passed'] ? pill('gold', tt('rc.passed') . ' ' . (int)$a['score'] . '/' . (int)$a['max_score']) : pill('grey', tt('rc.failed') . ' ' . (int)$a['score'] . '/' . (int)$a['max_score']) ?><?= !$a['knockout_ok'] ? ' ' . pill('grey', '⚑ ' . tt('rc.ko_hint')) : '' ?></p></div>
-<div class="btn-row"><?php if ($a['cv_path']): ?><a class="btn btn--gold" href="<?= url('rcr_cv', ['id' => $id]) ?>" target="_blank">📎 CV</a><?php endif; ?><a class="btn btn--ghost" href="mailto:<?= e($a['email']) ?>">✉</a></div></div>
+<div class="btn-row"><?php if ($a['cv_path']): ?><a class="btn btn--gold" href="<?= url('rcr_cv', ['id' => $id]) ?>" target="_blank">📎 CV</a><?php endif; ?><a class="btn btn--ghost" href="#rc-mail">✉ <?= tt('em.title') ?></a></div></div>
+<?php /* R92-005: e-mail to the candidate through the portal's e-mail card — To = the candidate, templated subject / text (Settings › E-mail templates), Outlook draft or mail app */
+if (function_exists('em_card_html') && em_has()) {
+    $cl = in_array((string)($a['lang'] ?? ''), array_keys(LOCALES), true) ? (string)$a['lang'] : 'en';
+    $rcKinds = ['rc_general' => t('et.k_rc_general'), 'rc_shortlisted' => t('et.k_rc_shortlisted'), 'rc_interview' => t('et.k_rc_interview'), 'rc_offer' => t('et.k_rc_offer'), 'rc_rejected' => t('et.k_rc_rejected')];
+    $rcKind = match ((string)$a['status']) { 'shortlisted' => 'rc_shortlisted', 'interview' => 'rc_interview', 'offer', 'hired' => 'rc_offer', 'rejected' => 'rc_rejected', default => 'rc_general' };
+    echo '<div id="rc-mail">' . em_card_html(['kind' => $rcKind, 'kinds' => $rcKinds, 'ctx' => ['no' => (string)$a['code'], 'title' => (string)$a['vacancy'], 'doc' => (string)$a['vacancy_code'], 'name' => (string)($a['name'] ?: $a['email']), 'email' => (string)$a['email'], 'locale' => $cl],
+        'people' => [['name' => (string)($a['name'] ?: $a['email']), 'email' => (string)$a['email'], 'role' => t('rc.candidate'), 'on' => true]], 'atts' => [], 'back' => url('rcr_application', ['id' => $id]), 'hidden' => '<input type="hidden" name="rc_app" value="' . $id . '">']) . '</div>';
+}
+?>
 <div class="cols" style="grid-template-columns:2fr 1fr;"><div>
 <div class="card"><h2><?= tt('rc.contact') ?></h2><div class="kv"><div><span><?= tt('rc.email') ?></span><b><?= e($a['email']) ?></b></div><div><span><?= tt('rc.phone') ?></span><b><?= e((string)$a['phone'] ?: '—') ?></b></div><div><span><?= tt('rc.applied') ?></span><b><?= e(fmt_datetime($a['created_at'])) ?></b></div><div><span><?= tt('rc.dept_interest') ?></span><b><?= e((string)$a['department_interest'] ?: '—') ?></b></div><div><span><?= tt('rc.source') ?></span><b><?= e($a['source']) ?> · <?= e($a['lang']) ?></b></div><div><span>GDPR</span><b><?= e((string)$a['consent_version']) ?> · <?= e(fmt_datetime($a['consent_at'])) ?></b></div></div>
 <?php if ($a['cover_note']): ?><h3><?= tt('rc.cover_note') ?></h3><p><?= nl2br(e($a['cover_note'])) ?></p><?php endif; ?></div>
@@ -35,14 +44,14 @@ layout_head($a['code'], 'rcr_dashboard');
 <?php endforeach; endif; ?>
 <details style="margin-top:12px;"<?= $sum['n'] ? '' : ' open' ?>><summary class="btn btn--gold" style="display:inline-block;cursor:pointer;">＋ <?= tt('rc.ev_add') ?></summary>
 <form method="post" class="form-grid" data-lock style="margin-top:12px;"><?= csrf_field() ?><input type="hidden" name="action" value="rcr_eval_save"><input type="hidden" name="id" value="<?= $id ?>">
-  <label><?= tt('rc.ev_stage') ?><select name="stage" data-nosearch><?php foreach (RCR_EVAL_STAGE as $st): ?><option value="<?= $st ?>"<?= $st === 'technical' ? ' selected' : '' ?>><?= tt('rc.ev_stage_' . $st) ?></option><?php endforeach; ?></select></label>
-  <label><?= tt('rc.ev_reco') ?><select name="recommendation" data-nosearch><?php foreach (RCR_EVAL_RECO as $r): ?><option value="<?= $r ?>"<?= $r === 'hold' ? ' selected' : '' ?>><?= tt('rc.ev_reco_' . $r) ?></option><?php endforeach; ?></select></label>
+  <div class="field"><label><?= tt('rc.ev_stage') ?></label><select name="stage" data-nosearch><?php foreach (RCR_EVAL_STAGE as $st): ?><option value="<?= $st ?>"<?= $st === 'technical' ? ' selected' : '' ?>><?= tt('rc.ev_stage_' . $st) ?></option><?php endforeach; ?></select></div>
+  <div class="field"><label><?= tt('rc.ev_reco') ?></label><select name="recommendation" data-nosearch><?php foreach (RCR_EVAL_RECO as $r): ?><option value="<?= $r ?>"<?= $r === 'hold' ? ' selected' : '' ?>><?= tt('rc.ev_reco_' . $r) ?></option><?php endforeach; ?></select></div>
   <div class="span2"><table class="tbl"><thead><tr><th><?= tt('rc.ev_criterion') ?></th><th class="num"><?= tt('rc.ev_weight') ?></th><th><?= tt('rc.ev_score') ?> 1 – 5</th></tr></thead><tbody>
   <?php foreach ($crit as $c): ?><tr><td><?= e($c['label']) ?></td><td class="num hint"><?= e((string)$c['weight']) ?> %</td><td><div style="display:flex;gap:6px;flex-wrap:wrap;"><?php for ($i = 1; $i <= 5; $i++): ?><label class="chk" style="margin:0;padding:4px 10px;border:1px solid var(--line,#E5E7EB);border-radius:8px;"><input type="radio" name="score[<?= e($c['key']) ?>]" value="<?= $i ?>" required> <?= $i ?></label><?php endfor; ?></div></td></tr><?php endforeach; ?>
   </tbody></table><p class="hint" style="margin:6px 0 0;"><?= tt('rc.ev_scale') ?></p></div>
-  <label><?= tt('rc.ev_strengths') ?><textarea name="strengths" rows="3" maxlength="2000"></textarea></label>
-  <label><?= tt('rc.ev_concerns') ?><textarea name="concerns" rows="3" maxlength="2000"></textarea></label>
-  <label class="span2"><?= tt('hr.notes') ?><textarea name="notes" rows="3" maxlength="4000"></textarea></label>
+  <div class="field"><label><?= tt('rc.ev_strengths') ?></label><textarea name="strengths" rows="3" maxlength="2000"></textarea></div>
+  <div class="field"><label><?= tt('rc.ev_concerns') ?></label><textarea name="concerns" rows="3" maxlength="2000"></textarea></div>
+  <div class="field span2"><label><?= tt('hr.notes') ?></label><textarea name="notes" rows="3" maxlength="4000"></textarea></div>
   <div class="btn-row span2"><button class="btn btn--gold"><?= tt('rc.ev_save') ?></button></div>
 </form></details>
 </div>
@@ -52,12 +61,12 @@ layout_head($a['code'], 'rcr_dashboard');
 <td><?php if ($i['status'] === 'planned'): ?><form method="post" style="display:flex;gap:4px;"><?= csrf_field() ?><input type="hidden" name="action" value="rcr_interview_status"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="int_id" value="<?= (int)$i['id'] ?>"><button class="btn btn--ghost btn--sm" name="status" value="done">✓</button><button class="btn btn--ghost btn--sm" name="status" value="no_show" title="<?= tt('rc.ev_int_no_show') ?>">∅</button><button class="btn btn--ghost btn--sm" name="status" value="cancelled" title="<?= tt('rc.ev_int_cancelled') ?>">✕</button></form><?php endif; ?></td></tr><?php endforeach; ?></tbody></table><?php endif; ?>
 <details style="margin-top:10px;"<?= $ints ? '' : ' open' ?>><summary class="btn btn--ghost" style="display:inline-block;cursor:pointer;">＋ <?= tt('rc.ev_plan_interview') ?></summary>
 <form method="post" class="form-grid" data-lock style="margin-top:12px;"><?= csrf_field() ?><input type="hidden" name="action" value="rcr_interview_save"><input type="hidden" name="id" value="<?= $id ?>">
-  <label><?= tt('rc.ev_stage') ?><select name="stage" data-nosearch><?php foreach (RCR_INT_STAGE as $st): ?><option value="<?= $st ?>"<?= $st === 'technical' ? ' selected' : '' ?>><?= tt('rc.ev_stage_' . $st) ?></option><?php endforeach; ?></select></label>
-  <label><?= tt('rc.ev_when') ?><input type="datetime-local" name="scheduled_at" required></label>
-  <label><?= tt('rc.ev_duration') ?><input type="number" name="duration_min" value="60" min="15" max="480" step="15"></label>
-  <label><?= tt('rc.ev_mode') ?><select name="mode" data-nosearch><option value="online"><?= tt('rc.ev_mode_online') ?></option><option value="onsite"><?= tt('rc.ev_mode_onsite') ?></option><option value="phone"><?= tt('rc.ev_mode_phone') ?></option></select></label>
-  <label class="span2"><?= tt('rc.ev_location') ?><input name="location" maxlength="200" placeholder="Teams link · Keratsini office · …"></label>
-  <label class="span2"><?= tt('rc.ev_interviewers') ?><input name="interviewers" maxlength="300" placeholder="<?= e($u['full_name']) ?>, …"></label>
+  <div class="field"><label><?= tt('rc.ev_stage') ?></label><select name="stage" data-nosearch><?php foreach (RCR_INT_STAGE as $st): ?><option value="<?= $st ?>"<?= $st === 'technical' ? ' selected' : '' ?>><?= tt('rc.ev_stage_' . $st) ?></option><?php endforeach; ?></select></div>
+  <div class="field"><label><?= tt('rc.ev_when') ?></label><input type="datetime-local" name="scheduled_at" required></div>
+  <div class="field"><label><?= tt('rc.ev_duration') ?></label><input type="number" name="duration_min" value="60" min="15" max="480" step="15"></div>
+  <div class="field"><label><?= tt('rc.ev_mode') ?></label><select name="mode" data-nosearch><option value="online"><?= tt('rc.ev_mode_online') ?></option><option value="onsite"><?= tt('rc.ev_mode_onsite') ?></option><option value="phone"><?= tt('rc.ev_mode_phone') ?></option></select></div>
+  <div class="field span2"><label><?= tt('rc.ev_location') ?></label><input name="location" maxlength="200" placeholder="Teams link · Keratsini office · …"></div>
+  <div class="field span2"><label><?= tt('rc.ev_interviewers') ?></label><input name="interviewers" maxlength="300" placeholder="<?= e($u['full_name']) ?>, …"></div>
   <label class="check span2"><input type="checkbox" name="notify" value="1" checked> <?= tt('rc.ev_notify_candidate') ?></label>
   <div class="btn-row span2"><button class="btn btn--gold"><?= tt('rc.ev_plan') ?></button></div>
 </form></details></div>
@@ -73,10 +82,10 @@ layout_head($a['code'], 'rcr_dashboard');
   <div class="btn-row span2"><button class="btn btn--ghost"><?= tt('btn.save') ?></button></div>
 </form></div>
 <form method="post" class="card form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="rcr_app_decide"><input type="hidden" name="id" value="<?= $id ?>"><h2><?= tt('rc.decision') ?></h2>
-  <label><?= tt('th.status') ?><select name="status" data-nosearch><?php foreach (RCR_APP_STATUS as $s): ?><option value="<?= $s ?>"<?= $a['status'] === $s ? ' selected' : '' ?>><?= tt('rc.st_' . $s) ?></option><?php endforeach; ?></select></label>
-  <label><?= tt('rc.rating') ?><select name="rating" data-nosearch><option value=""></option><?php for ($i = 1; $i <= 5; $i++): ?><option value="<?= $i ?>"<?= (int)$a['rating'] === $i ? ' selected' : '' ?>><?= str_repeat('★', $i) ?></option><?php endfor; ?></select></label>
-  <label><?= tt('rc.owner') ?><select name="owner_user_id"><option value=""></option><?php foreach ($owners as $o): ?><option value="<?= (int)$o['id'] ?>"<?= (int)$a['owner_user_id'] === (int)$o['id'] ? ' selected' : '' ?>><?= e($o['full_name']) ?></option><?php endforeach; ?></select></label>
-  <label><?= tt('hr.notes') ?><textarea name="hr_notes" rows="6"><?= e((string)$a['hr_notes']) ?></textarea></label>
+  <div class="field"><label><?= tt('th.status') ?></label><select name="status" data-nosearch><?php foreach (RCR_APP_STATUS as $s): ?><option value="<?= $s ?>"<?= $a['status'] === $s ? ' selected' : '' ?>><?= tt('rc.st_' . $s) ?></option><?php endforeach; ?></select></div>
+  <div class="field"><label><?= tt('rc.rating') ?></label><select name="rating" data-nosearch><option value=""></option><?php for ($i = 1; $i <= 5; $i++): ?><option value="<?= $i ?>"<?= (int)$a['rating'] === $i ? ' selected' : '' ?>><?= str_repeat('★', $i) ?></option><?php endfor; ?></select></div>
+  <div class="field"><label><?= tt('rc.owner') ?></label><select name="owner_user_id"><option value=""></option><?php foreach ($owners as $o): ?><option value="<?= (int)$o['id'] ?>"<?= (int)$a['owner_user_id'] === (int)$o['id'] ? ' selected' : '' ?>><?= e($o['full_name']) ?></option><?php endforeach; ?></select></div>
+  <div class="field"><label><?= tt('hr.notes') ?></label><textarea name="hr_notes" rows="6"><?= e((string)$a['hr_notes']) ?></textarea></div>
   <label class="check"><input type="checkbox" name="notify_candidate" value="1"> <?= tt('rc.ev_notify_status') ?></label>
   <button class="btn btn--gold"><?= tt('btn.save') ?></button>
   <?php if ($a['hired_person_id']): ?><p class="hint">→ <a href="<?= url('hr_person', ['id' => (int)$a['hired_person_id']]) ?>"><?= tt('rc.person_card') ?></a></p><?php endif; ?>

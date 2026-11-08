@@ -143,6 +143,7 @@ function em_draft_from_post(): void {
     if (!empty($_POST['proforma']) && function_exists('pi_mark_sent')) pi_mark_sent((int)$_POST['proforma']);   // R44-003
     if (!empty($_POST['po_id']) && !empty($_POST['rfq_sup']) && function_exists('rfo_mark_sent') && po_admin()) { try { rfo_mark_sent((int)$_POST['po_id'], (int)$_POST['rfq_sup'], $to); } catch (Throwable $e) {} }   // R88-001: RFO to this invited supplier
     elseif (!empty($_POST['po_id']) && function_exists('po_mark_sent') && po_admin()) { try { po_mark_sent((int)$_POST['po_id'], $to); } catch (Throwable $e) {} }   // R80-003: the PO / RFQ counts as sent once the draft is prepared
+    if (!empty($_POST['rc_app']) && function_exists('rcr_log') && function_exists('rcr_application')) { $ra = rcr_application((int)$_POST['rc_app']); if ($ra && rcr_can_view((int)$ra['vacancy_id'])) rcr_log('email_drafted', ['application_id' => (int)$ra['id']], implode(', ', $to) . ' — ' . $subject); }   // R92-005
     if (!empty($_POST['acc_report']) && function_exists('acc_mark_sent')) acc_mark_sent((int)$_POST['acc_report'], implode(', ', $to));   // R38-001: the accounting report is now with accounting
     $fn = preg_replace('/[^A-Za-z0-9._-]+/', '_', $subject); $fn = trim(mb_substr($fn, 0, 80), '_') ?: 'message';
     header('Content-Type: message/rfc822'); header('Content-Length: ' . strlen($eml)); header('Cache-Control: private, no-store');

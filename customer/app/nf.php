@@ -29,10 +29,10 @@ function nf_has(): bool {
     return $has;
 }
 function nf_groups(): array {
-    return ['fleet' => t('nav.g_fleet'), 'work' => t('nav.g_work'), 'commercial' => t('nav.g_commercial'), 'library' => t('nav.g_library')];
+    return ['fleet' => t('nav.g_fleet'), 'work' => t('nav.g_work'), 'commercial' => t('nav.g_commercial'), 'hr' => t('nav.g_hr'), 'library' => t('nav.g_library')];   // R92-005: HR group
 }
-const NF_GROUP_OF = ['tk' => 'work', 'wf' => 'work', 'jo' => 'work', 'fsr' => 'work', 'isr' => 'work', 'ts' => 'work', 'of' => 'commercial', 'oa' => 'commercial', 'ctn' => 'commercial',
-                     'cls' => 'fleet', 'drw' => 'fleet', 'spn' => 'fleet', 'spc' => 'fleet', 'doc' => 'library', 'td' => 'work', 'lic' => 'library', 'mt' => 'work', 'bg' => 'fleet', 'wp' => 'work', 'sec' => 'library', 'acc' => 'commercial', 'pd' => 'work', 'pi' => 'commercial', 'eng' => 'work', 'hrq' => 'work', 'hrm' => 'work', 'crq' => 'library', 'soc' => 'work', 'hrt' => 'work', 'hrev' => 'work', 'hra' => 'work'];
+const NF_GROUP_OF = ['rc' => 'hr', 'tk' => 'work', 'wf' => 'work', 'jo' => 'work', 'fsr' => 'work', 'isr' => 'work', 'ts' => 'work', 'of' => 'commercial', 'oa' => 'commercial', 'ctn' => 'commercial',
+                     'cls' => 'fleet', 'drw' => 'fleet', 'spn' => 'fleet', 'spc' => 'fleet', 'doc' => 'library', 'td' => 'work', 'lic' => 'library', 'mt' => 'work', 'bg' => 'fleet', 'wp' => 'work', 'sec' => 'library', 'acc' => 'commercial', 'pd' => 'work', 'pi' => 'commercial', 'eng' => 'work', 'hrq' => 'hr', 'hrm' => 'hr', 'crq' => 'library', 'soc' => 'work', 'hrt' => 'hr', 'hrev' => 'hr', 'hra' => 'hr'];
 
 /* ------------------------------------------------------------ sweep */
 
@@ -300,7 +300,7 @@ function nf_src_contact_notes(array $rows): int {
 /* ------------------------------------------------------------- read */
 
 function nf_counts(): array {
-    $z = ['fleet' => 0, 'work' => 0, 'commercial' => 0, 'library' => 0, 'total' => 0];
+    $z = ['fleet' => 0, 'work' => 0, 'commercial' => 0, 'hr' => 0, 'library' => 0, 'total' => 0];
     $u = current_user(); if (!$u || !nf_has()) return $z;
     foreach (all('SELECT grp, COUNT(*) n FROM notifications WHERE user_id = ? AND read_at IS NULL GROUP BY grp', [(int)$u['id']]) as $r) { $z[$r['grp']] = (int)$r['n']; $z['total'] += (int)$r['n']; }
     return $z;
@@ -390,7 +390,7 @@ function nf_ago(string $at): string {
     return fmt_date($at);
 }
 function nf_grp_pill(string $grp): string {
-    $tone = ['fleet' => 'navy', 'work' => 'gold', 'commercial' => 'green', 'library' => 'mute'][$grp] ?? 'mute';
+    $tone = ['fleet' => 'navy', 'work' => 'gold', 'commercial' => 'green', 'hr' => 'blue', 'library' => 'mute'][$grp] ?? 'mute';
     return '<span class="pill pill--' . $tone . ' nf-grp nf-grp--' . e($grp) . '">' . e(nf_groups()[$grp] ?? $grp) . '</span>';
 }
 
