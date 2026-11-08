@@ -29,6 +29,15 @@ return [
     // Generate with:  php -r "echo bin2hex(random_bytes(32));"   — the same value goes into the GitHub secret UPDATE_TOKEN.
     'update' => ['token' => ''],
 
+    // Outgoing e-mail (R91-003). goldenas.com.gr is on Microsoft 365 with an SPF that allows only Microsoft, so use the
+    // tenant's authenticated SMTP with a licensed mailbox that has "Authenticated SMTP" enabled. Leave 'host' empty to use PHP mail().
+    'smtp' => [
+        'host' => 'smtp.office365.com',
+        'port' => 587,
+        'user' => 'website@goldenas.com.gr',
+        'pass' => '',
+        'from' => 'website@goldenas.com.gr',
+    ],
     'app' => [
         'base_url'     => 'https://goldensas.com/customer',
         'company'      => 'Golden Automation Systems',

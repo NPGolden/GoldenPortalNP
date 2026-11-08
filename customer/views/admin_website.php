@@ -7,6 +7,7 @@ $counts = function_exists('web_has') && web_has() ? web_counts() : [];
 layout_head(t('web.title'), 'admin_website');
 ?>
 <?php settings_tabs('admin_website'); ?>
+<div class="card"><h2>✉ <?= tt('web.mail') ?></h2><p><?= function_exists('cp_mail_configured') && cp_mail_configured() ? pill('green', t('web.mail_smtp', ['host' => (string)cfg('smtp.host'), 'user' => (string)cfg('smtp.user')])) : pill('gold', t('web.mail_phpmail')) ?></p><p class="hint"><?= tt('web.mail_hint') ?></p></div>
 <h2 class="settings-h"><?= tt('web.title') ?></h2>
 <div class="card">
   <h2>🌐 <?= tt('web.feed') ?></h2>

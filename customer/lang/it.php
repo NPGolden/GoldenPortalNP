@@ -8305,4 +8305,9 @@ Cordiali saluti,
 // ---- GAS-CP-R91-002
 'rc.key_once' => 'mostrata una sola volta',
 'rc.key_once_hint' => 'Copiala ora nel secret PORTAL_RC_KEY (o PORTAL_STATS_KEY) del repository del sito — al prossimo caricamento è mascherata.',
+// R91-003 outgoing mail
+'web.mail' => 'Posta in uscita',
+'web.mail_smtp' => 'SMTP autenticato via {host} come {user}: i messaggi a candidati, HR e dal sito superano SPF/DMARC.',
+'web.mail_phpmail' => 'PHP mail(): SMTP non configurato. La posta goldenas.com.gr è su Microsoft 365 e il suo SPF rifiuta altri mittenti: i messaggi finiranno nella posta indesiderata.',
+'web.mail_hint' => 'Impostare il blocco smtp in customer/app/config.php (host smtp.office365.com, porta 587, una casella con licenza con "SMTP autenticato" abilitato e la sua password per app). Il sito usa la stessa casella.',
 ];

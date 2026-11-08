@@ -8305,4 +8305,9 @@ Best regards,
 // ---- GAS-CP-R91-002
 'rc.key_once' => 'shown once only',
 'rc.key_once_hint' => 'Copy it now into the website repository secret PORTAL_RC_KEY (or PORTAL_STATS_KEY) — on the next page load it is masked again.',
+// R91-003 outgoing mail
+'web.mail' => 'Outgoing e-mail',
+'web.mail_smtp' => 'Authenticated SMTP via {host} as {user} — candidate, HR and website messages pass SPF/DMARC.',
+'web.mail_phpmail' => 'PHP mail() — not configured for SMTP. goldenas.com.gr mail is on Microsoft 365 and its SPF rejects other senders: messages will land in junk.',
+'web.mail_hint' => 'Set the smtp block in customer/app/config.php (host smtp.office365.com, port 587, a licensed mailbox with "Authenticated SMTP" enabled and its app password). The website uses the same mailbox.',
 ];

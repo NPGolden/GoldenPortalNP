@@ -64,6 +64,7 @@ require __DIR__ . '/app/hr7.php';   // R64-001 targets, auto-metrics, personal g
 require __DIR__ . '/app/diag.php';  // R69-001 diagnostics
 require __DIR__ . '/app/rcr.php';    // R89-001 recruiting
 require __DIR__ . '/app/rcr_actions.php';
+require __DIR__ . '/app/mailer.php'; // R91-003 outgoing mail (SMTP)
 require __DIR__ . '/app/web.php';    // R90-001 website statistics feed
 require __DIR__ . '/app/hra.php';   // R67-001 HR Assistant — guided flows with HR approval
 require __DIR__ . '/app/cel.php';   // R62-004 celebrations

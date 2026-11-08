@@ -8291,4 +8291,9 @@ GAS-MSB-2026-002',
 // ---- GAS-CP-R91-002
 'rc.key_once' => 'показва се само веднъж',
 'rc.key_once_hint' => 'Копирайте го сега в secret PORTAL_RC_KEY (или PORTAL_STATS_KEY) на хранилището на сайта — при следващо зареждане е маскиран.',
+// R91-003 outgoing mail
+'web.mail' => 'Outgoing e-mail',
+'web.mail_smtp' => 'Authenticated SMTP via {host} as {user} — candidate, HR and website messages pass SPF/DMARC.',
+'web.mail_phpmail' => 'PHP mail() — not configured for SMTP. goldenas.com.gr mail is on Microsoft 365 and its SPF rejects other senders: messages will land in junk.',
+'web.mail_hint' => 'Set the smtp block in customer/app/config.php (host smtp.office365.com, port 587, a licensed mailbox with "Authenticated SMTP" enabled and its app password). The website uses the same mailbox.',
 ];

@@ -41,8 +41,10 @@ function rcr_notify_hr(string $title, ?string $body, string $url): void {
 /** Outbound e-mail to a candidate. The portal otherwise sends nothing itself (✉ cards are Outlook drafts); this uses PHP mail() only
  *  when Settings › Recruiting has a From address — otherwise the message is kept in rc_log for HR to send by hand. */
 function rcr_mail(string $to, string $subject, string $body): bool {
-    $from = trim((string) cp_setting('rc_mail_from', '')); if ($from === '' || !filter_var($to, FILTER_VALIDATE_EMAIL)) { rcr_log('mail_pending', [], "$to | $subject"); return false; }
-    $ok = @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, "From: Golden A/S HR <$from>\r\nReply-To: $from\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0");
+    $hr = trim((string) cp_setting('rc_mail_from', ''));
+    if (!filter_var($to, FILTER_VALIDATE_EMAIL) || ($hr === '' && !(function_exists('cp_mail_configured') && cp_mail_configured()))) { rcr_log('mail_pending', [], "$to | $subject"); return false; }
+    $ok = function_exists('cp_mail') ? cp_mail($to, $subject, $body, 'Golden A/S HR', $hr !== '' && cp_mail_configured() ? null : ($hr ?: null), $hr ?: null)
+                                     : @mail($to, '=?UTF-8?B?' . base64_encode($subject) . '?=', $body, "From: Golden A/S HR <$hr>\r\nReply-To: $hr\r\nContent-Type: text/plain; charset=UTF-8\r\nMIME-Version: 1.0");
     rcr_log($ok ? 'mail_sent' : 'mail_failed', [], "$to | $subject"); return $ok;
 }
 

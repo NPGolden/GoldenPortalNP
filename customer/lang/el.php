@@ -8305,4 +8305,9 @@ GAS-MSB-2026-002',
 // ---- GAS-CP-R91-002
 'rc.key_once' => 'εμφανίζεται μόνο μία φορά',
 'rc.key_once_hint' => 'Αντιγράψτε το τώρα στο secret PORTAL_RC_KEY (ή PORTAL_STATS_KEY) του αποθετηρίου του ιστότοπου — στην επόμενη φόρτωση εμφανίζεται καλυμμένο.',
+// R91-003 outgoing mail
+'web.mail' => 'Εξερχόμενα e-mail',
+'web.mail_smtp' => 'Πιστοποιημένο SMTP μέσω {host} ως {user} — τα μηνύματα προς υποψηφίους, HR και από τον ιστότοπο περνούν SPF/DMARC.',
+'web.mail_phpmail' => 'PHP mail() — χωρίς SMTP. Το mail του goldenas.com.gr είναι στο Microsoft 365 και το SPF του απορρίπτει άλλους αποστολείς: τα μηνύματα θα πάνε στην ανεπιθύμητη.',
+'web.mail_hint' => 'Ορίστε το μπλοκ smtp στο customer/app/config.php (host smtp.office365.com, θύρα 587, αδειοδοτημένο γραμματοκιβώτιο με ενεργό "Authenticated SMTP" και τον κωδικό εφαρμογής του). Ο ιστότοπος χρησιμοποιεί το ίδιο γραμματοκιβώτιο.',
 ];

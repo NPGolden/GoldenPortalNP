@@ -10,7 +10,7 @@
  */
 declare(strict_types=1);
 define('CP_ROOT', __DIR__); ini_set('session.use_cookies', '0'); ini_set('session.use_only_cookies', '0'); ini_set('session.cache_limiter', '');
-foreach (['version', 'db', 'cache', 'i18n', 'helpers', 'auth', 'lic', 'nf', 'tk', 'act', 'web'] as $m) { $f = __DIR__ . '/app/' . $m . '.php'; if (is_file($f)) require_once $f; }
+foreach (['version', 'db', 'cache', 'i18n', 'helpers', 'auth', 'lic', 'mailer', 'nf', 'tk', 'act', 'web'] as $m) { $f = __DIR__ . '/app/' . $m . '.php'; if (is_file($f)) require_once $f; }
 header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store'); header('X-Content-Type-Options: nosniff'); header('X-Robots-Tag: noindex');
 $out = function ($d, int $c = 200): void { http_response_code($c); echo json_encode($d, JSON_UNESCAPED_SLASHES); exit; };
 $m = $_SERVER['REQUEST_METHOD']; if ($m !== 'GET' && $m !== 'POST') { header('Allow: GET, POST'); $out(['error' => 'method not allowed'], 405); }
