@@ -98,7 +98,7 @@ function web_handle_action(string $action): bool {
     if ($action === 'web_make_ticket') { require_staff(); $tid = web_make_ticket((int) $_POST['id'], (int) $_POST['vessel_id']); flash('good', t('web.ticket_created')); redirect('ticket', ['id' => $tid, '_r' => uniqid()]); }
     if ($action !== 'web_settings_save') return false;
     require_cp_admin();
-    if (!empty($_POST['web_rotate_key'])) cp_setting_set('web_site_key', bin2hex(random_bytes(24)));
+    if (!empty($_POST['web_rotate_key'])) { $nk = bin2hex(random_bytes(24)); cp_setting_set('web_site_key', $nk); $_SESSION['web_key_once'] = $nk; }   // shown in full once, on the next page view only
     if (!empty($_POST['web_disable'])) cp_setting_set('web_site_key', '');
     if (function_exists('cache_forget')) cache_forget('web_counts');
     flash('good', t('sys.saved')); redirect('settings', ['tab' => 'website', '_r' => uniqid()]);

@@ -3,6 +3,8 @@
 require __DIR__ . '/_layout.php';
 $u = require_staff(); $id = (int)($_GET['id'] ?? 0); $ev = $id ? rcr_event($id) : null; $edit = isset($_GET['new']) || isset($_GET['edit']);
 if (!function_exists('rcr_has') || !rcr_has() || !rcr_can()) { http_response_code(403); layout_head(t('rc.title'), 'rcr_dashboard'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
+if ($id && !$ev) { http_response_code(404); layout_head(t('err.notfound'), 'rcr_dashboard'); echo '<h1>' . tt('err.notfound') . '</h1>'; layout_foot(); return; }
+if (!$id && !$edit) redirect('rcr_dashboard', ['tab' => 'events']);
 layout_head($ev['title'] ?? t('rc.new_event'), 'rcr_dashboard');
 ?>
 <p class="eyebrow"><a href="<?= url('rcr_dashboard', ['tab' => 'events']) ?>"><?= tt('rc.events') ?></a> › <?= $ev ? e($ev['code']) : tt('rc.new_event') ?></p>

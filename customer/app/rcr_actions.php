@@ -17,7 +17,7 @@ function rcr_handle_action(string $action): bool {
         case 'rcr_set_save': $id = rcr_set_save($_POST); flash('good', t('sys.saved')); redirect('rcr_sets', ['id' => $id]);
         case 'rcr_settings_save': if (!rcr_can()) throw new RuntimeException(t('err.noaccess'));
             foreach (['rc_site_origin', 'rc_retention_months', 'rc_notify_email', 'rc_cv_max_mb', 'rc_mail_from'] as $k) cp_setting_set($k, mb_substr(trim((string)($_POST[$k] ?? '')), 0, 190));
-            if (!empty($_POST['rc_rotate_key'])) cp_setting_set('rc_site_key', bin2hex(random_bytes(24)));
+            if (!empty($_POST['rc_rotate_key'])) { $nk = bin2hex(random_bytes(24)); cp_setting_set('rc_site_key', $nk); $_SESSION['rc_key_once'] = $nk; rcr_log('key_rotated'); }   // shown in full once, on the next page view only
             flash('good', t('sys.saved')); redirect('rcr_settings');
         case 'rcr_retention_now': if (!rcr_can()) throw new RuntimeException(t('err.noaccess')); $n = rcr_retention_run(); flash('good', 'Retention run: ' . json_encode($n)); redirect('rcr_settings');
     }

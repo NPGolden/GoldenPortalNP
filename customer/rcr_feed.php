@@ -18,7 +18,7 @@ $out = function ($d, int $c = 200): void { http_response_code($c); echo json_enc
 if ($key === '' || !rcr_has()) $out(['error' => 'feed disabled'], 503);
 $r = (string) ($_GET['r'] ?? ''); $m = $_SERVER['REQUEST_METHOD']; $ip = trim(explode(',', (string) ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'))[0]);
 // minute rate limit per IP (file-based, like api/v1 RateLimit)
-$dir = dirname(__DIR__) . '/storage/rc/rl'; if (!is_dir($dir)) @mkdir($dir, 0700, true); $f = $dir . '/' . md5($ip) . '.json'; $hits = is_file($f) ? (json_decode((string) file_get_contents($f), true) ?: []) : []; $hits = array_values(array_filter($hits, fn($t) => $t > time() - 60));
+$dir = __DIR__ . '/storage/rc/rl'; if (!is_dir($dir)) @mkdir($dir, 0700, true); $f = $dir . '/' . md5($ip) . '.json'; $hits = is_file($f) ? (json_decode((string) file_get_contents($f), true) ?: []) : []; $hits = array_values(array_filter($hits, fn($t) => $t > time() - 60));
 $lim = $m === 'GET' ? max(10, (int) cp_setting('rc_feed_rl_read', '60')) : max(3, (int) cp_setting('rc_feed_rl_write', '10'));   // per IP per minute
 if (count($hits) >= $lim) { header('Retry-After: 60'); $out(['error' => 'too many requests'], 429); } $hits[] = time(); @file_put_contents($f, json_encode($hits), LOCK_EX);
 try {

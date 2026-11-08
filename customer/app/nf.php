@@ -53,6 +53,7 @@ function nf_sweep(int $every = 60, bool $force = false): int {
             try { if (function_exists('td_remind')) $n += td_remind(); } catch (Throwable $e) {}        // R22-002 task reminders
             try { if (function_exists('lic_notify')) lic_notify(); } catch (Throwable $e) {}            // R22-001 licence expiry
             try { if (function_exists('hra_remind')) { $n += hra_remind(); hra_purge(); } } catch (Throwable $e) {}   // R67-001 HR Assistant reminders + purge of closed flows
+            try { if (function_exists('rcr_has') && rcr_has() && (string) cp_setting('rc_retention_last', '') < date('Y-m-d')) { cp_setting_set('rc_retention_last', date('Y-m-d')); rcr_retention_run(); } } catch (Throwable $e) {}   // R91-002: recruiting GDPR retention once a day, from the portal itself (tools/cron.php is optional)
             q('INSERT INTO nf_cursor (source, last_id, run_at) VALUES (?, 0, NOW()) ON DUPLICATE KEY UPDATE run_at = NOW()', ['_meta']);
             if (random_int(1, 40) === 1) nf_prune();                         // seen entries older than 90 days, now and then
         } finally { scalar("SELECT RELEASE_LOCK('nf_sweep')"); }

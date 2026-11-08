@@ -20,7 +20,8 @@ layout_head(t('web.title'), 'admin_website');
   </div>
   <?php endif; ?>
   <form method="post" action="<?= url('admin_website') ?>" class="form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="web_settings_save">
-    <label><?= tt('web.key') ?><input value="<?= $key ? e(substr($key, 0, 6)) . '…' . e(substr($key, -4)) : tt('rc.key_none') ?>" readonly><span class="hint"><?= tt('web.key_hint') ?></span></label>
+    <?php $once = (string)($_SESSION['web_key_once'] ?? ''); unset($_SESSION['web_key_once']); if ($once !== '' && hash_equals($key, $once)): ?><label class="span2"><?= tt('web.key') ?> — <b><?= tt('rc.key_once') ?></b><input value="<?= e($once) ?>" readonly class="mono" style="user-select:all"><span class="hint"><?= tt('rc.key_once_hint') ?></span></label>
+    <?php else: ?><label><?= tt('web.key') ?><input value="<?= $key ? e(substr($key, 0, 6)) . '…' . e(substr($key, -4)) : tt('rc.key_none') ?>" readonly><span class="hint"><?= tt('web.key_hint') ?></span></label><?php endif; ?>
     <label><?= tt('web.last_pull') ?><input value="<?= $last ? e($last) : '—' ?>" readonly></label>
     <label class="check span2"><input type="checkbox" name="web_rotate_key" value="1"> <?= $key ? tt('web.key_rotate') : tt('web.key_create') ?></label>
     <?php if ($key): ?><label class="check span2"><input type="checkbox" name="web_disable" value="1"> <?= tt('web.disable') ?></label><?php endif; ?>

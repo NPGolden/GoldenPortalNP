@@ -2,6 +2,8 @@
 /** HR › Recruiting › Vacancy (GAS-CP-R89-001): view / edit a vacancy and its applications.  ?p=rc_vacancy&id=  |  ?p=rc_vacancy&new=1 */
 require __DIR__ . '/_layout.php';
 $u = require_staff(); $id = (int)($_GET['id'] ?? 0); $v = $id ? rcr_vacancy($id) : null; $edit = isset($_GET['new']) || isset($_GET['edit']);
+if ($id && !$v) { http_response_code(404); layout_head(t('err.notfound'), 'rcr_dashboard'); echo '<h1>' . tt('err.notfound') . '</h1>'; layout_foot(); return; }
+if (!$id && !$edit) { redirect('rcr_dashboard'); }
 if (!function_exists('rcr_has') || !rcr_has() || ($id && !rcr_can_view($id)) || (!$id && !rcr_can()) || ($edit && !rcr_can())) { http_response_code(403); layout_head(t('rc.title'), 'rcr_dashboard'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
 layout_head(($v['title'] ?? t('rc.new_vacancy')), 'rcr_dashboard');
 ?>

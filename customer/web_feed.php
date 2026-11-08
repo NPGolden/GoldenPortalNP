@@ -17,7 +17,7 @@ $m = $_SERVER['REQUEST_METHOD']; if ($m !== 'GET' && $m !== 'POST') { header('Al
 $key = function_exists('web_has') && web_has() ? (string) cp_setting('web_site_key', '') : '';
 if ($key === '') $out(['error' => 'feed disabled'], 503);
 $ip = trim(explode(',', (string) ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0'))[0]);
-$dir = dirname(__DIR__) . '/storage/web/rl'; if (!is_dir($dir)) @mkdir($dir, 0700, true); $f = $dir . '/' . md5($ip) . '.json';
+$dir = __DIR__ . '/storage/web/rl'; if (!is_dir($dir)) @mkdir($dir, 0700, true); $f = $dir . '/' . md5($ip) . '.json';
 $hits = is_file($f) ? (json_decode((string) file_get_contents($f), true) ?: []) : []; $hits = array_values(array_filter($hits, fn($t) => $t > time() - 60));
 if (count($hits) >= ($m === 'GET' ? 10 : 20)) { header('Retry-After: 60'); $out(['error' => 'too many requests'], 429); } $hits[] = time(); @file_put_contents($f, json_encode($hits), LOCK_EX);
 if (!hash_equals($key, (string) ($_SERVER['HTTP_X_SITE_KEY'] ?? ''))) { usleep(300000); error_log('[web_feed] forbidden from ' . $ip); $out(['error' => 'forbidden'], 403); }

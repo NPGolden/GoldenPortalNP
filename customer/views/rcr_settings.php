@@ -9,7 +9,8 @@ layout_head(t('rc.settings'), 'rcr_dashboard');
 <form method="post" class="card form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="rcr_settings_save">
   <h2 class="span2"><?= tt('rc.feed') ?></h2>
   <label><?= tt('rc.site_origin') ?><input name="rc_site_origin" value="<?= e((string)cp_setting('rc_site_origin', 'https://goldenas.com.gr')) ?>"></label>
-  <label><?= tt('rc.site_key') ?><input value="<?= $key ? e(substr($key, 0, 6)) . '…' . e(substr($key, -4)) : tt('rc.key_none') ?>" readonly><span class="hint"><?= tt('rc.key_hint') ?></span></label>
+  <?php $once = (string)($_SESSION['rc_key_once'] ?? ''); unset($_SESSION['rc_key_once']); if ($once !== '' && hash_equals($key, $once)): ?><label class="span2"><?= tt('rc.site_key') ?> — <b><?= tt('rc.key_once') ?></b><input value="<?= e($once) ?>" readonly class="mono" style="user-select:all"><span class="hint"><?= tt('rc.key_once_hint') ?></span></label>
+  <?php else: ?><label><?= tt('rc.site_key') ?><input value="<?= $key ? e(substr($key, 0, 6)) . '…' . e(substr($key, -4)) : tt('rc.key_none') ?>" readonly><span class="hint"><?= tt('rc.key_hint') ?></span></label><?php endif; ?>
   <label class="check span2"><input type="checkbox" name="rc_rotate_key" value="1"> <?= $key ? tt('rc.key_rotate') : tt('rc.key_create') ?></label>
   <p class="hint span2"><?= tt('rc.feed_url') ?>: <code><?= e(rtrim((string)cfg('app.url', ''), '/')) ?>/customer/rcr_feed.php</code></p>
   <h2 class="span2">GDPR</h2>
