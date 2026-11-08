@@ -8304,6 +8304,13 @@ Best regards,
 'rc.ev_criteria_hint' => 'Weighted scorecard used by every interviewer (weights are normalised to 100 %). Change with care — existing scorecards keep their stored scores.',
 // ---- GAS-CP-R91-002
 'rc.key_once' => 'shown once only',
+'rc.ai_title' => 'Assistant — draft the vacancy',
+'rc.ai_hint' => 'Describe the role in a few words (what, where, seniority, must-have skills). The assistant fills title, summary, description, requirements, tags, location, type and seniority from your brief and the current form values; review and edit before saving. Only the form fields are sent — never candidate data.',
+'rc.ai_ph' => 'e.g. Automation engineer for IACMS commissioning, Keratsini with travel to Italian yards, mid level, Siemens TIA Portal, Modbus, class survey experience …',
+'rc.ai_draft' => 'Draft the vacancy',
+'rc.ai_applied' => 'Draft applied to the form — review and save.',
+'rc.ai_prefilled' => 'The assistant\'s draft is in the form; nothing is saved until you press Save.',
+'rc.ai_discard' => 'Discard the draft',
 'rc.key_once_hint' => 'Copy it now into the website repository secret PORTAL_RC_KEY (or PORTAL_STATS_KEY) — on the next page load it is masked again.',
 // R91-003 outgoing mail
 'web.mail' => 'Outgoing e-mail',

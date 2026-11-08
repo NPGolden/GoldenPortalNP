@@ -8304,6 +8304,13 @@ Cordiali saluti,
 'rc.ev_criteria_hint' => 'Scheda ponderata usata da ogni intervistatore (pesi normalizzati al 100 %). Modificare con cautela: le schede esistenti conservano i punteggi registrati.',
 // ---- GAS-CP-R91-002
 'rc.key_once' => 'mostrata una sola volta',
+'rc.ai_title' => 'Assistente — bozza della posizione',
+'rc.ai_hint' => 'Descrivi il ruolo in poche parole (cosa, dove, livello, competenze indispensabili). L\'assistente compila titolo, sintesi, descrizione, requisiti, tag, sede, tipo e livello dal tuo brief e dai valori attuali del modulo; controlla e correggi prima di salvare. Vengono inviati solo i campi del modulo — mai dati dei candidati.',
+'rc.ai_ph' => 'es. Ingegnere di automazione per il commissioning IACMS, Keratsini con trasferte nei cantieri italiani, livello intermedio, Siemens TIA Portal, Modbus, esperienza con le ispezioni di classe …',
+'rc.ai_draft' => 'Crea la bozza',
+'rc.ai_applied' => 'Bozza applicata al modulo — controlla e salva.',
+'rc.ai_prefilled' => 'La bozza dell\'assistente è nel modulo; nulla viene salvato finché non premi Salva.',
+'rc.ai_discard' => 'Scarta la bozza',
 'rc.key_once_hint' => 'Copiala ora nel secret PORTAL_RC_KEY (o PORTAL_STATS_KEY) del repository del sito — al prossimo caricamento è mascherata.',
 // R91-003 outgoing mail
 'web.mail' => 'Posta in uscita',

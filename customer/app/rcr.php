@@ -303,3 +303,38 @@ function rcr_interview_save(int $appId, array $in): int {
     return $id;
 }
 function rcr_interview_status(int $id, string $st): void { if (!in_array($st, ['planned', 'done', 'no_show', 'cancelled'], true)) return; $i = one('SELECT * FROM rc_interviews WHERE id = ?', [$id]); if (!$i) return; $a = rcr_application((int) $i['application_id']); if (!$a || !rcr_can_view((int) $a['vacancy_id'])) throw new RuntimeException(t('err.noaccess')); q('UPDATE rc_interviews SET status = ? WHERE id = ?', [$st, $id]); rcr_log('interview_' . $st, ['application_id' => (int) $i['application_id']], (string) $i['stage']); }
+
+/* ---- R92-001: the assistant drafts a vacancy from a short brief (title, summary, description, requirements, tags, location, type, seniority, department, branch) ---- */
+function rcr_vacancy_ai_fields(array $cur): array {
+    $sel = fn(array $rows, string $k, string $lbl) => array_map(fn($r) => ['value' => (string)$r[$k], 'label' => (string)$r[$lbl]], $rows);
+    $depts = function_exists('hr_departments') ? hr_departments() : []; $brs = function_exists('br_all') ? br_all(true) : [];
+    $f = fn(string $n, string $label, string $type, string $val, array $opts = []) => ['name' => $n, 'label' => $label, 'type' => $type, 'value' => mb_substr($val, 0, 600), 'options' => $opts];
+    return [
+        $f('title', t('rc.vacancy'), 'text', (string)($cur['title'] ?? '')),
+        $f('department_id', t('hr.department'), 'select', (string)($cur['department_id'] ?? ''), $sel($depts, 'id', 'name')),
+        $f('branch_id', t('rc.branch'), 'select', (string)($cur['branch_id'] ?? ''), $sel($brs, 'id', 'name')),
+        $f('location', t('rc.location') . ' (city, country code)', 'text', (string)($cur['location'] ?? '')),
+        $f('emp_type', t('rc.emp_type'), 'select', (string)($cur['emp_type'] ?? ''), array_map(fn($t) => ['value' => $t, 'label' => t('rc.' . $t)], RCR_EMP_TYPE)),
+        $f('seniority', t('rc.seniority'), 'select', (string)($cur['seniority'] ?? ''), array_map(fn($t) => ['value' => $t, 'label' => t('rc.' . $t)], RCR_SENIORITY)),
+        $f('summary', t('rc.summary') . ' (max 500 characters, one paragraph, shown on the careers page card)', 'textarea', (string)($cur['summary'] ?? '')),
+        $f('description_html', t('rc.description') . ' (plain text, 3-5 short paragraphs: the role, the projects and systems, the team, what we offer; no HTML, no headings)', 'textarea', (string)($cur['description_html'] ?? '')),
+        $f('requirements', t('rc.requirements') . ' (5-8 items, one per line, must-haves first)', 'textarea', (string)($cur['requirements'] ?? '')),
+        $f('tags', t('rc.tags') . ' (4-8 short keywords, comma separated)', 'textarea', (string)($cur['tags'] ?? '')),
+    ];
+}
+/** Run the draft; the suggestion is kept in the session and pre-fills the form until saved or discarded. Only the form's own fields leave the portal — no candidate or personal data. */
+function rcr_vacancy_ai_draft(int $id, string $brief, array $form): array {
+    if (!rcr_can()) throw new RuntimeException(t('err.noaccess'));
+    $cur = array_intersect_key($form, array_flip(['title', 'department_id', 'branch_id', 'location', 'emp_type', 'seniority', 'summary', 'description_html', 'requirements', 'tags']));
+    $prompt = ($brief !== '' ? $brief . "\n" : '') . "Draft this job vacancy for Golden A/S (marine electrical, automation and navigation systems integrator; superyacht newbuilding and refit; head office Keratsini / Piraeus, branches in Italy and the Netherlands; engineers work at shipyards across Europe). "
+        . "Use the brief and the current form values; keep what is already filled unless the brief changes it. Write in British English, factual, no marketing superlatives, no emojis. The audience is engineers and technicians; mention the real systems of the trade (PLC/SCADA, IAS/AMS, switchboards, navigation and communication equipment, class rules) only when they fit the role. "
+        . "Pick department_id, branch_id, emp_type and seniority from the listed options when the brief implies them; otherwise leave them as they are. Do not invent salary, dates or names.";
+    $r = ai_run('fill', ['title' => t('rc.new_vacancy'), 'headline' => t('rc.ai_hint'), 'fields' => rcr_vacancy_ai_fields($cur)], $prompt, null, 'rcr_vacancy');
+    if ($r['ok']) {
+        $f = $r['fields']; if (isset($f['description_html'])) $f['description_html'] = strip_tags((string)$f['description_html']); if (isset($f['summary'])) $f['summary'] = mb_substr(strip_tags((string)$f['summary']), 0, 600);
+        foreach (['department_id', 'branch_id'] as $k) if (isset($f[$k]) && !ctype_digit((string)$f[$k])) unset($f[$k]);
+        if (isset($f['emp_type']) && !in_array($f['emp_type'], RCR_EMP_TYPE, true)) unset($f['emp_type']); if (isset($f['seniority']) && !in_array($f['seniority'], RCR_SENIORITY, true)) unset($f['seniority']);
+        $_SESSION['rc_vac_ai'][$id] = ['fields' => $f, 'notes' => (string)($r['notes'] ?? ''), 'at' => time()];
+    }
+    return $r;
+}
