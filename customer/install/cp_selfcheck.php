@@ -219,6 +219,7 @@ $r89a = (bool)$pdo->query("SHOW TABLES LIKE 'rc_vacancies'")->fetch(); printf("%
 $r90a = (bool)$pdo->query("SELECT 1 FROM cp_settings WHERE k = 'web_site_key'")->fetch(); printf("%s R90-001 migration (website statistics feed)  %s\n", $r90a ? '[ OK ]' : '[WARN]', $r90a ? '' : '— run install/migrate_cp_r90_001_website_feed.sql');
 $r90b = (bool)$pdo->query("SHOW TABLES LIKE 'web_inquiries'")->fetch(); printf("%s R90-002 migration (website inbox)  %s\n", $r90b ? '[ OK ]' : '[WARN]', $r90b ? '' : '— run install/migrate_cp_r90_002_web_inquiries.sql');
 $r91a = (bool)$pdo->query("SHOW TABLES LIKE 'rc_evaluations'")->fetch(); printf("%s R91-001 migration (applicant evaluation)  %s\n", $r91a ? '[ OK ]' : '[WARN]', $r91a ? '' : '— run install/migrate_cp_r91_001_applicant_evaluation.sql');
+$r92c = (bool)$pdo->query("SELECT 1 FROM rc_screening_sets WHERE code = 'PM-STD-8'")->fetch(); printf("%s R92-003 migration (PM screening set)  %s\n", $r92c ? '[ OK ]' : '[WARN]', $r92c ? 'PM-STD-8 present' : 'PM-STD-8 missing');
 $r82 = (bool)$pdo->query("SHOW COLUMNS FROM offer_lines LIKE 'item_id'")->fetch();
 printf("%s R82-001 migration (offer lines from the inventory)  %s\n", $r82 ? '[ OK ]' : '[WARN]', $r82 ? '' : '— run install/migrate_cp_r82_integration.sql');
 $r81 = (bool)$pdo->query("SHOW TABLES LIKE 'si_invoices'")->fetch();

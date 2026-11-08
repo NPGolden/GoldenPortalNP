@@ -1189,3 +1189,6 @@ Built in the website project (branch `feature/r89-recruiting`, contract `goldena
 
 ## 251. v1.109.1 — Vacancy code shown on the form (GAS-CP-R92-002)
 `views/rcr_vacancy.php`: read-only **Code** field (`$v['code']`, or `rcr_code('VAC','rc_vacancies')` as a preview on a new vacancy — the real code is still assigned by `rcr_vacancy_save()` at INSERT, so two HR users opening the form at once cannot collide); the former "Vacancy *" input is now **Job title**. Keys `rc.job_title`, `rc.code_auto` × 5 languages (8159 each); HR manual. No SQL, no new action; the code input has no `name` so nothing from it is posted.
+
+## 252. v1.109.2 — Screening set for Project Managers (GAS-CP-R92-003)
+`install/migrate_cp_r92_003_pm_screening_set.sql` (`INSERT IGNORE` into `rc_screening_sets`, check `r92c` = row `PM-STD-8` exists): 8 questions, groups planning / stakeholders / cost / risk / class / team / loyalty×2, knock-out `loyalty`, pass 7. Each question has two scoring answers and one zero answer, as in ENG-STD-7, so the gate measures mindset rather than knowledge; scores stay server-side (`rcr_set_public` strips them — verified on `?r=set&code=PM-STD-8`). The website renders the set named by the vacancy; only its offline demo fallback hard-codes ENG-STD-7. HR manual; self-check line. **Security:** data-only migration, no code path change.

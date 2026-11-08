@@ -71,7 +71,8 @@ return [
       ]],
       ['tip' => 'Ask the staff to complete their cards before the payroll import: HR › People shows who has no personal data, and every employee sees the completeness of his card on My leave with the button to start.'],
     ]],
-    ['id' => 'recruiting', 'title' => 'Recruiting — careers website, screening, evaluation (v1.106.0 – v1.109.1)', 'body' => [
+    ['id' => 'recruiting', 'title' => 'Recruiting — careers website, screening, evaluation (v1.106.0 – v1.109.2)', 'body' => [
+      'Screening sets (v1.109.2): two sets come ready — ENG-STD-7 for engineers and technicians (7 questions, pass 6) and PM-STD-8 for project managers (8 questions on planning, stakeholders, cost and change control, risk, class documentation and team leadership, pass 7); both have the loyalty knock-out. Pick the set on the vacancy; edit questions or add sets under Recruiting › Screening sets — the website renders whatever the vacancy names.',
       'Vacancy code (v1.109.1): every vacancy gets a code VAC-year-number automatically; the form shows the next code in a read-only field before the first save and the fixed code afterwards — you only type the job title.',
       'Assistant draft (v1.109.0): on the vacancy form, describe the role in a few words in the "Assistant — draft the vacancy" box and press Draft. The assistant fills title, summary, description, requirements, tags, location, type, seniority and — when the brief implies them — discipline and branch, keeping what you had already typed. The draft sits in the form until you press Save (or Discard); only the form fields are sent to the assistant, never candidate data. The administrator enables the page under Settings › Assistant (page "Recruiting") and the usual monthly cap applies.',
       'Departments on vacancies are the portal Disciplines (Settings › Disciplines) — the same structure the HR registry uses since v1.62.0; there is no separate HR department list (v1.108.3).',

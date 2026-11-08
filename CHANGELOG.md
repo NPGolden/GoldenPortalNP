@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.109.1** (build 2026-11-08). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.109.2** (build 2026-11-08). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.109.2 | GAS-CP-R92-003 | 2026-11-08 | Recruiting: screening set PM-STD-8 for Project Managers (8 situational questions — planning, yard and owner stakeholders, cost and change control, risk, class documentation, team leadership, two loyalty knock-outs; pass 7 of 8) alongside ENG-STD-7; editable under Recruiting › Screening sets. | `install/migrate_cp_r92_003_pm_screening_set.sql` |
 | 1.109.1 | GAS-CP-R92-002 | 2026-11-08 | Vacancy form shows the automatic code (VAC-year-number, previewed before the first save, fixed afterwards) in a read-only field; the title field is named Job title. | — |
 | 1.109.0 | GAS-CP-R92-001 | 2026-11-08 | Recruiting: the assistant drafts a vacancy from a short brief (title, summary, description, requirements, tags, location, type, seniority, discipline, branch) on the vacancy form — reviewed and saved by HR, nothing leaves the portal except the form fields; the page is enabled under Settings › Assistant. Recruiting forms use the standard field layout. | — |
 | 1.108.3 | GAS-CP-R91-004 | 2026-11-08 | Recruiting on the live schema: vacancy lists, the vacancy form and the public careers feed joined the hr_departments table that R56-002 merged into Disciplines (and dropped) — they now use Disciplines, so HR › Recruiting and goldenas.com.gr/careers work on live; Website inbox filters no longer use inline handlers blocked by the CSP. | — |
