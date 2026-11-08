@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.109.2** (build 2026-11-08). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.109.3** (build 2026-11-08). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.109.3 | GAS-CP-R92-004 | 2026-11-08 | Recruiting: ten role screening sets — IT engineers (IT-STD-8), mechanical (MEC-STD-8), automation (AUT-STD-8), service (SRV-STD-8), accounting (ACC-STD-8), UI/UX designers (UX-STD-8), product designers (PRD-STD-8), sales engineers (SAL-STD-8), procurement (PRC-STD-8), sales assistants (SAS-STD-8); six role situations plus the two loyalty knock-outs each, pass 7 of 8; editable under Recruiting › Screening sets. | `install/migrate_cp_r92_004_role_screening_sets.sql` |
 | 1.109.2 | GAS-CP-R92-003 | 2026-11-08 | Recruiting: screening set PM-STD-8 for Project Managers (8 situational questions — planning, yard and owner stakeholders, cost and change control, risk, class documentation, team leadership, two loyalty knock-outs; pass 7 of 8) alongside ENG-STD-7; editable under Recruiting › Screening sets. | `install/migrate_cp_r92_003_pm_screening_set.sql` |
 | 1.109.1 | GAS-CP-R92-002 | 2026-11-08 | Vacancy form shows the automatic code (VAC-year-number, previewed before the first save, fixed afterwards) in a read-only field; the title field is named Job title. | — |
 | 1.109.0 | GAS-CP-R92-001 | 2026-11-08 | Recruiting: the assistant drafts a vacancy from a short brief (title, summary, description, requirements, tags, location, type, seniority, discipline, branch) on the vacancy form — reviewed and saved by HR, nothing leaves the portal except the form fields; the page is enabled under Settings › Assistant. Recruiting forms use the standard field layout. | — |

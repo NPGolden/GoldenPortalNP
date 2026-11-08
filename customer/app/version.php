@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.109.2';
+const CP_VERSION = '1.109.3';
 const CP_BUILD   = '2026-11-08';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R92-004', 'version' => '1.109.3', 'date' => '2026-11-08', 'title' => 'Recruiting: ten role screening sets — IT engineers (IT-STD-8), mechanical (MEC-STD-8), automation (AUT-STD-8), service (SRV-STD-8), accounting (ACC-STD-8), UI/UX designers (UX-STD-8), product designers (PRD-STD-8), sales engineers (SAL-STD-8), procurement (PRC-STD-8), sales assistants (SAS-STD-8); six role situations plus the two loyalty knock-outs each, pass 7 of 8; editable under Recruiting › Screening sets.', 'db' => 'install/migrate_cp_r92_004_role_screening_sets.sql', 'check' => 'r92d'],
         ['ref' => 'GAS-CP-R92-003', 'version' => '1.109.2', 'date' => '2026-11-08', 'title' => 'Recruiting: screening set PM-STD-8 for Project Managers (8 situational questions — planning, yard and owner stakeholders, cost and change control, risk, class documentation, team leadership, two loyalty knock-outs; pass 7 of 8) alongside ENG-STD-7; editable under Recruiting › Screening sets.', 'db' => 'install/migrate_cp_r92_003_pm_screening_set.sql', 'check' => 'r92c'],
         ['ref' => 'GAS-CP-R92-002', 'version' => '1.109.1', 'date' => '2026-11-08', 'title' => 'Vacancy form shows the automatic code (VAC-year-number, previewed before the first save, fixed afterwards) in a read-only field; the title field is named Job title.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R92-001', 'version' => '1.109.0', 'date' => '2026-11-08', 'title' => 'Recruiting: the assistant drafts a vacancy from a short brief (title, summary, description, requirements, tags, location, type, seniority, discipline, branch) on the vacancy form — reviewed and saved by HR, nothing leaves the portal except the form fields; the page is enabled under Settings › Assistant. Recruiting forms use the standard field layout.', 'db' => null, 'check' => null],
@@ -382,6 +383,7 @@ function cp_migration_state(): array {
         'r84c' => $has("SHOW COLUMNS FROM companies LIKE 'is_supplier'"),
         'r85b' => $has("SHOW TABLES LIKE 'contact_companies'"),
         'r85c' => $has("SHOW COLUMNS FROM vessel_companies LIKE 'company_id'"),
+        'r92d' => $has("SELECT 1 FROM rc_screening_sets WHERE code = 'SRV-STD-8'"),
         'r92c' => $has("SELECT 1 FROM rc_screening_sets WHERE code = 'PM-STD-8'"),
         'r91a' => $has("SHOW TABLES LIKE 'rc_evaluations'"),
         'r90b' => $has("SHOW TABLES LIKE 'web_inquiries'"),
