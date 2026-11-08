@@ -113,7 +113,7 @@ function settings_tab_groups(): array {
     if ($staff) $data[] = ['import', t('nav.import')];
     if ($admin && function_exists('fd_has') && fd_has()) $data[] = ['fd_import', t('fd.tab')];
     if ($data) $G[] = [t('stg.data'), $data];
-    if ($admin) $G[] = [t('stg.system'), [['admin_log', t('nav.loginlog')], ['admin_about', t('nav.about')], ['license', t('lic.title')]]];
+    if ($admin) $G[] = [t('stg.system'), array_merge([['admin_log', t('nav.loginlog')]], function_exists('web_has') && web_has() ? [['admin_website', t('web.title')]] : [], [['admin_about', t('nav.about')], ['license', t('lic.title')]])];   // R90-001
     return $G;
 }
 function settings_tabs_list(): array {
