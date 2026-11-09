@@ -225,6 +225,7 @@ $r92e = (int)$pdo->query("SELECT COUNT(*) FROM notifications WHERE grp = 'work' 
 $r92f = (bool)$pdo->query("SHOW COLUMNS FROM rc_applications LIKE 'keep_until'")->fetch(); printf("%s R92-005 migration (CV retention controls)  %s\n", $r92f ? '[ OK ]' : '[WARN]', $r92f ? 'keep_until present' : 'keep_until missing');
 $r93a = (bool)$pdo->query("SHOW TABLES LIKE 'work_permits'")->fetch(); printf("%s R93-001 migration (work permits)  %s\n", $r93a ? '[ OK ]' : '[WARN]', $r93a ? 'work_permits present' : 'work_permits missing');
 $r93b = (bool)$pdo->query("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_inquiries' AND COLUMN_NAME = 'kind' AND COLUMN_TYPE LIKE '%contact%'")->fetch(); printf("%s R93-002 migration (website contact kind)  %s\n", $r93b ? '[ OK ]' : '[WARN]', $r93b ? 'kind contact present' : 'kind contact missing');
+$r93c = (bool)$pdo->query("SHOW TABLES LIKE 'bom_import_rows'")->fetch(); printf("%s R93-006 migration (BOM import review)  %s\n", $r93c ? '[ OK ]' : '[WARN]', $r93c ? 'bom_import_rows present' : 'bom_import_rows missing');
 $r82 = (bool)$pdo->query("SHOW COLUMNS FROM offer_lines LIKE 'item_id'")->fetch();
 printf("%s R82-001 migration (offer lines from the inventory)  %s\n", $r82 ? '[ OK ]' : '[WARN]', $r82 ? '' : '— run install/migrate_cp_r82_integration.sql');
 $r81 = (bool)$pdo->query("SHOW TABLES LIKE 'si_invoices'")->fetch();

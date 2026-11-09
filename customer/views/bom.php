@@ -25,6 +25,7 @@ layout_head($b['sub_code'] . ' · BOM ' . $rev, 'projects');
     <?php if ($b['status'] === 'approved' && prq_can() && ($proc || $eng)): ?><form method="post" action="<?= url('bom', ['id' => $id]) ?>" data-lock data-confirm="<?= e(t('bom.kit_q')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="bom_to_kit"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--gold btn--sm" type="submit">🧰 <?= tt('bom.kit') ?></button></form><?php endif; ?>
     <?php if ($b['status'] === 'approved' && $cov['to_buy'] && prq_can() && ($proc || $eng)): ?><form method="post" action="<?= url('bom', ['id' => $id]) ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="bom_to_pr"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--sm" type="submit">🧾 <?= tt('bom.to_pr') ?></button></form><?php endif; ?>
     <a class="btn btn--ghost btn--sm" href="<?= url('bom', ['id' => $id, 'format' => 'xlsx']) ?>">⤓ Excel</a>
+    <?php if (bom_can_delete($b)): ?><form method="post" action="<?= url('bom', ['id' => $id]) ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="bom_delete"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost btn--sm" type="submit" data-confirm="<?= e(t('bom.del_q', ['r' => $rev])) ?>" data-confirm-ok="<?= tt('btn.delete') ?>">🗑 <?= tt('btn.delete') ?></button></form><?php endif; ?>
   </div>
 </div>
 
@@ -88,10 +89,55 @@ layout_head($b['sub_code'] . ' · BOM ' . $rev, 'projects');
   </form>
   <h3 style="margin-top:14px;"><?= tt('bom.import') ?></h3>
   <form method="post" action="<?= url('bom', ['id' => $id]) ?>" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="bom_import"><input type="hidden" name="id" value="<?= $id ?>">
-    <div class="btn-row"><input type="file" name="file" accept=".xlsx,.xls,.csv" required><button class="btn btn--sm" type="submit">⤒ <?= tt('bom.import_btn') ?></button><span class="hint"><?= tt('bom.import_hint') ?></span></div>
+    <div class="btn-row"><input type="file" name="file" accept=".xlsx,.xls,.csv" required><button class="btn btn--sm" type="submit">⤒ <?= tt('bom.import_btn') ?></button><a class="btn btn--ghost btn--sm" href="<?= url('bom_template') ?>">⤓ <?= tt('bom.imp_template') ?></a></div>
+    <p class="hint" style="margin:6px 0 0;"><?= tt('bom.imp_hint2') ?></p>
   </form>
   <?php endif; ?>
 </div>
+
+<?php $imp = $edit ? bom_import_rows($id) : []; if ($imp): $impPend = count(array_filter($imp, fn($r) => $r['decision'] === 'pending')); ?>
+<div class="card" id="import-review">
+  <div class="page-head" style="margin-bottom:6px;"><div><h2 style="margin:0;">⤒ <?= tt('bom.imp_review') ?> <span class="count"><?= count($imp) ?></span></h2><p class="hint"><?= tt('bom.imp_review_lede') ?></p></div>
+    <form method="post" action="<?= url('bom', ['id' => $id]) ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="bom_import_discard"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost btn--sm" data-confirm="<?= e(t('bom.imp_discard_q')) ?>"><?= tt('bom.imp_discard') ?></button></form></div>
+  <form method="post" action="<?= url('bom', ['id' => $id]) ?>" data-lock id="imp-form"><?= csrf_field() ?><input type="hidden" name="action" value="bom_import_decide"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="apply" id="imp-apply" value="0">
+  <div class="btn-row" style="margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+    <button class="btn btn--ghost btn--sm" type="button" data-imp-bulk="accept" data-imp-min="85"><?= tt('bom.imp_bulk_85') ?></button>
+    <button class="btn btn--ghost btn--sm" type="button" data-imp-bulk="accept" data-imp-min="1"><?= tt('bom.imp_bulk_all') ?></button>
+    <button class="btn btn--ghost btn--sm" type="button" data-imp-bulk="reject" data-imp-min="0" data-imp-unmatched="1"><?= tt('bom.imp_bulk_reject') ?></button>
+    <button class="btn btn--ghost btn--sm" type="button" data-imp-bulk="new" data-imp-min="0" data-imp-unmatched="1"><?= tt('bom.imp_bulk_new') ?></button>
+    <span class="hint" style="margin-left:auto;"><?= e(t('bom.imp_pending_n', ['n' => $impPend])) ?></span></div>
+  <div class="table-scroll"><table class="tbl imp-tbl">
+    <thead><tr><th>#</th><th><?= tt('bom.imp_from_file') ?></th><th><?= tt('bom.imp_proposal') ?></th><th><?= tt('bom.imp_decision') ?></th></tr></thead>
+    <tbody><?php foreach ($imp as $r): $conf = (int)$r['confidence']; $tone = $conf >= 85 ? 'ok' : ($conf >= 60 ? 'gold' : 'mute'); ?>
+      <tr data-imp-row data-conf="<?= $conf ?>" data-matched="<?= $r['item_id'] ? 1 : 0 ?>">
+        <td class="num"><?= (int)$r['seq'] ?></td>
+        <td><b><?= e($r['description']) ?></b><br><span class="hint"><?= e(rtrim(rtrim(number_format((float)$r['qty'], 3, '.', ''), '0'), '.')) ?> <?= e($r['unit']) ?><?= $r['maker'] ? ' · ' . e($r['maker']) : '' ?><?= $r['part_no'] ? ' · ' . e($r['part_no']) : '' ?><?= $r['code'] ? ' · ' . e($r['code']) : '' ?><?= $r['section'] ? ' · ' . e($r['section']) : '' ?></span></td>
+        <td><?php if ($r['item_id']): ?><a href="<?= url('inventory_item', ['id' => (int)$r['item_id']]) ?>" target="_blank" rel="noopener"><b><?= e($r['item_code']) ?></b></a> <?= pill($tone, $conf . ' %') ?> <?= pill($r['match_kind'] === 'ai' ? 'navy' : 'mute', t('bom.imp_k_' . $r['match_kind'])) ?><br><?= e($r['item_desc']) ?><br><span class="hint"><?= e(trim(($r['item_maker'] ?? '') . ' ' . ($r['item_pn'] ?? ''))) ?> · <?= tt('stk.on_hand') ?> <b><?= e(rtrim(rtrim(number_format((float)$r['on_hand'], 3, '.', ''), '0'), '.')) ?></b> <?= e($r['item_unit']) ?><?= (float)$r['reserved'] > 0 ? ' · ' . tt('stk.reserved') . ' ' . e(rtrim(rtrim(number_format((float)$r['reserved'], 3, '.', ''), '0'), '.')) : '' ?><?= $r['item_status'] !== 'active' ? ' · ' . pill('bad', t('stk.s_' . $r['item_status'])) : '' ?><?= $r['reason'] ? ' · ' . e($r['reason']) : '' ?></span>
+          <?php else: ?><span class="hint"><?= tt('bom.imp_no_match') ?><?= $r['reason'] ? ' · ' . e($r['reason']) : '' ?></span><?php endif; ?>
+          <div class="prq-pick" style="margin-top:4px;"><input type="text" class="imp-pick" data-row="<?= (int)$r['id'] ?>" placeholder="<?= tt('bom.imp_pick_other') ?>" autocomplete="off" style="max-width:280px;"><input type="hidden" name="item[<?= (int)$r['id'] ?>]" value=""></div></td>
+        <td style="white-space:nowrap;">
+          <?php foreach (['accept' => $r['item_id'] ? '' : ' disabled', 'reject' => '', 'new' => ''] as $d => $dis): ?><label class="check" style="display:block;margin:2px 0;"><input type="radio" name="dec[<?= (int)$r['id'] ?>]" value="<?= $d ?>"<?= $r['decision'] === $d ? ' checked' : '' ?><?= $dis ?>> <?= tt('bom.imp_d_' . $d) ?></label><?php endforeach; ?>
+          <label class="check" style="display:block;margin:2px 0;"><input type="radio" name="dec[<?= (int)$r['id'] ?>]" value="pending"<?= $r['decision'] === 'pending' ? ' checked' : '' ?>> <?= tt('bom.imp_d_pending') ?></label></td>
+      </tr>
+    <?php endforeach; ?></tbody></table></div>
+  <div class="btn-row" style="margin-top:10px;"><button class="btn btn--sm" type="submit"><?= tt('bom.imp_save_dec') ?></button><button class="btn btn--gold btn--sm" type="button" id="imp-apply-btn" data-confirm="<?= e(t('bom.imp_apply_q')) ?>"><?= tt('bom.imp_apply') ?></button><span class="hint"><?= tt('bom.imp_apply_hint') ?></span></div>
+  </form>
+</div>
+<script nonce="<?= csp_nonce() ?>">
+(function(){
+  var f=document.getElementById('imp-form'); if(!f) return;
+  document.querySelectorAll('[data-imp-bulk]').forEach(function(b){ b.addEventListener('click',function(){ var d=b.dataset.impBulk, min=+b.dataset.impMin, un=b.dataset.impUnmatched==='1';
+    f.querySelectorAll('tr[data-imp-row]').forEach(function(tr){ var m=tr.dataset.matched==='1', c=+tr.dataset.conf; if(un ? m : (!m||c<min)) return; var r=tr.querySelector('input[type=radio][value="'+d+'"]'); if(r&&!r.disabled) r.checked=true; }); }); });
+  var ab=document.getElementById('imp-apply-btn'); if(ab) ab.addEventListener('click',function(){ document.getElementById('imp-apply').value='1'; if(typeof f.requestSubmit==='function') f.requestSubmit(); else f.submit(); });
+  // pick another item: reuse the requisition item search endpoint
+  f.querySelectorAll('.imp-pick').forEach(function(inp){ var hid=inp.nextElementSibling, box=null, t=null;
+    inp.addEventListener('input',function(){ clearTimeout(t); var q=inp.value.trim(); hid.value=''; if(q.length<2){ if(box) box.remove(); box=null; return; }
+      t=setTimeout(function(){ fetch(<?= json_encode(url('prq_items')) ?>+'&q='+encodeURIComponent(q),{credentials:'same-origin'}).then(function(r){return r.json();}).then(function(j){ if(box) box.remove(); box=document.createElement('div'); box.className='prq-list';
+        (Array.isArray(j)?j:(j.items||[])).filter(function(it){return it.id;}).slice(0,8).forEach(function(it){ var a=document.createElement('div'); a.className='prq-opt'; a.textContent=(it.code||'')+' — '+(it.description||'')+(it.on_hand!=null?' · '+it.on_hand:''); a.addEventListener('click',function(){ hid.value=it.id; inp.value=(it.code||'')+' — '+(it.description||''); box.remove(); box=null; var tr=inp.closest('tr'); var r=tr.querySelector('input[type=radio][value="accept"]'); if(r){ r.disabled=false; r.checked=true; } }); box.appendChild(a); });
+        inp.parentNode.appendChild(box); }).catch(function(){}); },250); }); });
+})();
+</script>
+<?php endif; ?>
 
 <?php if ($b['status'] === 'issued' && $proc): ?>
 <div class="card" id="propose">

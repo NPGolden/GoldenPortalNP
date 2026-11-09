@@ -355,6 +355,7 @@ if ($page === 'file') { require_login(); cp_stream_file((int)($_GET['id'] ?? 0))
 if ($page === 'brlogo') { require_cp_admin(); br_logo_stream((int)($_GET['id'] ?? 0)); }
 if ($page === 'tfile') { require_login(); tk_stream_file((int)($_GET['id'] ?? 0)); }
 if ($page === 'permit_file') { require_login(); pmt_stream_file((int)($_GET['id'] ?? 0)); }   // R93-001
+if ($page === 'bom_template') { require_staff(); bom_import_template(); }   // R93-006
 if ($page === 'avatar') { require_login(); avatar_stream((int)($_GET['id'] ?? 0)); }
 if ($page === 'contacts_export') { ex_contacts(ct_filters_from_request($_GET)); }
 if ($page === 'vessels_export') { ex_vessels($_GET); }

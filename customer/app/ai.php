@@ -15,7 +15,7 @@
  */
 declare(strict_types=1);
 
-const AI_KINDS = ['fill', 'write', 'translate', 'ask', 'assess'];
+const AI_KINDS = ['fill', 'write', 'translate', 'ask', 'assess', 'match'];   // R93-006: match = pick inventory items for BOM rows
 const AI_ASSESS_PHOTOS = 6;   // R73-001: photos per weekly-note assessment
 const AI_MODELS = ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'];
 const AI_MAX_TEXT = 24000;      // characters of pasted text
@@ -32,7 +32,7 @@ function ai_can(?string $page = null): bool {
     return in_array($page, ai_pages(), true);
 }
 function ai_pages(): array { return array_values(array_filter(array_map('trim', explode(',', ai_setting('ai_pages'))))); }
-function ai_all_pages(): array { return ['fsr_edit' => 'fsr.title', 'ticket_edit' => 'nav.tickets', 'ticket' => 'nav.tickets', 'timesheet_edit' => 'nav.timesheets', 'weekly_vessel' => 'wk.title', 'weekly' => 'wk.title', 'offer_edit' => 'nav.offers', 'subproject' => 'bg.tab', 'planning' => 'pl.title', 'isr_edit' => 'isr.plural', 'equipment_edit' => 'eq.title', 'production_edit' => 'pd.title', 'inventory_item' => 'stk.title', 'jo_edit' => 'nav.joborders', 'rs_edit' => 'rs.title', 'hr_leaves' => 'hr.leaves', 'hr_eval' => 'hr.evaluations', 'hr_targets' => 'hr.targets', 'hra' => 'hra.title', 'rcr_vacancy' => 'rc.title']; }   // R64-002 / R67-001 / R92-001 vacancy drafting
+function ai_all_pages(): array { return ['fsr_edit' => 'fsr.title', 'ticket_edit' => 'nav.tickets', 'ticket' => 'nav.tickets', 'timesheet_edit' => 'nav.timesheets', 'weekly_vessel' => 'wk.title', 'weekly' => 'wk.title', 'offer_edit' => 'nav.offers', 'subproject' => 'bg.tab', 'planning' => 'pl.title', 'isr_edit' => 'isr.plural', 'equipment_edit' => 'eq.title', 'production_edit' => 'pd.title', 'inventory_item' => 'stk.title', 'jo_edit' => 'nav.joborders', 'rs_edit' => 'rs.title', 'hr_leaves' => 'hr.leaves', 'hr_eval' => 'hr.evaluations', 'hr_targets' => 'hr.targets', 'hra' => 'hra.title', 'rcr_vacancy' => 'rc.title', 'bom' => 'bom.title']; }   // R64-002 / R67-001 / R92-001 vacancy drafting
 
 /* ------------------------------------------------------------------ key at rest */
 function ai_crypt_key(): string { return sodium_crypto_generichash('gascp-ai|' . lic_instance_id() . '|' . (string) cfg('app.session_name', 'GASCP'), '', SODIUM_CRYPTO_SECRETBOX_KEYBYTES); }
@@ -74,6 +74,7 @@ function ai_system(string $kind, array $ctx): string {
     }
     switch ($kind) {
         case 'fill':      $s .= "\nTask: from the user's input (text and/or photo) propose values for the form fields. Answer ONLY a JSON object {\"fields\": {\"<name>\": <value>, …}, \"notes\": \"<one line on what could not be filled>\"}. Use field names exactly as listed; for select fields answer with an option value; dates as yyyy-mm-dd; numbers plain; multi-line text allowed. Omit fields you cannot fill."; break;
+        case 'match':     $s .= "\nTask: you are the procurement engineer of a marine electrical / automation integrator. The input lists BOM rows (row number, description, maker, maker part number, unit) and, for each row, candidate inventory items (id, code, description, maker, maker part number, unit, on hand). Pick for every row the ONE candidate that is the same article (same maker part number in any formatting, or clearly the same product — equivalent series, voltage, rating, size); never pick an item that is merely similar or a different rating. Answer ONLY a JSON object {\"matches\":[{\"row\":<row number>,\"item\":<candidate id or null>,\"confidence\":<0-100>,\"reason\":\"<max 20 words>\"}]} with one entry per row; item null when nothing fits."; break;
         case 'write':     $s .= "\nTask: write or improve the text of ONE field as asked. Answer ONLY the final text, no preamble, no quotes."; break;
         case 'translate': $s .= "\nTask: translate the given text to English, keeping technical terms, numbers, names and layout (line breaks, bullets). Answer ONLY the translation."; break;
         case 'assess':    $s .= "\nTask: you are a senior marine electrical / automation commissioning engineer surveying equipment on board. The photos are attached to a weekly site note of a sub-project; the note text (if any) is in <input>. For EVERY photo, in order, assess what is shown and answer ONLY a JSON object: "
@@ -105,6 +106,7 @@ function ai_run(string $kind, array $ctx, string $prompt, ?array $image, string 
     $outp = ['ok' => true, 'text' => trim($text), 'tokens' => $in + $out];
     if ($kind === 'assess') { $j = ai_json($text); $outp['items'] = array_slice((array)($j['items'] ?? []), 0, AI_ASSESS_PHOTOS); $outp['summary'] = mb_substr((string)($j['summary'] ?? ''), 0, 1500);
         $outp['text'] = $outp['items'] ? ai_assess_text($outp['items'], $outp['summary']) : trim($text); if (!$outp['items'] && $outp['summary'] === '') $outp['summary'] = mb_substr(trim($text), 0, 1500); $outp['images'] = count($images); }
+    if ($kind === 'match') { $j = ai_json($text); $outp['matches'] = []; foreach ((array)($j['matches'] ?? []) as $mm) if (is_array($mm) && isset($mm['row'])) $outp['matches'][(int)$mm['row']] = ['item' => isset($mm['item']) && $mm['item'] !== null ? (int)$mm['item'] : null, 'confidence' => max(0, min(100, (int)($mm['confidence'] ?? 0))), 'reason' => mb_substr((string)($mm['reason'] ?? ''), 0, 255)]; }
     if ($kind === 'fill') {
         $j = ai_json($text); $allowed = array_column($ctx['fields'] ?? [], 'name'); $vals = [];
         foreach ((array)($j['fields'] ?? []) as $k => $v) if (in_array((string)$k, $allowed, true) && (is_scalar($v) || $v === null)) $vals[(string)$k] = $v === null ? '' : (is_bool($v) ? ($v ? '1' : '') : mb_substr((string)$v, 0, 4000));
