@@ -53,7 +53,7 @@ try:
     cur = ar["attributes"]; bools = {"gambling", "unrestrictedWebAccess", "lootBox", "advertising", "parentalControls", "ageAssurance", "healthOrWellnessTopics", "messagingAndChat", "userGeneratedContent"}
     fill = {}
     for k, v in cur.items():
-        if k in ("kidsAgeBand", "ageRatingOverride", "koreaAgeRatingOverride"): continue
+        if k in ("kidsAgeBand", "ageRatingOverride", "koreaAgeRatingOverride") or k.endswith("Url") or k.endswith("Uri"): continue   # optional / URL-typed
         if v is None: fill[k] = False if k in bools else "NONE"
     def patch(f): req("PATCH", f"/ageRatingDeclarations/{ar['id']}", json={"data": {"type": "ageRatingDeclarations", "id": ar["id"], "attributes": f}})
     if fill:
