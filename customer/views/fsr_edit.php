@@ -94,7 +94,6 @@ layout_head($title, 'projects');
     <h2><?= tt('fsr.works') ?></h2>
     <p class="hint"><?= tt('fsr.tasks_hint') ?></p>
     <datalist id="engineers"><?php foreach ($engineers as $en): ?><option value="<?= e($en['full_name']) ?>"><?php endforeach; ?></datalist>
-    <datalist id="specialties"><?php foreach (fsr_specialties() as $sp): ?><option value="<?= e($sp) ?>"><?php endforeach; ?></datalist>
     <?php
     /* one task block; $i is the form index (any integer), $wk the stored task or null */
     $taskBlock = function (int $i, ?array $wk) use ($u, $sel): void {
@@ -122,7 +121,7 @@ layout_head($title, 'projects');
             <?php for ($k = 0; $k < FSR_MAX_LINES; $k++): $ln = $lines[$k] ?? null; ?>
               <tr>
                 <td><input name="wk_eng[<?= $i ?>][<?= $k ?>]" list="engineers" maxlength="120" value="<?= e($ln['engineer'] ?? (($i === 0 && $k === 0 && !$wk) ? $u['full_name'] : '')) ?>" placeholder="<?= tt('fsr.engineer_ph') ?>"></td>
-                <td><input name="wk_spec[<?= $i ?>][<?= $k ?>]" list="specialties" maxlength="80" value="<?= e($ln['specialty'] ?? fsr_specialty_default((int)$u['id'])) ?>" placeholder="<?= tt('fsr.specialty') ?>"></td>
+                <td><?php static $spOpts = null; if ($spOpts === null) $spOpts = fsr_specialty_options($pid ?: null, function_exists('fin_visible') && fin_visible()); $spNames = array_column($spOpts, 'name'); $curSp = (string)($ln['specialty'] ?? fsr_specialty_default((int)$u['id'])); ?><select name="wk_spec[<?= $i ?>][<?= $k ?>]" data-nosearch title="<?= tt('fsr.specialty_hint') ?>"><?php foreach ($spOpts as $o): ?><option value="<?= e($o['name']) ?>"<?= $o['name'] === $curSp ? ' selected' : '' ?>><?= e(fsr_specialty_label($o)) ?></option><?php endforeach; if ($curSp !== '' && !in_array($curSp, $spNames, true)): ?><option value="<?= e($curSp) ?>" selected><?= e($curSp) ?> · <?= tt('fsr.legacy_spec') ?></option><?php endif; ?></select></td>
                 <td><input name="wk_start[<?= $i ?>][<?= $k ?>]" type="time" class="js-t" value="<?= e(fsr_fmt_time($ln['start_time'] ?? null)) ?>"></td>
                 <td><input name="wk_end[<?= $i ?>][<?= $k ?>]" type="time" class="js-t" value="<?= e(fsr_fmt_time($ln['end_time'] ?? null)) ?>"></td>
                 <td><select name="wk_type[<?= $i ?>][<?= $k ?>]"><?php foreach (fsr_time_types() as $tk => $tl): ?><option value="<?= $tk ?>" title="<?= e(fsr_time_type_label($tk)) ?>"<?= $sel($tk, $ln['time_type'] ?? 'WT') ?>><?= $tl ?></option><?php endforeach; ?></select></td>

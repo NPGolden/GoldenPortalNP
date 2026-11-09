@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.114.1';
+const CP_VERSION = '1.114.2';
 const CP_BUILD   = '2026-11-09';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R94-003', 'version' => '1.114.2', 'date' => '2026-11-09', 'title' => 'Direct invoice from where the work is: 🧾 Invoice on every not-fully-invoiced sub-project of Collections › Accounting checks (amount still to invoice pre-filled), Direct invoice on an accounting report (net pre-filled; the reported lines are marked invoiced under the invoice number at once) and on an accepted service report. Service-report specialty drop-down shows each discipline with its rate card (and the hourly rate for financial roles) — same labels in the Service Engineer app (PWA 0.6.20).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R94-002', 'version' => '1.114.1', 'date' => '2026-11-09', 'title' => 'Service reports: the Specialty of a time line is a technical discipline of the portal (every active technical discipline offered, pre-filled with the engineer\'s own), so accounting prices the hours with that discipline\'s rate card; Settings › Disciplines › Service reports picks the disciplines offered; the Service Engineer app receives the same list.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R94-001', 'version' => '1.114.0', 'date' => '2026-11-09', 'title' => 'Invoicing control: direct invoices (an accounting invoice issued without a proforma) registered in the proforma module — payments, collections and the statement of account treat them alike; sub-project invoicing state computed from the documents (approved offers vs invoices registered on proformas + direct invoices) with an optional manual override; completed sub-projects hidden in the projects tree and in every picker (toggle to show); Collections › Accounting checks: sub-project invoicing coverage incl. completed sub-projects, proforma ↔ invoices mismatch, issued proformas without invoice, Excel export.', 'db' => 'install/migrate_cp_r94_001_direct_invoices.sql', 'check' => 'r94a'],
         ['ref' => 'GAS-CP-R93-009', 'version' => '1.113.3', 'date' => '2026-11-09', 'title' => 'Projects page: vessel group headers readable in dark mode; Offers and Sub-projects blocks fold / unfold per project (remembered per browser; offers start folded); sub-projects ordered by code numerically (Y.001, Y.002 … Y.010) instead of the manual sort order.', 'db' => null, 'check' => null],

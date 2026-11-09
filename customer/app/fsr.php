@@ -33,6 +33,25 @@ function fsr_specialties(): array {
     $c = $rows ? array_values(array_unique(array_map(fn($d) => (string)$d['name'], $rows))) : fsr_specialties_legacy();
     return $c;
 }
+/** R94-003: the specialty choices with their rate card, so the engineer sees which tariff each discipline bills at.
+ *  [['name', 'id', 'card', 'card_name', 'rate' (normal hour, local zone, null when unknown), 'cur']] — rates only when $withRates (financial roles). */
+function fsr_specialty_options(?int $projectId = null, bool $withRates = false): array {
+    $names = fsr_specialties(); $out = [];
+    $list = null; if (function_exists('rl_current')) { $bid = $projectId && function_exists('br_of') ? (int)(br_of($projectId)['id'] ?? 0) : 0; $list = rl_current($bid ?: null); }
+    $cards = $list && function_exists('rl_cards') ? rl_cards((int)$list['id']) : [];
+    foreach ($names as $n) {
+        $d = one('SELECT id FROM disciplines WHERE name = ?', [$n]); $card = $d && function_exists('acc_card_of') ? acc_card_of((int)$d['id']) : '';
+        $cn = $cards['hourly:' . $card]['name'] ?? ''; $rate = null;
+        if ($withRates && $list && $card !== '' && function_exists('acc_rate_item')) { $it = acc_rate_item((int)$list['id'], $card, 'normal', 'local'); if ($it) $rate = rl_price($it, 'local'); }
+        $out[] = ['name' => $n, 'id' => (int)($d['id'] ?? 0), 'card' => $card, 'card_name' => (string)$cn, 'rate' => $rate, 'cur' => (string)($list['currency'] ?? 'EUR')];
+    }
+    return $out;
+}
+/** Label of a specialty option: "Automation · card D — Automation engineer · 95 €/h" (rate only for financial roles). */
+function fsr_specialty_label(array $o): string {
+    $l = $o['name']; if ($o['card'] !== '') $l .= ' · ' . t('fsr.card') . ' ' . $o['card'] . ($o['card_name'] !== '' ? ' — ' . $o['card_name'] : '');
+    if ($o['rate'] !== null) $l .= ' · ' . number_format((float)$o['rate'], 0, ',', '.') . ' ' . $o['cur'] . '/h'; return $l;
+}
 /** Default specialty of a line: the engineer's own discipline when known, else the first offered. */
 function fsr_specialty_default(?int $userId = null): string { $n = $userId ? (string) scalar('SELECT d.name FROM customer_users cu JOIN disciplines d ON d.id = cu.discipline_id WHERE cu.id = ?', [$userId]) : ''; $all = fsr_specialties(); return $n !== '' && in_array($n, $all, true) ? $n : ($all[0] ?? 'Service Engineer'); }
 function fsr_time_types(): array { return ['WT' => 'WT', 'TT' => 'TT', 'NC' => 'NC']; }   // NC = not chargeable (R46-005)

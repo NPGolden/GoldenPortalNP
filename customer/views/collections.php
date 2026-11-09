@@ -170,7 +170,7 @@ layout_head(t('col.title'), 'collections');
   </table></div>
   <?php endif; ?>
 </div>
-<?php if ($chk): $covOpen = count(array_filter($cov, fn($r) => ($r['invoicing'] ?? 'none') !== 'full' || (float)($r['inv_contract'] ?? 0) <= 0.005)); ?>
+<?php if ($chk): $canDI = function_exists('pi_kind_has') && pi_kind_has() && pi_can_invoices(); $covOpen = count(array_filter($cov, fn($r) => ($r['invoicing'] ?? 'none') !== 'full' || (float)($r['inv_contract'] ?? 0) <= 0.005)); ?>
 <div class="card" id="col-checks">
   <div class="page-head" style="margin-bottom:6px;"><h2 style="margin:0;">🔎 <?= tt('chk.title') ?></h2>
     <div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('collections', $keep + ['cs' => $cf['status'], 'ci' => $cf['inv'], 'cd' => $cdays, 'format' => 'checks']) ?>">⤓ Excel</a></div></div>
@@ -190,7 +190,7 @@ layout_head(t('col.title'), 'collections');
   </form>
   <?php if (!$cov): ?><p class="hint"><?= tt('chk.cov_none') ?></p><?php else: ?>
   <div class="table-scroll"><table class="tbl">
-    <thead><tr><th><?= tt('pr.one') ?></th><th><?= tt('sp.one') ?></th><th><?= tt('th.vessel') ?></th><th><?= tt('th.status') ?></th><th class="num"><?= tt('chk.contract') ?></th><th class="num"><?= tt('fs.invoiced') ?></th><th class="num">%</th><th class="num"><?= tt('chk.collected') ?></th><th><?= tt('inv.title') ?></th></tr></thead>
+    <thead><tr><th><?= tt('pr.one') ?></th><th><?= tt('sp.one') ?></th><th><?= tt('th.vessel') ?></th><th><?= tt('th.status') ?></th><th class="num"><?= tt('chk.contract') ?></th><th class="num"><?= tt('fs.invoiced') ?></th><th class="num">%</th><th class="num"><?= tt('chk.collected') ?></th><th><?= tt('inv.title') ?></th><th></th></tr></thead>
     <tbody><?php foreach ($cov as $r): ?><tr class="<?= $r['status'] === 'completed' && ($r['invoicing'] ?? 'none') !== 'full' ? 'is-bad' : '' ?>">
       <td><?= pr_link((int)$r['project_id'], $r['project_code'], $r['project_name']) ?></td>
       <td><a href="<?= url('subproject', ['id' => (int)$r['id']]) ?>"><b><?= e($r['code']) ?></b> <?= e($r['name']) ?></a></td>
@@ -201,6 +201,7 @@ layout_head(t('col.title'), 'collections');
       <td class="num"><?= (int)($r['invoiced_pct'] ?? 0) ?> %</td>
       <td class="num"><?= e($m((float)$r['collected'])) ?></td>
       <td><?= inv_pill($r) ?><?= $r['invoicing_override'] ? ' <span class="hint" title="' . tt('chk.override') . '">✎</span>' : '' ?></td>
+      <td class="row-actions"><?php if ($canDI && ($r['invoicing'] ?? 'none') !== 'full'): $left = max(0.0, (float)($r['inv_contract'] ?? 0) - (float)($r['inv_invoiced'] ?? 0)); ?><a class="btn btn--gold btn--sm" href="<?= url('invoice_new', ['project' => (int)$r['project_id'], 'sub' => (int)$r['id']] + ($left > 0.005 ? ['gross' => number_format($left, 2, '.', '')] : [])) ?>" title="<?= tt('chk.invoice_hint') ?>">🧾 <?= tt('chk.invoice') ?></a><?php endif; ?></td>
     </tr><?php endforeach; ?></tbody>
   </table></div>
   <p class="hint" style="margin:6px 0 0;"><?= tt('chk.cov_hint') ?></p>

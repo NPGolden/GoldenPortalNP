@@ -114,7 +114,7 @@ final class Portal {
         $secs = function_exists('eng_sections') ? array_values(array_map(fn($s) => ['id' => (int)$s['id'], 'code' => $s['code'], 'name' => $s['name']], eng_sections())) : [];
         $systems = function_exists('isr_system_options') ? isr_system_options() : [];
         $bank = function_exists('isr_bank_lc') ? isr_bank_lc() : [];
-        return ['specialties' => fsr_specialties(), 'time_types' => array_keys(fsr_time_types()), 'part_types' => array_keys(fsr_part_types()), 'max_lines' => FSR_MAX_LINES, 'max_parts' => FSR_MAX_PARTS, 'max_photos' => FSR_MAX_PHOTOS,
+        return ['specialties' => fsr_specialties(), 'specialty_options' => array_map(fn($o) => ['name' => $o['name'], 'card' => $o['card'], 'card_name' => $o['card_name'], 'label' => fsr_specialty_label($o)], fsr_specialty_options()), 'time_types' => array_keys(fsr_time_types()), 'part_types' => array_keys(fsr_part_types()), 'max_lines' => FSR_MAX_LINES, 'max_parts' => FSR_MAX_PARTS, 'max_photos' => FSR_MAX_PHOTOS,
             'sections' => $secs, 'engineers' => $engineers, 'stages' => array_keys(stage_defs()), 'calendars' => $cal, 'activities' => function_exists('eng_activity_choices') ? eng_activity_choices((int)($u['discipline_id'] ?? 0) ?: null) : ['site'],
             'reasons' => defined('ENG_REASONS') ? ENG_REASONS : ['misjudgement', 'miscalculation'], 'isr_systems' => $systems, 'isr_bank' => $bank, 'isr_risk_levels' => array_keys(isr_risk_levels()), 'ticket_statuses' => tk_statuses()];
     }

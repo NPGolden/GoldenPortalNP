@@ -392,6 +392,19 @@ function acc_mark_sent(int $id, string $to): void {
     acc_event($id, 'sent', $to);
 }
 /** Accounting's answer: invoiced (all reported lines), partly (ticked lines), returned (lines go back to open). */
+/** Mark the reported lines of an accounting report as invoiced ($ids = null → every reported line); shared by the accounting answer and the direct invoice (R94-003). */
+function acc_mark_invoiced(array $R, string $ref, string $date, ?string $note = null, ?array $ids = null): string {
+    $id = (int)$R['id']; $u = current_user();
+    $ids = $ids ?? array_map(fn($l) => (int)$l['id'], array_filter($R['lines'], fn($l) => $l['state'] === 'reported'));
+    if (!$ids) throw new RuntimeException(t('acc.no_lines_ticked'));
+    q("UPDATE acc_lines SET state = 'invoiced', invoice_ref = ?, invoiced_at = ? WHERE report_id = ? AND state = 'reported' AND id IN (" . implode(',', array_fill(0, count($ids), '?')) . ')', array_merge([$ref, $date . ' 00:00:00', $id], $ids));
+    $left = (int) scalar("SELECT COUNT(*) FROM acc_lines WHERE report_id = ? AND state = 'reported'", [$id]);
+    $st = $left ? 'partly_invoiced' : 'invoiced';
+    $refs = array_values(array_unique(array_filter(array_merge(explode(', ', (string)$R['invoice_ref']), [$ref]))));
+    q('UPDATE acc_reports SET status = ?, invoice_ref = ?, invoice_date = ?, answered_at = NOW(), answered_by = ?, answered_name = ?, answer_note = ? WHERE id = ?', [$st, mb_substr(implode(', ', $refs), 0, 120), $date, (int)($u['id'] ?? 0), (string)($u['full_name'] ?? ''), $note, $id]);
+    acc_event($id, $st, $ref . ($note ? ' · ' . $note : ''));
+    return $st;
+}
 function acc_answer_from_post(int $id): void {
     if (!acc_is_accounting()) throw new RuntimeException(t('err.noaccess'));
     $R = acc_load($id); if (!$R || !in_array($R['status'], ['issued', 'sent', 'partly_invoiced'], true)) throw new RuntimeException(t('acc.not_answerable'));
@@ -399,14 +412,8 @@ function acc_answer_from_post(int $id): void {
     $note = mb_substr(trim((string)($_POST['answer_note'] ?? '')), 0, 1000) ?: null; $u = current_user();
     if ($kind === 'invoiced' || $kind === 'partly') {
         if ($ref === '') throw new RuntimeException(t('ts.ref_req'));
-        $ids = $kind === 'partly' ? array_map('intval', (array)($_POST['inv'] ?? [])) : array_map(fn($l) => (int)$l['id'], array_filter($R['lines'], fn($l) => $l['state'] === 'reported'));
-        if (!$ids) throw new RuntimeException(t('acc.no_lines_ticked'));
-        q("UPDATE acc_lines SET state = 'invoiced', invoice_ref = ?, invoiced_at = ? WHERE report_id = ? AND state = 'reported' AND id IN (" . implode(',', array_fill(0, count($ids), '?')) . ')', array_merge([$ref, $date . ' 00:00:00', $id], $ids));
-        $left = (int) scalar("SELECT COUNT(*) FROM acc_lines WHERE report_id = ? AND state = 'reported'", [$id]);
-        $st = $left ? 'partly_invoiced' : 'invoiced';
-        $refs = array_values(array_unique(array_filter(array_merge(explode(', ', (string)$R['invoice_ref']), [$ref]))));
-        q('UPDATE acc_reports SET status = ?, invoice_ref = ?, invoice_date = ?, answered_at = NOW(), answered_by = ?, answered_name = ?, answer_note = ? WHERE id = ?', [$st, mb_substr(implode(', ', $refs), 0, 120), $date, (int)$u['id'], (string)$u['full_name'], $note, $id]);
-        acc_event($id, $st, $ref . ($note ? ' · ' . $note : ''));
+        $ids = $kind === 'partly' ? array_map('intval', (array)($_POST['inv'] ?? [])) : null;
+        acc_mark_invoiced($R, $ref, $date, $note, $ids);
     } elseif ($kind === 'returned') {
         if ($note === null) throw new RuntimeException(t('acc.need_note'));
         q("UPDATE acc_lines SET state = 'draft' WHERE report_id = ? AND state = 'reported'", [$id]);    // back to the PM, same report, next revision

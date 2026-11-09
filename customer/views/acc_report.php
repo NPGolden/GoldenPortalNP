@@ -111,7 +111,9 @@ layout_head(t('acc.report') . ' ' . $title, 'acc_reports');
       <div class="field"><label><?= tt('acc.invoice_date') ?></label><input type="date" name="invoice_date" value="<?= date('Y-m-d') ?>"></div>
       <div class="field"><label><?= tt('acc.answer_note') ?></label><input name="answer_note" maxlength="1000"></div>
     </div>
-    <button class="btn btn--gold" type="submit"><?= tt('acc.answer_btn') ?></button>
+    <div class="btn-row"><button class="btn btn--gold" type="submit"><?= tt('acc.answer_btn') ?></button>
+    <?php if (function_exists('pi_kind_has') && pi_kind_has() && pi_can_invoices()): ?><a class="btn" href="<?= url('invoice_new', ['acc' => $id]) ?>" title="<?= tt('acc.di_hint') ?>">🧾 <?= tt('acc.di_btn') ?></a><?php endif; ?></div>
+    <p class="hint" style="margin:6px 0 0;"><?= tt('acc.di_hint') ?></p>
   </form>
 </div>
 <?php endif; ?>

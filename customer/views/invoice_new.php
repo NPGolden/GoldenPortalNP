@@ -8,6 +8,12 @@ require __DIR__ . '/_layout.php';
 $u = require_staff();
 if (!function_exists('pi_kind_has') || !pi_kind_has() || !pi_can_invoices()) { http_response_code(403); layout_head(t('err.noaccess'), 'proformas'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
 $curP = (int)($_GET['project'] ?? 0); $curS = (int)($_GET['sub'] ?? 0);
+// R94-003 — prefill when raised from Accounting checks (gross still to invoice), an accounting report (net) or a service report
+$preNet = (float) str_replace(',', '.', (string)($_GET['net'] ?? '')); $preGross = (float) str_replace(',', '.', (string)($_GET['gross'] ?? '')); $preTitle = mb_substr(trim((string)($_GET['title'] ?? '')), 0, 200);
+$arId = (int)($_GET['acc'] ?? 0); $AR = $arId && function_exists('acc_load') ? acc_load($arId) : null; if ($AR && !in_array($AR['status'], ['issued', 'sent', 'partly_invoiced'], true)) $AR = null;
+if ($AR) { $curP = $curP ?: (int)$AR['project_id']; $curS = $curS ?: (int)($AR['subproject_id'] ?? 0); if ($preNet <= 0) $preNet = (float)$AR['total_net']; if ($preTitle === '') $preTitle = t('pi.di_title_ar', ['no' => $AR['report_no'] . ' ' . $AR['revision']]); }
+$fsrId = (int)($_GET['fsr'] ?? 0); $FS = $fsrId && function_exists('fsr_load') ? fsr_load($fsrId) : null;
+if ($FS) { $curP = $curP ?: (int)$FS['project_id']; $curS = $curS ?: (int)($FS['subproject_id'] ?? 0); if ($preTitle === '') $preTitle = t('pi.di_title_fsr', ['no' => $FS['report_no']]); }
 $projects = all("SELECT p.id, p.project_code, p.name, p.vessel_id, p.customer_id, v.name AS vessel, c.name AS customer FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id LEFT JOIN customers c ON c.id = p.customer_id WHERE p.status IN ('active','quoted','onhold') OR p.id = ? ORDER BY p.project_code DESC, p.name", [$curP]);
 $subs = all('SELECT s.id, s.project_id, s.code, s.name, s.status FROM subprojects s JOIN projects p ON p.id = s.project_id WHERE ' . sp_pick_cond('s', $curS) . " AND (p.status IN ('active','quoted','onhold') OR p.id = ?) ORDER BY SUBSTRING_INDEX(s.code,'.',1), CAST(SUBSTRING_INDEX(s.code,'.',-1) AS UNSIGNED), s.code", [$curP]);
 $ivs = function_exists('iv_has') && iv_has() ? all("SELECT i.id, i.legal_name, i.vat_no, i.vat_pct, i.owner_type, i.owner_id FROM invoicing_details i WHERE i.is_active = 1 AND i.owner_type IN ('vessel','customer') ORDER BY i.legal_name") : [];
@@ -17,7 +23,10 @@ layout_head(t('pi.di_new'), 'proformas');
 <p class="eyebrow"><a href="<?= url('proformas') ?>"><?= tt('pi.title') ?></a> › <?= tt('pi.di_new') ?></p>
 <div class="page-head"><div><h1>🧾 <?= tt('pi.di_new') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('pi.di_lede') ?></p></div></div>
 <div class="card" style="max-width:980px;">
-  <form method="post" action="<?= url('invoice_new') ?>" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="pi_direct_create">
+  <form method="post" action="<?= url('invoice_new') ?>" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="pi_direct_create"><?php if ($AR): ?><input type="hidden" name="acc_report_id" value="<?= (int)$AR['id'] ?>"><?php endif; ?>
+    <?php if ($AR): ?><p class="flash flash--info" style="margin:0 0 10px;">🧾 <?= e(t('pi.di_ar_note', ['no' => $AR['report_no'] . ' ' . $AR['revision'], 'h' => acc_h((float)$AR['total_hours']), 'v' => acc_m((float)$AR['total_net'], $AR['currency'] ?: 'EUR')])) ?> <a href="<?= url('acc_report', ['id' => (int)$AR['id']]) ?>"><?= tt('acc.report') ?> ›</a></p><?php endif; ?>
+    <?php if ($FS): ?><p class="flash flash--info" style="margin:0 0 10px;">🛠 <?= e(t('pi.di_fsr_note', ['no' => $FS['report_no']])) ?> <a href="<?= url('fsr', ['id' => (int)$FS['id']]) ?>"><?= tt('fsr.title') ?> ›</a></p><?php endif; ?>
+    <?php if ($preGross > 0): ?><p class="flash flash--info" style="margin:0 0 10px;">📐 <?= e(t('pi.di_gross_note', ['v' => number_format($preGross, 2, ',', '.')])) ?></p><?php endif; ?>
     <div class="grid grid-3">
       <div class="field"><label for="pi_no"><?= tt('pi.di_no') ?> *</label><input id="pi_no" name="pi_no" maxlength="60" required placeholder="<?= tt('pi.di_no_ph') ?>"></div>
       <div class="field"><label for="issue_date"><?= tt('pi.issue_date') ?> *</label><input id="issue_date" type="date" name="issue_date" value="<?= date('Y-m-d') ?>" required></div>
@@ -27,9 +36,9 @@ layout_head(t('pi.di_new'), 'proformas');
       <div class="field"><label for="project_id"><?= tt('pr.one') ?> *</label><select id="project_id" name="project_id" required><option value="">—</option><?php foreach ($projects as $p): ?><option value="<?= (int)$p['id'] ?>" data-v="<?= (int)$p['vessel_id'] ?>" data-c="<?= (int)$p['customer_id'] ?>"<?= $curP === (int)$p['id'] ? ' selected' : '' ?>><?= e(trim(($p['project_code'] ?: '') . ' ' . $p['name']) . ($p['vessel'] ? ' · ' . $p['vessel'] : '') . ($p['customer'] ? ' · ' . $p['customer'] : '')) ?></option><?php endforeach; ?></select></div>
       <div class="field"><label for="subproject_id"><?= tt('sp.one') ?></label><select id="subproject_id" name="subproject_id"><option value="">—</option><?php foreach ($subs as $s): ?><option value="<?= (int)$s['id'] ?>" data-p="<?= (int)$s['project_id'] ?>"<?= $curS === (int)$s['id'] ? ' selected' : '' ?>><?= e(trim(($s['code'] ?: '') . ' ' . $s['name'])) ?><?= $s['status'] === 'completed' ? ' · ' . e(t('pr.completed')) : '' ?></option><?php endforeach; ?></select><p class="hint" style="margin:4px 0 0;"><?= tt('pi.di_sub_hint') ?></p></div>
     </div>
-    <div class="field"><label for="title"><?= tt('pi.description') ?></label><input id="title" name="title" maxlength="200" placeholder="<?= tt('pi.di_title_ph') ?>"></div>
+    <div class="field"><label for="title"><?= tt('pi.description') ?></label><input id="title" name="title" maxlength="200" value="<?= e($preTitle) ?>" placeholder="<?= tt('pi.di_title_ph') ?>"></div>
     <div class="grid grid-4">
-      <div class="field"><label for="amount_net"><?= tt('pi.net') ?> *</label><input id="amount_net" name="amount_net" inputmode="decimal" required placeholder="0,00"></div>
+      <div class="field"><label for="amount_net"><?= tt('pi.net') ?> *</label><input id="amount_net" name="amount_net" inputmode="decimal" required placeholder="0,00" value="<?= $preNet > 0 ? e(number_format($preNet, 2, ',', '.')) : '' ?>" data-gross="<?= $preGross > 0 ? e(number_format($preGross, 2, '.', '')) : '' ?>"></div>
       <div class="field"><label for="vat_pct"><?= tt('pi.vat') ?> %</label><input id="vat_pct" name="vat_pct" inputmode="decimal" value="<?= e((string)$vatDef) ?>"></div>
       <div class="field"><label for="currency"><?= tt('pi.currency') ?></label><input id="currency" name="currency" maxlength="3" value="EUR"></div>
       <div class="field"><label><?= tt('pi.gross') ?></label><output id="gross" class="mono" style="display:block;padding:9px 0;font-weight:700;">—</output></div>
@@ -55,6 +64,11 @@ layout_head(t('pi.di_new'), 'proformas');
   var n = document.getElementById('amount_net'), v = document.getElementById('vat_pct'), g = document.getElementById('gross'), cu = document.getElementById('currency');
   function num(s) { s = String(s || '').trim(); if (s.indexOf(',') > -1 && s.indexOf('.') > -1) s = s.replace(/\./g, '').replace(',', '.'); else s = s.replace(',', '.'); var x = parseFloat(s); return isNaN(x) ? 0 : x; }
   function calc() { var a = num(n.value), p = num(v.value); g.textContent = a > 0 ? (a * (1 + p / 100)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + (cu.value || 'EUR') : '—'; }
+  // raised from Accounting checks with the gross still to invoice: derive the net from the VAT % (re-derived when the VAT changes until the net is typed by hand)
+  var G = parseFloat(n.getAttribute('data-gross') || '0'), auto = G > 0 && !n.value;
+  function fromGross() { if (!auto) return; var p = num(v.value); n.value = (G / (1 + p / 100)).toFixed(2).replace('.', ','); calc(); }
+  n.addEventListener('input', function () { auto = false; });
+  v.addEventListener('input', fromGross); fromGross();
   [n, v, cu].forEach(function (el) { el.addEventListener('input', calc); }); calc();
 })();
 </script>

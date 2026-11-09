@@ -342,6 +342,12 @@ function pi_direct_create_from_post(): int {
     $id = (int) db()->lastInsertId();
     if (!empty($_FILES['file']['name']) && function_exists('cp_store_file')) { $fid = cp_store_file($_FILES['file'], $pid, $sid, 'issued', 'internal', $no); if ($fid) q('UPDATE proformas SET file_id = ? WHERE id = ?', [$fid, $id]); }
     if (function_exists('sp_log') && $sid) try { sp_log($sid, 'invoice_registered', $no . ' · ' . number_format($net, 2, ',', '.') . ' ' . $cur); } catch (Throwable $e) {}
+    // R94-003: raised from an accounting report (GAS-AR) → its reported lines are invoiced under this number, as the accounting answer would do
+    $arId = (int)($_POST['acc_report_id'] ?? 0);
+    if ($arId && function_exists('acc_load') && function_exists('acc_is_accounting') && acc_is_accounting()) {
+        $R = acc_load($arId);
+        if ($R && in_array($R['status'], ['issued', 'sent', 'partly_invoiced'], true)) { try { acc_mark_invoiced($R, $no, $issue, t('pi.di_from_ar', ['no' => $R['report_no']])); } catch (Throwable $e) {} }
+    }
     cache_bump_later('fs'); return $id;
 }
 /* ---- accounting checks (Collections › Checks) ---- */
