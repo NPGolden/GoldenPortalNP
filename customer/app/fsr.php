@@ -24,7 +24,8 @@ function fsr_specialties_legacy(): array {
  *  the specialty on a time line is a discipline name, so accounting prices the hours with that discipline's rate card. */
 function fsr_tech_disc_setting(): array { $v = function_exists('cp_setting') ? (string) cp_setting('fsr_disciplines', '') : ''; return $v === '' ? [] : array_values(array_unique(array_map('intval', array_filter(explode(',', $v), fn($x) => $x !== '')))); }
 function fsr_tech_disc_save(array $ids): void { if (!is_cp_admin()) throw new RuntimeException(t('err.noaccess')); cp_setting_set('fsr_disciplines', implode(',', array_values(array_unique(array_map('intval', $ids))))); }
-function fsr_specialties(): array {
+/** Names of the technical disciplines offered (see fsr_specialties() for the full list incl. rate-card-only specialties). */
+function fsr_disc_names(): array {
     static $c = null; if ($c !== null) return $c;
     try { $rows = all('SELECT id, name, sort_order FROM disciplines WHERE is_active = 1 ORDER BY sort_order, name'); } catch (Throwable $e) { $rows = []; }
     $sel = fsr_tech_disc_setting();
@@ -36,20 +37,28 @@ function fsr_specialties(): array {
 /** R94-003: the specialty choices with their rate card, so the engineer sees which tariff each discipline bills at.
  *  [['name', 'id', 'card', 'card_name', 'rate' (normal hour, local zone, null when unknown), 'cur']] — rates only when $withRates (financial roles). */
 function fsr_specialty_options(?int $projectId = null, bool $withRates = false): array {
-    $names = fsr_specialties(); $out = [];
+    static $memo = []; $mk = (int)$projectId . '|' . (int)$withRates; if (isset($memo[$mk])) return $memo[$mk];
+    $names = fsr_disc_names(); $out = []; $used = [];
     $list = null; if (function_exists('rl_current')) { $bid = $projectId && function_exists('br_of') ? (int)(br_of($projectId)['id'] ?? 0) : 0; $list = rl_current($bid ?: null); }
     $cards = $list && function_exists('rl_cards') ? rl_cards((int)$list['id']) : [];
+    $rateOf = function (string $card) use ($withRates, $list): ?float { if (!$withRates || !$list || $card === '' || !function_exists('acc_rate_item')) return null; $it = acc_rate_item((int)$list['id'], $card, 'normal', 'local'); return $it ? rl_price($it, 'local') : null; };
     foreach ($names as $n) {
         $d = one('SELECT id FROM disciplines WHERE name = ?', [$n]); $card = $d && function_exists('acc_card_of') ? acc_card_of((int)$d['id']) : '';
-        $cn = $cards['hourly:' . $card]['name'] ?? ''; $rate = null;
-        if ($withRates && $list && $card !== '' && function_exists('acc_rate_item')) { $it = acc_rate_item((int)$list['id'], $card, 'normal', 'local'); if ($it) $rate = rl_price($it, 'local'); }
-        $out[] = ['name' => $n, 'id' => (int)($d['id'] ?? 0), 'card' => $card, 'card_name' => (string)$cn, 'rate' => $rate, 'cur' => (string)($list['currency'] ?? 'EUR')];
+        $used[$card] = true;
+        $out[] = ['name' => $n, 'id' => (int)($d['id'] ?? 0), 'card' => $card, 'card_name' => (string)($cards['hourly:' . $card]['name'] ?? ''), 'rate' => $rateOf($card), 'cur' => (string)($list['currency'] ?? 'EUR')];
     }
-    return $out;
+    // R94-004: every other hourly card of the rate list (maker / product specialists — Atlas, Magnus, Aventics … — that are no discipline) is a specialty of its own, named after the card
+    foreach ($cards as $k => $c) { if ($c['section'] !== 'hourly' || isset($used[$c['card']]) || trim((string)$c['name']) === '') continue; $used[$c['card']] = true;
+        $out[] = ['name' => (string)$c['name'], 'id' => 0, 'card' => (string)$c['card'], 'card_name' => (string)$c['name'], 'rate' => $rateOf((string)$c['card']), 'cur' => (string)($list['currency'] ?? 'EUR')]; }
+    return $memo[$mk] = $out;
 }
+/** Every specialty an engineer may pick: the technical disciplines plus the rate-card-only specialties of the current rate list. */
+function fsr_specialties(): array { return array_values(array_unique(array_column(fsr_specialty_options(), 'name'))); }
+/** The hourly rate card a specialty names (card-only specialties and discipline names alike), or '' when unknown. */
+function fsr_specialty_card(string $specialty, ?int $projectId = null): string { $s = mb_strtolower(trim($specialty)); foreach (fsr_specialty_options($projectId) as $o) if (mb_strtolower($o['name']) === $s || ($o['card_name'] !== '' && mb_strtolower($o['card_name']) === $s)) return (string)$o['card']; return ''; }
 /** Label of a specialty option: "Automation · card D — Automation engineer · 95 €/h" (rate only for financial roles). */
 function fsr_specialty_label(array $o): string {
-    $l = $o['name']; if ($o['card'] !== '') $l .= ' · ' . t('fsr.card') . ' ' . $o['card'] . ($o['card_name'] !== '' ? ' — ' . $o['card_name'] : '');
+    $l = $o['name']; if ($o['card'] !== '') $l .= ' · ' . t('fsr.card') . ' ' . $o['card'] . ($o['card_name'] !== '' && $o['card_name'] !== $o['name'] ? ' — ' . $o['card_name'] : '');
     if ($o['rate'] !== null) $l .= ' · ' . number_format((float)$o['rate'], 0, ',', '.') . ' ' . $o['cur'] . '/h'; return $l;
 }
 /** Default specialty of a line: the engineer's own discipline when known, else the first offered. */

@@ -148,6 +148,9 @@ function acc_sync(): int {
         $did = $u['discipline_id'] ?? null;
         if ($r['specialty']) { $d = one('SELECT id FROM disciplines WHERE LOWER(name) = ? LIMIT 1', [mb_strtolower(trim((string)$r['specialty']))]); if ($d) $did = (int)$d['id']; }   // R94-002: the specialty IS a discipline name → its rate card wins over the engineer's default discipline
         if (!$did && $r['specialty']) { $d = one('SELECT id FROM disciplines WHERE LOWER(name) LIKE ? LIMIT 1', ['%' . mb_strtolower(mb_substr((string)$r['specialty'], 0, 6)) . '%']); $did = $d['id'] ?? null; }
+        // R94-004: a specialty that names a rate card (Atlas / Magnus / Aventics engineer …) pins the line to that card's rate item, whatever the engineer's discipline
+        $pinCard = $r['specialty'] && function_exists('fsr_specialty_card') ? fsr_specialty_card((string)$r['specialty'], (int)$r['project_id'] ?: null) : '';
+        $pinList = $pinCard !== '' && function_exists('rl_current') ? rl_current(function_exists('br_of') ? (int)(br_of((int)$r['project_id'] ?: null)['id'] ?? 0) ?: null : null) : null;
         $h = (float)$r['hours']; $parts = [];
         if ($r['time_type'] === 'TT') $parts['travel'] = $h;
         else {
@@ -160,9 +163,10 @@ function acc_sync(): int {
             }
         }
         foreach ($parts as $type => $hh) {
-            q("INSERT IGNORE INTO acc_lines (source, source_id, doc_id, doc_no, vessel_id, project_id, subproject_id, work_date, user_id, user_name, discipline_id, hour_type, hours, description, state)
-               VALUES ('fsr',?,?,?,?,?,?,?,?,?,?,?,?,?,'open')",
-              [(int)$r['line_id'], (int)$r['fsr_id'], $r['report_no'], $r['vessel_id'], $r['project_id'], $r['subproject_id'], $r['report_date'], $u['id'] ?? null, (string)$r['engineer'], $did, $type, $hh, mb_substr(trim((string)$r['specialty'] . ' ' . ($r['start_time'] ? substr((string)$r['start_time'], 0, 5) . '–' . substr((string)$r['end_time'], 0, 5) : '')), 0, 500) ?: null]);
+            $pinItem = $pinList ? acc_rate_item((int)$pinList['id'], $pinCard, $type, 'local') : null;
+            q("INSERT IGNORE INTO acc_lines (source, source_id, doc_id, doc_no, vessel_id, project_id, subproject_id, work_date, user_id, user_name, discipline_id, hour_type, hours, description, state, rate_item_id)
+               VALUES ('fsr',?,?,?,?,?,?,?,?,?,?,?,?,?,'open',?)",
+              [(int)$r['line_id'], (int)$r['fsr_id'], $r['report_no'], $r['vessel_id'], $r['project_id'], $r['subproject_id'], $r['report_date'], $u['id'] ?? null, (string)$r['engineer'], $did, $type, $hh, mb_substr(trim((string)$r['specialty'] . ' ' . ($r['start_time'] ? substr((string)$r['start_time'], 0, 5) . '–' . substr((string)$r['end_time'], 0, 5) : '')), 0, 500) ?: null, $pinItem ? (int)$pinItem['id'] : null]);
             $n++;
         }
     }
