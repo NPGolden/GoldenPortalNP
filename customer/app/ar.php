@@ -181,7 +181,9 @@ function ar_target_ticket(array $row, array $meta = []): array {
 /** Every path stays inside the storage root and uses safe components only. */
 function ar_safe_rel(string $rel): string {
     $rel = str_replace('\\', '/', $rel);
-    if ($rel === '' || strlen($rel) > 230 || preg_match('#(^|/)\.\.?(/|$)#', $rel) || !preg_match('#^[A-Za-z0-9._/-]+$#', $rel)) throw new RuntimeException('Unsafe archive path: ' . $rel);
+    // R93-008: the limit is per component (file systems cap a name at 255 bytes), not the whole path — a long customer name + sub-project title + document name used to be refused and the file stayed unfiled
+    if ($rel === '' || strlen($rel) > 1500 || preg_match('#(^|/)\.\.?(/|$)#', $rel) || !preg_match('#^[A-Za-z0-9._/-]+$#', $rel)) throw new RuntimeException('Unsafe archive path: ' . $rel);
+    foreach (explode('/', $rel) as $c) if (strlen($c) > 200) throw new RuntimeException('Archive path component too long: ' . $c);
     return ltrim($rel, '/');
 }
 /** Move $absSrc to <storage>/<relDir>/<name>; a name already taken gets -2, -3 …  Returns the relative path. */
