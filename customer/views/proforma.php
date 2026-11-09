@@ -7,13 +7,13 @@ if (!$r) { http_response_code(404); layout_head(t('err.notfound'), 'proformas');
 $sales = pi_is_sales(); $canInv = pi_can_invoices(); $backTo = url('proforma', ['id' => $id]); $draft = $r['status'] === 'draft'; $cur = (string)$r['currency'];
 $spRow = $r['subproject_id'] ? load_subproject((int)$r['subproject_id']) : null;
 $ivCh = $spRow && function_exists('iv_choices_for_sub') ? iv_choices_for_sub($spRow) : (function_exists('iv_vessel_has') && iv_vessel_has() && $r['vessel_id'] ? array_column(array_map(fn($x) => $x + ['src' => 'vessel'], iv_list('vessel', (int)$r['vessel_id'], true)), null, 'id') + array_column(array_map(fn($x) => $x + ['src' => 'customer'], iv_list('customer', (int)$r['customer_id'], true)), null, 'id') : []);
-$paid = (float)$r['paid_sum']; $open = max(0, (float)$r['gross'] - $paid);
+$paid = (float)$r['paid_sum']; $open = max(0, (float)$r['gross'] - $paid); $isInv = function_exists('pi_is_invoice') && pi_is_invoice($r);   // R94-001 direct invoice
 layout_head($r['pi_no'], 'proformas');
 ?>
 <p class="eyebrow"><a href="<?= url('proformas') ?>"><?= tt('pi.title') ?></a> › <?= e($r['pi_no']) ?></p>
 <div class="page-head">
-  <div><h1><span class="mono" style="color:var(--gold-text);"><?= e($r['pi_no']) ?></span> <?= e($r['title']) ?> <?= pi_status_pill($r['status']) ?><?= pi_overdue($r) ? ' ' . pill('bad', t('pi.overdue')) : '' ?></h1>
-    <p class="lede" style="margin-bottom:0;"><a href="<?= url('offer', ['id' => (int)$r['offer_id']]) ?>"><?= e($r['offer_no'] . ' ' . $r['revision']) ?></a><?= $r['sq_no'] ? ' · <span class="mono">SQ ' . e($r['sq_no']) . '</span>' : '' ?> · <?= pr_link((int)$r['project_id'], $r['project_code'], $r['project_name']) ?><?= $r['sub_code'] ? ' › <a href="' . url('subproject', ['id' => (int)$r['subproject_id']]) . '">' . e($r['sub_code'] . ' ' . $r['sub_name']) . '</a>' : '' ?><?= $r['vessel'] ? ' · ' . e($r['vessel']) : '' ?><?= $r['term_n'] ? ' · ' . e(t('pt.instalment', ['n' => (int)$r['term_n']])) : '' ?></p></div>
+  <div><h1><span class="mono" style="color:var(--gold-text);"><?= e($r['pi_no']) ?></span> <?= e($r['title']) ?> <?= $isInv ? pill('navy', t('pi.k_invoice')) . ' ' : '' ?><?= pi_status_pill($r['status']) ?><?= pi_overdue($r) ? ' ' . pill('bad', t('pi.overdue')) : '' ?></h1>
+    <p class="lede" style="margin-bottom:0;"><?php if ($r['offer_id']): ?><a href="<?= url('offer', ['id' => (int)$r['offer_id']]) ?>"><?= e($r['offer_no'] . ' ' . $r['revision']) ?></a><?= $r['sq_no'] ? ' · <span class="mono">SQ ' . e($r['sq_no']) . '</span>' : '' ?><?php else: ?><span class="hint"><?= tt('pi.di_no_offer') ?></span><?php endif; ?> · <?= pr_link((int)$r['project_id'], $r['project_code'], $r['project_name']) ?><?= $r['sub_code'] ? ' › <a href="' . url('subproject', ['id' => (int)$r['subproject_id']]) . '">' . e($r['sub_code'] . ' ' . $r['sub_name']) . '</a>' : '' ?><?= $r['vessel'] ? ' · ' . e($r['vessel']) : '' ?><?= $r['term_n'] ? ' · ' . e(t('pt.instalment', ['n' => (int)$r['term_n']])) : '' ?></p></div>
   <div class="btn-row">
     <?php if ($r['file_id']): ?><a class="btn btn--gold" href="<?= url('file', ['id' => (int)$r['file_id']]) ?>" target="_blank">⤓ PDF</a><?php else: ?><a class="btn btn--ghost" href="<?= url('proforma_pdf', ['id' => $id]) ?>" target="_blank">👁 <?= tt('pi.preview') ?></a><?php endif; ?>
     <?php if ($sales && $draft): ?><form method="post" action="<?= $backTo ?>" class="inline" data-lock data-confirm="<?= tt('pi.issue_confirm') ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('pi.issue') ?>" data-confirm-cancel="<?= tt('btn.cancel') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="pi_status"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="status" value="issued"><button class="btn btn--gold" type="submit">✔ <?= tt('pi.issue') ?></button></form><?php endif; ?>
@@ -72,13 +72,13 @@ layout_head($r['pi_no'], 'proformas');
   </div>
 </div>
 
-<?php if (function_exists('ppay_has') && ppay_has()): $pays = $r['payments'] ?? []; $offerRow = one('SELECT * FROM offers WHERE id = ?', [(int)$r['offer_id']]); $cap = $offerRow ? ppay_offer_cap($offerRow) : 0.0; $offerPaid = ppay_offer_paid((int)$r['offer_id']); $capLeft = max(0, $cap - $offerPaid); $ep = (int)($_GET['pay'] ?? 0); $exp = null; foreach ($pays as $x) if ((int)$x['id'] === $ep) $exp = $x; ?>
+<?php if (function_exists('ppay_has') && ppay_has()): $pays = $r['payments'] ?? []; $offerRow = $r['offer_id'] ? one('SELECT * FROM offers WHERE id = ?', [(int)$r['offer_id']]) : null; $cap = $offerRow ? ppay_offer_cap($offerRow) : ($isInv ? (float)$r['gross'] : 0.0); $offerPaid = $r['offer_id'] ? ppay_offer_paid((int)$r['offer_id']) : $paid; $capLeft = max(0, $cap - $offerPaid); $ep = (int)($_GET['pay'] ?? 0); $exp = null; foreach ($pays as $x) if ((int)$x['id'] === $ep) $exp = $x; ?>
 <div class="card" id="payments">
   <div class="card-head"><h2>💳 <?= tt('pay.title') ?> <span class="hint">(<?= count($pays) ?>)</span></h2><span class="hint"><?= tt('pay.hint') ?></span></div>
   <div class="kpi kpi--4" style="margin-bottom:10px;">
     <div class="stat green"><b><?= e(pi_money($paid, $cur)) ?></b><?= tt('pay.k_paid') ?><span class="s"><?= tt('pay.of') ?> <?= e(pi_money((float)$r['gross'], $cur)) ?></span></div>
     <div class="stat<?= $open > 0 ? ' gold' : '' ?>"><b><?= e(pi_money($open, $cur)) ?></b><?= tt('pay.k_open') ?></div>
-    <div class="stat"><b><?= e(pi_money($offerPaid, $cur)) ?></b><?= tt('pay.k_offer_paid') ?><span class="s"><?= tt('pay.of') ?> <?= e(pi_money($cap, $cur)) ?> · <?= e($r['offer_no']) ?></span></div>
+    <div class="stat"><b><?= e(pi_money($offerPaid, $cur)) ?></b><?= $isInv ? tt('pi.k_invoice') : tt('pay.k_offer_paid') ?><span class="s"><?= tt('pay.of') ?> <?= e(pi_money($cap, $cur)) ?> · <?= e($r['offer_no'] ?: $r['pi_no']) ?></span></div>
     <div class="stat<?= $capLeft <= 0 ? ' red' : '' ?>"><b><?= e(pi_money($capLeft, $cur)) ?></b><?= tt('pay.k_cap_left') ?></div>
   </div>
   <?php if (!$pays): ?><p class="hint"><?= tt('pay.none') ?></p><?php else: ?>
@@ -104,6 +104,7 @@ layout_head($r['pi_no'], 'proformas');
 </div>
 <?php endif; ?>
 
+<?php if (!$isInv): ?>
 <div class="card" id="invoices">
   <div class="card-head"><h2>🧾 <?= tt('pi.invoices') ?> <span class="hint">(<?= count($r['invoices']) ?>)</span></h2><span class="hint"><?= tt('pi.invoices_hint') ?></span></div>
   <?php if (!$r['invoices']): ?><p class="hint"><?= tt('pi.no_invoices') ?></p><?php else: ?>
@@ -130,6 +131,7 @@ layout_head($r['pi_no'], 'proformas');
   </form>
   <?php endif; ?>
 </div>
+<?php endif; ?>
 <?php if ($r['file_id'] && !$draft && function_exists('em_card_html')):
   echo em_card_html(['kind' => 'proforma', 'ctx' => ['no' => $r['pi_no'], 'title' => (string)$r['title'], 'vessel' => (string)($r['vessel'] ?? ''), 'customer' => (string)($r['customer_name'] ?? ''), 'project' => (string)($r['project_code'] ?? ''), 'doc' => t('em.w_proforma', ['no' => $r['pi_no']]), 'project_id' => (int)$r['project_id'], 'customer_id' => (int)($r['customer_id'] ?? 0)],
     'people' => em_people((int)($r['vessel_id'] ?? 0) ?: null, (int)($r['customer_id'] ?? 0) ?: null, $r['iv'] && $r['iv']['email'] ? [[(string)($r['iv']['attn'] ?: $r['iv']['legal_name']), $r['iv']['email'], t('iv.title')]] : [], $r['subproject_id'] && function_exists('spc_emails') ? spc_emails((int)$r['subproject_id']) : []), 'atts' => [['f:' . (int)$r['file_id'], $r['pi_no'] . '.pdf']], 'back' => $backTo, 'hidden' => '<input type="hidden" name="proforma" value="' . $id . '">']);

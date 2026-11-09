@@ -33,7 +33,7 @@ $tkId = $r ? (int)($r['ticket_id'] ?? 0) : (int)($_GET['ticket'] ?? 0);
 $tkOpts = tk_options_for_project($pid);
 $p = one('SELECT p.*, v.name AS vessel, c.name AS customer_name FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id LEFT JOIN customers c ON c.id = p.customer_id WHERE p.id = ?', [$pid]);
 if (!$p) { http_response_code(404); exit(t('err.notfound')); }
-$subs = all('SELECT id, code, name FROM subprojects WHERE project_id = ? ORDER BY sort_order, code', [$pid]);
+$subs = all('SELECT id, code, name FROM subprojects WHERE project_id = ? AND ' . sp_pick_cond('', $sid) . ' ORDER BY code', [$pid]);
 $tmIds = $r ? null : tm_allowed_ids($pid);                                        // R25-001: only the assigned active sub-projects
 if ($tmIds !== null) { $subs = array_values(array_filter($subs, fn($s) => in_array((int)$s['id'], $tmIds, true))); if (!$subs) { http_response_code(403); layout_head(t('err.noaccess'), 'projects'); echo '<div class="flash flash--warn">' . tt('tm.none_assigned_project') . '</div>'; layout_foot(); return; } }
 $jos  = all("SELECT id, jo_no, title, status FROM job_orders WHERE project_id = ? AND status IN ('approved','in_progress','done') ORDER BY id DESC", [$pid]);

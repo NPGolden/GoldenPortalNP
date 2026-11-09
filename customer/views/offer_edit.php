@@ -9,7 +9,7 @@ $o = $id ? of_load($id) : null;
 if ($id && !$o) { http_response_code(404); exit(t('err.notfound')); }
 $ob = function_exists('ob_has') && ob_has(); $build = $ob && ob_can();
 $projects = all('SELECT p.id, p.project_code, p.name, p.vessel_id, v.name AS vessel FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id ORDER BY p.status = "completed", p.project_code, p.name');
-$subs = all('SELECT id, project_id, code, name FROM subprojects ORDER BY sort_order, code');
+$subs = all('SELECT id, project_id, code, name FROM subprojects WHERE ' . sp_pick_cond('', (int)($o['subproject_id'] ?? 0)) . ' ORDER BY code');
 $vessels = $ob ? all('SELECT v.id, v.name, c.name AS customer FROM vessels v LEFT JOIN customers c ON c.id = v.customer_id WHERE v.is_active = 1' . (function_exists('vm_has') && vm_has() ? ' AND v.merged_into IS NULL' : '') . ' ORDER BY c.name, v.name') : [];
 $curP = $o ? (int)$o['project_id'] : (int)($_GET['project'] ?? 0);
 $curS = $o ? (int)($o['subproject_id'] ?? 0) : (int)($_GET['sub'] ?? 0);

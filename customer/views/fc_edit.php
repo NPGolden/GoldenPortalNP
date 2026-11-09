@@ -12,7 +12,7 @@ if (!$pid && $projOpts) $pid = (int)$projOpts[0]['id'];
 $p = $pid ? one('SELECT p.*, v.name AS vessel, v.imo, v.yard AS vessel_yard, c.name AS customer_name FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id LEFT JOIN customers c ON c.id = p.customer_id WHERE p.id = ?', [$pid]) : null;
 if (!$p) { layout_head(t('fc.title'), 'reports'); echo '<div class="card"><h2>' . tt('fc.title') . '</h2><p>' . tt('doc.need_project') . '</p></div>'; layout_foot(); return; }
 if (!array_filter($projOpts, fn($x) => (int)$x['id'] === $pid)) $projOpts[] = ['id' => $pid, 'project_code' => $p['project_code'], 'name' => $p['name'], 'vessel' => $p['vessel']];
-$subs = all('SELECT id, code, name FROM subprojects WHERE project_id = ? ORDER BY sort_order, code', [$pid]);
+$subs = all('SELECT id, code, name FROM subprojects WHERE project_id = ? AND ' . sp_pick_cond('', (int)($r['subproject_id'] ?? 0)) . ' ORDER BY code', [$pid]);
 $D = $r ? $r['data'] : ['head' => fc_prefill($tpl, $p, $u), 'chk' => [], 'free' => [], 'val' => [], 'extra' => [], 'closing' => 0];
 if ($r && (int)($_GET['project'] ?? 0)) foreach (['vessel' => 'vessel', 'imo' => 'imo', 'project_no' => 'project_code'] as $k => $col) $D['head'][$k] = (string)($p[$col] ?? '');
 $self = url('fc_edit', $r ? ['id' => $id] : ['project' => $pid, 'form' => $form]); $sides = $tpl['sides'];

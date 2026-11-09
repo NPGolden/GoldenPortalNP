@@ -943,6 +943,7 @@ function pm_handle_action(string $action, string $page): bool {
         case 'pt_default': { pt_default_save_from_post(); flash('good', t('pt.default_saved')); redirect('settings', ['tab' => 'offer_classes', '_r' => uniqid()]); }
         case 'oc_convert': { require_staff(); $oid = (int)$_POST['id']; $nid = oc_convert($oid, (int)($_POST['subproject_id'] ?? 0)); flash('good', t('oc.converted')); redirect('offer', ['id' => $nid, '_r' => uniqid()]); }
         case 'pt_save': { require_staff(); $oid = (int)$_POST['id']; pt_save_from_post($oid); flash('good', t('pt.saved')); redirect('offer', ['id' => $oid, '_r' => uniqid()], '#proformas'); }
+        case 'pi_direct_create': { require_staff(); $pid = pi_direct_create_from_post(); flash('good', t('pi.di_created')); redirect('proforma', ['id' => $pid, '_r' => uniqid()]); }   // R94-001
         case 'pi_create': { require_staff(); $oid = (int)$_POST['id']; $pid = pi_create($oid, (int)($_POST['term_n'] ?? 0) ?: null); flash('good', t('pi.created')); redirect('proforma', ['id' => $pid, '_r' => uniqid()]); }
         case 'pi_save': { require_staff(); $pid = (int)$_POST['id']; pi_save_from_post($pid); flash('good', t('pi.saved')); redirect('proforma', ['id' => $pid, '_r' => uniqid()]); }
         case 'pi_status': { require_staff(); $pid = (int)$_POST['id']; pi_set_status($pid, (string)($_POST['status'] ?? '')); flash('good', t('pi.status_saved')); redirect('proforma', ['id' => $pid, '_r' => uniqid()]); }
@@ -1519,7 +1520,9 @@ function cu_save_discipline(int $uid, string $role): void {
 
 /** Invoicing fields from the form (ignored until R10 has run). */
 function pm_save_invoicing(int $subId): void {
-    if (!stk_has() || !isset($_POST['invoicing'])) return;
+    // R94-001: the state is computed from proformas / invoices; the form only stores an optional override (empty = computed)
+    if (array_key_exists('invoicing_override', $_POST)) { $ov = (string)$_POST['invoicing_override']; try { q('UPDATE subprojects SET invoicing_override = ? WHERE id = ?', [array_key_exists($ov, inv_states()) ? $ov : null, $subId]); } catch (Throwable $e) {} }
+    if (!isset($_POST['invoicing'])) return;   // legacy clients (GoldenPM app) still post the manual field
     $st  = array_key_exists((string)$_POST['invoicing'], inv_states()) ? (string)$_POST['invoicing'] : 'none';
     $pct = max(0, min(100, (int)($_POST['invoiced_pct'] ?? 0)));
     if ($st === 'full') $pct = 100; elseif ($st === 'none') $pct = 0; elseif ($pct === 100) $st = 'full';

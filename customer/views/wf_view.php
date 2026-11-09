@@ -15,7 +15,7 @@ if (!$f) { http_response_code(404); layout_head(t('err.notfound'), 'projects'); 
 $edit = $staff && wf_can_edit(null, (int)$f['project_id']) && $f['status'] === 'draft';
 $canIssue = $staff && wf_can_edit(null, (int)$f['project_id']);
 $areas = wf_areas((int)$f['vessel_id']); $decks = wf_decks((int)$f['vessel_id']);
-$subs = all('SELECT id, code, name FROM subprojects WHERE project_id = ? ORDER BY sort_order, code', [(int)$f['project_id']]);
+$subs = all('SELECT id, code, name FROM subprojects WHERE project_id = ? AND ' . sp_pick_cond('', (int)($f['subproject_id'] ?? 0)) . ' ORDER BY code', [(int)$f['project_id']]);
 $hl = []; foreach ($f['items'] as $it) $hl[(int)$it['area_id']] = ($hl[(int)$it['area_id']] ?? '') === 'A' ? 'A' : $it['plan'];
 $we = date('Y-m-d', strtotime($f['week_start'] . ' +6 days')); $DL = wf_day_labels();
 $issued = function_exists('ar_issued') ? ar_issued($f['doc_no'], (int)$f['project_id']) : [];

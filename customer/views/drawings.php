@@ -31,7 +31,7 @@ foreach ($rows as $r) {
 $tot = ['total' => 0, 'pending' => 0, 'received' => 0, 'not_required' => 0];
 foreach ($sum as $s) foreach ($tot as $k => $v) $tot[$k] += $s[$k];
 $revs = all('SELECT * FROM drawing_tracker_revisions WHERE project_id = ? ORDER BY issued_at DESC, id DESC', [$pid]);
-$subs = $staff ? all('SELECT id, code, name, system_id FROM subprojects WHERE project_id = ? ORDER BY sort_order, code', [$pid]) : [];
+$subs = $staff ? all('SELECT id, code, name, system_id FROM subprojects WHERE project_id = ? AND ' . sp_pick_cond() . ' ORDER BY code', [$pid]) : [];
 $systems = $staff ? sys_options() : [];
 $ed = $staff && (int)($_GET['edit'] ?? 0) ? one('SELECT * FROM drawing_requests WHERE id = ? AND project_id = ?', [(int)$_GET['edit'], $pid]) : null;   // R36-003: edit one request
 if ($ed && $ed['system_id'] && !in_array((int)$ed['system_id'], array_map(fn($s) => (int)$s['id'], $systems), true)) { $cur = one('SELECT * FROM vessel_systems WHERE id = ?', [(int)$ed['system_id']]); if ($cur) $systems[] = $cur; }   // R72-006: an inactive system stays selectable on its own row

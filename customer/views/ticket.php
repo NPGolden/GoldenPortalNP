@@ -69,7 +69,7 @@ layout_head($t['ticket_no'] . ' · ' . $t['title'], 'tickets');
     <?php endif; ?>
     <?php if ($staff): $vAll = all('SELECT id, name, imo, is_active FROM vessels ORDER BY is_active DESC, name'); $curVid = (int)$t['vessel_id'];
           $vProjects = all('SELECT id, vessel_id, project_code, name FROM projects ORDER BY project_code, name');
-          $vSubs = all('SELECT s.id, s.project_id, s.code, s.name FROM subprojects s ORDER BY s.sort_order, s.code'); $hasVP = (bool) array_filter($vProjects, fn($x) => (int)$x['vessel_id'] === $curVid); ?>
+          $vSubs = all('SELECT s.id, s.project_id, s.code, s.name FROM subprojects s WHERE ' . sp_pick_cond('s', (int)($t['subproject_id'] ?? 0)) . ' ORDER BY s.code'); $hasVP = (bool) array_filter($vProjects, fn($x) => (int)$x['vessel_id'] === $curVid); ?>
     <div class="card<?= !$t['project_id'] && $isOpen ? ' card--attention' : '' ?>">
       <h2><?= tt('tk.project_card') ?></h2>
       <p class="hint"><?= !$curVid ? tt('tk.project_hint_novessel') : (!$t['project_id'] ? tt('tk.project_hint_none') : tt('tk.project_hint')) ?></p>

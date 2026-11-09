@@ -7,7 +7,7 @@ $id = (int)($_GET['id'] ?? 0);
 $t = $id ? td_load($id) : null;
 if ($id && !$t) { http_response_code(404); exit(t('err.notfound')); }
 $projects = all("SELECT id, project_code, name, vessel_id FROM projects WHERE status = 'active' OR id = ? OR id = (SELECT project_id FROM offers WHERE id = ?) ORDER BY project_code, name", [(int)($t['project_id'] ?? 0), (int)($_GET['offer'] ?? 0)]);
-$subs = all('SELECT s.id, s.project_id, s.code, s.name FROM subprojects s JOIN projects p ON p.id = s.project_id ORDER BY p.project_code, p.name, s.sort_order, s.code');
+$subs = all('SELECT s.id, s.project_id, s.code, s.name FROM subprojects s JOIN projects p ON p.id = s.project_id WHERE ' . sp_pick_cond('s', (int)($t['subproject_id'] ?? 0)) . ' ORDER BY p.project_code, p.name, s.code');
 $people = staff_users();
 $curP = $t ? (int)$t['project_id'] : (int)($_GET['project'] ?? 0); $curS = $t ? (int)$t['subproject_id'] : (int)($_GET['sub'] ?? 0);
 $due = $t ? $t['due_at'] : date('Y-m-d') . ' 09:00:00';

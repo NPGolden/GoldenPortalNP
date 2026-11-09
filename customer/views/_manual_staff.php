@@ -23,6 +23,7 @@ return [
       'HR publishes leave periods (the summer groups, a quiet week in a yard) on My leave › Open periods. Join one with your own dates inside the period — your manager approves and the leave is recorded without a second request. Periods marked 🔒 Mandatory are company closures (Christmas week, August): HR assigns them to everybody, you cannot join or opt out; the working days of the closure are charged to your annual leave automatically. "Full" means the places of a period are taken.',
     ]],
     ['id' => 'program', 'title' => 'My program — the Planning board', 'body' => [
+      'Completed sub-projects (v1.114.0): a sub-project the PM set to Completed no longer appears in the sub-project lists of your forms (timesheets, service and inspection reports, tasks, tickets, drawings, risks) nor in the Projects tree — the tree says "n completed hidden ›" to show them. A report or timesheet that already points to a completed sub-project keeps it.',
       'Work › Planning (or My program for employee accounts) shows where you are planned day by day: sub-projects and vessels in colour, your leave, the days off of your calendar. Click a chip to see the sub-project, the open items and the contacts. The week view on the dashboard shows the next seven days. Changes are made by the project managers and HR — if your program is wrong, tell your PM.',
       ['fig' => 'g-colour-code.jpg', 'cap' => 'The colour code of the chips'],
     ]],

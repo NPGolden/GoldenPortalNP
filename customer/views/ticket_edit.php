@@ -12,7 +12,7 @@ if ($t && !is_staff() && ((int)$t['created_by'] !== (int)$u['id'] || !in_array($
 $vessels = all("SELECT v.id, v.name, v.imo FROM vessels v WHERE {$vscope} AND (v.is_active = 1 OR v.id = ?) ORDER BY v.name", array_merge($vargs, [$t ? (int)$t['vessel_id'] : 0]));   // the ticket's own vessel stays selectable even when inactive (R29-010)
 $vids = array_map(fn($v) => (int)$v['id'], $vessels) ?: [0];
 $projects = all('SELECT id, vessel_id, project_code, name FROM projects WHERE vessel_id IN (' . implode(',', $vids) . ') ORDER BY project_code, name');
-$subs = all('SELECT s.id, s.project_id, s.code, s.name FROM subprojects s JOIN projects p ON p.id = s.project_id WHERE p.vessel_id IN (' . implode(',', $vids) . ') ORDER BY s.sort_order, s.code');
+$subs = all('SELECT s.id, s.project_id, s.code, s.name FROM subprojects s JOIN projects p ON p.id = s.project_id WHERE p.vessel_id IN (' . implode(',', $vids) . ') AND ' . sp_pick_cond('s', (int)($t['subproject_id'] ?? 0)) . ' ORDER BY s.code');
 $systems = all('SELECT id, abbr, name FROM vessel_systems WHERE is_active = 1 ORDER BY sort_order, name');
 $curV = $t ? (int)$t['vessel_id'] : (int)($_GET['vessel'] ?? 0);
 $curP = $t ? (int)$t['project_id'] : (int)($_GET['project'] ?? 0);

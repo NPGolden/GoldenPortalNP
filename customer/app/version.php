@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.113.3';
-const CP_BUILD   = '2026-11-08';
+const CP_VERSION = '1.114.0';
+const CP_BUILD   = '2026-11-09';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R94-001', 'version' => '1.114.0', 'date' => '2026-11-09', 'title' => 'Invoicing control: direct invoices (an accounting invoice issued without a proforma) registered in the proforma module — payments, collections and the statement of account treat them alike; sub-project invoicing state computed from the documents (approved offers vs invoices registered on proformas + direct invoices) with an optional manual override; completed sub-projects hidden in the projects tree and in every picker (toggle to show); Collections › Accounting checks: sub-project invoicing coverage incl. completed sub-projects, proforma ↔ invoices mismatch, issued proformas without invoice, Excel export.', 'db' => 'install/migrate_cp_r94_001_direct_invoices.sql', 'check' => 'r94a'],
         ['ref' => 'GAS-CP-R93-009', 'version' => '1.113.3', 'date' => '2026-11-09', 'title' => 'Projects page: vessel group headers readable in dark mode; Offers and Sub-projects blocks fold / unfold per project (remembered per browser; offers start folded); sub-projects ordered by code numerically (Y.001, Y.002 … Y.010) instead of the manual sort order.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R93-008', 'version' => '1.113.2', 'date' => '2026-11-09', 'title' => 'Document archive: a long customer name plus a long sub-project title no longer stops a file from being filed ("Unsafe archive path" in the PHP log) — the length rule is per folder / file name, not the whole path; run Settings › Archive › Reorganise once to file what was skipped.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R93-007', 'version' => '1.113.1', 'date' => '2026-11-09', 'title' => 'Sub-project comments posted by staff are internal by default; "Reply to customer" is an explicit choice, and a reply pre-selects the visibility of the message it answers.', 'db' => null, 'check' => null],
@@ -397,6 +398,7 @@ function cp_migration_state(): array {
         'r85b' => $has("SHOW TABLES LIKE 'contact_companies'"),
         'r85c' => $has("SHOW COLUMNS FROM vessel_companies LIKE 'company_id'"),
         'r93c' => $has("SHOW TABLES LIKE 'bom_import_rows'"),
+        'r94a' => $has("SHOW COLUMNS FROM proformas LIKE 'kind'"),
         'r93b' => $has("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_inquiries' AND COLUMN_NAME = 'kind' AND COLUMN_TYPE LIKE '%contact%'"),
         'r93a' => $has("SHOW TABLES LIKE 'work_permits'"),
         'r92f' => $has("SHOW COLUMNS FROM rc_applications LIKE 'keep_until'"),

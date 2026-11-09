@@ -11,6 +11,10 @@ $from = $d($_GET['from'] ?? '', date('Y-m-d', strtotime('-30 days'))); $to = $d(
 $fAll = array_diff_key($f, ['bucket' => 1]);
 $open = col_open($f); $S = col_summary(col_open($fAll), 30, $fAll); $projects = col_projects($fAll); $paid = col_paid($from, $to, $fAll);
 if (($_GET['format'] ?? '') === 'xlsx') { col_xlsx($open, $projects, $paid, $S, $from, $to); exit; }
+// R94-001 accounting checks: sub-project invoicing coverage (completed included), proforma ↔ invoices mismatch, issued proformas without invoice
+$chk = function_exists('pi_check_coverage'); $cf = ['project' => $f['project'], 'status' => (string)($_GET['cs'] ?? 'all'), 'inv' => (string)($_GET['ci'] ?? 'open')]; $cdays = max(1, min(365, (int)($_GET['cd'] ?? 30)));
+$cov = $chk ? pi_check_coverage($cf) : []; $mis = $chk ? pi_check_mismatch() : []; $unv = $chk ? pi_check_uninvoiced($cdays) : [];
+if (($_GET['format'] ?? '') === 'checks' && $chk) { col_checks_xlsx($cov, $mis, $unv, $cdays); exit; }
 $cur = $S['cur']; $m = fn(float $v) => col_money($v, $cur); $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : '';
 $keep = array_filter($f + ['from' => $from, 'to' => $to]);
 $vessels = all('SELECT DISTINCT v.id, v.name FROM proformas pi JOIN vessels v ON v.id = pi.vessel_id ORDER BY v.name');
@@ -23,7 +27,7 @@ layout_head(t('col.title'), 'collections');
 ?>
 <div class="page-head">
   <div><h1>📥 <?= tt('col.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('col.lede') ?></p></div>
-  <div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('collections', $keep + ['format' => 'xlsx']) ?>">⤓ Excel</a><button type="button" class="btn btn--ghost btn--sm" data-print>🖨 <?= tt('btn.print') ?></button></div>
+  <div class="btn-row"><?php if (function_exists('pi_kind_has') && pi_kind_has() && pi_can_invoices()): ?><a class="btn btn--gold btn--sm" href="<?= url('invoice_new') ?>">+ <?= tt('pi.di_new') ?></a><?php endif; ?><a class="btn btn--ghost btn--sm" href="<?= url('collections', $keep + ['format' => 'xlsx']) ?>">⤓ Excel</a><button type="button" class="btn btn--ghost btn--sm" data-print>🖨 <?= tt('btn.print') ?></button></div>
 </div>
 
 <div class="kpi kpi--4" style="margin-bottom:10px;">
@@ -166,5 +170,72 @@ layout_head(t('col.title'), 'collections');
   </table></div>
   <?php endif; ?>
 </div>
+<?php if ($chk): $covOpen = count(array_filter($cov, fn($r) => ($r['invoicing'] ?? 'none') !== 'full' || (float)($r['inv_contract'] ?? 0) <= 0.005)); ?>
+<div class="card" id="col-checks">
+  <div class="page-head" style="margin-bottom:6px;"><h2 style="margin:0;">🔎 <?= tt('chk.title') ?></h2>
+    <div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('collections', $keep + ['cs' => $cf['status'], 'ci' => $cf['inv'], 'cd' => $cdays, 'format' => 'checks']) ?>">⤓ Excel</a></div></div>
+  <p class="hint" style="margin:0 0 10px;"><?= tt('chk.lede') ?></p>
+  <div class="kpi kpi--3" style="margin-bottom:10px;">
+    <a class="stat<?= $covOpen ? ' gold' : ' green' ?>" href="#chk-cov"><b><?= $covOpen ?></b><?= tt('chk.k_cov') ?><span class="s"><?= tt('chk.k_cov_s') ?></span></a>
+    <a class="stat<?= $mis ? ' red' : ' green' ?>" href="#chk-mis"><b><?= count($mis) ?></b><?= tt('chk.k_mis') ?><span class="s"><?= tt('chk.k_mis_s') ?></span></a>
+    <a class="stat<?= $unv ? ' gold' : ' green' ?>" href="#chk-unv"><b><?= count($unv) ?></b><?= tt('chk.k_unv') ?><span class="s"><?= e(t('chk.k_unv_s', ['n' => $cdays])) ?></span></a>
+  </div>
+
+  <h3 id="chk-cov" style="margin:12px 0 6px;"><?= tt('chk.cov_title') ?> <span class="count"><?= count($cov) ?></span></h3>
+  <form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1fr 1fr 1fr auto; margin-bottom:8px;"><input type="hidden" name="p" value="collections"><?php foreach (array_filter($f) as $k => $v): if ($k === 'project') continue; ?><input type="hidden" name="<?= e($k) ?>" value="<?= e((string)$v) ?>"><?php endforeach; ?>
+    <div class="field"><label><?= tt('pr.one') ?></label><select name="project"><option value=""><?= tt('flt.any') ?></option><?php foreach (all("SELECT id, project_code, name FROM projects WHERE status IN ('active','quoted','onhold','completed') ORDER BY project_code DESC") as $pp): ?><option value="<?= (int)$pp['id'] ?>"<?= $sel($pp['id'], $f['project']) ?>><?= e(trim(($pp['project_code'] ?: '') . ' ' . $pp['name'])) ?></option><?php endforeach; ?></select></div>
+    <div class="field"><label><?= tt('sp.one') ?> · <?= tt('th.status') ?></label><select name="cs" data-nosearch><option value="all"<?= $sel('all', $cf['status']) ?>><?= tt('flt.all') ?></option><option value="active"<?= $sel('active', $cf['status']) ?>><?= tt('pr.active') ?></option><option value="completed"<?= $sel('completed', $cf['status']) ?>><?= tt('pr.completed') ?></option></select></div>
+    <div class="field"><label><?= tt('inv.title') ?></label><select name="ci" data-nosearch><option value="open"<?= $sel('open', $cf['inv']) ?>><?= tt('chk.ci_open') ?></option><option value="none"<?= $sel('none', $cf['inv']) ?>><?= tt('inv.none') ?></option><option value="partial"<?= $sel('partial', $cf['inv']) ?>><?= tt('inv.partial') ?></option><option value="full"<?= $sel('full', $cf['inv']) ?>><?= tt('inv.full') ?></option><option value="all"<?= $sel('all', $cf['inv']) ?>><?= tt('flt.all') ?></option></select></div>
+    <div class="fltbar-actions"><button class="btn btn--sm" type="submit"><?= tt('btn.apply') ?></button></div>
+  </form>
+  <?php if (!$cov): ?><p class="hint"><?= tt('chk.cov_none') ?></p><?php else: ?>
+  <div class="table-scroll"><table class="tbl">
+    <thead><tr><th><?= tt('pr.one') ?></th><th><?= tt('sp.one') ?></th><th><?= tt('th.vessel') ?></th><th><?= tt('th.status') ?></th><th class="num"><?= tt('chk.contract') ?></th><th class="num"><?= tt('fs.invoiced') ?></th><th class="num">%</th><th class="num"><?= tt('chk.collected') ?></th><th><?= tt('inv.title') ?></th></tr></thead>
+    <tbody><?php foreach ($cov as $r): ?><tr class="<?= $r['status'] === 'completed' && ($r['invoicing'] ?? 'none') !== 'full' ? 'is-bad' : '' ?>">
+      <td><?= pr_link((int)$r['project_id'], $r['project_code'], $r['project_name']) ?></td>
+      <td><a href="<?= url('subproject', ['id' => (int)$r['id']]) ?>"><b><?= e($r['code']) ?></b> <?= e($r['name']) ?></a></td>
+      <td><?= e($r['vessel'] ?: '—') ?></td>
+      <td><?= $r['status'] === 'completed' ? pill('mute', t('pr.completed')) . ($r['completed_at'] ? ' <span class="hint">' . e(fmt_date(substr((string)$r['completed_at'], 0, 10))) . '</span>' : '') : pill('green', t('pr.active')) ?></td>
+      <td class="num"><?= (float)$r['inv_contract'] > 0.005 ? e($m((float)$r['inv_contract'])) : '—' ?></td>
+      <td class="num"><?= e($m((float)$r['inv_invoiced'])) ?></td>
+      <td class="num"><?= (int)($r['invoiced_pct'] ?? 0) ?> %</td>
+      <td class="num"><?= e($m((float)$r['collected'])) ?></td>
+      <td><?= inv_pill($r) ?><?= $r['invoicing_override'] ? ' <span class="hint" title="' . tt('chk.override') . '">✎</span>' : '' ?></td>
+    </tr><?php endforeach; ?></tbody>
+  </table></div>
+  <p class="hint" style="margin:6px 0 0;"><?= tt('chk.cov_hint') ?></p>
+  <?php endif; ?>
+
+  <h3 id="chk-mis" style="margin:16px 0 6px;"><?= tt('chk.mis_title') ?> <span class="count"><?= count($mis) ?></span></h3>
+  <?php if (!$mis): ?><p class="hint"><?= tt('chk.mis_none') ?></p><?php else: ?>
+  <div class="table-scroll"><table class="tbl">
+    <thead><tr><th><?= tt('pi.no') ?></th><th><?= tt('pi.description') ?></th><th><?= tt('pr.one') ?></th><th><?= tt('pi.issue_date') ?></th><th class="num"><?= tt('pi.gross') ?></th><th class="num"><?= tt('chk.inv_total') ?></th><th class="num"><?= tt('chk.diff') ?></th><th><?= tt('pi.invoice_no') ?></th><th><?= tt('th.status') ?></th></tr></thead>
+    <tbody><?php foreach ($mis as $r): $it = 0.0; $nos = []; foreach ($r['invoices'] ?? [] as $x) { $it += (float)$x['amount']; $nos[] = $x['invoice_no']; } $dif = $it - (float)$r['gross']; ?><tr>
+      <td class="mono"><a href="<?= url('proforma', ['id' => (int)$r['id']]) ?>#invoices"><b><?= e($r['pi_no']) ?></b></a></td><td><?= e($r['title']) ?></td>
+      <td><?= pr_link((int)$r['project_id'], $r['project_code'], $r['project_name']) ?><?= $r['sub_code'] ? ' <span class="hint">' . e($r['sub_code']) . '</span>' : '' ?></td>
+      <td class="date"><?= $r['issue_date'] ? e(fmt_date($r['issue_date'])) : '—' ?></td>
+      <td class="num"><?= e($m((float)$r['gross'])) ?></td><td class="num"><?= e($m($it)) ?></td>
+      <td class="num" style="color:var(--bad-text,#b42318);font-weight:700;"><?= ($dif > 0 ? '+' : '') . e($m($dif)) ?></td>
+      <td class="mono"><?= e(implode(', ', $nos)) ?></td><td><?= pi_status_pill($r['status']) ?></td>
+    </tr><?php endforeach; ?></tbody>
+  </table></div>
+  <?php endif; ?>
+
+  <h3 id="chk-unv" style="margin:16px 0 6px;"><?= e(t('chk.unv_title', ['n' => $cdays])) ?> <span class="count"><?= count($unv) ?></span></h3>
+  <form method="get" action="index.php" class="btn-row" style="align-items:flex-end;gap:8px;margin-bottom:8px;"><input type="hidden" name="p" value="collections"><?php foreach (array_filter($f) as $k => $v): ?><input type="hidden" name="<?= e($k) ?>" value="<?= e((string)$v) ?>"><?php endforeach; ?><input type="hidden" name="cs" value="<?= e($cf['status']) ?>"><input type="hidden" name="ci" value="<?= e($cf['inv']) ?>">
+    <div class="field" style="margin:0;"><label><?= tt('chk.older_than') ?></label><input type="number" name="cd" min="1" max="365" value="<?= $cdays ?>" style="width:90px;"></div><button class="btn btn--sm" type="submit"><?= tt('btn.apply') ?></button></form>
+  <?php if (!$unv): ?><p class="hint"><?= tt('chk.unv_none') ?></p><?php else: ?>
+  <div class="table-scroll"><table class="tbl">
+    <thead><tr><th><?= tt('pi.no') ?></th><th><?= tt('pi.description') ?></th><th><?= tt('th.vessel') ?></th><th><?= tt('pr.one') ?></th><th><?= tt('pi.issue_date') ?></th><th class="num"><?= tt('chk.days') ?></th><th class="num"><?= tt('pi.gross') ?></th><th class="num"><?= tt('pi.paid_lbl') ?></th><th><?= tt('th.status') ?></th></tr></thead>
+    <tbody><?php foreach ($unv as $r): ?><tr>
+      <td class="mono"><a href="<?= url('proforma', ['id' => (int)$r['id']]) ?>#invoices"><b><?= e($r['pi_no']) ?></b></a></td><td><?= e($r['title']) ?></td><td><?= e($r['vessel'] ?: '—') ?></td>
+      <td><?= pr_link((int)$r['project_id'], $r['project_code'], $r['project_name']) ?><?= $r['sub_code'] ? ' <span class="hint">' . e($r['sub_code']) . '</span>' : '' ?></td>
+      <td class="date"><?= e(fmt_date($r['issue_date'])) ?></td><td class="num"><?= (int) floor((time() - strtotime($r['issue_date'])) / 86400) ?></td>
+      <td class="num"><?= e($m((float)$r['gross'])) ?></td><td class="num"><?= e($m((float)$r['paid_sum'])) ?></td><td><?= pi_status_pill($r['status']) ?></td>
+    </tr><?php endforeach; ?></tbody>
+  </table></div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
 <?php layout_foot(); ?>
 <script nonce="<?= csp_nonce() ?>">document.querySelectorAll('[data-print]').forEach(function (b) { b.addEventListener('click', function () { window.print(); }); });</script>

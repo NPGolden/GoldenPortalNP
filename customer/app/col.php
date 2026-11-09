@@ -30,13 +30,13 @@ function col_money(float $v, string $cur = 'EUR'): string { return number_format
 function col_bucket(int $age): string { return $age <= 0 ? 'current' : ($age <= 30 ? 'd30' : ($age <= 60 ? 'd60' : ($age <= 90 ? 'd90' : 'd90p'))); }
 function col_bucket_pill(string $b): string { $m = ['current' => 'green', 'd30' => 'gold', 'd60' => 'gold', 'd90' => 'bad', 'd90p' => 'bad']; return pill($m[$b] ?? 'mute', t('col.b_' . $b)); }
 
-const COL_SELECT = "SELECT pi.id, pi.pi_no, pi.title, pi.term_n, pi.issue_date, pi.due_date, pi.gross, pi.currency, pi.status, pi.sent_at, pi.paid_at, pi.offer_id, pi.project_id, pi.subproject_id, pi.vessel_id,
-                   o.offer_no, p.project_code, p.name AS project_name, p.pm_user_id, p.customer_id, s.code AS sub_code, v.name AS vessel, c.name AS customer_name, cu.full_name AS pm_name,
+const COL_SELECT = "SELECT pi.id, pi.kind, pi.pi_no, pi.title, pi.term_n, pi.issue_date, pi.due_date, pi.gross, pi.currency, pi.status, pi.sent_at, pi.paid_at, pi.offer_id, pi.project_id, pi.subproject_id, pi.vessel_id,
+                   o.offer_no, p.project_code, p.name AS project_name, p.pm_user_id, COALESCE(p.customer_id, pi.customer_id, v.customer_id) AS customer_id, s.code AS sub_code, v.name AS vessel, c.name AS customer_name, cu.full_name AS pm_name,
                    ((SELECT COALESCE(SUM(pp.amount),0) FROM proforma_payments pp WHERE pp.proforma_id = pi.id) + (SELECT COALESCE(SUM(x.paid_amount),0) FROM proforma_invoices x WHERE x.proforma_id = pi.id AND NOT EXISTS (SELECT 1 FROM proforma_payments pq WHERE pq.invoice_id = x.id))) AS paid_sum,
                    (SELECT MAX(pp.paid_on) FROM proforma_payments pp WHERE pp.proforma_id = pi.id) AS last_paid_on,
                    (SELECT GROUP_CONCAT(x.invoice_no ORDER BY x.id SEPARATOR ', ') FROM proforma_invoices x WHERE x.proforma_id = pi.id) AS invoice_nos,
                    fu.next_at AS fu_next, fu.promise_at AS fu_promise, fu.note AS fu_note, fu.user_name AS fu_by, fu.created_at AS fu_at
-            FROM proformas pi JOIN offers o ON o.id = pi.offer_id JOIN projects p ON p.id = pi.project_id LEFT JOIN subprojects s ON s.id = pi.subproject_id LEFT JOIN vessels v ON v.id = pi.vessel_id
+            FROM proformas pi LEFT JOIN offers o ON o.id = pi.offer_id JOIN projects p ON p.id = pi.project_id LEFT JOIN subprojects s ON s.id = pi.subproject_id LEFT JOIN vessels v ON v.id = pi.vessel_id
             LEFT JOIN customers c ON c.id = p.customer_id LEFT JOIN customer_users cu ON cu.id = p.pm_user_id
             LEFT JOIN pi_followups fu ON fu.id = (SELECT f2.id FROM pi_followups f2 WHERE f2.proforma_id = pi.id ORDER BY f2.id DESC LIMIT 1)";
 
@@ -68,7 +68,7 @@ function col_open(array $f = []): array {
 function col_paid(string $from, string $to, array $f = []): array {
     [$w, $a] = col_where($f); $w[] = 'pp.paid_on BETWEEN ? AND ?'; array_push($a, $from, $to);
     return all("SELECT pp.*, pi.pi_no, pi.title, pi.currency, pi.gross, pi.status, pi.project_id, pi.vessel_id, o.offer_no, p.project_code, p.name AS project_name, v.name AS vessel, c.name AS customer_name, x.invoice_no, cu.full_name AS by_name
-                FROM proforma_payments pp JOIN proformas pi ON pi.id = pp.proforma_id JOIN offers o ON o.id = pi.offer_id JOIN projects p ON p.id = pi.project_id LEFT JOIN vessels v ON v.id = pi.vessel_id LEFT JOIN customers c ON c.id = p.customer_id
+                FROM proforma_payments pp JOIN proformas pi ON pi.id = pp.proforma_id LEFT JOIN offers o ON o.id = pi.offer_id JOIN projects p ON p.id = pi.project_id LEFT JOIN vessels v ON v.id = pi.vessel_id LEFT JOIN customers c ON c.id = p.customer_id
                 LEFT JOIN proforma_invoices x ON x.id = pp.invoice_id LEFT JOIN customer_users cu ON cu.id = pp.created_by WHERE " . implode(' AND ', $w) . ' ORDER BY pp.paid_on DESC, pp.id DESC', $a);
 }
 /** Headline figures + the week-by-week projection of the next $days days. */
@@ -229,7 +229,7 @@ function col_statement_pdf(array $D): string {
         $need(16); $hrow(); $proj = null;
         foreach ($V['items'] as $r) {
             if ($r['project_id'] !== $proj) { $proj = $r['project_id']; $need(12); $pdf->setFont('B', 7.5); $pdf->setColor($navy); $pdf->text($L + 1.5, $y + 4, trim(($r['project_code'] ?: '') . ' — ' . $r['project_name'])); $y += 5.5; }
-            $desc = (string)$r['title'] . ($r['offer_no'] ? ' · ' . $r['offer_no'] : '') . ($r['invoice_nos'] ? ' · ' . $T('pi.invoice_no') . ' ' . $r['invoice_nos'] : '');
+            $desc = (function_exists('pi_is_invoice') && pi_is_invoice($r) ? $T('pi.k_invoice') . ' · ' : '') . (string)$r['title'] . ($r['offer_no'] ? ' · ' . $r['offer_no'] : '') . ($r['invoice_nos'] ? ' · ' . $T('pi.invoice_no') . ' ' . $r['invoice_nos'] : '');   // R94-001: direct invoices carry their kind
             $pdf->setFont('R', 7.4); $lines = $pdf->wrap($desc, 44); $noLines = $pdf->wrap((string)$r['pi_no'], 26); $hh = max(5.2, max(count($lines), count($noLines) + ($r['overdue'] ? 1 : 0)) * 3.6 + 1.6); $need($hh + 4 * count($r['payments']) + 6);
             $x = $L; $cells = [fmt_date($r['issue_date']), (string)$r['pi_no'], null, $r['due_date'] ? fmt_date($r['due_date']) : '—', $m((float)$r['gross']), $m($r['paid_to']), $r['open'] > 0.005 ? $m($r['open']) : '—'];
             foreach ($cells as $i => $val) { $pdf->setColor($i === 3 && $r['overdue'] ? $red : $ink); if ($i === 2) foreach ($lines as $k => $ln) $pdf->text($x + 1.5, $y + 3.6 + $k * 3.6, $ln); elseif ($i === 1) foreach ($noLines as $k => $ln) $pdf->text($x + 1.5, $y + 3.6 + $k * 3.6, $ln); else $pdf->text($x + 1.5, $y + 3.6, (string)$val, $cols[$i][2], $cols[$i][1] - 3); $x += $cols[$i][1]; }
@@ -252,10 +252,10 @@ function col_statement_sheets(array $D): array {
     $sum = []; foreach ($D['vessels'] as $V) $sum[] = [(string)$V['name'], (string)($V['customer_name'] ?? ''), $V['n'], round($V['invoiced'], 2), round($V['paid'], 2), round($V['open'], 2), round($V['overdue'], 2), round($V['buckets']['current'], 2), round($V['buckets']['d30'], 2), round($V['buckets']['d60'], 2), round($V['buckets']['d90'], 2), round($V['buckets']['d90p'], 2)];
     $sum[] = [t('ob.c_total'), '', $D['totals']['n'], round($D['totals']['invoiced'], 2), round($D['totals']['paid'], 2), round($D['totals']['open'], 2), round($D['totals']['overdue'], 2), round($D['totals']['buckets']['current'], 2), round($D['totals']['buckets']['d30'], 2), round($D['totals']['buckets']['d60'], 2), round($D['totals']['buckets']['d90'], 2), round($D['totals']['buckets']['d90p'], 2)];
     $it = []; $pa = [];
-    foreach ($D['vessels'] as $V) foreach ($V['items'] as $r) { $it[] = [(string)$V['name'], (string)$r['project_code'], (string)$r['pi_no'], (string)$r['title'], (string)$r['offer_no'], (string)($r['invoice_nos'] ?? ''), (string)$r['issue_date'], (string)$r['due_date'], $r['overdue'] ? $r['age'] : 0, round((float)$r['gross'], 2), round($r['paid_to'], 2), round($r['open'], 2), t('pi.s_' . $r['status'])]; foreach ($r['payments'] as $p) $pa[] = [(string)$V['name'], (string)$r['pi_no'], (string)$p['paid_on'], round((float)$p['amount'], 2), t('pay.m_' . $p['method']), (string)($p['reference'] ?? ''), (string)($p['invoice_no'] ?? '')]; }
+    foreach ($D['vessels'] as $V) foreach ($V['items'] as $r) { $it[] = [(string)$V['name'], (string)$r['project_code'], function_exists('pi_kind_label') ? pi_kind_label($r) : '', (string)$r['pi_no'], (string)$r['title'], (string)$r['offer_no'], (string)($r['invoice_nos'] ?? ''), (string)$r['issue_date'], (string)$r['due_date'], $r['overdue'] ? $r['age'] : 0, round((float)$r['gross'], 2), round($r['paid_to'], 2), round($r['open'], 2), t('pi.s_' . $r['status'])]; foreach ($r['payments'] as $p) $pa[] = [(string)$V['name'], (string)$r['pi_no'], (string)$p['paid_on'], round((float)$p['amount'], 2), t('pay.m_' . $p['method']), (string)($p['reference'] ?? ''), (string)($p['invoice_no'] ?? '')]; }
     return [
         ['name' => 'Summary', 'first' => true, 'header' => [t('v.one'), t('rp.customer'), 'PI', t('fs.invoiced') . ' ' . $cur, t('pi.paid_lbl'), t('fr.open'), t('fs.overdue'), t('col.b_current'), t('col.b_d30'), t('col.b_d60'), t('col.b_d90'), t('col.b_d90p')], 'rows' => $sum],
-        ['name' => 'Items', 'header' => [t('v.one'), t('pr.one'), t('pi.no'), t('pi.description'), t('of.no'), t('pi.invoice_no'), t('pi.issue_date'), t('pi.due'), t('soa.days_overdue'), t('fr.gross'), t('pi.paid_lbl'), t('fr.open'), t('th.status')], 'rows' => $it],
+        ['name' => 'Items', 'header' => [t('v.one'), t('pr.one'), t('pi.kind'), t('pi.no'), t('pi.description'), t('of.no'), t('pi.invoice_no'), t('pi.issue_date'), t('pi.due'), t('soa.days_overdue'), t('fr.gross'), t('pi.paid_lbl'), t('fr.open'), t('th.status')], 'rows' => $it],
         ['name' => 'Payments', 'header' => [t('v.one'), t('pi.no'), t('th.date'), t('pt.amount'), t('pay.method'), t('pay.reference'), t('pi.invoice_no')], 'rows' => $pa],
     ];
 }
@@ -266,4 +266,17 @@ function col_em_attachment(array $p): ?array {
     $D = col_statement(explode(',', (string)($p[1] ?? '')), $p[3] ?? null, $p[4] ?? null); if (!$D) return null;
     if (($p[2] ?? 'pdf') === 'xlsx') { require_once __DIR__ . '/xlsxw.php'; return [xlsx_bytes(col_statement_sheets($D)), $D['doc_no'] . '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']; }
     return [col_statement_pdf($D), $D['doc_no'] . '.pdf', 'application/pdf'];
+}
+
+/* ---- R94-001 accounting checks → xlsx ---- */
+function col_checks_xlsx(array $cov, array $mis, array $unv, int $days): void {
+    require_once __DIR__ . '/xlsxw.php';
+    $c = []; foreach ($cov as $r) $c[] = [(string)$r['project_code'], (string)$r['project_name'], (string)$r['code'], (string)$r['name'], (string)$r['vessel'], (string)$r['customer_name'], t($r['status'] === 'completed' ? 'pr.completed' : 'pr.active'), (string)($r['completed_at'] ? substr((string)$r['completed_at'], 0, 10) : ''), round((float)$r['inv_contract'], 2), round((float)$r['inv_invoiced'], 2), (int)($r['invoiced_pct'] ?? 0), round((float)$r['collected'], 2), t('inv.' . ($r['invoicing'] ?? 'none')), $r['invoicing_override'] ? t('inv.' . $r['invoicing_override']) : ''];
+    $x = []; foreach ($mis as $r) { $it = 0.0; $nos = []; foreach ($r['invoices'] ?? [] as $i) { $it += (float)$i['amount']; $nos[] = $i['invoice_no']; } $x[] = [(string)$r['pi_no'], (string)$r['title'], (string)$r['project_code'], (string)$r['sub_code'], (string)$r['vessel'], (string)$r['issue_date'], round((float)$r['gross'], 2), round($it, 2), round($it - (float)$r['gross'], 2), implode(', ', $nos), t('pi.s_' . $r['status'])]; }
+    $u = []; foreach ($unv as $r) $u[] = [(string)$r['pi_no'], (string)$r['title'], (string)$r['vessel'], (string)$r['project_code'], (string)$r['sub_code'], (string)$r['issue_date'], (int) floor((time() - strtotime($r['issue_date'])) / 86400), round((float)$r['gross'], 2), round((float)$r['paid_sum'], 2), t('pi.s_' . $r['status'])];
+    xlsx_download('GAS-CHK-' . date('Ymd') . '.xlsx', [
+        ['name' => 'Coverage', 'first' => true, 'header' => [t('pr.code'), t('pr.one'), t('sp.code'), t('sp.one'), t('v.one'), t('rp.customer'), t('th.status'), t('pr.completed'), t('chk.contract'), t('fs.invoiced'), '%', t('chk.collected'), t('inv.title'), t('chk.override')], 'rows' => $c],
+        ['name' => 'Mismatch', 'header' => [t('pi.no'), t('pi.description'), t('pr.code'), t('sp.code'), t('v.one'), t('pi.issue_date'), t('pi.gross'), t('chk.inv_total'), t('chk.diff'), t('pi.invoice_no'), t('th.status')], 'rows' => $x],
+        ['name' => 'Not invoiced ' . $days . 'd', 'header' => [t('pi.no'), t('pi.description'), t('v.one'), t('pr.code'), t('sp.code'), t('pi.issue_date'), t('chk.days'), t('pi.gross'), t('pi.paid_lbl'), t('th.status')], 'rows' => $u],
+    ]);
 }

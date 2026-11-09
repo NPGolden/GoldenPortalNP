@@ -10,7 +10,7 @@ $isBud = ($o['kind'] ?? 'firm') === 'budgetary';
 ?>
 <div class="card" id="proformas">
   <div class="card-head"><h2>💶 <?= tt('pt.title') ?> · <?= tt('pi.title') ?> <span class="hint">(<?= count($pis) ?>)</span></h2><span class="hint"><?= tt('pt.hint') ?></span></div>
-  <?php if ($isBud && $approved && !$o['converted_to'] && $sales): $subs = all('SELECT id, code, name FROM subprojects WHERE project_id = ? ORDER BY sort_order, code', [(int)$o['project_id']]); ?>
+  <?php if ($isBud && $approved && !$o['converted_to'] && $sales): $subs = all('SELECT id, code, name FROM subprojects WHERE project_id = ? AND ' . sp_pick_cond('', (int)($o['subproject_id'] ?? 0)) . ' ORDER BY code', [(int)$o['project_id']]); ?>
   <form method="post" action="<?= $backTo ?>" class="fltbar" style="grid-template-columns: 1fr auto; margin-bottom:10px;" data-lock data-confirm="<?= tt('oc.convert_confirm') ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('oc.convert') ?>" data-confirm-cancel="<?= tt('btn.cancel') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="oc_convert"><input type="hidden" name="id" value="<?= $id ?>">
     <div class="field"><label><?= tt('oc.convert_to') ?></label><select name="subproject_id" required><option value=""><?= tt('tk.choose') ?></option><?php foreach ($subs as $sb): ?><option value="<?= (int)$sb['id'] ?>"><?= e(trim($sb['code'] . ' ' . $sb['name'])) ?></option><?php endforeach; ?></select></div>
     <div class="fltbar-actions"><button class="btn btn--gold btn--sm" type="submit">⇄ <?= tt('oc.convert') ?></button></div>

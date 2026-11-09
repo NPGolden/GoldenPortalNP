@@ -117,7 +117,7 @@ const PI_PAID_SQL = "((SELECT COALESCE(SUM(pp.amount),0) FROM proforma_payments 
 const PI_SELECT = "SELECT pi.*, o.offer_no, o.revision, o.sq_no, o.title AS offer_title, o.status AS offer_status, p.project_code, p.name AS project_name, p.pm_user_id, s.code AS sub_code, s.name AS sub_name, v.name AS vessel, c.name AS customer_name, p.customer_id,
                    iv.label AS iv_label, iv.legal_name AS iv_legal, f.original_name, cu.full_name AS created_name,
                    ((SELECT COALESCE(SUM(pp.amount),0) FROM proforma_payments pp WHERE pp.proforma_id = pi.id) + (SELECT COALESCE(SUM(x.paid_amount),0) FROM proforma_invoices x WHERE x.proforma_id = pi.id AND NOT EXISTS (SELECT 1 FROM proforma_payments pq WHERE pq.invoice_id = x.id))) AS paid_sum, (SELECT COUNT(*) FROM proforma_invoices x WHERE x.proforma_id = pi.id) AS n_inv
-            FROM proformas pi JOIN offers o ON o.id = pi.offer_id JOIN projects p ON p.id = pi.project_id LEFT JOIN subprojects s ON s.id = pi.subproject_id LEFT JOIN vessels v ON v.id = pi.vessel_id LEFT JOIN customers c ON c.id = p.customer_id
+            FROM proformas pi LEFT JOIN offers o ON o.id = pi.offer_id JOIN projects p ON p.id = pi.project_id LEFT JOIN subprojects s ON s.id = pi.subproject_id LEFT JOIN vessels v ON v.id = pi.vessel_id LEFT JOIN customers c ON c.id = p.customer_id
             LEFT JOIN invoicing_details iv ON iv.id = pi.invoicing_id LEFT JOIN sp_files f ON f.id = pi.file_id LEFT JOIN customer_users cu ON cu.id = pi.created_by";
 function pi_get(int $id): ?array {
     if (!pi_can_view() || !$id) return null;
@@ -197,6 +197,7 @@ function pi_refresh_status(int $id): void {
 }
 function pinv_save_from_post(int $piId): void { cache_bump_later('fs');
     $r = pi_get($piId); if (!$r || !pi_can_invoices()) throw new RuntimeException(t('err.noaccess'));
+    if (pi_is_invoice($r)) throw new RuntimeException(t('pi.di_is_invoice'));   // R94-001: the row itself is the invoice
     $id = (int)($_POST['inv_id'] ?? 0); $s = fn(string $k, int $n) => mb_substr(trim((string)($_POST[$k] ?? '')), 0, $n);
     $d = fn(string $k) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST[$k] ?? '')) ? $_POST[$k] : null;
     $no = $s('invoice_no', 60); if ($no === '') throw new RuntimeException(t('pi.need_inv_no'));
@@ -255,7 +256,7 @@ function pi_render_pdf(array $r): string {
     $navy = '#0B1E2D'; $gold = '#C89B3C'; $line = '#9AA5B1'; $ink = '#1F2937'; $head = '#EEF1F4'; $L = 15.0; $R = 195.0; $W = $R - $L; $cur = (string)$r['currency'];
     $m = fn(float $v) => number_format($v, 2, ',', '.') . ' ' . $cur;
     $pdf->addPage(); if (!empty($bd['logo'])) $pdf->image($bd['logo'], 150, 12, 45, 16);
-    $pdf->setColor($navy); $pdf->setFont('B', 16); $pdf->text($L, 20, mb_strtoupper(t('pi.doc_title')));
+    $pdf->setColor($navy); $pdf->setFont('B', 16); $pdf->text($L, 20, mb_strtoupper(pi_is_invoice($r) ? t('pi.di_doc_title') : t('pi.doc_title')));
     $pdf->setFont('R', 8.5); $pdf->setColor($gold); $pdf->text($L, 26, $r['pi_no'] . ' · ' . fmt_date($r['issue_date'] ?: date('Y-m-d')));
     $pdf->setLineWidth(0.6); $pdf->line($L, 30, $R, 30); $y = 36.0;
     // issuer / bill to
@@ -264,7 +265,7 @@ function pi_render_pdf(array $r): string {
     $iv = $r['iv'] ?? null; $yr = $y; $bill = $iv ? array_filter([(string)$iv['legal_name'], (string)($iv['address'] ?? ''), trim((string)($iv['postal_code'] ?? '') . ' ' . (string)($iv['city'] ?? '') . ' ' . (string)($iv['country'] ?? '')), $iv['vat_no'] ? 'VAT ' . $iv['vat_no'] : '', $iv['attn'] ? t('iv.attn') . ' ' . $iv['attn'] : '', (string)($iv['email'] ?? '')]) : [(string)($r['customer_name'] ?: '—')];
     foreach ($bill as $ln0) foreach ($pdf->wrap($ln0, 85) as $ln) { $pdf->text(110, $yr, $ln); $yr += 4; }
     $y = max($yl, $yr) + 4;
-    $kv = [[t('pr.one'), trim(($r['project_code'] ?: '') . ' ' . $r['project_name']) . ($r['sub_code'] ? ' › ' . $r['sub_code'] . ' ' . $r['sub_name'] : '')], [t('v.one'), (string)($r['vessel'] ?: '—')], [t('of.one'), $r['offer_no'] . ' ' . $r['revision'] . ($r['sq_no'] ? ' · SQ ' . $r['sq_no'] : '')], [t('pi.due'), $r['due_date'] ? fmt_date($r['due_date']) : '—'], [t('pi.terms_ref'), $r['term_n'] ? t('pt.instalment', ['n' => (int)$r['term_n']]) : '—']];
+    $kv = [[t('pr.one'), trim(($r['project_code'] ?: '') . ' ' . $r['project_name']) . ($r['sub_code'] ? ' › ' . $r['sub_code'] . ' ' . $r['sub_name'] : '')], [t('v.one'), (string)($r['vessel'] ?: '—')], [t('of.one'), $r['offer_id'] ? $r['offer_no'] . ' ' . $r['revision'] . ($r['sq_no'] ? ' · SQ ' . $r['sq_no'] : '') : '—'], [t('pi.due'), $r['due_date'] ? fmt_date($r['due_date']) : '—'], [t('pi.terms_ref'), $r['term_n'] ? t('pt.instalment', ['n' => (int)$r['term_n']]) : '—']];
     $pdf->setFont('R', 8.5); foreach ($kv as [$k, $v]) { $pdf->setColor($navy); $pdf->setFont('B', 8.5); $pdf->text($L, $y, $k); $pdf->setColor($ink); $pdf->setFont('R', 8.5); foreach ($pdf->wrap($v, $W - 40) as $i => $ln) $pdf->text($L + 40, $y + $i * 4.2, $ln); $y += 4.6 + (count($pdf->wrap($v, $W - 40)) - 1) * 4.2; }
     $y += 4;
     $cols = [[t('pi.description'), 110, 'L'], [t('pi.net'), 25, 'R'], [t('pi.vat'), 20, 'R'], [t('pi.gross'), 25, 'R']]; $x = $L; $pdf->setColor($head); $pdf->rect($L, $y, 180, 7, 'F'); $pdf->setFont('B', 8); $pdf->setColor($navy);
@@ -297,8 +298,8 @@ function ppay_save_from_post(int $piId): void { cache_bump_later('fs');
     $id = (int)($_POST['pay_id'] ?? 0); $d = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['paid_on'] ?? '')) ? $_POST['paid_on'] : date('Y-m-d');
     $amt = function_exists('of_parse_amount') ? of_parse_amount((string)($_POST['amount'] ?? '0')) : (float)($_POST['amount'] ?? 0); if ($amt <= 0) throw new RuntimeException(t('pay.need_amount'));
     $method = in_array($_POST['method'] ?? '', PPAY_METHODS, true) ? $_POST['method'] : 'bank'; $ref = mb_substr(trim((string)($_POST['reference'] ?? '')), 0, 80) ?: null; $note = mb_substr(trim((string)($_POST['note'] ?? '')), 0, 255) ?: null;
-    $o = one('SELECT * FROM offers WHERE id = ?', [(int)$r['offer_id']]); $cap = $o ? ppay_offer_cap($o) : 0.0;
-    $already = ppay_offer_paid((int)$r['offer_id']); if ($id) $already -= (float) (scalar('SELECT amount FROM proforma_payments WHERE id = ? AND proforma_id = ?', [$id, $piId]) ?: 0);
+    $o = $r['offer_id'] ? one('SELECT * FROM offers WHERE id = ?', [(int)$r['offer_id']]) : null; $cap = $o ? ppay_offer_cap($o) : (pi_is_invoice($r) ? (float)$r['gross'] : 0.0);   // R94-001: a direct invoice caps at its own gross
+    $already = $r['offer_id'] ? ppay_offer_paid((int)$r['offer_id']) : (float) scalar('SELECT COALESCE(SUM(amount),0) FROM proforma_payments WHERE proforma_id = ?', [$piId]); if ($id) $already -= (float) (scalar('SELECT amount FROM proforma_payments WHERE id = ? AND proforma_id = ?', [$id, $piId]) ?: 0);
     if ($cap > 0 && $already + $amt > $cap + 0.005) throw new RuntimeException(t('pay.exceeds', ['paid' => pi_money($already, $r['currency']), 'cap' => pi_money($cap, $r['currency']), 'left' => pi_money(max(0, $cap - $already), $r['currency'])]));
     if ($id) q('UPDATE proforma_payments SET paid_on = ?, amount = ?, method = ?, reference = ?, note = ? WHERE id = ? AND proforma_id = ?', [$d, $amt, $method, $ref, $note, $id, $piId]);
     else q('INSERT INTO proforma_payments (proforma_id, paid_on, amount, method, reference, note, created_by) VALUES (?,?,?,?,?,?,?)', [$piId, $d, $amt, $method, $ref, $note, (int)(current_user()['id'] ?? 0)]);
@@ -309,3 +310,67 @@ function ppay_delete(int $payId): int { cache_bump_later('fs'); $x = one('SELECT
 /** An invoice settles payments: link the chosen uninvoiced payments of the proforma to it. */
 function ppay_link(int $piId, int $invId, array $payIds): void { if (!ppay_has()) return; $ids = array_values(array_filter(array_map('intval', $payIds))); q('UPDATE proforma_payments SET invoice_id = NULL WHERE proforma_id = ? AND invoice_id = ?', [$piId, $invId]); if ($ids) q('UPDATE proforma_payments SET invoice_id = ? WHERE proforma_id = ? AND id IN (' . implode(',', $ids) . ')', [$invId, $piId]); }
 
+
+/* ======================================================================================================================
+ * GAS-CP-R94-001 — direct invoices: an accounting invoice issued for work that had no proforma. Same table (kind = invoice),
+ * so collections, statements, aging, follow-ups and e-mails treat it exactly like a proforma; the row itself IS the invoice.
+ * ==================================================================================================================== */
+function pi_kind_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM proformas LIKE 'kind'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function pi_is_invoice(array $r): bool { return (string)($r['kind'] ?? 'proforma') === 'invoice'; }
+/** Label of the document for pills, PDF and statements. */
+function pi_kind_label(array $r): string { return pi_is_invoice($r) ? t('pi.k_invoice') : t('pi.k_proforma'); }
+/** Register a direct invoice from the form. Issued at once (the invoice exists in the books), so it enters collections immediately. */
+function pi_direct_create_from_post(): int {
+    if (!pi_kind_has() || !pi_can_invoices()) throw new RuntimeException(t('err.noaccess'));
+    $s = fn(string $k, int $n) => mb_substr(trim((string)($_POST[$k] ?? '')), 0, $n);
+    $d = fn(string $k) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST[$k] ?? '')) ? $_POST[$k] : null;
+    $no = $s('pi_no', 60); if ($no === '') throw new RuntimeException(t('pi.di_need_no'));
+    if (scalar('SELECT COUNT(*) FROM proformas WHERE pi_no = ?', [$no])) throw new RuntimeException(t('pi.di_dup_no', ['n' => $no]));
+    $pid = (int)($_POST['project_id'] ?? 0) ?: null; $sid = (int)($_POST['subproject_id'] ?? 0) ?: null;
+    $p = $pid ? one('SELECT id, vessel_id, customer_id FROM projects WHERE id = ?', [$pid]) : null; if ($pid && !$p) throw new RuntimeException(t('err.notfound'));
+    if ($sid && !scalar('SELECT COUNT(*) FROM subprojects WHERE id = ? AND project_id = ?', [$sid, $pid])) $sid = null;
+    $vid = (int)($_POST['vessel_id'] ?? 0) ?: ($p ? (int)$p['vessel_id'] : null) ?: null; $cid = (int)($_POST['customer_id'] ?? 0) ?: ($p ? (int)$p['customer_id'] : null) ?: null;
+    if (!$pid && !$vid && !$cid) throw new RuntimeException(t('pi.di_need_target'));
+    if (!$pid) { $pid = (int) scalar("SELECT id FROM projects WHERE vessel_id = ? AND project_code LIKE 'GEN-%' LIMIT 1", [$vid]) ?: (int) scalar('SELECT id FROM projects WHERE vessel_id = ? ORDER BY id DESC LIMIT 1', [$vid]); if (!$pid) throw new RuntimeException(t('pi.di_need_target')); }
+    $issue = $d('issue_date') ?: date('Y-m-d'); $due = $d('due_date');
+    $net = function_exists('of_parse_amount') ? of_parse_amount((string)($_POST['amount_net'] ?? '0')) : (float) str_replace(',', '.', (string)($_POST['amount_net'] ?? '0')); if ($net <= 0) throw new RuntimeException(t('pi.di_need_amount'));
+    $vat = max(0, min(100, (float) str_replace(',', '.', (string)($_POST['vat_pct'] ?? '0')))); $cur = strtoupper($s('currency', 3)) ?: 'EUR';
+    $iv = (int)($_POST['invoicing_id'] ?? 0) ?: null; if ($iv && !iv_load($iv)) $iv = null;
+    $title = $s('title', 200) ?: t('pi.k_invoice') . ' ' . $no;
+    q('INSERT INTO proformas (kind, pi_no, offer_id, term_n, project_id, subproject_id, vessel_id, customer_id, invoicing_id, title, issue_date, due_date, amount_net, vat_pct, vat_amount, gross, currency, status, notes, created_by, sent_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())',
+      ['invoice', $no, null, 0, $pid, $sid, $vid, $cid, $iv, $title, $issue, $due, $net, $vat, round($net * $vat / 100, 2), round($net * (1 + $vat / 100), 2), $cur, 'sent', $s('notes', 2000) ?: null, (int)(current_user()['id'] ?? 0)]);
+    $id = (int) db()->lastInsertId();
+    if (!empty($_FILES['file']['name']) && function_exists('cp_store_file')) { $fid = cp_store_file($_FILES['file'], $pid, $sid, 'issued', 'internal', $no); if ($fid) q('UPDATE proformas SET file_id = ? WHERE id = ?', [$fid, $id]); }
+    if (function_exists('sp_log') && $sid) try { sp_log($sid, 'invoice_registered', $no . ' · ' . number_format($net, 2, ',', '.') . ' ' . $cur); } catch (Throwable $e) {}
+    cache_bump_later('fs'); return $id;
+}
+/* ---- accounting checks (Collections › Checks) ---- */
+/** Proformas whose registered invoices do not add up to the proforma gross (issued / sent / partly paid / paid; cancelled and drafts excluded). */
+function pi_check_mismatch(): array {
+    $rows = all(PI_SELECT . " WHERE pi.kind = 'proforma' AND pi.status NOT IN ('draft','cancelled') AND EXISTS (SELECT 1 FROM proforma_invoices x WHERE x.proforma_id = pi.id)
+                 AND ABS((SELECT COALESCE(SUM(x.amount),0) FROM proforma_invoices x WHERE x.proforma_id = pi.id) - pi.gross) > 0.01 ORDER BY pi.issue_date DESC");
+    foreach ($rows as &$r) $r['invoices'] = all('SELECT invoice_no, amount FROM proforma_invoices WHERE proforma_id = ? ORDER BY invoice_date, id', [(int)$r['id']]); unset($r);
+    return $rows;
+}
+/** Issued proformas older than $days with no accounting invoice registered yet. */
+function pi_check_uninvoiced(int $days = 30): array {
+    return all(PI_SELECT . " WHERE pi.kind = 'proforma' AND pi.status IN ('issued','sent','partly_paid','paid') AND pi.issue_date <= DATE_SUB(CURDATE(), INTERVAL ? DAY)
+                 AND NOT EXISTS (SELECT 1 FROM proforma_invoices x WHERE x.proforma_id = pi.id) ORDER BY pi.issue_date", [$days]);
+}
+/** Sub-project invoicing coverage — all sub-projects (completed included) with contract value, invoiced, collected and the computed state. */
+function pi_check_coverage(array $f = []): array {
+    $w = ['1 = 1']; $a = [];
+    if (!empty($f['project'])) { $w[] = 's.project_id = ?'; $a[] = (int)$f['project']; }
+    if (!empty($f['status']) && $f['status'] !== 'all') { $w[] = 's.status = ?'; $a[] = (string)$f['status']; }
+    [$sc, $sa] = scope_sql('p'); $w[] = $sc; $a = array_merge($a, $sa);
+    $rows = all("SELECT s.id, s.code, s.name, s.status, s.completed_at, s.invoicing_override, p.id AS project_id, p.project_code, p.name AS project_name, v.name AS vessel, c.name AS customer_name,
+                        (SELECT COALESCE(SUM(pp.amount),0) FROM proforma_payments pp JOIN proformas pi ON pi.id = pp.proforma_id WHERE pi.subproject_id = s.id AND pi.status <> 'cancelled') AS collected
+                 FROM subprojects s JOIN projects p ON p.id = s.project_id LEFT JOIN vessels v ON v.id = p.vessel_id LEFT JOIN customers c ON c.id = p.customer_id
+                 WHERE " . implode(' AND ', $w) . " ORDER BY p.project_code DESC, SUBSTRING_INDEX(s.code, '.', 1), CAST(SUBSTRING_INDEX(s.code, '.', -1) AS UNSIGNED), s.code", $a);
+    inv_apply($rows);
+    $st = (string)($f['inv'] ?? '');
+    // "open": anything accounting should look at — not fully invoiced, or invoiced without an approved offer to measure against (contract unknown); idle quoted subs are left out
+    if ($st === 'open') $rows = array_values(array_filter($rows, fn($r) => (($r['invoicing'] ?? 'none') !== 'full' || (float)($r['inv_contract'] ?? 0) <= 0.005) && ((float)($r['inv_contract'] ?? 0) > 0.005 || (float)($r['inv_invoiced'] ?? 0) > 0.005 || (float)$r['collected'] > 0.005 || $r['status'] === 'completed')));
+    elseif ($st !== '' && $st !== 'all') $rows = array_values(array_filter($rows, fn($r) => ($r['invoicing'] ?? 'none') === $st));
+    return $rows;
+}

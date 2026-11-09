@@ -83,6 +83,7 @@ function of_has_origin(): bool { static $h = null; if ($h === null) { try { $h =
 function of_origin_pill(array $o): string { return of_has_origin() && ($o['origin'] ?? 'portal') === 'erp' ? '<span class="pill pill--mute" title="' . e(t('of.erp_hint')) . '">ERP</span>' : ''; }
 
 function of_event(int $id, string $event, ?string $note = null): void {
+    if ($id <= 0) return;   // R94-001: direct invoices have no offer
     $u = current_user();
     q('INSERT INTO offer_events (offer_id, event, user_id, user_name, note, ip) VALUES (?,?,?,?,?,?)', [$id, $event, (int)($u['id'] ?? 0) ?: null, $u['full_name'] ?? null, $note, tk_ip()]);
 }

@@ -149,13 +149,15 @@ layout_head(t('pr.title'), 'projects');
         <?php if (function_exists('td_card_html') && ($tdc = td_card_html(['project' => (int)$p['id']], url('task_edit', ['project' => $p['id']]), true, 6)) !== ''): ?><div class="ot-tree td-tree"><?= $tdc ?></div><?php endif; ?>
         <?php if (function_exists('tk_card_html') && ($tkc = tk_card_html((int)$p['id'], url('ticket_edit', ['project' => $p['id']]), 6)) !== ''): ?><div class="ot-tree tk-tree"><?= $tkc ?></div><?php endif; ?>
         <?php if ($staff && function_exists('pmt_card_html') && ($pmc = pmt_card_html((int)$p['id'], pmt_can_edit((int)$p['id']) ? url('permit_edit', ['project' => $p['id']]) : null, 6)) !== ''): ?><div class="ot-tree tk-tree"><?= $pmc ?></div><?php endif; ?>
-        <?php if (!$p['subs']): ?>
+        <?php if (!$p['subs'] && !empty($p['subs_hidden'])): ?>
+          <p class="hint" style="padding:8px 0;"><?= e(t('pr.completed_hidden', ['n' => (int)$p['subs_hidden']])) ?> · <a href="<?= url('projects', array_filter($_GET + ['p' => null, 'sc' => 1])) ?>"><?= tt('pr.show_completed') ?></a></p>
+        <?php elseif (!$p['subs']): ?>
           <p class="hint" style="padding:8px 0;"><?= tt('pr.nosubs') ?>
             <?php if (is_staff()): ?> <a href="<?= url('subproject_new', ['project' => $p['id']]) ?>"><?= tt('pr.addsub') ?></a>
             · <a href="<?= url('project_edit', ['id' => $p['id']]) ?>"><?= tt('pr.edit') ?></a><?php endif; ?>
           </p>
         <?php else: ?>
-          <details class="fold subs-fold" open data-fold="subs-<?= (int)$p['id'] ?>"><summary class="fold-sum"><span class="fold-tw">▸</span> <?= tt('pr.subprojects') ?> <span class="count"><?= count($p['subs']) ?></span></summary>
+          <details class="fold subs-fold" open data-fold="subs-<?= (int)$p['id'] ?>"><summary class="fold-sum"><span class="fold-tw">▸</span> <?= tt('pr.subprojects') ?> <span class="count"><?= count($p['subs']) ?></span><?php if (!empty($p['subs_hidden'])): ?> <a class="hint" style="font-weight:400;margin-left:8px;" href="<?= url('projects', array_filter($_GET + ['p' => null, 'sc' => 1])) ?>#p<?= (int)$p['id'] ?>"><?= e(t('pr.completed_hidden', ['n' => (int)$p['subs_hidden']])) ?> ›</a><?php elseif (!empty($_GET['sc'])): ?> <a class="hint" style="font-weight:400;margin-left:8px;" href="<?= url('projects', array_filter(array_diff_key($_GET, ['p' => 1, 'sc' => 1]))) ?>"><?= tt('pr.hide_completed') ?></a><?php endif; ?></summary>
           <?php foreach ($p['subs'] as $s): ?>
             <a class="sub" href="<?= url('subproject', ['id' => $s['id']]) ?>">
               <span class="scode"><?= e($s['code'] ?: '—') ?></span>

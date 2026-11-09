@@ -3,7 +3,7 @@
 if (!function_exists('rk_has') || !rk_has() || !is_staff()) return;
 $sid = $sid ?? null; $risks = rk_list($pid, $sid); $staffList = staff_users();
 $ed = (int)($_GET['risk'] ?? 0) ? one('SELECT * FROM sp_risks WHERE id = ? AND project_id = ?', [(int)$_GET['risk'], $pid]) : null;
-$subsR = all('SELECT id, code, name FROM subprojects WHERE project_id = ? ORDER BY sort_order, code', [$pid]);
+$subsR = all('SELECT id, code, name FROM subprojects WHERE project_id = ? AND ' . sp_pick_cond() . ' ORDER BY code', [$pid]);
 $cnt = ['n' => count($risks), 'open' => 0, 'mit' => 0, 'score' => 0]; foreach ($risks as $r) { if ($r['status'] === 'open' || $r['status'] === 'occurred') $cnt['open']++; if (in_array($r['status'], ['mitigated', 'closed'], true)) $cnt['mit']++; if ($r['status'] === 'open') $cnt['score'] = max($cnt['score'], (int)$r['likelihood'] * (int)$r['impact']); }
 $rmi = $cnt['n'] ? $cnt['mit'] / $cnt['n'] : null;
 $v = fn(string $k, $d = '') => e((string)($ed[$k] ?? $d)); $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : '';

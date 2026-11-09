@@ -54,7 +54,7 @@ layout_head($sp['code'] . ' · ' . $sp['name'], 'projects');
       <?= e($sp['vessel'] ?: tt('pr.novessel')) ?><?= $sp['system_name'] ? ' · ' . e($sp['system_name']) : '' ?>
       <?= $staff ? ' · ' . e($sp['customer_name'] ?? '') : '' ?>
       · <strong><?= overall_pct($sp) ?>%</strong> <?= tt('sp.overall') ?>
-      <?= inv_has() ? ' · ' . inv_pill($sp) : '' ?><?php if ($staff && function_exists('fs_pills') && fin_visible() && ($fsp = fs_pills((int)$sp['project_id'], $id))): ?> · <?= $fsp ?><?php endif; ?><?php if ($staff && function_exists('fr_can') && fr_can()): ?> · <a href="<?= url('report_fin', ['project' => (int)$sp['project_id'], 'sub' => $id]) ?>" title="<?= tt('fr.title') ?>">💶 <?= tt('fr.short') ?></a><?php endif; ?><?php if ($staff && function_exists('iv_for_sub') && fin_visible() && ($ivr = iv_for_sub($sp))): ?> · <span title="<?= tt('iv.title') ?>">🧾 <?= e(iv_label($ivr)) ?><?= (int)($sp['invoicing_id'] ?? 0) ? '' : ' <span class="hint">(' . tt('iv.sub_default_short') . ')</span>' ?></span><?php endif; ?>
+      <?php if (inv_has()) { $spc = [$sp]; inv_apply($spc); $sp = $spc[0]; } ?><?= inv_has() ? ' · ' . inv_pill($sp) : '' ?><?php if ($staff && function_exists('fs_pills') && fin_visible() && ($fsp = fs_pills((int)$sp['project_id'], $id))): ?> · <?= $fsp ?><?php endif; ?><?php if ($staff && function_exists('fr_can') && fr_can()): ?> · <a href="<?= url('report_fin', ['project' => (int)$sp['project_id'], 'sub' => $id]) ?>" title="<?= tt('fr.title') ?>">💶 <?= tt('fr.short') ?></a><?php endif; ?><?php if ($staff && function_exists('iv_for_sub') && fin_visible() && ($ivr = iv_for_sub($sp))): ?> · <span title="<?= tt('iv.title') ?>">🧾 <?= e(iv_label($ivr)) ?><?= (int)($sp['invoicing_id'] ?? 0) ? '' : ' <span class="hint">(' . tt('iv.sub_default_short') . ')</span>' ?></span><?php endif; ?>
     </p>
   </div>
   <div class="actions">
@@ -135,8 +135,9 @@ layout_head($sp['code'] . ' · ' . $sp['name'], 'projects');
       <?php if (inv_has()): ?>
       <div class="grid grid-2">
         <div class="field"><label for="sp_inv"><?= tt('inv.title') ?></label>
-          <select id="sp_inv" name="invoicing"><?php foreach (inv_states() as $k => $l): ?><option value="<?= $k ?>"<?= ($sp['invoicing'] ?? 'none') === $k ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
-        <div class="field"><label for="sp_invpct"><?= tt('inv.pct') ?></label><input id="sp_invpct" name="invoiced_pct" type="number" min="0" max="100" step="5" value="<?= (int)($sp['invoiced_pct'] ?? 0) ?>"><p class="hint"><?= tt('inv.pct_hint') ?></p></div>
+          <?php $ic = inv_compute((int)$sp['id']); ?>
+          <select id="sp_inv" name="invoicing_override"><option value=""<?= empty($sp['invoicing_override']) ? ' selected' : '' ?>><?= e(t('inv.computed_opt', ['s' => inv_states()[$ic['raw']] ?? $ic['raw'], 'n' => $ic['raw_pct']])) ?></option><?php foreach (inv_states() as $k => $l): ?><option value="<?= $k ?>"<?= ($sp['invoicing_override'] ?? '') === $k ? ' selected' : '' ?>><?= e(t('inv.override_opt', ['s' => $l])) ?></option><?php endforeach; ?></select>
+          <p class="hint"><?= e(t('inv.computed_hint', ['c' => pi_money((float)$ic['contract']), 'i' => pi_money((float)$ic['invoiced']), 'p' => $ic['n_pi'], 'n' => $ic['n_inv']])) ?></p></div>
       </div>
       <?php endif; ?>
       <div class="field"><label for="sp_desc"><?= tt('sp.description') ?></label>

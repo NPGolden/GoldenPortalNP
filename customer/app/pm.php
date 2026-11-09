@@ -134,12 +134,16 @@ function project_tree_filtered(array $f, int $limit, int $offset): array {
                      LIMIT " . (int)$limit . ' OFFSET ' . (int)$offset, $args);
     if ($projects) {
         $ids  = implode(',', array_map('intval', array_column($projects, 'id')));
+        $hidden = [];
         $subs = all("SELECT s.*, vs.name AS system_name FROM subprojects s LEFT JOIN vessel_systems vs ON vs.id = s.system_id
                      WHERE s.project_id IN ({$ids}) ORDER BY SUBSTRING_INDEX(s.code, '.', 1), CAST(SUBSTRING_INDEX(s.code, '.', -1) AS UNSIGNED), s.code, s.name");   // R93-009: by code, not by the manual sort_order
+        inv_apply($subs);   // R94-001: invoicing state from proformas / invoices
+        $showDone = !empty($_GET['sc']); foreach ($subs as $k => $sx) if (!$showDone && ($sx['status'] ?? '') === 'completed') { $hidden[(int)$sx['project_id']] = ($hidden[(int)$sx['project_id']] ?? 0) + 1; unset($subs[$k]); }
 
         $by = [];
         foreach ($subs as $s) $by[(int)$s['project_id']][] = $s;
-        foreach ($projects as &$p) $p['subs'] = $by[(int)$p['id']] ?? [];
+        foreach ($projects as &$p) { $p['subs'] = $by[(int)$p['id']] ?? []; $p['subs_hidden'] = $hidden[(int)$p['id']] ?? 0; }
+        unset($p);
     }
     return ['rows' => $projects, 'total' => $total, 'subs_total' => $subsTotal];
 }
@@ -511,6 +515,39 @@ function inv_norm(string $v): ?string {
           'full' => 'full', 'fully' => 'full', 'fullyinvoiced' => 'full', 'invoiced' => 'full', 'yes' => 'full', 'complete' => 'full', '100' => 'full'];
     return $m[$k] ?? null;
 }
+/* ---- R94-001: invoicing state computed from the documents — contract value = approved offers of the sub-project (gross),
+ *      invoiced = accounting invoices registered on its proformas + direct invoices; the manual field survives only as an override. ---- */
+function inv_compute_many(array $subIds): array {
+    $subIds = array_values(array_unique(array_filter(array_map('intval', $subIds)))); if (!$subIds) return [];
+    $in = implode(',', $subIds); $out = array_fill_keys($subIds, ['contract' => 0.0, 'invoiced' => 0.0, 'pct' => 0, 'state' => 'none', 'raw' => 'none', 'raw_pct' => 0, 'override' => null, 'n_pi' => 0, 'n_inv' => 0]);
+    try {
+        if (function_exists('of_has') && of_has()) {
+            $beh = []; foreach (all("SELECT subproject_id, status, gross_total, amount, vat_pct FROM offers WHERE subproject_id IN ($in) AND kind <> 'budget' AND converted_to IS NULL") as $o) {
+                $b = function_exists('of_status_behaves') ? of_status_behaves((string)$o['status']) : 'open'; if ($b !== 'approved') continue;
+                $g = (float)($o['gross_total'] ?: (float)$o['amount'] * (1 + (float)($o['vat_pct'] ?? 0) / 100)); $out[(int)$o['subproject_id']]['contract'] += $g;
+            }
+        }
+        if (function_exists('pi_has') && pi_has()) {
+            foreach (all("SELECT pi.subproject_id, pi.kind, pi.gross, (SELECT COALESCE(SUM(x.amount),0) FROM proforma_invoices x WHERE x.proforma_id = pi.id) AS inv_sum, (SELECT COUNT(*) FROM proforma_invoices x WHERE x.proforma_id = pi.id) AS inv_n
+                          FROM proformas pi WHERE pi.subproject_id IN ($in) AND pi.status <> 'cancelled'") as $r) {
+                $k = (int)$r['subproject_id']; if ($r['kind'] === 'invoice') { $out[$k]['invoiced'] += (float)$r['gross']; $out[$k]['n_inv']++; } else { $out[$k]['n_pi']++; $out[$k]['invoiced'] += (float)$r['inv_sum']; $out[$k]['n_inv'] += (int)$r['inv_n']; }
+            }
+        }
+        foreach (all("SELECT id, invoicing_override FROM subprojects WHERE id IN ($in) AND invoicing_override IS NOT NULL") as $r) $out[(int)$r['id']]['override'] = (string)$r['invoicing_override'];
+    } catch (Throwable $e) {}
+    foreach ($out as $k => &$v) {
+        if ($v['contract'] > 0.005) $v['pct'] = (int) min(100, round($v['invoiced'] / $v['contract'] * 100));
+        else $v['pct'] = $v['invoiced'] > 0.005 ? 100 : 0;
+        $v['state'] = $v['invoiced'] <= 0.005 ? 'none' : ($v['pct'] >= 100 || ($v['contract'] > 0.005 && $v['invoiced'] >= $v['contract'] - 0.01) ? 'full' : 'partial'); $v['raw'] = $v['state']; $v['raw_pct'] = $v['pct'];
+        if ($v['override']) { $v['state'] = $v['override']; if ($v['override'] === 'full') $v['pct'] = 100; elseif ($v['override'] === 'none') $v['pct'] = 0; }
+    }
+    unset($v); return $out;
+}
+function inv_compute(int $subId): array { return inv_compute_many([$subId])[$subId] ?? ['contract' => 0.0, 'invoiced' => 0.0, 'pct' => 0, 'state' => 'none', 'raw' => 'none', 'raw_pct' => 0, 'override' => null, 'n_pi' => 0, 'n_inv' => 0]; }
+/** Apply the computed state onto rows that carry 'id' (sub-project rows), setting invoicing / invoiced_pct for the pill. */
+function inv_apply(array &$rows): void { $c = inv_compute_many(array_column($rows, 'id')); foreach ($rows as &$r) if (isset($c[(int)$r['id']])) { $r['invoicing'] = $c[(int)$r['id']]['state']; $r['invoiced_pct'] = $c[(int)$r['id']]['pct']; $r['inv_contract'] = $c[(int)$r['id']]['contract']; $r['inv_invoiced'] = $c[(int)$r['id']]['invoiced']; } unset($r); }
+/** Sub-project pickers for new / edited records: completed sub-projects are hidden unless they are the current value (R94-001). */
+function sp_pick_cond(string $alias = '', int $keep = 0): string { $a = $alias !== '' ? $alias . '.' : ''; return "({$a}status <> 'completed'" . ($keep ? " OR {$a}id = " . (int)$keep : '') . ')'; }
 /** Invoicing pill: grey = not invoiced, gold = partial (with the %), green = fully invoiced. */
 function inv_pill(array $sub, bool $short = false): string {
     $st  = (string)($sub['invoicing'] ?? 'none');
