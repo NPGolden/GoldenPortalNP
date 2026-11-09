@@ -1,0 +1,24 @@
+{
+ "privacyPolicyUrl": "https://www.goldenas.com.gr/privacy.html",
+ "supportUrl": "https://www.goldenas.com.gr/contact.html",
+ "marketingUrl": "https://www.goldenas.com.gr/",
+ "primaryCategory": "BUSINESS",
+ "secondaryCategory": "PRODUCTIVITY",
+ "locale": "en-US",
+ "releaseType": "MANUAL",
+ "contact": {
+  "firstName": "Nikos",
+  "lastName": "Polykandriotis",
+  "email": "np@goldenas.com.gr",
+  "phone": "+302104018000"
+ },
+ "distribution": "unlisted",
+ "name": "Golden PM",
+ "subtitle": "Projects for Golden A/S PMs",
+ "promotionalText": "Projects, approvals, drawings, team and inbox — the project manager's view of the Golden A/S portal.",
+ "description": "Golden PM is the project-management application for the project managers of Golden Automation Systems (Golden A/S), the marine electrical, automation and navigation systems integrator based in Keratsini, Greece, with branches in Italy and the Netherlands.\n\nAn account issued by Golden A/S is required. The app is a companion to the Golden A/S portal and is not intended for the general public.\n\nWith it a project manager can:\n• follow every project and sub-project with progress, issues and submittals\n• approve timesheets, leave requests and parts requisitions from the team\n• track drawings and documents due to the yard and the classification society\n• read the inbox of portal notifications and reminders\n• see the team on site, their requests and who is away\n• work offline and synchronise later\n\nSign-in with password and authenticator code, or with Face ID / Touch ID and passkeys after the first sign-in. All data stays on the Golden A/S portal; nothing is shared with third parties.",
+ "keywords": "project management,marine,yacht,shipyard,approvals,drawings,team,automation",
+ "whatsNew": "First App Store release of Golden PM: projects, approvals, drawings and submittals, inbox, team, offline, passkeys.",
+ "reviewNotes": "This is the project-management application for employees of Golden Automation Systems (Golden A/S); it is distributed unlisted to our staff and requires an account issued by the company.\n\nPlease sign in with the demo account provided (a project-manager user with a demo project; no real customer data). No authenticator code is needed for this account. After sign-in: Home shows the project summary and items needing a decision; Projects lists the projects; Approvals shows drawings and submittals; Team shows the people on site. Push notifications and passkeys are optional.",
+ "bundleId": "gr.goldenas.pm"
+}

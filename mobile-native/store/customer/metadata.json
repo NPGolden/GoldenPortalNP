@@ -1,0 +1,24 @@
+{
+ "privacyPolicyUrl": "https://www.goldenas.com.gr/privacy.html",
+ "supportUrl": "https://www.goldenas.com.gr/contact.html",
+ "marketingUrl": "https://www.goldenas.com.gr/",
+ "primaryCategory": "BUSINESS",
+ "secondaryCategory": "PRODUCTIVITY",
+ "locale": "en-US",
+ "releaseType": "MANUAL",
+ "contact": {
+  "firstName": "Nikos",
+  "lastName": "Polykandriotis",
+  "email": "np@goldenas.com.gr",
+  "phone": "+302104018000"
+ },
+ "distribution": "public",
+ "name": "Golden A/S Customer",
+ "subtitle": "Projects, documents, offers",
+ "promotionalText": "Follow your Golden A/S projects, sign documents, decide on offers and reach our engineers — from your phone.",
+ "description": "Golden A/S Customer is the application for the owners, captains and technical managers of vessels whose electrical, automation and navigation systems are built or serviced by Golden Automation Systems (Golden A/S).\n\nAccess is by invitation from your Golden A/S project manager; the app is a companion to the Golden A/S customer portal.\n\nWith it you can:\n• follow the progress of your projects and sub-projects, vessel by vessel\n• review and approve drawings and documents submitted for owner approval, with comments\n• sign field service reports and acceptance documents on the device\n• see the offers issued to you and accept or decline them\n• open support tickets for your vessels and follow their resolution\n• read the project documentation and the service history of your equipment\n\nSign-in with password and authenticator code, or with Face ID / Touch ID and passkeys after the first sign-in. Your data stays on the Golden A/S portal and is never shared with third parties. Available in English, Greek, Italian, Ukrainian and Bulgarian.",
+ "keywords": "yacht,owner,captain,marine,automation,approvals,offers,service,documents",
+ "whatsNew": "First App Store release of the Golden A/S Customer app: project progress, document approval, signing, offers, tickets, documents, passkeys.",
+ "reviewNotes": "Companion app of the Golden A/S customer portal for the owners and captains of vessels we work on. Accounts are created by Golden A/S when a project starts, so a sign-in is required.\n\nPlease sign in with the demo account provided (a customer user of a demo fleet; no real customer data). No authenticator code is needed for this account. After sign-in: Home shows the action centre; Sign lists documents for approval (open one to see the PDF and the Review / Sign buttons); Offers shows issued offers; Tickets lets you open a support request. Passkeys and push notifications are optional.",
+ "bundleId": "gr.goldenas.customer"
+}

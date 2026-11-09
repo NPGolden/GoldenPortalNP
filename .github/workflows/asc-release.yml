@@ -1,0 +1,46 @@
+# App Store release preparation — pushes store/<app>/metadata.json + screenshots to App Store Connect, attaches the latest
+# VALID TestFlight build, fills the review details (demo account from secrets) and, when submit=true, submits for review.
+# Secrets: ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8_B64 (as for Build iOS app) + ASC_DEMO_USER_<APP>, ASC_DEMO_PASS_<APP>
+# (APP = ENGINEER | PM | CUSTOMER). Nothing secret is printed; API errors are redacted.
+name: App Store release
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'Which app'
+        type: choice
+        options: [engineer, pm, customer]
+        default: customer
+      submit:
+        description: 'Submit for review (otherwise only prepare)'
+        type: boolean
+        default: false
+concurrency: { group: "asc-release-${{ github.event.inputs.app }}", cancel-in-progress: false }
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: mobile-native } }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Demo account for this app
+        id: demo
+        env: { APP: "${{ github.event.inputs.app }}" }
+        run: |
+          case "$APP" in engineer) echo "u=ASC_DEMO_USER_ENGINEER" >> "$GITHUB_OUTPUT"; echo "p=ASC_DEMO_PASS_ENGINEER" >> "$GITHUB_OUTPUT";;
+                         pm)       echo "u=ASC_DEMO_USER_PM" >> "$GITHUB_OUTPUT";       echo "p=ASC_DEMO_PASS_PM" >> "$GITHUB_OUTPUT";;
+                         customer) echo "u=ASC_DEMO_USER_CUSTOMER" >> "$GITHUB_OUTPUT"; echo "p=ASC_DEMO_PASS_CUSTOMER" >> "$GITHUB_OUTPUT";; esac
+      - name: Prepare / submit
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          K: ${{ secrets.ASC_KEY_P8_B64 }}
+          DEMO_USER: ${{ secrets[steps.demo.outputs.u] }}
+          DEMO_PASS: ${{ secrets[steps.demo.outputs.p] }}
+          APP: ${{ github.event.inputs.app }}
+          SUBMIT: ${{ github.event.inputs.submit }}
+        run: |
+          set -e; pip -q install pyjwt cryptography requests >/dev/null
+          echo "$K" | base64 -d > "$RUNNER_TEMP/AuthKey.p8"; export ASC_KEY_P8="$RUNNER_TEMP/AuthKey.p8"
+          [ -n "$DEMO_PASS" ] && echo "::add-mask::$DEMO_PASS"; [ -n "$DEMO_USER" ] && echo "::add-mask::$DEMO_USER"
+          if [ "$SUBMIT" = "true" ]; then python3 asc_release.py "$APP" --submit; else python3 asc_release.py "$APP"; fi
+          rm -f "$RUNNER_TEMP/AuthKey.p8"

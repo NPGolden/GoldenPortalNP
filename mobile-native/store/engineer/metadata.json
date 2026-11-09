@@ -1,0 +1,24 @@
+{
+ "privacyPolicyUrl": "https://www.goldenas.com.gr/privacy.html",
+ "supportUrl": "https://www.goldenas.com.gr/contact.html",
+ "marketingUrl": "https://www.goldenas.com.gr/",
+ "primaryCategory": "BUSINESS",
+ "secondaryCategory": "PRODUCTIVITY",
+ "locale": "en-US",
+ "releaseType": "MANUAL",
+ "contact": {
+  "firstName": "Nikos",
+  "lastName": "Polykandriotis",
+  "email": "np@goldenas.com.gr",
+  "phone": "+302104018000"
+ },
+ "distribution": "unlisted",
+ "name": "Golden A/S Service",
+ "subtitle": "Field service for Golden staff",
+ "promotionalText": "The field tool of Golden A/S service engineers — reports, tickets, equipment and hours, on board and offline.",
+ "description": "Golden A/S Service is the field application for the service engineers of Golden Automation Systems (Golden A/S), the marine electrical, automation and navigation systems integrator based in Keratsini, Greece, with branches in Italy and the Netherlands.\n\nAn account issued by Golden A/S is required. The app is a companion to the Golden A/S portal and is not intended for the general public.\n\nWith it an engineer on board or at a shipyard can:\n• see the tickets and work orders assigned to them and the day's schedule\n• write field service and inspection reports with tasks, time lines, parts and photos taken with the camera, and submit them for approval\n• browse the equipment of the vessel by system or location, with its service history\n• book working hours per project and section, with overtime, holiday and travel\n• reach HR for leave requests and messages\n• keep working without a connection — drafts are kept on the device and synchronised later\n\nSign-in with password and authenticator code, or with Face ID / Touch ID and passkeys after the first sign-in. All data stays on the Golden A/S portal; nothing is shared with third parties.",
+ "keywords": "marine,service,field report,engineer,automation,yacht,shipyard,tickets,hours",
+ "whatsNew": "First App Store release of the Golden A/S Service app: field and inspection reports, tickets, equipment, hours, HR requests, offline drafts, passkeys.",
+ "reviewNotes": "This is the field application for employees of Golden Automation Systems (Golden A/S); it is distributed unlisted to our staff and requires an account issued by the company.\n\nPlease sign in with the demo account provided (a staff user with a demo project; no real customer data). No authenticator code is needed for this account. After sign-in: Home shows the assigned tickets; Reports › + Field Service Report shows the report form with camera upload; Equipment lists a vessel's systems; Hours books time. Push notifications and passkeys are optional.",
+ "bundleId": "gr.goldenas.service"
+}
