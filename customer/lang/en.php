@@ -8541,4 +8541,9 @@ Best regards,
 'chk.older_than' => 'Older than (days)',
 'chk.days' => 'Days',
 'chk.override' => 'Manual override',
+// GAS-CP-R94-002 — service-report disciplines
+'fsr.discs_title' => 'Service reports — technical disciplines on the time lines',
+'fsr.discs_hint' => 'Tick the technical disciplines an engineer may pick as specialty on a service-report time line; accounting prices those hours with the discipline\'s rate card. Nothing ticked = every active technical discipline (the HR departments — Administration, Accounting, Sales — are left out unless ticked). The Service Engineer app receives the same list.',
+'fsr.discs_n' => '{n} disciplines offered on service reports',
+'fsr.discs_saved' => 'Service-report disciplines saved.',
 ];

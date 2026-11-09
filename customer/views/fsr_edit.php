@@ -122,7 +122,7 @@ layout_head($title, 'projects');
             <?php for ($k = 0; $k < FSR_MAX_LINES; $k++): $ln = $lines[$k] ?? null; ?>
               <tr>
                 <td><input name="wk_eng[<?= $i ?>][<?= $k ?>]" list="engineers" maxlength="120" value="<?= e($ln['engineer'] ?? (($i === 0 && $k === 0 && !$wk) ? $u['full_name'] : '')) ?>" placeholder="<?= tt('fsr.engineer_ph') ?>"></td>
-                <td><input name="wk_spec[<?= $i ?>][<?= $k ?>]" list="specialties" maxlength="80" value="<?= e($ln['specialty'] ?? 'Service Engineer') ?>"></td>
+                <td><input name="wk_spec[<?= $i ?>][<?= $k ?>]" list="specialties" maxlength="80" value="<?= e($ln['specialty'] ?? fsr_specialty_default((int)$u['id'])) ?>" placeholder="<?= tt('fsr.specialty') ?>"></td>
                 <td><input name="wk_start[<?= $i ?>][<?= $k ?>]" type="time" class="js-t" value="<?= e(fsr_fmt_time($ln['start_time'] ?? null)) ?>"></td>
                 <td><input name="wk_end[<?= $i ?>][<?= $k ?>]" type="time" class="js-t" value="<?= e(fsr_fmt_time($ln['end_time'] ?? null)) ?>"></td>
                 <td><select name="wk_type[<?= $i ?>][<?= $k ?>]"><?php foreach (fsr_time_types() as $tk => $tl): ?><option value="<?= $tk ?>" title="<?= e(fsr_time_type_label($tk)) ?>"<?= $sel($tk, $ln['time_type'] ?? 'WT') ?>><?= $tl ?></option><?php endforeach; ?></select></td>

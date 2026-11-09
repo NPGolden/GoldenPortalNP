@@ -15,10 +15,26 @@ const FSR_MAX_WORKS  = 20;           // tasks per report (added one by one on th
 const FSR_MAX_PARTS  = 3;
 const FSR_MAX_PHOTOS = 9;
 
-function fsr_specialties(): array {
+/** Legacy free-text specialties (reports before R94-002 carry these). */
+function fsr_specialties_legacy(): array {
     return ['Service Engineer', 'Automation Engineer', 'Electrical Engineer', 'Electrician', 'Navigation Engineer',
             'Commissioning Engineer', 'Project Manager', 'Technician', 'Supervisor'];
 }
+/** R94-002: the technical disciplines ticked in Settings › Disciplines › Service reports (nothing ticked = every active discipline);
+ *  the specialty on a time line is a discipline name, so accounting prices the hours with that discipline's rate card. */
+function fsr_tech_disc_setting(): array { $v = function_exists('cp_setting') ? (string) cp_setting('fsr_disciplines', '') : ''; return $v === '' ? [] : array_values(array_unique(array_map('intval', array_filter(explode(',', $v), fn($x) => $x !== '')))); }
+function fsr_tech_disc_save(array $ids): void { if (!is_cp_admin()) throw new RuntimeException(t('err.noaccess')); cp_setting_set('fsr_disciplines', implode(',', array_values(array_unique(array_map('intval', $ids))))); }
+function fsr_specialties(): array {
+    static $c = null; if ($c !== null) return $c;
+    try { $rows = all('SELECT id, name, sort_order FROM disciplines WHERE is_active = 1 ORDER BY sort_order, name'); } catch (Throwable $e) { $rows = []; }
+    $sel = fsr_tech_disc_setting();
+    // ticked ones; nothing ticked = the technical disciplines (the HR departments — Administration, Accounting, Sales — sit at sort order 900+ since R56-002 and are left out)
+    $rows = array_values(array_filter($rows, fn($d) => $sel ? in_array((int)$d['id'], $sel, true) : (int)$d['sort_order'] < 900));
+    $c = $rows ? array_values(array_unique(array_map(fn($d) => (string)$d['name'], $rows))) : fsr_specialties_legacy();
+    return $c;
+}
+/** Default specialty of a line: the engineer's own discipline when known, else the first offered. */
+function fsr_specialty_default(?int $userId = null): string { $n = $userId ? (string) scalar('SELECT d.name FROM customer_users cu JOIN disciplines d ON d.id = cu.discipline_id WHERE cu.id = ?', [$userId]) : ''; $all = fsr_specialties(); return $n !== '' && in_array($n, $all, true) ? $n : ($all[0] ?? 'Service Engineer'); }
 function fsr_time_types(): array { return ['WT' => 'WT', 'TT' => 'TT', 'NC' => 'NC']; }   // NC = not chargeable (R46-005)
 function fsr_time_type_label(string $k): string { return ['WT' => t('fsr.tt_wt'), 'TT' => t('fsr.tt_tt'), 'NC' => t('fsr.tt_nc')][$k] ?? $k; }
 function fsr_part_types(): array { return ['W' => 'W', 'G' => 'G', 'I' => 'I']; }
@@ -177,7 +193,7 @@ function fsr_save_from_post(?int $id): int {
             if ($eng === '' && $st === '' && $en === '') continue;
             $st = preg_match('/^\d{1,2}:\d{2}$/', $st) ? $st . ':00' : null;
             $en = preg_match('/^\d{1,2}:\d{2}$/', $en) ? $en . ':00' : null;
-            $lines[] = ['engineer' => mb_substr($eng, 0, 120) ?: null, 'specialty' => mb_substr(trim((string)($_POST['wk_spec'][$i][$k] ?? '')), 0, 80) ?: 'Service Engineer',
+            $lines[] = ['engineer' => mb_substr($eng, 0, 120) ?: null, 'specialty' => mb_substr(trim((string)($_POST['wk_spec'][$i][$k] ?? '')), 0, 80) ?: fsr_specialty_default(),
                         'start' => $st, 'end' => $en, 'type' => in_array($_POST['wk_type'][$i][$k] ?? '', ['TT', 'WT', 'NC'], true) ? $_POST['wk_type'][$i][$k] : 'WT'];
         }
         $orig = (int)($_POST['wk_orig'][$i] ?? 0);

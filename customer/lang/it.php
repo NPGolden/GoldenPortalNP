@@ -8541,4 +8541,9 @@ Cordiali saluti,
 'chk.older_than' => 'Più vecchie di (giorni)',
 'chk.days' => 'Giorni',
 'chk.override' => 'Forzatura manuale',
+// GAS-CP-R94-002 — service-report disciplines
+'fsr.discs_title' => 'Rapporti di servizio — discipline tecniche sulle righe ore',
+'fsr.discs_hint' => 'Spunta le discipline tecniche che un tecnico può scegliere come specialità su una riga ore del rapporto di servizio; la contabilità prezza quelle ore con il listino della disciplina. Nulla spuntato = tutte le discipline tecniche attive (i reparti HR — Amministrazione, Contabilità, Vendite — restano esclusi se non spuntati). L\'app Service Engineer riceve lo stesso elenco.',
+'fsr.discs_n' => '{n} discipline offerte nei rapporti di servizio',
+'fsr.discs_saved' => 'Discipline dei rapporti di servizio salvate.',
 ];

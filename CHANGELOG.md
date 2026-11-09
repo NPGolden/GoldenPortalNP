@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.114.0** (build 2026-11-09). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.114.1** (build 2026-11-09). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.114.1 | GAS-CP-R94-002 | 2026-11-09 | Service reports: the Specialty of a time line is a technical discipline of the portal (every active technical discipline offered, pre-filled with the engineer's own), so accounting prices the hours with that discipline's rate card; Settings › Disciplines › Service reports picks the disciplines offered; the Service Engineer app receives the same list. | — |
 | 1.114.0 | GAS-CP-R94-001 | 2026-11-09 | Invoicing control: direct invoices (an accounting invoice issued without a proforma) registered in the proforma module — payments, collections and the statement of account treat them alike; sub-project invoicing state computed from the documents (approved offers vs invoices registered on proformas + direct invoices) with an optional manual override; completed sub-projects hidden in the projects tree and in every picker (toggle to show); Collections › Accounting checks: sub-project invoicing coverage incl. completed sub-projects, proforma ↔ invoices mismatch, issued proformas without invoice, Excel export. | `install/migrate_cp_r94_001_direct_invoices.sql` |
 | 1.113.3 | GAS-CP-R93-009 | 2026-11-09 | Projects page: vessel group headers readable in dark mode; Offers and Sub-projects blocks fold / unfold per project (remembered per browser; offers start folded); sub-projects ordered by code numerically (Y.001, Y.002 … Y.010) instead of the manual sort order. | — |
 | 1.113.2 | GAS-CP-R93-008 | 2026-11-09 | Document archive: a long customer name plus a long sub-project title no longer stops a file from being filed ("Unsafe archive path" in the PHP log) — the length rule is per folder / file name, not the whole path; run Settings › Archive › Reorganise once to file what was skipped. | — |

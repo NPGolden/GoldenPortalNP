@@ -1248,3 +1248,11 @@ PHP error log 9 Nov 11:55: `archive: Unsafe archive path: customers/3245_STREAML
 **Security:** direct invoices need `pi_can_invoices()`; the invoice number is a plain string, unique on `uq_pi_no`; file upload through `cp_store_file` (type / size checks as every portal file); all new HTML escaped, inline script carries the CSP nonce. No new secrets, no new endpoints reachable without staff login.
 
 **Migration:** `install/migrate_cp_r94_001_direct_invoices.sql`, check `r94a` (`proformas.kind`). Lang keys +45 per file (8378).
+
+## 267. v1.114.1 — Service reports: specialty = technical discipline, tariff follows it (GAS-CP-R94-002)
+
+**Why:** the time-line *Specialty* of a service report was a free-text datalist of nine fixed labels; accounting mapped it to a discipline by the first six letters, so an electrician booking automation hours could not get the automation tariff.
+
+**Change:** `fsr_specialties()` (`app/fsr.php`) now returns the names of the active disciplines ticked in Settings › Disciplines › *Service reports* (`cp_setting fsr_disciplines`, action `fsr_discs_save`); nothing ticked = every active discipline with `sort_order < 900` (the HR departments imported at 900+ by R56-002 are left out). `fsr_specialty_default($userId)` pre-fills the engineer's own discipline. `acc.php` pricing matches the specialty to a discipline by exact name first (then the legacy fuzzy match), so the chosen discipline's rate card wins over the engineer's default. The API master data (`api/v1/lib/portal.php`) already served `fsr_specialties()`, so the Service Engineer app gets the same list; old reports keep their legacy labels (`fsr_specialties_legacy()` is the fallback when the disciplines table is empty). No DB step. Lang +4 keys × 5 (8382).
+
+**Security:** the setting is admin-only (`is_cp_admin()`); the specialty stays a bounded string (80 chars) — no new input surface.

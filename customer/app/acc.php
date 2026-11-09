@@ -146,6 +146,7 @@ function acc_sync(): int {
     foreach ($rows as $r) {
         $u = $users[mb_strtolower(trim((string)$r['engineer']))] ?? null;
         $did = $u['discipline_id'] ?? null;
+        if ($r['specialty']) { $d = one('SELECT id FROM disciplines WHERE LOWER(name) = ? LIMIT 1', [mb_strtolower(trim((string)$r['specialty']))]); if ($d) $did = (int)$d['id']; }   // R94-002: the specialty IS a discipline name → its rate card wins over the engineer's default discipline
         if (!$did && $r['specialty']) { $d = one('SELECT id FROM disciplines WHERE LOWER(name) LIKE ? LIMIT 1', ['%' . mb_strtolower(mb_substr((string)$r['specialty'], 0, 6)) . '%']); $did = $d['id'] ?? null; }
         $h = (float)$r['hours']; $parts = [];
         if ($r['time_type'] === 'TT') $parts['travel'] = $h;
