@@ -7,7 +7,13 @@ $counts = function_exists('web_has') && web_has() ? web_counts() : [];
 layout_head(t('web.title'), 'admin_website');
 ?>
 <?php settings_tabs('admin_website'); ?>
-<div class="card"><h2>✉ <?= tt('web.mail') ?></h2><p><?= function_exists('cp_mail_configured') && cp_mail_configured() ? pill('green', t('web.mail_smtp', ['host' => (string)cfg('smtp.host'), 'user' => (string)cfg('smtp.user')])) : pill('gold', t('web.mail_phpmail')) ?></p><p class="hint"><?= tt('web.mail_hint') ?></p></div>
+<div class="card"><h2>✉ <?= tt('web.mail') ?></h2>
+  <?php $tr = function_exists('cp_mail_transport') ? cp_mail_transport() : 'mail'; ?>
+  <p><?= $tr === 'graph' ? pill('green', t('web.mail_graph', ['from' => (string)cfg('graph.from')])) : ($tr === 'smtp' ? pill('green', t('web.mail_smtp', ['host' => (string)cfg('smtp.host'), 'user' => (string)cfg('smtp.user')])) : pill('gold', t('web.mail_phpmail'))) ?></p>
+  <p class="hint"><?= tt('web.mail_hint') ?></p>
+  <?php if (isset($_SESSION['mail_test'])): $mt = $_SESSION['mail_test']; unset($_SESSION['mail_test']); ?><p class="flash flash--<?= $mt['ok'] ? 'good' : 'bad' ?>" style="margin:8px 0;"><?= e($mt['ok'] ? t('web.mail_test_ok', ['to' => $mt['to']]) : t('web.mail_test_fail')) ?></p><?php endif; ?>
+  <form method="post" class="btn-row" style="margin-top:8px;" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="web_mail_test"><button class="btn btn--sm" type="submit">✉ <?= e(t('web.mail_test_btn', ['to' => (string)(current_user()['email'] ?? '')])) ?></button><span class="hint"><?= tt('web.mail_test_hint') ?></span></form>
+</div>
 <h2 class="settings-h"><?= tt('web.title') ?></h2>
 <div class="card">
   <h2>🌐 <?= tt('web.feed') ?></h2>

@@ -8465,7 +8465,7 @@ GAS-MSB-2026-002',
 'web.mail' => 'Outgoing e-mail',
 'web.mail_smtp' => 'Authenticated SMTP via {host} as {user} — candidate, HR and website messages pass SPF/DMARC.',
 'web.mail_phpmail' => 'PHP mail() — not configured for SMTP. goldenas.com.gr mail is on Microsoft 365 and its SPF rejects other senders: messages will land in junk.',
-'web.mail_hint' => 'Set the smtp block in customer/app/config.php (host smtp.office365.com, port 587, a licensed mailbox with "Authenticated SMTP" enabled and its app password). The website uses the same mailbox.',
+'web.mail_hint' => 'Бажано: Microsoft Graph з OAuth2 client credentials — задайте блок graph у customer/app/config.php (tenant, client_id, client_secret, from) з реєстрації застосунку Entra з дозволом Mail.Send, обмеженим скринькою-відправником через application access policy; пароль скриньки не зберігається. Резерв: блок smtp (smtp.office365.com:587, скринька з "Authenticated SMTP" та app password). Сайт використовує ті самі значення у api/config.php.',
 // R91-004 CV retention controls
 'rc.pool_retention' => 'Talent-pool retention (months)',
 'rc.pool_retention_hint' => 'Talent-pool entries rest on the candidate\'s consent and may be kept longer than applications; they are deleted after this period.',
@@ -8550,4 +8550,12 @@ GAS-MSB-2026-002',
 // GAS-CP-R94-005 — website inquiries → tickets
 'web.no_vessel_yet' => 'Поки без судна (вкажіть його в тікеті пізніше)',
 'web.convert_hint' => 'Будь-який запит із сайту — запит підтримки, контактна форма, запит доступу до порталу — стає тікетом із відправником, e-mail, телефоном та оригінальним текстом в описі; запит позначається виконаним і прив’язується до тікета. Конвертувати можуть керівники проєктів, керівництво, продажі та команда робіт.',
+// GAS-CP-R94-007 — Graph mailer
+'web.mail_graph' => 'Microsoft Graph (OAuth2 client credentials), надсилає як {from} — без пароля скриньки; листи проходять SPF/DMARC.',
+'web.mail_test_btn' => 'Надіслати тестовий лист на {to}',
+'web.mail_test_hint' => 'Проходить через активний транспорт; перевірте Вхідні та Спам.',
+'web.mail_test_ok' => 'Тестовий лист передано поштовій службі для {to}.',
+'web.mail_test_fail' => 'Тестовий лист не надіслано — див. картку PHP error log щодо причини.',
+'web.mail_test_subject' => 'Тест вихідної пошти',
+'web.mail_test_body' => 'Тестовий лист із порталу Golden A/S ({host}).\nТранспорт: {t}\nНадіслано: {at}\n\nЯкщо ви читаєте це у Вхідних (не в Спамі), вихідну пошту налаштовано правильно.',
 ];

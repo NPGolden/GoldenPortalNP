@@ -8479,7 +8479,7 @@ Best regards,
 'web.mail' => 'Outgoing e-mail',
 'web.mail_smtp' => 'Authenticated SMTP via {host} as {user} — candidate, HR and website messages pass SPF/DMARC.',
 'web.mail_phpmail' => 'PHP mail() — not configured for SMTP. goldenas.com.gr mail is on Microsoft 365 and its SPF rejects other senders: messages will land in junk.',
-'web.mail_hint' => 'Set the smtp block in customer/app/config.php (host smtp.office365.com, port 587, a licensed mailbox with "Authenticated SMTP" enabled and its app password). The website uses the same mailbox.',
+'web.mail_hint' => 'Preferred: Microsoft Graph with OAuth2 client credentials — set the graph block in customer/app/config.php (tenant, client_id, client_secret, from) from an Entra app registration with the application permission Mail.Send, limited to the sending mailbox by an application access policy; no mailbox password is stored. Fallback: the smtp block (smtp.office365.com:587, mailbox with "Authenticated SMTP" and an app password). The website uses the same values in its api/config.php.',
 // R91-004 CV retention controls
 'rc.pool_retention' => 'Talent-pool retention (months)',
 'rc.pool_retention_hint' => 'Talent-pool entries rest on the candidate\'s consent and may be kept longer than applications; they are deleted after this period.',
@@ -8564,4 +8564,12 @@ Best regards,
 // GAS-CP-R94-005 — website inquiries → tickets
 'web.no_vessel_yet' => 'No vessel yet (set it on the ticket later)',
 'web.convert_hint' => 'Any website inquiry — support request, contact form, portal-access request — becomes a ticket with the sender, e-mail, phone and the original text in its description; the inquiry is marked done and linked to the ticket. Project managers, management, sales and the works team can convert.',
+// GAS-CP-R94-007 — Graph mailer
+'web.mail_graph' => 'Microsoft Graph (OAuth2 client credentials) sending as {from} — no mailbox password; messages pass SPF/DMARC.',
+'web.mail_test_btn' => 'Send a test e-mail to {to}',
+'web.mail_test_hint' => 'Goes through the active transport; look in Inbox and Junk.',
+'web.mail_test_ok' => 'Test message handed to the mail service for {to}.',
+'web.mail_test_fail' => 'The test message could not be sent — see the PHP error log card for the reason.',
+'web.mail_test_subject' => 'Outgoing e-mail test',
+'web.mail_test_body' => 'This is a test message from the Golden A/S portal ({host}).\nTransport: {t}\nSent at: {at}\n\nIf you read this in your Inbox (not Junk), outgoing e-mail is configured correctly.',
 ];

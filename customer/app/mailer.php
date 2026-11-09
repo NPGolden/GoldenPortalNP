@@ -6,17 +6,59 @@
  *  website@goldenas.com.gr) and falls back to mail() otherwise. Candidate, HR and website-inbox messages all use it. */
 declare(strict_types=1);
 
-function cp_mail_configured(): bool { return (bool) (cfg('smtp.host') && cfg('smtp.user') && cfg('smtp.pass')); }
+/* R94-007 — Microsoft Graph with OAuth2 client credentials (preferred): config.php 'graph' => ['tenant', 'client_id', 'client_secret', 'from'].
+ * The app registration needs the application permission Mail.Send (admin consent) and should be limited to the sending mailbox with an
+ * Exchange application access policy. No mailbox password anywhere; the token (1 h) is cached in a 0600 file outside the web root. */
+function cp_graph_configured(): bool { return (bool) (cfg('graph.tenant') && cfg('graph.client_id') && cfg('graph.client_secret') && cfg('graph.from')); }
+function cp_mail_configured(): bool { return cp_graph_configured() || (bool) (cfg('smtp.host') && cfg('smtp.user') && cfg('smtp.pass')); }
+/** Human label of the active transport for the settings card. */
+function cp_mail_transport(): string { return cp_graph_configured() ? 'graph' : (cfg('smtp.host') && cfg('smtp.user') && cfg('smtp.pass') ? 'smtp' : 'mail'); }
+/** The mailbox messages are sent from. */
+function cp_mail_from(): string { return (string) (cfg('graph.from') ?: cfg('smtp.from') ?: cfg('smtp.user') ?: 'noreply@goldenas.com.gr'); }
+
+function cp_graph_token(bool $fresh = false): ?string {
+    $tenant = (string) cfg('graph.tenant'); $cid = (string) cfg('graph.client_id'); $sec = (string) cfg('graph.client_secret');
+    $cache = rtrim(sys_get_temp_dir(), '/') . '/gascp-graph-' . substr(hash('sha256', $tenant . '|' . $cid . '|' . $sec), 0, 24) . '.json';
+    if (!$fresh && is_file($cache)) { $c = json_decode((string) @file_get_contents($cache), true); if (is_array($c) && ($c['exp'] ?? 0) > time() + 60 && !empty($c['t'])) return (string) $c['t']; }
+    $ch = curl_init('https://login.microsoftonline.com/' . rawurlencode($tenant) . '/oauth2/v2.0/token');
+    curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15, CURLOPT_CONNECTTIMEOUT => 8,
+        CURLOPT_POSTFIELDS => http_build_query(['client_id' => $cid, 'client_secret' => $sec, 'scope' => 'https://graph.microsoft.com/.default', 'grant_type' => 'client_credentials'])]);
+    $res = curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+    $j = is_string($res) ? json_decode($res, true) : null;
+    if ($code !== 200 || empty($j['access_token'])) { error_log('[cp_mail] Graph token failed (' . $code . ') ' . ($err ?: (string) ($j['error'] ?? '')) . ' ' . preg_replace('/\s+/', ' ', mb_substr((string) ($j['error_description'] ?? ''), 0, 160))); return null; }
+    @file_put_contents($cache, json_encode(['t' => $j['access_token'], 'exp' => time() + (int) ($j['expires_in'] ?? 3600)]), LOCK_EX); @chmod($cache, 0600);
+    return (string) $j['access_token'];
+}
+/** Send through Graph: POST /users/{from}/sendMail. Plain text; optional Reply-To; saved to the mailbox's Sent Items. */
+function cp_graph_send(string $from, string $fromName, string $to, string $subject, string $body, ?string $replyTo = null, array $attachments = []): bool {
+    $tok = cp_graph_token(); if (!$tok) return false;
+    $msg = ['subject' => preg_replace('/[\r\n]/', ' ', $subject), 'body' => ['contentType' => 'Text', 'content' => $body],
+            'toRecipients' => [['emailAddress' => ['address' => $to]]], 'from' => ['emailAddress' => ['address' => $from, 'name' => preg_replace('/[\r\n"]/', '', $fromName)]]];
+    if ($replyTo && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) $msg['replyTo'] = [['emailAddress' => ['address' => $replyTo]]];
+    foreach ($attachments as $a) if (!empty($a['name']) && isset($a['bytes']) && strlen($a['bytes']) <= 3 * 1024 * 1024) $msg['attachments'][] = ['@odata.type' => '#microsoft.graph.fileAttachment', 'name' => (string) $a['name'], 'contentType' => (string) ($a['mime'] ?? 'application/octet-stream'), 'contentBytes' => base64_encode($a['bytes'])];
+    $post = function (string $tok) use ($from, $msg): array {
+        $ch = curl_init('https://graph.microsoft.com/v1.0/users/' . rawurlencode($from) . '/sendMail');
+        curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20, CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $tok, 'Content-Type: application/json'], CURLOPT_POSTFIELDS => json_encode(['message' => $msg, 'saveToSentItems' => true], JSON_UNESCAPED_UNICODE)]);
+        $res = curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch); return [$code, is_string($res) ? $res : ''];
+    };
+    [$code, $res] = $post($tok);
+    if ($code === 401) { $tok = cp_graph_token(true); if ($tok) [$code, $res] = $post($tok); }   // expired / revoked token → one retry
+    if ($code === 202) return true;
+    $j = json_decode($res, true); error_log('[cp_mail] Graph sendMail → ' . $code . ' ' . preg_replace('/\s+/', ' ', mb_substr((string) ($j['error']['code'] ?? '') . ' ' . (string) ($j['error']['message'] ?? ''), 0, 200)));
+    return false;
+}
 
 /** Plain-text mail. $fromName/$from default to the SMTP mailbox; Reply-To optional. */
 function cp_mail(string $to, string $subject, string $body, string $fromName = 'Golden A/S', ?string $from = null, ?string $replyTo = null): bool {
     if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return false;
-    $from = $from ?: (string) (cfg('smtp.from') ?: cfg('smtp.user') ?: 'noreply@goldenas.com.gr');
+    $from = $from ?: cp_mail_from();
+    if (cp_graph_configured()) { if (cp_graph_send((string) cfg('graph.from'), $fromName, $to, $subject, $body, $replyTo)) return true; error_log('[cp_mail] Graph failed for ' . $to . ' — trying SMTP / mail()'); }   // Graph sends as the configured mailbox; any other $from becomes Reply-To-less but logged
     $domain = substr(strrchr($from, '@') ?: '@goldenas.com.gr', 1);
     $hdr = ['From: ' . preg_replace('/[\r\n"]/', '', $fromName) . ' <' . $from . '>', 'To: <' . $to . '>', 'Date: ' . date('r'), 'Message-ID: <' . bin2hex(random_bytes(8)) . '@' . $domain . '>', 'MIME-Version: 1.0', 'Content-Type: text/plain; charset=UTF-8', 'Content-Transfer-Encoding: 8bit', 'X-Mailer: Golden A/S Customer Portal'];
     if ($replyTo && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) $hdr[] = 'Reply-To: <' . $replyTo . '>';
     $subj = '=?UTF-8?B?' . base64_encode(preg_replace('/[\r\n]/', ' ', $subject)) . '?=';
-    if (cp_mail_configured()) {
+    if (cfg('smtp.host') && cfg('smtp.user') && cfg('smtp.pass')) {
         if (cp_smtp_send($from, $to, "Subject: $subj\r\n" . implode("\r\n", $hdr) . "\r\n\r\n" . preg_replace('/(?<!\r)\n/', "\r\n", $body))) return true;
         error_log('[cp_mail] SMTP failed for ' . $to . ' — falling back to mail()');
     }

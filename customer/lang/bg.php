@@ -8465,7 +8465,7 @@ GAS-MSB-2026-002',
 'web.mail' => 'Outgoing e-mail',
 'web.mail_smtp' => 'Authenticated SMTP via {host} as {user} — candidate, HR and website messages pass SPF/DMARC.',
 'web.mail_phpmail' => 'PHP mail() — not configured for SMTP. goldenas.com.gr mail is on Microsoft 365 and its SPF rejects other senders: messages will land in junk.',
-'web.mail_hint' => 'Set the smtp block in customer/app/config.php (host smtp.office365.com, port 587, a licensed mailbox with "Authenticated SMTP" enabled and its app password). The website uses the same mailbox.',
+'web.mail_hint' => 'Предпочитано: Microsoft Graph с OAuth2 client credentials — задайте блока graph в customer/app/config.php (tenant, client_id, client_secret, from) от Entra регистрация на приложение с разрешение Mail.Send, ограничено до изпращащата кутия чрез application access policy; не се съхранява парола. Резервен вариант: блокът smtp (smtp.office365.com:587, кутия с "Authenticated SMTP" и app password). Сайтът използва същите стойности в api/config.php.',
 // R91-004 CV retention controls
 'rc.pool_retention' => 'Talent-pool retention (months)',
 'rc.pool_retention_hint' => 'Talent-pool entries rest on the candidate\'s consent and may be kept longer than applications; they are deleted after this period.',
@@ -8550,4 +8550,12 @@ GAS-MSB-2026-002',
 // GAS-CP-R94-005 — website inquiries → tickets
 'web.no_vessel_yet' => 'Без кораб засега (задайте го в билета по-късно)',
 'web.convert_hint' => 'Всяко запитване от сайта — заявка за поддръжка, контактна форма, заявка за достъп до портала — става билет с подателя, e-mail, телефон и оригиналния текст в описанието; запитването се отбелязва като обработено и се свързва с билета. Конвертират ръководители на проекти, мениджмънт, продажби и екипът по работите.',
+// GAS-CP-R94-007 — Graph mailer
+'web.mail_graph' => 'Microsoft Graph (OAuth2 client credentials), изпраща като {from} — без парола на пощенска кутия; съобщенията минават SPF/DMARC.',
+'web.mail_test_btn' => 'Изпрати тестов имейл до {to}',
+'web.mail_test_hint' => 'Минава през активния транспорт; проверете Входящи и Нежелана поща.',
+'web.mail_test_ok' => 'Тестовото съобщение е предадено на пощенската услуга за {to}.',
+'web.mail_test_fail' => 'Тестовото съобщение не беше изпратено — вижте картата PHP error log за причината.',
+'web.mail_test_subject' => 'Тест на изходящата поща',
+'web.mail_test_body' => 'Тестово съобщение от портала на Golden A/S ({host}).\nТранспорт: {t}\nИзпратено: {at}\n\nАко го четете във Входящи (не в Нежелана поща), изходящата поща е настроена правилно.',
 ];

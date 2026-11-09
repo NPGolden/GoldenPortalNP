@@ -134,6 +134,11 @@ function web_handle_action(string $action): bool {
         q('UPDATE web_inquiries SET status = ?, note = ?, handled_by = ?, handled_at = NOW() WHERE id = ?', [$st, mb_substr(trim((string) ($_POST['note'] ?? '')), 0, 400) ?: null, (int) current_user()['id'], $id]);
         flash('good', t('sys.saved')); redirect('web_inbox', ['id' => $id, '_r' => uniqid()]); }
     if ($action === 'web_make_ticket') { require_staff(); $tid = web_make_ticket((int) $_POST['id'], (int) ($_POST['vessel_id'] ?? 0), (string) ($_POST['category'] ?? ''), (string) ($_POST['priority'] ?? '')); flash('good', t('web.ticket_created')); redirect('ticket', ['id' => $tid, '_r' => uniqid()]); }
+    if ($action === 'web_mail_test') {   // R94-007: administrators send themselves a test message through the active transport
+        require_cp_admin(); $u = current_user(); $to = (string)($u['email'] ?? '');
+        $ok = function_exists('cp_mail') && cp_mail($to, '[Golden A/S Portal] ' . t('web.mail_test_subject'), str_replace('\\n', "\n", t('web.mail_test_body', ['t' => cp_mail_transport(), 'at' => date('Y-m-d H:i:s'), 'host' => (string) parse_url((string) cfg('app.base_url'), PHP_URL_HOST)])), 'Golden A/S Portal');
+        $_SESSION['mail_test'] = ['ok' => $ok, 'to' => $to]; redirect('admin_website', ['_r' => uniqid()]);
+    }
     if ($action !== 'web_settings_save') return false;
     require_cp_admin();
     if (!empty($_POST['web_rotate_key'])) { $nk = bin2hex(random_bytes(24)); cp_setting_set('web_site_key', $nk); $_SESSION['web_key_once'] = $nk; }   // shown in full once, on the next page view only

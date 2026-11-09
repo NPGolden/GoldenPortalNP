@@ -1278,3 +1278,15 @@ All three website forms already post to the inbox (`api/ticket.php` → kind tic
 ## 271. v1.114.5 — Fix: `$pid` undefined in the FSR task block (GAS-CP-R94-006)
 
 The specialty `<select>` added in §268 computed `fsr_specialty_options($pid …)` inside `$taskBlock`, a closure that does not `use ($pid)` → "PHP Warning: Undefined variable $pid … fsr_edit.php:124" on every form render (the list still rendered, without the project's branch rate list). The options are now built once before the closure and passed with `use ($spOpts, $spNames)`. No functional change otherwise.
+
+## 272. v1.115.0 — Outgoing e-mail via Microsoft Graph, OAuth2 client credentials (GAS-CP-R94-007)
+
+**Why:** goldenas.com.gr SPF is Microsoft-only; PHP `mail()` lands in junk, and authenticated SMTP needs a mailbox app password (not available with Security Defaults, and a password at rest on the host).
+
+**Portal (`app/mailer.php`):** `cp_graph_configured()` (config `graph.tenant`, `graph.client_id`, `graph.client_secret`, `graph.from`), `cp_graph_token()` (client-credentials token from `login.microsoftonline.com/<tenant>/oauth2/v2.0/token`, scope `https://graph.microsoft.com/.default`, cached in `sys_get_temp_dir()/gascp-graph-<hash>.json` 0600, refreshed 60 s before expiry), `cp_graph_send()` (`POST /v1.0/users/<from>/sendMail`, text body, Reply-To, optional ≤3 MB attachments, `saveToSentItems`, one retry on 401). `cp_mail()` order: Graph → SMTP → `mail()`; `cp_mail_configured()` true for Graph or SMTP; `cp_mail_transport()` graph / smtp / mail; `cp_mail_from()`. Settings › System › Website card shows the transport and offers `web_mail_test` (admin only, sends to the administrator's own address, result flashed). `config.sample.php` documents the block.
+
+**Website (`goldenas-website` R14, `api/_lib.php`):** `gas_graph_token()` / `gas_graph_send()` with `GRAPH_TENANT`, `GRAPH_CLIENT_ID`, `GRAPH_CLIENT_SECRET`, `GRAPH_FROM` in `api/config.php`; `gas_mail()` tries Graph first, then SMTP, then `mail()`.
+
+**Entra setup (admin, once):** App registration "Golden A/S Portal mailer" (single tenant) → Certificates & secrets → new client secret (24 months; note the VALUE) → API permissions → Microsoft Graph → Application permissions → `Mail.Send` → Grant admin consent. Exchange Online PowerShell: `New-ApplicationAccessPolicy -AppId <client id> -PolicyScopeGroupId <mail-enabled security group containing website@goldenas.com.gr> -AccessRight RestrictAccess -Description "Portal mailer"` (`Test-ApplicationAccessPolicy` to verify). Then fill the graph block on the server and press the test button.
+
+**Security:** no mailbox credential anywhere; the app can send only as the policy-scoped mailbox; secret in `config.php` (git-ignored, outside the deploy zip); tokens 0600 in temp, never logged; Graph error bodies logged truncated without the token. Lang +7 keys × 5 (8405).

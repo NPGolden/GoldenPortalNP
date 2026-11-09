@@ -8479,7 +8479,7 @@ GAS-MSB-2026-002',
 'web.mail' => 'Εξερχόμενα e-mail',
 'web.mail_smtp' => 'Πιστοποιημένο SMTP μέσω {host} ως {user} — τα μηνύματα προς υποψηφίους, HR και από τον ιστότοπο περνούν SPF/DMARC.',
 'web.mail_phpmail' => 'PHP mail() — χωρίς SMTP. Το mail του goldenas.com.gr είναι στο Microsoft 365 και το SPF του απορρίπτει άλλους αποστολείς: τα μηνύματα θα πάνε στην ανεπιθύμητη.',
-'web.mail_hint' => 'Ορίστε το μπλοκ smtp στο customer/app/config.php (host smtp.office365.com, θύρα 587, αδειοδοτημένο γραμματοκιβώτιο με ενεργό "Authenticated SMTP" και τον κωδικό εφαρμογής του). Ο ιστότοπος χρησιμοποιεί το ίδιο γραμματοκιβώτιο.',
+'web.mail_hint' => 'Προτιμώμενο: Microsoft Graph με OAuth2 client credentials — ορίστε το block graph στο customer/app/config.php (tenant, client_id, client_secret, from) από Entra app registration με δικαίωμα εφαρμογής Mail.Send, περιορισμένο στη θυρίδα αποστολής με application access policy· δεν αποθηκεύεται κωδικός θυρίδας. Εναλλακτικά: το block smtp (smtp.office365.com:587, θυρίδα με "Authenticated SMTP" και app password). Η ιστοσελίδα χρησιμοποιεί τις ίδιες τιμές στο api/config.php.',
 // R91-004 CV retention controls
 'rc.pool_retention' => 'Διατήρηση δεξαμενής ταλέντων (μήνες)',
 'rc.pool_retention_hint' => 'Οι εγγραφές στη δεξαμενή βασίζονται στη συναίνεση του υποψηφίου και μπορούν να διατηρηθούν περισσότερο από τις αιτήσεις· διαγράφονται μετά από αυτή την περίοδο.',
@@ -8564,4 +8564,12 @@ GAS-MSB-2026-002',
 // GAS-CP-R94-005 — website inquiries → tickets
 'web.no_vessel_yet' => 'Χωρίς πλοίο ακόμη (ορίστε το αργότερα στο ticket)',
 'web.convert_hint' => 'Κάθε αίτημα από την ιστοσελίδα — αίτημα υποστήριξης, φόρμα επικοινωνίας, αίτημα πρόσβασης — γίνεται ticket με αποστολέα, e-mail, τηλέφωνο και το αρχικό κείμενο στην περιγραφή· το αίτημα σημειώνεται ως διεκπεραιωμένο και συνδέεται με το ticket. Μετατρέπουν οι project managers, η διοίκηση, οι πωλήσεις και η ομάδα έργων.',
+// GAS-CP-R94-007 — Graph mailer
+'web.mail_graph' => 'Microsoft Graph (OAuth2 client credentials) με αποστολέα {from} — χωρίς κωδικό θυρίδας· τα μηνύματα περνούν SPF/DMARC.',
+'web.mail_test_btn' => 'Αποστολή δοκιμαστικού e-mail στο {to}',
+'web.mail_test_hint' => 'Περνά από την ενεργή μέθοδο αποστολής· ελέγξτε Εισερχόμενα και Ανεπιθύμητα.',
+'web.mail_test_ok' => 'Το δοκιμαστικό μήνυμα παραδόθηκε στην υπηρεσία αλληλογραφίας για το {to}.',
+'web.mail_test_fail' => 'Το δοκιμαστικό μήνυμα δεν στάλθηκε — δείτε την κάρτα PHP error log για τον λόγο.',
+'web.mail_test_subject' => 'Δοκιμή εξερχόμενης αλληλογραφίας',
+'web.mail_test_body' => 'Δοκιμαστικό μήνυμα από το portal της Golden A/S ({host}).\nΜέθοδος: {t}\nΩρα: {at}\n\nΑν το διαβάζετε στα Εισερχόμενα (όχι στα Ανεπιθύμητα), η εξερχόμενη αλληλογραφία είναι σωστά ρυθμισμένη.',
 ];

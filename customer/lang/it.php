@@ -8479,7 +8479,7 @@ Cordiali saluti,
 'web.mail' => 'Posta in uscita',
 'web.mail_smtp' => 'SMTP autenticato via {host} come {user}: i messaggi a candidati, HR e dal sito superano SPF/DMARC.',
 'web.mail_phpmail' => 'PHP mail(): SMTP non configurato. La posta goldenas.com.gr è su Microsoft 365 e il suo SPF rifiuta altri mittenti: i messaggi finiranno nella posta indesiderata.',
-'web.mail_hint' => 'Impostare il blocco smtp in customer/app/config.php (host smtp.office365.com, porta 587, una casella con licenza con "SMTP autenticato" abilitato e la sua password per app). Il sito usa la stessa casella.',
+'web.mail_hint' => 'Preferito: Microsoft Graph con OAuth2 client credentials — imposta il blocco graph in customer/app/config.php (tenant, client_id, client_secret, from) da una registrazione app Entra con permesso applicativo Mail.Send, limitata alla casella mittente da una application access policy; nessuna password di casella viene salvata. Ripiego: il blocco smtp (smtp.office365.com:587, casella con "Authenticated SMTP" e app password). Il sito usa gli stessi valori nel suo api/config.php.',
 // R91-004 CV retention controls
 'rc.pool_retention' => 'Conservazione talent pool (mesi)',
 'rc.pool_retention_hint' => 'Le iscrizioni al talent pool si basano sul consenso del candidato e possono durare più delle candidature; vengono cancellate dopo questo periodo.',
@@ -8564,4 +8564,12 @@ Cordiali saluti,
 // GAS-CP-R94-005 — website inquiries → tickets
 'web.no_vessel_yet' => 'Nessuna nave per ora (impostala sul ticket in seguito)',
 'web.convert_hint' => 'Ogni richiesta dal sito — richiesta di assistenza, modulo di contatto, richiesta di accesso al portale — diventa un ticket con mittente, e-mail, telefono e testo originale nella descrizione; la richiesta è segnata come evasa e collegata al ticket. Possono convertire i project manager, la direzione, le vendite e il team lavori.',
+// GAS-CP-R94-007 — Graph mailer
+'web.mail_graph' => 'Microsoft Graph (OAuth2 client credentials) invia come {from} — nessuna password di casella; i messaggi superano SPF/DMARC.',
+'web.mail_test_btn' => 'Invia un\'e-mail di prova a {to}',
+'web.mail_test_hint' => 'Passa dal trasporto attivo; controlla Posta in arrivo e Indesiderata.',
+'web.mail_test_ok' => 'Messaggio di prova consegnato al servizio di posta per {to}.',
+'web.mail_test_fail' => 'Il messaggio di prova non è stato inviato — vedi la scheda PHP error log per il motivo.',
+'web.mail_test_subject' => 'Prova posta in uscita',
+'web.mail_test_body' => 'Messaggio di prova dal portale Golden A/S ({host}).\nTrasporto: {t}\nInviato: {at}\n\nSe lo leggi in Posta in arrivo (non Indesiderata), la posta in uscita è configurata correttamente.',
 ];

@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.114.5';
+const CP_VERSION = '1.115.0';
 const CP_BUILD   = '2026-11-09';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R94-007', 'version' => '1.115.0', 'date' => '2026-11-09', 'title' => 'Outgoing e-mail through Microsoft Graph with OAuth2 client credentials (config graph block: tenant, client_id, client_secret, from) — no mailbox password; authenticated SMTP and PHP mail() remain fallbacks. Settings › System › Website shows the active transport and sends a test e-mail to the administrator. Website R14 uses the same mailer for the form copies.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R94-006', 'version' => '1.114.5', 'date' => '2026-11-09', 'title' => 'Fix: PHP warning "Undefined variable $pid" on the service-report form (specialty options are now built once per form and handed to the task block).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R94-005', 'version' => '1.114.4', 'date' => '2026-11-09', 'title' => 'Website inbox: every website inquiry (support request, contact form, portal-access request) can be converted into a ticket — vessel (optional for contact / access), category and priority chosen on the message; sender, contact details and original text carried into the ticket, inquiry marked done and linked. Converters: administrators, management, project managers, sales, works team.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R94-004', 'version' => '1.114.3', 'date' => '2026-11-09', 'title' => 'Service-report specialty: the hourly rate cards of the current rate list that belong to no discipline (Atlas engineers, Magnus, Aventics …) are offered as specialties too; hours booked under them are pinned to that card\'s rate item in the accounting register. Same list in the Service Engineer app.', 'db' => null, 'check' => null],

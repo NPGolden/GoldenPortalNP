@@ -31,6 +31,15 @@ return [
 
     // Outgoing e-mail (R91-003). goldenas.com.gr is on Microsoft 365 with an SPF that allows only Microsoft, so use the
     // tenant's authenticated SMTP with a licensed mailbox that has "Authenticated SMTP" enabled. Leave 'host' empty to use PHP mail().
+    // R94-007 — preferred: Microsoft Graph with OAuth2 client credentials (no mailbox password). Entra app registration with the
+    // application permission Mail.Send (admin consent), limited to the sending mailbox by an Exchange application access policy.
+    // When all four are set, Graph is used and the smtp block is only a fallback.
+    'graph' => [
+        'tenant'        => '',                          // tenant ID (GUID) or goldenas.com.gr
+        'client_id'     => '',                          // Application (client) ID
+        'client_secret' => '',                          // client secret VALUE (not its ID) — rotate before it expires
+        'from'          => 'website@goldenas.com.gr',   // the licensed mailbox the app may send as
+    ],
     'smtp' => [
         'host' => 'smtp.office365.com',
         'port' => 587,
