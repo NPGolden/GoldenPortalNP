@@ -188,6 +188,7 @@ return [
 'pr.nosubs' => 'No sub-projects yet.',
 'pr.novessel' => 'No vessel',
 'pr.nsubs' => '{n} sub-project(s)',
+'pr.subprojects' => 'Sub-projects',
 'pr.saved' => 'Saved.',
 'sp.one' => 'Sub-project',
 'sp.code' => 'Code',

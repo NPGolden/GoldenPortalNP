@@ -145,7 +145,7 @@ layout_head(t('pr.title'), 'projects');
         <span class="pmeta"><?= e(t('pr.nsubs', ['n' => count($p['subs'])])) ?><?php if (!empty($pmtC[(int)$p['id']])): ?> · <?= pmt_project_pill((int)$p['id'], $pmtC[(int)$p['id']]) ?><?php endif; ?><?php if (!empty($tkOpen[(int)$p['id']])): ?> · <a class="pill pill--gold" href="<?= url('tickets', ['view' => 'open', 'project' => $p['id'], 'status' => 'open_all']) ?>" title="<?= tt('tk.open_in_project') ?>">🎫 <?= (int)$tkOpen[(int)$p['id']] ?></a><?php endif; ?></span>
       </summary>
       <div class="subs">
-        <?php if ($pof && $pof['n'] && of_visible()): ?><div class="ot-tree"><?php $otRows = of_list(['project' => (int)$p['id']]); $otShowSub = true; $otNewUrl = url('offer_edit', ['project' => $p['id']]); require __DIR__ . '/_offers_table.php'; ?></div><?php elseif (of_has() && is_staff() && of_visible()): ?><p class="hint ot-none"><?= tt('of.none_here') ?> <a href="<?= url('offer_edit', ['project' => $p['id']]) ?>">+ <?= tt('of.new') ?></a></p><?php endif; ?>
+        <?php if ($pof && $pof['n'] && of_visible()): ?><details class="ot-tree fold" data-fold="offers-<?= (int)$p['id'] ?>"><summary class="fold-sum"><span class="fold-tw">▸</span> <?= tt('of.title') ?> <span class="count"><?= (int)$pof['n'] ?></span></summary><?php $otRows = of_list(['project' => (int)$p['id']]); $otShowSub = true; $otNewUrl = url('offer_edit', ['project' => $p['id']]); require __DIR__ . '/_offers_table.php'; ?></details><?php elseif (of_has() && is_staff() && of_visible()): ?><p class="hint ot-none"><?= tt('of.none_here') ?> <a href="<?= url('offer_edit', ['project' => $p['id']]) ?>">+ <?= tt('of.new') ?></a></p><?php endif; ?>
         <?php if (function_exists('td_card_html') && ($tdc = td_card_html(['project' => (int)$p['id']], url('task_edit', ['project' => $p['id']]), true, 6)) !== ''): ?><div class="ot-tree td-tree"><?= $tdc ?></div><?php endif; ?>
         <?php if (function_exists('tk_card_html') && ($tkc = tk_card_html((int)$p['id'], url('ticket_edit', ['project' => $p['id']]), 6)) !== ''): ?><div class="ot-tree tk-tree"><?= $tkc ?></div><?php endif; ?>
         <?php if ($staff && function_exists('pmt_card_html') && ($pmc = pmt_card_html((int)$p['id'], pmt_can_edit((int)$p['id']) ? url('permit_edit', ['project' => $p['id']]) : null, 6)) !== ''): ?><div class="ot-tree tk-tree"><?= $pmc ?></div><?php endif; ?>
@@ -155,6 +155,7 @@ layout_head(t('pr.title'), 'projects');
             · <a href="<?= url('project_edit', ['id' => $p['id']]) ?>"><?= tt('pr.edit') ?></a><?php endif; ?>
           </p>
         <?php else: ?>
+          <details class="fold subs-fold" open data-fold="subs-<?= (int)$p['id'] ?>"><summary class="fold-sum"><span class="fold-tw">▸</span> <?= tt('pr.subprojects') ?> <span class="count"><?= count($p['subs']) ?></span></summary>
           <?php foreach ($p['subs'] as $s): ?>
             <a class="sub" href="<?= url('subproject', ['id' => $s['id']]) ?>">
               <span class="scode"><?= e($s['code'] ?: '—') ?></span>
@@ -165,6 +166,7 @@ layout_head(t('pr.title'), 'projects');
               <span><?= inv_has() ? inv_pill($s, true) : '' ?><?= !empty($ofBySub[(int)$s['id']]) && of_visible() ? ' ' . of_sub_pills($ofBySub[(int)$s['id']]) : '' ?><?= function_exists('bg_pill') ? ' ' . bg_pill($s) : '' ?></span>
             </a>
           <?php endforeach; ?>
+          </details>
           <?php if (is_staff()): ?>
             <p style="margin:10px 0 0;"><a class="btn btn--ghost btn--sm" href="<?= url('project_edit', ['id' => $p['id']]) ?>">✎ <?= tt('pr.edit') ?></a>
                <a class="btn btn--ghost btn--sm" href="<?= url('subproject_new', ['project' => $p['id']]) ?>">+ <?= tt('pr.addsub') ?></a>

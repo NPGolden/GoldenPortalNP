@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.113.2';
+const CP_VERSION = '1.113.3';
 const CP_BUILD   = '2026-11-08';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R93-009', 'version' => '1.113.3', 'date' => '2026-11-09', 'title' => 'Projects page: vessel group headers readable in dark mode; Offers and Sub-projects blocks fold / unfold per project (remembered per browser; offers start folded); sub-projects ordered by code numerically (Y.001, Y.002 … Y.010) instead of the manual sort order.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R93-008', 'version' => '1.113.2', 'date' => '2026-11-09', 'title' => 'Document archive: a long customer name plus a long sub-project title no longer stops a file from being filed ("Unsafe archive path" in the PHP log) — the length rule is per folder / file name, not the whole path; run Settings › Archive › Reorganise once to file what was skipped.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R93-007', 'version' => '1.113.1', 'date' => '2026-11-09', 'title' => 'Sub-project comments posted by staff are internal by default; "Reply to customer" is an explicit choice, and a reply pre-selects the visibility of the message it answers.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R93-006', 'version' => '1.113.0', 'date' => '2026-11-09', 'title' => 'Engineering BOM: administrators and Procurement can delete a revision; import template (Section, Qty, Unit, Description, Maker, Maker part no, Golden code, Note); the import now stages the rows for review — matched against the inventory by Golden code, maker part number (exact and ignoring spaces / dashes) and, for the rest, by the assistant choosing among candidate items — and the engineer accepts (line linked, stock visible), rejects (free-text line), picks another item or creates a new inventory item before the lines are written.', 'db' => 'install/migrate_cp_r93_006_bom_import_review.sql', 'check' => 'r93c'],

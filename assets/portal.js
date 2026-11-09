@@ -646,3 +646,6 @@ document.querySelectorAll('[data-tl-more]').forEach(function (b) { var more = b.
 
 /* ---- R87-001: [data-check-all="name"] ticks / unticks every checkbox of that name in the same form ---- */
 document.addEventListener('change', function (e) { var c = e.target; if (!c.matches || !c.matches('input[type=checkbox][data-check-all]')) return; var f = c.closest('form') || document; f.querySelectorAll('input[type=checkbox][name="' + c.getAttribute('data-check-all') + '"]').forEach(function (x) { x.checked = c.checked; }); });
+
+/* R93-009: remember open / closed state of details[data-fold] */
+(function(){ try { var K='cp.fold.'; document.querySelectorAll('details[data-fold]').forEach(function(d){ var k=K+d.dataset.fold, v=localStorage.getItem(k); if(v==='1') d.open=true; else if(v==='0') d.open=false; d.addEventListener('toggle',function(){ try{ localStorage.setItem(k, d.open?'1':'0'); }catch(e){} }); }); } catch(e){} })();

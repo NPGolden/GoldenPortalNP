@@ -1793,7 +1793,7 @@ html[data-theme="dark"] .online-pop { background: #0F2436; }
 
 /* R75-002 vessel groups */
 tr.vg-h td { background: var(--cp-gold-dim, #F6F2E7); border-top: 2px solid var(--cp-gold, #C89B3C); padding: 6px 10px; }
-.vg-btn { background: none; border: 0; font: inherit; font-weight: 700; color: var(--cp-navy, #0B1E2D); cursor: pointer; padding: 0; display: inline-flex; gap: 6px; align-items: center; }
+.vg-btn { background: none; border: 0; font: inherit; font-weight: 700; color: var(--navy-text, #0B1E2D); cursor: pointer; padding: 0; display: inline-flex; gap: 6px; align-items: center; }
 .vg-tw { display: inline-block; transition: transform .15s; }
 .vg-h.is-collapsed .vg-tw, .vg-hdr.is-collapsed .vg-tw { transform: rotate(-90deg); }
 .vg-hidden { display: none !important; }
@@ -1874,3 +1874,10 @@ html[data-theme="dark"] .pp-col { background: #16263A; } html[data-theme="dark"]
 :root[data-theme="dark"] .ut-bar { background: rgba(255, 255, 255, .1); }
 /* R84-001 e-mail card finder */
 .em-find-list { position: absolute; left: 0; right: 0; top: 100%; z-index: 30; max-height: 240px; overflow: auto; }
+
+/* R93-009: collapsible blocks in the project tree */
+details.fold > summary.fold-sum { cursor: pointer; list-style: none; font-weight: 700; color: var(--navy-text, #0B1E2D); padding: 6px 0; display: flex; align-items: center; gap: 6px; user-select: none; }
+details.fold > summary.fold-sum::-webkit-details-marker { display: none; }
+details.fold > summary .fold-tw { display: inline-block; transition: transform .15s; font-size: 12px; }
+details.fold[open] > summary .fold-tw { transform: rotate(90deg); }
+details.fold > summary .count { font-weight: 500; color: var(--ink-2, #5b6b7a); margin-left: 2px; }

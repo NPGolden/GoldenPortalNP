@@ -100,7 +100,8 @@ function project_tree(?int $onlyProject = null): array {
     $subs = all("SELECT s.*, vs.name AS system_name
                  FROM subprojects s LEFT JOIN vessel_systems vs ON vs.id = s.system_id
                  WHERE s.project_id IN ({$ids})
-                 ORDER BY s.sort_order, s.code, s.name");
+                 ORDER BY SUBSTRING_INDEX(s.code, '.', 1), CAST(SUBSTRING_INDEX(s.code, '.', -1) AS UNSIGNED), s.code, s.name");   // R93-009: by code, not by the manual sort_order
+
     $by = [];
     foreach ($subs as $s) $by[(int)$s['project_id']][] = $s;
     foreach ($projects as &$p) $p['subs'] = $by[(int)$p['id']] ?? [];
@@ -134,7 +135,8 @@ function project_tree_filtered(array $f, int $limit, int $offset): array {
     if ($projects) {
         $ids  = implode(',', array_map('intval', array_column($projects, 'id')));
         $subs = all("SELECT s.*, vs.name AS system_name FROM subprojects s LEFT JOIN vessel_systems vs ON vs.id = s.system_id
-                     WHERE s.project_id IN ({$ids}) ORDER BY s.sort_order, s.code, s.name");
+                     WHERE s.project_id IN ({$ids}) ORDER BY SUBSTRING_INDEX(s.code, '.', 1), CAST(SUBSTRING_INDEX(s.code, '.', -1) AS UNSIGNED), s.code, s.name");   // R93-009: by code, not by the manual sort_order
+
         $by = [];
         foreach ($subs as $s) $by[(int)$s['project_id']][] = $s;
         foreach ($projects as &$p) $p['subs'] = $by[(int)$p['id']] ?? [];
