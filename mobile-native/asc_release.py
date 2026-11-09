@@ -50,11 +50,16 @@ try:
 except SystemExit as e: log("categories not changed:", " ".join(str(e).split())[:400])
 try:
     ar = req("GET", f"/appInfos/{info['id']}/ageRatingDeclaration")["data"]
-    none = {k: "NONE" for k in ["alcoholTobaccoOrDrugUseOrReferences", "contests", "gamblingSimulated", "horrorOrFearThemes", "matureOrSuggestiveThemes", "medicalOrTreatmentInformation", "profanityOrCrudeHumor", "sexualContentGraphicAndNudity", "sexualContentOrNudity", "violenceCartoonOrFantasy", "violenceRealistic", "violenceRealisticProlongedGraphicOrSadistic"]}
-    none.update({"gambling": False, "unrestrictedWebAccess": False})
-    req("PATCH", f"/ageRatingDeclarations/{ar['id']}", json={"data": {"type": "ageRatingDeclarations", "id": ar["id"], "attributes": none}})
-    log("age rating 4+")
-except SystemExit as e: log("age rating not changed:", " ".join(str(e).split())[:600])
+    cur = ar["attributes"]; bools = {"gambling", "unrestrictedWebAccess", "lootBox", "advertising", "parentalControls", "ageAssurance", "healthOrWellnessTopics", "messagingAndChat", "userGeneratedContent"}
+    fill = {}
+    for k, v in cur.items():
+        if k in ("kidsAgeBand", "ageRatingOverride", "koreaAgeRatingOverride"): continue
+        if v is None: fill[k] = False if k in bools else "NONE"
+    if fill:
+        req("PATCH", f"/ageRatingDeclarations/{ar['id']}", json={"data": {"type": "ageRatingDeclarations", "id": ar["id"], "attributes": fill}})
+        log("age rating: answered", len(fill), "open questions with none/no →", sorted(fill))
+    else: log("age rating already complete")
+except SystemExit as e: log("age rating not changed (answer the questionnaire in App Information):", " ".join(str(e).split())[:500])
 
 # ---- version ----
 version_string = open("APP_VERSION").read().strip() if os.path.exists("APP_VERSION") else None
