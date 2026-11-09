@@ -8561,4 +8561,7 @@ Best regards,
 'fsr.card' => 'card',
 'fsr.specialty_hint' => 'The discipline the hours belong to — accounting bills them at this discipline\'s rate card',
 'fsr.legacy_spec' => 'earlier label',
+// GAS-CP-R94-005 — website inquiries → tickets
+'web.no_vessel_yet' => 'No vessel yet (set it on the ticket later)',
+'web.convert_hint' => 'Any website inquiry — support request, contact form, portal-access request — becomes a ticket with the sender, e-mail, phone and the original text in its description; the inquiry is marked done and linked to the ticket. Project managers, management, sales and the works team can convert.',
 ];

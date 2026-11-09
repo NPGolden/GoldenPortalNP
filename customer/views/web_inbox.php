@@ -31,10 +31,14 @@ layout_head(t('web.inbox'), 'web_inbox');
     <div><h3 style="margin-top:0;"><?= tt('web.message') ?></h3><div class="prose" style="white-space:pre-wrap;"><?= e((string)$cur['message']) ?></div></div>
   </div>
   <div class="btn-row" style="margin-top:14px;flex-wrap:wrap;gap:10px;">
-    <?php if ($cur['kind'] === 'ticket' && !$cur['ticket_id']): $vs = all('SELECT id, name FROM vessels WHERE is_active = 1 ORDER BY (name LIKE ?) DESC, name', ['%' . $cur['vessel'] . '%']); ?>
-    <form method="post" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="web_make_ticket"><input type="hidden" name="id" value="<?= (int)$cur['id'] ?>">
-      <select name="vessel_id" required style="min-width:260px;"><option value=""><?= tt('web.pick_vessel') ?></option><?php foreach ($vs as $v): ?><option value="<?= (int)$v['id'] ?>"><?= e($v['name']) ?></option><?php endforeach; ?></select>
-      <button class="btn btn--gold">🎫 <?= tt('web.create_ticket') ?></button></form>
+    <?php if (!$cur['ticket_id'] && function_exists('web_can_convert') && web_can_convert()): $hint = trim((string)($cur['vessel'] ?: $cur['vessels'] ?: '')); $vs = all('SELECT id, name FROM vessels WHERE is_active = 1 ORDER BY (name LIKE ?) DESC, name', ['%' . ($hint !== '' ? mb_substr($hint, 0, 40) : '§none§') . '%']);
+          $defCat = web_default_category((string)$cur['kind']); $defPri = ['low' => 'low', 'normal' => 'normal', 'high' => 'high', 'vessel_stopped' => 'urgent'][(string)$cur['priority']] ?? 'normal'; ?>
+    <form method="post" class="card" style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;padding:10px 12px;margin:0;width:100%;" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="web_make_ticket"><input type="hidden" name="id" value="<?= (int)$cur['id'] ?>">
+      <div class="field" style="margin:0;min-width:260px;flex:1;"><label><?= tt('v.one') ?></label><select name="vessel_id"<?= $cur['kind'] === 'ticket' ? ' required' : '' ?>><option value=""><?= $cur['kind'] === 'ticket' ? tt('web.pick_vessel') : tt('web.no_vessel_yet') ?></option><?php foreach ($vs as $v): ?><option value="<?= (int)$v['id'] ?>"<?= $hint !== '' && $v === $vs[0] && mb_stripos($v['name'], mb_substr($hint, 0, 40)) !== false ? ' selected' : '' ?>><?= e($v['name']) ?></option><?php endforeach; ?></select></div>
+      <div class="field" style="margin:0;"><label><?= tt('tk.category') ?></label><select name="category" data-nosearch><?php foreach (tk_categories() as $k => $l): ?><option value="<?= e($k) ?>"<?= $k === $defCat ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
+      <div class="field" style="margin:0;"><label><?= tt('tk.priority') ?></label><select name="priority" data-nosearch><?php foreach (tk_priorities() as $k => $l): ?><option value="<?= e($k) ?>"<?= $k === $defPri ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
+      <button class="btn btn--gold">🎫 <?= tt('web.create_ticket') ?></button>
+      <p class="hint" style="flex-basis:100%;margin:0;"><?= tt('web.convert_hint') ?></p></form>
     <?php endif; ?>
     <?php if ($cur['kind'] === 'access' && function_exists('url')): ?><a class="btn btn--gold" href="<?= url('admin_users') ?>">👤 <?= tt('web.open_accounts') ?></a><?php endif; ?>
     <form method="post" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="web_inq_status"><input type="hidden" name="id" value="<?= (int)$cur['id'] ?>">

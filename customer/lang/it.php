@@ -8561,4 +8561,7 @@ Cordiali saluti,
 'fsr.card' => 'listino',
 'fsr.specialty_hint' => 'La disciplina a cui appartengono le ore — la contabilità le fattura al listino di questa disciplina',
 'fsr.legacy_spec' => 'etichetta precedente',
+// GAS-CP-R94-005 — website inquiries → tickets
+'web.no_vessel_yet' => 'Nessuna nave per ora (impostala sul ticket in seguito)',
+'web.convert_hint' => 'Ogni richiesta dal sito — richiesta di assistenza, modulo di contatto, richiesta di accesso al portale — diventa un ticket con mittente, e-mail, telefono e testo originale nella descrizione; la richiesta è segnata come evasa e collegata al ticket. Possono convertire i project manager, la direzione, le vendite e il team lavori.',
 ];

@@ -89,18 +89,35 @@ function web_inquiries(array $f = []): array {
 function web_inquiry(int $id): ?array { return one('SELECT i.*, u.full_name handled_name, t.ticket_no FROM web_inquiries i LEFT JOIN customer_users u ON u.id = i.handled_by LEFT JOIN tickets t ON t.id = i.ticket_id WHERE i.id = ?', [$id]) ?: null; }
 function web_inbox_count(): int { try { return web_inbox_has() ? (int) scalar("SELECT COUNT(*) FROM web_inquiries WHERE status = 'new'") : 0; } catch (Throwable $e) { return 0; } }
 /** Turns a website support request into a portal ticket on the chosen vessel (staff). */
-function web_make_ticket(int $id, int $vesselId): int {
-    $i = web_inquiry($id); if (!$i || $i['kind'] !== 'ticket') throw new RuntimeException(t('err.notfound'));
+/** R94-005: who turns a website inquiry into a ticket — administrators, management, project managers, sales and the works team. */
+function web_can_convert(): bool {
+    static $v = null; if ($v !== null) return $v; if (!is_staff()) return $v = false;
+    $v = is_cp_admin() || (function_exists('mgmt_can') && mgmt_can()) || (function_exists('pm_is_pm') && pm_is_pm()) || (function_exists('pi_is_sales') && pi_is_sales())
+       || (bool) scalar('SELECT can_works FROM customer_users WHERE id = ?', [(int)(current_user()['id'] ?? 0)]);
+    return $v;
+}
+/** Default ticket category per inquiry kind. */
+function web_default_category(string $kind): string { return ['ticket' => 'fault', 'contact' => 'question', 'access' => 'other'][$kind] ?? 'other'; }
+/**
+ * Turn any website inquiry (support request, contact form, portal-access request) into a ticket — R94-005 extends it from support requests only.
+ * $vesselId 0 = no vessel yet (the ticket is internal until a vessel is set on it); $category / $priority from the form, defaults per kind.
+ */
+function web_make_ticket(int $id, int $vesselId, string $category = '', string $priority = ''): int {
+    $i = web_inquiry($id); if (!$i) throw new RuntimeException(t('err.notfound'));
+    if (!web_can_convert()) throw new RuntimeException(t('err.noaccess'));
     if ($i['ticket_id']) return (int) $i['ticket_id'];
-    $v = one('SELECT id, customer_id FROM vessels WHERE id = ?', [$vesselId]); if (!$v) throw new RuntimeException(t('err.notfound'));
+    $v = $vesselId ? one('SELECT id, customer_id FROM vessels WHERE id = ?', [$vesselId]) : null; if ($vesselId && !$v) throw new RuntimeException(t('err.notfound'));
     $u = current_user();
-    $pri = ['low' => 'low', 'normal' => 'normal', 'high' => 'high', 'vessel_stopped' => 'urgent'][$i['priority']] ?? 'normal';
-    $desc = $i['message'] . "\n\n— " . t('web.from_site') . ' ' . $i['ref'] . ' · ' . $i['name'] . ' (' . $i['company'] . ') · ' . $i['email'] . ($i['phone'] !== '' ? ' · ' . $i['phone'] : '') . ($i['location'] !== '' ? ' · ' . $i['location'] : '') . ' · ' . t('web.system') . ': ' . $i['system_kind'];
+    $cats = function_exists('tk_categories') ? tk_categories() : []; if (!array_key_exists($category, $cats)) $category = web_default_category((string)$i['kind']);
+    $pri = array_key_exists($priority, function_exists('tk_priorities') ? tk_priorities() : []) ? $priority : (['low' => 'low', 'normal' => 'normal', 'high' => 'high', 'vessel_stopped' => 'urgent'][(string)$i['priority']] ?? 'normal');
+    $kindLabel = t('web.kind_' . $i['kind']); $title = trim((string)$i['subject']) !== '' ? (string)$i['subject'] : $kindLabel . ' — ' . $i['name'] . ($i['company'] ? ' (' . $i['company'] . ')' : '');
+    $extra = $i['kind'] === 'access' ? ' · ' . t('web.role') . ': ' . (string)$i['role'] . ($i['vessels'] ? ' · ' . t('web.vessels') . ': ' . $i['vessels'] : '') : ($i['system_kind'] ? ' · ' . t('web.system') . ': ' . $i['system_kind'] : '');
+    $desc = $i['message'] . "\n\n— " . t('web.from_site') . ' ' . $i['ref'] . ' (' . $kindLabel . ') · ' . $i['name'] . ($i['company'] ? ' (' . $i['company'] . ')' : '') . ' · ' . $i['email'] . ($i['phone'] !== '' ? ' · ' . $i['phone'] : '') . ((string)($i['location'] ?? '') !== '' ? ' · ' . $i['location'] : '') . $extra;
     q('INSERT INTO tickets (ticket_no, customer_id, vessel_id, title, description, category, priority, created_side, created_by, created_name) VALUES (?,?,?,?,?,?,?,?,?,?)',
-      [tk_number(), $v['customer_id'], (int) $v['id'], mb_substr($i['subject'], 0, 160), $desc, 'fault', $pri, 'customer', (int) $u['id'], mb_substr($i['name'], 0, 120)]);
+      [tk_number(), $v ? $v['customer_id'] : null, $v ? (int) $v['id'] : null, mb_substr($title, 0, 160), $desc, $category, $pri, $i['kind'] === 'ticket' && $v ? 'customer' : 'golden', (int) $u['id'], mb_substr($i['name'], 0, 120)]);
     $tid = (int) db()->lastInsertId();
     if (function_exists('tk_event')) tk_event($tid, 'created', t('web.from_site') . ' ' . $i['ref']);
-    if (function_exists('rs_has') && rs_has() && function_exists('rs_cover_ticket')) rs_cover_ticket($tid, (int) $v['id']);
+    if ($v && function_exists('rs_has') && rs_has() && function_exists('rs_cover_ticket')) rs_cover_ticket($tid, (int) $v['id']);
     q('UPDATE web_inquiries SET ticket_id = ?, status = "done", handled_by = ?, handled_at = NOW() WHERE id = ?', [$tid, (int) $u['id'], $id]);
     return $tid;
 }
@@ -116,7 +133,7 @@ function web_handle_action(string $action): bool {
     if ($action === 'web_inq_status') { require_staff(); $id = (int) $_POST['id']; $st = in_array($_POST['status'] ?? '', ['new', 'in_progress', 'done', 'spam'], true) ? (string) $_POST['status'] : 'in_progress';
         q('UPDATE web_inquiries SET status = ?, note = ?, handled_by = ?, handled_at = NOW() WHERE id = ?', [$st, mb_substr(trim((string) ($_POST['note'] ?? '')), 0, 400) ?: null, (int) current_user()['id'], $id]);
         flash('good', t('sys.saved')); redirect('web_inbox', ['id' => $id, '_r' => uniqid()]); }
-    if ($action === 'web_make_ticket') { require_staff(); $tid = web_make_ticket((int) $_POST['id'], (int) $_POST['vessel_id']); flash('good', t('web.ticket_created')); redirect('ticket', ['id' => $tid, '_r' => uniqid()]); }
+    if ($action === 'web_make_ticket') { require_staff(); $tid = web_make_ticket((int) $_POST['id'], (int) ($_POST['vessel_id'] ?? 0), (string) ($_POST['category'] ?? ''), (string) ($_POST['priority'] ?? '')); flash('good', t('web.ticket_created')); redirect('ticket', ['id' => $tid, '_r' => uniqid()]); }
     if ($action !== 'web_settings_save') return false;
     require_cp_admin();
     if (!empty($_POST['web_rotate_key'])) { $nk = bin2hex(random_bytes(24)); cp_setting_set('web_site_key', $nk); $_SESSION['web_key_once'] = $nk; }   // shown in full once, on the next page view only
