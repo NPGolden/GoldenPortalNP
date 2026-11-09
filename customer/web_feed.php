@@ -29,6 +29,7 @@ try {
     $fwd = trim((string) ($body['ip'] ?? '')); $vip = preg_match('/^[0-9a-fA-F:.]{3,45}$/', $fwd) ? $fwd : $ip;   // the website passes the visitor's address
     if ($r === 'ticket') $out(web_pub_ticket($body, $vip), 201);
     if ($r === 'access') $out(web_pub_access($body, $vip), 201);
+    if ($r === 'contact') $out(web_pub_contact($body, $vip), 201);   // R93-002
     $out(['error' => 'not found'], 404);
 }
 catch (RuntimeException $e) { $c = (int) $e->getCode(); if ($c >= 400 && $c < 600 && !($e instanceof PDOException)) $out(['error' => $e->getMessage()], $c); error_log('[web_feed] ' . $e->getMessage()); $out(['error' => 'server error'], 500); }

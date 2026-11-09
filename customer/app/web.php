@@ -33,7 +33,22 @@ const WEB_SYSTEMS = ['power', 'automation', 'navigation', 'communication', 'cybe
 const WEB_PRIORITIES = ['low', 'normal', 'high', 'vessel_stopped'];
 /** Staff who hear about a new website inquiry: works people for tickets, administrators for access requests. */
 function web_notify_ids(string $kind): array {
-    try { $sql = $kind === 'ticket' ? "SELECT id FROM customer_users WHERE role IN ('staff','admin') AND is_active = 1 AND (can_works = 1 OR role = 'admin')" : "SELECT id FROM customer_users WHERE role = 'admin' AND is_active = 1"; return array_map(fn($r) => (int) $r['id'], all($sql)); } catch (Throwable $e) { return []; }
+    try { $sql = $kind === 'ticket' ? "SELECT id FROM customer_users WHERE role IN ('staff','admin') AND is_active = 1 AND (can_works = 1 OR role = 'admin')" : ($kind === 'contact' ? "SELECT id FROM customer_users WHERE role IN ('staff','admin') AND is_active = 1 AND (can_sales = 1 OR role = 'admin')" : "SELECT id FROM customer_users WHERE role = 'admin' AND is_active = 1"); return array_map(fn($r) => (int) $r['id'], all($sql)); } catch (Throwable $e) { return []; }
+}
+/** Public POST ?r=contact — the general contact form (api/contact.php). Sales staff are notified; the e-mail to sales@ still goes out from the website. R93-002 */
+function web_pub_contact(array $b, string $ip): array {
+    $f = fn(string $k, int $max) => mb_substr(trim((string) ($b[$k] ?? '')), 0, $max);
+    $name = $f('name', 120); $email = $f('email', 190); $msg = $f('message', 4000); $topic = $f('topic', 40); $company = $f('company', 160);
+    if ($name === '' || $email === '' || $msg === '') throw new RuntimeException('missing fields', 422);
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new RuntimeException('bad email', 422);
+    $dup = one('SELECT ref FROM web_inquiries WHERE kind = "contact" AND email = ? AND message = ? AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)', [$email, $msg]); if ($dup) return ['ref' => $dup['ref'], 'duplicate' => true];
+    $ref = web_ref(); $topics = ['general' => 'General', 'newbuild' => 'Newbuild', 'refit' => 'Refit', 'service' => 'Service', 'eswitchboard' => 'E-switchboard', 'bridge' => 'Bridge', 'cyber' => 'Cyber', 'zerogen' => 'ZeroGen', 'partnership' => 'Partnership'];
+    $subject = ($topic !== '' ? ($topics[$topic] ?? ucfirst($topic)) . ' — ' : '') . $name . ($company !== '' ? ' (' . $company . ')' : '');
+    q('INSERT INTO web_inquiries (ref, kind, name, company, email, phone, system_kind, subject, message, ip) VALUES (?,?,?,?,?,?,?,?,?,?)',
+      [$ref, 'contact', $name, $company, $email, $f('phone', 40), $topic, mb_substr($subject, 0, 190), $msg, mb_substr($ip, 0, 64)]);
+    $id = (int) db()->lastInsertId();
+    if (function_exists('nf_push')) try { nf_push(web_notify_ids('contact'), 'tk', 'web:' . $id, t('web.nf_contact', ['name' => $name]), mb_substr($msg, 0, 140), url('web_inbox', ['id' => $id]), null, 'Website'); } catch (Throwable $e) {}
+    return ['ref' => $ref];
 }
 /** Public POST ?r=ticket — payload from api/ticket.php on the website. Returns ['ref' => …]. */
 function web_pub_ticket(array $b, string $ip): array {

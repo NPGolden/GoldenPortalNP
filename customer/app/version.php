@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.111.0';
+const CP_VERSION = '1.111.1';
 const CP_BUILD   = '2026-11-08';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R93-002', 'version' => '1.111.1', 'date' => '2026-11-09', 'title' => 'Website inbox also receives the general contact form of goldenas.com.gr (kind Contact form, topic in the subject, sales staff notified) — until now only support requests and portal-access requests were handed over; both still need the Website site key.', 'db' => 'install/migrate_cp_r93_002_web_contact.sql', 'check' => 'r93b'],
         ['ref' => 'GAS-CP-R93-001', 'version' => '1.111.0', 'date' => '2026-11-09', 'title' => 'Work permits per main project: register of permits, residence permits, visas, A1 certificates, yard and port passes with holder, number, authority, country, issue and expiry dates and the scanned document; Projects dashboard shows a per-project pill (count · expired · expiring) and a "needing attention" card; warnings to the project manager, HR and administrators 60 / 30 / 14 / 7 days before expiry and on the day, lapsed permits monthly; Work permits page with totals, tabs and filters; edit rights for management, HR and the project PM.', 'db' => 'install/migrate_cp_r93_001_work_permits.sql', 'check' => 'r93a'],
         ['ref' => 'GAS-CP-R92-008', 'version' => '1.110.2', 'date' => '2026-11-08', 'title' => 'Careers website kept current: saving a vacancy or event tells the website to drop its read cache (same site key), and the public feeds now carry the Athens time offset on event times (they ran in UTC outside index.php — an 11:00 event showed as 13:00 on the site).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R92-007', 'version' => '1.110.1', 'date' => '2026-11-08', 'title' => 'Event form shows the automatic code (EVT-year-number, previewed before the first save, fixed afterwards) in a read-only field; the title field is named Event title.', 'db' => null, 'check' => null],
@@ -388,6 +389,7 @@ function cp_migration_state(): array {
         'r84c' => $has("SHOW COLUMNS FROM companies LIKE 'is_supplier'"),
         'r85b' => $has("SHOW TABLES LIKE 'contact_companies'"),
         'r85c' => $has("SHOW COLUMNS FROM vessel_companies LIKE 'company_id'"),
+        'r93b' => $has("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_inquiries' AND COLUMN_NAME = 'kind' AND COLUMN_TYPE LIKE '%contact%'"),
         'r93a' => $has("SHOW TABLES LIKE 'work_permits'"),
         'r92f' => $has("SHOW COLUMNS FROM rc_applications LIKE 'keep_until'"),
         'r92e' => !$has("SELECT 1 FROM notifications WHERE grp = 'work' AND (kind LIKE 'rc%' OR kind LIKE 'hrq%' OR kind LIKE 'hrm%' OR kind LIKE 'hrt%' OR kind LIKE 'hrev%' OR kind LIKE 'hra%') LIMIT 1"),
