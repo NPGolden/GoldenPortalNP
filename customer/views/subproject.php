@@ -420,7 +420,7 @@ layout_head($sp['code'] . ' · ' . $sp['name'], 'projects');
     <div class="field"><textarea data-mt name="body" required maxlength="4000" placeholder="<?= tt('cm.write') ?>"></textarea></div>
     <div class="actions">
       <?php if ($staff): ?>
-        <select name="visibility" style="max-width:260px;"><option value="external"><?= tt('cm.reply_customer') ?></option><option value="internal"><?= tt('cm.internal_note') ?></option></select>
+        <select name="visibility" id="cm-vis" style="max-width:260px;"><option value="internal" selected><?= tt('cm.internal_note') ?></option><option value="external"><?= tt('cm.reply_customer') ?></option></select>
       <?php else: ?><input type="hidden" name="visibility" value="external"><?php endif; ?>
       <button class="btn" type="submit"><?= tt('qa.post') ?></button>
     </div>

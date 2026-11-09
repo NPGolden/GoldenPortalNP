@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.113.0** (build 2026-11-08). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.113.1** (build 2026-11-08). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.113.1 | GAS-CP-R93-007 | 2026-11-09 | Sub-project comments posted by staff are internal by default; "Reply to customer" is an explicit choice, and a reply pre-selects the visibility of the message it answers. | — |
 | 1.113.0 | GAS-CP-R93-006 | 2026-11-09 | Engineering BOM: administrators and Procurement can delete a revision; import template (Section, Qty, Unit, Description, Maker, Maker part no, Golden code, Note); the import now stages the rows for review — matched against the inventory by Golden code, maker part number (exact and ignoring spaces / dashes) and, for the rest, by the assistant choosing among candidate items — and the engineer accepts (line linked, stock visible), rejects (free-text line), picks another item or creates a new inventory item before the lines are written. | `install/migrate_cp_r93_006_bom_import_review.sql` |
 | 1.112.0 | GAS-CP-R93-005 | 2026-11-09 | Vessel page › Documents tab: every document of the vessel across all its projects, grouped as in the project archive — reports (weekly, monthly, issued), service reports, inspections, drawings, owner approvals, class, tests, offers, files — plus ticket attachments and delivery notes; filters by year, group and text; customers see external documents of their own vessel only. Tickets card and issued-revisions box no longer repeat under the Equipment and Documents tabs. | — |
 | 1.111.3 | GAS-CP-R93-004 | 2026-11-09 | Project Files tab: administrators can delete a file (with confirmation; record and stored file removed, logged on the sub-project). Photos of notes / reports and drawing overlays are deleted where they belong. | — |

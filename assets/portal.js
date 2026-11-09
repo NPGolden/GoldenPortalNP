@@ -95,6 +95,7 @@
     b.addEventListener('click', function () {
       var pid = document.getElementById('parent_id'), box = document.getElementById('reply-to'); if (!pid || !box) return;
       pid.value = b.dataset.reply; box.querySelector('b').textContent = b.dataset.author || ''; box.hidden = false;
+      var vis = pid.form.querySelector('#cm-vis'), msg = b.closest('.msg'); if (vis && msg) vis.value = msg.classList.contains('internal') ? 'internal' : 'external';   // R93-007: a reply follows the visibility of the message it answers
       var ta = pid.form.querySelector('textarea'); if (ta) { ta.focus(); ta.scrollIntoView({ behavior: 'smooth', block: 'center' }); }
     });
   });

@@ -732,7 +732,7 @@ function pm_handle_action(string $action, string $page): bool {
             $u = require_login();
             $sid = (int)$_POST['subproject_id'];
             if (!load_subproject($sid)) { http_response_code(403); exit(t('err.noaccess')); }
-            $vis = (is_staff() && ($_POST['visibility'] ?? '') === 'internal') ? 'internal' : 'external';
+            $vis = is_staff() ? ((($_POST['visibility'] ?? 'internal') === 'external') ? 'external' : 'internal') : 'external';   // R93-007: staff comments are internal unless explicitly sent to the customer
             $body = $str('body', 4000);
             if ($body) {
                 $dup = scalar('SELECT COUNT(*) FROM sp_comments WHERE subproject_id = ? AND author_id = ? AND body = ? AND created_at >= NOW() - INTERVAL 20 SECOND', [$sid, (int)$u['id'], $body]);
