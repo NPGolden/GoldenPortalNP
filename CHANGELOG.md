@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.111.3** (build 2026-11-08). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.112.0** (build 2026-11-08). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.112.0 | GAS-CP-R93-005 | 2026-11-09 | Vessel page › Documents tab: every document of the vessel across all its projects, grouped as in the project archive — reports (weekly, monthly, issued), service reports, inspections, drawings, owner approvals, class, tests, offers, files — plus ticket attachments and delivery notes; filters by year, group and text; customers see external documents of their own vessel only. Tickets card and issued-revisions box no longer repeat under the Equipment and Documents tabs. | — |
 | 1.111.3 | GAS-CP-R93-004 | 2026-11-09 | Project Files tab: administrators can delete a file (with confirmation; record and stored file removed, logged on the sub-project). Photos of notes / reports and drawing overlays are deleted where they belong. | — |
 | 1.111.2 | GAS-CP-R93-003 | 2026-11-09 | Website inbox: administrators can delete a message (with confirmation; its notifications are removed too). Staff keep the status / spam handling. | — |
 | 1.111.1 | GAS-CP-R93-002 | 2026-11-09 | Website inbox also receives the general contact form of goldenas.com.gr (kind Contact form, topic in the subject, sales staff notified) — until now only support requests and portal-access requests were handed over; both still need the Website site key. | `install/migrate_cp_r93_002_web_contact.sql` |

@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.111.3';
+const CP_VERSION = '1.112.0';
 const CP_BUILD   = '2026-11-08';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R93-005', 'version' => '1.112.0', 'date' => '2026-11-09', 'title' => 'Vessel page › Documents tab: every document of the vessel across all its projects, grouped as in the project archive — reports (weekly, monthly, issued), service reports, inspections, drawings, owner approvals, class, tests, offers, files — plus ticket attachments and delivery notes; filters by year, group and text; customers see external documents of their own vessel only. Tickets card and issued-revisions box no longer repeat under the Equipment and Documents tabs.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R93-004', 'version' => '1.111.3', 'date' => '2026-11-09', 'title' => 'Project Files tab: administrators can delete a file (with confirmation; record and stored file removed, logged on the sub-project). Photos of notes / reports and drawing overlays are deleted where they belong.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R93-003', 'version' => '1.111.2', 'date' => '2026-11-09', 'title' => 'Website inbox: administrators can delete a message (with confirmation; its notifications are removed too). Staff keep the status / spam handling.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R93-002', 'version' => '1.111.1', 'date' => '2026-11-09', 'title' => 'Website inbox also receives the general contact form of goldenas.com.gr (kind Contact form, topic in the subject, sales staff notified) — until now only support requests and portal-access requests were handed over; both still need the Website site key.', 'db' => 'install/migrate_cp_r93_002_web_contact.sql', 'check' => 'r93b'],

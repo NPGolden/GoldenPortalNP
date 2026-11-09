@@ -15,9 +15,11 @@ $allProjects = $h ? all('SELECT id, project_code, name FROM projects WHERE vesse
 if (!$h) { http_response_code(404); layout_head(t('err.notfound'), 'vessels'); echo '<h1>' . tt('err.notfound') . '</h1>'; layout_foot(); return; }
 $v = $h['vessel']; $s = $h['stats']; $staff = is_staff();
 $tab = (string)($_GET['tab'] ?? 'overview');
-if (!in_array($tab, ['overview', 'history', 'services', 'parts', 'people', 'tickets', 'equipment'], true)) $tab = 'overview';
+if (!in_array($tab, ['overview', 'history', 'services', 'parts', 'people', 'tickets', 'equipment', 'documents'], true)) $tab = 'overview';
+$vdF = ['project' => $pid, 'group' => (string)($_GET['g'] ?? ''), 'q' => trim((string)($_GET['q'] ?? '')), 'year' => (int)($_GET['year'] ?? 0)];
+$vd = function_exists('vd_collect') ? vd_collect($id, $staff, $vdF) : ['items' => [], 'groups' => [], 'years' => [], 'total' => 0]; $vdTotal = (int)$vd['total'];
 $eqUnits = function_exists('eq_has') && eq_has() ? eq_list(['vessel' => $id, 'status' => 'all']) : [];
-$tabs = [['overview', t('vh.tab_overview'), null], ['history', t('vh.tab_history'), count($h['timeline'])], ['services', t('vh.tab_services'), $s['services']], ['parts', t('vh.tab_parts'), $s['parts']], ['people', t('vh.tab_people'), $s['technicians']], ['tickets', t('tk.title'), $s['tickets']], ['equipment', t('eq.title'), count($eqUnits)]];
+$tabs = [['overview', t('vh.tab_overview'), null], ['history', t('vh.tab_history'), count($h['timeline'])], ['services', t('vh.tab_services'), $s['services']], ['parts', t('vh.tab_parts'), $s['parts']], ['people', t('vh.tab_people'), $s['technicians']], ['tickets', t('tk.title'), $s['tickets']], ['equipment', t('eq.title'), count($eqUnits)], ['documents', t('vd.title'), $vdTotal]];   // R93-005 documents
 if ($staff && function_exists('iv_vessel_has') && iv_vessel_has() && fin_visible()) $tabs[] = ['invoicing', t('iv.title'), iv_count('vessel', $id)];   // R43-002
 $tabUrl = fn($x) => url('vessel', array_filter(['id' => $id, 'tab' => $x, 'project' => $pid]));
 $rq = array_filter(['id' => $id, 'project' => $pid]);
@@ -202,7 +204,7 @@ layout_head($v['name'], 'vessels');
   </div>
 </div>
 
-<?php else: ?>
+<?php elseif (!in_array($tab, ['equipment', 'invoicing', 'documents'], true)): ?>
 <div class="card">
   <div class="page-head" style="margin-bottom:8px;"><h2 style="margin:0;"><?= tt('tk.title') ?></h2><a class="btn btn--gold btn--sm" href="<?= url('ticket_edit', ['vessel' => $id]) ?>">+ <?= tt('tk.new') ?></a></div>
   <?php if (!$h['tickets']): ?><div class="empty"><?= tt('tk.empty') ?></div><?php else: ?>
@@ -213,7 +215,7 @@ layout_head($v['name'], 'vessels');
   <?php endif; ?>
 </div>
 <?php endif; ?>
-<?php if (ar_has() && $staff) { $arPid = (int)($h['only_project']['id'] ?? 0) ?: ar_vessel_project($id); if ($arPid) echo ar_issued_html(vh_doc_no($h['vessel'], $h['only_project'] ?? null), $arPid, ['kind' => 'vessel', 'id' => $id, 'project' => $pid], url('vessel', $rq)); } ?>
+<?php if (ar_has() && $staff && !in_array($tab, ['equipment', 'invoicing', 'documents'], true)) { $arPid = (int)($h['only_project']['id'] ?? 0) ?: ar_vessel_project($id); if ($arPid) echo ar_issued_html(vh_doc_no($h['vessel'], $h['only_project'] ?? null), $arPid, ['kind' => 'vessel', 'id' => $id, 'project' => $pid], url('vessel', $rq)); } ?>
 <?php if ($tab === 'invoicing' && $staff && function_exists('iv_vessel_has') && iv_vessel_has() && fin_visible()): ?>
 <div class="card"><p class="hint" style="margin-top:0;"><?= tt('iv.vessel_lede') ?></p><?php iv_section('vessel', $id, url('vessel', ['id' => $id, 'tab' => 'invoicing']), (int)($_GET['iv'] ?? 0)); ?></div>
 <?php endif; ?>
@@ -224,6 +226,33 @@ layout_head($v['name'], 'vessels');
   <div class="table-scroll"><table><thead><tr><th><?= tt('eq.sn') ?></th><th><?= tt('eq.maker') ?></th><th><?= tt('eq.model') ?></th><th><?= tt('eq.warranty') ?></th><th><?= tt('eq.last_service') ?></th><th class="num"><?= tt('eq.records') ?></th><th><?= tt('th.status') ?></th><th></th></tr></thead><tbody>
     <?php foreach ($eqUnits as $e): ?><tr><td class="ref"><a href="<?= url('equipment_view', ['id' => (int)$e['id']]) ?>"><b><?= e($e['serial_no']) ?></b></a></td><td><?= e(trim($e['maker'] . ' ' . ($e['family'] ?? ''))) ?></td><td><?= e($e['model'] ?: '—') ?></td><td class="date"><?= $e['warranty_until'] ? ($e['warranty_until'] >= date('Y-m-d') ? pill('gold', fmt_date($e['warranty_until'])) : e(fmt_date($e['warranty_until']))) : '—' ?></td><td class="date"><?= $e['last_service'] ? e(fmt_date($e['last_service'])) : '—' ?></td><td class="num"><?= (int)$e['n_hist'] ?></td><td><?= $e['retired'] ? pill('mute', t('eq.st_retired')) : pill('green', t('eq.st_active')) ?></td><td class="row-actions"><a class="btn btn--ghost btn--sm" href="<?= url('equipment_view', ['id' => (int)$e['id']]) ?>"><?= tt('fsr.open') ?></a></td></tr><?php endforeach; ?></tbody></table></div>
   <?php endif; ?>
+</div>
+<?php endif; ?>
+<?php if ($tab === 'documents'): /* R93-005 — every document of the vessel, grouped */ ?>
+<div class="card">
+  <div class="page-head" style="margin-bottom:8px;"><div><h2 style="margin:0;"><?= tt('vd.title') ?></h2><p class="hint"><?= tt($staff ? 'vd.lede_staff' : 'vd.lede') ?></p></div>
+    <form method="get" action="index.php" class="btn-row" style="gap:8px;align-items:flex-end;flex-wrap:wrap;"><input type="hidden" name="p" value="vessel"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="tab" value="documents"><?php if ($pid): ?><input type="hidden" name="project" value="<?= $pid ?>"><?php endif; ?>
+      <div class="field" style="margin:0;"><label><?= tt('vd.year') ?></label><select name="year" data-nosearch data-js-submit="1"><option value=""><?= tt('vd.all_years') ?></option><?php foreach ($vd['years'] as $y => $n): ?><option value="<?= $y ?>"<?= $vdF['year'] === (int)$y ? ' selected' : '' ?>><?= $y ?> (<?= $n ?>)</option><?php endforeach; ?></select></div>
+      <div class="field" style="margin:0;"><label><?= tt('vd.search') ?></label><input name="q" value="<?= e($vdF['q']) ?>" placeholder="<?= tt('vd.search_ph') ?>" style="min-width:220px;"></div>
+      <button class="btn btn--sm"><?= tt('btn.apply') ?></button></form></div>
+  <div class="chips" style="display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px;">
+    <a class="pill <?= $vdF['group'] === '' ? 'pill--navy' : 'pill--mute' ?>" href="<?= url('vessel', array_filter(['id' => $id, 'tab' => 'documents', 'project' => $pid, 'q' => $vdF['q'], 'year' => $vdF['year'] ?: null])) ?>"><?= tt('vd.all') ?> <?= $vd['total'] ?></a>
+    <?php foreach (VD_GROUPS as $g): if (empty($vd['groups'][$g])) continue; ?><a class="pill <?= $vdF['group'] === $g ? 'pill--navy' : 'pill--mute' ?>" href="<?= url('vessel', array_filter(['id' => $id, 'tab' => 'documents', 'project' => $pid, 'g' => $g, 'q' => $vdF['q'], 'year' => $vdF['year'] ?: null])) ?>"><?= vd_group_icon($g) ?> <?= e(vd_group_label($g)) ?> <?= $vd['groups'][$g] ?></a><?php endforeach; ?>
+  </div>
+  <?php if (!$vd['items']): ?><div class="empty"><?= tt('vd.none') ?></div><?php else:
+    $byGroup = []; foreach ($vd['items'] as $it) $byGroup[$it['group']][] = $it;
+    foreach (VD_GROUPS as $g): if (empty($byGroup[$g])) continue; $list = $byGroup[$g]; ?>
+    <details class="vd-group" open style="margin-bottom:10px;"><summary style="cursor:pointer;font-weight:600;padding:6px 0;"><?= vd_group_icon($g) ?> <?= e(vd_group_label($g)) ?> <span class="count"><?= count($list) ?></span></summary>
+    <div class="table-scroll"><table class="tbl">
+      <thead><tr><th><?= tt('vd.document') ?></th><th><?= tt('vd.doc_no') ?></th><th><?= tt('vd.kind') ?></th><th><?= tt('vd.project') ?></th><th><?= tt('th.date') ?></th><th><?= tt('th.by') ?></th><?= $staff ? '<th>' . tt('vis.label') . '</th>' : '' ?></tr></thead>
+      <tbody><?php foreach ($list as $it): ?>
+        <tr><td><a href="<?= e($it['url']) ?>" target="_blank" rel="noopener"><b><?= e($it['title']) ?></b></a><?= $it['file'] !== '' && $it['file'] !== $it['title'] ? '<br><span class="hint">' . e($it['file']) . ($it['size'] ? ' · ' . number_format($it['size'] / 1024) . ' KB' : '') . '</span>' : ($it['size'] ? '<br><span class="hint">' . number_format($it['size'] / 1024) . ' KB</span>' : '') ?></td>
+          <td class="mono"><?= e($it['doc_no'] ?: '—') ?><?= $it['ctx'] ? ' <a class="hint" href="' . e($it['ctx']) . '" title="' . tt('vd.open_source') . '">↗</a>' : '' ?></td>
+          <td><?= e($it['kind']) ?></td><td><?= e($it['project']) ?><?= $it['sub'] !== '' ? '<br><span class="hint">' . e($it['sub']) . '</span>' : '' ?></td>
+          <td class="date"><?= e(fmt_date(substr($it['date'], 0, 10))) ?></td><td><?= e($it['by'] ?: '—') ?></td>
+          <?= $staff ? '<td><span class="vis-tag ' . e($it['visibility']) . '">' . tt('vis.' . $it['visibility']) . '</span></td>' : '' ?></tr>
+      <?php endforeach; ?></tbody></table></div></details>
+  <?php endforeach; endif; ?>
 </div>
 <?php endif; ?>
 <?php layout_foot(); ?>

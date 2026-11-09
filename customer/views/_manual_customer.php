@@ -31,6 +31,7 @@ return [
     ]],
     ['id' => 'vessels', 'title' => 'Vessels', 'body' => [
       'Fleet › Vessels lists your vessels with their projects and open tickets. Open a vessel for its technical history: the projects and sub-projects on board, the systems installed, tickets, work orders and service reports in date order, and the weekly reports.',
+      'Documents (v1.112.0): the Documents tab of a vessel gathers everything shared with you across its projects — weekly and monthly reports, service and inspection reports, drawings, documents you approved, class and test documents and other files — grouped and searchable by year or text.',
       ['ul' => ['The Projects filter narrows the list to vessels with active projects, with any project, or without projects; the Projects column shows the total and the active count.']],
       ['fig' => 'c-vessels.jpg', 'cap' => 'The vessel list'],
       ['fig' => 'c-vessel.jpg', 'cap' => 'The vessel page — history, projects, open items and the report buttons'],

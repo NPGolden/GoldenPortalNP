@@ -423,6 +423,7 @@ return [
     ['id' => 'vessels', 'title' => 'Vessels', 'body' => [
       'Fleet › Vessels lists every vessel with customer, projects and open tickets; staff can add and edit vessels, assign them to a customer, and open the technical history and the weekly report. Vessels usually come from the Excel / SoftOne imports; unknown customers are created automatically and completed later in Settings › Customers.',
       ['ul' => ['Filter the list by Projects — with active projects (the working fleet), with any project, or without projects; the Projects column shows the total and the active count.', 'The Equipment tab of a vessel lists the registered units on board (serial number, maker, model, warranty, last service); the vessel technical-history report prints them with their service history.']],
+      'Documents tab (v1.112.0): every document the portal holds for the vessel across all its projects, grouped as in the project archive — Reports (weekly, monthly, issued), Service reports, Inspections, Drawings, Owner approvals, Class, Tests, Offers, Files — plus ticket attachments and delivery notes. Filter by year, group or text; the ↗ next to the document number opens the report, offer or ticket it belongs to. Use the project selector at the top to narrow to one project. Customers see the external documents of their own vessel only.',
       ['fig' => 'g-vessel.jpg', 'cap' => 'A vessel page for staff'],
     ]],
     ['id' => 'vessel_unify', 'title' => 'One record per vessel — duplicates, aliases, related companies', 'body' => [
