@@ -47,14 +47,14 @@ log("app info localisation", LOC, "ok")
 try:
     req("PATCH", f"/appInfos/{info['id']}", json={"data": {"type": "appInfos", "id": info["id"], "relationships": {"primaryCategory": rel("appCategories", META["primaryCategory"]), "secondaryCategory": rel("appCategories", META["secondaryCategory"])}}})
     log("categories", META["primaryCategory"], META["secondaryCategory"])
-except SystemExit as e: log("categories not changed:", str(e)[:200])
+except SystemExit as e: log("categories not changed:", " ".join(str(e).split())[:400])
 try:
     ar = req("GET", f"/appInfos/{info['id']}/ageRatingDeclaration")["data"]
     none = {k: "NONE" for k in ["alcoholTobaccoOrDrugUseOrReferences", "contests", "gamblingSimulated", "horrorOrFearThemes", "matureOrSuggestiveThemes", "medicalOrTreatmentInformation", "profanityOrCrudeHumor", "sexualContentGraphicAndNudity", "sexualContentOrNudity", "violenceCartoonOrFantasy", "violenceRealistic", "violenceRealisticProlongedGraphicOrSadistic"]}
-    none.update({"gambling": False, "unrestrictedWebAccess": False, "kidsAgeBand": None})
+    none.update({"gambling": False, "unrestrictedWebAccess": False})
     req("PATCH", f"/ageRatingDeclarations/{ar['id']}", json={"data": {"type": "ageRatingDeclarations", "id": ar["id"], "attributes": none}})
     log("age rating 4+")
-except SystemExit as e: log("age rating not changed:", str(e)[:200])
+except SystemExit as e: log("age rating not changed:", " ".join(str(e).split())[:600])
 
 # ---- version ----
 version_string = open("APP_VERSION").read().strip() if os.path.exists("APP_VERSION") else None
@@ -62,10 +62,11 @@ vers = req("GET", f"/apps/{aid}/appStoreVersions", params={"filter[platform]": "
 editable = [v for v in vers if v["attributes"]["appStoreState"] in ("PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED", "METADATA_REJECTED", "INVALID_BINARY", "WAITING_FOR_REVIEW")]
 live = [v for v in vers if v["attributes"]["appStoreState"] in ("READY_FOR_SALE", "READY_FOR_DISTRIBUTION", "PENDING_DEVELOPER_RELEASE", "PROCESSING_FOR_DISTRIBUTION")]
 # latest valid build decides the version string when APP_VERSION is absent
-builds = req("GET", "/builds", params={"filter[app]": aid, "filter[processingState]": "VALID", "sort": "-uploadedDate", "limit": 1, "include": "preReleaseVersion"})
+builds = req("GET", "/builds", params={"filter[app]": aid, "filter[processingState]": "VALID", "sort": "-uploadedDate", "limit": 1})
 build = builds["data"][0] if builds["data"] else None
-pre = next((i for i in builds.get("included", []) if i["type"] == "preReleaseVersions"), None)
-if not version_string: version_string = pre["attributes"]["version"] if pre else (editable[0]["attributes"]["versionString"] if editable else "1.0.0")
+pre = req("GET", f"/builds/{build['id']}/preReleaseVersion")["data"] if build else None
+if pre: version_string = pre["attributes"]["version"]          # the store version must carry the build's marketing version
+if not version_string: version_string = editable[0]["attributes"]["versionString"] if editable else "1.0.0"
 if editable:
     ver = editable[0]
     if ver["attributes"]["versionString"] != version_string and ver["attributes"]["appStoreState"] in ("PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED", "METADATA_REJECTED", "INVALID_BINARY"):
