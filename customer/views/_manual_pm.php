@@ -38,6 +38,9 @@ return [
       ['fig' => 'flow-offer.svg', 'cap' => 'Offers — the statuses and who sets them'],
       ['tip' => 'Never approve a timesheet or a work order "to be done later": the badge on the menu is your to-do list and it should be zero when you leave in the evening.'],
     ]],
+    ['id' => 'permits', 'title' => 'Work permits of your people (v1.111.0)', 'body' => [
+      'Every person working on your project at a yard abroad needs valid papers — work or residence permit, visa, A1 certificate, yard and port passes. Record them under Fleet › Work permits (or the 🪪 button on your project) with the expiry date and the scan; the portal shows them on the Projects page and warns you, HR and management 60, 30, 14 and 7 days before they lapse and on the day. When a renewal is filed set the status to "Renewal requested"; when the new permit arrives, update the expiry date and replace the document.',
+    ]],
     ['id' => 'tickets', 'title' => 'Tickets — the owner\'s voice', 'body' => [
       'Every request of the owner is a ticket: a fault, a service request, a question, a spare part. Tickets of your projects are your responsibility from the moment they arrive, even before an engineer is assigned.',
       ['fig' => 'flow-ticket.svg', 'cap' => 'The ticket lifecycle'],

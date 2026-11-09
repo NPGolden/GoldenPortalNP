@@ -312,6 +312,11 @@ function pm_handle_action(string $action, string $page): bool {
             redirect('approval', ['id' => $id, '_r' => uniqid()]);
         }
         /* ---------------------------------------------------- R14: tickets */
+        case 'pmt_save': {   // R93-001 work permits
+            require_login(); $id = (int)($_POST['id'] ?? 0);
+            $id = pmt_save_from_post($id); flash('good', t('pmt.saved')); redirect('permits', ['project' => (int)$_POST['project_id'], '_r' => uniqid()]);
+        }
+        case 'pmt_delete': { require_login(); $pp = pmt_load((int)($_POST['id'] ?? 0)); pmt_delete((int)($_POST['id'] ?? 0)); flash('good', t('pmt.deleted')); redirect('permits', $pp ? ['project' => (int)$pp['project_id']] : []); }
         case 'tk_save': {
             require_login();
             if (!tk_has()) throw new RuntimeException(t('tk.need_r14'));

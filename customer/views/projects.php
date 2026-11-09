@@ -25,6 +25,7 @@ $pageNo    = max(1, (int)($_GET['page'] ?? 1));
 
 $res   = project_tree_filtered(['status' => $st, 'customer' => $fCustomer, 'vessel' => $fVessel, 'pm' => $fPm, 'branch' => $fBranch, 'q' => $q], $per, ($pageNo - 1) * $per);
 $tree  = $res['rows']; $total = $res['total'];
+$pmtC = ($staff && function_exists('pmt_can_view') && pmt_can_view() && $tree) ? pmt_project_counts(array_column($tree, 'id')) : [];   // R93-001 work permits per project
 $tkOpen = []; if (function_exists('tk_has') && tk_has() && $tree) { [$tkScope, $tkArgs] = tk_scope(); foreach (all("SELECT t.project_id, COUNT(*) n FROM tickets t LEFT JOIN vessels v ON v.id = t.vessel_id WHERE {$tkScope} AND t.project_id IS NOT NULL AND t.status IN ('open','in_progress','waiting_customer') GROUP BY t.project_id", $tkArgs) as $r) $tkOpen[(int)$r['project_id']] = (int)$r['n']; }   // R30-003: open tickets per project
 $keep  = array_filter(['q' => $q, 'st' => $st, 'customer' => $fCustomer, 'vessel' => $fVessel, 'pm' => $fPm, 'branch' => $fBranch, 'per' => $per, 'f' => 1]);
 
@@ -141,12 +142,13 @@ layout_head(t('pr.title'), 'projects');
           <?php endif; ?>
         </span>
         <span title="<?= !empty($p['activated_at']) && $p['status'] === 'active' ? e(t('pr.active_since', ['d' => fmt_date($p['activated_at'])])) : ($p['status'] === 'quoted' ? tt('pr.quoted_hint') : '') ?>"><?= $statusPill($p['status']) ?></span>
-        <span class="pmeta"><?= e(t('pr.nsubs', ['n' => count($p['subs'])])) ?><?php if (!empty($tkOpen[(int)$p['id']])): ?> · <a class="pill pill--gold" href="<?= url('tickets', ['view' => 'open', 'project' => $p['id'], 'status' => 'open_all']) ?>" title="<?= tt('tk.open_in_project') ?>">🎫 <?= (int)$tkOpen[(int)$p['id']] ?></a><?php endif; ?></span>
+        <span class="pmeta"><?= e(t('pr.nsubs', ['n' => count($p['subs'])])) ?><?php if (!empty($pmtC[(int)$p['id']])): ?> · <?= pmt_project_pill((int)$p['id'], $pmtC[(int)$p['id']]) ?><?php endif; ?><?php if (!empty($tkOpen[(int)$p['id']])): ?> · <a class="pill pill--gold" href="<?= url('tickets', ['view' => 'open', 'project' => $p['id'], 'status' => 'open_all']) ?>" title="<?= tt('tk.open_in_project') ?>">🎫 <?= (int)$tkOpen[(int)$p['id']] ?></a><?php endif; ?></span>
       </summary>
       <div class="subs">
         <?php if ($pof && $pof['n'] && of_visible()): ?><div class="ot-tree"><?php $otRows = of_list(['project' => (int)$p['id']]); $otShowSub = true; $otNewUrl = url('offer_edit', ['project' => $p['id']]); require __DIR__ . '/_offers_table.php'; ?></div><?php elseif (of_has() && is_staff() && of_visible()): ?><p class="hint ot-none"><?= tt('of.none_here') ?> <a href="<?= url('offer_edit', ['project' => $p['id']]) ?>">+ <?= tt('of.new') ?></a></p><?php endif; ?>
         <?php if (function_exists('td_card_html') && ($tdc = td_card_html(['project' => (int)$p['id']], url('task_edit', ['project' => $p['id']]), true, 6)) !== ''): ?><div class="ot-tree td-tree"><?= $tdc ?></div><?php endif; ?>
         <?php if (function_exists('tk_card_html') && ($tkc = tk_card_html((int)$p['id'], url('ticket_edit', ['project' => $p['id']]), 6)) !== ''): ?><div class="ot-tree tk-tree"><?= $tkc ?></div><?php endif; ?>
+        <?php if ($staff && function_exists('pmt_card_html') && ($pmc = pmt_card_html((int)$p['id'], pmt_can_edit((int)$p['id']) ? url('permit_edit', ['project' => $p['id']]) : null, 6)) !== ''): ?><div class="ot-tree tk-tree"><?= $pmc ?></div><?php endif; ?>
         <?php if (!$p['subs']): ?>
           <p class="hint" style="padding:8px 0;"><?= tt('pr.nosubs') ?>
             <?php if (is_staff()): ?> <a href="<?= url('subproject_new', ['project' => $p['id']]) ?>"><?= tt('pr.addsub') ?></a>
@@ -171,6 +173,7 @@ layout_head(t('pr.title'), 'projects');
                <a class="btn btn--ghost btn--sm" href="<?= url('weekly', ['project' => $p['id']]) ?>"><?= tt('wk.title') ?></a><?php if (function_exists('bg_can') && bg_can()): ?> <a class="btn btn--ghost btn--sm" href="<?= url('cost_control', ['project' => $p['id']]) ?>">€ <?= tt('bg.board_title') ?></a><?php endif; ?><?php if (function_exists('rk_has') && rk_has() && $staff): ?> <a class="btn btn--ghost btn--sm" href="<?= url('risks', ['project' => $p['id']]) ?>">⚠ <?= tt('rk.title') ?></a><?php endif; ?><?php if (function_exists('fr_can') && fr_can()): ?> <a class="btn btn--ghost btn--sm" href="<?= url('report_fin', ['project' => $p['id']]) ?>">💶 <?= tt('fr.title') ?></a><?php endif; ?><?php if (function_exists('cf_can') && cf_can()): ?> <a class="btn btn--ghost btn--sm" href="<?= url('cashflow', ['project' => $p['id']]) ?>">💰 <?= tt('cf.title') ?></a><?php endif; ?>
                <?php if (of_visible()): ?><a class="btn btn--ghost btn--sm" href="<?= url('offers', ['project' => $p['id']]) ?>"><?= tt('of.title') ?></a><?php endif; ?>
                <a class="btn btn--ghost btn--sm" href="<?= url('tickets', ['view' => 'open', 'project' => $p['id'], 'status' => 'open_all']) ?>"><?= tt('nav.tickets') ?></a>
+               <?php if (function_exists('pmt_can_view') && pmt_can_view()): ?><a class="btn btn--ghost btn--sm" href="<?= url('permits', ['project' => $p['id']]) ?>">🪪 <?= tt('pmt.title') ?></a><?php endif; ?>
                <?php if (function_exists('wf_has') && wf_has()): ?><a class="btn btn--ghost btn--sm" href="<?= url('wf', ['project' => $p['id']]) ?>">🗓 <?= tt('wf.title') ?></a><?php endif; ?>
                <a class="btn btn--ghost btn--sm" href="<?= url('monthly', ['project' => $p['id']]) ?>"><?= tt('mo.title') ?></a>
                <a class="btn btn--ghost btn--sm" href="<?= url('jo_list', ['project' => $p['id']]) ?>"><?= tt('jo.plural') ?></a>

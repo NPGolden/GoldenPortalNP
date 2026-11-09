@@ -31,7 +31,7 @@ function nf_has(): bool {
 function nf_groups(): array {
     return ['fleet' => t('nav.g_fleet'), 'work' => t('nav.g_work'), 'commercial' => t('nav.g_commercial'), 'hr' => t('nav.g_hr'), 'library' => t('nav.g_library')];   // R92-005: HR group
 }
-const NF_GROUP_OF = ['rc' => 'hr', 'tk' => 'work', 'wf' => 'work', 'jo' => 'work', 'fsr' => 'work', 'isr' => 'work', 'ts' => 'work', 'of' => 'commercial', 'oa' => 'commercial', 'ctn' => 'commercial',
+const NF_GROUP_OF = ['rc' => 'hr', 'wkp' => 'work', 'tk' => 'work', 'wf' => 'work', 'jo' => 'work', 'fsr' => 'work', 'isr' => 'work', 'ts' => 'work', 'of' => 'commercial', 'oa' => 'commercial', 'ctn' => 'commercial',
                      'cls' => 'fleet', 'drw' => 'fleet', 'spn' => 'fleet', 'spc' => 'fleet', 'doc' => 'library', 'td' => 'work', 'lic' => 'library', 'mt' => 'work', 'bg' => 'fleet', 'wp' => 'work', 'sec' => 'library', 'acc' => 'commercial', 'pd' => 'work', 'pi' => 'commercial', 'eng' => 'work', 'hrq' => 'hr', 'hrm' => 'hr', 'crq' => 'library', 'soc' => 'work', 'hrt' => 'hr', 'hrev' => 'hr', 'hra' => 'hr'];
 
 /* ------------------------------------------------------------ sweep */
@@ -51,6 +51,7 @@ function nf_sweep(int $every = 60, bool $force = false): int {
                 try { if (function_exists($fn)) $n += nf_run_source($src, $fn); } catch (Throwable $e) { /* a module not installed on this portal: skip its source */ }
             }
             try { if (function_exists('td_remind')) $n += td_remind(); } catch (Throwable $e) {}        // R22-002 task reminders
+            try { if (function_exists('pmt_remind')) $n += pmt_remind(); } catch (Throwable $e) {}      // R93-001 work-permit expiry
             try { if (function_exists('lic_notify')) lic_notify(); } catch (Throwable $e) {}            // R22-001 licence expiry
             try { if (function_exists('hra_remind')) { $n += hra_remind(); hra_purge(); } } catch (Throwable $e) {}   // R67-001 HR Assistant reminders + purge of closed flows
             try { if (function_exists('rcr_has') && rcr_has() && (string) cp_setting('rc_retention_last', '') < date('Y-m-d')) { cp_setting_set('rc_retention_last', date('Y-m-d')); rcr_retention_run(); } } catch (Throwable $e) {}   // R91-002: recruiting GDPR retention once a day, from the portal itself (tools/cron.php is optional)
