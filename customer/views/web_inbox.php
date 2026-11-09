@@ -40,6 +40,7 @@ layout_head(t('web.inbox'), 'web_inbox');
     <form method="post" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="web_inq_status"><input type="hidden" name="id" value="<?= (int)$cur['id'] ?>">
       <select name="status" data-nosearch><?php foreach (['new', 'in_progress', 'done', 'spam'] as $s): ?><option value="<?= $s ?>"<?= $cur['status'] === $s ? ' selected' : '' ?>><?= tt('web.st_' . $s) ?></option><?php endforeach; ?></select>
       <input name="note" maxlength="400" placeholder="<?= tt('web.note') ?>" value="<?= e((string)$cur['note']) ?>" style="min-width:240px;"><button class="btn btn--ghost"><?= tt('btn.save') ?></button></form>
+    <?php if (is_cp_admin()): ?><form method="post" style="margin-left:auto;"><?= csrf_field() ?><input type="hidden" name="action" value="web_inq_delete"><input type="hidden" name="id" value="<?= (int)$cur['id'] ?>"><button class="btn btn--ghost btn--sm" data-confirm="<?= e(t('web.delete_confirm', ['ref' => $cur['ref']])) ?>" data-confirm-ok="<?= tt('btn.delete') ?>">🗑 <?= tt('btn.delete') ?></button></form><?php endif; ?>
   </div>
 </div>
 <?php endif; ?>

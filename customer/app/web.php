@@ -107,6 +107,12 @@ function web_make_ticket(int $id, int $vesselId): int {
 
 /** Settings › System › Website actions (administrators only) + inbox actions (staff). */
 function web_handle_action(string $action): bool {
+    if ($action === 'web_inq_delete') {   // R93-003: administrators only; the related notifications go with it
+        require_staff(); if (!is_cp_admin()) throw new RuntimeException(t('err.noaccess'));
+        $id = (int) $_POST['id']; $i = web_inquiry($id); if (!$i) throw new RuntimeException(t('err.notfound'));
+        q('DELETE FROM web_inquiries WHERE id = ?', [$id]); q("DELETE FROM notifications WHERE ref_key = ?", ['web:' . $id]);
+        flash('good', t('web.deleted', ['ref' => $i['ref']])); redirect('web_inbox');
+    }
     if ($action === 'web_inq_status') { require_staff(); $id = (int) $_POST['id']; $st = in_array($_POST['status'] ?? '', ['new', 'in_progress', 'done', 'spam'], true) ? (string) $_POST['status'] : 'in_progress';
         q('UPDATE web_inquiries SET status = ?, note = ?, handled_by = ?, handled_at = NOW() WHERE id = ?', [$st, mb_substr(trim((string) ($_POST['note'] ?? '')), 0, 400) ?: null, (int) current_user()['id'], $id]);
         flash('good', t('sys.saved')); redirect('web_inbox', ['id' => $id, '_r' => uniqid()]); }
