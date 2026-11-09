@@ -96,7 +96,8 @@ layout_head($title, 'projects');
     <datalist id="engineers"><?php foreach ($engineers as $en): ?><option value="<?= e($en['full_name']) ?>"><?php endforeach; ?></datalist>
     <?php
     /* one task block; $i is the form index (any integer), $wk the stored task or null */
-    $taskBlock = function (int $i, ?array $wk) use ($u, $sel): void {
+    $spOpts = fsr_specialty_options($pid ?: null, function_exists('fin_visible') && fin_visible()); $spNames = array_column($spOpts, 'name');   // R94-002/004 specialty choices with rate cards
+    $taskBlock = function (int $i, ?array $wk) use ($u, $sel, $spOpts, $spNames): void {
         $parts = $wk['parts'] ?? []; $lines = $wk['lines'] ?? []; $photos = $wk['photos'] ?? []; ?>
       <details class="fsr-work" open data-task="<?= $i ?>">
         <summary><span class="fsr-task-no"><?= e(t('fsr.task_n', ['n' => '#'])) ?></span><?= $wk && $wk['description'] ? ' — <span class="hint">' . e(mb_substr((string)$wk['description'], 0, 60)) . '</span>' : '' ?>
@@ -121,7 +122,7 @@ layout_head($title, 'projects');
             <?php for ($k = 0; $k < FSR_MAX_LINES; $k++): $ln = $lines[$k] ?? null; ?>
               <tr>
                 <td><input name="wk_eng[<?= $i ?>][<?= $k ?>]" list="engineers" maxlength="120" value="<?= e($ln['engineer'] ?? (($i === 0 && $k === 0 && !$wk) ? $u['full_name'] : '')) ?>" placeholder="<?= tt('fsr.engineer_ph') ?>"></td>
-                <td><?php static $spOpts = null; if ($spOpts === null) $spOpts = fsr_specialty_options($pid ?: null, function_exists('fin_visible') && fin_visible()); $spNames = array_column($spOpts, 'name'); $curSp = (string)($ln['specialty'] ?? fsr_specialty_default((int)$u['id'])); ?><select name="wk_spec[<?= $i ?>][<?= $k ?>]" data-nosearch title="<?= tt('fsr.specialty_hint') ?>"><?php foreach ($spOpts as $o): ?><option value="<?= e($o['name']) ?>"<?= $o['name'] === $curSp ? ' selected' : '' ?>><?= e(fsr_specialty_label($o)) ?></option><?php endforeach; if ($curSp !== '' && !in_array($curSp, $spNames, true)): ?><option value="<?= e($curSp) ?>" selected><?= e($curSp) ?> · <?= tt('fsr.legacy_spec') ?></option><?php endif; ?></select></td>
+                <td><?php $curSp = (string)($ln['specialty'] ?? fsr_specialty_default((int)$u['id'])); ?><select name="wk_spec[<?= $i ?>][<?= $k ?>]" data-nosearch title="<?= tt('fsr.specialty_hint') ?>"><?php foreach ($spOpts as $o): ?><option value="<?= e($o['name']) ?>"<?= $o['name'] === $curSp ? ' selected' : '' ?>><?= e(fsr_specialty_label($o)) ?></option><?php endforeach; if ($curSp !== '' && !in_array($curSp, $spNames, true)): ?><option value="<?= e($curSp) ?>" selected><?= e($curSp) ?> · <?= tt('fsr.legacy_spec') ?></option><?php endif; ?></select></td>
                 <td><input name="wk_start[<?= $i ?>][<?= $k ?>]" type="time" class="js-t" value="<?= e(fsr_fmt_time($ln['start_time'] ?? null)) ?>"></td>
                 <td><input name="wk_end[<?= $i ?>][<?= $k ?>]" type="time" class="js-t" value="<?= e(fsr_fmt_time($ln['end_time'] ?? null)) ?>"></td>
                 <td><select name="wk_type[<?= $i ?>][<?= $k ?>]"><?php foreach (fsr_time_types() as $tk => $tl): ?><option value="<?= $tk ?>" title="<?= e(fsr_time_type_label($tk)) ?>"<?= $sel($tk, $ln['time_type'] ?? 'WT') ?>><?= $tl ?></option><?php endforeach; ?></select></td>

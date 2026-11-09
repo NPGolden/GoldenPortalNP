@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.114.4** (build 2026-11-09). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.114.5** (build 2026-11-09). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.114.5 | GAS-CP-R94-006 | 2026-11-09 | Fix: PHP warning "Undefined variable $pid" on the service-report form (specialty options are now built once per form and handed to the task block). | — |
 | 1.114.4 | GAS-CP-R94-005 | 2026-11-09 | Website inbox: every website inquiry (support request, contact form, portal-access request) can be converted into a ticket — vessel (optional for contact / access), category and priority chosen on the message; sender, contact details and original text carried into the ticket, inquiry marked done and linked. Converters: administrators, management, project managers, sales, works team. | — |
 | 1.114.3 | GAS-CP-R94-004 | 2026-11-09 | Service-report specialty: the hourly rate cards of the current rate list that belong to no discipline (Atlas engineers, Magnus, Aventics …) are offered as specialties too; hours booked under them are pinned to that card's rate item in the accounting register. Same list in the Service Engineer app. | — |
 | 1.114.2 | GAS-CP-R94-003 | 2026-11-09 | Direct invoice from where the work is: 🧾 Invoice on every not-fully-invoiced sub-project of Collections › Accounting checks (amount still to invoice pre-filled), Direct invoice on an accounting report (net pre-filled; the reported lines are marked invoiced under the invoice number at once) and on an accepted service report. Service-report specialty drop-down shows each discipline with its rate card (and the hourly rate for financial roles) — same labels in the Service Engineer app (PWA 0.6.20). | — |
