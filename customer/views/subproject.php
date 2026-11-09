@@ -447,13 +447,14 @@ layout_head($sp['code'] . ' · ' . $sp['name'], 'projects');
   <?php endif; ?>
   <?php if (!$files): ?><div class="empty"><p><?= tt('fl.empty') ?></p></div><?php else: ?>
   <div class="table-scroll"><table>
-    <thead><tr><th><?= tt('fl.kind') ?></th><th><?= tt('fl.title') ?></th><th><?= tt('th.size') ?></th><th><?= tt('th.by') ?></th><th><?= tt('th.date') ?></th><?= $staff ? '<th>' . tt('vis.label') . '</th>' : '' ?></tr></thead>
+    <thead><tr><th><?= tt('fl.kind') ?></th><th><?= tt('fl.title') ?></th><th><?= tt('th.size') ?></th><th><?= tt('th.by') ?></th><th><?= tt('th.date') ?></th><?= $staff ? '<th>' . tt('vis.label') . '</th>' : '' ?><?= is_cp_admin() ? '<th></th>' : '' ?></tr></thead>
     <tbody><?php foreach ($files as $f): ?>
       <tr><td><?= e(fk_label($f['kind'])) ?></td>
         <td><a href="<?= url('file', ['id' => $f['id']]) ?>"><?= e($f['title'] ?: $f['original_name']) ?></a><?= $f['title'] ? '<br><span class="hint">' . e($f['original_name']) . '</span>' : '' ?></td>
         <td class="num"><?= number_format($f['size_bytes'] / 1024, 0) ?> KB</td><td><?= e($f['full_name'] ?? '—') ?></td>
         <td class="date"><?= e(fmt_datetime($f['created_at'])) ?></td>
-        <?= $staff ? '<td><span class="vis-tag ' . e($f['visibility']) . '">' . tt('vis.' . $f['visibility']) . '</span></td>' : '' ?></tr>
+        <?= $staff ? '<td><span class="vis-tag ' . e($f['visibility']) . '">' . tt('vis.' . $f['visibility']) . '</span></td>' : '' ?>
+        <?php if (is_cp_admin()): ?><td class="num"><form method="post" style="display:inline"><?= csrf_field() ?><input type="hidden" name="action" value="file_delete"><input type="hidden" name="id" value="<?= (int)$f['id'] ?>"><input type="hidden" name="project_id" value="<?= $pid ?>"><input type="hidden" name="subproject_id" value="<?= (int)$id ?>"><button class="btn btn--ghost btn--sm" title="<?= tt('btn.delete') ?>" data-confirm="<?= e(t('fl.delete_confirm', ['name' => $f['title'] ?: $f['original_name']])) ?>" data-confirm-ok="<?= tt('btn.delete') ?>">🗑</button></form></td><?php endif; ?></tr>
     <?php endforeach; ?></tbody></table></div>
   <?php endif; ?>
 </div>

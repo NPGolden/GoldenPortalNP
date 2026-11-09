@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.111.2** (build 2026-11-08). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.111.3** (build 2026-11-08). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.111.3 | GAS-CP-R93-004 | 2026-11-09 | Project Files tab: administrators can delete a file (with confirmation; record and stored file removed, logged on the sub-project). Photos of notes / reports and drawing overlays are deleted where they belong. | — |
 | 1.111.2 | GAS-CP-R93-003 | 2026-11-09 | Website inbox: administrators can delete a message (with confirmation; its notifications are removed too). Staff keep the status / spam handling. | — |
 | 1.111.1 | GAS-CP-R93-002 | 2026-11-09 | Website inbox also receives the general contact form of goldenas.com.gr (kind Contact form, topic in the subject, sales staff notified) — until now only support requests and portal-access requests were handed over; both still need the Website site key. | `install/migrate_cp_r93_002_web_contact.sql` |
 | 1.111.0 | GAS-CP-R93-001 | 2026-11-09 | Work permits per main project: register of permits, residence permits, visas, A1 certificates, yard and port passes with holder, number, authority, country, issue and expiry dates and the scanned document; Projects dashboard shows a per-project pill (count · expired · expiring) and a "needing attention" card; warnings to the project manager, HR and administrators 60 / 30 / 14 / 7 days before expiry and on the day, lapsed permits monthly; Work permits page with totals, tabs and filters; edit rights for management, HR and the project PM. | `install/migrate_cp_r93_001_work_permits.sql` |

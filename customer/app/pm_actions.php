@@ -768,6 +768,16 @@ function pm_handle_action(string $action, string $page): bool {
             $back();
         }
 
+        case 'file_delete': {   // R93-004: administrators only — removes the record and the stored file
+            require_staff(); if (!is_cp_admin()) throw new RuntimeException(t('err.noaccess'));
+            $fid = (int)($_POST['id'] ?? 0); $f = one("SELECT id, kind, title, original_name FROM sp_files WHERE id = ? AND project_id = ?", [$fid, (int)$_POST['project_id']]);
+            if (!$f) throw new RuntimeException(t('err.notfound'));
+            if (in_array((string)$f['kind'], ['photo', 'fsr_photo', 'ga'], true)) throw new RuntimeException(t('fl.delete_linked'));   // belongs to a note / report / GA overlay — delete it there
+            cp_delete_file($fid); if (function_exists('sp_log')) try { sp_log((int)($_POST['subproject_id'] ?? 0), 'file_deleted', $f['title'] ?: $f['original_name']); } catch (Throwable $e) {}
+            flash('good', t('fl.deleted', ['name' => $f['title'] ?: $f['original_name']]));
+            $back();
+        }
+
         /* --------------------------------------------- GA overlays */
         case 'ga_add': {
             require_staff();
