@@ -55,8 +55,14 @@ try:
     for k, v in cur.items():
         if k in ("kidsAgeBand", "ageRatingOverride", "koreaAgeRatingOverride"): continue
         if v is None: fill[k] = False if k in bools else "NONE"
+    def patch(f): req("PATCH", f"/ageRatingDeclarations/{ar['id']}", json={"data": {"type": "ageRatingDeclarations", "id": ar["id"], "attributes": f}})
     if fill:
-        req("PATCH", f"/ageRatingDeclarations/{ar['id']}", json={"data": {"type": "ageRatingDeclarations", "id": ar["id"], "attributes": fill}})
+        try: patch(fill)
+        except SystemExit as e:          # Apple adds questions over time — learn their type from the error and retry once
+            import re
+            for k in re.findall(r"attribute '([A-Za-z]+)'\. Expected a BOOLEAN", str(e)): fill[k] = False
+            for k in re.findall(r"attribute '([A-Za-z]+)'\. Expected a STRING|Expected an ENUM", str(e)): fill[k] = "NONE"
+            patch(fill)
         log("age rating: answered", len(fill), "open questions with none/no →", sorted(fill))
     else: log("age rating already complete")
 except SystemExit as e: log("age rating not changed (answer the questionnaire in App Information):", " ".join(str(e).split())[:500])
