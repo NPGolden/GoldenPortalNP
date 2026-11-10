@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.115.0';
-const CP_BUILD   = '2026-11-09';
+const CP_VERSION = '1.116.0';
+const CP_BUILD   = '2026-11-10';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R95-001', 'version' => '1.116.0', 'date' => '2026-11-10', 'title' => 'Website statistics: the portal pulls goldenas.com.gr\'s first-party, cookieless visitor statistics (aggregates only) every 15 minutes with a shared key — Work › Website statistics page with period presets (today, 7 / 30 days, month, year, 12 months, custom) and comparison to the previous period: visitors, views, pages per visit, time on page and scroll depth, countries and regions, pages, site-search terms (with no-result searches), sources and campaigns, devices / browsers / OS / languages, hour-of-day and weekday, videos, outbound clicks, downloads, conversions joined with the Website inbox; CSV export and print layout; Monday digest to administrators; Settings › System › Website: feed URL and key.', 'db' => 'install/migrate_cp_r95_001_web_stats.sql', 'check' => 'r95a'],
         ['ref' => 'GAS-CP-R94-007', 'version' => '1.115.0', 'date' => '2026-11-09', 'title' => 'Outgoing e-mail through Microsoft Graph with OAuth2 client credentials (config graph block: tenant, client_id, client_secret, from) — no mailbox password; authenticated SMTP and PHP mail() remain fallbacks. Settings › System › Website shows the active transport and sends a test e-mail to the administrator. Website R14 uses the same mailer for the form copies.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R94-006', 'version' => '1.114.5', 'date' => '2026-11-09', 'title' => 'Fix: PHP warning "Undefined variable $pid" on the service-report form (specialty options are now built once per form and handed to the task block).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R94-005', 'version' => '1.114.4', 'date' => '2026-11-09', 'title' => 'Website inbox: every website inquiry (support request, contact form, portal-access request) can be converted into a ticket — vessel (optional for contact / access), category and priority chosen on the message; sender, contact details and original text carried into the ticket, inquiry marked done and linked. Converters: administrators, management, project managers, sales, works team.', 'db' => null, 'check' => null],
@@ -404,6 +405,7 @@ function cp_migration_state(): array {
         'r85b' => $has("SHOW TABLES LIKE 'contact_companies'"),
         'r85c' => $has("SHOW COLUMNS FROM vessel_companies LIKE 'company_id'"),
         'r93c' => $has("SHOW TABLES LIKE 'bom_import_rows'"),
+        'r95a' => $has("SHOW TABLES LIKE 'web_stats_day'"),
         'r94a' => $has("SHOW COLUMNS FROM proformas LIKE 'kind'"),
         'r93b' => $has("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_inquiries' AND COLUMN_NAME = 'kind' AND COLUMN_TYPE LIKE '%contact%'"),
         'r93a' => $has("SHOW TABLES LIKE 'work_permits'"),

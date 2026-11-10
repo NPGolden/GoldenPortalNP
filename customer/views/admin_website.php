@@ -36,4 +36,16 @@ layout_head(t('web.title'), 'admin_website');
     <div class="btn-row span2"><button class="btn btn--gold"><?= tt('btn.save') ?></button></div>
   </form>
 </div>
+<div class="card"><h2>📈 <?= tt('ws.title') ?></h2>
+  <p class="hint"><?= tt('ws.settings_hint') ?></p>
+  <?php $wsk = function_exists('ws_key') ? ws_key() : ''; $wsl = (string)cp_setting('ws_last_pull', ''); $wse = (string)cp_setting('ws_last_error', ''); ?>
+  <form method="post" action="<?= url('admin_website') ?>" class="form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="ws_settings_save">
+    <label><?= tt('ws.feed_url') ?><input name="ws_feed_url" value="<?= e((string)cp_setting('ws_feed_url', '')) ?>" placeholder="https://www.goldenas.com.gr/api/stats-feed.php"></label>
+    <label><?= tt('ws.feed_key') ?><input name="ws_feed_key" value="" placeholder="<?= $wsk ? e(substr($wsk, 0, 6)) . '…' . e(substr($wsk, -4)) : tt('rc.key_none') ?>" autocomplete="off"><span class="hint"><?= tt('ws.feed_key_hint') ?></span></label>
+    <label><?= tt('ws.last_pull') ?><input value="<?= $wsl ? e(fmt_datetime($wsl)) : '—' ?>" readonly></label>
+    <label><?= tt('ws.last_error') ?><input value="<?= $wse ? e($wse) : '—' ?>" readonly></label>
+    <?php if ($wsk): ?><label class="check span2"><input type="checkbox" name="ws_clear_key" value="1"> <?= tt('ws.clear_key') ?></label><?php endif; ?>
+    <div class="btn-row span2"><button class="btn btn--gold"><?= tt('btn.save') ?></button><?php if ($wsk): ?><a class="btn" href="<?= url('web_stats') ?>"><?= tt('ws.open') ?> →</a><?php endif; ?></div>
+  </form>
+</div>
 <?php layout_foot(); ?>
