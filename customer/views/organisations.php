@@ -15,7 +15,10 @@ layout_head(t('org.title'), 'contacts');
   <div class="stat<?= $C['people_fix'] ? ' gold' : '' ?>"><b><?= $C['people_fix'] ?></b><?= tt('org.k_people') ?></div>
 </div>
 <div class="btn-row" style="margin-bottom:10px;">
-  <?php if ($C['match']): ?><form method="post" action="<?= $self ?>" data-lock data-confirm="<?= e(t('org.link_all_q', ['n' => $C['match']])) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="org_link_all"><button class="btn btn--gold btn--sm" type="submit">🔗 <?= e(t('org.link_all', ['n' => $C['match']])) ?></button></form><?php endif; ?>
+  <?php $nSure = count(array_filter($M['match'], fn($m) => $m['how'] !== 'name')); $nName = count($M['match']) - $nSure; ?>
+  <?php if ($nSure): ?><form method="post" action="<?= $self ?>" data-lock data-confirm="<?= e(t('org.link_all_q', ['n' => $nSure])) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="org_link_all"><input type="hidden" name="hows" value="vat,erp"><button class="btn btn--gold btn--sm" type="submit">🔗 <?= e(t('org.link_all_sure', ['n' => $nSure])) ?></button></form><?php endif; ?>
+  <?php if ($nName): ?><form method="post" action="<?= $self ?>" data-lock data-confirm="<?= e(t('org.link_all_name_q', ['n' => $nName])) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="org_link_all"><input type="hidden" name="hows" value="name"><button class="btn btn--sm" type="submit">🔗 <?= e(t('org.link_all_name', ['n' => $nName])) ?></button></form><?php endif; ?>
+  <?php if ($C['none']): ?><form method="post" action="<?= $self ?>" data-lock data-confirm="<?= e(t('org.create_all_q', ['n' => $C['none']])) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="org_create_all"><button class="btn btn--sm" type="submit">🏛 <?= e(t('org.create_all', ['n' => $C['none']])) ?></button></form><?php endif; ?>
   <?php if ($C['people_fix']): ?><form method="post" action="<?= $self ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="org_derive_people"><button class="btn btn--sm" type="submit">👤 <?= e(t('org.derive', ['n' => $C['people_fix']])) ?></button></form><?php endif; ?>
 </div>
 <div class="card">

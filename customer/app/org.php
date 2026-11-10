@@ -25,7 +25,10 @@ function org_matches(): array {
         $cid = (int)$cu['id'];
         if (!empty($byCust[$cid])) { $out['linked'][] = ['customer' => $cu, 'company' => $byCust[$cid][0], 'how' => 'linked']; continue; }
         $hit = null; $how = '';
-        if (($v = org_vat($cu['vat_no'])) && !empty($byVat[$v])) { $hit = $byVat[$v][0]; $how = 'vat'; }   // R85-003: VAT only — ERP code and name never propose a match (decision of 06/11/2026)
+        if (($v = org_vat($cu['vat_no'])) && !empty($byVat[$v])) { $hit = $byVat[$v][0]; $how = 'vat'; }
+        // R95-002 (decision 2 of 10/11/2026, replacing R85-003 "VAT only"): ERP code and normalised name are PROPOSED as matches to confirm — never linked silently
+        if (!$hit && ($e = mb_strtolower(trim((string)$cu['erp_code']))) !== '' && !empty($byErp[$e])) { $hit = $byErp[$e][0]; $how = 'erp'; }
+        if (!$hit && ($k = org_key((string)$cu['name'])) !== '' && mb_strlen($k) >= 4 && !empty($byKey[$k])) { $hit = $byKey[$k][0]; $how = 'name'; }
         if ($hit && $hit['customer_id'] && (int)$hit['customer_id'] !== $cid) $hit = null;   // already someone else's
         if ($hit) $out['match'][] = ['customer' => $cu, 'company' => $hit, 'how' => $how]; else $out['none'][] = ['customer' => $cu, 'company' => null, 'how' => ''];
     }
@@ -59,7 +62,9 @@ function org_create_for_customer(int $cuId, string $kind = 'owner'): int {
     $id = (int) db()->lastInsertId(); q('UPDATE contacts SET company_id = ?, company = ? WHERE customer_id = ? AND company_id IS NULL', [$id, $cu['name'], $cuId]); return $id;
 }
 /** Link every suggested match at once; returns the number linked. */
-function org_link_all(): int { $n = 0; foreach (org_matches()['match'] as $m) { try { org_link((int)$m['company']['id'], (int)$m['customer']['id']); $n++; } catch (Throwable $e) {} } return $n; }
+function org_link_all(?array $hows = null): int { $n = 0; foreach (org_matches()['match'] as $m) { if ($hows !== null && !in_array($m['how'], $hows, true)) continue; try { org_link((int)$m['company']['id'], (int)$m['customer']['id']); $n++; } catch (Throwable $e) {} } return $n; }
+/** R95-002: give every customer without an organisation its own (role Customer; the matcher has already been consulted by org_matches). Returns the number created. */
+function org_create_all(): int { if (!org_can()) throw new RuntimeException(t('err.noaccess')); $n = 0; foreach (org_matches()['none'] as $m) { try { org_create_for_customer((int)$m['customer']['id'], 'other'); $n++; } catch (Throwable $e) { error_log('[org_create_all] ' . $e->getMessage()); } } org_find_reset(); return $n; }
 /** People without an organisation but with a customer, or without a customer but with a linked organisation — fixed in one go. */
 function org_derive_people(): int {
     $n = (int) q('UPDATE contacts ct JOIN companies co ON co.id = ct.company_id SET ct.customer_id = co.customer_id WHERE ct.customer_id IS NULL AND co.customer_id IS NOT NULL')->rowCount();

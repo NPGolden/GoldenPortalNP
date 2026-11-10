@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.117.0';
+const CP_VERSION = '1.117.1';
 const CP_BUILD   = '2026-11-10';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R95-002b', 'version' => '1.117.1', 'date' => '2026-11-10', 'title' => 'Organisations: matches to confirm by ERP code and normalised name (not only VAT); bulk "Link VAT / ERP matches", "Link name matches" and "Create an organisation for every customer without one" — the clean-up for the 393 customers without organisation.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R95-002', 'version' => '1.117.0', 'date' => '2026-11-10', 'title' => 'Parties / invoicing plan — phase 0: one organisation matcher (VAT → ERP code → normalised name) in every customer, organisation and supplier form (refuses a probable duplicate unless "Create anyway") and in every import (new organisations / customers / vessels are proposed, created only when "Create the new …" is ticked); contact "new organisation" links to the matching one; Duplicate customers workbench with merge (re-points projects, vessels, users, contacts, tickets, documents, invoicing details, linked organisation) next to the organisation and vessel merge tools.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R94-009', 'version' => '1.116.2', 'date' => '2026-11-10', 'title' => 'Accounting register (administrators): bulk re-attribution of a project\'s service-report lines from one registered name to an engineer (sub-project filter, invoiced lines included, event per accounting report); administrators may also correct invoiced single lines.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R94-008', 'version' => '1.116.1', 'date' => '2026-11-10', 'title' => 'Accounting register: the engineer of a service-report line can be corrected (✎ next to the name; open / reported lines, re-priced, event logged) — office staff preparing reports on behalf of engineers no longer end up as the billed name. Service-report form: the engineer is pre-filled only for technical staff and the Engineer list offers technical staff only.', 'db' => null, 'check' => null],
