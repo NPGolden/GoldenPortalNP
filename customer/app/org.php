@@ -19,7 +19,7 @@ function org_vat(?string $v): string { $d = preg_replace('/\D/', '', (string)$v)
 function org_matches(): array {
     $cos = all('SELECT co.id, co.name, co.kind, co.is_supplier, co.customer_id, co.country, co.city, co.email, co.phone, co.website, ' . (co_roles_has() ? 'COALESCE(NULLIF(co.vat_no, \'\'), sd.vat_no) AS vat_no, COALESCE(co.erp_code, sd.erp_code) AS erp_code' : 'sd.vat_no, sd.erp_code') . ' FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE co.is_active = 1');
     $byCust = []; $byVat = []; $byErp = []; $byKey = [];
-    foreach ($cos as $c) { if ($c['customer_id']) $byCust[(int)$c['customer_id']][] = $c; if ($v = org_vat($c['vat_no'])) $byVat[$v][] = $c; if ($c['erp_code']) $byErp[mb_strtolower((string)$c['erp_code'])][] = $c; $byKey[org_key($c['name'])][] = $c; }
+    foreach ($cos as $c) { if ($c['customer_id']) $byCust[(int)$c['customer_id']][] = $c; if ($v = org_vat($c['vat_no'])) $byVat[$v][] = $c; if ($c['erp_code']) $byErp[mb_strtolower((string)$c['erp_code'])][] = $c; if (!empty($c['is_supplier'])) continue; $byKey[org_key($c['name'])][] = $c; }   // name matches never against suppliers either
     $out = ['linked' => [], 'match' => [], 'none' => []];
     foreach (all('SELECT * FROM customers WHERE is_active = 1 ORDER BY name') as $cu) {
         $cid = (int)$cu['id'];
@@ -27,7 +27,8 @@ function org_matches(): array {
         $hit = null; $how = '';
         if (($v = org_vat($cu['vat_no'])) && !empty($byVat[$v])) { $hit = $byVat[$v][0]; $how = 'vat'; }
         // R95-002 (decision 2 of 10/11/2026, replacing R85-003 "VAT only"): ERP code and normalised name are PROPOSED as matches to confirm — never linked silently
-        if (!$hit && ($e = mb_strtolower(trim((string)$cu['erp_code']))) !== '' && !empty($byErp[$e])) { $hit = $byErp[$e][0]; $how = 'erp'; }
+        // ERP codes: the customer ledger and the supplier ledger of the ERP use the same numbers for different entities — a customer code may only match an organisation that is NOT a supplier and carries the customer role
+        if (!$hit && ($e = mb_strtolower(trim((string)$cu['erp_code']))) !== '' && !empty($byErp[$e])) { foreach ($byErp[$e] as $c) { if (!empty($c['is_supplier']) || (co_roles_has() && !in_array('customer', co_roles($c), true)) || !empty($c['sd_only'])) continue; $hit = $c; $how = 'erp'; break; } }
         if (!$hit && ($k = org_key((string)$cu['name'])) !== '' && mb_strlen($k) >= 4 && !empty($byKey[$k])) { $hit = $byKey[$k][0]; $how = 'name'; }
         if ($hit && $hit['customer_id'] && (int)$hit['customer_id'] !== $cid) $hit = null;   // already someone else's
         if ($hit) $out['match'][] = ['customer' => $cu, 'company' => $hit, 'how' => $how]; else $out['none'][] = ['customer' => $cu, 'company' => null, 'how' => ''];
@@ -61,6 +62,8 @@ function org_create_for_customer(int $cuId, string $kind = 'owner'): int {
     q('INSERT INTO companies (name, kind, customer_id, country, city, website, email, phone, is_active' . (co_roles_has() ? ', roles, vat_no, erp_code, address, postal_code' : '') . ') VALUES (?,?,?,?,?,?,?,?,1' . (co_roles_has() ? ',?,?,?,?,?' : '') . ')', array_merge([mb_substr((string)$cu['name'], 0, 160), $kind, $cuId, $cu['country'] ?: null, $cu['city'] ?: null, $cu['website'] ?: null, $cu['email'] ?: null, $cu['phone'] ?: null], co_roles_has() ? [$kind . ',customer', $cu['vat_no'] ?: null, $cu['erp_code'] ?: null, $cu['address'] ?: null, $cu['postal_code'] ?: null] : []));
     $id = (int) db()->lastInsertId(); q('UPDATE contacts SET company_id = ?, company = ? WHERE customer_id = ? AND company_id IS NULL', [$id, $cu['name'], $cuId]); return $id;
 }
+/** R95-002c: undo a link — the company keeps its data, the customer loses its organisation (people keep their customer). */
+function org_unlink(int $coId): void { if (!org_can()) throw new RuntimeException(t('err.noaccess')); q('UPDATE companies SET customer_id = NULL WHERE id = ?', [$coId]); org_find_reset(); }
 /** Link every suggested match at once; returns the number linked. */
 function org_link_all(?array $hows = null): int { $n = 0; foreach (org_matches()['match'] as $m) { if ($hows !== null && !in_array($m['how'], $hows, true)) continue; try { org_link((int)$m['company']['id'], (int)$m['customer']['id']); $n++; } catch (Throwable $e) {} } return $n; }
 /** R95-002: give every customer without an organisation its own (role Customer; the matcher has already been consulted by org_matches). Returns the number created. */
@@ -133,7 +136,7 @@ function org_find(string $name, ?string $vat = null, ?string $erp = null): ?arra
     $C =& $GLOBALS['__org_find_cache'];
     if (!is_array($C)) {
         $C = ['cos' => [], 'cus' => []];
-        try { $C['cos'] = all('SELECT id, name, customer_id' . (co_roles_has() ? ', vat_no, erp_code' : ', NULL AS vat_no, NULL AS erp_code') . ' FROM companies WHERE is_active = 1 AND name NOT LIKE \'%[merged #%\''); } catch (Throwable $e) {}
+        try { $C['cos'] = all('SELECT id, name, customer_id, is_supplier' . (co_roles_has() ? ', vat_no, erp_code' : ', NULL AS vat_no, NULL AS erp_code') . ' FROM companies WHERE is_active = 1 AND name NOT LIKE \'%[merged #%\''); } catch (Throwable $e) {}
         try { $C['cus'] = all('SELECT id, name, erp_code, vat_no FROM customers WHERE is_active = 1 AND name NOT LIKE \'%[merged #%\''); } catch (Throwable $e) {}
         foreach ($C['cos'] as &$c) { $c['k'] = org_key((string)$c['name']); $c['v'] = org_vat($c['vat_no'] ?? null); } unset($c);
         foreach ($C['cus'] as &$c) { $c['k'] = org_key((string)$c['name']); $c['v'] = org_vat($c['vat_no'] ?? null); } unset($c);
@@ -142,7 +145,7 @@ function org_find(string $name, ?string $vat = null, ?string $erp = null): ?arra
     $co = fn(array $c, string $how): array => ['company_id' => (int)$c['id'], 'customer_id' => $c['customer_id'] ? (int)$c['customer_id'] : null, 'how' => $how, 'name' => (string)$c['name']];
     $cu = function (array $c, string $how) use ($C): array { $coId = null; foreach ($C['cos'] as $x) if ((int)$x['customer_id'] === (int)$c['id']) { $coId = (int)$x['id']; break; } return ['company_id' => $coId, 'customer_id' => (int)$c['id'], 'how' => $how, 'name' => (string)$c['name']]; };
     if ($v !== '') { foreach ($C['cos'] as $c) if ($c['v'] === $v) return $co($c, 'vat'); foreach ($C['cus'] as $c) if ($c['v'] === $v) return $cu($c, 'vat'); }
-    if ($e !== '') { foreach ($C['cos'] as $c) if ((string)($c['erp_code'] ?? '') !== '' && strcasecmp((string)$c['erp_code'], $e) === 0) return $co($c, 'erp'); foreach ($C['cus'] as $c) if ((string)($c['erp_code'] ?? '') !== '' && strcasecmp((string)$c['erp_code'], $e) === 0) return $cu($c, 'erp'); }
+    if ($e !== '') { foreach ($C['cos'] as $c) if ((string)($c['erp_code'] ?? '') !== '' && strcasecmp((string)$c['erp_code'], $e) === 0 && empty($c['is_supplier']) && $c['customer_id']) return $co($c, 'erp'); foreach ($C['cus'] as $c) if ((string)($c['erp_code'] ?? '') !== '' && strcasecmp((string)$c['erp_code'], $e) === 0) return $cu($c, 'erp'); }   // ERP: customer ledger only (supplier codes overlap)
     if ($k !== '' && mb_strlen($k) >= 3) { foreach ($C['cos'] as $c) if ($c['k'] === $k) return $co($c, 'name'); foreach ($C['cus'] as $c) if ($c['k'] === $k) return $cu($c, 'name'); }
     return null;
 }

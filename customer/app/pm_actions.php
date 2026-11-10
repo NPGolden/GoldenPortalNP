@@ -589,6 +589,7 @@ function pm_handle_action(string $action, string $page): bool {
         case 'ofs_delete': { of_status_delete((string)($_POST['skey'] ?? '')); flash('good', t('ofs.deleted')); redirect('admin_offer_statuses', ['_r' => uniqid()]); }
         case 'org_link': { org_link((int)($_POST['company_id'] ?? 0), (int)($_POST['customer_id'] ?? 0)); flash('good', t('org.linked_ok')); redirect('organisations'); }
         case 'org_link_all': { $h = array_values(array_intersect(['vat', 'erp', 'name'], explode(',', (string)($_POST['hows'] ?? 'vat,erp')))); $n = org_link_all($h ?: ['vat', 'erp']); flash('good', t('org.linked_n', ['n' => $n])); redirect('organisations'); }
+        case 'org_unlink': { org_unlink((int)($_POST['company_id'] ?? 0)); flash('good', t('org.unlinked_ok')); redirect('organisations', ['_r' => uniqid()], '#sec-linked'); }   // R95-002c
         case 'org_create_all': { $n = org_create_all(); flash('good', t('org.created_n', ['n' => $n])); redirect('organisations'); }   // R95-002
         case 'org_create_co': { org_create_for_customer((int)($_POST['customer_id'] ?? 0), (string)($_POST['kind'] ?? 'owner')); flash('good', t('org.created_ok')); redirect('organisations'); }
         case 'cu_merge': { $d = cu_merge((int)($_POST['keep'] ?? 0), (int)($_POST['drop'] ?? 0)); flash('good', t('org.cu_merged_ok', ['n' => array_sum($d)])); redirect('organisations', ['_r' => uniqid()], '#cu-dupes'); }   // R95-002

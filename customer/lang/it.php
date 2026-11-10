@@ -8703,4 +8703,7 @@ Cordiali saluti,
 'org.create_all' => 'Crea un\'organizzazione per i {n} clienti che non ne hanno',
 'org.create_all_q' => 'Creare {n} organizzazioni (ruolo Cliente) dai clienti che non ne hanno? Ognuna prende nome, P.IVA, codice ERP e indirizzo del cliente; un cliente la cui P.IVA esiste già su un\'organizzazione viene collegato ad essa.',
 'org.created_n' => '{n} organizzazioni create.',
+'org.unlink' => 'Scollega',
+'org.unlink_q' => 'Rimuovere il collegamento tra il cliente "{a}" e l\'organizzazione "{b}"? Le schede restano; va via solo il collegamento.',
+'org.unlinked_ok' => 'Collegamento rimosso.',
 ];

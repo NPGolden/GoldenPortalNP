@@ -8703,4 +8703,7 @@ Best regards,
 'org.create_all' => 'Create an organisation for the {n} customers without one',
 'org.create_all_q' => 'Create {n} organisations (role Customer) from the customers that have none? Each gets the customer\'s name, VAT, ERP code and address; a customer whose VAT already exists on an organisation is linked to it instead.',
 'org.created_n' => '{n} organisation(s) created.',
+'org.unlink' => 'Unlink',
+'org.unlink_q' => 'Remove the link between customer "{a}" and organisation "{b}"? Both records stay; only the link goes.',
+'org.unlinked_ok' => 'Link removed.',
 ];

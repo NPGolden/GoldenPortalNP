@@ -43,7 +43,7 @@ layout_head(t('org.title'), 'contacts');
 </div>
 <?php endif; ?>
 <?php foreach (['match' => 'gold', 'none' => 'red', 'linked' => 'ok'] as $sec => $tone): $rows = $M[$sec]; ?>
-<div class="card">
+<div class="card" id="sec-<?= $sec ?>">
   <div class="card-head"><h2><?= tt('org.s_' . $sec) ?> <span class="count"><?= count($rows) ?></span></h2><span class="hint"><?= tt('org.h_' . $sec) ?></span></div>
   <?php if (!$rows): ?><p class="hint"><?= tt('org.empty') ?></p><?php else: ?>
   <div class="table-scroll"><table class="tbl tbl--wrap"><thead><tr><th><?= tt('rp.customer') ?></th><th><?= tt('org.vat_erp') ?></th><th><?= tt('co.one') ?></th><th><?= tt('org.how') ?></th><th></th></tr></thead><tbody>
@@ -55,6 +55,7 @@ layout_head(t('org.title'), 'contacts');
       <td class="num">
         <?php if ($sec === 'match'): ?><form method="post" action="<?= $self ?>" data-lock style="display:inline;"><?= csrf_field() ?><input type="hidden" name="action" value="org_link"><input type="hidden" name="company_id" value="<?= (int)$co['id'] ?>"><input type="hidden" name="customer_id" value="<?= (int)$cu['id'] ?>"><button class="btn btn--gold btn--sm" type="submit">🔗 <?= tt('org.link') ?></button></form>
         <?php elseif ($sec === 'none'): ?><form method="post" action="<?= $self ?>" data-lock style="display:inline-flex; gap:4px; align-items:center;"><?= csrf_field() ?><input type="hidden" name="action" value="org_create_co"><input type="hidden" name="customer_id" value="<?= (int)$cu['id'] ?>"><select name="kind" data-nosearch style="width:auto;"><?php foreach ($kinds as $k => $lab): if ($k === 'supplier') continue; ?><option value="<?= $k ?>"<?= $k === 'owner' ? ' selected' : '' ?>><?= e($lab) ?></option><?php endforeach; ?></select><button class="btn btn--sm" type="submit">+ <?= tt('org.create_co') ?></button></form>
+        <?php elseif ($sec === 'linked' && is_cp_admin()): ?><form method="post" action="<?= $self ?>" data-lock data-confirm="<?= e(t('org.unlink_q', ['a' => $cu['name'], 'b' => $co['name']])) ?>" style="display:inline;"><?= csrf_field() ?><input type="hidden" name="action" value="org_unlink"><input type="hidden" name="company_id" value="<?= (int)$co['id'] ?>"><button class="btn btn--ghost btn--sm" type="submit" title="<?= tt('org.unlink') ?>">⛓ <?= tt('org.unlink') ?></button></form>
         <?php endif; ?></td></tr>
   <?php endforeach; ?></tbody></table></div><?php endif; ?>
 </div>

@@ -1310,3 +1310,7 @@ Decisions of 2026-11-10 (see `GAS-CP-R95-combined-analysis_R1.md`). **Matcher** 
 ## 276. v1.117.1 — Organisations: ERP / name matches to confirm, bulk link, bulk create (GAS-CP-R95-002b)
 
 Live showed 322 linked / 0 to confirm / 393 customers without organisation — R85-003 had restricted proposals to VAT only. `org_matches()` now proposes ERP-code and `org_key` name matches too (how = erp / name; a company already linked to another customer is never proposed). `org_link_all($hows)` links a subset (`hows` POST field: `vat,erp` or `name`); `org_create_all()` creates an organisation (kind other, role customer) for every remaining customer via `org_create_for_customer()` (which itself links by VAT when the VAT already exists). Page: three buttons with confirmations. Lang +6 × 5 (8532).
+
+## 277. v1.117.2 — Fix: ERP matches vs suppliers (GAS-CP-R95-002c)
+
+§276 proposed 346 "ERP code" matches on live, almost all customer ↔ supplier (e.g. customer 4028 Aegean Shipping ↔ supplier 4028 Freshworks): SoftOne numbers customers and suppliers independently. `org_matches()` now accepts an ERP match only on an organisation that is not a supplier and carries the customer role; name matches skip suppliers too; `org_find()` ERP matching against companies requires `is_supplier = 0` and a linked customer. `org_unlink($coId)` + ⛓ Unlink on the Linked rows (admins) to undo a wrong link. Lang +3 × 5 (8535).

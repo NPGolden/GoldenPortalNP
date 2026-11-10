@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.117.1** (build 2026-11-10). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.117.2** (build 2026-11-10). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.117.2 | GAS-CP-R95-002c | 2026-11-10 | Fix: ERP-code and name matches in Organisations never point a customer at a supplier (the ERP uses the same code numbers in its customer and supplier ledgers); Unlink on linked rows for administrators. | — |
 | 1.117.1 | GAS-CP-R95-002b | 2026-11-10 | Organisations: matches to confirm by ERP code and normalised name (not only VAT); bulk "Link VAT / ERP matches", "Link name matches" and "Create an organisation for every customer without one" — the clean-up for the 393 customers without organisation. | — |
 | 1.117.0 | GAS-CP-R95-002 | 2026-11-10 | Parties / invoicing plan — phase 0: one organisation matcher (VAT → ERP code → normalised name) in every customer, organisation and supplier form (refuses a probable duplicate unless "Create anyway") and in every import (new organisations / customers / vessels are proposed, created only when "Create the new …" is ticked); contact "new organisation" links to the matching one; Duplicate customers workbench with merge (re-points projects, vessels, users, contacts, tickets, documents, invoicing details, linked organisation) next to the organisation and vessel merge tools. | — |
 | 1.116.2 | GAS-CP-R94-009 | 2026-11-10 | Accounting register (administrators): bulk re-attribution of a project's service-report lines from one registered name to an engineer (sub-project filter, invoiced lines included, event per accounting report); administrators may also correct invoiced single lines. | — |
