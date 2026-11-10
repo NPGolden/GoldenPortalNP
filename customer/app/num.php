@@ -68,15 +68,26 @@ function iv_vessel_has(): bool { static $h = null; if ($h === null) { try { $h =
 /** The invoicing details a sub-project may use: the vessel's (first) then the customer's; [id => row]. */
 function iv_choices_for_sub(array $sp): array {
     if (!iv_vessel_has()) return [];
+    if (function_exists('pty_has') && pty_has()) {   // R95-003: the party's identities first (★), then the vessel's (⚓), then other organisations linked to the vessel (🏢)
+        $org = pty_sub($sp) ?: (!empty($sp['customer_id']) ? pty_org_of_customer((int)$sp['customer_id']) : null);
+        $out = pty_identities($org, !empty($sp['vessel_id']) ? (int)$sp['vessel_id'] : null, !empty($sp['project_id']) ? (int)$sp['project_id'] : null);
+        foreach ($out as &$r) if ($r['src'] === 'party') $r['src'] = 'customer'; unset($r);   // legacy src labels: customer = the party, vessel, other
+        return $out;
+    }
     $out = [];
     if (!empty($sp['vessel_id'])) foreach (iv_list('vessel', (int)$sp['vessel_id'], true) as $r) $out[(int)$r['id']] = $r + ['src' => 'vessel'];
     if (!empty($sp['customer_id'])) foreach (iv_list('customer', (int)$sp['customer_id'], true) as $r) $out[(int)$r['id']] = $r + ['src' => 'customer'];
     return $out;
 }
-/** The invoicing details of a sub-project: the chosen one, else the vessel's default, else the customer's default. */
+/** The invoicing details of a sub-project: the chosen one → the project's chosen one → the party's default → the vessel's default → the customer's default. */
 function iv_for_sub(array $sp): ?array {
     if (!iv_vessel_has()) return null;
     if (!empty($sp['invoicing_id'])) { $r = iv_load((int)$sp['invoicing_id']); if ($r && $r['is_active']) return $r; }
+    if (function_exists('pty_has') && pty_has() && !empty($sp['project_id'])) {   // R95-003
+        $P = pty_project((int)$sp['project_id']);
+        if ($P['invoicing_id'] && empty($sp['billing_org_id'])) { $r = iv_load((int)$P['invoicing_id']); if ($r && $r['is_active']) return $r; }
+        $org = pty_sub($sp); if ($org && ($r = iv_default('company', $org))) return $r;
+    }
     if (!empty($sp['vessel_id']) && ($r = iv_default('vessel', (int)$sp['vessel_id']))) return $r;
     return !empty($sp['customer_id']) ? iv_default('customer', (int)$sp['customer_id']) : null;
 }

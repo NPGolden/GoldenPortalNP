@@ -33,7 +33,7 @@ function pm_handle_action(string $action, string $page): bool {
                $str('category', 80), $str('next_milestone', 120)]);
             $newPid = (int) db()->lastInsertId();
             if (br_has()) q('UPDATE projects SET branch_id = ? WHERE id = ?', [br_from_post(), $newPid]);                 // R24-001
-            pm_save_deadline('projects', $newPid);
+            pm_save_deadline('projects', $newPid); if (function_exists('pty_project_save')) pty_project_save($newPid);   // R95-003
             flash('good', t('pr.saved'));
             redirect('projects', ['_r' => uniqid()]);
         }
@@ -64,7 +64,7 @@ function pm_handle_action(string $action, string $page): bool {
                in_array($_POST['status'] ?? '', pm_statuses(), true) ? $_POST['status'] : pm_default_status(),
                $pmId, $pmName, $str('category', 80), $str('next_milestone', 120), $id]);
             if (br_has() && isset($_POST['branch_id'])) q('UPDATE projects SET branch_id = ? WHERE id = ?', [br_from_post(), $id]);   // R24-001
-            pm_save_deadline('projects', $id);
+            pm_save_deadline('projects', $id); if (function_exists('pty_project_save')) pty_project_save($id);   // R95-003
             flash('good', t('pr.updated'));
             redirect('projects', ['_r' => uniqid()]);
         }
@@ -79,7 +79,7 @@ function pm_handle_action(string $action, string $page): bool {
               [$code, $str('name', 120), (int)($_POST['system_id'] ?? 0) ?: null, $str('description', 4000), (int)($_POST['sort_order'] ?? 0),
                in_array($_POST['status'] ?? '', pm_statuses(), true) ? $_POST['status'] : $s['status'], $id]);
             if (br_has() && isset($_POST['branch_id'])) q('UPDATE subprojects SET branch_id = ? WHERE id = ?', [br_from_post(), $id]);   // R24-001
-            pm_save_invoicing($id); pm_save_deadline('subprojects', $id); pm_track_completed($id); if (function_exists('iv_sub_save')) iv_sub_save($id);
+            pm_save_invoicing($id); pm_save_deadline('subprojects', $id); pm_track_completed($id); if (function_exists('iv_sub_save')) iv_sub_save($id); if (function_exists('pty_sub_save')) pty_sub_save($id);
             flash('good', t('sp.updated'));
             redirect('subproject', ['id' => $id, '_r' => uniqid()]);
         }
@@ -93,7 +93,7 @@ function pm_handle_action(string $action, string $page): bool {
             $newId = (int) db()->lastInsertId();
             if (function_exists('of_sync_project')) of_sync_project($pid);                                           // R57-001: follows an approved project-level offer
             if (br_has()) q('UPDATE subprojects SET branch_id = ? WHERE id = ?', [br_from_post(), $newId]);                // R24-001
-            pm_save_invoicing($newId); pm_save_deadline('subprojects', $newId); if (function_exists('iv_sub_save')) iv_sub_save($newId);
+            pm_save_invoicing($newId); pm_save_deadline('subprojects', $newId); if (function_exists('iv_sub_save')) iv_sub_save($newId); if (function_exists('pty_sub_save')) pty_sub_save($newId);
             flash('good', t('pr.saved'));
             redirect('subproject', ['id' => $newId]);
         }
@@ -108,7 +108,7 @@ function pm_handle_action(string $action, string $page): bool {
             $sets[] = 'description = ?'; $vals[] = $str('description', 4000);
             $vals[] = $id;
             q('UPDATE subprojects SET ' . implode(', ', $sets) . ' WHERE id = ?', $vals);
-            pm_save_invoicing($id); pm_save_deadline('subprojects', $id); pm_track_completed($id); if (function_exists('iv_sub_save')) iv_sub_save($id);
+            pm_save_invoicing($id); pm_save_deadline('subprojects', $id); pm_track_completed($id); if (function_exists('iv_sub_save')) iv_sub_save($id); if (function_exists('pty_sub_save')) pty_sub_save($id);
             if (of_has()) pm_auto_snapshot($id);
             if (!empty($_POST['snapshot'])) {
                 $s = one('SELECT * FROM subprojects WHERE id = ?', [$id]);
@@ -590,6 +590,7 @@ function pm_handle_action(string $action, string $page): bool {
         case 'org_link': { org_link((int)($_POST['company_id'] ?? 0), (int)($_POST['customer_id'] ?? 0)); flash('good', t('org.linked_ok')); redirect('organisations'); }
         case 'org_link_all': { $h = array_values(array_intersect(['vat', 'erp', 'name'], explode(',', (string)($_POST['hows'] ?? 'vat,erp')))); $n = org_link_all($h ?: ['vat', 'erp']); flash('good', t('org.linked_n', ['n' => $n])); redirect('organisations'); }
         case 'org_unlink': { org_unlink((int)($_POST['company_id'] ?? 0)); flash('good', t('org.unlinked_ok')); redirect('organisations', ['_r' => uniqid()], '#sec-linked'); }   // R95-002c
+        case 'org_iv_move': { $n = iv_migrate_owners(); flash('good', t('org.iv_moved_n', ['n' => $n])); redirect('organisations'); }   // R95-003
         case 'org_create_all': { $n = org_create_all(); flash('good', t('org.created_n', ['n' => $n])); redirect('organisations'); }   // R95-002
         case 'org_create_co': { org_create_for_customer((int)($_POST['customer_id'] ?? 0), (string)($_POST['kind'] ?? 'owner')); flash('good', t('org.created_ok')); redirect('organisations'); }
         case 'cu_merge': { $d = cu_merge((int)($_POST['keep'] ?? 0), (int)($_POST['drop'] ?? 0)); flash('good', t('org.cu_merged_ok', ['n' => array_sum($d)])); redirect('organisations', ['_r' => uniqid()], '#cu-dupes'); }   // R95-002

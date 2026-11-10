@@ -94,6 +94,7 @@ require __DIR__ . '/app/ct.php';
 require __DIR__ . '/app/export.php';
 require __DIR__ . '/app/nf.php';
 require __DIR__ . '/app/iv.php';
+require __DIR__ . '/app/party.php';   // R95-003 billing party
 require __DIR__ . '/app/ar.php';
 require __DIR__ . '/app/rp.php';
 require __DIR__ . '/app/kb.php';

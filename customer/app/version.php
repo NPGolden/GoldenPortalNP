@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.117.2';
+const CP_VERSION = '1.118.0';
 const CP_BUILD   = '2026-11-10';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R95-003', 'version' => '1.118.0', 'date' => '2026-11-10', 'title' => 'Parties plan — phase 1: billing party (organisation) on every project, overridable per sub-project, with the invoicing identity chosen among the party\'s (★), the vessel\'s (⚓) and other vessel-linked organisations\' (🏢) identities; identities belong to organisations or vessels (customer / contact identities read and stored through the organisation; "Move identities" in Organisations); every proforma and invoice stores party, customer and vessel at creation; existing ledger rows back-filled from the project (main-level and vessel-less documents now reach the vessel statement).', 'db' => 'install/migrate_cp_r95_003_billing_party.sql', 'check' => 'r95b'],
         ['ref' => 'GAS-CP-R95-002c', 'version' => '1.117.2', 'date' => '2026-11-10', 'title' => 'Fix: ERP-code and name matches in Organisations never point a customer at a supplier (the ERP uses the same code numbers in its customer and supplier ledgers); Unlink on linked rows for administrators.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R95-002b', 'version' => '1.117.1', 'date' => '2026-11-10', 'title' => 'Organisations: matches to confirm by ERP code and normalised name (not only VAT); bulk "Link VAT / ERP matches", "Link name matches" and "Create an organisation for every customer without one" — the clean-up for the 393 customers without organisation.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R95-002', 'version' => '1.117.0', 'date' => '2026-11-10', 'title' => 'Parties / invoicing plan — phase 0: one organisation matcher (VAT → ERP code → normalised name) in every customer, organisation and supplier form (refuses a probable duplicate unless "Create anyway") and in every import (new organisations / customers / vessels are proposed, created only when "Create the new …" is ticked); contact "new organisation" links to the matching one; Duplicate customers workbench with merge (re-points projects, vessels, users, contacts, tickets, documents, invoicing details, linked organisation) next to the organisation and vessel merge tools.', 'db' => null, 'check' => null],
@@ -412,6 +413,7 @@ function cp_migration_state(): array {
         'r93c' => $has("SHOW TABLES LIKE 'bom_import_rows'"),
         'r95a' => $has("SHOW TABLES LIKE 'web_stats_day'"),
         'r94a' => $has("SHOW COLUMNS FROM proformas LIKE 'kind'"),
+        'r95b' => $has("SHOW COLUMNS FROM projects LIKE 'billing_org_id'"),
         'r93b' => $has("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_inquiries' AND COLUMN_NAME = 'kind' AND COLUMN_TYPE LIKE '%contact%'"),
         'r93a' => $has("SHOW TABLES LIKE 'work_permits'"),
         'r92f' => $has("SHOW COLUMNS FROM rc_applications LIKE 'keep_until'"),

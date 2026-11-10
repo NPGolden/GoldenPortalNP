@@ -155,6 +155,7 @@ function pi_create(int $offerId, ?int $termN): int {
     q('INSERT INTO proformas (pi_no, offer_id, term_n, project_id, subproject_id, vessel_id, invoicing_id, title, issue_date, due_date, amount_net, vat_pct, vat_amount, gross, currency, status, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       [$no, $offerId, $n, $pid, $sid, $o['vessel_id'] ?: null, $iv ? (int)$iv['id'] : null, mb_substr((string)$title, 0, 200), date('Y-m-d'), $due, $net, $vat, round($net * $vat / 100, 2), round($net * (1 + $vat / 100), 2), $o['currency'] ?: 'EUR', 'draft', (int)(current_user()['id'] ?? 0)]);
     $id = (int) db()->lastInsertId(); of_event($offerId, 'proforma', $no);
+    pi_set_party($id);   // R95-003: party, customer and vessel of the ledger row
     return $id;
 }
 function pi_save_from_post(int $id): void { cache_bump_later('fs');
@@ -169,6 +170,7 @@ function pi_save_from_post(int $id): void { cache_bump_later('fs');
     $fileId = !empty($_FILES['file']['name']) ? cp_store_file($_FILES['file'], (int)$r['project_id'], $r['subproject_id'] ? (int)$r['subproject_id'] : null, 'other', 'internal', $r['pi_no'], null, null, ['doc_no' => $r['pi_no'], 'label' => $r['pi_no']]) : null;
     q('UPDATE proformas SET title=?, issue_date=?, due_date=?, amount_net=?, vat_pct=?, vat_amount=?, gross=?, currency=?, invoicing_id=?, notes=?' . ($fileId ? ', file_id=?' : '') . ' WHERE id=?',
       array_merge([$s('title', 200) ?: $r['title'], $d('issue_date') ?: $r['issue_date'], $d('due_date'), $net, $vat, round($net * $vat / 100, 2), round($net * (1 + $vat / 100), 2), $cur, $iv, $s('notes', 4000) ?: null], $fileId ? [$fileId] : [], [$id]));
+    pi_set_party($id, $iv);   // R95-003
     pi_refresh_status($id);
 }
 /** Issue: status issued, PDF generated and stored unless an uploaded file exists. */
@@ -340,6 +342,7 @@ function pi_direct_create_from_post(): int {
     q('INSERT INTO proformas (kind, pi_no, offer_id, term_n, project_id, subproject_id, vessel_id, customer_id, invoicing_id, title, issue_date, due_date, amount_net, vat_pct, vat_amount, gross, currency, status, notes, created_by, sent_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())',
       ['invoice', $no, null, 0, $pid, $sid, $vid, $cid, $iv, $title, $issue, $due, $net, $vat, round($net * $vat / 100, 2), round($net * (1 + $vat / 100), 2), $cur, 'sent', $s('notes', 2000) ?: null, (int)(current_user()['id'] ?? 0)]);
     $id = (int) db()->lastInsertId();
+    pi_set_party($id, $iv);   // R95-003
     if (!empty($_FILES['file']['name']) && function_exists('cp_store_file')) { $fid = cp_store_file($_FILES['file'], $pid, $sid, 'issued', 'internal', $no); if ($fid) q('UPDATE proformas SET file_id = ? WHERE id = ?', [$fid, $id]); }
     if (function_exists('sp_log') && $sid) try { sp_log($sid, 'invoice_registered', $no . ' · ' . number_format($net, 2, ',', '.') . ' ' . $cur); } catch (Throwable $e) {}
     // R94-003: raised from an accounting report (GAS-AR) → its reported lines are invoiced under this number, as the accounting answer would do
@@ -349,6 +352,15 @@ function pi_direct_create_from_post(): int {
         if ($R && in_array($R['status'], ['issued', 'sent', 'partly_invoiced'], true)) { try { acc_mark_invoiced($R, $no, $issue, t('pi.di_from_ar', ['no' => $R['report_no']])); } catch (Throwable $e) {} }
     }
     cache_bump_later('fs'); return $id;
+}
+/** R95-003: store party (from the chosen identity, else sub-project / project), customer and vessel (from the project) on a ledger row. */
+function pi_set_party(int $id, ?int $ivId = null): void {
+    if (!function_exists('pty_has') || !pty_has()) return;
+    $r = one('SELECT id, project_id, subproject_id, vessel_id, customer_id, invoicing_id FROM proformas WHERE id = ?', [$id]); if (!$r) return;
+    $ivId = $ivId ?? ((int)$r['invoicing_id'] ?: null);
+    $org = pty_for_doc((int)$r['project_id'] ?: null, (int)$r['subproject_id'] ?: null, $ivId);
+    $P = $r['project_id'] ? pty_project((int)$r['project_id']) : ['customer_id' => null, 'vessel_id' => null];
+    q('UPDATE proformas SET billing_org_id = ?, customer_id = COALESCE(customer_id, ?), vessel_id = COALESCE(vessel_id, ?) WHERE id = ?', [$org, $P['customer_id'], $P['vessel_id'], $id]);
 }
 /* ---- accounting checks (Collections › Checks) ---- */
 /** Proformas whose registered invoices do not add up to the proforma gross (issued / sent / partly paid / paid; cancelled and drafts excluded). */

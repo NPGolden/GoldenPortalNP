@@ -227,6 +227,7 @@ $r93a = (bool)$pdo->query("SHOW TABLES LIKE 'work_permits'")->fetch(); printf("%
 $r93b = (bool)$pdo->query("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_inquiries' AND COLUMN_NAME = 'kind' AND COLUMN_TYPE LIKE '%contact%'")->fetch(); printf("%s R93-002 migration (website contact kind)  %s\n", $r93b ? '[ OK ]' : '[WARN]', $r93b ? 'kind contact present' : 'kind contact missing');
 $r93c = (bool)$pdo->query("SHOW TABLES LIKE 'bom_import_rows'")->fetch(); printf("%s R93-006 migration (BOM import review)  %s\n", $r93c ? '[ OK ]' : '[WARN]', $r93c ? 'bom_import_rows present' : 'bom_import_rows missing');
 $r94a = (bool)$pdo->query("SHOW COLUMNS FROM proformas LIKE 'kind'")->fetch(); printf("%s R94-001 migration (direct invoices)  %s\n", $r94a ? '[ OK ]' : '[WARN]', $r94a ? 'proformas.kind present' : 'proformas.kind missing');
+$r95b = (bool)$pdo->query("SHOW COLUMNS FROM projects LIKE 'billing_org_id'")->fetch(); printf("%s R95-003 migration (billing party)  %s\n", $r95b ? '[ OK ]' : '[WARN]', $r95b ? 'projects.billing_org_id present' : 'projects.billing_org_id missing');
 $r82 = (bool)$pdo->query("SHOW COLUMNS FROM offer_lines LIKE 'item_id'")->fetch();
 printf("%s R82-001 migration (offer lines from the inventory)  %s\n", $r82 ? '[ OK ]' : '[WARN]', $r82 ? '' : '— run install/migrate_cp_r82_integration.sql');
 $r81 = (bool)$pdo->query("SHOW TABLES LIKE 'si_invoices'")->fetch();

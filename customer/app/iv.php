@@ -31,17 +31,47 @@ function iv_owner_exists(string $type, int $id): bool {
     $tbl = ['customer' => 'customers', 'company' => 'companies', 'contact' => 'contacts', 'vessel' => 'vessels'][$type] ?? null;
     return $tbl && $id > 0 && (bool) scalar("SELECT COUNT(*) FROM {$tbl} WHERE id = ?", [$id]);
 }
+/* R95-003 (decision 3): identities belong to an ORGANISATION or a VESSEL. A customer's identities are its organisation's; a contact's are its
+ * organisation's. Rows still stored with owner_type customer / contact are read through the organisation until "Move identities to
+ * organisations" (Contacts › Organisations) rewrites them; new rows are always stored on the organisation. */
+function iv_owner_norm(string $type, int $id): array {
+    if ($type === 'customer' && function_exists('pty_org_of_customer') && ($o = pty_org_of_customer($id))) return ['company', $o];
+    if ($type === 'contact') { $c = one('SELECT company_id, customer_id FROM contacts WHERE id = ?', [$id]); if ($c && $c['company_id']) return ['company', (int)$c['company_id']]; if ($c && $c['customer_id'] && function_exists('pty_org_of_customer') && ($o = pty_org_of_customer((int)$c['customer_id']))) return ['company', $o]; }
+    return [$type, $id];
+}
+/** WHERE fragment + params matching every row that belongs to an owner, legacy customer / contact rows of the same organisation included. */
+function iv_owner_where(string $type, int $id): array {
+    [$t, $i] = iv_owner_norm($type, $id);
+    if ($t !== 'company') return ['(owner_type = ? AND owner_id = ?)', [$t, $i]];
+    $w = ['(owner_type = \'company\' AND owner_id = ?)']; $a = [$i];
+    foreach (all('SELECT id FROM customers WHERE id IN (SELECT customer_id FROM companies WHERE id = ?)', [$i]) as $c) { $w[] = '(owner_type = \'customer\' AND owner_id = ?)'; $a[] = (int)$c['id']; }
+    foreach (all('SELECT id FROM contacts WHERE company_id = ?', [$i]) as $c) { $w[] = '(owner_type = \'contact\' AND owner_id = ?)'; $a[] = (int)$c['id']; }
+    return ['(' . implode(' OR ', $w) . ')', $a];
+}
 function iv_list(string $type, int $id, bool $activeOnly = false): array {
     if (!iv_has() || !iv_type_ok($type)) return [];
-    return all('SELECT * FROM invoicing_details WHERE owner_type = ? AND owner_id = ?' . ($activeOnly ? ' AND is_active = 1' : '') . ' ORDER BY is_default DESC, is_active DESC, label', [$type, $id]);
+    [$w, $a] = iv_owner_where($type, $id);
+    return all('SELECT * FROM invoicing_details WHERE ' . $w . ($activeOnly ? ' AND is_active = 1' : '') . ' ORDER BY is_default DESC, is_active DESC, label', $a);
 }
 function iv_default(string $type, int $id): ?array {
     $rows = iv_list($type, $id, true);
     return $rows ? $rows[0] : null;
 }
 function iv_count(string $type, int $id): int {
-    return iv_has() ? (int) scalar('SELECT COUNT(*) FROM invoicing_details WHERE owner_type = ? AND owner_id = ? AND is_active = 1', [$type, $id]) : 0;
+    if (!iv_has() || !iv_type_ok($type)) return 0; [$w, $a] = iv_owner_where($type, $id);
+    return (int) scalar('SELECT COUNT(*) FROM invoicing_details WHERE ' . $w . ' AND is_active = 1', $a);
 }
+/** Rows still owned by a customer or a contact that have an organisation → rewrite them onto the organisation. Returns the number moved. */
+function iv_migrate_owners(): int {
+    if (!iv_has() || !is_cp_admin()) return 0; $n = 0;
+    foreach (all("SELECT id, owner_type, owner_id FROM invoicing_details WHERE owner_type IN ('customer','contact')") as $r) {
+        [$t, $i] = iv_owner_norm((string)$r['owner_type'], (int)$r['owner_id']); if ($t !== 'company') continue;
+        if ((bool) scalar("SELECT COUNT(*) FROM invoicing_details WHERE owner_type = 'company' AND owner_id = ? AND is_default = 1", [$i])) q('UPDATE invoicing_details SET is_default = 0 WHERE id = ?', [(int)$r['id']]);
+        q("UPDATE invoicing_details SET owner_type = 'company', owner_id = ? WHERE id = ?", [$i, (int)$r['id']]); $n++;
+    }
+    return $n;
+}
+function iv_pending_owner_moves(): int { return iv_has() ? (int) scalar("SELECT COUNT(*) FROM invoicing_details WHERE owner_type IN ('customer','contact')") : 0; }
 function iv_load(int $id): ?array { return iv_has() && $id ? one('SELECT * FROM invoicing_details WHERE id = ?', [$id]) : null; }
 
 function iv_save_from_post(): array {
@@ -51,6 +81,7 @@ function iv_save_from_post(): array {
     $type = (string)($_POST['owner_type'] ?? ''); $oid = (int)($_POST['owner_id'] ?? 0);
     if ($id) { $ex = iv_load($id); if (!$ex) throw new RuntimeException(t('err.notfound')); $type = $ex['owner_type']; $oid = (int)$ex['owner_id']; }
     if (!iv_type_ok($type) || !iv_owner_exists($type, $oid)) throw new RuntimeException(t('err.notfound'));
+    if (!$id) [$type, $oid] = iv_owner_norm($type, $oid);   // R95-003: a new identity of a customer / contact is stored on its organisation
     $v = [];
     foreach (IV_FIELDS as $k => $max) { $s = trim((string)($_POST[$k] ?? '')); $v[$k] = $s === '' ? null : mb_substr($s, 0, $max); }
     if (!$v['legal_name']) throw new RuntimeException(t('iv.need_legal'));
