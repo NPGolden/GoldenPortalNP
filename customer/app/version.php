@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.118.1';
+const CP_VERSION = '1.118.2';
 const CP_BUILD   = '2026-11-10';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R95-003c', 'version' => '1.118.2', 'date' => '2026-11-10', 'title' => 'Identity pickers offer only the billing party\'s (★) and the vessel\'s (⚓) identities — to invoice the yard or the manager, choose them as billing party; ★ / ⚓ markers fixed; "default (billing party, else vessel)".', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R95-003b', 'version' => '1.118.1', 'date' => '2026-11-10', 'title' => 'Fix: the Invoicing details tab of a vessel opened Overview instead (tab name missing from the whitelist since the Documents tab of v1.112.0).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R95-003', 'version' => '1.118.0', 'date' => '2026-11-10', 'title' => 'Parties plan — phase 1: billing party (organisation) on every project, overridable per sub-project, with the invoicing identity chosen among the party\'s (★), the vessel\'s (⚓) and other vessel-linked organisations\' (🏢) identities; identities belong to organisations or vessels (customer / contact identities read and stored through the organisation; "Move identities" in Organisations); every proforma and invoice stores party, customer and vessel at creation; existing ledger rows back-filled from the project (main-level and vessel-less documents now reach the vessel statement).', 'db' => 'install/migrate_cp_r95_003_billing_party.sql', 'check' => 'r95b'],
         ['ref' => 'GAS-CP-R95-002c', 'version' => '1.117.2', 'date' => '2026-11-10', 'title' => 'Fix: ERP-code and name matches in Organisations never point a customer at a supplier (the ERP uses the same code numbers in its customer and supplier ledgers); Unlink on linked rows for administrators.', 'db' => null, 'check' => null],

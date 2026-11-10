@@ -1326,3 +1326,7 @@ Live showed 322 linked / 0 to confirm / 393 customers without organisation — R
 ## 279. v1.118.1 — Fix: vessel Invoicing details tab (GAS-CP-R95-003b)
 
 `views/vessel_view.php` line 18 whitelists the `tab` parameter; R93-005 rewrote the list with `documents` and dropped `invoicing`, so `?tab=invoicing` fell back to Overview (the tab rendered, the click did nothing). Re-added.
+
+## 280. v1.118.2 — Identity pickers: party + vessel only (GAS-CP-R95-003c)
+
+Nikos (10/11/2026): a sub-project must not offer the identities of the other organisations linked to the vessel. `pty_identities()` returns the party's and the vessel's rows only; other organisations are reached by choosing them as billing party. `$ivr + ['src' => …]` did not override the existing `src` (array union keeps the left key) → ★ missing; now `array_replace`. `iv.sub_default` reworded.

@@ -54,12 +54,12 @@ function pty_candidates(?int $pid, ?int $vid = null, ?int $cid = null, ?int $cur
 function pty_role_label(string $role): string { return $role === 'customer' ? t('rp.customer') : ($role === 'current' ? t('pty.chosen') : (function_exists('vm_role_label') ? vm_role_label($role) : $role)); }
 function pty_label(?int $orgId, ?string $role = null): string { $o = $orgId ? pty_org($orgId) : null; if (!$o) return '—'; return (string)$o['name'] . ($role ? ' · ' . pty_role_label($role) : ''); }
 
-/** Identities offered for a document: party's (★ default first), then the vessel's (⚓), then other vessel-linked organisations' (🏢). [id => row + src, org_id, org_name] */
+/** Identities offered for a document: the party's (★, default first) and the vessel's (⚓ — an SPV of the yacht). Identities of the other
+ *  organisations linked to the vessel are NOT offered: to invoice the yard or the manager, choose them as the billing party (Nikos, 10/11/2026). */
 function pty_identities(?int $orgId, ?int $vid, ?int $pid = null): array {
-    $out = []; $put = function (array $rows, string $src, ?int $oid, string $oname) use (&$out) { foreach ($rows as $r) if (!isset($out[(int)$r['id']])) $out[(int)$r['id']] = $r + ['src' => $src, 'org_id' => $oid, 'org_name' => $oname]; };
+    $out = []; $put = function (array $rows, string $src, ?int $oid, string $oname) use (&$out) { foreach ($rows as $r) if (!isset($out[(int)$r['id']])) $out[(int)$r['id']] = array_replace($r, ['src' => $src, 'org_id' => $oid, 'org_name' => $oname]); };
     if ($orgId) { $o = pty_org($orgId); $put(iv_list('company', $orgId, true), 'party', $orgId, (string)($o['name'] ?? '')); }
     if ($vid) $put(iv_list('vessel', $vid, true), 'vessel', null, (string) scalar('SELECT name FROM vessels WHERE id = ?', [$vid]));
-    foreach (pty_candidates($pid, $vid, null, null) as $c) if ((int)$c['id'] !== (int)$orgId) $put(iv_list('company', (int)$c['id'], true), 'other', (int)$c['id'], $c['name']);
     return $out;
 }
 function pty_identity_label(array $r): string { $p = ['party' => '★ ', 'vessel' => '⚓ ', 'other' => '🏢 '][$r['src'] ?? ''] ?? ''; return $p . iv_label($r) . ($r['src'] === 'other' && !empty($r['org_name']) ? ' — ' . $r['org_name'] : ''); }
