@@ -1881,3 +1881,6 @@ details.fold > summary.fold-sum::-webkit-details-marker { display: none; }
 details.fold > summary .fold-tw { display: inline-block; transition: transform .15s; font-size: 12px; }
 details.fold[open] > summary .fold-tw { transform: rotate(90deg); }
 details.fold > summary .count { font-weight: 500; color: var(--ink-2, #5b6b7a); margin-left: 2px; }
+
+/* R94-008 — inline correction inside a table cell (register engineer) */
+details.inline-edit{display:inline-block;margin-left:4px}details.inline-edit>summary{list-style:none;cursor:pointer;display:inline;opacity:.55}details.inline-edit>summary::-webkit-details-marker{display:none}details.inline-edit[open]>summary{opacity:1}details.inline-edit form input{padding:4px 6px;font-size:.85rem}

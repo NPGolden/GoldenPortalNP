@@ -8663,4 +8663,9 @@ Cordiali saluti,
 'ws.digest_title' => 'Sito web, settimana {from} – {to}',
 'ws.digest_body' => '{visitors} visitatori {dv} · {views} pagine viste {dp} · pagina principale: {top} · {forms} moduli · {countries} paesi',
 'ws.form_careers' => 'Candidatura',
+// GAS-CP-R94-008 — register engineer correction
+'acc.eng_fix' => 'Correggi il tecnico di questa riga (attribuzione di fatturazione; il rapporto firmato non cambia)',
+'acc.eng_saved' => 'Tecnico corretto sulla riga del registro.',
+'acc.eng_locked' => 'Riga già fatturata — il tecnico non può più cambiare.',
+'acc.eng_required' => 'Inserisci il nome del tecnico.',
 ];

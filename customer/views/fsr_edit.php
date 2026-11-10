@@ -37,7 +37,7 @@ $subs = all('SELECT id, code, name FROM subprojects WHERE project_id = ? AND ' .
 $tmIds = $r ? null : tm_allowed_ids($pid);                                        // R25-001: only the assigned active sub-projects
 if ($tmIds !== null) { $subs = array_values(array_filter($subs, fn($s) => in_array((int)$s['id'], $tmIds, true))); if (!$subs) { http_response_code(403); layout_head(t('err.noaccess'), 'projects'); echo '<div class="flash flash--warn">' . tt('tm.none_assigned_project') . '</div>'; layout_foot(); return; } }
 $jos  = all("SELECT id, jo_no, title, status FROM job_orders WHERE project_id = ? AND status IN ('approved','in_progress','done') ORDER BY id DESC", [$pid]);
-$engineers = staff_users();
+$engineers = function_exists('fsr_engineer_choices') ? fsr_engineer_choices() : staff_users();   // R94-008: technical staff only
 $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : '';
 $v = fn(string $k, $d = '') => e((string)($r[$k] ?? ($ext[$k] ?? $d)));
 $works = $r['works'] ?? [];
@@ -121,7 +121,7 @@ layout_head($title, 'projects');
             <tbody>
             <?php for ($k = 0; $k < FSR_MAX_LINES; $k++): $ln = $lines[$k] ?? null; ?>
               <tr>
-                <td><input name="wk_eng[<?= $i ?>][<?= $k ?>]" list="engineers" maxlength="120" value="<?= e($ln['engineer'] ?? (($i === 0 && $k === 0 && !$wk) ? $u['full_name'] : '')) ?>" placeholder="<?= tt('fsr.engineer_ph') ?>"></td>
+                <td><input name="wk_eng[<?= $i ?>][<?= $k ?>]" list="engineers" maxlength="120" value="<?= e($ln['engineer'] ?? (($i === 0 && $k === 0 && !$wk && fsr_user_is_technical()) ? $u['full_name'] : '')) ?>" placeholder="<?= tt('fsr.engineer_ph') ?>"></td>
                 <td><?php $curSp = (string)($ln['specialty'] ?? fsr_specialty_default((int)$u['id'])); ?><select name="wk_spec[<?= $i ?>][<?= $k ?>]" data-nosearch title="<?= tt('fsr.specialty_hint') ?>"><?php foreach ($spOpts as $o): ?><option value="<?= e($o['name']) ?>"<?= $o['name'] === $curSp ? ' selected' : '' ?>><?= e(fsr_specialty_label($o)) ?></option><?php endforeach; if ($curSp !== '' && !in_array($curSp, $spNames, true)): ?><option value="<?= e($curSp) ?>" selected><?= e($curSp) ?> · <?= tt('fsr.legacy_spec') ?></option><?php endif; ?></select></td>
                 <td><input name="wk_start[<?= $i ?>][<?= $k ?>]" type="time" class="js-t" value="<?= e(fsr_fmt_time($ln['start_time'] ?? null)) ?>"></td>
                 <td><input name="wk_end[<?= $i ?>][<?= $k ?>]" type="time" class="js-t" value="<?= e(fsr_fmt_time($ln['end_time'] ?? null)) ?>"></td>

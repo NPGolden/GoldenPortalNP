@@ -417,6 +417,7 @@ function pm_handle_action(string $action, string $page): bool {
         case 'acc_issue':   { $id = (int)$_POST['id']; $r = acc_issue($id); flash('good', t('acc.issued', ['no' => $r['report_no'] . ' ' . $r['revision']])); redirect('acc_report', ['id' => $id, '_r' => uniqid()]); }
         case 'acc_answer':  { $id = (int)$_POST['id']; acc_answer_from_post($id); flash('good', t('acc.answered')); redirect('acc_report', ['id' => $id, '_r' => uniqid()]); }
         case 'acc_delete':  { $id = (int)$_POST['id']; acc_delete_draft($id); flash('good', t('acc.deleted')); redirect('acc_reports', ['_r' => uniqid()]); }
+        case 'acc_line_engineer': { acc_line_set_engineer((int)$_POST['line_id'], (string)($_POST['name'] ?? '')); flash('good', t('acc.eng_saved')); redirect((string)($_POST['back'] ?? '') === 'report' ? 'acc_report' : 'acc_register', (string)($_POST['back'] ?? '') === 'report' ? ['id' => (int)$_POST['report_id'], '_r' => uniqid()] : array_filter(['project' => (int)($_POST['project'] ?? 0), 'state' => (string)($_POST['state'] ?? ''), '_r' => uniqid()])); }   // R94-008
         case 'acc_sync':    { acc_require(); $n = acc_sync(); flash('good', t('acc.synced', ['n' => $n])); redirect('acc_register', ['_r' => uniqid()]); }
         /* ---------------------------------------------- R35-001: work packages */
         case 'wp_save': { $sid = (int)$_POST['subproject_id']; $wid = wp_save_from_post($sid); flash('good', t('wp.saved')); redirect('subproject', ['id' => $sid, 'tab' => 'works', '_r' => uniqid()]); }

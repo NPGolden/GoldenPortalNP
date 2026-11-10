@@ -8649,4 +8649,9 @@ GAS-MSB-2026-002',
 'ws.digest_title' => 'Website week {from} – {to}',
 'ws.digest_body' => '{visitors} visitors {dv} · {views} page views {dp} · top page: {top} · {forms} forms · {countries} countries',
 'ws.form_careers' => 'Career application',
+// GAS-CP-R94-008 — register engineer correction
+'acc.eng_fix' => 'Виправити інженера цього рядка (для виставлення; підписаний сервісний звіт не змінюється)',
+'acc.eng_saved' => 'Інженера виправлено в рядку реєстру.',
+'acc.eng_locked' => 'Рядок уже виставлено — інженера більше не змінити.',
+'acc.eng_required' => 'Введіть ім’я інженера.',
 ];

@@ -61,6 +61,14 @@ function fsr_specialty_label(array $o): string {
     $l = $o['name']; if ($o['card'] !== '') $l .= ' · ' . t('fsr.card') . ' ' . $o['card'] . ($o['card_name'] !== '' && $o['card_name'] !== $o['name'] ? ' — ' . $o['card_name'] : '');
     if ($o['rate'] !== null) $l .= ' · ' . number_format((float)$o['rate'], 0, ',', '.') . ' ' . $o['cur'] . '/h'; return $l;
 }
+/** R94-008: engineers offered on the time lines — active staff of a technical discipline (HR departments at sort order 900+ left out), the current user first. */
+function fsr_engineer_choices(): array {
+    return all("SELECT cu.id, cu.full_name, cu.discipline_id FROM customer_users cu LEFT JOIN disciplines d ON d.id = cu.discipline_id LEFT JOIN staff_roles sr ON sr.id = cu.staff_role_id
+                WHERE cu.role IN ('staff','admin') AND cu.is_active = 1 AND (cu.discipline_id IS NULL OR d.sort_order < 900) AND (sr.scope IS NULL OR sr.scope <> 'hr')
+                ORDER BY (cu.id = ?) DESC, cu.full_name", [(int)(current_user()['id'] ?? 0)]);
+}
+/** Whether the signed-in user is technical staff (then their own name pre-fills the first time line; office staff preparing a report on behalf of an engineer get an empty field). */
+function fsr_user_is_technical(): bool { $u = current_user(); if (!$u || !is_staff()) return false; $d = $u['discipline_id'] ?? null; if (!$d) return true; return (int) scalar('SELECT sort_order FROM disciplines WHERE id = ?', [(int)$d]) < 900; }
 /** Default specialty of a line: the engineer's own discipline when known, else the first offered. */
 function fsr_specialty_default(?int $userId = null): string { $n = $userId ? (string) scalar('SELECT d.name FROM customer_users cu JOIN disciplines d ON d.id = cu.discipline_id WHERE cu.id = ?', [$userId]) : ''; $all = fsr_specialties(); return $n !== '' && in_array($n, $all, true) ? $n : ($all[0] ?? 'Service Engineer'); }
 function fsr_time_types(): array { return ['WT' => 'WT', 'TT' => 'TT', 'NC' => 'NC']; }   // NC = not chargeable (R46-005)

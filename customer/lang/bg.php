@@ -8649,4 +8649,9 @@ GAS-MSB-2026-002',
 'ws.digest_title' => 'Website week {from} – {to}',
 'ws.digest_body' => '{visitors} visitors {dv} · {views} page views {dp} · top page: {top} · {forms} forms · {countries} countries',
 'ws.form_careers' => 'Career application',
+// GAS-CP-R94-008 — register engineer correction
+'acc.eng_fix' => 'Коригирайте инженера на този ред (за фактуриране; подписаният сервизен отчет не се променя)',
+'acc.eng_saved' => 'Инженерът е коригиран в реда на регистъра.',
+'acc.eng_locked' => 'Редът вече е фактуриран — инженерът не може да се променя.',
+'acc.eng_required' => 'Въведете името на инженера.',
 ];

@@ -396,6 +396,22 @@ function acc_mark_sent(int $id, string $to): void {
     acc_event($id, 'sent', $to);
 }
 /** Accounting's answer: invoiced (all reported lines), partly (ticked lines), returned (lines go back to open). */
+/** R94-008: correct the engineer of a register line (service-report lines; open or reported, never invoiced) — the signed report stays as it is,
+ *  the register carries the billing attribution. The engineer's own discipline is re-applied unless the line's specialty pins one. */
+function acc_line_set_engineer(int $lineId, string $name): void {
+    if (!acc_is_accounting() && !acc_can_prepare()) throw new RuntimeException(t('err.noaccess'));
+    $l = one("SELECT * FROM acc_lines WHERE id = ?", [$lineId]); if (!$l || $l['source'] !== 'fsr') throw new RuntimeException(t('err.notfound'));
+    if ($l['state'] === 'invoiced') throw new RuntimeException(t('acc.eng_locked'));
+    $name = mb_substr(trim($name), 0, 120); if ($name === '') throw new RuntimeException(t('acc.eng_required'));
+    $u = one("SELECT id, discipline_id FROM customer_users WHERE role IN ('staff','admin') AND LOWER(full_name) = ? LIMIT 1", [mb_strtolower($name)]);
+    $did = $l['discipline_id'];
+    $spec = ''; $fl = one('SELECT specialty FROM fsr_lines WHERE id = ?', [(int)$l['source_id']]); if ($fl) $spec = (string)$fl['specialty'];
+    $pinned = $spec !== '' && (bool) scalar('SELECT COUNT(*) FROM disciplines WHERE LOWER(name) = ?', [mb_strtolower(trim($spec))]);
+    if (!$pinned && $u && $u['discipline_id']) $did = (int)$u['discipline_id'];
+    // a specialty that names a rate card keeps its pinned rate item; otherwise the item follows the (new) discipline at pricing time
+    q('UPDATE acc_lines SET user_name = ?, user_id = ?, discipline_id = ?' . ($pinned || !empty($l['rate_item_id']) && $spec !== '' && function_exists('fsr_specialty_card') && fsr_specialty_card($spec) !== '' ? '' : ', rate_item_id = NULL, unit_price = NULL, value = NULL') . ' WHERE id = ?', [$name, $u ? (int)$u['id'] : null, $did, $lineId]);
+    if ($l['report_id']) { try { acc_event((int)$l['report_id'], 'line_engineer', $l['user_name'] . ' → ' . $name . ' (' . $l['work_date'] . ')'); } catch (Throwable $e) {} }
+}
 /** Mark the reported lines of an accounting report as invoiced ($ids = null → every reported line); shared by the accounting answer and the direct invoice (R94-003). */
 function acc_mark_invoiced(array $R, string $ref, string $date, ?string $note = null, ?array $ids = null): string {
     $id = (int)$R['id']; $u = current_user();

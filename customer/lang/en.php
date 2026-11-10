@@ -8663,4 +8663,9 @@ Best regards,
 'ws.digest_title' => 'Website week {from} – {to}',
 'ws.digest_body' => '{visitors} visitors {dv} · {views} page views {dp} · top page: {top} · {forms} forms · {countries} countries',
 'ws.form_careers' => 'Career application',
+// GAS-CP-R94-008 — register engineer correction
+'acc.eng_fix' => 'Correct the engineer of this line (billing attribution; the signed service report is not changed)',
+'acc.eng_saved' => 'Engineer corrected on the register line.',
+'acc.eng_locked' => 'This line is already invoiced — its engineer can no longer change.',
+'acc.eng_required' => 'Enter the engineer\'s name.',
 ];
