@@ -15,7 +15,7 @@ $allProjects = $h ? all('SELECT id, project_code, name FROM projects WHERE vesse
 if (!$h) { http_response_code(404); layout_head(t('err.notfound'), 'vessels'); echo '<h1>' . tt('err.notfound') . '</h1>'; layout_foot(); return; }
 $v = $h['vessel']; $s = $h['stats']; $staff = is_staff();
 $tab = (string)($_GET['tab'] ?? 'overview');
-if (!in_array($tab, ['overview', 'history', 'services', 'parts', 'people', 'tickets', 'equipment', 'documents'], true)) $tab = 'overview';
+if (!in_array($tab, ['overview', 'history', 'services', 'parts', 'people', 'tickets', 'equipment', 'invoicing', 'documents'], true)) $tab = 'overview';
 $vdF = ['project' => $pid, 'group' => (string)($_GET['g'] ?? ''), 'q' => trim((string)($_GET['q'] ?? '')), 'year' => (int)($_GET['year'] ?? 0)];
 $vd = function_exists('vd_collect') ? vd_collect($id, $staff, $vdF) : ['items' => [], 'groups' => [], 'years' => [], 'total' => 0]; $vdTotal = (int)$vd['total'];
 $eqUnits = function_exists('eq_has') && eq_has() ? eq_list(['vessel' => $id, 'status' => 'all']) : [];
