@@ -590,6 +590,7 @@ function pm_handle_action(string $action, string $page): bool {
         case 'org_link': { org_link((int)($_POST['company_id'] ?? 0), (int)($_POST['customer_id'] ?? 0)); flash('good', t('org.linked_ok')); redirect('organisations'); }
         case 'org_link_all': { $n = org_link_all(); flash('good', t('org.linked_n', ['n' => $n])); redirect('organisations'); }
         case 'org_create_co': { org_create_for_customer((int)($_POST['customer_id'] ?? 0), (string)($_POST['kind'] ?? 'owner')); flash('good', t('org.created_ok')); redirect('organisations'); }
+        case 'cu_merge': { $d = cu_merge((int)($_POST['keep'] ?? 0), (int)($_POST['drop'] ?? 0)); flash('good', t('org.cu_merged_ok', ['n' => array_sum($d)])); redirect('organisations', ['_r' => uniqid()], '#cu-dupes'); }   // R95-002
         case 'org_merge': { org_merge((int)($_POST['keep'] ?? 0), (int)($_POST['drop'] ?? 0)); flash('good', t('org.merged_ok')); redirect('organisations'); }
         case 'org_derive_people': { if (!org_can()) throw new RuntimeException(t('err.noaccess')); $n = org_derive_people(); flash('good', t('org.derived_n', ['n' => $n])); redirect('organisations'); }
         case 'co_save': {
@@ -1038,7 +1039,7 @@ function pm_handle_action(string $action, string $page): bool {
         case 'sup_maker_del': { require_pr_admin(); $sid = (int)($_POST['id'] ?? 0); sup_maker_delete($sid, (int)($_POST['mid'] ?? 0)); flash('good', t('stk.saved')); redirect('suppliers', ['id' => $sid, '_r' => uniqid()]); }
         case 'sup_maker_primary': { require_pr_admin(); $sid = (int)($_POST['id'] ?? 0); sup_maker_primary($sid, (int)($_POST['mid'] ?? 0)); flash('good', t('stk.saved')); redirect('suppliers', ['id' => $sid, '_r' => uniqid()]); }
         case 'sup_import_parse': { require_pr_admin(); if (empty($_FILES['file']['tmp_name'])) throw new RuntimeException(t('im.file')); $_SESSION['sup_import'] = sup_import_parse($_FILES['file']['tmp_name']); redirect('suppliers_import', ['_r' => uniqid()]); }
-        case 'sup_import_apply': { require_pr_admin(); $pv = $_SESSION['sup_import'] ?? null; if (!$pv) throw new RuntimeException(t('stk.imp_empty')); $_SESSION['sup_import_result'] = sup_import_apply($pv, !empty($_POST['update'])); unset($_SESSION['sup_import']); redirect('suppliers_import', ['_r' => uniqid()]); }
+        case 'sup_import_apply': { require_pr_admin(); if (function_exists('im_set_create')) im_set_create(!empty($_POST['create_new'])); $pv = $_SESSION['sup_import'] ?? null; if (!$pv) throw new RuntimeException(t('stk.imp_empty')); $_SESSION['sup_import_result'] = sup_import_apply($pv, !empty($_POST['update'])); unset($_SESSION['sup_import']); redirect('suppliers_import', ['_r' => uniqid()]); }
         case 'col_fu': { require_staff(); if (!function_exists('col_can') || !col_can()) throw new RuntimeException(t('err.noaccess')); col_followup_save((int)($_POST['id'] ?? 0), (string)($_POST['next'] ?? ''), (string)($_POST['promise'] ?? ''), (string)($_POST['note'] ?? '')); flash('good', t('col.fu_saved')); $qs = []; foreach (['vessel', 'project', 'customer', 'pm', 'bucket', 'q', 'from', 'to'] as $k) if (($v = (string)($_GET[$k] ?? '')) !== '') $qs[$k] = $v; redirect('collections', $qs + ['_r' => uniqid()], '#col-open'); }   // R78-001
         case 'ppay_save': { require_staff(); $pid = (int)$_POST['id']; ppay_save_from_post($pid); flash('good', t('pay.saved')); redirect('proforma', ['id' => $pid, '_r' => uniqid()], '#payments'); }
         case 'ppay_delete': { require_staff(); $pid = ppay_delete((int)$_POST['pay_id']); flash('good', t('pay.deleted')); redirect('proforma', ['id' => $pid, '_r' => uniqid()], '#payments'); }
@@ -1053,7 +1054,7 @@ function pm_handle_action(string $action, string $page): bool {
         case 'eq_import': {
             require_staff();
             if (empty($_FILES['xlsx']['tmp_name']) || !is_uploaded_file($_FILES['xlsx']['tmp_name'])) throw new RuntimeException(t('err.upload'));
-            $dry = !empty($_POST['dry']); $res = eq_import($_FILES['xlsx']['tmp_name'], (string)($_POST['maker'] ?? ''), $dry);
+            $dry = !empty($_POST['dry']); if (function_exists('im_set_create')) im_set_create(!empty($_POST['create_new'])); $res = eq_import($_FILES['xlsx']['tmp_name'], (string)($_POST['maker'] ?? ''), $dry);
             $res['kind'] = 'equipment'; $res['dry'] = $dry; $_SESSION['cp_import_result'] = $res;
             redirect('equipment', ['_r' => uniqid()]);
         }
@@ -1291,7 +1292,7 @@ function pm_handle_action(string $action, string $page): bool {
             require_staff(); if ($action === 'of_import') of_require();
             require_once __DIR__ . '/xlsx.php';
             if (empty($_FILES['xlsx']['tmp_name']) || !is_uploaded_file($_FILES['xlsx']['tmp_name'])) throw new RuntimeException(t('err.upload'));
-            $dry = !empty($_POST['dry']);
+            $dry = !empty($_POST['dry']); if (function_exists('im_set_create')) im_set_create(!empty($_POST['create_new']));   // R95-002: new organisations / customers / vessels only when ticked
             $res = match ($action) {
                 'vessel_import' => pm_import_vessels($_FILES['xlsx']['tmp_name'], $dry),
                 'sys_import'    => pm_import_systems($_FILES['xlsx']['tmp_name'], $dry),
@@ -1554,9 +1555,11 @@ function pm_find_customer(string $name, array &$res): ?int {
     $name = trim($name);
     if ($name === '') return null;
     $id = scalar('SELECT id FROM customers WHERE LOWER(name) = LOWER(?) OR erp_code = ? ORDER BY is_active DESC LIMIT 1', [$name, $name]);
+    if (!$id && function_exists('org_find') && ($m = org_find($name, null, $name)) && $m['customer_id']) { $id = $m['customer_id']; $res['customers_matched'] = ($res['customers_matched'] ?? 0) + 1; }   // R95-002
     if ($id) return (int)$id;
+    if (function_exists('im_may_create') && !im_may_create()) { im_propose($res, 'customer', $name); return null; }   // R95-002: propose, the user confirms
     q('INSERT INTO customers (name, is_active) VALUES (?, 1)', [mb_substr($name, 0, 160)]);
-    $res['customers_new']++;
+    $res['customers_new']++; org_find_reset();
     return (int) db()->lastInsertId();
 }
 function pm_find_vessel(?int $cid, string $name, array &$res, bool $create = true): ?int {
@@ -1580,6 +1583,7 @@ function pm_find_vessel(?int $cid, string $name, array &$res, bool $create = tru
     }
     if ($id) return (int)$id;
     if (!$create) return null;
+    if (function_exists('im_may_create') && !im_may_create()) { im_propose($res, 'vessel', $name, $cid ? (string) scalar('SELECT name FROM customers WHERE id = ?', [$cid]) : ''); return null; }   // R95-002
     q('INSERT INTO vessels (customer_id, name, is_active) VALUES (?, ?, 1)', [$cid, mb_substr(function_exists('vm_canonical') ? vm_canonical($name) : $name, 0, 120)]);
     $res['vessels_new']++;
     return (int) db()->lastInsertId();
@@ -1711,6 +1715,7 @@ function pm_import_vessels(string $path, bool $dry): array {
                   [$imo, $yard, $act === null ? null : (int)$act, $vid]);
                 $res['vessels_upd']++;
             } else {
+                if (function_exists('im_may_create') && !im_may_create()) { im_propose($res, 'vessel', $name, trim(($imo ?: '') . ' ' . ($yard ?: ''))); continue; }   // R95-002
                 if (!$cid) $res['vessels_unassigned'] = ($res['vessels_unassigned'] ?? 0) + 1;
                 q('INSERT INTO vessels (customer_id, name, imo, yard, is_active) VALUES (?,?,?,?,?)',
                   [$cid, mb_substr($name, 0, 120), $imo, $yard, $act === null ? 1 : (int)$act]);

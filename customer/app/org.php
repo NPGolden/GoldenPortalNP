@@ -114,3 +114,77 @@ function org_ensure_for_customer(int $cuId): int {
       array_merge([$cu['name'], $cu['country'], $cu['city'], $cu['website'], $cu['email'], $cu['phone']], co_roles_has() ? [$cu['vat_no'], $cu['erp_code'], $cu['address'], $cu['postal_code']] : [], [$id, $cu['name'], $id]));
     return $id;
 }
+
+/* ======================================================================================================================
+ * GAS-CP-R95-002 — phase 0 of the parties / invoicing / collections plan: ONE matcher for every form and import, imports and
+ * forms that propose instead of creating silently, and the customers duplicates workbench (companies: org_dupes/org_merge above,
+ * vessels: vm_groups/vm_merge).
+ * ==================================================================================================================== */
+
+/** Matcher. Finds the organisation (company) a name / VAT / ERP code refers to: VAT → ERP code → normalised name (org_key),
+ *  companies and customers alike (a customer resolves to its linked company, or to a virtual match on the customer itself).
+ *  Returns ['company_id' => int|null, 'customer_id' => int|null, 'how' => vat|erp|name, 'name' => matched name] or null. */
+function org_find(string $name, ?string $vat = null, ?string $erp = null): ?array {
+    $C =& $GLOBALS['__org_find_cache'];
+    if (!is_array($C)) {
+        $C = ['cos' => [], 'cus' => []];
+        try { $C['cos'] = all('SELECT id, name, customer_id' . (co_roles_has() ? ', vat_no, erp_code' : ', NULL AS vat_no, NULL AS erp_code') . ' FROM companies WHERE is_active = 1 AND name NOT LIKE \'%[merged #%\''); } catch (Throwable $e) {}
+        try { $C['cus'] = all('SELECT id, name, erp_code, vat_no FROM customers WHERE is_active = 1 AND name NOT LIKE \'%[merged #%\''); } catch (Throwable $e) {}
+        foreach ($C['cos'] as &$c) { $c['k'] = org_key((string)$c['name']); $c['v'] = org_vat($c['vat_no'] ?? null); } unset($c);
+        foreach ($C['cus'] as &$c) { $c['k'] = org_key((string)$c['name']); $c['v'] = org_vat($c['vat_no'] ?? null); } unset($c);
+    }
+    $v = org_vat($vat); $e = trim((string)$erp); $k = org_key(trim($name));
+    $co = fn(array $c, string $how): array => ['company_id' => (int)$c['id'], 'customer_id' => $c['customer_id'] ? (int)$c['customer_id'] : null, 'how' => $how, 'name' => (string)$c['name']];
+    $cu = function (array $c, string $how) use ($C): array { $coId = null; foreach ($C['cos'] as $x) if ((int)$x['customer_id'] === (int)$c['id']) { $coId = (int)$x['id']; break; } return ['company_id' => $coId, 'customer_id' => (int)$c['id'], 'how' => $how, 'name' => (string)$c['name']]; };
+    if ($v !== '') { foreach ($C['cos'] as $c) if ($c['v'] === $v) return $co($c, 'vat'); foreach ($C['cus'] as $c) if ($c['v'] === $v) return $cu($c, 'vat'); }
+    if ($e !== '') { foreach ($C['cos'] as $c) if ((string)($c['erp_code'] ?? '') !== '' && strcasecmp((string)$c['erp_code'], $e) === 0) return $co($c, 'erp'); foreach ($C['cus'] as $c) if ((string)($c['erp_code'] ?? '') !== '' && strcasecmp((string)$c['erp_code'], $e) === 0) return $cu($c, 'erp'); }
+    if ($k !== '' && mb_strlen($k) >= 3) { foreach ($C['cos'] as $c) if ($c['k'] === $k) return $co($c, 'name'); foreach ($C['cus'] as $c) if ($c['k'] === $k) return $cu($c, 'name'); }
+    return null;
+}
+/** Forget the matcher cache after a record was created or merged in the same request. */
+function org_find_reset(): void { unset($GLOBALS['__org_find_cache']); }
+/** Human line for a match: "Acme Yachts S.A. (same VAT)". */
+function org_match_label(array $m): string { return $m['name'] . ' (' . t('org.how_' . $m['how']) . ')'; }
+
+/* ---- import gate: imports propose new organisations / customers / vessels unless the user ticked "create new" ---- */
+function im_may_create(): bool { return !empty($GLOBALS['cp_import_create']); }
+function im_set_create(bool $yes): void { $GLOBALS['cp_import_create'] = $yes; }
+/** Record a proposal in an import report: $res['proposals'][] = [kind, name, hint]; the row is skipped by the caller. */
+function im_propose(array &$res, string $kind, string $name, string $hint = ''): void { $res['proposals'][] = ['kind' => $kind, 'name' => $name, 'hint' => $hint]; $res['proposed'] = ($res['proposed'] ?? 0) + 1; }
+
+/* ---- customers duplicates + merge (workbench) ---- */
+/** Probable duplicate customers: same VAT, same ERP code or same normalised name. [['keep' => row, 'drop' => row, 'how' => …]] */
+function cu_dupes(): array {
+    $rows = all('SELECT c.id, c.name, c.erp_code, c.vat_no, c.country, c.is_active, (SELECT COUNT(*) FROM projects p WHERE p.customer_id = c.id) AS n_projects, (SELECT COUNT(*) FROM vessels v WHERE v.customer_id = c.id) AS n_vessels, (SELECT COUNT(*) FROM customer_users u WHERE u.customer_id = c.id) AS n_users, (SELECT COUNT(*) FROM companies co WHERE co.customer_id = c.id) AS n_co FROM customers c WHERE c.is_active = 1 AND c.name NOT LIKE \'%[merged #%\' ORDER BY c.name');
+    $g = [];
+    foreach ($rows as $r) { if (($v = org_vat($r['vat_no'])) !== '') $g['vat:' . $v][$r['id']] = $r; if (($e = trim((string)$r['erp_code'])) !== '') $g['erp:' . mb_strtolower($e)][$r['id']] = $r; if (($k = org_key((string)$r['name'])) !== '' && mb_strlen($k) >= 4) $g['name:' . $k][$r['id']] = $r; }
+    $out = []; $seen = [];
+    foreach ($g as $gk => $grp) {
+        if (count($grp) < 2) continue; $grp = array_values($grp);
+        usort($grp, fn($a, $b) => [-(int)$a['n_projects'], -(int)$a['n_users'], -(int)$a['n_vessels'], (int)$a['id']] <=> [-(int)$b['n_projects'], -(int)$b['n_users'], -(int)$b['n_vessels'], (int)$b['id']]);
+        $keep = $grp[0]; foreach (array_slice($grp, 1) as $d) { $pk = min($keep['id'], $d['id']) . '-' . max($keep['id'], $d['id']); if (isset($seen[$pk])) continue; $seen[$pk] = 1; $out[] = ['keep' => $keep, 'drop' => $d, 'how' => explode(':', $gk)[0]]; }
+    }
+    return $out;
+}
+/** Merge customer $drop into $keep: every table with a customer_id column is re-pointed (projects, vessels, users, contacts, tickets,
+ *  invoicing details, proformas, companies …), master data is completed from the duplicate, the duplicate is deactivated and renamed.
+ *  Linked companies: both linked → the companies are merged too (org_merge). */
+function cu_merge(int $keep, int $drop): array {
+    if (!is_cp_admin()) throw new RuntimeException(t('err.noaccess')); if ($keep === $drop) throw new RuntimeException(t('err.notfound'));
+    $K = one('SELECT * FROM customers WHERE id = ?', [$keep]); $D = one('SELECT * FROM customers WHERE id = ?', [$drop]); if (!$K || !$D) throw new RuntimeException(t('err.notfound'));
+    $db = (string) scalar('SELECT DATABASE()'); $done = [];
+    foreach (all("SELECT TABLE_NAME t, COLUMN_NAME c FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = ? AND COLUMN_NAME = 'customer_id' AND TABLE_NAME <> 'customers' ORDER BY TABLE_NAME", [$db]) as $r) {
+        try { $n = q("UPDATE IGNORE {$r['t']} SET customer_id = ? WHERE customer_id = ?", [$keep, $drop])->rowCount(); if ($n) $done[$r['t']] = $n; } catch (Throwable $e) { error_log('[cu_merge] ' . $r['t'] . ': ' . $e->getMessage()); }
+        try { q("DELETE FROM {$r['t']} WHERE customer_id = ?", [$drop]); } catch (Throwable $e) {}   // rows refused by UNIQUE (already present for $keep)
+    }
+    // invoicing details of the duplicate → the kept customer (only one default)
+    try { if (scalar("SELECT COUNT(*) FROM invoicing_details WHERE owner_type = 'customer' AND owner_id = ?", [$keep])) q("UPDATE invoicing_details SET is_default = 0 WHERE owner_type = 'customer' AND owner_id = ?", [$drop]); $n = q("UPDATE invoicing_details SET owner_id = ? WHERE owner_type = 'customer' AND owner_id = ?", [$keep, $drop])->rowCount(); if ($n) $done['invoicing_details'] = $n; } catch (Throwable $e) {}
+    // master data: fill the blanks of the kept record from the duplicate
+    foreach (['erp_code', 'vat_no', 'country', 'address', 'city', 'postal_code', 'email', 'phone', 'website'] as $c) { if ((string)($K[$c] ?? '') === '' && (string)($D[$c] ?? '') !== '') { try { q("UPDATE customers SET {$c} = ? WHERE id = ?", [$D[$c], $keep]); } catch (Throwable $e) {} } }
+    q('UPDATE customers SET is_active = 0, erp_code = NULL, name = CONCAT(name, \' [merged #\', id, \']\') WHERE id = ?', [$drop]);
+    // linked companies: after the re-point the kept customer may have two companies → merge them
+    $cos = all('SELECT id FROM companies WHERE customer_id = ? AND is_active = 1 ORDER BY id', [$keep]);
+    if (count($cos) > 1 && function_exists('org_merge')) { $first = (int)$cos[0]['id']; foreach (array_slice($cos, 1) as $c) { try { org_merge($first, (int)$c['id']); $done['companies'] = ($done['companies'] ?? 0) + 1; } catch (Throwable $e) { error_log('[cu_merge] org_merge: ' . $e->getMessage()); } } }
+    cache_bump_later('fs'); cache_bump_later('inv');
+    return $done;
+}

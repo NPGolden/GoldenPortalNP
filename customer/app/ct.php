@@ -104,8 +104,13 @@ function co_find(string $name, ?string $kind = null, bool $create = false, ?arra
     $name = trim($name); if ($name === '' || !co_has()) return null;
     $id = scalar('SELECT id FROM companies WHERE LOWER(name) = LOWER(?) LIMIT 1', [$name]);
     if (!$id) { $cid = scalar('SELECT id FROM customers WHERE LOWER(name) = LOWER(?) OR erp_code = ? LIMIT 1', [$name, $name]); if ($cid) $id = scalar('SELECT id FROM companies WHERE customer_id = ? LIMIT 1', [$cid]); }
+    if (!$id && function_exists('org_find') && ($m = org_find($name, null, $name))) {   // R95-002: VAT / ERP / normalised-name match ("Acme Yachts SA" = "ACME YACHTS S.A.")
+        $id = $m['company_id'] ?: ($m['customer_id'] && function_exists('org_ensure_for_customer') ? org_ensure_for_customer((int)$m['customer_id']) : null);
+        if ($id && $res !== null) $res['companies_matched'] = ($res['companies_matched'] ?? 0) + 1;
+    }
     if ($id) return (int)$id;
     if (!$create) return null;
+    if ($res !== null && function_exists('im_may_create') && !im_may_create()) { im_propose($res, 'company', $name, $kind ?: ''); return null; }   // R95-002: imports propose, the user confirms
     q('INSERT INTO companies (name, kind' . (co_roles_has() ? ', roles' : '') . ') VALUES (?, ?' . (co_roles_has() ? ', ?' : '') . ')', array_merge([mb_substr($name, 0, 160), $kind ?: 'other'], co_roles_has() ? [$kind ?: 'other'] : []));
     if ($res !== null) $res['companies_new'] = ($res['companies_new'] ?? 0) + 1;
     return (int) db()->lastInsertId();
@@ -120,6 +125,7 @@ function co_save_from_post(int $id): int {
     $str = fn(string $k, int $max) => ($v = trim((string)($_POST[$k] ?? ''))) === '' ? null : mb_substr($v, 0, $max);
     $name = $str('name', 160); if (!$name) throw new RuntimeException(t('co.need_name'));
     $dup = scalar('SELECT id FROM companies WHERE LOWER(name) = LOWER(?) AND id <> ?', [$name, $id]); if ($dup) throw new RuntimeException(t('co.dup', ['v' => $name]));
+    if (!$id && empty($_POST['force_new']) && function_exists('org_find') && ($m = org_find($name, $str('vat_no', 40), $str('erp_code', 40)))) throw new RuntimeException(t('org.looks_like', ['m' => org_match_label($m)]));   // R95-002
     if (co_roles_has()) {   // R87-003: one organisation per VAT number / ERP code — point to the existing one instead of a database error
         if (($v = function_exists('org_vat') ? org_vat($str('vat_no', 40)) : '') !== '' && ($d = one('SELECT id, name FROM companies WHERE REGEXP_REPLACE(COALESCE(vat_no, \'\'), \'[^0-9]\', \'\') = ? AND id <> ? LIMIT 1', [$v, $id]))) throw new RuntimeException(t('co.dup_vat', ['v' => $v, 'name' => $d['name']]));
         if (($ec = $str('erp_code', 40)) !== null && ($d = one('SELECT id, name FROM companies WHERE erp_code = ? AND id <> ? LIMIT 1', [$ec, $id]))) throw new RuntimeException(t('co.dup_erp', ['v' => $ec, 'name' => $d['name']]));
@@ -607,6 +613,7 @@ function co_import(string $path, bool $dry): array {
                 $sets = ['name = ?']; $vals = [$name];
                 foreach ($fields as $k => $v) if ($v !== null) { $sets[] = "$k = ?"; $vals[] = $v; }
                 $vals[] = $id; q('UPDATE companies SET ' . implode(', ', $sets) . ' WHERE id = ?', $vals); $res['companies_upd']++;
+            } elseif (function_exists('im_may_create') && !im_may_create()) { im_propose($res, 'company', $name, $kind ?: ''); continue;   // R95-002
             } else {
                 q('INSERT INTO companies (name, kind, customer_id, country, city, website, email, phone, notes, is_active) VALUES (?,?,?,?,?,?,?,?,?,?)',
                   [$name, $kind ?: ($cid ? 'owner' : 'other'), $cid, $fields['country'], $fields['city'], $fields['website'], $fields['email'], $fields['phone'], $fields['notes'], $active ?? 1]);

@@ -78,6 +78,7 @@ layout_head(t('co.title'), 'contacts');
       </div>
       <div class="field"><label for="notes"><?= tt('ct.notes') ?></label><textarea id="notes" name="notes" rows="3"><?= $v('notes') ?></textarea></div>
       <?php if (!co_roles_has() && function_exists('sup_flag_has') && sup_flag_has()): ?><label class="chk"><input type="checkbox" name="is_supplier" value="1"<?= !empty($edit['is_supplier']) ? ' checked' : '' ?>> <?= tt('co.also_supplier') ?></label><?php endif; ?>
+      <?php if (!$edit): ?><label class="chk" title="<?= tt('org.force_new_hint') ?>"><input type="checkbox" name="force_new" value="1"<?= !empty($_POST['force_new']) ? ' checked' : '' ?>> <?= tt('org.force_new') ?></label><?php endif; ?>
       <?php if ($edit): ?><label class="chk"><input type="checkbox" name="is_active" value="1"<?= $edit['is_active'] ? ' checked' : '' ?>> <?= tt('au.active') ?></label><?php endif; ?>
       <div class="btn-row"><button class="btn btn--gold" type="submit"><?= $edit ? tt('btn.save') : tt('co.create') ?></button><?php if ($edit): ?><a class="btn btn--ghost" href="<?= url('companies') ?>"><?= tt('btn.cancel') ?></a><?php endif; ?></div>
     </form>

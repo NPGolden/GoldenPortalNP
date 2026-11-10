@@ -85,6 +85,7 @@ layout_head(t('cu.title'), 'admin_customers');
       <?php else: ?>
       <div class="field"><label for="country"><?= tt('co.country') ?></label><input id="country" name="country" maxlength="80" value="<?= $v('country') ?>"></div>
       <?php endif; ?>
+      <?php if (!$edit): ?><label class="chk" title="<?= tt('org.force_new_hint') ?>"><input type="checkbox" name="force_new" value="1"<?= !empty($_POST['force_new']) ? ' checked' : '' ?>> <?= tt('org.force_new') ?></label><?php endif; ?>
       <?php if ($edit): ?><label class="chk"><input type="checkbox" name="is_active" value="1"<?= $edit['is_active'] ? ' checked' : '' ?>> <?= tt('au.active') ?></label><p class="hint"><?= tt('cu.inactive_hint') ?></p><?php endif; ?>
       <div class="btn-row"><button class="btn btn--gold" type="submit"><?= $edit ? tt('btn.save') : tt('cu.create') ?></button><a class="btn btn--ghost" href="<?= url('admin_customers', $keep) ?>"><?= tt('btn.cancel') ?></a></div>
     </form>

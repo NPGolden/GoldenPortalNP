@@ -267,6 +267,7 @@ function sup_save_from_post(int $id): int {
     require_pr_admin(); $s = fn(string $k, int $max) => ($v = trim((string)($_POST[$k] ?? ''))) === '' ? null : mb_substr($v, 0, $max);
     $name = $s('name', 160); if (!$name) throw new RuntimeException(t('co.need_name'));
     $dup = scalar('SELECT id FROM companies WHERE LOWER(name) = LOWER(?) AND id <> ?', [$name, $id]); if ($dup) throw new RuntimeException(t('co.dup', ['v' => $name]));
+    if (!$id && empty($_POST['force_new']) && function_exists('org_find') && ($m = org_find($name, $s('vat_no', 40), $s('erp_code', 40)))) throw new RuntimeException(t('org.looks_like', ['m' => org_match_label($m)]));   // R95-002
     $vals = [$name, $s('country', 80), $s('city', 80), $s('website', 190), $s('email', 190), $s('phone', 60), $s('notes', 4000), $id ? (int)!empty($_POST['is_active']) : 1];
     if ($id) { $vals[] = $id; q("UPDATE companies SET name = ?, kind = IF(kind IN ('other', 'supplier', ''), 'supplier', kind), " . (sup_flag_has() ? 'is_supplier = 1, ' : '') . "country = ?, city = ?, website = ?, email = ?, phone = ?, notes = ?, is_active = ? WHERE id = ?", $vals); }
     else { q("INSERT INTO companies (name, kind, " . (sup_flag_has() ? 'is_supplier, ' : '') . "country, city, website, email, phone, notes, is_active) VALUES (?,'supplier'," . (sup_flag_has() ? '1,' : '') . "?,?,?,?,?,?,?)", $vals); $id = (int) db()->lastInsertId(); }
@@ -492,10 +493,12 @@ function sup_import_template(): void {
 }
 /** Apply: new suppliers created, existing ones updated field by field (empty cells never erase), makers added (never removed). */
 function sup_import_apply(array $pv, bool $updateExisting = true): array {
-    require_pr_admin(); $created = 0; $updated = 0; $makersN = 0; $errors = [];
+    require_pr_admin(); $created = 0; $updated = 0; $makersN = 0; $errors = []; $proposals = [];
     foreach ($pv['rows'] as $i => $r) {
         $id = (int)$r['id'];
         try {
+        if (!$id && function_exists('org_find') && ($m = org_find((string)$r['name'], (string)($r['vat_no'] ?? ''), (string)($r['erp_code'] ?? ''))) && $m['company_id']) { $id = (int)$m['company_id']; $pv['rows'][$i]['id'] = $id; }   // R95-002: VAT / ERP / normalised-name match
+        if (!$id && function_exists('im_may_create') && !im_may_create()) { $proposals[] = (string)$r['name']; continue; }   // R95-002: propose, the user confirms
         if ($id) { if (!$updateExisting) continue; $set = ["kind = IF(kind IN ('other', 'supplier', ''), 'supplier', kind)", 'is_active = 1']; if (sup_flag_has()) $set[] = 'is_supplier = 1'; if (function_exists('co_roles_has') && co_roles_has()) { $set[] = "roles = TRIM(BOTH ',' FROM CONCAT_WS(',', NULLIF(roles, ''), IF(FIND_IN_SET('supplier', roles), NULL, 'supplier')))"; $set[] = "vat_no = COALESCE(NULLIF(vat_no, ''), ?)"; $set[] = 'erp_code = COALESCE(erp_code, ?)'; $set[] = 'address = COALESCE(address, ?)'; $set[] = 'postal_code = COALESCE(postal_code, ?)'; } $a = (function_exists('co_roles_has') && co_roles_has()) ? [$r['vat_no'], $r['erp_code'], $r['address'], $r['postal_code']] : []; foreach (['country', 'city', 'website', 'email', 'phone'] as $k) if ($r[$k] !== null) { $set[] = "$k = ?"; $a[] = $r[$k]; } if ($r['notes'] !== null) { $set[] = 'notes = COALESCE(NULLIF(notes, \'\'), ?)'; $a[] = $r['notes']; } if ($set) { $a[] = $id; q('UPDATE companies SET ' . implode(', ', $set) . ' WHERE id = ?', $a); } $updated++; }
         else { q("INSERT INTO companies (name, kind, " . (sup_flag_has() ? 'is_supplier, ' : '') . (function_exists('co_roles_has') && co_roles_has() ? 'roles, vat_no, erp_code, address, postal_code, ' : '') . "country, city, website, email, phone, notes, is_active) VALUES (?,'supplier'," . (sup_flag_has() ? '1,' : '') . (function_exists('co_roles_has') && co_roles_has() ? "'supplier',?,?,?,?," : '') . "?,?,?,?,?,?,1)", array_merge([$r['name']], function_exists('co_roles_has') && co_roles_has() ? [$r['vat_no'], $r['erp_code'], $r['address'], $r['postal_code']] : [], [$r['country'], $r['city'], $r['website'], $r['email'], $r['phone'], $r['notes']])); $id = (int) db()->lastInsertId(); $created++; }
         q('INSERT INTO supplier_details (company_id, erp_code, vat_no, address, postal_code, terms_days, advance_pct, currency, lead_days, incoterms) VALUES (?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE erp_code = COALESCE(VALUES(erp_code), erp_code), vat_no = COALESCE(VALUES(vat_no), vat_no), address = COALESCE(VALUES(address), address), postal_code = COALESCE(VALUES(postal_code), postal_code), terms_days = COALESCE(VALUES(terms_days), terms_days), advance_pct = COALESCE(VALUES(advance_pct), advance_pct), currency = COALESCE(VALUES(currency), currency), lead_days = COALESCE(VALUES(lead_days), lead_days), incoterms = COALESCE(VALUES(incoterms), incoterms)',
@@ -513,5 +516,5 @@ function sup_import_apply(array $pv, bool $updateExisting = true): array {
         else q("INSERT INTO contacts (company_id, company, full_name, position, category, email, phone, mobile, is_active, created_by) VALUES (?,?,?,?,'supplier',?,?,?,1,?)", [$cid, $coName, $c['full_name'], $c['position'], $c['email'], $c['phone'], $c['mobile'], $me ?: null]);
         $ctN++;
     }
-    cache_bump_later('inv'); return ['created' => $created, 'updated' => $updated, 'makers' => $makersN, 'contacts' => $ctN, 'errors' => $errors];
+    cache_bump_later('inv'); return ['created' => $created, 'updated' => $updated, 'makers' => $makersN, 'contacts' => $ctN, 'errors' => $errors, 'proposals' => $proposals ?? []];
 }

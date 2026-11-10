@@ -25,7 +25,7 @@ $res = $_SESSION['cp_import_result'] ?? null;
 unset($_SESSION['cp_import_result']);
 
 $counts = function (array $r): array {
-    $keys = ['rows', 'customers_new', 'customers_upd', 'invoicing_new', 'invoicing_upd', 'vessels_new', 'vessels_unassigned', 'vessels_upd', 'projects_new', 'projects_upd', 'subs_new', 'subs_upd', 'systems_new', 'systems_upd', 'offers_new', 'offers_upd', 'contacts_new', 'contacts_upd', 'companies_new', 'companies_upd', 'links_new', 'notes_new', 'users_new', 'users_upd'];
+    $keys = ['rows', 'proposed', 'customers_matched', 'companies_matched', 'customers_new', 'customers_upd', 'invoicing_new', 'invoicing_upd', 'vessels_new', 'vessels_unassigned', 'vessels_upd', 'projects_new', 'projects_upd', 'subs_new', 'subs_upd', 'systems_new', 'systems_upd', 'offers_new', 'offers_upd', 'contacts_new', 'contacts_upd', 'companies_new', 'companies_upd', 'links_new', 'notes_new', 'users_new', 'users_upd'];
     if (!empty($r['warnings'])) $out['warnings'] = count($r['warnings']);
     $out = [];
     foreach ($keys as $k) if (array_key_exists($k, $r)) $out[$k] = (int)$r[$k];
@@ -48,6 +48,7 @@ layout_head(t('im.title'), 'import');
       <?= csrf_field() ?><input type="hidden" name="action" value="vessel_import">
       <div class="field"><label><?= tt('im.file') ?></label><input name="xlsx" type="file" accept=".xlsx" required></div>
       <label class="chk"><input type="checkbox" name="dry" value="1" checked> <?= tt('im.dry') ?></label>
+      <label class="chk"><input type="checkbox" name="create_new" value="1"> <?= tt('im.create_new') ?></label>
       <button class="btn" type="submit"><?= tt('im.run') ?></button>
     </form>
   </div>
@@ -61,6 +62,7 @@ layout_head(t('im.title'), 'import');
       <?= csrf_field() ?><input type="hidden" name="action" value="proj_import">
       <div class="field"><label><?= tt('im.file') ?></label><input name="xlsx" type="file" accept=".xlsx" required></div>
       <label class="chk"><input type="checkbox" name="dry" value="1" checked> <?= tt('im.dry') ?></label>
+      <label class="chk"><input type="checkbox" name="create_new" value="1"> <?= tt('im.create_new') ?></label>
       <button class="btn" type="submit"><?= tt('im.run') ?></button>
     </form>
   </div>
@@ -73,6 +75,7 @@ layout_head(t('im.title'), 'import');
       <?= csrf_field() ?><input type="hidden" name="action" value="sys_import">
       <div class="field"><label><?= tt('im.file') ?></label><input name="xlsx" type="file" accept=".xlsx" required></div>
       <label class="chk"><input type="checkbox" name="dry" value="1" checked> <?= tt('im.dry') ?></label>
+      <label class="chk"><input type="checkbox" name="create_new" value="1"> <?= tt('im.create_new') ?></label>
       <button class="btn" type="submit"<?= sys_has_codes() ? '' : ' disabled title="' . e(t('sys.need_r9')) . '"' ?>><?= tt('im.run') ?></button>
     </form>
   </div>
@@ -87,6 +90,7 @@ layout_head(t('im.title'), 'import');
       <?= csrf_field() ?><input type="hidden" name="action" value="of_import">
       <div class="field"><label><?= tt('im.file') ?></label><input name="xlsx" type="file" accept=".xlsx" required></div>
       <label class="chk"><input type="checkbox" name="dry" value="1" checked> <?= tt('im.dry') ?></label>
+      <label class="chk"><input type="checkbox" name="create_new" value="1"> <?= tt('im.create_new') ?></label>
       <button class="btn" type="submit"><?= tt('im.run') ?></button>
     </form>
   </div>
@@ -101,6 +105,7 @@ layout_head(t('im.title'), 'import');
       <?= csrf_field() ?><input type="hidden" name="action" value="ct_import">
       <div class="field"><label><?= tt('im.file') ?></label><input name="xlsx" type="file" accept=".xlsx" required></div>
       <label class="chk"><input type="checkbox" name="dry" value="1" checked> <?= tt('im.dry') ?></label>
+      <label class="chk"><input type="checkbox" name="create_new" value="1"> <?= tt('im.create_new') ?></label>
       <button class="btn" type="submit"><?= tt('im.run') ?></button>
     </form>
   </div>
@@ -115,6 +120,7 @@ layout_head(t('im.title'), 'import');
       <?= csrf_field() ?><input type="hidden" name="action" value="co_import">
       <div class="field"><label><?= tt('im.file') ?></label><input name="xlsx" type="file" accept=".xlsx" required></div>
       <label class="chk"><input type="checkbox" name="dry" value="1" checked> <?= tt('im.dry') ?></label>
+      <label class="chk"><input type="checkbox" name="create_new" value="1"> <?= tt('im.create_new') ?></label>
       <button class="btn" type="submit"><?= tt('im.run') ?></button>
     </form>
   </div>
@@ -129,6 +135,7 @@ layout_head(t('im.title'), 'import');
       <?= csrf_field() ?><input type="hidden" name="action" value="cu_import">
       <div class="field"><label><?= tt('im.file') ?></label><input name="xlsx" type="file" accept=".xlsx" required></div>
       <label class="chk"><input type="checkbox" name="dry" value="1" checked> <?= tt('im.dry') ?></label>
+      <label class="chk"><input type="checkbox" name="create_new" value="1"> <?= tt('im.create_new') ?></label>
       <button class="btn" type="submit"><?= tt('im.run') ?></button>
     </form>
   </div>
@@ -141,6 +148,7 @@ layout_head(t('im.title'), 'import');
       <?= csrf_field() ?><input type="hidden" name="action" value="au_import">
       <div class="field"><label><?= tt('im.file') ?></label><input name="xlsx" type="file" accept=".xlsx" required></div>
       <label class="chk"><input type="checkbox" name="dry" value="1" checked> <?= tt('im.dry') ?></label>
+      <label class="chk"><input type="checkbox" name="create_new" value="1"> <?= tt('im.create_new') ?></label>
       <button class="btn" type="submit"><?= tt('im.run') ?></button>
     </form>
   </div>
@@ -155,6 +163,8 @@ layout_head(t('im.title'), 'import');
   <div class="flash flash--<?= $res['dry'] ? 'warn' : 'good' ?>" style="margin-top:10px;">
     <?= $res['dry'] ? tt('im.dry_result') : tt('im.applied') ?>
   </div>
+  <?php if (!empty($res['proposals'])): ?><div class="flash flash--warn" style="margin-top:8px;"><b><?= e(t('im.proposed_n', ['n' => count($res['proposals'])])) ?></b> — <?= tt('im.proposed_hint') ?>
+    <ul style="margin:6px 0 0 18px;columns:2;"><?php foreach ($res['proposals'] as $pp): ?><li><?= e(t('im.kind_' . $pp['kind'])) ?>: <b><?= e($pp['name']) ?></b><?= $pp['hint'] !== '' ? ' <span class="hint">' . e($pp['hint']) . '</span>' : '' ?></li><?php endforeach; ?></ul></div><?php endif; ?>
   <?php $n = count($c); $cols = $n % 3 === 0 ? 3 : ($n <= 6 ? $n : 4); ?>
   <div class="imp-stats" style="--cols:<?= $cols ?>;">
     <?php foreach ($c as $k => $v): ?>

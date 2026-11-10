@@ -64,9 +64,11 @@ layout_head(t('eq.title'), 'equipment');
     <div class="field"><label><?= tt('im.file') ?></label><input name="xlsx" type="file" accept=".xlsx" required></div>
     <div class="field"><label><?= tt('eq.maker') ?></label><input name="maker" list="eq-makers" required maxlength="60" placeholder="ATLAS"><datalist id="eq-makers"><?php foreach (eq_makers() as $m): ?><option value="<?= e($m) ?>"><?php endforeach; ?><option value="ATLAS"><option value="MAGNUS"></datalist></div>
     <label class="chk" style="padding-bottom:10px;"><input type="checkbox" name="dry" value="1" checked> <?= tt('im.dry') ?></label>
+      <label class="chk"><input type="checkbox" name="create_new" value="1"> <?= tt('im.create_new') ?></label>
     <div class="fltbar-actions"><button class="btn" type="submit"><?= tt('im.run') ?></button></div>
   </form>
   <?php if ($res): ?><div class="flash <?= $res['dry'] ? 'flash--warn' : 'flash--good' ?>" style="margin-top:10px;"><?= e(t('eq.im_result', ['n' => $res['rows'], 'a' => $res['units_new'], 'u' => $res['units_upd'], 'r' => $res['records'], 'v' => $res['vessels_new']])) ?><?= $res['dry'] ? ' · ' . tt('im.dry_note') : '' ?>
+    <?php if (!empty($res['proposals'])): ?><div class="flash flash--warn" style="margin:8px 0;"><b><?= e(t('im.proposed_n', ['n' => count($res['proposals'])])) ?></b> — <?= tt('im.proposed_hint') ?><ul style="margin:6px 0 0 18px;"><?php foreach ($res['proposals'] as $pp): ?><li><?= e(t('im.kind_' . $pp['kind'])) ?>: <b><?= e($pp['name']) ?></b> <span class="hint"><?= e($pp['hint']) ?></span></li><?php endforeach; ?></ul></div><?php endif; ?>
     <?php if ($res['warnings']): ?><ul class="hint" style="margin:6px 0 0 18px;"><?php foreach (array_slice($res['warnings'], 0, 30) as [$ln, $why]): ?><li><?= e($why) ?></li><?php endforeach; ?></ul><?php endif; ?>
     <?php if ($res['skipped']): ?><ul class="hint" style="margin:6px 0 0 18px;"><?php foreach (array_slice($res['skipped'], 0, 20) as [$ln, $why]): ?><li><?= e(t('im.line', ['n' => $ln])) ?>: <?= e($why) ?></li><?php endforeach; ?></ul><?php endif; ?></div><?php endif; ?>
 </div>

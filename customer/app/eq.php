@@ -230,7 +230,8 @@ function eq_import(string $path, string $maker, bool $dry): array {
             $members = eq_expand_set($snRaw); $set = count($members) > 1 ? mb_substr($snRaw, 0, 80) : null;
             $vName = $g($r, 'vessel'); $vKey = eq_norm($vName); $vid = $vessels[$vKey] ?? null; $site = null;
             if ($vName !== '' && !$vid && function_exists('vm_has') && vm_has()) { $vid = vm_find($vName); if ($vid) $vessels[$vKey] = $vid; }   // R30-001
-            if ($vName !== '' && !$vid) { if (preg_match('/^(M\/Y|MY|S\/Y|SY|M\/V|MV|M\/T|MT|GY\d*-?)\s*/iu', $vName)) { q('INSERT INTO vessels (name, is_active) VALUES (?, 1)', [mb_substr($vName, 0, 120)]); $vid = (int) db()->lastInsertId(); $vessels[$vKey] = $vid; $res['vessels_new']++; } else { $site = mb_substr($vName, 0, 120); $res['unmatched_vessels'][$vName] = true; } }
+            if ($vName !== '' && !$vid && function_exists('im_may_create') && !im_may_create() && preg_match('/^(M\/Y|MY|S\/Y|SY|M\/V|MV|M\/T|MT|GY\d*-?)\s*/iu', $vName)) { im_propose($res, 'vessel', $vName, 'equipment ' . $snRaw); $vid = null; }   // R95-002: propose, do not create the vessel
+            elseif ($vName !== '' && !$vid) { if (preg_match('/^(M\/Y|MY|S\/Y|SY|M\/V|MV|M\/T|MT|GY\d*-?)\s*/iu', $vName)) { q('INSERT INTO vessels (name, is_active) VALUES (?, 1)', [mb_substr($vName, 0, 120)]); $vid = (int) db()->lastInsertId(); $vessels[$vKey] = $vid; $res['vessels_new']++; } else { $site = mb_substr($vName, 0, 120); $res['unmatched_vessels'][$vName] = true; } }
             $model = mb_substr($g($r, 'model'), 0, 120); $family = $g($r, 'family') !== '' ? mb_substr($g($r, 'family'), 0, 60) : eq_family_of($model);
             $first = eq_date($g($r, 'first')); $dateSold = eq_date($g($r, 'date_sold')); $warr = eq_date($g($r, 'warranty')); $retAt = eq_date($g($r, 'retired_at'));
             $sold = (int)$yes($g($r, 'sold')); $retired = (int)$yes($g($r, 'retired'));

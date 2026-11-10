@@ -46,7 +46,7 @@ layout_head(t('sup.title'), 'suppliers');
       </div>
       <div class="field"><label><?= tt('sup.remarks') ?></label><textarea name="sup_remarks" rows="3"><?= $v('sup_remarks') ?></textarea></div>
       <div class="field"><label><?= tt('ct.notes') ?></label><textarea name="notes" rows="2"><?= $v('notes') ?></textarea></div>
-      <?php if ($sup): ?><label class="chk"><input type="checkbox" name="is_active" value="1"<?= $sup['is_active'] ? ' checked' : '' ?>> <?= tt('au.active') ?></label><?php endif; ?>
+      <?php if ($sup): ?><label class="chk"><input type="checkbox" name="is_active" value="1"<?= $sup['is_active'] ? ' checked' : '' ?>> <?= tt('au.active') ?></label><?php else: ?><label class="chk" title="<?= tt('org.force_new_hint') ?>"><input type="checkbox" name="force_new" value="1"<?= !empty($_POST['force_new']) ? ' checked' : '' ?>> <?= tt('org.force_new') ?></label><?php endif; ?>
       <div class="btn-row"><button class="btn btn--gold" type="submit"><?= tt('btn.save') ?></button><a class="btn btn--ghost" href="<?= url('suppliers', $sup ? ['id' => $id] : []) ?>"><?= tt('btn.cancel') ?></a></div>
     </form>
   </div>

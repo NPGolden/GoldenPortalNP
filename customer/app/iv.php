@@ -121,6 +121,7 @@ function cu_save_from_post(int $id): int {
     $dup = scalar('SELECT id FROM customers WHERE LOWER(name) = LOWER(?) AND id <> ?', [$name, $id]); if ($dup) throw new RuntimeException(t('cu.dup', ['v' => $name]));
     $erp = $str('erp_code', 32);
     if ($erp && scalar('SELECT id FROM customers WHERE erp_code = ? AND id <> ?', [$erp, $id])) throw new RuntimeException(t('cu.dup_erp', ['v' => $erp]));
+    if (!$id && empty($_POST['force_new']) && function_exists('org_find') && ($m = org_find($name, $str('vat_no', 40), $erp))) throw new RuntimeException(t('org.looks_like', ['m' => org_match_label($m)]));   // R95-002: same VAT / ERP / normalised name → propose, do not create
     $active = $id ? (int)!empty($_POST['is_active']) : 1;
     if ($cu_ext = cu_cols_ok()) {
         $vals = [$name, $erp, $str('country', 80), $str('address', 200), $str('city', 80), $str('postal_code', 20), $str('vat_no', 40), $str('email', 190), $str('phone', 60), $str('website', 190), $str('notes', 4000), $active];
@@ -202,9 +203,12 @@ function cu_import(string $path, bool $dry): array {
                 if ($sets) { $vals[] = $id; q('UPDATE customers SET ' . implode(', ', $sets) . ' WHERE id = ?', $vals); }
                 $res['customers_upd']++;
             } else {
+                if (function_exists('org_find') && ($m = org_find($name, $f['vat_no'] ?? null, $f['erp_code'] ?? null)) && $m['customer_id']) { $res['customers_matched'] = ($res['customers_matched'] ?? 0) + 1; $id = (int)$m['customer_id']; }   // R95-002: VAT / ERP / normalised name
+                elseif (function_exists('im_may_create') && !im_may_create()) { im_propose($res, 'customer', $name, trim((string)($f['vat_no'] ?? '') . ' ' . (string)($f['erp_code'] ?? ''))); continue; }
+                else {
                 $f['is_active'] = $active ?? 1; $f = ['name' => $name] + $f;
                 q('INSERT INTO customers (' . implode(', ', array_keys($f)) . ') VALUES (' . implode(',', array_fill(0, count($f), '?')) . ')', array_values($f));
-                $id = (int) db()->lastInsertId(); $res['customers_new']++;
+                $id = (int) db()->lastInsertId(); $res['customers_new']++; org_find_reset(); }
             }
             $id = (int)$id;
             if (function_exists('org_ensure_for_customer') && function_exists('co_roles_has') && co_roles_has()) { try { org_ensure_for_customer($id); $res['organisations'] = ($res['organisations'] ?? 0) + 1; } catch (Throwable $e) { $res['warnings'][] = [$line, $e->getMessage()]; } }   // R85-004: the organisation behind every imported customer

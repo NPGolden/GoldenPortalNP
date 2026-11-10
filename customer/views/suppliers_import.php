@@ -10,6 +10,7 @@ layout_head(t('sup.import'), 'suppliers');
 <p class="eyebrow"><a href="<?= url('suppliers') ?>"><?= tt('sup.title') ?></a></p>
 <div class="page-head"><div><h1>⤒ <?= tt('sup.import') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('sup.import_lede') ?></p></div></div>
 <?php if ($res): ?><div class="flash flash--good"><b><?= tt('stk.imp_done') ?></b> — <?= e(t('sup.imp_done_s', array_filter($res, 'is_scalar'))) ?> <a href="<?= url('suppliers') ?>"><?= tt('sup.title') ?> →</a></div>
+<?php if (!empty($res['proposals'])): ?><div class="flash flash--warn"><b><?= e(t('im.proposed_n', ['n' => count($res['proposals'])])) ?></b> — <?= tt('im.proposed_hint') ?><ul style="margin:6px 0 0 18px;"><?php foreach ($res['proposals'] as $pn): ?><li><?= e($pn) ?></li><?php endforeach; ?></ul></div><?php endif; ?>
 <?php if (!empty($res['errors'])): ?><details class="flash flash--warn"><summary><b><?= e(t('sup.imp_err_n', ['n' => count($res['errors'])])) ?></b></summary><ul style="margin:6px 0 0 18px;"><?php foreach ($res['errors'] as $x): ?><li><?= e($x) ?></li><?php endforeach; ?></ul></details><?php endif; ?><?php endif; ?>
 <div class="cols">
 <div>
@@ -40,6 +41,7 @@ layout_head(t('sup.import'), 'suppliers');
     <h2>3 · <?= tt('stk.imp_apply') ?></h2>
     <form method="post" action="<?= url('suppliers_import') ?>" data-lock data-confirm="<?= e(t('stk.imp_confirm', ['n' => count($prev['rows'])])) ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('stk.imp_apply') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="sup_import_apply">
       <label class="chk"><input type="checkbox" name="update" value="1" checked> <?= tt('sup.imp_update_existing') ?></label>
+      <label class="chk"><input type="checkbox" name="create_new" value="1"> <?= tt('im.create_new') ?></label>
       <p class="hint"><?= tt('sup.imp_apply_hint') ?></p>
       <div class="btn-row"><button class="btn btn--gold" type="submit"><?= tt('stk.imp_apply') ?></button><a class="btn btn--ghost" href="<?= url('suppliers_import', ['discard' => 1]) ?>"><?= tt('btn.cancel') ?></a></div>
     </form>

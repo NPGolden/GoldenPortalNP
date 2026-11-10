@@ -27,6 +27,18 @@ layout_head(t('org.title'), 'contacts');
       <td class="num"><form method="post" action="<?= $self ?>" data-lock data-confirm="<?= e(t('org.merge_q', ['a' => $D['name'], 'b' => $K['name']])) ?>" style="display:inline;"><?= csrf_field() ?><input type="hidden" name="action" value="org_merge"><input type="hidden" name="keep" value="<?= (int)$K['id'] ?>"><input type="hidden" name="drop" value="<?= (int)$D['id'] ?>"><button class="btn btn--sm" type="submit">⤵ <?= tt('org.merge') ?></button></form></td></tr>
   <?php endforeach; ?></tbody></table></div><?php endif; ?>
 </div>
+<?php if (is_cp_admin() && function_exists('cu_dupes')): $cd = cu_dupes(); $vg = function_exists('vm_groups') ? vm_groups() : []; ?>
+<div class="card" id="cu-dupes">
+  <div class="card-head"><h2><?= tt('org.s_cu_dupes') ?> <span class="count"><?= count($cd) ?></span></h2><span class="hint"><?= tt('org.h_cu_dupes') ?></span></div>
+  <?php if (!$cd): ?><p class="hint"><?= tt('org.empty') ?></p><?php else: ?>
+  <div class="table-scroll"><table class="tbl tbl--wrap"><thead><tr><th><?= tt('org.keep') ?></th><th><?= tt('org.drop') ?></th><th><?= tt('org.how') ?></th><th></th></tr></thead><tbody>
+  <?php foreach ($cd as $d): $K = $d['keep']; $D = $d['drop']; $lab = fn($c) => '<a href="' . url('admin_customers', ['edit' => (int)$c['id']]) . '"><b>' . e($c['name']) . '</b></a><br><span class="hint">' . e(trim(($c['erp_code'] ? 'ERP ' . $c['erp_code'] . ' · ' : '') . ($c['vat_no'] ? 'VAT ' . $c['vat_no'] . ' · ' : '') . ($c['country'] ?: ''), ' ·')) . ' · ' . e(t('org.cu_counts', ['p' => (int)$c['n_projects'], 'v' => (int)$c['n_vessels'], 'u' => (int)$c['n_users']])) . '</span>'; ?>
+    <tr><td><?= $lab($K) ?></td><td><?= $lab($D) ?></td><td><?= pill($d['how'] === 'name' ? 'mute' : 'gold', t('org.how_' . $d['how'])) ?></td>
+      <td class="num"><form method="post" action="<?= $self ?>" data-lock data-confirm="<?= e(t('org.cu_merge_q', ['a' => $D['name'], 'b' => $K['name']])) ?>" style="display:inline;"><?= csrf_field() ?><input type="hidden" name="action" value="cu_merge"><input type="hidden" name="keep" value="<?= (int)$K['id'] ?>"><input type="hidden" name="drop" value="<?= (int)$D['id'] ?>"><button class="btn btn--sm btn--gold" type="submit">⇢ <?= tt('org.merge') ?></button></form></td></tr>
+  <?php endforeach; ?></tbody></table></div><?php endif; ?>
+  <p class="hint" style="margin:8px 0 0;"><?= e(t('org.v_dupes_n', ['n' => count($vg)])) ?> <a href="<?= url('admin_vessel_merge') ?>"><?= tt('org.v_dupes_link') ?> ›</a></p>
+</div>
+<?php endif; ?>
 <?php foreach (['match' => 'gold', 'none' => 'red', 'linked' => 'ok'] as $sec => $tone): $rows = $M[$sec]; ?>
 <div class="card">
   <div class="card-head"><h2><?= tt('org.s_' . $sec) ?> <span class="count"><?= count($rows) ?></span></h2><span class="hint"><?= tt('org.h_' . $sec) ?></span></div>
