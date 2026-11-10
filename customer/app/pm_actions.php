@@ -860,6 +860,7 @@ function pm_handle_action(string $action, string $page): bool {
                 q('UPDATE vessels SET former_names = ? WHERE id = ?', [$str('former_names', 255) ?: null, $id]);
                 foreach (preg_split('/[\r\n;]+/', (string)($_POST['aliases'] ?? '')) as $al) if (trim($al) !== '') vm_alias_add($id, trim($al), 'manual');
             }
+            if (function_exists('vo_sync')) vo_sync($id);   // R95-005: a changed customer becomes an ownership period
             flash('good', t('v.saved'));
             redirect('vessels', ['_r' => uniqid()]);
         }

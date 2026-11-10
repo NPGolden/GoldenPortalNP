@@ -5,7 +5,7 @@
 require __DIR__ . '/_layout.php';
 $u = require_staff();
 if (!function_exists('col_can') || !col_can()) { http_response_code(403); layout_head(t('err.noaccess'), 'collections'); echo '<h1>' . tt('err.noaccess') . '</h1><p class="hint">' . tt('col.noaccess_hint') . '</p>'; layout_foot(); return; }
-$f = ['vessel' => (int)($_GET['vessel'] ?? 0), 'project' => (int)($_GET['project'] ?? 0), 'customer' => (int)($_GET['customer'] ?? 0), 'pm' => (int)($_GET['pm'] ?? 0), 'bucket' => (string)($_GET['bucket'] ?? ''), 'q' => trim((string)($_GET['q'] ?? ''))];
+$f = ['vessel' => (int)($_GET['vessel'] ?? 0), 'project' => (int)($_GET['project'] ?? 0), 'customer' => (int)($_GET['customer'] ?? 0), 'pm' => (int)($_GET['pm'] ?? 0), 'bucket' => (string)($_GET['bucket'] ?? ''), 'q' => trim((string)($_GET['q'] ?? '')), 'party' => (int)($_GET['party'] ?? 0)];
 $d = fn($v, $def) => ($v && preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) && strtotime($v)) ? $v : $def;
 $from = $d($_GET['from'] ?? '', date('Y-m-d', strtotime('-30 days'))); $to = $d($_GET['to'] ?? '', date('Y-m-d')); if ($from > $to) [$from, $to] = [$to, $from];
 $fAll = array_diff_key($f, ['bucket' => 1]);
@@ -18,6 +18,7 @@ if (($_GET['format'] ?? '') === 'checks' && $chk) { col_checks_xlsx($cov, $mis, 
 $cur = $S['cur']; $m = fn(float $v) => col_money($v, $cur); $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : '';
 $keep = array_filter($f + ['from' => $from, 'to' => $to]);
 $vessels = all('SELECT DISTINCT v.id, v.name FROM proformas pi JOIN vessels v ON v.id = pi.vessel_id ORDER BY v.name');
+$parties = function_exists('col_statement_parties') ? col_statement_parties() : [];   // R95-005
 $customers = all('SELECT DISTINCT c.id, c.name FROM proformas pi JOIN projects p ON p.id = pi.project_id JOIN customers c ON c.id = p.customer_id ORDER BY c.name');
 $pms = all('SELECT DISTINCT cu.id, cu.full_name FROM proformas pi JOIN projects p ON p.id = pi.project_id JOIN customer_users cu ON cu.id = p.pm_user_id ORDER BY cu.full_name');
 $paidSum = 0.0; foreach ($paid as $r) $paidSum += (float)$r['amount'];
@@ -57,10 +58,11 @@ layout_head(t('col.title'), 'collections');
   </div>
 </div>
 
-<form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1.3fr 1fr 1fr 1fr 1fr 1fr auto;">
+<form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1.3fr 1fr 1fr 1fr 1fr 1fr 1fr auto;">
   <input type="hidden" name="p" value="collections"><input type="hidden" name="from" value="<?= e($from) ?>"><input type="hidden" name="to" value="<?= e($to) ?>">
   <div class="field"><label><?= tt('pr.search') ?></label><input name="q" value="<?= e($f['q']) ?>" placeholder="<?= tt('col.search_ph') ?>"></div>
   <div class="field"><label><?= tt('th.vessel') ?></label><select name="vessel"><option value=""><?= tt('flt.any') ?></option><?php foreach ($vessels as $x): ?><option value="<?= (int)$x['id'] ?>"<?= $sel($x['id'], $f['vessel']) ?>><?= e($x['name']) ?></option><?php endforeach; ?></select></div>
+  <div class="field"><label><?= tt('pty.party') ?></label><select name="party"><option value=""><?= tt('flt.any') ?></option><?php foreach ($parties as $x): ?><option value="<?= (int)$x['id'] ?>"<?= $sel($x['id'], $f['party']) ?>><?= e($x['name']) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label><?= tt('nav.customers') ?></label><select name="customer"><option value=""><?= tt('flt.any') ?></option><?php foreach ($customers as $x): ?><option value="<?= (int)$x['id'] ?>"<?= $sel($x['id'], $f['customer']) ?>><?= e($x['name']) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label>PM</label><select name="pm"><option value=""><?= tt('flt.any') ?></option><?php foreach ($pms as $x): ?><option value="<?= (int)$x['id'] ?>"<?= $sel($x['id'], $f['pm']) ?>><?= e($x['full_name']) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label><?= tt('col.bucket') ?></label><select name="bucket" data-nosearch><option value=""><?= tt('flt.any') ?></option><option value="overdue"<?= $sel('overdue', $f['bucket']) ?>><?= tt('fs.overdue') ?></option><option value="followup"<?= $sel('followup', $f['bucket']) ?>><?= tt('col.fu_due') ?></option><?php foreach (COL_BUCKETS as $b): ?><option value="<?= $b ?>"<?= $sel($b, $f['bucket']) ?>><?= e(t('col.b_' . $b)) ?></option><?php endforeach; ?></select></div>
@@ -69,14 +71,19 @@ layout_head(t('col.title'), 'collections');
 
 <?php $svs = col_statement_vessels(); $selV = array_values(array_unique(array_map('intval', (array)($_GET['v'] ?? [])))); if (!$selV && $f['vessel']) $selV = [$f['vessel']];
   $asOf = $d($_GET['asof'] ?? '', date('Y-m-d')); $soaFrom = $d($_GET['sfrom'] ?? '', '');
-  $stKey = $selV ? 'st:' . implode(',', $selV) . ':%s:' . $asOf . ($soaFrom ? ':' . $soaFrom : '') : null;
+  // R95-005: the statement is addressed to a billing party; the vessels are sections (tick some to narrow it), a vessel-only statement stays available
+  $selP = (int)($_GET['sparty'] ?? 0) ?: (int)$f['party']; $pRow = null; foreach ($parties as $x) if ((int)$x['id'] === $selP) $pRow = $x; if (!$pRow) $selP = 0;
+  $SD = ($selV || $selP) ? col_statement($selV, $asOf, $soaFrom ?: null, $selP ?: null) : null;
+  $stKey = ($selV || $selP) ? 'st:' . implode(',', array_merge($selP ? ['o' . $selP] : [], $selV)) . ':%s:' . $asOf . ($soaFrom ? ':' . $soaFrom : '') : null;
   $selNames = array_map(fn($x) => (string)$x['name'], array_filter($svs, fn($x) => in_array((int)$x['id'], $selV, true)));
-  $cid = 0; foreach ($svs as $x) if (in_array((int)$x['id'], $selV, true)) { $cid = (int) scalar('SELECT customer_id FROM vessels WHERE id = ?', [(int)$x['id']]); break; } ?>
+  if ($selP) $selNames = array_merge([(string)$pRow['name']], $selNames);
+  $cid = $SD && !empty($SD['customer_id']) ? (int)$SD['customer_id'] : 0; if (!$cid) foreach ($svs as $x) if (in_array((int)$x['id'], $selV, true)) { $cid = (int) scalar('SELECT customer_id FROM vessels WHERE id = ?', [(int)$x['id']]); break; } ?>
 <div class="card" id="col-soa">
   <h2>📄 <?= tt('soa.title') ?></h2>
   <p class="hint" style="margin-top:0;"><?= tt('soa.hint') ?></p>
   <form method="get" action="index.php#col-soa" class="soa-form"><input type="hidden" name="p" value="collections"><?php foreach (array_filter($f) as $k => $v): ?><input type="hidden" name="<?= e($k) ?>" value="<?= e((string)$v) ?>"><?php endforeach; ?><input type="hidden" name="from" value="<?= e($from) ?>"><input type="hidden" name="to" value="<?= e($to) ?>">
     <div class="btn-row" style="align-items:flex-end;gap:10px;">
+      <div class="field" style="min-width:260px;"><label><?= tt('soa.party_lbl') ?></label><select name="sparty"><option value=""><?= tt('soa.party_none') ?></option><?php foreach ($parties as $x): ?><option value="<?= (int)$x['id'] ?>"<?= $sel($x['id'], $selP) ?>><?= e($x['name']) ?> · <?= (int)$x['n'] ?><?= (float)$x['open_sum'] > 0.005 ? ' · ' . e($m((float)$x['open_sum'])) : '' ?></option><?php endforeach; ?></select></div>
       <div class="field" style="min-width:320px;"><label><?= tt('soa.vessels_lbl') ?></label>
         <details class="msel" data-msel data-empty="<?= tt('soa.pick_vessels') ?>" data-one="<?= tt('soa.n_vessels_1') ?>" data-many="<?= tt('soa.n_vessels') ?>"><summary class="msel-sum"><?= tt('soa.pick_vessels') ?></summary>
           <div class="msel-pop"><input type="search" class="msel-q" placeholder="<?= tt('pr.search') ?>…" autocomplete="off">
@@ -88,15 +95,22 @@ layout_head(t('col.title'), 'collections');
       <div class="field"><label><?= tt('soa.as_of_lbl') ?></label><input type="date" name="asof" value="<?= e($asOf) ?>"></div>
       <div class="field"><label><?= tt('soa.from_lbl') ?></label><input type="date" name="sfrom" value="<?= e($soaFrom) ?>"></div>
       <button class="btn btn--sm" type="submit"><?= tt('soa.prepare') ?></button>
-      <?php if ($selV): $q = ['v' => $selV, 'asof' => $asOf] + ($soaFrom ? ['from' => $soaFrom] : []); ?>
+      <?php if ($SD): $q = array_filter(['party' => $selP ?: null, 'v' => $selV ?: null]) + ['asof' => $asOf] + ($soaFrom ? ['from' => $soaFrom] : []); ?>
         <a class="btn btn--gold btn--sm" href="<?= url('statement', $q) ?>" target="_blank">⤓ PDF</a><a class="btn btn--ghost btn--sm" href="<?= url('statement', $q + ['format' => 'xlsx']) ?>">⤓ Excel</a>
       <?php endif; ?>
     </div>
   </form>
-  <?php if ($selV && function_exists('em_card_html')):
+  <?php if (($selV || $selP) && !$SD): ?><p class="hint"><?= tt('soa.nothing') ?></p><?php endif; ?>
+  <?php if ($SD): ?>
+    <p class="hint" style="margin:8px 0 0;">📄 <b><?= e($SD['doc_no']) ?></b> · <?= tt('soa.to') ?>: <b><?= e(!empty($SD['multi_party']) ? t('soa.several_parties') : (($SD['party']['name'] ?? '') ?: ($SD['customer_name'] ?: '—'))) ?></b><?= !empty($SD['owner_then']) ? ' <span class="hint">(' . e(t('soa.owner_then', ['d' => fmt_date($asOf)])) . ')</span>' : '' ?> · <?= e(t('soa.sections_n', ['n' => count($SD['vessels']), 'd' => $SD['totals']['n']])) ?> · <?= tt('fr.open') ?> <b><?= e($m((float)$SD['totals']['open'])) ?></b></p>
+    <?php if (!empty($SD['multi_party'])): ?><div class="flash flash--warn" style="margin:8px 0 0;"><?= tt('soa.multi_party_hint') ?> <?php foreach ($SD['parties'] as $oid => $on): ?><a class="btn btn--ghost btn--sm" href="<?= url('collections', $keep + ['sparty' => (int)$oid, 'v' => $selV, 'asof' => $asOf] + ($soaFrom ? ['sfrom' => $soaFrom] : [])) ?>#col-soa"><?= e($on) ?></a> <?php endforeach; ?></div><?php endif; ?>
+  <?php endif; ?>
+  <?php if ($SD && function_exists('em_card_html')):
     $ctx = ['no' => 'SOA ' . fmt_date($asOf), 'title' => implode(', ', $selNames), 'vessel' => implode(', ', $selNames), 'customer' => '', 'project' => '', 'doc' => t('em.w_statement', ['v' => implode(', ', $selNames), 'd' => fmt_date($asOf)]), 'project_id' => 0, 'customer_id' => $cid, 'date' => fmt_date($asOf)];
     $cRow = $cid ? one('SELECT name, email FROM customers WHERE id = ?', [$cid]) : null;
-    $people = em_people(count($selV) === 1 ? $selV[0] : null, $cid ?: null, $cRow && $cRow['email'] ? [[(string)$cRow['name'], $cRow['email'], t('soa.accounting_dept')]] : []);
+    $extra = $cRow && $cRow['email'] ? [[(string)$cRow['name'], $cRow['email'], t('soa.accounting_dept')]] : [];
+    if (!empty($SD['party']['email']) && empty($SD['multi_party'])) array_unshift($extra, [(string)$SD['party']['name'], (string)$SD['party']['email'], t('pty.party')]);   // R95-005: the party's own address first
+    $people = em_people(count($selV) === 1 ? $selV[0] : null, $cid ?: null, $extra);
     echo em_card_html(['kind' => 'statement', 'ctx' => $ctx, 'people' => $people, 'atts' => [[sprintf($stKey, 'pdf'), t('soa.att_pdf', ['v' => implode(', ', $selNames)])], [sprintf($stKey, 'xlsx'), t('soa.att_xlsx')]], 'back' => url('collections', $keep)]);
   endif; ?>
 </div>
@@ -115,7 +129,7 @@ layout_head(t('col.title'), 'collections');
       <?php endif; $gSum += $r['open']; $gN++; $fid = 'fu' . (int)$r['id']; ?>
       <tr class="<?= $r['overdue'] ? 'is-late' : '' ?>">
         <td class="mono"><a href="<?= url('proforma', ['id' => (int)$r['id']]) ?>"><b><?= e($r['pi_no']) ?></b></a><?= ($r['kind'] ?? '') === 'invoice' ? ' ' . pill('navy', t('pi.k_invoice')) : '' ?><?= !empty($r['invoice_nos']) ? '<br><span class="hint">🧾 ' . e($r['invoice_nos']) . '</span>' : '' ?><?= !empty($r['settles_nos']) ? '<br><span class="hint">' . e(t('pi.settles_short', ['n' => $r['settles_nos']])) . '</span>' : '' ?></td>
-        <td><?= e($r['title']) ?><?= $r['term_n'] ? ' <span class="hint">' . e(t('pt.instalment', ['n' => (int)$r['term_n']])) . '</span>' : '' ?><br><span class="hint"><?= e($r['offer_no']) ?><?= $r['sub_code'] ? ' · ' . e($r['sub_code']) : '' ?></span></td>
+        <td><?= e($r['title']) ?><?= $r['term_n'] ? ' <span class="hint">' . e(t('pt.instalment', ['n' => (int)$r['term_n']])) . '</span>' : '' ?><br><span class="hint"><?= e($r['offer_no']) ?><?= $r['sub_code'] ? ' · ' . e($r['sub_code']) : '' ?><?= !empty($r['party_name']) && mb_strtolower((string)$r['party_name']) !== mb_strtolower((string)$r['customer_name']) ? ' · 🏛 ' . e($r['party_name']) : '' ?></span></td>
         <td class="date"><?= e(fmt_date($r['issue_date'])) ?></td>
         <td class="date<?= $r['overdue'] ? ' is-late' : '' ?>"><?= $r['due_date'] ? e(fmt_date($r['due_date'])) : '—' ?></td>
         <td class="num"><?= $r['age'] > 0 ? '<b>' . (int)$r['age'] . '</b>' : '<span class="hint">' . e(t('col.due_in', ['n' => -(int)$r['age']])) . '</span>' ?><br><?= col_bucket_pill($r['bucket']) ?></td>

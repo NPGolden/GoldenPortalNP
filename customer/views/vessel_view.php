@@ -123,6 +123,25 @@ layout_head($v['name'], 'vessels');
   <?php if (!$rsAll): ?><p class="hint"><?= tt('rs.none_vessel') ?></p><?php else: foreach (($rsLive ?: array_slice($rsAll, 0, 2)) as $c) { echo rs_card_html($c); } endif; ?>
 </div>
 <?php endif; ?>
+<?php if ($staff && function_exists('vo_has') && vo_has()): $vos = vo_list($id); $voCan = vo_can(); $voOrgs = $voCan && function_exists('co_all') ? co_all() : []; ?>
+<div class="card" id="vo-owners">
+  <div class="card-head"><h2>🧭 <?= tt('vo.title') ?> <span class="count"><?= count($vos) ?></span></h2></div>
+  <p class="hint"><?= tt('vo.hint') ?></p>
+  <?php if ($vos): ?><table class="tbl" data-nosort><thead><tr><th><?= tt('vo.owner') ?></th><th><?= tt('vo.from') ?></th><th><?= tt('vo.to') ?></th><th><?= tt('th.remarks') ?></th><th></th></tr></thead><tbody>
+    <?php foreach ($vos as $k => $o): ?><tr><td><?php if (!empty($o['company_id'])): ?><a href="<?= url('companies', ['edit' => (int)$o['company_id']]) ?>"><b><?= e((string)$o['owner_name']) ?></b></a><?php else: ?><b><?= e((string)($o['owner_name'] ?: '—')) ?></b><?php endif; ?> <?= $o['date_to'] === null ? pill('green', t('vo.current')) : pill('mute', t('vo.former')) ?></td>
+      <td class="date"><?= $o['date_from'] ? e(fmt_date((string)$o['date_from'])) : '<span class="hint">' . tt('vo.unknown') . '</span>' ?></td><td class="date"><?= $o['date_to'] ? e(fmt_date((string)$o['date_to'])) : '—' ?></td>
+      <td class="hint"><?= e((string)($o['note'] ?? '')) ?><?= !empty($o['by_name']) ? ($o['note'] ? ' · ' : '') . e((string)$o['by_name']) : '' ?></td>
+      <td style="text-align:right;"><?php if ($k === 0 && $o['date_to'] === null && count($vos) > 1 && is_cp_admin()): ?><form method="post" action="<?= url('vessel', ['id' => $id]) ?>" class="inline" data-confirm="<?= tt('vo.delete_confirm') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="vo_delete"><input type="hidden" name="id" value="<?= (int)$o['id'] ?>"><button class="btn btn--ghost btn--sm" type="submit" title="<?= tt('vo.delete') ?>">×</button></form><?php endif; ?></td></tr><?php endforeach; ?>
+  </tbody></table><?php else: ?><p class="hint"><?= tt('vo.none') ?></p><?php endif; ?>
+  <?php if ($voCan): ?><details style="margin-top:10px;"><summary class="btn btn--ghost btn--sm"><?= tt('vo.change') ?></summary>
+  <form method="post" action="<?= url('vessel', ['id' => $id]) ?>" class="grid grid-4" style="align-items:end;margin-top:10px;" data-confirm="<?= tt('vo.change_confirm') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="vo_change"><input type="hidden" name="vessel_id" value="<?= $id ?>">
+    <div class="field" style="margin:0;"><label><?= tt('vo.new_owner') ?></label><select name="company_id" required><option value=""><?= tt('vm.choose') ?></option><?php foreach ($voOrgs as $c): ?><option value="<?= (int)$c['id'] ?>"><?= e($c['name']) ?></option><?php endforeach; ?></select></div>
+    <div class="field" style="margin:0;"><label><?= tt('vo.from') ?></label><input type="date" name="date_from" value="<?= e(date('Y-m-d')) ?>" required></div>
+    <div class="field" style="margin:0;"><label><?= tt('th.remarks') ?></label><input name="note" maxlength="255" placeholder="<?= tt('vo.note_ph') ?>"></div>
+    <div class="btn-row"><button class="btn btn--sm" type="submit"><?= tt('vo.change_btn') ?></button></div>
+  </form></details><?php endif; ?>
+</div>
+<?php endif; ?>
 <?php if ($staff && function_exists('vm_has') && vm_has()): $rel = vm_related($id); $als = vm_aliases($id); $vmOrgs = function_exists('vm_orgs_has') && vm_orgs_has(); $allCust = $vmOrgs ? co_all() : all('SELECT id, name FROM customers WHERE is_active = 1 ORDER BY name'); ?>
 <div class="card" id="vm-related">
   <div class="card-head"><h2><?= tt('vm.related') ?> <span class="count"><?= count($rel) ?></span></h2></div>

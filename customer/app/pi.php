@@ -208,6 +208,9 @@ function pi_set_status(int $id, string $st): void { cache_bump_later('fs');
 /** Mark sent when the e-mail card is used (hidden field proforma=<id>). */
 function pi_mark_sent(int $id): void { cache_bump_later('fs'); $r = pi_get($id); if ($r && in_array($r['status'], ['issued'], true)) { q("UPDATE proformas SET status = 'sent', sent_at = NOW() WHERE id = ?", [$id]); of_event((int)$r['offer_id'], 'proforma_sent', $r['pi_no']); } }
 /** Status from what is paid: paid when Σ paid ≥ gross, partly_paid when > 0, else the issued/sent state. */
+/** R95-005: was this invoice row built by registering it on proformas (gross = Σ allocations), or is it a direct invoice typed by accounting (its own gross)? */
+function pi_links_col(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM proformas LIKE 'from_links'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function pi_from_links(array $inv): bool { return pi_links_col() ? (int)($inv['from_links'] ?? 0) === 1 : !empty($inv['legacy_inv_id']); }
 function pi_refresh_status(int $id): void {
     $r = one("SELECT pi.*, " . PI_PAID_SQL . " AS paid_sum, " . PI_INV_SQL . " AS inv_sum FROM proformas pi WHERE pi.id = ?", [$id]); if (!$r || in_array($r['status'], ['draft', 'cancelled'], true)) return;
     $paid = (float)$r['paid_sum']; $gross = (float)$r['gross'];
@@ -231,10 +234,14 @@ function pi_register_invoice(int $piId, string $no, ?string $date, float $amount
     if (!$inv) {
         q('INSERT INTO proformas (kind, pi_no, offer_id, term_n, project_id, subproject_id, vessel_id, customer_id, billing_org_id, invoicing_id, title, issue_date, due_date, amount_net, vat_pct, vat_amount, gross, currency, status, notes, created_by, sent_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,NOW())',
           ['invoice', $no, null, 0, $r['project_id'], $r['subproject_id'], $r['vessel_id'], $r['customer_id'], $r['billing_org_id'] ?? null, $r['invoicing_id'], mb_substr((string)$r['title'], 0, 200), $date ?: date('Y-m-d'), $r['due_date'], round($amount / (1 + $vat / 100), 2), $vat, round($amount - $amount / (1 + $vat / 100), 2), $amount, $r['currency'], 'sent', $note ?: null, (int)(current_user()['id'] ?? 0)]);
-        $invId = (int) db()->lastInsertId();
-    } else {   // an existing invoice settles one more proforma: its gross grows by the allocated amount when it was built from proformas (never a direct invoice typed by accounting)
+        $invId = (int) db()->lastInsertId(); if (pi_links_col()) q('UPDATE proformas SET from_links = 1 WHERE id = ?', [$invId]);
+    } else {   // an existing invoice settles one more proforma
         $invId = (int)$inv['id'];
-        if ($inv['offer_id'] === null && (int) scalar('SELECT COUNT(*) FROM pi_links WHERE invoice_id = ?', [$invId]) > 0) q('UPDATE proformas SET gross = gross + ?, amount_net = amount_net + ?, vat_amount = gross - amount_net WHERE id = ?', [$amount, round($amount / (1 + $vat / 100), 2), $invId]);
+        if (pi_from_links($inv)) q('UPDATE proformas SET gross = gross + ?, amount_net = amount_net + ?, vat_amount = gross - amount_net WHERE id = ?', [$amount, round($amount / (1 + $vat / 100), 2), $invId]);   // built from proformas: its gross grows by the allocation
+        else {   // R95-005: a direct invoice keeps its own gross — only what is not allocated yet can settle a proforma
+            $left = round((float)$inv['gross'] - (float) scalar('SELECT COALESCE(SUM(amount),0) FROM pi_links WHERE invoice_id = ?', [$invId]), 2);
+            if ($amount > $left + 0.005) throw new RuntimeException(t('pi.inv_alloc_over', ['n' => $no, 'left' => pi_money(max(0.0, $left), (string)$inv['currency'])]));
+        }
     }
     q('INSERT INTO pi_links (invoice_id, proforma_id, amount) VALUES (?,?,?)', [$invId, $piId, $amount]);
     // advances received on the proforma move to the invoice (oldest first, while they fit)
@@ -262,8 +269,10 @@ function pinv_delete(int $linkId): int { cache_bump_later('fs');
     $paid = (float) scalar('SELECT COALESCE(SUM(amount),0) FROM proforma_payments WHERE proforma_id = ?', [$invId]);
     q('DELETE FROM pi_links WHERE id = ?', [$linkId]);
     $left = (int) scalar('SELECT COUNT(*) FROM pi_links WHERE invoice_id = ?', [$invId]);
+    $invRow = one('SELECT * FROM proformas WHERE id = ?', [$invId]);
+    if (!$invRow || !pi_from_links($invRow)) { if ($invRow) pi_refresh_status($invId); pi_refresh_status($piId); return $piId; }   // R95-005: a direct invoice is never shrunk or deleted by an unlink — it keeps its gross and its payments
     if (!$left) { if ($paid > 0.005) q('UPDATE proforma_payments SET proforma_id = ? WHERE proforma_id = ?', [$piId, $invId]);   // its payments go back to the proforma as advances
-                  q('DELETE FROM proformas WHERE id = ? AND offer_id IS NULL', [$invId]); }
+                  q("DELETE FROM proformas WHERE id = ? AND kind = 'invoice' AND offer_id IS NULL", [$invId]); }
     else { $inv = one('SELECT vat_pct FROM proformas WHERE id = ?', [$invId]); q('UPDATE proformas SET gross = gross - ?, amount_net = amount_net - ?, vat_amount = gross - amount_net WHERE id = ?', [(float)$l['amount'], round((float)$l['amount'] / (1 + (float)($inv['vat_pct'] ?? 0) / 100), 2), $invId]); pi_refresh_status($invId); }
     pi_refresh_status($piId); return $piId;
 }
@@ -469,7 +478,7 @@ function pi_ledger_convert(): int {
         if (!$inv) {
             q('INSERT INTO proformas (kind, legacy_inv_id, pi_no, offer_id, term_n, project_id, subproject_id, vessel_id, customer_id, billing_org_id, invoicing_id, title, issue_date, due_date, amount_net, vat_pct, vat_amount, gross, currency, status, notes, created_by, sent_at, created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
               ['invoice', (int)$x['id'], $no, null, 0, $x['project_id'], $x['subproject_id'], $x['vessel_id'], $x['customer_id'], $x['billing_org_id'], $x['invoicing_id'], mb_substr((string)$x['title'], 0, 200), $x['invoice_date'] ?: $x['pi_issue'], $x['pi_due'], round($amt / (1 + $vat / 100), 2), $vat, round($amt - $amt / (1 + $vat / 100), 2), $amt, $x['currency'] ?: 'EUR', 'sent', $x['note'] ?: null, (int)$x['created_by'], $x['created_at'], $x['created_at']]);
-            $invId = (int) db()->lastInsertId();
+            $invId = (int) db()->lastInsertId(); if (pi_links_col()) q('UPDATE proformas SET from_links = 1 WHERE id = ?', [$invId]);
         } else { $invId = (int)$inv['id']; if ($inv['legacy_inv_id']) q('UPDATE proformas SET gross = gross + ?, amount_net = amount_net + ?, vat_amount = gross - amount_net WHERE id = ?', [$amt, round($amt / (1 + $vat / 100), 2), $invId]); }
         q('INSERT IGNORE INTO pi_links (invoice_id, proforma_id, amount, legacy_id) VALUES (?,?,?,?)', [$invId, (int)$x['proforma_id'], $amt, (int)$x['id']]);
         // payments: those tied to the registered invoice move onto it; then the proforma's untied payments while they fit the allocation (the same money must not be counted twice);

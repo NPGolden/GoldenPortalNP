@@ -65,7 +65,7 @@ function org_create_for_customer(int $cuId, string $kind = 'owner'): int {
 /** R95-002c: undo a link — the company keeps its data, the customer loses its organisation (people keep their customer). */
 function org_unlink(int $coId): void { if (!org_can()) throw new RuntimeException(t('err.noaccess')); q('UPDATE companies SET customer_id = NULL WHERE id = ?', [$coId]); org_find_reset(); }
 /** Link every suggested match at once; returns the number linked. */
-function org_link_all(?array $hows = null): int { $n = 0; foreach (org_matches()['match'] as $m) { if ($hows !== null && !in_array($m['how'], $hows, true)) continue; try { org_link((int)$m['company']['id'], (int)$m['customer']['id']); $n++; } catch (Throwable $e) {} } return $n; }
+function org_link_all(?array $hows = null): int { if (!org_can()) throw new RuntimeException(t('err.noaccess')); $n = 0; foreach (org_matches()['match'] as $m) { if ($hows !== null && !in_array($m['how'], $hows, true)) continue; try { org_link((int)$m['company']['id'], (int)$m['customer']['id']); $n++; } catch (Throwable $e) {} } return $n; }
 /** R95-002: give every customer without an organisation its own (role Customer; the matcher has already been consulted by org_matches). Returns the number created. */
 function org_create_all(): int { if (!org_can()) throw new RuntimeException(t('err.noaccess')); $n = 0; foreach (org_matches()['none'] as $m) { try { org_create_for_customer((int)$m['customer']['id'], 'other'); $n++; } catch (Throwable $e) { error_log('[org_create_all] ' . $e->getMessage()); } } org_find_reset(); return $n; }
 /** People without an organisation but with a customer, or without a customer but with a linked organisation — fixed in one go. */

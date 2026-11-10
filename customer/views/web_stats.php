@@ -51,7 +51,7 @@ table.ws-h{width:100%;border-collapse:collapse}.ws-h td{padding:5px 6px;border-b
   <div class="btn-row no-print">
     <form method="post" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="ws_pull_now"><button class="btn btn--sm" type="submit">⟳ <?= tt('ws.pull_now') ?></button></form>
     <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="ws_export"><input type="hidden" name="p" value="<?= e($per) ?>"><input type="hidden" name="from" value="<?= e($from) ?>"><input type="hidden" name="to" value="<?= e($to) ?>"><button class="btn btn--sm" type="submit">⬇ CSV</button></form>
-    <button class="btn btn--sm" type="button" onclick="window.print()">🖨 <?= tt('ws.print') ?></button>
+    <button class="btn btn--sm" type="button" data-print>🖨 <?= tt('ws.print') ?></button>
   </div></div>
 <?php if (!ws_configured()): ?><p class="flash flash--bad"><?= tt('ws.not_configured') ?> <a href="<?= url('settings', ['tab' => 'website']) ?>"><?= tt('web.title') ?> →</a></p><?php endif; ?>
 <?php if ($err): ?><p class="flash flash--bad"><?= tt('ws.last_error') ?>: <?= e($err) ?></p><?php endif; ?>
@@ -114,4 +114,5 @@ table.ws-h{width:100%;border-collapse:collapse}.ws-h td{padding:5px 6px;border-b
   <div class="card"><h2>↗ <?= tt('ws.outbound') ?></h2><?= ws_hbars($outb, fn($r) => e($r['k'])) ?><?php if ($downloads): ?><h3 style="margin-top:10px">⬇ <?= tt('ws.downloads') ?></h3><?= ws_hbars($downloads, fn($r) => e($r['k'])) ?><?php endif; ?></div>
 </div>
 <p class="hint"><?= tt('ws.privacy_note') ?></p>
+<script nonce="<?= csp_nonce() ?>">document.querySelectorAll('[data-print]').forEach(function (b) { b.addEventListener('click', function () { window.print(); }); });</script>
 <?php layout_foot(); ?>
