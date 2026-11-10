@@ -8668,4 +8668,12 @@ Cordiali saluti,
 'acc.eng_saved' => 'Tecnico corretto sulla riga del registro.',
 'acc.eng_locked' => 'Riga già fatturata — il tecnico non può più cambiare.',
 'acc.eng_required' => 'Inserisci il nome del tecnico.',
+// GAS-CP-R94-009 — bulk re-attribution
+'acc.reattr_title' => 'Riattribuisci righe dei rapporti di servizio (amministratori)',
+'acc.reattr_hint' => 'Sposta ogni riga di rapporto di servizio del progetto (o di un sotto-progetto) registrata sotto un nome a un altro tecnico — la pulizia quando i rapporti sono stati preparati per conto dei tecnici. Incluse le righe fatturate; ogni rapporto contabile toccato riceve un evento. I rapporti firmati non cambiano.',
+'acc.reattr_from' => 'Righe registrate sotto',
+'acc.reattr_to' => 'Tecnico',
+'acc.reattr_btn' => 'Riattribuisci',
+'acc.reattr_confirm' => 'Riattribuire tutte le righe corrispondenti del progetto al tecnico indicato?',
+'acc.reattr_done' => '{n} riga/e riattribuite.',
 ];

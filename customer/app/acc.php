@@ -401,7 +401,7 @@ function acc_mark_sent(int $id, string $to): void {
 function acc_line_set_engineer(int $lineId, string $name): void {
     if (!acc_is_accounting() && !acc_can_prepare()) throw new RuntimeException(t('err.noaccess'));
     $l = one("SELECT * FROM acc_lines WHERE id = ?", [$lineId]); if (!$l || $l['source'] !== 'fsr') throw new RuntimeException(t('err.notfound'));
-    if ($l['state'] === 'invoiced') throw new RuntimeException(t('acc.eng_locked'));
+    if ($l['state'] === 'invoiced' && !is_cp_admin()) throw new RuntimeException(t('acc.eng_locked'));   // administrators may correct invoiced lines too (logged)
     $name = mb_substr(trim($name), 0, 120); if ($name === '') throw new RuntimeException(t('acc.eng_required'));
     $u = one("SELECT id, discipline_id FROM customer_users WHERE role IN ('staff','admin') AND LOWER(full_name) = ? LIMIT 1", [mb_strtolower($name)]);
     $did = $l['discipline_id'];
@@ -411,6 +411,15 @@ function acc_line_set_engineer(int $lineId, string $name): void {
     // a specialty that names a rate card keeps its pinned rate item; otherwise the item follows the (new) discipline at pricing time
     q('UPDATE acc_lines SET user_name = ?, user_id = ?, discipline_id = ?' . ($pinned || !empty($l['rate_item_id']) && $spec !== '' && function_exists('fsr_specialty_card') && fsr_specialty_card($spec) !== '' ? '' : ', rate_item_id = NULL, unit_price = NULL, value = NULL') . ' WHERE id = ?', [$name, $u ? (int)$u['id'] : null, $did, $lineId]);
     if ($l['report_id']) { try { acc_event((int)$l['report_id'], 'line_engineer', $l['user_name'] . ' → ' . $name . ' (' . $l['work_date'] . ')'); } catch (Throwable $e) {} }
+}
+/** R94-009: administrators re-attribute every service-report line of a project (optionally one sub-project) from one name to another — the
+ *  clean-up when reports were prepared on behalf of the engineers. Invoiced lines included; one event per touched accounting report. */
+function acc_reattribute(int $projectId, int $subId, string $from, string $to): int {
+    if (!is_cp_admin()) throw new RuntimeException(t('err.noaccess'));
+    $from = trim($from); $to = mb_substr(trim($to), 0, 120); if ($from === '' || $to === '' || mb_strtolower($from) === mb_strtolower($to)) throw new RuntimeException(t('acc.eng_required'));
+    $ids = all("SELECT id FROM acc_lines WHERE source = 'fsr' AND project_id = ? AND LOWER(user_name) = ?" . ($subId ? ' AND subproject_id = ?' : ''), array_merge([$projectId, mb_strtolower($from)], $subId ? [$subId] : []));
+    foreach ($ids as $r) acc_line_set_engineer((int)$r['id'], $to);
+    return count($ids);
 }
 /** Mark the reported lines of an accounting report as invoiced ($ids = null → every reported line); shared by the accounting answer and the direct invoice (R94-003). */
 function acc_mark_invoiced(array $R, string $ref, string $date, ?string $note = null, ?array $ids = null): string {

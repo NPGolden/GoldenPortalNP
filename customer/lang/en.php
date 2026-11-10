@@ -8668,4 +8668,12 @@ Best regards,
 'acc.eng_saved' => 'Engineer corrected on the register line.',
 'acc.eng_locked' => 'This line is already invoiced — its engineer can no longer change.',
 'acc.eng_required' => 'Enter the engineer\'s name.',
+// GAS-CP-R94-009 — bulk re-attribution
+'acc.reattr_title' => 'Re-attribute service-report lines (administrators)',
+'acc.reattr_hint' => 'Moves every service-report line of this project (or one sub-project) registered under one name to another engineer — the clean-up when reports were prepared on behalf of the engineers. Invoiced lines are included; each touched accounting report gets an event. The signed reports are not changed.',
+'acc.reattr_from' => 'Lines registered under',
+'acc.reattr_to' => 'Engineer',
+'acc.reattr_btn' => 'Re-attribute',
+'acc.reattr_confirm' => 'Re-attribute all matching lines of this project to the engineer entered?',
+'acc.reattr_done' => '{n} line(s) re-attributed.',
 ];
