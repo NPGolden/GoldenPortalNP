@@ -125,7 +125,7 @@ layout_head($title, 'projects');
                 <td><?php $curSp = (string)($ln['specialty'] ?? fsr_specialty_default((int)$u['id'])); ?><select name="wk_spec[<?= $i ?>][<?= $k ?>]" data-nosearch title="<?= tt('fsr.specialty_hint') ?>"><?php foreach ($spOpts as $o): ?><option value="<?= e($o['name']) ?>"<?= $o['name'] === $curSp ? ' selected' : '' ?>><?= e(fsr_specialty_label($o)) ?></option><?php endforeach; if ($curSp !== '' && !in_array($curSp, $spNames, true)): ?><option value="<?= e($curSp) ?>" selected><?= e($curSp) ?> · <?= tt('fsr.legacy_spec') ?></option><?php endif; ?></select></td>
                 <td><input name="wk_start[<?= $i ?>][<?= $k ?>]" type="time" class="js-t" value="<?= e(fsr_fmt_time($ln['start_time'] ?? null)) ?>"></td>
                 <td><input name="wk_end[<?= $i ?>][<?= $k ?>]" type="time" class="js-t" value="<?= e(fsr_fmt_time($ln['end_time'] ?? null)) ?>"></td>
-                <td><select name="wk_type[<?= $i ?>][<?= $k ?>]"><?php foreach (fsr_time_types() as $tk => $tl): ?><option value="<?= $tk ?>" title="<?= e(fsr_time_type_label($tk)) ?>"<?= $sel($tk, $ln['time_type'] ?? 'WT') ?>><?= $tl ?></option><?php endforeach; ?></select></td>
+                <td><select name="wk_type[<?= $i ?>][<?= $k ?>]"><?php foreach (fsr_time_types() as $tk => $tl): ?><option value="<?= $tk ?>" title="<?= e(fsr_time_type_label($tk)) ?>"<?= $sel($tk, $ln['time_type'] ?? 'WT') ?>><?= $tl ?></option><?php endforeach; ?></select><?php if (fsr_nc_has()): ?><select name="wk_ncr[<?= $i ?>][<?= $k ?>]" class="js-ncr" title="<?= tt('fsr.nc_reason') ?>"<?= ($ln['time_type'] ?? 'WT') === 'NC' ? '' : ' hidden' ?>><?php foreach (fsr_nc_reasons() as $rk => $rl): ?><option value="<?= $rk ?>"<?= $sel($rk, $ln['nc_reason'] ?? 'other') ?>><?= e($rl) ?></option><?php endforeach; ?></select><?php endif; ?></td>
                 <td class="num js-h"><?= $ln ? e(fsr_fmt_hours((float)$ln['hours'])) : '0:00' ?></td>
               </tr>
             <?php endfor; ?>
@@ -185,6 +185,10 @@ layout_head($title, 'projects');
   }
   form.addEventListener('input', function (e) {
     if (e.target.classList.contains('js-t')) hours(e.target.closest('tr'));
+  });
+  // R95-004: the "why not chargeable" choice appears only for NC lines
+  form.addEventListener('change', function (e) {
+    if (e.target.name && e.target.name.indexOf('wk_type') === 0) { var r = e.target.parentNode.querySelector('.js-ncr'); if (r) r.hidden = e.target.value !== 'NC'; }
   });
   // a caption field for every photo chosen
   form.addEventListener('change', function (e) {

@@ -62,6 +62,7 @@ layout_head(t('cf.title'), $p ? 'projects' : 'cashflow');
     <table class="kv"><tbody>
       <tr><th><?= tt('cf.s_paid') ?></th><td class="num"><?= e(cf_money($D['in_paid'])) ?></td></tr>
       <tr><th><?= tt('cf.s_pi') ?></th><td class="num"><?= e(cf_money($D['in_pi'])) ?></td></tr>
+      <tr><th><?= tt('cf.s_ar') ?></th><td class="num"><?= e(cf_money((float)($D['in_ar'] ?? 0))) ?></td></tr>
       <tr><th><?= tt('cf.s_terms') ?></th><td class="num"><?= e(cf_money($D['in_terms'])) ?></td></tr>
     </tbody></table>
     <table class="kv"><tbody>

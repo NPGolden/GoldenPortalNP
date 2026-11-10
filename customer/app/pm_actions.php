@@ -953,7 +953,7 @@ function pm_handle_action(string $action, string $page): bool {
         case 'pi_create': { require_staff(); $oid = (int)$_POST['id']; $pid = pi_create($oid, (int)($_POST['term_n'] ?? 0) ?: null); flash('good', t('pi.created')); redirect('proforma', ['id' => $pid, '_r' => uniqid()]); }
         case 'pi_save': { require_staff(); $pid = (int)$_POST['id']; pi_save_from_post($pid); flash('good', t('pi.saved')); redirect('proforma', ['id' => $pid, '_r' => uniqid()]); }
         case 'pi_status': { require_staff(); $pid = (int)$_POST['id']; pi_set_status($pid, (string)($_POST['status'] ?? '')); flash('good', t('pi.status_saved')); redirect('proforma', ['id' => $pid, '_r' => uniqid()]); }
-        case 'pinv_save': { require_staff(); $pid = (int)$_POST['id']; pinv_save_from_post($pid); flash('good', t('pi.inv_saved')); redirect('proforma', ['id' => $pid, '_r' => uniqid()], '#invoices'); }
+        case 'pinv_save': { require_staff(); $pid = (int)$_POST['id']; $warn = pinv_save_from_post($pid); flash($warn ? 'warn' : 'good', $warn ? t('pi.inv_saved') . ' ' . $warn : t('pi.inv_saved')); redirect('proforma', ['id' => $pid, '_r' => uniqid()], '#invoices'); }
         case 'pinv_delete': { require_staff(); $pid = pinv_delete((int)$_POST['inv_id']); flash('good', t('pi.inv_deleted')); redirect('proforma', ['id' => $pid, '_r' => uniqid()], '#invoices'); }
         case 'inv_item_save': { require_pr_admin(); $id = stk_item_save_from_post((int)($_POST['id'] ?? 0)); flash('good', t('stk.saved')); redirect('inventory_item', ['id' => $id, '_r' => uniqid()]); }   // R79-001
         case 'stk_move': { require_pr_wh(); stk_move_from_post(); flash('good', t('stk.move_saved')); redirect('inventory_item', ['id' => (int)($_POST['item_id'] ?? 0), '_r' => uniqid()]); }

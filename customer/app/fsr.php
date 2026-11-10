@@ -72,6 +72,9 @@ function fsr_user_is_technical(): bool { $u = current_user(); if (!$u || !is_sta
 /** Default specialty of a line: the engineer's own discipline when known, else the first offered. */
 function fsr_specialty_default(?int $userId = null): string { $n = $userId ? (string) scalar('SELECT d.name FROM customer_users cu JOIN disciplines d ON d.id = cu.discipline_id WHERE cu.id = ?', [$userId]) : ''; $all = fsr_specialties(); return $n !== '' && in_array($n, $all, true) ? $n : ($all[0] ?? 'Service Engineer'); }
 function fsr_time_types(): array { return ['WT' => 'WT', 'TT' => 'TT', 'NC' => 'NC']; }   // NC = not chargeable (R46-005)
+/** R95-004: why a line is not chargeable — decided by the engineer on the service report; accounting only confirms. */
+function fsr_nc_reasons(): array { return ['warranty' => t('fsr.ncr_warranty'), 'goodwill' => t('fsr.ncr_goodwill'), 'internal' => t('fsr.ncr_internal'), 'training' => t('fsr.ncr_training'), 'rework' => t('fsr.ncr_rework'), 'other' => t('fsr.ncr_other')]; }
+function fsr_nc_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW COLUMNS FROM fsr_lines LIKE 'nc_reason'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
 function fsr_time_type_label(string $k): string { return ['WT' => t('fsr.tt_wt'), 'TT' => t('fsr.tt_tt'), 'NC' => t('fsr.tt_nc')][$k] ?? $k; }
 function fsr_part_types(): array { return ['W' => 'W', 'G' => 'G', 'I' => 'I']; }
 
@@ -230,7 +233,8 @@ function fsr_save_from_post(?int $id): int {
             $st = preg_match('/^\d{1,2}:\d{2}$/', $st) ? $st . ':00' : null;
             $en = preg_match('/^\d{1,2}:\d{2}$/', $en) ? $en . ':00' : null;
             $lines[] = ['engineer' => mb_substr($eng, 0, 120) ?: null, 'specialty' => mb_substr(trim((string)($_POST['wk_spec'][$i][$k] ?? '')), 0, 80) ?: fsr_specialty_default(),
-                        'start' => $st, 'end' => $en, 'type' => in_array($_POST['wk_type'][$i][$k] ?? '', ['TT', 'WT', 'NC'], true) ? $_POST['wk_type'][$i][$k] : 'WT'];
+                        'start' => $st, 'end' => $en, 'type' => in_array($_POST['wk_type'][$i][$k] ?? '', ['TT', 'WT', 'NC'], true) ? $_POST['wk_type'][$i][$k] : 'WT',
+                        'ncr' => ($_POST['wk_type'][$i][$k] ?? '') === 'NC' && isset(fsr_nc_reasons()[$_POST['wk_ncr'][$i][$k] ?? '']) ? $_POST['wk_ncr'][$i][$k] : null];   // R95-004
         }
         $orig = (int)($_POST['wk_orig'][$i] ?? 0);
         $hasPhotos = $orig && scalar("SELECT COUNT(*) FROM sp_files WHERE fsr_id = ? AND kind = 'fsr_photo' AND fsr_task = ?", [$id, $orig]);
@@ -241,8 +245,8 @@ function fsr_save_from_post(?int $id): int {
         $taskNo[$i] = $seq;
         if ($orig) $keep[$orig] = $seq;
         foreach ($lines as $ln) {
-            q('INSERT INTO fsr_lines (report_id, work_id, seq, specialty, engineer, start_time, end_time, time_type, hours, remarks) VALUES (?,?,?,?,?,?,?,?,?,?)',
-              [$id, $wid, ++$lineSeq, $ln['specialty'], $ln['engineer'], $ln['start'], $ln['end'], $ln['type'], fsr_hours($ln['start'], $ln['end']), $ln['engineer']]);
+            q('INSERT INTO fsr_lines (report_id, work_id, seq, specialty, engineer, start_time, end_time, time_type, hours, remarks' . (fsr_nc_has() ? ', nc_reason' : '') . ') VALUES (?,?,?,?,?,?,?,?,?,?' . (fsr_nc_has() ? ',?' : '') . ')',
+              array_merge([$id, $wid, ++$lineSeq, $ln['specialty'], $ln['engineer'], $ln['start'], $ln['end'], $ln['type'], fsr_hours($ln['start'], $ln['end']), $ln['engineer']], fsr_nc_has() ? [$ln['type'] === 'NC' ? ($ln['ncr'] ?? 'other') : null] : []));
         }
     }
     if (function_exists('fsr_parts_issue')) fsr_parts_issue($id);   // R82-001

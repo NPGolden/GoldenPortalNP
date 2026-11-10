@@ -137,9 +137,13 @@ function acc_sync(): int {
         $n++;
     }
     // service reports: submitted or accepted; one registered line per engineer per day and hour type (TT = travel; WT split normal / overtime by the engineer's calendar)
-    $rows = all("SELECT l.id AS line_id, l.engineer, l.specialty, l.time_type, l.hours, l.start_time, l.end_time, r.id AS fsr_id, r.report_no, r.report_date, r.project_id, r.subproject_id, p.vessel_id
+    // R95-004: NC lines (marked not chargeable at source) are collected too, pre-excluded with the engineer's reason, so accounting confirms rather than decides;
+    //          reports already reported / invoiced before this release keep their NC lines out (no retroactive noise)
+    $ncHas = function_exists('fsr_nc_has') && fsr_nc_has();
+    $rows = all("SELECT l.id AS line_id, l.engineer, l.specialty, l.time_type, l.hours, l.start_time, l.end_time" . ($ncHas ? ', l.nc_reason' : '') . ", r.id AS fsr_id, r.report_no, r.report_date, r.project_id, r.subproject_id, p.vessel_id
                  FROM fsr_lines l JOIN fsr_reports r ON r.id = l.report_id LEFT JOIN projects p ON p.id = r.project_id
-                 WHERE r.status IN ('submitted','accepted') AND l.hours > 0 AND l.time_type <> 'NC' AND NOT EXISTS (SELECT 1 FROM acc_lines a WHERE a.source = 'fsr' AND a.source_id = l.id)" . (function_exists('fsr_ext_has') && fsr_ext_has() ? " AND r.kind = 'internal'" : '') . "
+                 WHERE r.status IN ('submitted','accepted') AND l.hours > 0 AND NOT EXISTS (SELECT 1 FROM acc_lines a WHERE a.source = 'fsr' AND a.source_id = l.id)" . (function_exists('fsr_ext_has') && fsr_ext_has() ? " AND r.kind = 'internal'" : '') . "
+                   AND (l.time_type <> 'NC' OR " . ($ncHas ? "NOT EXISTS (SELECT 1 FROM acc_lines a2 WHERE a2.source = 'fsr' AND a2.doc_id = r.id AND a2.state IN ('reported','invoiced'))" : '0') . ")
                  ORDER BY r.id, l.start_time, l.id");
     $usedNormal = [];                                    // normal hours already counted per engineer per report date
     $users = []; foreach (all("SELECT id, full_name, discipline_id, work_calendar FROM customer_users WHERE role IN ('staff','admin')") as $u) $users[mb_strtolower(trim((string)$u['full_name']))] = $u;
@@ -152,12 +156,19 @@ function acc_sync(): int {
         $pinCard = $r['specialty'] && function_exists('fsr_specialty_card') ? fsr_specialty_card((string)$r['specialty'], (int)$r['project_id'] ?: null) : '';
         $pinList = $pinCard !== '' && function_exists('rl_current') ? rl_current(function_exists('br_of') ? (int)(br_of((int)$r['project_id'] ?: null)['id'] ?? 0) ?: null : null) : null;
         $h = (float)$r['hours']; $parts = [];
+        if ($r['time_type'] === 'NC') {   // R95-004: one line, flagged; excluded automatically when pulled into a report
+            $why = 'NC · ' . (function_exists('fsr_nc_reasons') ? (fsr_nc_reasons()[(string)($r['nc_reason'] ?? '')] ?? t('fsr.ncr_other')) : t('fsr.tt_nc'));
+            q("INSERT IGNORE INTO acc_lines (source, source_id, doc_id, doc_no, vessel_id, project_id, subproject_id, work_date, user_id, user_name, discipline_id, hour_type, hours, description, state, exclude_reason)
+               VALUES ('fsr',?,?,?,?,?,?,?,?,?,?,'normal',?,?,'open',?)",
+              [(int)$r['line_id'], (int)$r['fsr_id'], $r['report_no'], $r['vessel_id'], $r['project_id'], $r['subproject_id'], $r['report_date'], $u['id'] ?? null, (string)$r['engineer'], $did, $h, mb_substr(trim((string)$r['specialty'] . ' ' . ($r['start_time'] ? substr((string)$r['start_time'], 0, 5) . '–' . substr((string)$r['end_time'], 0, 5) : '')), 0, 500) ?: null, mb_substr($why, 0, 255)]);
+            $n++; continue;
+        }
         if ($r['time_type'] === 'TT') $parts['travel'] = $h;
         else {
             $cal = (string)($u['work_calendar'] ?? 'GR'); $day = function_exists('wc_has') && wc_has() ? wc_day($cal, (string)$r['report_date']) : ['workday' => (int)date('N', strtotime((string)$r['report_date'])) < 6, 'normal' => 8.0, 'off_type' => 'overtime'];
             if (!$day['workday']) $parts[$day['off_type'] === 'holiday' ? 'holiday' : 'overtime'] = $h;
             else {
-                $k = ($u['id'] ?? $r['engineer']) . '|' . $r['report_date']; $used = $usedNormal[$k] ?? (float) scalar("SELECT COALESCE(SUM(hours),0) FROM acc_lines WHERE source = 'fsr' AND hour_type = 'normal' AND work_date = ? AND " . ($u ? 'user_id = ?' : 'user_name = ?'), [$r['report_date'], $u ? (int)$u['id'] : (string)$r['engineer']]);
+                $k = ($u['id'] ?? $r['engineer']) . '|' . $r['report_date']; $used = $usedNormal[$k] ?? (float) scalar("SELECT COALESCE(SUM(hours),0) FROM acc_lines WHERE source = 'fsr' AND hour_type = 'normal' AND (exclude_reason IS NULL OR exclude_reason NOT LIKE 'NC %') AND work_date = ? AND " . ($u ? 'user_id = ?' : 'user_name = ?'), [$r['report_date'], $u ? (int)$u['id'] : (string)$r['engineer']]);
                 $norm = max(0.0, min($h, (float)$day['normal'] - $used)); $usedNormal[$k] = $used + $norm;
                 if ($norm > 0) $parts['normal'] = $norm; if ($h - $norm > 0.001) $parts['overtime'] = round($h - $norm, 2);
             }
@@ -269,6 +280,7 @@ function acc_create(?int $vid, ?int $pid, ?int $sid, ?string $from, ?string $to,
       ['DRAFT-' . bin2hex(random_bytes(3)), 'R0', (int)($b['id'] ?? 0) ?: null, $vid, $pid, $sid, $from, $to, $zone, (int)$u['id'], (string)$u['full_name'], $note]);
     $id = (int) db()->lastInsertId();
     q("UPDATE acc_lines a SET a.state = 'draft', a.report_id = ? WHERE " . implode(' AND ', $w), array_merge([$id], $a));
+    q("UPDATE acc_lines SET state = 'excluded', value = 0 WHERE report_id = ? AND state = 'draft' AND exclude_reason LIKE 'NC %'", [$id]);   // R95-004: not chargeable at source → excluded, accounting confirms
     acc_reprice($id, true);
     acc_event($id, 'created', ($vid ? 'V' . $vid : '') . ($pid ? ' P' . $pid : '') . ($sid ? ' S' . $sid : ''));
     return $id;
@@ -422,11 +434,13 @@ function acc_reattribute(int $projectId, int $subId, string $from, string $to): 
     return count($ids);
 }
 /** Mark the reported lines of an accounting report as invoiced ($ids = null → every reported line); shared by the accounting answer and the direct invoice (R94-003). */
-function acc_mark_invoiced(array $R, string $ref, string $date, ?string $note = null, ?array $ids = null): string {
+function acc_mark_invoiced(array $R, string $ref, string $date, ?string $note = null, ?array $ids = null, ?int $invoiceId = null): string {
     $id = (int)$R['id']; $u = current_user();
     $ids = $ids ?? array_map(fn($l) => (int)$l['id'], array_filter($R['lines'], fn($l) => $l['state'] === 'reported'));
     if (!$ids) throw new RuntimeException(t('acc.no_lines_ticked'));
-    q("UPDATE acc_lines SET state = 'invoiced', invoice_ref = ?, invoiced_at = ? WHERE report_id = ? AND state = 'reported' AND id IN (" . implode(',', array_fill(0, count($ids), '?')) . ')', array_merge([$ref, $date . ' 00:00:00', $id], $ids));
+    if (!$invoiceId) { try { $invoiceId = (int) scalar("SELECT id FROM proformas WHERE kind = 'invoice' AND pi_no = ?", [$ref]) ?: null; } catch (Throwable $e) { $invoiceId = null; } }   // R95-004: the ledger invoice with that number, when it exists
+    $hasInvCol = (bool) scalar("SHOW COLUMNS FROM acc_lines LIKE 'invoice_id'");
+    q("UPDATE acc_lines SET state = 'invoiced', invoice_ref = ?, invoiced_at = ?" . ($hasInvCol ? ', invoice_id = ?' : '') . " WHERE report_id = ? AND state = 'reported' AND id IN (" . implode(',', array_fill(0, count($ids), '?')) . ')', array_merge([$ref, $date . ' 00:00:00'], $hasInvCol ? [$invoiceId] : [], [$id], $ids));
     $left = (int) scalar("SELECT COUNT(*) FROM acc_lines WHERE report_id = ? AND state = 'reported'", [$id]);
     $st = $left ? 'partly_invoiced' : 'invoiced';
     $refs = array_values(array_unique(array_filter(array_merge(explode(', ', (string)$R['invoice_ref']), [$ref]))));

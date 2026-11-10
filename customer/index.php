@@ -11,6 +11,7 @@ require __DIR__ . '/app/clk.php';    // R70-004 world clocks per user
 require __DIR__ . '/app/pk.php';     // R71-001 passkeys
 require __DIR__ . '/app/pipe.php';   // R75-001 sales pipeline
 require __DIR__ . '/app/finrep.php'; // R76-002 financial statement
+require __DIR__ . '/app/pi.php';     // proformas / ledger (before col.php: COL_SELECT uses its amount constants — R95-004)
 require __DIR__ . '/app/col.php';    // R78-001 collections + management gate
 require __DIR__ . '/app/inv.php';
 require __DIR__ . '/app/prq.php';    // R80-001 purchase requisitions
@@ -50,7 +51,6 @@ require __DIR__ . '/app/kpi.php';
 require __DIR__ . '/app/sales.php';
 require __DIR__ . '/app/pd.php';
 require __DIR__ . '/app/num.php';
-require __DIR__ . '/app/pi.php';
 require __DIR__ . '/app/cf.php';
 require __DIR__ . '/app/eng.php';   // R47-001
 require __DIR__ . '/app/ai.php';    // R50-001
@@ -107,6 +107,8 @@ require __DIR__ . '/app/wc.php';
 
 session_boot();
 i18n_boot();
+// R95-004: one-off ledger conversion (proforma_invoices → invoice rows + links) on the first request after the migration; guarded by the ledger_v2 setting
+if (function_exists('pi_ledger_convert') && function_exists('cp_setting') && cp_setting('ledger_v2', '') !== '1') { try { pi_ledger_convert(); } catch (Throwable $e) { error_log('[ledger_v2] ' . $e->getMessage()); } }
 
 header('X-Frame-Options: SAMEORIGIN');
 /* Dynamic pages must never be cached: a cached copy re-shows stale flash

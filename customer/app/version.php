@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.118.2';
+const CP_VERSION = '1.119.0';
 const CP_BUILD   = '2026-11-10';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R95-004', 'version' => '1.119.0', 'date' => '2026-11-10', 'title' => 'Parties plan — phase 2: one ledger. Invoices are documents (registered once by number, settling one or more proformas through pi_links); payments recorded once — on the invoice, or as advances on the proforma until invoiced; Σ invoices ≠ proforma gross is a warning only; caps per document; the invoice row of a direct invoice is linked to its accounting-report lines; service-report lines marked not chargeable at source carry a reason and are pre-excluded in accounting (accounting confirms); collections, statement, financial report and cash flow read the new sources.', 'db' => 'install/migrate_cp_r95_004_ledger.sql', 'check' => 'r95c'],
         ['ref' => 'GAS-CP-R95-003c', 'version' => '1.118.2', 'date' => '2026-11-10', 'title' => 'Identity pickers offer only the billing party\'s (★) and the vessel\'s (⚓) identities — to invoice the yard or the manager, choose them as billing party; ★ / ⚓ markers fixed; "default (billing party, else vessel)".', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R95-003b', 'version' => '1.118.1', 'date' => '2026-11-10', 'title' => 'Fix: the Invoicing details tab of a vessel opened Overview instead (tab name missing from the whitelist since the Documents tab of v1.112.0).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R95-003', 'version' => '1.118.0', 'date' => '2026-11-10', 'title' => 'Parties plan — phase 1: billing party (organisation) on every project, overridable per sub-project, with the invoicing identity chosen among the party\'s (★), the vessel\'s (⚓) and other vessel-linked organisations\' (🏢) identities; identities belong to organisations or vessels (customer / contact identities read and stored through the organisation; "Move identities" in Organisations); every proforma and invoice stores party, customer and vessel at creation; existing ledger rows back-filled from the project (main-level and vessel-less documents now reach the vessel statement).', 'db' => 'install/migrate_cp_r95_003_billing_party.sql', 'check' => 'r95b'],
@@ -416,6 +417,7 @@ function cp_migration_state(): array {
         'r95a' => $has("SHOW TABLES LIKE 'web_stats_day'"),
         'r94a' => $has("SHOW COLUMNS FROM proformas LIKE 'kind'"),
         'r95b' => $has("SHOW COLUMNS FROM projects LIKE 'billing_org_id'"),
+        'r95c' => $has("SHOW TABLES LIKE 'pi_links'"),
         'r93b' => $has("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_inquiries' AND COLUMN_NAME = 'kind' AND COLUMN_TYPE LIKE '%contact%'"),
         'r93a' => $has("SHOW TABLES LIKE 'work_permits'"),
         'r92f' => $has("SHOW COLUMNS FROM rc_applications LIKE 'keep_until'"),

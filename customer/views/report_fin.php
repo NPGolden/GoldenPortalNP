@@ -55,11 +55,12 @@ layout_head(t('fr.title'), 'projects');
     <h2>📄 <?= tt('fr.inv_register') ?> <span class="count"><?= count($D['invoices']) ?></span></h2>
     <?php if (!$D['invoices']): ?><p class="hint"><?= tt('pi.no_invoices') ?></p><?php else: ?>
     <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('pi.invoice_no') ?></th><th><?= tt('th.date') ?></th><th><?= tt('pi.no') ?></th><th class="num"><?= tt('pt.amount') ?></th><th class="num"><?= tt('pi.paid_lbl') ?></th><th><?= tt('pi.paid_on') ?></th></tr></thead><tbody>
-    <?php foreach ($D['invoices'] as $r): ?><tr><td class="mono"><b><?= e($r['invoice_no']) ?></b></td><td class="date"><?= e(fmt_date($r['invoice_date'])) ?></td><td class="mono"><a href="<?= url('proforma', ['id' => (int)$r['proforma_id']]) ?>#invoices"><?= e($r['pi_no']) ?></a></td><td class="num"><?= e($m((float)$r['amount'])) ?></td><td class="num"><?= (float)$r['settled'] > 0 ? e($m((float)$r['settled'])) . ' <span class="hint">' . tt('pay.via_payments') . '</span>' : e($m((float)$r['paid_amount'])) ?></td><td class="date"><?= e(fmt_date($r['paid_at'])) ?></td></tr><?php endforeach; ?>
+    <?php foreach ($D['invoices'] as $r): ?><tr><td class="mono"><b><?= e($r['invoice_no']) ?></b></td><td class="date"><?= e(fmt_date($r['invoice_date'])) ?></td><td class="mono"><a href="<?= url('proforma', ['id' => (int)$r['proforma_id']]) ?>"><?= e($r['pi_no']) ?></a></td><td class="num"><?= e($m((float)$r['amount'])) ?></td><td class="num"><?= e($m((float)$r['paid_amount'])) ?></td><td class="date"><?= $r['paid_at'] ? e(fmt_date($r['paid_at'])) : '—' ?></td></tr><?php endforeach; ?>
     <tr><td colspan="3"><b><?= tt('ob.c_total') ?></b></td><td class="num"><b><?= e($m($T['invoices'])) ?></b></td><td colspan="2"></td></tr>
     </tbody></table></div><?php endif; ?>
   </div>
 </div>
+<?php if (($T['h_billed'] ?? 0) + ($T['h_open'] ?? 0) + ($T['h_excluded'] ?? 0) > 0): ?><p class="hint">⏱ <?= e(t('fr.hours_line', ['b' => number_format($T['h_billed'], 1, ',', '.'), 'o' => number_format($T['h_open'], 1, ',', '.'), 'x' => number_format($T['h_excluded'], 1, ',', '.'), 'nc' => number_format($T['h_nc'], 1, ',', '.')])) ?></p><?php endif; ?>
 <p class="hint"><?= tt('fr.method') ?></p>
 <script nonce="<?= csp_nonce() ?>">document.querySelectorAll('[data-print]').forEach(function (b) { b.addEventListener('click', function () { window.print(); }); });</script>
 <?php layout_foot(); ?>

@@ -21,17 +21,23 @@ function fr_data(int $pid, ?int $sid = null): ?array {
     $ids = array_map(fn($x) => (int)$x['id'], $pis); $inv = []; $pay = [];
     if ($ids) {
         $in = implode(',', $ids);
-        foreach (all("SELECT x.*, pi.pi_no, pi.currency, (SELECT COALESCE(SUM(pp.amount),0) FROM proforma_payments pp WHERE pp.invoice_id = x.id) AS settled FROM proforma_invoices x JOIN proformas pi ON pi.id = x.proforma_id WHERE x.proforma_id IN ({$in}) ORDER BY x.invoice_date, x.id") as $r) $inv[] = $r;
-        if (function_exists('ppay_has') && ppay_has()) foreach (all("SELECT pp.*, pi.pi_no, pi.currency, x.invoice_no, cu.full_name AS by_name FROM proforma_payments pp JOIN proformas pi ON pi.id = pp.proforma_id LEFT JOIN proforma_invoices x ON x.id = pp.invoice_id LEFT JOIN customer_users cu ON cu.id = pp.created_by WHERE pp.proforma_id IN ({$in}) ORDER BY pp.paid_on, pp.id") as $r) $pay[] = $r;
+        // R95-004: invoices are ledger rows — list the invoice rows of the project with the proformas they settle; payments on every row
+        foreach ($pis as $x) if ($x['kind'] === 'invoice') $inv[] = ['id' => (int)$x['id'], 'proforma_id' => (int)$x['id'], 'invoice_no' => (string)$x['pi_no'], 'invoice_date' => (string)$x['issue_date'], 'pi_no' => (string)($x['settles_nos'] ?: '—'), 'amount' => (float)$x['gross'], 'settled' => (float)$x['adv_sum'], 'paid_amount' => (float)$x['adv_sum'], 'paid_at' => (string)($x['paid_at'] ?? ''), 'currency' => $x['currency'], 'status' => $x['status']];
+        if (function_exists('ppay_has') && ppay_has()) foreach (all("SELECT pp.*, pi.pi_no, pi.currency, pi.kind, NULL AS invoice_no, cu.full_name AS by_name FROM proforma_payments pp JOIN proformas pi ON pi.id = pp.proforma_id LEFT JOIN customer_users cu ON cu.id = pp.created_by WHERE pp.proforma_id IN ({$in}) ORDER BY pp.paid_on, pp.id") as $r) $pay[] = $r;
     }
     $cur = $pis[0]['currency'] ?? ($offers[0]['currency'] ?? 'EUR'); $today = date('Y-m-d');
     $T = ['offered_net' => 0.0, 'offered_gross' => 0.0, 'open_offers' => 0.0, 'invoiced' => 0.0, 'collected' => 0.0, 'outstanding' => 0.0, 'overdue' => 0.0, 'to_invoice' => 0.0, 'invoices' => 0.0, 'n_offers' => 0, 'n_pi' => 0, 'n_inv' => count($inv), 'n_pay' => count($pay)];
     foreach ($offers as &$o) { $b = of_status_behaves((string)$o['status']); $o['behaves'] = $b; $o['gross'] = function_exists('ppay_offer_cap') ? ppay_offer_cap($o) : (float)$o['amount'] * (1 + (float)($o['vat_pct'] ?? 0) / 100); $o['terms'] = $termsBy[(int)$o['id']] ?? [];
         if (in_array($b, ['approved', 'closed_won'], true)) { $T['offered_net'] += (float)$o['amount']; $T['offered_gross'] += $o['gross']; $T['n_offers']++; } elseif ($b === 'open') $T['open_offers'] += (float)$o['amount']; } unset($o);
-    foreach ($pis as &$x) { $x['paid'] = (float)$x['paid_sum']; $x['open'] = max(0, (float)$x['gross'] - $x['paid']); $x['overdue'] = in_array($x['status'], ['issued', 'sent', 'partly_paid'], true) && !empty($x['due_date']) && $x['due_date'] < $today;
-        if (!in_array($x['status'], ['draft', 'cancelled'], true)) { $T['invoiced'] += (float)$x['gross']; $T['collected'] += min((float)$x['gross'], $x['paid']); $T['outstanding'] += $x['open']; if ($x['overdue']) $T['overdue'] += $x['open']; $T['n_pi']++; } } unset($x);
+    // R95-004 one ledger: 'invoiced' (requested) = invoices + not-yet-invoiced proforma remainders; collected = payments once (on the invoice, or advances on the proforma)
+    foreach ($pis as &$x) { $x['paid'] = (float)$x['paid_sum']; $g = $x['kind'] === 'invoice' ? (float)$x['gross'] : max(0.0, (float)$x['gross'] - (float)$x['inv_sum']); $x['open'] = max(0, (float)$x['open_sum']); $x['overdue'] = in_array($x['status'], ['issued', 'sent', 'partly_paid'], true) && !empty($x['due_date']) && $x['due_date'] < $today && $x['open'] > 0.005;
+        if (!in_array($x['status'], ['draft', 'cancelled'], true)) { $T['invoiced'] += $g; $T['collected'] += min($g, (float)$x['adv_sum']); $T['outstanding'] += $x['open']; if ($x['overdue']) $T['overdue'] += $x['open']; if ($x['kind'] !== 'invoice') $T['n_pi']++; } } unset($x);
     foreach ($inv as $r) $T['invoices'] += (float)$r['amount'];
     $T['to_invoice'] = max(0, $T['offered_gross'] - $T['invoiced']);
+    // R95-004: labour hours from the accounting register — billed (reported / invoiced), open, and excluded (not billed; NC = marked at source)
+    $T['h_billed'] = $T['h_open'] = $T['h_excluded'] = $T['h_nc'] = 0.0;
+    if (function_exists('acc_has') && acc_has()) { $wh = 'project_id = ?'; $ah = [$pid]; if ($sid) { $wh .= ' AND subproject_id = ?'; $ah[] = $sid; }
+        foreach (all("SELECT state, SUM(hours) h, SUM(IF(exclude_reason LIKE 'NC %', hours, 0)) nc FROM acc_lines WHERE {$wh} GROUP BY state", $ah) as $r) { $h = (float)$r['h']; if (in_array($r['state'], ['reported', 'invoiced'], true)) $T['h_billed'] += $h; elseif (in_array($r['state'], ['open', 'draft'], true)) $T['h_open'] += $h; elseif ($r['state'] === 'excluded') { $T['h_excluded'] += $h; $T['h_nc'] += (float)$r['nc']; } } }
     return ['project' => $p, 'sub' => $s, 'offers' => $offers, 'proformas' => $pis, 'invoices' => $inv, 'payments' => $pay, 'totals' => $T, 'cur' => $cur, 'doc_no' => (function_exists('br_prefix') ? br_prefix($pid) : 'GAS') . '-FS-' . date('Y-m-d') . '-' . ($p['project_code'] ?: $pid) . ($s ? '-' . $s['code'] : '')];
 }
 /** Excel workbook: Summary · Offers · Proformas · Invoices · Payments. */

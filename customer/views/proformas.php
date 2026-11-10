@@ -6,7 +6,7 @@ if (!function_exists('pi_can_view') || !pi_can_view()) { http_response_code(403)
 $f = ['status' => (string)($_GET['status'] ?? 'open'), 'vessel' => (int)($_GET['vessel'] ?? 0), 'pm' => (int)($_GET['pm'] ?? 0), 'project' => (int)($_GET['project'] ?? 0), 'q' => trim((string)($_GET['q'] ?? ''))];
 $rows = pi_list($f); $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : '';
 $tot = ['gross' => 0.0, 'paid' => 0.0, 'open' => 0.0, 'overdue' => 0.0]; $cur = 'EUR';
-foreach ($rows as $r) { if (in_array($r['status'], ['draft', 'cancelled'], true)) continue; $cur = $r['currency']; $tot['gross'] += (float)$r['gross']; $tot['paid'] += min((float)$r['gross'], (float)$r['paid_sum']); $o = max(0, (float)$r['gross'] - (float)$r['paid_sum']); $tot['open'] += $o; if (pi_overdue($r)) $tot['overdue'] += $o; }
+foreach ($rows as $r) { if (in_array($r['status'], ['draft', 'cancelled'], true)) continue; $cur = $r['currency']; $g = $r['kind'] === 'invoice' ? (float)$r['gross'] : max(0.0, (float)$r['gross'] - (float)($r['inv_sum'] ?? 0)); $tot['gross'] += $g; $tot['paid'] += min($g, (float)($r['adv_sum'] ?? $r['paid_sum'])); $o = max(0, (float)($r['open_sum'] ?? ((float)$r['gross'] - (float)$r['paid_sum']))); $tot['open'] += $o; if (pi_overdue($r)) $tot['overdue'] += $o; }
 $c = []; foreach (all("SELECT status, COUNT(*) n FROM proformas GROUP BY status") as $x) $c[$x['status']] = (int)$x['n']; $nOver = (int) scalar("SELECT COUNT(*) FROM proformas WHERE status IN ('issued','sent','partly_paid') AND due_date < CURDATE()");
 $vessels = all("SELECT DISTINCT v.id, v.name FROM proformas pi JOIN vessels v ON v.id = pi.vessel_id ORDER BY v.name"); $pms = all("SELECT DISTINCT cu.id, cu.full_name FROM proformas pi JOIN projects p ON p.id = pi.project_id JOIN customer_users cu ON cu.id = p.pm_user_id ORDER BY cu.full_name");
 layout_head(t('pi.title'), 'proformas');
@@ -30,7 +30,7 @@ layout_head(t('pi.title'), 'proformas');
 <div class="card">
   <?php if (!$rows): ?><p class="hint"><?= tt('pi.none') ?></p><?php else: ?>
   <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('pi.no') ?></th><th><?= tt('pi.description') ?></th><th><?= tt('th.vessel') ?></th><th><?= tt('pr.one') ?></th><th><?= tt('of.one') ?></th><th><?= tt('pi.issue_date') ?></th><th><?= tt('pi.due') ?></th><th class="num"><?= tt('pi.gross') ?></th><th class="num"><?= tt('pi.paid_lbl') ?></th><th class="num"><?= tt('pi.open') ?></th><th><?= tt('th.status') ?></th><th class="num"><?= tt('pi.invoices') ?></th></tr></thead><tbody>
-  <?php foreach ($rows as $r): $open = max(0, (float)$r['gross'] - (float)$r['paid_sum']); $od = pi_overdue($r); ?>
+  <?php foreach ($rows as $r): $open = max(0, (float)($r['open_sum'] ?? ((float)$r['gross'] - (float)$r['paid_sum']))); $od = pi_overdue($r) && $open > 0.005; ?>
     <tr class="<?= in_array($r['status'], ['paid', 'cancelled'], true) ? 'is-muted' : '' ?>">
       <td class="mono"><a href="<?= url('proforma', ['id' => (int)$r['id']]) ?>"><b><?= e($r['pi_no']) ?></b></a></td>
       <td><?= e($r['title']) ?><?= $r['term_n'] ? '<br><span class="hint">' . e(t('pt.instalment', ['n' => (int)$r['term_n']])) . '</span>' : '' ?></td>
@@ -41,9 +41,9 @@ layout_head(t('pi.title'), 'proformas');
       <td class="date<?= $od ? ' is-late' : '' ?>"><?= $r['due_date'] ? e(fmt_date($r['due_date'])) : '—' ?><?= $od ? ' ' . pill('bad', t('pi.overdue')) : '' ?></td>
       <td class="num"><b><?= e(pi_money((float)$r['gross'], $r['currency'])) ?></b></td>
       <td class="num"><?= e(pi_money((float)$r['paid_sum'], $r['currency'])) ?></td>
-      <td class="num"><?= e(pi_money($open, $r['currency'])) ?></td>
+      <td class="num"><?= e(pi_money($open, $r['currency'])) ?><?= $r['kind'] !== 'invoice' && (float)($r['inv_sum'] ?? 0) > 0.005 ? '<br><span class="hint">' . e(t('pi.invoiced_short', ['v' => pi_money((float)$r['inv_sum'], $r['currency'])])) . '</span>' : '' ?></td>
       <td><?= pi_status_pill($r['status']) ?></td>
-      <td class="num"><?= (int)$r['n_inv'] ?></td>
+      <td class="num"><?= $r['kind'] === 'invoice' ? ($r['settles_nos'] ? '<span class="hint" title="' . tt('pi.settles') . '">' . e($r['settles_nos']) . '</span>' : '—') : ((int)$r['n_inv'] . ($r['invoice_nos'] ? ' <span class="hint">' . e($r['invoice_nos']) . '</span>' : '')) ?></td>
     </tr>
   <?php endforeach; ?>
   </tbody><tfoot><tr><td colspan="7"><b><?= e(t('pi.count', ['n' => count($rows)])) ?></b></td><td class="num"><b><?= e(pi_money($tot['gross'], $cur)) ?></b></td><td class="num"><b><?= e(pi_money($tot['paid'], $cur)) ?></b></td><td class="num"><b><?= e(pi_money($tot['open'], $cur)) ?></b><?= $tot['overdue'] > 0 ? '<br><span class="is-late">' . tt('pi.overdue') . ' ' . e(pi_money($tot['overdue'], $cur)) . '</span>' : '' ?></td><td colspan="2"></td></tr></tfoot></table></div>

@@ -89,6 +89,7 @@ return [
       ['ul' => ['To request work, open the project (or the ticket it relates to) and press + Work order; describe the work, the location and the date you need it.', 'A work order Golden A/S requests from you appears with Approve / Reject buttons; a rejection needs a note.', 'When the work is done, the service report is linked to the work order.']],
     ]],
     ['id' => 'fsr', 'title' => 'Service reports — accepting the engineer\'s work', 'body' => [
+      'Hours marked NC (not chargeable) on a service report — warranty, goodwill or rework — are shown for information and are not invoiced (v1.119.0).',
       'After an intervention on board, the Golden A/S engineer submits a field service report (form SF-GLD-014): date, location, the tasks carried out, the hours, spare parts used, open issues and photos. Work › Service Reports lists them; the ones waiting for your acceptance carry a badge.',
       ['ul' => ['A service call without a project (a visit for a fault, a check) is reported under the vessel directly — you find it under the vessel\'s Services tab and in the report list. A report marked External is a document Golden A/S received from elsewhere (yard, maker) and filed for you; it may later be followed by a portal report "from EXT-…" with the detailed hours.']],
       ['fig' => 'c-reports.jpg', 'cap' => 'The service-report list'],

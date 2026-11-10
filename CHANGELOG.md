@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.118.2** (build 2026-11-10). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.119.0** (build 2026-11-10). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.119.0 | GAS-CP-R95-004 | 2026-11-10 | Parties plan — phase 2: one ledger. Invoices are documents (registered once by number, settling one or more proformas through pi_links); payments recorded once — on the invoice, or as advances on the proforma until invoiced; Σ invoices ≠ proforma gross is a warning only; caps per document; the invoice row of a direct invoice is linked to its accounting-report lines; service-report lines marked not chargeable at source carry a reason and are pre-excluded in accounting (accounting confirms); collections, statement, financial report and cash flow read the new sources. | `install/migrate_cp_r95_004_ledger.sql` |
 | 1.118.2 | GAS-CP-R95-003c | 2026-11-10 | Identity pickers offer only the billing party's (★) and the vessel's (⚓) identities — to invoice the yard or the manager, choose them as billing party; ★ / ⚓ markers fixed; "default (billing party, else vessel)". | — |
 | 1.118.1 | GAS-CP-R95-003b | 2026-11-10 | Fix: the Invoicing details tab of a vessel opened Overview instead (tab name missing from the whitelist since the Documents tab of v1.112.0). | — |
 | 1.118.0 | GAS-CP-R95-003 | 2026-11-10 | Parties plan — phase 1: billing party (organisation) on every project, overridable per sub-project, with the invoicing identity chosen among the party's (★), the vessel's (⚓) and other vessel-linked organisations' (🏢) identities; identities belong to organisations or vessels (customer / contact identities read and stored through the organisation; "Move identities" in Organisations); every proforma and invoice stores party, customer and vessel at creation; existing ledger rows back-filled from the project (main-level and vessel-less documents now reach the vessel statement). | `install/migrate_cp_r95_003_billing_party.sql` |

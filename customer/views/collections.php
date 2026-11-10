@@ -114,7 +114,7 @@ layout_head(t('col.title'), 'collections');
       <tr class="col-group"><td colspan="12">⚓ <b><?= e($r['vessel'] ?: t('pr.novessel')) ?></b> › <?= pr_link((int)$r['project_id'], $r['project_code'], $r['project_name']) ?><?= $r['customer_name'] ? ' · ' . e($r['customer_name']) : '' ?><?= $r['pm_name'] ? ' · PM ' . e($r['pm_name']) : '' ?> <a class="hint" href="<?= url('report_fin', ['project' => (int)$r['project_id']]) ?>">(<?= tt('fr.title') ?>)</a></td></tr>
       <?php endif; $gSum += $r['open']; $gN++; $fid = 'fu' . (int)$r['id']; ?>
       <tr class="<?= $r['overdue'] ? 'is-late' : '' ?>">
-        <td class="mono"><a href="<?= url('proforma', ['id' => (int)$r['id']]) ?>"><b><?= e($r['pi_no']) ?></b></a><?= $r['invoice_nos'] ? '<br><span class="hint">' . e($r['invoice_nos']) . '</span>' : '' ?></td>
+        <td class="mono"><a href="<?= url('proforma', ['id' => (int)$r['id']]) ?>"><b><?= e($r['pi_no']) ?></b></a><?= ($r['kind'] ?? '') === 'invoice' ? ' ' . pill('navy', t('pi.k_invoice')) : '' ?><?= !empty($r['invoice_nos']) ? '<br><span class="hint">🧾 ' . e($r['invoice_nos']) . '</span>' : '' ?><?= !empty($r['settles_nos']) ? '<br><span class="hint">' . e(t('pi.settles_short', ['n' => $r['settles_nos']])) . '</span>' : '' ?></td>
         <td><?= e($r['title']) ?><?= $r['term_n'] ? ' <span class="hint">' . e(t('pt.instalment', ['n' => (int)$r['term_n']])) . '</span>' : '' ?><br><span class="hint"><?= e($r['offer_no']) ?><?= $r['sub_code'] ? ' · ' . e($r['sub_code']) : '' ?></span></td>
         <td class="date"><?= e(fmt_date($r['issue_date'])) ?></td>
         <td class="date<?= $r['overdue'] ? ' is-late' : '' ?>"><?= $r['due_date'] ? e(fmt_date($r['due_date'])) : '—' ?></td>
