@@ -36,6 +36,7 @@ return [
       ['fig' => 'c-vessels.jpg', 'cap' => 'The vessel list'],
       ['fig' => 'c-vessel.jpg', 'cap' => 'The vessel page — history, projects, open items and the report buttons'],
       ['ul' => ['Technical history (PDF / Word) is a complete dossier of the vessel: every project, document, ticket and service report — and, since v1.27.1, the equipment on board with its service history.', 'The Equipment tab of the vessel lists the units Golden A/S looks after on board by serial number (see Equipment on board).', 'Weekly vessel report opens the week view with everything that happened in a chosen week; PDF and Word versions can be downloaded.', 'The project selector at the top narrows the page to one project when a vessel has several.']],
+      'Since v1.122.0 the weekly and the monthly report open with an executive summary: a short paragraph from your project manager, six figures (progress actual and planned, schedule performance index, drawings approved, open risks, lost-time injuries of the period), the progress S-curve — planned against actual — and the milestones with their planned week, forecast week and status.',
       ['fig' => 'c-weekly.jpg', 'cap' => 'The weekly vessel report — one week, all projects on board, with the issued revisions underneath'],
     ]],
     ['id' => 'equipment', 'title' => 'Equipment on board — service history by serial number', 'body' => [

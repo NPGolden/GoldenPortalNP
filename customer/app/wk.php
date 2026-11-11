@@ -327,6 +327,8 @@ function wk_render_pdf(array $W): string {
     $tw = ($Wd - 12) / 5; $x = $L;
     foreach ($tiles as [$lab, $val, $col]) { $pdf->setColor($head); $pdf->rect($x, $y, $tw, 16, 'F'); $pdf->setColor($col); $fs = 12; $pdf->setFont('B', $fs); while ($pdf->width($val) > $tw - 2 && $fs > 7) { $fs -= 0.5; $pdf->setFont('B', $fs); } $pdf->text($x, $y + 8.5, $val, 'C', $tw); $pdf->setColor($ink); $fs = 6.5; $pdf->setFont('R', $fs); while ($pdf->width(mb_strtoupper($lab)) > $tw - 2 && $fs > 4.5) { $fs -= 0.25; $pdf->setFont('R', $fs); } $pdf->text($x, $y + 13.5, mb_strtoupper($lab), 'C', $tw); $x += $tw + 3; }
     $y += 20;
+    // R96-001: executive summary, S-curve and milestones — per project
+    if (function_exists('xs_has') && xs_has()) { $fg = 0; foreach ($W['projects'] as $P) { $XS = xs_data((int)$P['p']['id'], 'week', $W['week_start'], $W['staff']); if ($XS) { $y += 2; xs_pdf($pdf, $XS, $L, $Wd, $y, $need, count($W['projects']) > 1 ? ($P['p']['project_code'] ?: $P['p']['name']) . ' · ' : '', ++$fg); } } }
     foreach (wk_sections($W) as $sec) { $h1($sec['title']); foreach ($sec['tables'] as $T) $table($T); foreach ($sec['text'] as $t) $para($t); }
     // appendix: weekly-note photos
     $np = wk_note_photos($W);
@@ -380,6 +382,7 @@ function wk_render_docx(array $W): string {
               [$kv(t('rp.issued')), $vv(date('d.m.Y H:i') . ' · ' . (current_user()['full_name'] ?? ''))]], [2400, 7240], ['border' => '9AA5B1']);
     $hdr = fn($x) => ['text' => $x, 'b' => true, 'sz' => 8, 'fill' => $HEAD, 'align' => 'center'];
     $c = fn($x, $al = 'left', $b = false) => ['text' => (string)$x, 'sz' => 8.5, 'align' => $al, 'b' => $b];
+    if (function_exists('xs_has') && xs_has()) foreach ($W['projects'] as $P) { $XS = xs_data((int)$P['p']['id'], 'week', $W['week_start'], $W['staff']); if ($XS) xs_docx($w, $XS, count($W['projects']) > 1 ? ($P['p']['project_code'] ?: $P['p']['name']) . ' · ' : ''); }   // R96-001
     foreach (wk_sections($W) as $sec) {
         $w->heading($sec['title'], 2);
         foreach ($sec['tables'] as $T) {

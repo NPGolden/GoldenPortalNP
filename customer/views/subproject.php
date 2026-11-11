@@ -515,6 +515,7 @@ layout_head($sp['code'] . ' · ' . $sp['name'], 'projects');
     <a class="btn" href="<?= url('report_sp', ['id' => $id, 'format' => 'docx']) ?>"><?= tt('rp.word') ?></a>
     <a class="btn btn--ghost" href="<?= url('weekly', ['project' => $pid]) ?>"><?= tt('wk.report') ?></a>
     <a class="btn btn--ghost" href="<?= url('monthly', ['project' => $pid]) ?>"><?= tt('mo.title') ?></a>
+    <?php if (is_staff() && function_exists('xs_has') && xs_has()): ?><a class="btn btn--ghost" href="<?= url('project_ms', ['project' => $pid]) ?>">🏁 <?= tt('ms.title') ?></a><?php endif; ?>
   </div>
   <?php if (ar_has() && $staff) { $D0 = rp_sp_data($id); echo ar_issued_html($D0['docNo'], $pid, ['kind' => 'monthly', 'id' => $id], url('subproject', ['id' => $id, 'tab' => 'reports'])); } ?>
   <p class="hint" style="margin-top:12px;"><?= tt('rp.pdf_hint') ?></p>

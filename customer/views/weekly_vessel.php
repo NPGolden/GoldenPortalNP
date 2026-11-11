@@ -34,6 +34,11 @@ layout_head(t('wv.title') . ' · ' . $v['name'], 'vessels');
   </form>
 </div>
 
+<?php /* R96-001: executive summary, progress S-curve and milestones — one block per project of the report */
+if (function_exists('xs_has') && xs_has()): $xsN = 0; foreach ($W['projects'] as $P): $xsPid = (int)$P['p']['id']; $XS = xs_data($xsPid, 'week', $ws, $staff); if (!$XS) continue; $xsN++; ?>
+<div class="card wv-sec" id="xs<?= $xsPid ?>"><?= xs_html($XS, ['fig' => $xsN, 'head' => count($W['projects']) > 1 ? ($P['p']['project_code'] ?: $P['p']['name']) . ' · ' : '']) ?></div>
+<?= xs_editor_html($XS, $q(), ['vessel' => $vid, 'only' => (int)$pid]) ?>
+<?php endforeach; endif; ?>
 <?php foreach ($sections as $no => $sec): ?>
 <div class="card wv-sec" id="s<?= $no ?>">
   <h2><?= e($sec['title']) ?></h2>

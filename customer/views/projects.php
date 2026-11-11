@@ -179,7 +179,7 @@ layout_head(t('pr.title'), 'projects');
                <a class="btn btn--ghost btn--sm" href="<?= url('tickets', ['view' => 'open', 'project' => $p['id'], 'status' => 'open_all']) ?>"><?= tt('nav.tickets') ?></a>
                <?php if (function_exists('pmt_can_view') && pmt_can_view()): ?><a class="btn btn--ghost btn--sm" href="<?= url('permits', ['project' => $p['id']]) ?>">🪪 <?= tt('pmt.title') ?></a><?php endif; ?>
                <?php if (function_exists('wf_has') && wf_has()): ?><a class="btn btn--ghost btn--sm" href="<?= url('wf', ['project' => $p['id']]) ?>">🗓 <?= tt('wf.title') ?></a><?php endif; ?>
-               <a class="btn btn--ghost btn--sm" href="<?= url('monthly', ['project' => $p['id']]) ?>"><?= tt('mo.title') ?></a>
+               <a class="btn btn--ghost btn--sm" href="<?= url('monthly', ['project' => $p['id']]) ?>"><?= tt('mo.title') ?></a><?php if ($staff && function_exists('xs_has') && xs_has()): ?><a class="btn btn--ghost btn--sm" href="<?= url('project_ms', ['project' => $p['id']]) ?>">🏁 <?= tt('ms.title') ?></a><?php endif; ?>
                <a class="btn btn--ghost btn--sm" href="<?= url('jo_list', ['project' => $p['id']]) ?>"><?= tt('jo.plural') ?></a>
                <a class="btn btn--ghost btn--sm" href="<?= url('fsr_list', ['project' => $p['id']]) ?>"><?= tt('fsr.plural') ?></a>
                <a class="btn btn--ghost btn--sm" href="<?= url('isr_list', ['project' => $p['id']]) ?>"><?= tt('isr.plural') ?></a>
@@ -198,7 +198,7 @@ layout_head(t('pr.title'), 'projects');
                <a class="btn btn--ghost btn--sm" href="<?= url('drawings', ['project' => $p['id']]) ?>"><?= tt('dr.title') ?></a>
                <a class="btn btn--ghost btn--sm" href="<?= url('overlay', ['project' => $p['id']]) ?>"><?= tt('ga.title') ?></a>
                <a class="btn btn--ghost btn--sm" href="<?= url('weekly', ['project' => $p['id']]) ?>"><?= tt('wk.title') ?></a><?php if (function_exists('bg_can') && bg_can()): ?> <a class="btn btn--ghost btn--sm" href="<?= url('cost_control', ['project' => $p['id']]) ?>">€ <?= tt('bg.board_title') ?></a><?php endif; ?><?php if (function_exists('rk_has') && rk_has() && $staff): ?> <a class="btn btn--ghost btn--sm" href="<?= url('risks', ['project' => $p['id']]) ?>">⚠ <?= tt('rk.title') ?></a><?php endif; ?><?php if (function_exists('fr_can') && fr_can()): ?> <a class="btn btn--ghost btn--sm" href="<?= url('report_fin', ['project' => $p['id']]) ?>">💶 <?= tt('fr.title') ?></a><?php endif; ?><?php if (function_exists('cf_can') && cf_can()): ?> <a class="btn btn--ghost btn--sm" href="<?= url('cashflow', ['project' => $p['id']]) ?>">💰 <?= tt('cf.title') ?></a><?php endif; ?>
-               <a class="btn btn--ghost btn--sm" href="<?= url('monthly', ['project' => $p['id']]) ?>"><?= tt('mo.title') ?></a>
+               <a class="btn btn--ghost btn--sm" href="<?= url('monthly', ['project' => $p['id']]) ?>"><?= tt('mo.title') ?></a><?php if ($staff && function_exists('xs_has') && xs_has()): ?><a class="btn btn--ghost btn--sm" href="<?= url('project_ms', ['project' => $p['id']]) ?>">🏁 <?= tt('ms.title') ?></a><?php endif; ?>
                <a class="btn btn--ghost btn--sm" href="<?= url('jo_list', ['project' => $p['id']]) ?>"><?= tt('jo.plural') ?></a>
                <a class="btn btn--ghost btn--sm" href="<?= url('fsr_list', ['project' => $p['id']]) ?>"><?= tt('fsr.plural') ?></a>
                <a class="btn btn--ghost btn--sm" href="<?= url('isr_list', ['project' => $p['id']]) ?>"><?= tt('isr.plural') ?></a></p>

@@ -66,6 +66,8 @@ layout_head(t('mo.title'), 'projects');
   <h1><?= tt('mo.title') ?> — <?= e($month) ?></h1>
   <p><strong><?= e($p['project_code'] ?: '') ?> <?= e($p['name']) ?></strong> · <?= e($p['vessel'] ?: '') ?> · <?= e($p['customer_name'] ?? '') ?> · <?= tt('rp.prepared') ?>: Golden Automation Systems</p>
 
+  <?php /* R96-001: executive summary, progress S-curve and milestones */ $XS = function_exists('xs_has') && xs_has() ? xs_data($pid, 'month', $month) : null; if ($XS) echo xs_html($XS, ['fig' => 1]); ?>
+
   <h2><?= tt('mo.progress') ?></h2>
   <table>
     <thead><tr><th><?= tt('sp.code') ?></th><th><?= tt('sp.name') ?></th><?php foreach (stage_defs() as $d): ?><th><?= tt($d['key']) ?></th><?php endforeach; ?><th><?= tt('sp.overall') ?></th><th><?= tt('mo.delta') ?></th></tr></thead>
@@ -113,4 +115,5 @@ layout_head(t('mo.title'), 'projects');
     <p><span class="when" style="font-family:var(--mono);font-size:12px;color:#666;"><?= e(fmt_date($n['note_date'])) ?></span> — <?= rt_html($n['body']) ?></p>
   <?php endforeach; ?>
 </div>
+<?php if (!empty($XS)) echo xs_editor_html($XS, url('monthly', ['project' => $pid, 'month' => $month])); ?>
 <?php layout_foot(); ?>
