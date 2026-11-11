@@ -1500,3 +1500,13 @@ Not done, waiting for a decision: restricting "Remove link" and payment edits on
 
 **Tested**: guard file written after deletion; audit line with IP; trail kept after delete; export for administrator, 403 for PM and customer; 51st revision refused; 21st upload refused; old staged row purged, recent one kept; cron output; Diagnostics rows OK. Language keys 9 141 each.
 
+## §292 v1.127.0 (R97-006) — System Budgets: priority
+
+Migration `install/migrate_cp_r97_006_sb_priority.sql`: `sb_budgets.priority` (`urgent` / `high` / `normal` / `low`, default `normal`) and key `(status, priority)`. `sb_prio()` guards the column.
+
+`SB_PRIORITIES`, `sb_prio_pill()`, `sb_set_priority()` (any `sb_can()` user; draft, working or finished; not templates; `priority` event with old → new). Action `sb_priority`; `sb_create` accepts `priority`; `sb_from_ticket()` copies the ticket's priority. `sb_list()`: filter `priority`; order = open budgets (draft, working, finished) first, `FIELD(priority, 'urgent','high','normal','low')`, nearest `target_date`, then last update. `sb_dash()`: counts of urgent and high among draft / working, shown on the "Past target date" tile (which opens the urgent ones). Budget page: pill beside the status and a selector with "Set priority"; Excel summary line. Copies and templates start at Normal; revisions do not carry the priority (it belongs to the budget, not to a state of its lines).
+
+**Security review**: the value is checked against the fixed list (anything else refused — tested), bound as a parameter, changes behind `sb_guard()` and CSRF, recorded in the audit trail with the IP; customer and HR-scope accounts refused (tested). The list filter ignores unknown values. No new proposals — the checklist of §291 applies.
+
+Language keys 9 152 each.
+

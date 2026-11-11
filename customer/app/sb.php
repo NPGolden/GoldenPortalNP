@@ -13,6 +13,8 @@ declare(strict_types=1);
 const SB_STATUSES = ['draft', 'working', 'finished', 'converted', 'cancelled'];
 const SB_TONE = ['draft' => 'mute', 'working' => 'gold', 'finished' => 'green', 'converted' => 'navy', 'cancelled' => 'bad'];
 const SB_MAX_PARTS = 124;
+const SB_PRIORITIES = ['urgent', 'high', 'normal', 'low'];   // R97-006 — in the order the team handles them
+const SB_PRIO_TONE = ['urgent' => 'bad', 'high' => 'gold', 'normal' => 'mute', 'low' => 'mute'];
 const SB_EXP_KINDS = ['travel', 'logistics', 'pass', 'permit', 'other'];
 const SB_BUCKETS = ['Engineering', 'Site', 'Workshop', 'Commissioning', 'PM'];
 const SB_BUCKET_STAGE = ['Engineering' => 'engineering', 'Workshop' => 'production', 'Site' => 'installation', 'Commissioning' => 'commissioning'];
@@ -30,6 +32,15 @@ function sb_money(float $v, string $cur = 'EUR'): string { return number_format(
 function sb_h(float $h): string { return rtrim(rtrim(number_format($h, 2, ',', ''), '0'), ',') ?: '0'; }
 function sb_num(string $s): float { $s = trim($s); if ($s === '') return 0.0; return function_exists('of_parse_amount') ? (float) of_parse_amount($s) : (float) str_replace(',', '.', $s); }
 function sb_pill(string $st): string { return pill(SB_TONE[$st] ?? 'mute', t('sb.st_' . $st)); }
+function sb_prio(): bool { static $h = null; if ($h === null) { try { $h = sb_has() && (bool) scalar("SHOW COLUMNS FROM sb_budgets LIKE 'priority'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function sb_prio_pill(?string $p): string { $p = in_array($p, SB_PRIORITIES, true) ? $p : 'normal'; return pill(SB_PRIO_TONE[$p], t('sb.pr_' . $p)); }
+/** Set the priority of a budget — allowed while it still needs work or waits for its offer (draft, working, finished). */
+function sb_set_priority(int $id, string $p): void {
+    sb_guard(); if (!sb_prio()) throw new RuntimeException(t('err.noaccess')); $B = sb_get($id); if (!$B) throw new RuntimeException(t('err.notfound'));
+    if (!in_array($p, SB_PRIORITIES, true)) throw new RuntimeException(t('sb.pr_bad')); if (!in_array($B['status'], ['draft', 'working', 'finished'], true) || !empty($B['is_template'])) throw new RuntimeException(t('sb.locked'));
+    $old = (string)($B['priority'] ?? 'normal'); if ($old === $p) return;
+    q('UPDATE sb_budgets SET priority = ? WHERE id = ?', [$p, $id]); sb_event($id, 'priority', t('sb.pr_' . $old) . ' → ' . t('sb.pr_' . $p));
+}
 function sb_editable(array $B): bool { return in_array($B['status'], ['draft', 'working'], true); }
 function sb_label(array $B): string { return $B['sb_no'] . ' R' . (int)$B['revision']; }
 
@@ -101,16 +112,18 @@ function sb_list(array $f = []): array {
     if ($st === 'open') $w[] = "b.status IN ('draft','working')"; elseif (in_array($st, SB_STATUSES, true)) { $w[] = 'b.status = ?'; $b[] = $st; }
     if (!empty($f['project'])) { $w[] = 'b.project_id = ?'; $b[] = (int)$f['project']; }
     if (!empty($f['owner'])) { $w[] = 'b.owner_user_id = ?'; $b[] = (int)$f['owner']; }
+    $pr = sb_prio(); if ($pr && in_array($f['priority'] ?? '', SB_PRIORITIES, true)) { $w[] = 'b.priority = ?'; $b[] = $f['priority']; }
     $qq = trim((string)($f['q'] ?? '')); if ($qq !== '') { $w[] = '(b.sb_no LIKE ? OR b.title LIKE ? OR b.source_ref LIKE ? OR p.project_code LIKE ?)'; $like = '%' . $qq . '%'; array_push($b, $like, $like, $like, $like); }
     return all('SELECT b.*, p.project_code, p.name AS project_name, s.code AS sub_code, s.name AS sub_name, ou.full_name AS owner_name,
                        (SELECT COUNT(*) FROM sb_labour l WHERE l.budget_id = b.id) AS n_lab, (SELECT COUNT(*) FROM sb_parts x WHERE x.budget_id = b.id) AS n_parts, (SELECT COUNT(*) FROM sb_comments c WHERE c.budget_id = b.id) AS n_com
                 FROM sb_budgets b LEFT JOIN projects p ON p.id = b.project_id LEFT JOIN subprojects s ON s.id = b.subproject_id LEFT JOIN customer_users ou ON ou.id = b.owner_user_id
-                WHERE ' . implode(' AND ', $w) . ' ORDER BY b.updated_at DESC, b.id DESC LIMIT 500', $b);
+                WHERE ' . implode(' AND ', $w) . ' ORDER BY ' . ($pr ? "(b.status IN ('draft','working','finished')) DESC, CASE WHEN b.status IN ('draft','working','finished') THEN FIELD(b.priority,'urgent','high','normal','low') ELSE 9 END, CASE WHEN b.status IN ('draft','working','finished') THEN COALESCE(b.target_date, '9999-12-31') ELSE '9999-12-31' END, " : '') . 'b.updated_at DESC, b.id DESC LIMIT 500', $b);   // R97-006: what to handle first — priority, then the nearest target date
 }
 /** Dashboard figures: working / finished not converted / converted this year / past target / average days to finish. */
 function sb_dash(): array {
-    $D = ['open' => 0, 'finished' => 0, 'converted' => 0, 'late' => 0, 'avg_days' => null, 'open_sale' => 0.0, 'finished_sale' => 0.0];
+    $D = ['open' => 0, 'finished' => 0, 'converted' => 0, 'late' => 0, 'avg_days' => null, 'open_sale' => 0.0, 'finished_sale' => 0.0, 'urgent' => 0, 'high' => 0];
     if (!sb_has()) return $D;
+    if (sb_prio()) foreach (all("SELECT priority, COUNT(*) n FROM sb_budgets WHERE status IN ('draft','working') AND priority IN ('urgent','high')" . (sb_r2() ? ' AND is_template = 0' : '') . ' GROUP BY priority') as $r) $D[(string)$r['priority']] = (int)$r['n'];
     foreach (all("SELECT status, COUNT(*) n, COALESCE(SUM(tot_sale),0) s, SUM(target_date IS NOT NULL AND target_date < CURDATE()) late FROM sb_budgets WHERE status IN ('draft','working','finished')" . (sb_r2() ? ' AND is_template = 0' : '') . " GROUP BY status") as $r) {
         if ($r['status'] === 'finished') { $D['finished'] = (int)$r['n']; $D['finished_sale'] = (float)$r['s']; } else { $D['open'] += (int)$r['n']; $D['open_sale'] += (float)$r['s']; $D['late'] += (int)$r['late']; }
     }
@@ -482,6 +495,7 @@ function sb_from_ticket(int $ticketId): int {
         $pid = (int)($tk['project_id'] ?? 0); $sid = (int)($tk['subproject_id'] ?? 0); if ($sid && !$pid) $pid = (int) scalar('SELECT project_id FROM subprojects WHERE id = ?', [$sid]);
         $desc = '**' . t('sb.tk_request', ['n' => (string)$tk['ticket_no']]) . '**' . "\n" . trim((string)$tk['description']);
         q('UPDATE sb_budgets SET ticket_id = ?, project_id = ?, subproject_id = ?, description = ? WHERE id = ?', [$ticketId, $pid ?: null, $sid ?: null, mb_substr($desc, 0, 60000), $id]);
+        if (sb_prio() && in_array($tk['priority'] ?? '', SB_PRIORITIES, true)) q('UPDATE sb_budgets SET priority = ? WHERE id = ?', [(string)$tk['priority'], $id]);   // R97-006: the request's priority carries over
         if (in_array($tk['status'], tk_open_statuses(), true)) tk_set_status($ticketId, 'resolved', t('sb.tk_resolution'));
         sb_event($id, 'ticket', (string)$tk['ticket_no']);   // nothing is written on the ticket's own timeline — the customer reads it
         $pdo->commit(); return $id;
@@ -491,7 +505,7 @@ function sb_from_ticket(int $ticketId): int {
 /** Excel of a budget or a stored revision: Summary, Labour, Parts, Other costs — cost and sale columns side by side. Internal document. */
 function sb_export_xlsx(array $B): void {
     sb_guard(); require_once __DIR__ . '/xlsxw.php'; $T = sb_totals($B); $sec = sb_sections(); $dis = sb_disciplines(); $r2 = fn(float $v) => round($v, 2);
-    $sum = [[t('sb.no'), sb_label($B)], [t('sb.f_title'), (string)$B['title']], [t('th.status'), t('sb.st_' . $B['status'])], [t('sb.project'), trim((string)($B['project_code'] ?? '') . ' ' . (string)($B['sub_code'] ?? '') . ' ' . (string)($B['sub_name'] ?? ''))], [t('sb.owner'), (string)($B['owner_name'] ?? '')], [t('sb.target'), (string)($B['target_date'] ?? '')],
+    $sum = [[t('sb.no'), sb_label($B)], [t('sb.f_title'), (string)$B['title']], [t('th.status'), t('sb.st_' . $B['status'])], [t('sb.priority'), t('sb.pr_' . (in_array($B['priority'] ?? '', SB_PRIORITIES, true) ? $B['priority'] : 'normal'))], [t('sb.project'), trim((string)($B['project_code'] ?? '') . ' ' . (string)($B['sub_code'] ?? '') . ' ' . (string)($B['sub_name'] ?? ''))], [t('sb.owner'), (string)($B['owner_name'] ?? '')], [t('sb.target'), (string)($B['target_date'] ?? '')],
             [t('sb.parts_margin'), (float)$B['parts_margin']], [t('sb.flat'), (int)$B['flat_on'] ? (float)$B['flat_rate'] : '—'], [t('sb.cost_rate'), (float)$B['cost_rate']], [t('sb.commission'), (float)$B['commission_pct']], ['', ''],
             [t('sb.labour') . ' — ' . t('sb.hours'), $r2($T['hours'])], [t('sb.labour') . ' — ' . t('sb.cost'), $r2($T['lab_cost'])], [t('sb.labour') . ' — ' . t('sb.sale'), $r2($T['lab_sale'])], [t('sb.parts') . ' — ' . t('sb.cost'), $r2($T['parts_cost'])], [t('sb.parts') . ' — ' . t('sb.sale'), $r2($T['parts_sale'])],
             [t('sb.expenses') . ' — ' . t('sb.cost'), $r2($T['exp_cost'])], [t('sb.expenses') . ' — ' . t('sb.sale'), $r2($T['exp_sale'])], [t('sb.total') . ' — ' . t('sb.cost'), $r2($T['cost'])], [t('sb.total') . ' — ' . t('sb.sale'), $r2($T['sale'])], [t('sb.margin') . ' %', $T['margin_pct']]];
