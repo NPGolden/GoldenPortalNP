@@ -1450,3 +1450,19 @@ Migration `install/migrate_cp_r97_002_sb_sources.sql`: `sb_budgets.is_template`,
 
 Language keys 9 002 each.
 
+## §289 v1.125.0 (R97-003) — System Budgets, release 3: BOM import, inventory proposals, AI description
+
+Migration `install/migrate_cp_r97_003_sb_assist.sql`: table `sb_import_rows` (budget, optional `part_id` of an existing line, file fields, `unit_cost`, proposed `item_id`, `match_kind`, `confidence`, `reason`). `sb_r3()` guards its use.
+
+**BOM import** — `sb_bom_stage()`: the header aliases of `bom_import_stage()` plus `price` (unit price / unit cost / LCO); matching by `sb_match_row()` = Golden code (100), maker part number (95), normalised part number (85) with `bom_imp_norm()`; unmatched rows → `sb_stage_ai()` (`ai_run('match')`, candidates from `bom_imp_candidates()`, batches of 25, accepted from confidence 50) when `ai_can('system_budget')`. At most 400 rows staged. Review page `views/system_budget_bom.php`; `sb_stage_apply()` in one transaction: accept → part line with `item_id`, free → free line, skip → nothing; cost = file price, else `sb_item_cost()` (lowest price on record → last price → average cost) with the origin; the 124-line limit is enforced and the rows that did not fit are reported. No inventory item is created from a budget (unlike the Engineering BOM).
+
+**Inventory proposals** — `sb_propose_stage()`: free lines (no `item_id`, not excluded) staged with `part_id`; match by code, then a token of the description (≥ 5 characters with a digit) equal to a normalised maker part number, then the assistant. Accept updates the line: `item_id`, cost kept when the line has one (origin "line cost kept · linked to <code>"), else inventory cost.
+
+**AI description** — `sb_ai_description()`: prompt from title, work packages (code, description, section, hours, remarks), parts (code, description, quantity, unit, EXCLUDED flag), other-cost headings and the existing description; no prices, costs, margins, people or customer data. The text is kept in the session (`$_SESSION['sb_ai'][id]`), shown once in the textarea with a notice and saved only by the user's Save. Page key `system_budget` added to `ai_all_pages()` — the administrator enables it in Settings › AI assistant; the per-user "can use AI" flag, the monthly cap, the rate limit and the usage log apply as everywhere.
+
+**Tested**: BOM file with exact, normalised, code and unmatched rows; review; apply; proposals from the description text; override by inventory code; AI disabled path. The assistant paths (matching and description) could not be run in the sandbox — no API key there — they use the calls already in service for the Engineering BOM and the report summaries.
+
+**Security review**: uploads as §287 (xlsx, 5 MB, parsed from the PHP temp file, nothing stored); all actions behind `sb_load_editable()`; row ids of the review are read back from the budget's own staged rows (a posted id of another budget is ignored); the override resolves an inventory code server-side; AI input is technical text only and its answers are treated as data (item ids accepted only among the candidates offered; description escaped through `rt_html`). Proposals without performance cost: (1) purge staged rows older than 30 days in the nightly job; (2) show the assistant's monthly cost per page in Settings › AI assistant.
+
+Language keys 9 062 each.
+

@@ -189,7 +189,7 @@ function sb_save_parts_from_post(int $id): int {
 /** Lowest known unit cost of an inventory item and where it comes from (lowest price on record, else last price, else average cost). */
 function sb_item_cost(array $i): array {
     $low = null; try { $low = one("SELECT p.unit_price, p.priced_at, co.name AS supplier FROM inv_prices p LEFT JOIN companies co ON co.id = p.supplier_id WHERE p.item_id = ? AND p.source <> 'rollup' AND p.unit_price > 0 ORDER BY p.unit_price ASC, p.priced_at DESC LIMIT 1", [(int)$i['id']]); } catch (Throwable $e) {}
-    if ($low) return [(float)$low['unit_price'], trim(t('sb.org_lowest') . ' · ' . (string)$low['supplier'] . ' · ' . (string)$low['priced_at'], ' ·')];
+    if ($low) return [(float)$low['unit_price'], implode(' · ', array_filter([t('sb.org_lowest'), (string)$low['supplier'], (string)$low['priced_at']], fn($x) => $x !== ''))];
     if ((float)($i['last_price'] ?? 0) > 0) return [(float)$i['last_price'], t('sb.org_last') . ($i['last_price_at'] ? ' · ' . $i['last_price_at'] : '')];
     if ((float)($i['avg_cost'] ?? 0) > 0) return [(float)$i['avg_cost'], t('sb.org_avg')];
     return [0.0, t('sb.org_none')];
@@ -486,4 +486,134 @@ function sb_export_xlsx(array $B): void {
         ['name' => 'Parts', 'header' => ['#', t('th.code'), t('sb.p_descr'), t('sb.qty'), t('sb.unit'), t('sb.unit_cost'), t('sb.margin_pct'), t('sb.unit_sale'), t('sb.cost'), t('sb.sale'), t('sb.origin'), t('th.remarks')], 'rows' => $par, 'widths' => [5, 14, 54, 9, 7, 12, 10, 12, 12, 12, 34, 34]],
         ['name' => 'Other costs', 'header' => [t('sb.x_kind'), t('sb.l_descr'), t('sb.cost'), t('sb.sale'), ''], 'rows' => $exp, 'widths' => [26, 50, 12, 12, 20]],
     ]);
+}
+
+/* ───────────── Release 3 (GAS-CP-R97-003): BOM import with review, inventory proposals for free lines, AI description draft ───────────── */
+
+function sb_r3(): bool { static $h = null; if ($h === null) { try { $h = sb_has() && (bool) scalar("SHOW TABLES LIKE 'sb_import_rows'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function sb_ai_on(): bool { return function_exists('ai_can') && ai_can('system_budget'); }
+function sb_stage_rows(int $id): array {
+    if (!sb_r3()) return [];
+    return all("SELECT r.*, i.code AS item_code, i.description AS item_desc, i.maker AS item_maker, i.factory_code AS item_pn, i.unit AS item_unit, i.last_price, i.last_price_at, i.avg_cost FROM sb_import_rows r LEFT JOIN inv_items i ON i.id = r.item_id WHERE r.budget_id = ? ORDER BY r.seq, r.id", [$id]);
+}
+/** Deterministic match of one row against the inventory — the rules of the Engineering BOM import: Golden code, maker part number, the same without spaces / dashes. */
+function sb_match_row(string $code, string $pn, string $maker, array $normMap): array {
+    if (!function_exists('stk_item_by_code')) return [null, 'none', 0, null];
+    if ($code !== '' && ($it = stk_item_by_code($code))) return [$it, 'code', 100, t('bom.imp_r_code')];
+    if ($pn !== '' && ($it = one(STK_SELECT . " WHERE i.status <> 'blocked' AND LOWER(i.factory_code) = LOWER(?)" . ($maker !== '' ? ' ORDER BY (LOWER(i.maker) = LOWER(?)) DESC' : '') . ' LIMIT 1', $maker !== '' ? [$pn, $maker] : [$pn]))) return [$it, 'part_no', 95, t('bom.imp_r_pn')];
+    if ($pn !== '' && ($nk = bom_imp_norm($pn)) !== '' && isset($normMap[$nk]) && ($it = stk_item((int)($normMap[$nk][mb_strtolower($maker)] ?? reset($normMap[$nk]))))) return [$it, 'part_no_norm', 85, t('bom.imp_r_pn_norm')];
+    return [null, 'none', 0, null];
+}
+function sb_norm_map(): array { $m = []; try { foreach (all("SELECT id, maker, factory_code FROM inv_items WHERE status <> 'blocked' AND factory_code IS NOT NULL AND factory_code <> ''") as $x) { $k = bom_imp_norm((string)$x['factory_code']); if ($k !== '') $m[$k][mb_strtolower((string)$x['maker'])] = (int)$x['id']; } } catch (Throwable $e) {} return $m; }
+/** Ask the assistant to choose among inventory candidates for the staged rows still unmatched (batches of 25, at most 124). Only descriptions, makers, part numbers and units leave the portal. */
+function sb_stage_ai(int $id): int {
+    if (!sb_ai_on() || !function_exists('bom_imp_candidates')) return 0;
+    $rows = all("SELECT * FROM sb_import_rows WHERE budget_id = ? AND match_kind = 'none' AND decision = 'pending' ORDER BY seq LIMIT " . SB_MAX_PARTS, [$id]); $done = 0;
+    foreach (array_chunk($rows, 25) as $chunk) {
+        $lines = []; $cands = [];
+        foreach ($chunk as $r) {
+            $c = bom_imp_candidates($r); if (!$c) continue; $cands[(int)$r['seq']] = array_column($c, null, 'id');
+            $lines[] = 'Row ' . $r['seq'] . ': ' . $r['description'] . ($r['maker'] ? ' | maker ' . $r['maker'] : '') . ($r['part_no'] ? ' | part no ' . $r['part_no'] : '') . ' | unit ' . $r['unit']
+                . "\n  candidates: " . implode('; ', array_map(fn($x) => $x['id'] . ' [' . $x['code'] . '] ' . $x['description'] . ($x['maker'] ? ' · ' . $x['maker'] : '') . ($x['factory_code'] ? ' · pn ' . $x['factory_code'] : '') . ' · ' . $x['unit'], $c));
+        }
+        if (!$lines) continue;
+        $res = ai_run('match', [], implode("\n", $lines), null, 'system_budget'); if (empty($res['ok'])) throw new RuntimeException((string)($res['error'] ?? 'AI'));
+        foreach ((array)($res['matches'] ?? []) as $seq => $m) {
+            if (!isset($cands[$seq])) continue;
+            if (empty($m['item']) || !isset($cands[$seq][$m['item']]) || $m['confidence'] < 50) { if ($m['reason'] !== '') q("UPDATE sb_import_rows SET reason = ? WHERE budget_id = ? AND seq = ? AND match_kind = 'none'", [mb_substr('AI: ' . $m['reason'], 0, 255), $id, $seq]); continue; }
+            q("UPDATE sb_import_rows SET item_id = ?, match_kind = 'ai', confidence = ?, reason = ? WHERE budget_id = ? AND seq = ? AND match_kind = 'none'", [(int)$m['item'], (int)$m['confidence'], mb_substr('AI: ' . $m['reason'], 0, 255), $id, $seq]); $done++;
+        }
+    }
+    return $done;
+}
+/** Stage a BOM file (the Engineering BOM template; a unit price / cost column is read when present): parse, match, keep for review. Nothing is written to the budget. */
+function sb_bom_stage(int $id, array $file): array {
+    $B = sb_load_editable($id); if (!sb_r3() || !function_exists('bom_imp_norm')) throw new RuntimeException(t('err.noaccess'));
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string)$file['tmp_name'])) throw new RuntimeException(t('sb.imp_nofile'));
+    if ((int)$file['size'] > SB_IMPORT_MAX || strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION)) !== 'xlsx') throw new RuntimeException(t('sb.imp_badfile'));
+    require_once __DIR__ . '/xlsx.php'; $rows = xlsx_rows((string)$file['tmp_name']); if (count($rows) < 2) throw new RuntimeException(t('sb.bom_empty'));
+    $H = ['section' => ['section', 'τμήμα', 'area', 'system', 'panel', 'location'], 'qty' => ['qty', 'quantity', 'q.ty', 'ποσότητα', 'ποσ.', 'pcs', 'amount'], 'unit' => ['unit', 'um', 'uom', 'μ.μ', 'μ.μ.', 'μον.'],
+          'description' => ['description', 'desc', 'περιγραφή', 'designation', 'item description', 'material'], 'maker' => ['maker', 'manufacturer', 'brand', 'κατασκευαστής', 'make', 'vendor'],
+          'part_no' => ['maker part no', 'part no', 'part no.', 'part number', 'p/n', 'pn', 'type', 'type no', 'article', 'article no', 'order code', 'factory code', 'κωδ. κατασκευαστή', 'ref'], 'code' => ['golden code', 'code', 'κωδικός', 'κωδ.', 'item code', 'our code', 'stock code'], 'note' => ['note', 'notes', 'remark', 'remarks', 'σημείωση', 'comment'],
+          'price' => ['unit price', 'unit cost', 'price', 'cost', 'unit lco', 'unit lco (€)', 'lco', 'τιμή', 'τιμή μονάδας', 'κόστος']];
+    $hdrIdx = 0; foreach ($rows as $ri => $r) { $hits = 0; foreach ($r as $c) { $n = mb_strtolower(trim((string)$c)); foreach ($H as $alts) if ($n !== '' && in_array($n, $alts, true)) $hits++; } if ($hits >= 2) { $hdrIdx = $ri; break; } if ($ri > 10) break; }
+    $map = []; foreach ($rows[$hdrIdx] as $i => $h) { $n = mb_strtolower(trim((string)$h)); if ($n === '') continue; foreach ($H as $k => $alts) if (!isset($map[$k]) && in_array($n, $alts, true)) { $map[$k] = $i; break; } }
+    if (!isset($map['description'])) throw new RuntimeException(t('bom.imp_need_desc_col'));
+    $num = function ($v): ?float { $v = str_replace(['€', ' '], '', trim((string)$v)); if ($v === '') return null; if (preg_match('/^-?\d{1,3}(\.\d{3})+(,\d+)?$/', $v)) $v = str_replace('.', '', $v); $v = str_replace(',', '.', $v); return is_numeric($v) ? (float)$v : null; };
+    q('DELETE FROM sb_import_rows WHERE budget_id = ?', [$id]); $normMap = sb_norm_map(); $seq = 0; $st = ['rows' => 0, 'matched' => 0, 'none' => 0, 'ai' => 0, 'warn' => []];
+    foreach (array_slice($rows, $hdrIdx + 1) as $r) {
+        $g = fn(string $k, int $max = 255) => isset($map[$k]) ? mb_substr(trim((string)($r[$map[$k]] ?? '')), 0, $max) : '';
+        $desc = $g('description', 400); $code = $g('code', 60); $pn = $g('part_no', 80); $maker = $g('maker', 80); if ($desc === '' && $code === '' && $pn === '') continue;
+        [$it, $kind, $conf, $reason] = sb_match_row($code, $pn, $maker, $normMap); if ($desc === '' && $it) $desc = (string)$it['description']; if ($desc === '') continue;
+        if ($seq >= 400) { $st['warn'][] = t('sb.bom_cut', ['n' => 400]); break; }
+        $qty = $num($g('qty')) ?? 1.0; if ($qty <= 0) $qty = 1.0; $price = $num($g('price')); if ($price !== null && $price < 0) $price = null;
+        q('INSERT INTO sb_import_rows (budget_id, seq, section, qty, unit, description, maker, part_no, code, note, unit_cost, item_id, match_kind, confidence, reason) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+          [$id, ++$seq, $g('section', 80) ?: null, $qty, $it ? (string)$it['unit'] : (function_exists('stk_unit_norm') ? (stk_unit_norm($g('unit', 12)) ?: 'pcs') : ($g('unit', 12) ?: 'pcs')), $desc, $maker ?: null, $pn ?: null, $code ?: null, $g('note') ?: null, $price, $it ? (int)$it['id'] : null, $kind, $conf, $reason]);
+        $st['rows']++; $st[$kind === 'none' ? 'none' : 'matched']++;
+    }
+    if (!$st['rows']) throw new RuntimeException(t('sb.bom_empty'));
+    if ($st['none'] && sb_ai_on()) { try { $st['ai'] = sb_stage_ai($id); } catch (Throwable $e) { $st['warn'][] = 'AI: ' . $e->getMessage(); } }
+    sb_event($id, 'bom_staged', mb_substr(basename((string)$file['name']), 0, 120) . ' · ' . $st['rows']); return $st;
+}
+/** Propose inventory items for the free part lines of the budget (no inventory link yet): code, then part numbers found in the text, then the assistant. Staged for the same review. */
+function sb_propose_stage(int $id): array {
+    $B = sb_load_editable($id); if (!sb_r3() || !function_exists('bom_imp_norm')) throw new RuntimeException(t('err.noaccess'));
+    q('DELETE FROM sb_import_rows WHERE budget_id = ?', [$id]); $normMap = sb_norm_map(); $seq = 0; $st = ['rows' => 0, 'matched' => 0, 'none' => 0, 'ai' => 0, 'warn' => []];
+    foreach ($B['parts'] as $p) {
+        if ((int)$p['item_id'] || sb_part_excluded($p) || trim((string)$p['descr']) === '') continue;
+        $code = trim((string)$p['code']); $desc = (string)$p['descr']; $it = null; $kind = 'none'; $conf = 0; $reason = null; $pn = '';
+        [$it, $kind, $conf, $reason] = sb_match_row($code, '', '', $normMap);
+        if (!$it) foreach (preg_split('/[\s,;()]+/u', $desc) ?: [] as $tok) {   // a maker part number written inside the description (≥ 5 characters with a digit)
+            $nk = bom_imp_norm($tok); if (strlen($nk) < 5 || !preg_match('/\d/', $nk) || !isset($normMap[$nk])) continue;
+            if ($it = stk_item((int) reset($normMap[$nk]))) { $kind = 'part_no_norm'; $conf = 85; $reason = t('sb.prop_r_text', ['t' => $tok]); $pn = mb_substr($tok, 0, 80); break; }
+        }
+        q('INSERT INTO sb_import_rows (budget_id, part_id, seq, qty, unit, description, part_no, code, unit_cost, item_id, match_kind, confidence, reason) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+          [$id, (int)$p['id'], ++$seq, (float)$p['qty'], $p['unit'] ?: null, mb_substr($desc, 0, 400), $pn ?: null, $code ?: null, (float)$p['unit_cost'] > 0 ? (float)$p['unit_cost'] : null, $it ? (int)$it['id'] : null, $kind, $conf, $reason]);
+        $st['rows']++; $st[$kind === 'none' ? 'none' : 'matched']++;
+    }
+    if (!$st['rows']) throw new RuntimeException(t('sb.prop_none'));
+    if ($st['none'] && sb_ai_on()) { try { $st['ai'] = sb_stage_ai($id); } catch (Throwable $e) { $st['warn'][] = 'AI: ' . $e->getMessage(); } }
+    sb_event($id, 'proposed', (string)$st['rows']); return $st;
+}
+function sb_stage_discard(int $id): void { sb_load_editable($id); if (sb_r3()) q('DELETE FROM sb_import_rows WHERE budget_id = ?', [$id]); }
+/**
+ * Apply the review. Per row: accept = use the proposed (or the chosen) inventory item; free = keep as a free line; skip = leave out.
+ * BOM rows become part lines (cost: the file's price, else the item's lowest price on record); rows of existing lines only link the line
+ * to the item (its cost is filled from the inventory only when the line had none). Returns counts.
+ */
+function sb_stage_apply(int $id, array $dec, array $items): array {
+    $B = sb_load_editable($id); $rows = sb_stage_rows($id); $count = count($B['parts']); $n = ['accept' => 0, 'free' => 0, 'skip' => 0, 'left' => 0]; $pdo = db(); $pdo->beginTransaction();
+    try {
+        foreach ($rows as $r) {
+            $rid = (int)$r['id']; $d = (string)($dec[$rid] ?? 'skip'); if (!in_array($d, ['accept', 'free', 'skip'], true)) $d = 'skip';
+            $it = null; if ($d === 'accept') { $iid = (int)($items[$rid] ?? 0) ?: (int)$r['item_id']; $it = $iid ? one("SELECT * FROM inv_items WHERE id = ? AND status <> 'blocked'", [$iid]) : null; if (!$it) $d = (int)$r['part_id'] ? 'skip' : 'free'; }
+            if ((int)$r['part_id']) {   // an existing free line
+                if ($d === 'accept') { [$c, $org] = sb_item_cost($it); $has = (float)($r['unit_cost'] ?? 0) > 0;
+                    q('UPDATE sb_parts SET item_id = ?, unit_cost = ?, cost_origin = ?, unit = COALESCE(NULLIF(unit, \'\'), ?) WHERE id = ? AND budget_id = ?', [(int)$it['id'], $has ? (float)$r['unit_cost'] : $c, mb_substr($has ? t('sb.org_kept', ['c' => (string)$it['code']]) : $org, 0, 120), $it['unit'] ?: null, (int)$r['part_id'], $id]); $n['accept']++; }
+                else $n['skip']++;
+            } elseif ($d !== 'skip') {
+                if ($count >= SB_MAX_PARTS) { $n['left']++; continue; }
+                $cost = $r['unit_cost'] !== null ? (float)$r['unit_cost'] : 0.0; $org = $r['unit_cost'] !== null ? t('sb.org_file') : null;
+                if ($it && $r['unit_cost'] === null) [$cost, $org] = sb_item_cost($it);
+                $descr = trim((string)$r['description'] . ($r['maker'] ? ' · ' . $r['maker'] : '') . ($r['part_no'] ? ' · ' . $r['part_no'] : ''));
+                q('INSERT INTO sb_parts (budget_id, sort_order, code, item_id, descr, qty, unit, unit_cost, cost_origin, remarks) VALUES (?,?,?,?,?,?,?,?,?,?)', [$id, 9600 + (int)$r['seq'], mb_substr((string)($it ? $it['code'] : $r['code']), 0, 20) ?: null, $it ? (int)$it['id'] : null, mb_substr($descr, 0, 400), (float)$r['qty'], $it ? ($it['unit'] ?: $r['unit']) : $r['unit'], $cost, $org !== null ? mb_substr($org, 0, 120) : null, mb_substr(trim((string)$r['section'] . ($r['note'] ? ' · ' . $r['note'] : ''), ' ·'), 0, 500) ?: null]);
+                $count++; $n[$it ? 'accept' : 'free']++;
+            } else $n['skip']++;
+        }
+        q('DELETE FROM sb_import_rows WHERE budget_id = ?', [$id]); if ($B['status'] === 'draft') q("UPDATE sb_budgets SET status = 'working' WHERE id = ?", [$id]);
+        sb_recalc($id); sb_event($id, 'bom_applied', $n['accept'] . ' / ' . $n['free'] . ' / ' . $n['skip']); $pdo->commit(); return $n;
+    } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+}
+/** Draft of the description by the assistant, from the technical content only: title, work packages with hours, parts with quantities, kinds of other costs. No prices, costs, margins or people leave the portal. Returns the text — nothing is saved. */
+function sb_ai_description(int $id, string $ask = ''): string {
+    $B = sb_load_editable($id); if (!sb_ai_on()) throw new RuntimeException(t('sb.ai_off'));
+    $sec = sb_sections(); $L = ['System budget title: ' . $B['title']];
+    if ($B['labour']) { $L[] = 'Work packages (code | description | section | hours):'; foreach ($B['labour'] as $l) { $c = sb_labour_calc($B, $l); $L[] = '- ' . trim((string)$l['code']) . ' | ' . $l['descr'] . ' | ' . (string)($sec[(int)$l['section_id']]['name'] ?? ($l['bucket'] ?? '')) . ' | ' . sb_h($c['hours']) . ' h' . ($c['hours'] <= 0 ? ' (excluded / by others)' : '') . ($l['remarks'] ? ' | ' . mb_substr((string)$l['remarks'], 0, 160) : ''); } }
+    if ($B['parts']) { $L[] = 'Parts (code | description | quantity | unit):'; foreach (array_slice($B['parts'], 0, SB_MAX_PARTS) as $p) $L[] = '- ' . trim((string)$p['code']) . ' | ' . $p['descr'] . ' | ' . sb_h((float)$p['qty']) . ' | ' . (string)$p['unit'] . (sb_part_excluded($p) ? ' | EXCLUDED' : ''); }
+    if ($B['expenses']) $L[] = 'Other cost headings: ' . implode(', ', array_unique(array_map(fn($x) => (string)$x['descr'], $B['expenses'])));
+    if (trim((string)$B['description']) !== '') $L[] = "Existing description (keep its facts):\n" . mb_substr(rt_plain((string)$B['description']), 0, 3000);
+    $prompt = "Write the Description of this internal system budget for the sales department: (1) Scope of supply and works — one short paragraph; (2) Included — bullets grouped engineering / materials / installation / commissioning as applicable; (3) Excluded / by others — from the lines marked excluded or at 0 hours; (4) Assumptions and open points — only what the data supports. "
+            . "Use only the data below; do not invent quantities, makers, standards or dates; do not mention prices. Plain text with '- ' bullets and **bold** headings, at most 250 words." . (trim($ask) !== '' ? "\nExtra instruction from the user: " . mb_substr(trim($ask), 0, 400) : '') . "\n\n" . implode("\n", $L);
+    $res = ai_run('write', ['title' => t('sb.title'), 'headline' => sb_label($B)], $prompt, null, 'system_budget'); if (empty($res['ok'])) throw new RuntimeException((string)($res['error'] ?? 'AI'));
+    $txt = trim((string)$res['text']); if ($txt === '') throw new RuntimeException(t('ai.failed')); sb_event($id, 'ai_descr'); return mb_substr($txt, 0, 20000);
 }

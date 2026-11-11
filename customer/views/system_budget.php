@@ -10,6 +10,9 @@ $ed = !$isRev && sb_editable($B); $T = sb_totals($B); $cur = (string)$B['currenc
 $sec = sb_sections(); $dis = sb_disciplines(); $cards = sb_cards((string)$B['zone']); $staff = staff_users(); $blk = $ed && !$tpl ? sb_finish_blockers($B) : [];
 $subs = $ed ? all("SELECT s.id, s.code, s.name, p.project_code, p.name AS pname FROM subprojects s JOIN projects p ON p.id = s.project_id ORDER BY p.project_code DESC, s.sort_order, s.code LIMIT 3000") : [];
 $n2 = fn(float $v) => number_format($v, 2, ',', '.'); $hv = fn($v) => (float)$v > 0 ? sb_h((float)$v) : ''; $ro = $ed ? '' : ' readonly';
+$r3 = function_exists('sb_r3') && sb_r3(); $aiOn = $r3 && sb_ai_on(); $nStaged = $r3 && !$isRev ? (int) scalar('SELECT COUNT(*) FROM sb_import_rows WHERE budget_id = ?', [$id]) : 0;
+$aiDraft = !$isRev && $ed && isset($_SESSION['sb_ai'][$id]) ? (string)$_SESSION['sb_ai'][$id] : null; unset($_SESSION['sb_ai'][$id]);
+$nFree = 0; foreach ($B['parts'] as $fp) if (!(int)($fp['item_id'] ?? 0) && !sb_part_excluded($fp) && trim((string)$fp['descr']) !== '') $nFree++;
 $nNewL = 3; $nNewP = min(5, max(0, SB_MAX_PARTS - count($B['parts']))); $com = sb_comments($id); $ev = sb_events($id);
 layout_head(sb_label($B) . ' · ' . $B['title'], 'system_budgets');
 ?>
@@ -85,9 +88,13 @@ layout_head(sb_label($B) . ' · ' . $B['title'], 'system_budgets');
 <div class="card" id="descr">
   <div class="card-head"><h2>📝 <?= tt('sb.description') ?></h2></div>
   <?php if ($ed): ?><form method="post" action="<?= $self ?>#descr" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_descr"><input type="hidden" name="id" value="<?= $id ?>">
-    <div class="field"><textarea name="description" rows="<?= max(6, min(24, substr_count((string)$B['description'], "\n") + 3)) ?>" maxlength="60000" placeholder="<?= tt('sb.descr_ph') ?>"><?= e((string)$B['description']) ?></textarea></div>
-    <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit"><?= tt('btn.save') ?></button></div>
-  </form><?php else: ?><div class="rt"><?= trim((string)$B['description']) !== '' ? rt_html((string)$B['description']) : '<p class="hint">—</p>' ?></div><?php endif; ?>
+    <?php if ($aiDraft !== null): ?><p class="flash flash--warn" style="margin:0 0 8px;">✨ <?= tt('sb.ai_review') ?></p><?php endif; $dTxt = $aiDraft ?? (string)$B['description']; ?>
+    <div class="field"><textarea name="description" rows="<?= max(6, min(26, substr_count($dTxt, "\n") + 3)) ?>" maxlength="60000" placeholder="<?= tt('sb.descr_ph') ?>"><?= e($dTxt) ?></textarea></div>
+    <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit"><?= tt('btn.save') ?></button><?php if ($aiDraft !== null): ?><a class="btn btn--ghost btn--sm" href="<?= $self ?>#descr"><?= tt('sb.ai_drop') ?></a><?php endif; ?></div>
+  </form>
+  <?php if ($aiOn): ?><form method="post" action="<?= $self ?>#descr" data-lock style="margin-top:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="sb_ai_descr"><input type="hidden" name="id" value="<?= $id ?>">
+    <div class="field" style="margin:0;"><div style="display:flex;gap:8px;"><input name="ask" maxlength="400" placeholder="<?= tt('sb.ai_ask_ph') ?>"><button class="btn btn--sm" type="submit" style="white-space:nowrap;">✨ <?= tt('sb.ai_draft') ?></button></div><p class="hint" style="margin:4px 0 0;"><?= tt('sb.ai_hint') ?></p></div>
+  </form><?php endif; ?><?php else: ?><div class="rt"><?= trim((string)$B['description']) !== '' ? rt_html((string)$B['description']) : '<p class="hint">—</p>' ?></div><?php endif; ?>
 </div>
 
 <div class="card" id="labour">
@@ -141,6 +148,21 @@ layout_head(sb_label($B) . ' · ' . $B['title'], 'system_budgets');
   </tbody></table></div>
   <?php if ($ed): ?><div class="btn-row" style="margin-top:8px;"><button class="btn btn--gold btn--sm" type="submit"><?= tt('sb.save_lines') ?></button><span class="hint"><?= tt('sb.parts_lines_hint') ?></span></div><?php endif; ?>
   </form>
+  <?php if ($ed && $r3): ?>
+  <?php if ($nStaged): ?><p class="flash flash--warn" style="margin:12px 0 0;"><?= e(t('sb.stage_waiting', ['n' => $nStaged])) ?> <a href="<?= url('system_budget_bom', ['id' => $id]) ?>"><b><?= tt('sb.stage_open') ?> ›</b></a></p><?php endif; ?>
+  <div class="grid grid-2" style="align-items:start;margin-top:12px;">
+    <form method="post" action="<?= $self ?>#parts" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_bom_upload"><input type="hidden" name="id" value="<?= $id ?>">
+      <h3 style="margin:0 0 6px;">📑 <?= tt('sb.bom_title') ?></h3>
+      <div class="field"><input type="file" name="file" accept=".xlsx" required><p class="hint" style="margin:4px 0 0;"><?= tt('sb.bom_hint') ?></p></div>
+      <div class="btn-row"><button class="btn btn--sm" type="submit"><?= tt('sb.bom_btn') ?></button></div>
+    </form>
+    <form method="post" action="<?= $self ?>#parts" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_propose"><input type="hidden" name="id" value="<?= $id ?>">
+      <h3 style="margin:0 0 6px;">🔎 <?= tt('sb.prop_title') ?></h3>
+      <p class="hint" style="margin:0 0 8px;"><?= e(t($aiOn ? 'sb.prop_hint_ai' : 'sb.prop_hint', ['n' => $nFree])) ?></p>
+      <div class="btn-row"><button class="btn btn--sm" type="submit"<?= $nFree ? '' : ' disabled' ?>><?= tt('sb.prop_btn') ?></button></div>
+    </form>
+  </div>
+  <?php endif; ?>
   <?php if ($ed && count($B['parts']) < SB_MAX_PARTS && ($inv = sb_inv_options())): ?>
   <form method="post" action="<?= $self ?>#parts" data-lock style="margin-top:12px;"><?= csrf_field() ?><input type="hidden" name="action" value="sb_part_inv"><input type="hidden" name="id" value="<?= $id ?>">
     <h3 style="margin:0 0 6px;">📦 <?= tt('sb.inv_add') ?></h3>
