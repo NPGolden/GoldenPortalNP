@@ -1550,3 +1550,11 @@ No SQL. Root `index.php`: `<a class="land-banner" href="https://www.goldenas.com
 
 **Security review**: a plain outbound link — `rel="noopener"` keeps the opened page from reaching back into the entry page; no script, no tracking parameter, no third-party resource is loaded. The proposal of §296 (close `/employee/` once confirmed unused) stays open.
 
+## §298 v1.127.6 (R97-012) — entry page: renamed door, no caching
+
+No SQL. After v1.127.4 / v1.127.5 the entry page still showed two doors: the root `index.php` sent no cache headers, so the firewall (Sucuri) and the browser served their stored copy of the page and of `assets/portal.css`. The page now sends `Cache-Control: no-store, no-cache, must-revalidate, max-age=0` (+ `Pragma`, `Expires`) and links the stylesheet as `assets/portal.css?v=<file time>`. The door reads "Golden A/S Portal" (badge G; "Projects, documents, service & procurement · Πρόοδος έργων · Stato progetti").
+
+The copy the firewall already holds is not removed by a release: it expires by itself, or at once with Sucuri › Performance › Clear cache. Check without waiting: `https://goldensas.com/index.php?fresh=1`.
+
+**Security review**: no-store on a page without personal data costs one small PHP response per visit; nothing else changes. The proposal of §296 stays open.
+

@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.127.5** (build 2026-11-11). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.127.6** (build 2026-11-11). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.127.6 | GAS-CP-R97-012 | 2026-11-11 | Entry page goldensas.com: the door is named "Golden A/S Portal"; the page is never cached (browser, firewall) and its stylesheet carries a version, so a change shows at once. | — |
 | 1.127.5 | GAS-CP-R97-011 | 2026-11-11 | Entry page goldensas.com: banner with a link to the company website www.goldenas.com.gr under the portal door. | — |
 | 1.127.4 | GAS-CP-R97-010 | 2026-11-11 | Entry page goldensas.com: the Employee Portal door was removed — procurement, warehouse and dispatch are part of the portal; one door, centred. | — |
 | 1.127.3 | GAS-CP-R97-009 | 2026-11-11 | Website statistics: the trend chart keeps a fixed size — with only a few days or months of data the bars are no longer stretched over the whole page. | — |

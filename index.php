@@ -1,4 +1,7 @@
-<?php /* goldensas.com — portal entry. GAS-APP-PORTAL-001 · R97-010: the Employee Portal door was removed — procurement, warehouse and dispatch are part of the portal */ ?>
+<?php /* goldensas.com — portal entry. GAS-APP-PORTAL-001 · R97-010: the Employee Portal door was removed — procurement, warehouse and dispatch are part of the portal
+   R97-012: never cached (browser, firewall cache) — a changed entry page must show at once; the stylesheet carries its file time for the same reason. */
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0'); header('Pragma: no-cache'); header('Expires: 0');
+$cssV = (int) @filemtime(__DIR__ . '/assets/portal.css'); ?>
 <!doctype html>
 <html lang="en">
 <head>
@@ -7,7 +10,7 @@
 <title>Golden Automation Systems — Portal</title>
 <link rel="icon" href="assets/favicon.png" type="image/png">
 <link rel="apple-touch-icon" href="assets/favicon.png">
-<link rel="stylesheet" href="assets/portal.css">
+<link rel="stylesheet" href="assets/portal.css?v=<?= $cssV ?>">
 </head>
 <body>
 <div class="land">
@@ -19,9 +22,9 @@
   </div>
   <div class="doors doors--one">
     <a class="door" href="customer/">
-      <span class="badge">C</span>
-      <b>Customer Portal</b>
-      <span>Project status &amp; documents · Πρόοδος έργων · Stato progetti</span>
+      <span class="badge">G</span>
+      <b>Golden A/S Portal</b>
+      <span>Projects, documents, service &amp; procurement · Πρόοδος έργων · Stato progetti</span>
     </a>
   </div>
   <a class="land-banner" href="https://www.goldenas.com.gr/" target="_blank" rel="noopener">

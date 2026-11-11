@@ -1,8 +1,8 @@
 {
     "name": "Golden A/S Customer Portal",
-    "version": "1.127.5",
+    "version": "1.127.6",
     "build": "2026-11-11",
-    "generated_at": "2026-11-11T15:42:46+00:00",
+    "generated_at": "2026-11-11T15:47:35+00:00",
     "count": 786,
     "files": {
         ".htaccess": {
@@ -10,8 +10,8 @@
             "size": 181
         },
         "CHANGELOG.md": {
-            "sha256": "b0d3ffb95bcce3e1fcdf700fd6ccbc8f0a5e3ea6d68a96fe405eac246b2a1026",
-            "size": 150308
+            "sha256": "1ff1f9c440311550aace4dac7cb67ecbea8dea7bbf50a1fb6b01d2c54afbb17a",
+            "size": 150570
         },
         "README.md": {
             "sha256": "aaac31c2a33e616de5c3dc217d5e2f5b7803f116db21e3d4a01cfb1b96e4b974",
@@ -930,8 +930,8 @@
             "size": 6873
         },
         "customer/app/version.php": {
-            "sha256": "ad68f2127372dcf8baeac388257f1d416cbaf3d860f94313469a42a442716b18",
-            "size": 193571
+            "sha256": "12f6ea8864383f8c4beff123eb05554729b8f24ab3b5bd5a8b3265f4d6fe6396",
+            "size": 193876
         },
         "customer/app/vh.php": {
             "sha256": "e48f7d44763f6ac11691f44d3be783d532dc2788a159710b6bd796808936ac76",
@@ -2170,8 +2170,8 @@
             "size": 33407
         },
         "customer/views/_manual_golden.php": {
-            "sha256": "ca5b2535169d2245d753bae941cf5144fcbf4c87df3872add40a6ca7f974f634",
-            "size": 275912
+            "sha256": "922c5d4a627a5964f828a75588a0ffc6b4552eafbcb7010da88f6575763a2187",
+            "size": 276082
         },
         "customer/views/_manual_hr.php": {
             "sha256": "d693399fd8906874ed58331828d6bf8dae5b9e14247f0cc0327533fe78d6b868",
@@ -3146,8 +3146,8 @@
             "size": 5107
         },
         "index.php": {
-            "sha256": "e251de26e4fa6c0fc3de005be989d43204191a079588619b43cd88560792335e",
-            "size": 1533
+            "sha256": "9645dd7981fc492272310a3a14205b683007eeb266e317a19a7d767d8e157604",
+            "size": 1900
         }
     }
 }
