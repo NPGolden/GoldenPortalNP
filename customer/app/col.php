@@ -55,8 +55,10 @@ function col_open(array $f = []): array {
     $rows = all(COL_SELECT . ' WHERE ' . implode(' AND ', $w) . ' ORDER BY v.name, p.project_code, pi.due_date IS NULL, pi.due_date, pi.id', $a);
     $today = date('Y-m-d'); $t0 = strtotime($today); $out = [];
     foreach ($rows as $r) {
-        $open = round((float)$r['open_sum'], 2); if ($open <= 0.005) continue;   // R95-004: invoice → gross − paid; proforma → gross − invoiced − advances
+        $open = round((float)$r['open_sum'], 2); $isCr = $r['kind'] === 'credit';
+        if ($isCr ? $open >= -0.005 : $open <= 0.005) continue;   // R95-004: invoice → gross − paid − credits; proforma → gross − invoiced − advances; R95-006: credit note → −(not applied, not refunded)
         $due = $r['due_date'] ?: null; $age = $due ? (int) floor(($t0 - strtotime($due)) / 86400) : (int) floor(($t0 - strtotime((string)$r['issue_date'])) / 86400) - 30;
+        if ($isCr) $age = 0;   // a credit is never overdue
         $r['open'] = $open; $r['age'] = $age; $r['bucket'] = col_bucket($age); $r['overdue'] = $age > 0;
         $r['expected'] = $r['fu_promise'] ?: ($due ?: date('Y-m-d', strtotime((string)$r['issue_date'] . ' +30 days')));
         $r['promise_missed'] = $r['fu_promise'] && $r['fu_promise'] < $today;
@@ -182,10 +184,12 @@ function col_statement(array $vesselIds, ?string $asOf = null, ?string $from = n
     $vs = all("SELECT v.*, c.name AS customer_name, c.address AS c_address, c.city AS c_city, c.postal_code AS c_postal, c.country AS c_country, c.vat_no AS c_vat, c.email AS c_email FROM vessels v LEFT JOIN customers c ON c.id = v.customer_id WHERE v.id IN ({$vin}) ORDER BY " . ($orgId ? '' : 'c.name, ') . 'v.name');
     if ($orgId && array_filter($rows, fn($r) => !(int)$r['vessel_id'])) $vs[] = ['id' => 0, 'name' => t('soa.no_vessel'), 'imo' => null, 'customer_id' => $party['customer_id'], 'customer_name' => $party['org_name'], 'c_address' => null, 'c_city' => null, 'c_postal' => null, 'c_country' => null, 'c_vat' => null, 'c_email' => null];
     if (!$vs) return null;
-    $ids = array_map(fn($r) => (int)$r['id'], $rows); $pay = []; $inv = [];
+    $ids = array_map(fn($r) => (int)$r['id'], $rows); $pay = []; $inv = []; $crIn = []; $crOut = [];
     if ($ids) {   // R95-004: payments on each ledger row (invoice payments on the invoice, advances on the proforma); links = the invoices settling a proforma
         $pin = implode(',', $ids);
         foreach (all("SELECT pp.*, NULL AS invoice_no FROM proforma_payments pp WHERE pp.proforma_id IN ({$pin}) AND pp.paid_on <= ? ORDER BY pp.paid_on, pp.id", [$asOf]) as $p) $pay[(int)$p['proforma_id']][] = $p;
+        // R95-006: credit notes applied to an invoice (dated by the credit note) reduce what is open on it; what a credit note applied reduces its own (negative) balance
+        if (function_exists('cn_has') && cn_has()) foreach (all("SELECT k.credit_id, k.invoice_id, k.amount FROM pi_credits k JOIN proformas x ON x.id = k.credit_id WHERE (k.invoice_id IN ({$pin}) OR k.credit_id IN ({$pin})) AND x.issue_date <= ? AND x.status <> 'cancelled'", [$asOf]) as $k) { $crIn[(int)$k['invoice_id']] = ($crIn[(int)$k['invoice_id']] ?? 0.0) + (float)$k['amount']; $crOut[(int)$k['credit_id']] = ($crOut[(int)$k['credit_id']] ?? 0.0) + (float)$k['amount']; }
         foreach (all("SELECT l.proforma_id, l.amount, x.id, x.pi_no AS invoice_no, x.issue_date AS invoice_date, x.gross, (SELECT COALESCE(SUM(pp.amount),0) FROM proforma_payments pp WHERE pp.proforma_id = x.id AND pp.paid_on <= ?) AS paid_amount FROM pi_links l JOIN proformas x ON x.id = l.invoice_id WHERE l.proforma_id IN ({$pin}) ORDER BY x.issue_date, x.id", [$asOf]) as $x) $inv[(int)$x['proforma_id']][] = $x;
     }
     $t0 = strtotime($asOf); $G = ['invoiced' => 0.0, 'paid' => 0.0, 'open' => 0.0, 'overdue' => 0.0, 'n' => 0, 'n_open' => 0, 'buckets' => array_fill_keys(COL_BUCKETS, 0.0)]; $cur = 'EUR'; $out = [];
@@ -196,10 +200,11 @@ function col_statement(array $vesselIds, ?string $asOf = null, ?string $from = n
             $ps = $pay[(int)$r['id']] ?? []; $paidTo = 0.0; foreach ($ps as $p) $paidTo += (float)$p['amount'];
             $links = $inv[(int)$r['id']] ?? []; $invTo = 0.0; foreach ($links as $x) if ((string)$x['invoice_date'] <= $asOf) $invTo += (float)$x['amount'];
             if ($r['kind'] !== 'invoice' && $links && $invTo + 0.005 >= (float)$r['gross'] && $paidTo <= 0.005) continue;   // fully invoiced proforma: its invoices are the statement lines
-            $gross = $r['kind'] === 'invoice' ? (float)$r['gross'] : max(0.0, (float)$r['gross'] - $invTo);   // a partly invoiced proforma shows its not-yet-invoiced remainder
-            $open = max(0.0, round($gross - $paidTo, 2)); $age = $r['due_date'] ? (int) floor(($t0 - strtotime($r['due_date'])) / 86400) : 0; $od = $open > 0.005 && $r['due_date'] && $r['due_date'] < $asOf;
-            $r['payments'] = $ps; $r['invoices'] = $links; $r['paid_to'] = $paidTo; $r['gross'] = $gross; $r['open'] = $open; $r['age'] = $age; $r['overdue'] = $od; $r['bucket'] = $open > 0.005 ? col_bucket($age) : null;
-            $V['items'][] = $r; $V['n']++; $V['invoiced'] += $gross; $V['paid'] += min($gross, $paidTo); $V['open'] += $open; if ($open > 0.005) { $V['n_open']++; $V['buckets'][$r['bucket']] += $open; } if ($od) $V['overdue'] += $open; $V['cur'] = $r['currency']; $cur = $r['currency'];
+            $isCr = $r['kind'] === 'credit'; $crd = $isCr ? ($crOut[(int)$r['id']] ?? 0.0) : ($r['kind'] === 'invoice' ? ($crIn[(int)$r['id']] ?? 0.0) : 0.0);
+            $gross = in_array($r['kind'], ['invoice', 'credit'], true) ? (float)$r['gross'] : max(0.0, (float)$r['gross'] - $invTo);   // a partly invoiced proforma shows its not-yet-invoiced remainder; a credit note is negative
+            $open = $isCr ? min(0.0, round($gross + $crd - $paidTo, 2)) : max(0.0, round($gross - $paidTo - $crd, 2)); $age = $r['due_date'] && !$isCr ? (int) floor(($t0 - strtotime($r['due_date'])) / 86400) : 0; $od = $open > 0.005 && $r['due_date'] && $r['due_date'] < $asOf;
+            $r['payments'] = $ps; $r['invoices'] = $links; $r['paid_to'] = $paidTo; $r['credited'] = $crd; $r['gross'] = $gross; $r['open'] = $open; $r['age'] = $age; $r['overdue'] = $od; $r['bucket'] = abs($open) > 0.005 ? col_bucket($age) : null;
+            $V['items'][] = $r; $V['n']++; $V['invoiced'] += $gross; $V['paid'] += $isCr ? $paidTo : min($gross, $paidTo); $V['open'] += $open; if (abs($open) > 0.005) { $V['n_open']++; $V['buckets'][$r['bucket']] += $open; } if ($od) $V['overdue'] += $open; $V['cur'] = $r['currency']; $cur = $r['currency'];
             if (!$V['iv'] && $r['id']) { $ivId = (int) scalar('SELECT invoicing_id FROM proformas WHERE id = ?', [(int)$r['id']]); if ($ivId && function_exists('iv_load')) $V['iv'] = iv_load($ivId); }
         }
         foreach (['invoiced', 'paid', 'open', 'overdue', 'n', 'n_open'] as $k) $G[$k] += $V[$k]; foreach (COL_BUCKETS as $b) $G['buckets'][$b] += $V['buckets'][$b];
@@ -261,9 +266,9 @@ function col_statement_pdf(array $D): string {
         $need(16); $hrow(); $proj = null;
         foreach ($V['items'] as $r) {
             if ($r['project_id'] !== $proj) { $proj = $r['project_id']; $need(12); $pdf->setFont('B', 7.5); $pdf->setColor($navy); $pdf->text($L + 1.5, $y + 4, trim(($r['project_code'] ?: '') . ' — ' . $r['project_name'])); $y += 5.5; }
-            $desc = (function_exists('pi_is_invoice') && pi_is_invoice($r) ? $T('pi.k_invoice') . ' · ' : '') . (string)$r['title'] . ($r['offer_no'] ? ' · ' . $r['offer_no'] : '') . (!empty($r['settles_nos']) ? ' · ' . $T('pi.settles_short', ['n' => $r['settles_nos']]) : '') . (!pi_is_invoice($r) && $r['invoice_nos'] ? ' · ' . $T('pi.invoice_no') . ' ' . $r['invoice_nos'] : '');   // R94-001: direct invoices carry their kind
+            $desc = (($r['kind'] ?? '') === 'credit' ? $T('cn.one') . ' · ' : (function_exists('pi_is_invoice') && pi_is_invoice($r) ? $T('pi.k_invoice') . ' · ' : '')) . (string)$r['title'] . (($r['kind'] ?? '') === 'invoice' && ($r['credited'] ?? 0) > 0.005 ? ' · ' . $T('cn.credited_short', ['v' => col_money((float)$r['credited'], (string)$r['currency'])]) : '') . ($r['offer_no'] ? ' · ' . $r['offer_no'] : '') . (!empty($r['settles_nos']) ? ' · ' . $T('pi.settles_short', ['n' => $r['settles_nos']]) : '') . (!pi_is_invoice($r) && $r['invoice_nos'] ? ' · ' . $T('pi.invoice_no') . ' ' . $r['invoice_nos'] : '');   // R94-001: direct invoices carry their kind
             $pdf->setFont('R', 7.4); $lines = $pdf->wrap($desc, 44); $noLines = $pdf->wrap((string)$r['pi_no'], 26); $hh = max(5.2, max(count($lines), count($noLines) + ($r['overdue'] ? 1 : 0)) * 3.6 + 1.6); $need($hh + 4 * count($r['payments']) + 6);
-            $x = $L; $cells = [fmt_date($r['issue_date']), (string)$r['pi_no'], null, $r['due_date'] ? fmt_date($r['due_date']) : '—', $m((float)$r['gross']), $m($r['paid_to']), $r['open'] > 0.005 ? $m($r['open']) : '—'];
+            $x = $L; $cells = [fmt_date($r['issue_date']), (string)$r['pi_no'], null, $r['due_date'] ? fmt_date($r['due_date']) : '—', $m((float)$r['gross']), $m($r['paid_to']), abs($r['open']) > 0.005 ? $m($r['open']) : '—'];
             foreach ($cells as $i => $val) { $pdf->setColor($i === 3 && $r['overdue'] ? $red : $ink); if ($i === 2) foreach ($lines as $k => $ln) $pdf->text($x + 1.5, $y + 3.6 + $k * 3.6, $ln); elseif ($i === 1) foreach ($noLines as $k => $ln) $pdf->text($x + 1.5, $y + 3.6 + $k * 3.6, $ln); else $pdf->text($x + 1.5, $y + 3.6, (string)$val, $cols[$i][2], $cols[$i][1] - 3); $x += $cols[$i][1]; }
             if ($r['overdue']) { $pdf->setFont('B', 6.6); $pdf->setColor($red); $pdf->text($cx[1] + 1.5, $y + 3.6 + 3.6 * count($noLines), $T('soa.overdue_days', ['n' => $r['age']])); }
             $y += $hh;

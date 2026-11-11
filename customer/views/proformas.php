@@ -6,13 +6,13 @@ if (!function_exists('pi_can_view') || !pi_can_view()) { http_response_code(403)
 $f = ['status' => (string)($_GET['status'] ?? 'open'), 'vessel' => (int)($_GET['vessel'] ?? 0), 'pm' => (int)($_GET['pm'] ?? 0), 'project' => (int)($_GET['project'] ?? 0), 'q' => trim((string)($_GET['q'] ?? ''))];
 $rows = pi_list($f); $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : '';
 $tot = ['gross' => 0.0, 'paid' => 0.0, 'open' => 0.0, 'overdue' => 0.0]; $cur = 'EUR';
-foreach ($rows as $r) { if (in_array($r['status'], ['draft', 'cancelled'], true)) continue; $cur = $r['currency']; $g = $r['kind'] === 'invoice' ? (float)$r['gross'] : max(0.0, (float)$r['gross'] - (float)($r['inv_sum'] ?? 0)); $tot['gross'] += $g; $tot['paid'] += min($g, (float)($r['adv_sum'] ?? $r['paid_sum'])); $o = max(0, (float)($r['open_sum'] ?? ((float)$r['gross'] - (float)$r['paid_sum']))); $tot['open'] += $o; if (pi_overdue($r)) $tot['overdue'] += $o; }
+foreach ($rows as $r) { if (in_array($r['status'], ['draft', 'cancelled'], true)) continue; $cur = $r['currency']; $isCr = $r['kind'] === 'credit'; $g = in_array($r['kind'], ['invoice', 'credit'], true) ? (float)$r['gross'] : max(0.0, (float)$r['gross'] - (float)($r['inv_sum'] ?? 0)); $tot['gross'] += $g; $tot['paid'] += $isCr ? (float)($r['adv_sum'] ?? 0) : min($g, (float)($r['adv_sum'] ?? $r['paid_sum'])); $o = $isCr ? (float)$r['open_sum'] : max(0, (float)($r['open_sum'] ?? ((float)$r['gross'] - (float)$r['paid_sum']))); $tot['open'] += $o; if (pi_overdue($r)) $tot['overdue'] += $o; }
 $c = []; foreach (all("SELECT status, COUNT(*) n FROM proformas GROUP BY status") as $x) $c[$x['status']] = (int)$x['n']; $nOver = (int) scalar("SELECT COUNT(*) FROM proformas WHERE status IN ('issued','sent','partly_paid') AND due_date < CURDATE()");
 $vessels = all("SELECT DISTINCT v.id, v.name FROM proformas pi JOIN vessels v ON v.id = pi.vessel_id ORDER BY v.name"); $pms = all("SELECT DISTINCT cu.id, cu.full_name FROM proformas pi JOIN projects p ON p.id = pi.project_id JOIN customer_users cu ON cu.id = p.pm_user_id ORDER BY cu.full_name");
 layout_head(t('pi.title'), 'proformas');
 ?>
 <div class="page-head"><div><h1>💶 <?= tt('pi.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('pi.lede') ?></p></div>
-  <?php if (function_exists('pi_kind_has') && pi_kind_has() && pi_can_invoices()): ?><div class="btn-row"><a class="btn btn--gold" href="<?= url('invoice_new') ?>">+ <?= tt('pi.di_new') ?></a></div><?php endif; ?></div>
+  <?php if (function_exists('pi_kind_has') && pi_kind_has() && pi_can_invoices()): ?><div class="btn-row"><a class="btn btn--gold" href="<?= url('invoice_new') ?>">+ <?= tt('pi.di_new') ?></a><?php if (function_exists('cn_has') && cn_has()): ?><a class="btn btn--ghost" href="<?= url('invoice_new', ['doc' => 'credit']) ?>">↩ <?= tt('cn.new') ?></a><?php endif; ?></div><?php endif; ?></div>
 <div class="kpi kpi--4">
   <a class="stat" href="<?= url('proformas', ['status' => 'open']) ?>"><b><?= (int)($c['issued'] ?? 0) + (int)($c['sent'] ?? 0) + (int)($c['partly_paid'] ?? 0) + (int)($c['draft'] ?? 0) ?></b><span class="s"><?= tt('pi.k_open') ?></span></a>
   <a class="stat<?= $nOver ? ' red' : '' ?>" href="<?= url('proformas', ['status' => 'overdue']) ?>"><b><?= $nOver ?></b><span class="s"><?= tt('pi.overdue') ?></span></a>
@@ -36,7 +36,7 @@ layout_head(t('pi.title'), 'proformas');
       <td><?= e($r['title']) ?><?= $r['term_n'] ? '<br><span class="hint">' . e(t('pt.instalment', ['n' => (int)$r['term_n']])) . '</span>' : '' ?></td>
       <td><?= e($r['vessel'] ?: '—') ?></td>
       <td><?= pr_link((int)$r['project_id'], $r['project_code'], $r['project_name']) ?><?= $r['sub_code'] ? '<br><span class="hint">' . e($r['sub_code']) . '</span>' : '' ?></td>
-      <td><?php if ($r['offer_id']): ?><a href="<?= url('offer', ['id' => (int)$r['offer_id']]) ?>"><?= e($r['offer_no']) ?></a><?php else: ?><?= pill('navy', t('pi.k_invoice')) ?><?php endif; ?></td>
+      <td><?php if ($r['offer_id']): ?><a href="<?= url('offer', ['id' => (int)$r['offer_id']]) ?>"><?= e($r['offer_no']) ?></a><?php else: ?><?= $r['kind'] === 'credit' ? pill('gold', t('cn.one')) : pill('navy', t('pi.k_invoice')) ?><?php endif; ?></td>
       <td class="date"><?= $r['issue_date'] ? e(fmt_date($r['issue_date'])) : '—' ?></td>
       <td class="date<?= $od ? ' is-late' : '' ?>"><?= $r['due_date'] ? e(fmt_date($r['due_date'])) : '—' ?><?= $od ? ' ' . pill('bad', t('pi.overdue')) : '' ?></td>
       <td class="num"><b><?= e(pi_money((float)$r['gross'], $r['currency'])) ?></b></td>

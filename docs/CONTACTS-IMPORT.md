@@ -1366,3 +1366,23 @@ Decisions 8 and 9 of 10/11/2026.
 4. Seven language keys used by views but never defined (`btn.filter`, `col.open` → `fr.open`, `im.working`, `pr.subs`, `pt.currency`, `sys.hidden`, `web.role`) — shown as raw keys; added × 5. `pay.exceeds` said "offer total" for a per-document cap; reworded (bg / uk were still in English).
 5. Collections Excel › Open items gained the Billing party column.
 
+## 283. v1.121.0 — Customer credit notes (GAS-CP-R95-006)
+
+Decisions of 11/11/2026: credit notes are issued for an invoice **and** standalone; for the amount not absorbed by an invoice the accountant chooses refund or carry-forward.
+
+**Schema** (`install/migrate_cp_r95_006_credit_notes.sql`, check `r95e` = `pi_credits`): `proformas.kind` gains `credit`; `proformas.credit_mode ENUM('refund','carry')`, `proformas.credit_of_id` (the invoice it was raised for, informative); `pi_credits (credit_id, invoice_id, amount)` unique per pair.
+
+**Convention**: a credit note row stores `amount_net`, `vat_amount`, `gross` **negative**; a refund is a **negative** `proforma_payments` row on the credit note. Every plain `SUM(gross)` / `SUM(amount)` therefore nets by itself.
+
+**SQL** (app/pi.php): `PI_CRIN_SQL` (credits applied to an invoice), `PI_CROUT_SQL` (applied by a credit note); `PI_OPEN_SQL` = `CASE kind WHEN 'credit' THEN gross + CROUT − payments WHEN 'invoice' THEN gross − payments − CRIN ELSE gross − advances − invoiced`; `PI_SELECT.cr_sum`. `pi_refresh_status()`: invoice settled by payments + credits, credit note by applications + refunds ("paid" = settled; no "paid" notification without money). `ppay_save_from_post()`: on a credit note the amount is stored negative, cap = |gross| − applied; an invoice's cap = gross − credits. `pi_delete()` refuses rows with applications. `pi_direct_create_from_post()` with `doc_kind=credit` (+ `credit_of`, `credit_mode`): copies project / sub-project / vessel / customer / identity / currency / party from the invoice, inserts negative, applies automatically (`cn_apply(…, null)`).
+
+**Module** `app/cn.php`: `cn_has, cn_modes, cn_remainder, cn_applied, cn_on_invoice, cn_for_invoice, cn_candidates, cn_apply, cn_unapply, cn_set_mode`. `cn_apply` enforces: both issued, same currency, same billing party (same project when no party), amount ≤ min(remainder, invoice open). Actions `cn_apply`, `cn_unapply`, `cn_mode` (index.php), all behind `pi_can_invoices()`.
+
+**Views**: `invoice_new.php` (`?doc=credit`, `?credit_of=<invoice>`), `proforma.php` (credit card: amount / applied / refunded / remainder + mode, applications, apply form, mode form; Refunds card when mode = refund or refunds exist; invoice page: Credit notes card + button), `proformas.php`, `collections.php` (pill, button).
+
+**Readers**: `col_open` keeps credit rows with a negative open (bucket "not due", never overdue); `col_statement` dates applications by the credit note (`crIn` / `crOut` as of the statement date), invoice lines carry "credited …"; `fs_totals_build`, `fr_data`, `inv_compute_many`, proforma list totals and `cf_data` (open credit = negative forecast) count credits negative.
+
+**Self-check**: `pi_credits` present; applications point to a credit note and an invoice; no credit note with a positive amount.
+
+**Security review**: no new endpoint; the three new actions and the creation path are gated by `pi_can_invoices()` inside the functions, CSRF as every POST, prepared statements, amounts parsed server-side and capped; `credit_mode` whitelisted; `credit_of` re-read from the database (project and party are taken from the invoice, never from the form); candidates are limited by the project scope. Proposals (no performance cost): (1) audit-trail entry for credit applications, removals and refunds with before / after amounts; (2) a second approval for refunds above a threshold (as in Payables); (3) restrict credit-note registration to the accounting role only (today: everyone who may register invoices).
+

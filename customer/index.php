@@ -96,6 +96,7 @@ require __DIR__ . '/app/nf.php';
 require __DIR__ . '/app/iv.php';
 require __DIR__ . '/app/party.php';   // R95-003 billing party
 require __DIR__ . '/app/vo.php';      // R95-005 vessel ownership periods
+require __DIR__ . '/app/cn.php';      // R95-006 customer credit notes
 require __DIR__ . '/app/ar.php';
 require __DIR__ . '/app/rp.php';
 require __DIR__ . '/app/kb.php';
@@ -241,6 +242,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             case 'vm_related_set': { require_staff(); vm_related_set((int)$_POST['vessel_id'], (int)($_POST['company_id'] ?? ($_POST['customer_id'] ?? 0)), (string)($_POST['role'] ?? 'other'), trim((string)($_POST['note'] ?? '')) ?: null); flash('good', t('vm.related_saved')); redirect('vessel', ['id' => (int)$_POST['vessel_id'], '_r' => uniqid()], '#vm-related'); }
             case 'vm_related_remove': { require_staff(); vm_related_remove((int)$_POST['id']); flash('good', t('vm.related_removed')); redirect('vessel', ['id' => (int)$_POST['vessel_id'], '_r' => uniqid()], '#vm-related'); }
+            case 'cn_apply': { require_staff(); $cid = (int)($_POST['id'] ?? 0); $amt = trim((string)($_POST['amount'] ?? '')); $v = cn_apply($cid, (int)($_POST['invoice_id'] ?? 0), $amt === '' ? null : (function_exists('of_parse_amount') ? of_parse_amount($amt) : (float) str_replace(',', '.', $amt))); flash('good', t('cn.applied_ok', ['v' => pi_money($v, 'EUR')])); redirect('proforma', ['id' => $cid, '_r' => uniqid()], '#credit'); }
+            case 'cn_unapply': { require_staff(); $cid = cn_unapply((int)($_POST['app_id'] ?? 0)); $back = (int)($_POST['back'] ?? 0) ?: $cid; flash('good', t('cn.unapplied_ok')); redirect('proforma', ['id' => $back, '_r' => uniqid()], '#credit'); }
+            case 'cn_mode': { require_staff(); $cid = (int)($_POST['id'] ?? 0); cn_set_mode($cid, (string)($_POST['credit_mode'] ?? '')); flash('good', t('cn.mode_saved')); redirect('proforma', ['id' => $cid, '_r' => uniqid()], '#credit'); }
             case 'vo_change': { require_staff(); $vid = (int)($_POST['vessel_id'] ?? 0); vo_change($vid, (int)($_POST['company_id'] ?? 0), (string)($_POST['date_from'] ?? ''), trim((string)($_POST['note'] ?? '')) ?: null); flash('good', t('vo.changed')); redirect('vessel', ['id' => $vid, '_r' => uniqid()], '#vo-owners'); }
             case 'vo_delete': { require_staff(); $vid = vo_delete((int)($_POST['id'] ?? 0)); flash('good', t('vo.deleted')); redirect('vessel', ['id' => $vid, '_r' => uniqid()], '#vo-owners'); }
             case 'isc_save': { iss_cat_save(); flash('good', t('isc.saved')); redirect('admin_issue_cats', ['_r' => uniqid()]); }

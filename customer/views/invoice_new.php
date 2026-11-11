@@ -20,19 +20,33 @@ $ivs = function_exists('iv_has') && iv_has() ? all("SELECT i.id, i.legal_name, i
 // R95-003: identities are offered per project — the party's first (★), then the vessel's (⚓), then other organisations linked to the vessel (🏢); the JS narrows the list to the chosen project
 $ivByProject = []; if (function_exists('pty_has') && pty_has()) foreach ($projects as $pp) { $PP = pty_project((int)$pp['id']); foreach (pty_identities($PP['org_id'], $PP['vessel_id'], (int)$pp['id']) as $iid => $ivr) $ivByProject[(int)$pp['id']][$iid] = pty_identity_label($ivr); }
 $vatDef = 24;
-layout_head(t('pi.di_new'), 'proformas');
+// R95-006 — the same form registers a customer CREDIT NOTE: ?doc=credit (standalone) or ?credit_of=<invoice> (for an invoice: project, party, identity and VAT follow it)
+$isCr = function_exists('cn_has') && cn_has() && (($_GET['doc'] ?? '') === 'credit' || !empty($_GET['credit_of']));
+$crOf = $isCr && (int)($_GET['credit_of'] ?? 0) ? pi_get((int)$_GET['credit_of']) : null; if ($crOf && ($crOf['kind'] !== 'invoice' || in_array($crOf['status'], ['draft', 'cancelled'], true))) $crOf = null;
+if ($crOf) { $curP = (int)$crOf['project_id']; $curS = (int)$crOf['subproject_id']; $vatDef = (float)$crOf['vat_pct']; if ($preNet <= 0) $preNet = (float)$crOf['amount_net']; if ($preTitle === '') $preTitle = t('cn.title_of', ['no' => $crOf['pi_no']]); }
+$crInvoices = $isCr && !$crOf ? all("SELECT pi.id, pi.pi_no, pi.gross, pi.currency, pi.issue_date, p.project_code, v.name AS vessel FROM proformas pi JOIN projects p ON p.id = pi.project_id LEFT JOIN vessels v ON v.id = pi.vessel_id WHERE pi.kind = 'invoice' AND pi.status NOT IN ('draft','cancelled')" . ($curP ? ' AND pi.project_id = ' . (int)$curP : '') . ' ORDER BY pi.issue_date DESC, pi.id DESC LIMIT 400') : [];
+$ttl = $isCr ? t('cn.new') : t('pi.di_new');
+layout_head($ttl, 'proformas');
 ?>
-<p class="eyebrow"><a href="<?= url('proformas') ?>"><?= tt('pi.title') ?></a> › <?= tt('pi.di_new') ?></p>
-<div class="page-head"><div><h1>🧾 <?= tt('pi.di_new') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('pi.di_lede') ?></p></div></div>
+<p class="eyebrow"><a href="<?= url('proformas') ?>"><?= tt('pi.title') ?></a> › <?= e($ttl) ?></p>
+<div class="page-head"><div><h1><?= $isCr ? '↩' : '🧾' ?> <?= e($ttl) ?></h1><p class="lede" style="margin-bottom:0;"><?= $isCr ? tt('cn.lede') : tt('pi.di_lede') ?></p></div>
+  <?php if (function_exists('cn_has') && cn_has() && !$AR): ?><div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('invoice_new', $isCr ? array_filter(['project' => $curP]) : array_filter(['doc' => 'credit', 'project' => $curP])) ?>"><?= $isCr ? '🧾 ' . tt('pi.di_new') : '↩ ' . tt('cn.new') ?></a></div><?php endif; ?></div>
 <div class="card" style="max-width:980px;">
   <form method="post" action="<?= url('invoice_new') ?>" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="pi_direct_create"><?php if ($AR): ?><input type="hidden" name="acc_report_id" value="<?= (int)$AR['id'] ?>"><?php endif; ?>
     <?php if ($AR): ?><p class="flash flash--info" style="margin:0 0 10px;">🧾 <?= e(t('pi.di_ar_note', ['no' => $AR['report_no'] . ' ' . $AR['revision'], 'h' => acc_h((float)$AR['total_hours']), 'v' => acc_m((float)$AR['total_net'], $AR['currency'] ?: 'EUR')])) ?> <a href="<?= url('acc_report', ['id' => (int)$AR['id']]) ?>"><?= tt('acc.report') ?> ›</a></p><?php endif; ?>
     <?php if ($FS): ?><p class="flash flash--info" style="margin:0 0 10px;">🛠 <?= e(t('pi.di_fsr_note', ['no' => $FS['report_no']])) ?> <a href="<?= url('fsr', ['id' => (int)$FS['id']]) ?>"><?= tt('fsr.title') ?> ›</a></p><?php endif; ?>
     <?php if ($preGross > 0): ?><p class="flash flash--info" style="margin:0 0 10px;">📐 <?= e(t('pi.di_gross_note', ['v' => number_format($preGross, 2, ',', '.')])) ?></p><?php endif; ?>
+    <?php if ($isCr): ?><input type="hidden" name="doc_kind" value="credit">
+      <?php if ($crOf): ?><input type="hidden" name="credit_of" value="<?= (int)$crOf['id'] ?>"><p class="flash flash--info" style="margin:0 0 10px;">↩ <?= e(t('cn.of_note', ['no' => $crOf['pi_no'], 'g' => pi_money((float)$crOf['gross'], (string)$crOf['currency']), 'o' => pi_money(max(0, (float)$crOf['open_sum']), (string)$crOf['currency'])])) ?> <a href="<?= url('proforma', ['id' => (int)$crOf['id']]) ?>"><?= e($crOf['pi_no']) ?> ›</a></p><?php endif; ?>
+      <div class="grid grid-2">
+        <?php if (!$crOf): ?><div class="field"><label for="credit_of"><?= tt('cn.of_lbl') ?></label><select id="credit_of" name="credit_of"><option value=""><?= tt('cn.standalone') ?></option><?php foreach ($crInvoices as $x): ?><option value="<?= (int)$x['id'] ?>"><?= e($x['pi_no'] . ' · ' . fmt_date((string)$x['issue_date']) . ' · ' . pi_money((float)$x['gross'], (string)$x['currency']) . ' · ' . $x['project_code'] . ($x['vessel'] ? ' · ' . $x['vessel'] : '')) ?></option><?php endforeach; ?></select><p class="hint" style="margin:4px 0 0;"><?= tt('cn.of_hint') ?></p></div><?php endif; ?>
+        <div class="field"><label for="credit_mode"><?= tt('cn.mode_lbl') ?></label><select id="credit_mode" name="credit_mode" data-nosearch><?php foreach (cn_modes() as $mk => $ml): ?><option value="<?= $mk ?>"<?= $mk === 'carry' ? ' selected' : '' ?>><?= e($ml) ?></option><?php endforeach; ?></select><p class="hint" style="margin:4px 0 0;"><?= tt('cn.mode_hint') ?></p></div>
+      </div>
+    <?php endif; ?>
     <div class="grid grid-3">
-      <div class="field"><label for="pi_no"><?= tt('pi.di_no') ?> *</label><input id="pi_no" name="pi_no" maxlength="60" required placeholder="<?= tt('pi.di_no_ph') ?>"></div>
+      <div class="field"><label for="pi_no"><?= $isCr ? tt('cn.no') : tt('pi.di_no') ?> *</label><input id="pi_no" name="pi_no" maxlength="60" required placeholder="<?= tt('pi.di_no_ph') ?>"></div>
       <div class="field"><label for="issue_date"><?= tt('pi.issue_date') ?> *</label><input id="issue_date" type="date" name="issue_date" value="<?= date('Y-m-d') ?>" required></div>
-      <div class="field"><label for="due_date"><?= tt('pi.due') ?></label><input id="due_date" type="date" name="due_date"></div>
+      <?php if (!$isCr): ?><div class="field"><label for="due_date"><?= tt('pi.due') ?></label><input id="due_date" type="date" name="due_date"></div><?php endif; ?>
     </div>
     <div class="grid grid-2">
       <div class="field"><label for="project_id"><?= tt('pr.one') ?> *</label><select id="project_id" name="project_id" required><option value="">—</option><?php foreach ($projects as $p): ?><option value="<?= (int)$p['id'] ?>" data-v="<?= (int)$p['vessel_id'] ?>" data-c="<?= (int)$p['customer_id'] ?>"<?= $curP === (int)$p['id'] ? ' selected' : '' ?>><?= e(trim(($p['project_code'] ?: '') . ' ' . $p['name']) . ($p['vessel'] ? ' · ' . $p['vessel'] : '') . ($p['customer'] ? ' · ' . $p['customer'] : '')) ?></option><?php endforeach; ?></select></div>
@@ -50,8 +64,8 @@ layout_head(t('pi.di_new'), 'proformas');
       <div class="field"><label for="file"><?= tt('pi.di_file') ?></label><input id="file" type="file" name="file" accept="application/pdf,image/*"></div>
       <div class="field"><label for="notes"><?= tt('pi.notes') ?></label><textarea id="notes" name="notes" rows="2" maxlength="2000"></textarea></div>
     </div>
-    <div class="btn-row"><button class="btn btn--gold" type="submit">✔ <?= tt('pi.di_register') ?></button><a class="btn btn--ghost" href="<?= url('proformas') ?>"><?= tt('btn.cancel') ?></a></div>
-    <p class="hint" style="margin:8px 0 0;"><?= tt('pi.di_hint') ?></p>
+    <div class="btn-row"><button class="btn btn--gold" type="submit">✔ <?= $isCr ? tt('cn.register') : tt('pi.di_register') ?></button><a class="btn btn--ghost" href="<?= url('proformas') ?>"><?= tt('btn.cancel') ?></a></div>
+    <p class="hint" style="margin:8px 0 0;"><?= $isCr ? tt('cn.hint') : tt('pi.di_hint') ?></p>
   </form>
 </div>
 <script nonce="<?= csp_nonce() ?>">

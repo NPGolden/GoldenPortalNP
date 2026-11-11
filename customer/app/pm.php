@@ -530,7 +530,7 @@ function inv_compute_many(array $subIds): array {
         if (function_exists('pi_has') && pi_has()) {
             // R95-004: every invoice is a ledger row (direct or settling proformas) → invoiced = Σ gross of invoice rows of the sub-project; proformas counted for information
             foreach (all("SELECT pi.subproject_id, pi.kind, pi.gross FROM proformas pi WHERE pi.subproject_id IN ($in) AND pi.status <> 'cancelled'") as $r) {
-                $k = (int)$r['subproject_id']; if ($r['kind'] === 'invoice') { $out[$k]['invoiced'] += (float)$r['gross']; $out[$k]['n_inv']++; } else $out[$k]['n_pi']++;
+                $k = (int)$r['subproject_id']; if ($r['kind'] === 'invoice') { $out[$k]['invoiced'] += (float)$r['gross']; $out[$k]['n_inv']++; } elseif ($r['kind'] === 'credit') $out[$k]['invoiced'] += (float)$r['gross'];   /* R95-006: negative */ else $out[$k]['n_pi']++;
             }
         }
         foreach (all("SELECT id, invoicing_override FROM subprojects WHERE id IN ($in) AND invoicing_override IS NOT NULL") as $r) $out[(int)$r['id']]['override'] = (string)$r['invoicing_override'];

@@ -28,7 +28,7 @@ layout_head(t('col.title'), 'collections');
 ?>
 <div class="page-head">
   <div><h1>📥 <?= tt('col.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('col.lede') ?></p></div>
-  <div class="btn-row"><?php if (function_exists('pi_kind_has') && pi_kind_has() && pi_can_invoices()): ?><a class="btn btn--gold btn--sm" href="<?= url('invoice_new') ?>">+ <?= tt('pi.di_new') ?></a><?php endif; ?><a class="btn btn--ghost btn--sm" href="<?= url('collections', $keep + ['format' => 'xlsx']) ?>">⤓ Excel</a><button type="button" class="btn btn--ghost btn--sm" data-print>🖨 <?= tt('btn.print') ?></button></div>
+  <div class="btn-row"><?php if (function_exists('pi_kind_has') && pi_kind_has() && pi_can_invoices()): ?><a class="btn btn--gold btn--sm" href="<?= url('invoice_new') ?>">+ <?= tt('pi.di_new') ?></a><?php if (function_exists('cn_has') && cn_has()): ?><a class="btn btn--ghost btn--sm" href="<?= url('invoice_new', ['doc' => 'credit']) ?>">↩ <?= tt('cn.new') ?></a><?php endif; ?><?php endif; ?><a class="btn btn--ghost btn--sm" href="<?= url('collections', $keep + ['format' => 'xlsx']) ?>">⤓ Excel</a><button type="button" class="btn btn--ghost btn--sm" data-print>🖨 <?= tt('btn.print') ?></button></div>
 </div>
 
 <div class="kpi kpi--4" style="margin-bottom:10px;">
@@ -128,7 +128,7 @@ layout_head(t('col.title'), 'collections');
       <tr class="col-group"><td colspan="12">⚓ <b><?= e($r['vessel'] ?: t('pr.novessel')) ?></b> › <?= pr_link((int)$r['project_id'], $r['project_code'], $r['project_name']) ?><?= $r['customer_name'] ? ' · ' . e($r['customer_name']) : '' ?><?= $r['pm_name'] ? ' · PM ' . e($r['pm_name']) : '' ?> <a class="hint" href="<?= url('report_fin', ['project' => (int)$r['project_id']]) ?>">(<?= tt('fr.title') ?>)</a></td></tr>
       <?php endif; $gSum += $r['open']; $gN++; $fid = 'fu' . (int)$r['id']; ?>
       <tr class="<?= $r['overdue'] ? 'is-late' : '' ?>">
-        <td class="mono"><a href="<?= url('proforma', ['id' => (int)$r['id']]) ?>"><b><?= e($r['pi_no']) ?></b></a><?= ($r['kind'] ?? '') === 'invoice' ? ' ' . pill('navy', t('pi.k_invoice')) : '' ?><?= !empty($r['invoice_nos']) ? '<br><span class="hint">🧾 ' . e($r['invoice_nos']) . '</span>' : '' ?><?= !empty($r['settles_nos']) ? '<br><span class="hint">' . e(t('pi.settles_short', ['n' => $r['settles_nos']])) . '</span>' : '' ?></td>
+        <td class="mono"><a href="<?= url('proforma', ['id' => (int)$r['id']]) ?>"><b><?= e($r['pi_no']) ?></b></a><?= ($r['kind'] ?? '') === 'invoice' ? ' ' . pill('navy', t('pi.k_invoice')) : (($r['kind'] ?? '') === 'credit' ? ' ' . pill('gold', t('cn.one')) : '') ?><?= !empty($r['invoice_nos']) ? '<br><span class="hint">🧾 ' . e($r['invoice_nos']) . '</span>' : '' ?><?= !empty($r['settles_nos']) ? '<br><span class="hint">' . e(t('pi.settles_short', ['n' => $r['settles_nos']])) . '</span>' : '' ?></td>
         <td><?= e($r['title']) ?><?= $r['term_n'] ? ' <span class="hint">' . e(t('pt.instalment', ['n' => (int)$r['term_n']])) . '</span>' : '' ?><br><span class="hint"><?= e($r['offer_no']) ?><?= $r['sub_code'] ? ' · ' . e($r['sub_code']) : '' ?><?= !empty($r['party_name']) && mb_strtolower((string)$r['party_name']) !== mb_strtolower((string)$r['customer_name']) ? ' · 🏛 ' . e($r['party_name']) : '' ?></span></td>
         <td class="date"><?= e(fmt_date($r['issue_date'])) ?></td>
         <td class="date<?= $r['overdue'] ? ' is-late' : '' ?>"><?= $r['due_date'] ? e(fmt_date($r['due_date'])) : '—' ?></td>

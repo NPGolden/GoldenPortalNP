@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.120.0';
-const CP_BUILD   = '2026-11-10';
+const CP_VERSION = '1.121.0';
+const CP_BUILD   = '2026-11-11';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R95-006', 'version' => '1.121.0', 'date' => '2026-11-11', 'title' => 'Customer credit notes in the one ledger: registered by number like a direct invoice (Register credit note), for an invoice or standalone; applied to one or more invoices of the same billing party; the amount not applied is refunded to the customer (refunds recorded on the credit note) or carried forward as a credit — the accountant chooses and can change it; invoices show their credit notes and what is still open; collections, statement of account, sub-project invoicing, financial report and cash flow count credit notes negative.', 'db' => 'install/migrate_cp_r95_006_credit_notes.sql', 'check' => 'r95e'],
         ['ref' => 'GAS-CP-R95-005', 'version' => '1.120.0', 'date' => '2026-11-10', 'title' => 'Parties plan — phase 3: statement of account per billing party (every document billed to the organisation, vessels and "no vessel" as sections; vessel statement kept as a filter, addressed to the party of its documents or to the owner of the period; PDF, Excel, e-mail card); billing-party filter and 🏛 party on the Collections open items; vessel ownership periods (Ownership history card, Change owner on a resale — nothing already issued is re-pointed; the vessel form records a changed customer as a period). Regression pass of phases 0–3: unlinking never deletes or shrinks a direct invoice (from_links), allocation cap on direct invoices, access check on bulk organisation linking, Print button of Website statistics, undefined language keys.', 'db' => 'install/migrate_cp_r95_005_ownership.sql', 'check' => 'r95d'],
         ['ref' => 'GAS-CP-R95-004', 'version' => '1.119.0', 'date' => '2026-11-10', 'title' => 'Parties plan — phase 2: one ledger. Invoices are documents (registered once by number, settling one or more proformas through pi_links); payments recorded once — on the invoice, or as advances on the proforma until invoiced; Σ invoices ≠ proforma gross is a warning only; caps per document; the invoice row of a direct invoice is linked to its accounting-report lines; service-report lines marked not chargeable at source carry a reason and are pre-excluded in accounting (accounting confirms); collections, statement, financial report and cash flow read the new sources.', 'db' => 'install/migrate_cp_r95_004_ledger.sql', 'check' => 'r95c'],
         ['ref' => 'GAS-CP-R95-003c', 'version' => '1.118.2', 'date' => '2026-11-10', 'title' => 'Identity pickers offer only the billing party\'s (★) and the vessel\'s (⚓) identities — to invoice the yard or the manager, choose them as billing party; ★ / ⚓ markers fixed; "default (billing party, else vessel)".', 'db' => null, 'check' => null],
@@ -420,6 +421,7 @@ function cp_migration_state(): array {
         'r95b' => $has("SHOW COLUMNS FROM projects LIKE 'billing_org_id'"),
         'r95c' => $has("SHOW TABLES LIKE 'pi_links'"),
         'r95d' => $has("SHOW TABLES LIKE 'vessel_owners'"),
+        'r95e' => $has("SHOW TABLES LIKE 'pi_credits'"),
         'r93b' => $has("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_inquiries' AND COLUMN_NAME = 'kind' AND COLUMN_TYPE LIKE '%contact%'"),
         'r93a' => $has("SHOW TABLES LIKE 'work_permits'"),
         'r92f' => $has("SHOW COLUMNS FROM rc_applications LIKE 'keep_until'"),
