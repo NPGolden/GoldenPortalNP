@@ -14,7 +14,7 @@ declare(strict_types=1);
 
 const FLT_PAGES = [
     'tickets'         => ['ctx' => ['view' => 'open'],        'keys' => ['q', 'vessel', 'customer', 'project', 'status', 'priority', 'category', 'side', 'assigned', 'aq', 'aperiod', 'afrom', 'ato', 'aopen', 'asort']],
-    'offers'          => ['ctx' => [],              'keys' => ['q', 'project', 'vessel', 'status']],
+    'offers'          => ['ctx' => [],              'keys' => ['q', 'project', 'vessel', 'status', 'branch']],
     'equipment'       => ['ctx' => [],              'keys' => ['q', 'maker', 'family', 'vessel', 'status']],
     'vessels'         => ['ctx' => [],              'keys' => ['q', 'customer', 'status', 'projects']],
     'projects'        => ['ctx' => [],              'keys' => ['q', 'customer', 'vessel', 'pm', 'branch', 'st', 'f']],

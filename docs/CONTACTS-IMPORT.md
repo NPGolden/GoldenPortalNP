@@ -1402,3 +1402,9 @@ Decisions of 11/11/2026: milestones = a list per project kept by the PM, pre-fil
 
 **Security review**: every write is gated inside the function by `xs_can_edit()` (administrator, management, the project's PM, PM role) and the project scope (`xs_project` → `scope_sql`); CSRF as every POST; the return address is rebuilt from validated fields (`xs_return`), never taken from the request — no open redirect; `period` is derived server-side from `kind` + `ref` and checked by pattern; rich text is rendered through `rt_html` (escaped); the SVG contains only numbers and escaped labels; the safety log asks for no names or medical details (stated on the form). Proposals (no performance cost): (1) audit-trail entries for released summaries and safety events; (2) notify management when a lost-time injury is recorded; (3) keep AI drafts out of the assistant provider's retention by enabling zero-retention on the API account, if available on the plan.
 
+## 285. v1.122.1 — Offers filtered per branch (GAS-CP-R96-002)
+
+`of_list($f)` accepts `branch`: `COALESCE(s.branch_id, p.branch_id, <default branch>) = ?` — the rule of `br_of()` (sub-project override, else project, else default); staff only, ignored for customers; the row now carries `branch_id`. `views/offers.php`: `$brOn` (staff, `br_has()`, `br_multi()`), select with `br_options()`, the tiles query takes the same branch, branch code beside the project; an unknown branch id is dropped. `app/flt.php`: `branch` added to the remembered keys of `offers`. No database change.
+
+**Security review**: the value is cast to int, checked against the active branches and bound as a parameter; customers never get the filter (their list stays scoped by `scope_sql`). No proposals beyond those of §284.
+

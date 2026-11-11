@@ -104,9 +104,11 @@ function of_list(array $f = []): array {
     [$scope, $args] = scope_sql('p'); $w = [$scope]; $ob = function_exists('ob_has') && ob_has(); $vcol = $ob ? 'COALESCE(o.vessel_id, p.vessel_id)' : 'p.vessel_id';
     foreach (['project' => 'o.project_id', 'sub' => 'o.subproject_id', 'vessel' => $vcol, 'customer' => 'p.customer_id'] + ($ob ? ['ticket' => 'o.ticket_id'] : []) as $k => $col) if (!empty($f[$k])) { $w[] = "{$col} = ?"; $args[] = (int)$f[$k]; }
     if (!is_staff()) $w[] = "o.status <> 'draft'";
+    // R96-002: branch of an offer = its sub-project's branch, else the project's, else the default branch (as br_of())
+    if (!empty($f['branch']) && is_staff() && function_exists('br_has') && br_has()) { $w[] = 'COALESCE(s.branch_id, p.branch_id, ?) = ?'; array_push($args, (int)br_default()['id'], (int)$f['branch']); }
     if (!empty($f['status'])) { if ($f['status'] === 'open') { $ks = of_open_statuses(); $w[] = 'o.status IN (' . implode(',', array_fill(0, count($ks), '?')) . ')'; array_push($args, ...$ks); } elseif (isset(of_status_defs()[$f['status']])) { $w[] = 'o.status = ?'; $args[] = $f['status']; } }
     if (!empty($f['q'])) { $sq = function_exists('num_has') && num_has(); $w[] = '(o.offer_no LIKE ? OR o.title LIKE ? OR p.project_code LIKE ? OR v.name LIKE ?' . ($sq ? ' OR o.sq_no LIKE ?' : '') . ')'; $l = '%' . $f['q'] . '%'; array_push($args, $l, $l, $l, $l); if ($sq) $args[] = $l; }
-    return all("SELECT o.*, p.project_code, p.name AS project_name, v.name AS vessel, c.name AS customer_name, s.code AS sub_code, s.name AS sub_name
+    return all("SELECT o.*, p.project_code, p.name AS project_name, v.name AS vessel, c.name AS customer_name, s.code AS sub_code, s.name AS sub_name, COALESCE(s.branch_id, p.branch_id) AS branch_id
                 FROM offers o JOIN projects p ON p.id = o.project_id LEFT JOIN vessels v ON v.id = {$vcol} LEFT JOIN customers c ON c.id = p.customer_id LEFT JOIN subprojects s ON s.id = o.subproject_id
                 WHERE " . implode(' AND ', $w) . " ORDER BY FIELD(o.status,'draft','sent','approved','in_progress','to_be_invoiced','rejected','cancelled','finished'), o.sent_at DESC, o.id DESC", $args);
 }

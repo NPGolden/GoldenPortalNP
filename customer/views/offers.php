@@ -4,9 +4,11 @@
 require __DIR__ . '/_layout.php';
 $u = require_login(); $staff = is_staff();
 if (!of_has()) { layout_head(t('of.title'), 'offers'); echo '<h1>' . tt('of.title') . '</h1><div class="flash flash--warn">' . tt('of.need_r15') . '</div>'; layout_foot(); return; }
-$f = ['project' => (int)($_GET['project'] ?? 0), 'vessel' => (int)($_GET['vessel'] ?? 0), 'status' => (string)($_GET['status'] ?? ''), 'q' => trim((string)($_GET['q'] ?? ''))];
+$brOn = $staff && function_exists('br_has') && br_has() && br_multi();   // R96-002: branch filter (staff, when more than one branch is active)
+$f = ['project' => (int)($_GET['project'] ?? 0), 'vessel' => (int)($_GET['vessel'] ?? 0), 'status' => (string)($_GET['status'] ?? ''), 'q' => trim((string)($_GET['q'] ?? '')), 'branch' => $brOn ? (int)($_GET['branch'] ?? 0) : 0];
+if ($f['branch'] && !isset(br_all(true)[$f['branch']])) $f['branch'] = 0;
 $rows = of_list($f);
-$all = of_list(array_filter(['project' => $f['project'], 'vessel' => $f['vessel']]));
+$all = of_list(array_filter(['project' => $f['project'], 'vessel' => $f['vessel'], 'branch' => $f['branch']]));
 $k = ['sent' => 0, 'sent_amount' => 0.0, 'approved' => 0, 'approved_amount' => 0.0, 'tbi' => 0, 'tbi_amount' => 0.0, 'rejected' => 0, 'oldest' => 0, 'ages' => []];
 foreach ($all as $o) {
     $a = (float)$o['amount'];
@@ -37,12 +39,13 @@ layout_head(t('of.title'), 'offers');
 </div>
 
 <div class="card card--tight">
-  <form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1.6fr 1fr 1fr 1fr auto;">
+  <form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1.6fr 1fr 1fr 1fr <?= $brOn ? '1fr ' : '' ?>auto;">
     <input type="hidden" name="p" value="offers">
     <div class="field"><label for="q"><?= tt('pr.search') ?></label><input id="q" name="q" value="<?= e($f['q']) ?>" placeholder="<?= tt('of.search_ph') ?>"></div>
     <div class="field"><label for="vessel"><?= tt('v.one') ?></label><select id="vessel" name="vessel"><option value=""><?= tt('flt.any') ?></option><?php foreach ($vessels as $v): ?><option value="<?= $v['id'] ?>"<?= $sel($v['id'], $f['vessel']) ?>><?= e($v['name']) ?></option><?php endforeach; ?></select></div>
     <div class="field"><label for="project"><?= tt('pr.one') ?></label><select id="project" name="project"><option value=""><?= tt('flt.any') ?></option><?php foreach ($projects as $pr): ?><option value="<?= $pr['id'] ?>"<?= $sel($pr['id'], $f['project']) ?>><?= e(($pr['project_code'] ?: '') . ' ' . $pr['name']) ?></option><?php endforeach; ?></select></div>
     <div class="field"><label for="status"><?= tt('th.status') ?></label><select id="status" name="status"><option value=""><?= tt('flt.any') ?></option><option value="open"<?= $sel('open', $f['status']) ?>><?= tt('of.st_open') ?></option><?php foreach (of_statuses() as $s): ?><option value="<?= $s ?>"<?= $sel($s, $f['status']) ?>><?= e(of_status_label($s)) ?></option><?php endforeach; ?></select></div>
+    <?php if ($brOn): ?><div class="field"><label for="branch"><?= tt('br.one') ?></label><select id="branch" name="branch" data-nosearch><option value=""><?= tt('flt.any') ?></option><?= br_options($f['branch'] ?: null) ?></select></div><?php endif; ?>
     <div class="fltbar-actions"><button class="btn" type="submit"><?= tt('btn.apply') ?></button><a class="btn btn--ghost" href="<?= url('offers', ['reset' => 1, 'reset' => 1]) ?>"><?= tt('btn.clear') ?></a></div>
   </form>
 </div>
@@ -56,7 +59,7 @@ layout_head(t('of.title'), 'offers');
       <tr<?= $vg ? ' data-vg="' . e(vg_slug($vgV)) . '"' : '' ?>>
         <td class="ref"><a href="<?= url('offer', ['id' => $o['id']]) ?>"><?= e($o['offer_no']) ?></a> <span class="hint"><?= e($o['revision']) ?></span> <?= of_origin_pill($o) ?><?= !empty($o['sq_no']) ? '<br><span class="hint mono" title="SQ">' . e($o['sq_no']) . '</span>' : '' ?></td>
         <td><strong><?= e($o['title']) ?></strong></td>
-        <td><?= e($o['project_code'] ?: $o['project_name']) ?><?= $o['sub_code'] ? '<br><span class="hint">' . e($o['sub_code'] . ' ' . $o['sub_name']) . '</span>' : '' ?></td>
+        <td><?= e($o['project_code'] ?: $o['project_name']) ?><?= $o['sub_code'] ? '<br><span class="hint">' . e($o['sub_code'] . ' ' . $o['sub_name']) . '</span>' : '' ?><?= $brOn ? ' <span class="hint" title="' . tt('br.one') . '">· ' . e((string)br_get((int)($o['branch_id'] ?? 0) ?: null)['code']) . '</span>' : '' ?></td>
         <td><?= e($o['vessel'] ?: '—') ?><?= $staff && $o['customer_name'] ? '<br><span class="hint">' . e($o['customer_name']) . '</span>' : '' ?></td>
         <td class="num"><b><?= e(of_money((float)$o['amount'], $o['currency'])) ?></b></td>
         <td class="date"><?= e(fmt_date($o['sent_at'])) ?><?= $o['valid_until'] ? '<br><span class="hint">' . tt('of.valid_until') . ' ' . e(fmt_date($o['valid_until'])) . '</span>' : '' ?></td>

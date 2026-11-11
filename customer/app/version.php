@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.122.0';
+const CP_VERSION = '1.122.1';
 const CP_BUILD   = '2026-11-11';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R96-002', 'version' => '1.122.1', 'date' => '2026-11-11', 'title' => 'Offers: filter by branch (sub-project branch, else project, else default) — list, tiles and remembered filter; branch code on every row.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R96-001', 'version' => '1.122.0', 'date' => '2026-11-11', 'title' => 'Weekly and monthly project reports open with an executive block: the summary paragraph (AI draft the project manager edits and releases; generated sentences until then), six tiles (progress actual, progress planned, SPI, drawings approved, open risks, LTI of the period), the progress S-curve (planned vs actual per week) and the milestones table (plan, forecast, status). New per project: Milestones (pre-filled from the sub-project deadlines) and the Safety log. On screen, in the printed monthly report and in the weekly PDF and Word.', 'db' => 'install/migrate_cp_r96_001_exec_summary.sql', 'check' => 'r96a'],
         ['ref' => 'GAS-CP-R95-006', 'version' => '1.121.0', 'date' => '2026-11-11', 'title' => 'Customer credit notes in the one ledger: registered by number like a direct invoice (Register credit note), for an invoice or standalone; applied to one or more invoices of the same billing party; the amount not applied is refunded to the customer (refunds recorded on the credit note) or carried forward as a credit — the accountant chooses and can change it; invoices show their credit notes and what is still open; collections, statement of account, sub-project invoicing, financial report and cash flow count credit notes negative.', 'db' => 'install/migrate_cp_r95_006_credit_notes.sql', 'check' => 'r95e'],
         ['ref' => 'GAS-CP-R95-005', 'version' => '1.120.0', 'date' => '2026-11-10', 'title' => 'Parties plan — phase 3: statement of account per billing party (every document billed to the organisation, vessels and "no vessel" as sections; vessel statement kept as a filter, addressed to the party of its documents or to the owner of the period; PDF, Excel, e-mail card); billing-party filter and 🏛 party on the Collections open items; vessel ownership periods (Ownership history card, Change owner on a resale — nothing already issued is re-pointed; the vessel form records a changed customer as a period). Regression pass of phases 0–3: unlinking never deletes or shrinks a direct invoice (from_links), allocation cap on direct invoices, access check on bulk organisation linking, Print button of Website statistics, undefined language keys.', 'db' => 'install/migrate_cp_r95_005_ownership.sql', 'check' => 'r95d'],
