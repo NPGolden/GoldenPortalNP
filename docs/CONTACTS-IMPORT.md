@@ -1434,3 +1434,19 @@ Design: GAS-2026-PORTAL-DES-001 R0, accepted by the team with the proposed answe
 
 Language keys 8 956 each (en, el, it translated; bg, uk English).
 
+## §288 v1.124.0 (R97-002) — System Budgets, release 2: revisions, copy, templates, ticket, Excel
+
+Migration `install/migrate_cp_r97_002_sb_sources.sql`: `sb_budgets.is_template`, `sb_budgets.copied_from`, key on `ticket_id`, table `sb_revisions` (budget, revision, note, snapshot JSON, totals). `sb_r2()` guards every use, so the code runs before the migration too.
+
+**Revisions**: `sb_snapshot()` = header settings (`SB_SNAP_HEAD`) + labour / part / other-cost rows without ids. `sb_revise()` stores the snapshot under the current number and increments `sb_budgets.revision`; `sb_revision_get()` shapes a stored revision like a budget for the same page (`?p=system_budget&id=N&rev=R`, read-only); `sb_restore()` first stores the working state as a revision, then `sb_write_snapshot()` in one transaction. Only while the budget is editable; templates have none.
+
+**Copy / templates**: `sb_copy($src, $title, $asTemplate)` — a new draft via `sb_create()` with the snapshot written in (no sub-project, no target date; `copied_from`). Template: `is_template = 1`, number `SBT-NNNN`, excluded from the list and the tiles, no status changes, deleted by management (`sb_delete_template`). Create form: `from` = template id.
+
+**Ticket**: `sb_from_ticket()` — returns the existing live budget of the ticket if there is one; else creates the budget (title `<ticket no> · <title>`, description starts with the request text, project / sub-project of the ticket, `ticket_id`), and resolves an open ticket through `tk_set_status()` with the fixed text `sb.tk_resolution`. Nothing is written to the ticket timeline with the budget number — customers read that timeline. The ticket page shows the button / the link only when `sb_can()`.
+
+**Excel**: `?p=system_budget_export&id=N[&rev=R]` → `sb_export_xlsx()` through the in-house writer.
+
+**Security review**: every new action passes `sb_guard()` / `sb_load_editable()`; export and revision pages behind `sb_can()` (customer: 403, tested); HR-scope account cannot convert a ticket (tested); snapshot rows are written back only through fixed column lists, so a stored JSON cannot set other columns; restore and copy are transactional; the customer-facing ticket shows no budget number or link. Proposals without performance cost: (1) log restore and template deletion in the audit trail; (2) cap stored revisions per budget (e.g. 50) to bound the table.
+
+Language keys 9 002 each.
+

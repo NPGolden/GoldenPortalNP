@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.123.0';
+const CP_VERSION = '1.124.0';
 const CP_BUILD   = '2026-11-11';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-002', 'version' => '1.124.0', 'date' => '2026-11-11', 'title' => 'System Budgets — release 2: revisions R0, R1 … before a budget is finished (view, restore), copy of any budget or revision to a new one, template budgets per system, start from a ticket request (the ticket is resolved automatically and linked; the customer reads only that the request is being quoted), Excel export of a budget or a revision.', 'db' => 'install/migrate_cp_r97_002_sb_sources.sql', 'check' => 'r97b'],
         ['ref' => 'GAS-CP-R97-001', 'version' => '1.123.0', 'date' => '2026-11-11', 'title' => 'System Budgets (Work menu; Sales, project managers, management): internal estimate of a system before the offer — labour lines per section, discipline or rate card with normal, travelling and overtime hours and daily allowances, up to 124 part lines (free or from inventory, cost and sale side by side, 40 % margin on cost), travelling expenses and other costs, rich-text description, optional flat labour rate, dashboard, comments, history; import of the GLD-BUD budget working file (Excel) with a review step, into a new or an existing budget.', 'db' => 'install/migrate_cp_r97_001_system_budgets.sql', 'check' => 'r97a'],
         ['ref' => 'GAS-CP-R96-003', 'version' => '1.122.2', 'date' => '2026-11-11', 'title' => 'Payments keep the proforma they were received for: an advance moved to an accounting invoice that settles several proformas is no longer spread pro rata over all of them; a payment on such an invoice can be assigned to one proforma or shared; unlinking returns the money to its proforma.', 'db' => 'install/migrate_cp_r96_003_payment_origin.sql', 'check' => 'r96b'],
         ['ref' => 'GAS-CP-R96-002', 'version' => '1.122.1', 'date' => '2026-11-11', 'title' => 'Offers: filter by branch (sub-project branch, else project, else default) — list, tiles and remembered filter; branch code on every row.', 'db' => null, 'check' => null],
@@ -429,6 +430,7 @@ function cp_migration_state(): array {
         'r96a' => $has("SHOW TABLES LIKE 'pm_milestones'"),
         'r96b' => $has("SHOW COLUMNS FROM proforma_payments LIKE 'for_pi'"),
         'r97a' => $has("SHOW TABLES LIKE 'sb_budgets'"),
+        'r97b' => $has("SHOW TABLES LIKE 'sb_revisions'"),
         'r93b' => $has("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_inquiries' AND COLUMN_NAME = 'kind' AND COLUMN_TYPE LIKE '%contact%'"),
         'r93a' => $has("SHOW TABLES LIKE 'work_permits'"),
         'r92f' => $has("SHOW COLUMNS FROM rc_applications LIKE 'keep_until'"),

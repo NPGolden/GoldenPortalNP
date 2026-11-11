@@ -3,7 +3,7 @@
 require __DIR__ . '/_layout.php';
 $u = sb_require();
 $f = ['status' => (string)($_GET['status'] ?? 'open'), 'q' => trim((string)($_GET['q'] ?? '')), 'owner' => (int)($_GET['owner'] ?? 0)];
-$rows = sb_list($f); $D = sb_dash(); $staff = staff_users();
+$rows = sb_list($f); $D = sb_dash(); $staff = staff_users(); $tpls = function_exists('sb_templates') ? sb_templates() : [];
 layout_head(t('sb.title'), 'system_budgets');
 ?>
 <div class="page-head">
@@ -22,7 +22,8 @@ layout_head(t('sb.title'), 'system_budgets');
     <h2>＋ <?= tt('sb.new') ?></h2>
     <form method="post" action="<?= url('system_budgets') ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_create">
       <div class="field"><label><?= tt('sb.f_title') ?> *</label><input name="title" maxlength="200" required placeholder="<?= tt('sb.title_ph') ?>"></div>
-      <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit"><?= tt('sb.create') ?></button></div>
+      <?php if ($tpls): ?><div class="field"><label><?= tt('sb.start_from') ?></label><select name="from" data-nosearch><option value="0"><?= tt('sb.start_blank') ?></option><?php foreach ($tpls as $tp): ?><option value="<?= (int)$tp['id'] ?>">★ <?= e($tp['title'] . ' · ' . (int)$tp['n_lab'] . ' L / ' . (int)$tp['n_parts'] . ' P') ?></option><?php endforeach; ?></select></div><?php endif; ?>
+      <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit"><?= tt('sb.create') ?></button><span class="hint"><?= tt('sb.start_hint') ?></span></div>
     </form>
   </div>
   <div class="card">
@@ -58,4 +59,10 @@ layout_head(t('sb.title'), 'system_budgets');
   </tbody></table></div>
   <?php endif; ?>
 </div>
+<?php if ($tpls): ?><div class="card" id="templates">
+  <div class="card-head"><h2>★ <?= tt('sb.tpl_many') ?> <span class="count"><?= count($tpls) ?></span></h2><span class="hint"><?= tt('sb.tpl_hint') ?></span></div>
+  <div class="table-scroll"><table class="tbl" style="max-width:1000px;"><thead><tr><th><?= tt('sb.no') ?></th><th><?= tt('sb.f_title') ?></th><th class="num"><?= tt('sb.labour') ?></th><th class="num"><?= tt('sb.parts') ?></th><th class="num"><?= tt('sb.hours') ?></th><th class="num"><?= tt('sb.sale') ?></th></tr></thead><tbody>
+  <?php foreach ($tpls as $tp): ?><tr><td class="mono"><a href="<?= url('system_budget', ['id' => (int)$tp['id']]) ?>"><b><?= e($tp['sb_no']) ?></b></a></td><td><?= e($tp['title']) ?></td><td class="num"><?= (int)$tp['n_lab'] ?></td><td class="num"><?= (int)$tp['n_parts'] ?></td><td class="num"><?= e(sb_h((float)$tp['tot_hours'])) ?></td><td class="num"><?= e(sb_money((float)$tp['tot_sale'], $tp['currency'])) ?></td></tr><?php endforeach; ?>
+  </tbody></table></div>
+</div><?php endif; ?>
 <?php layout_foot(); ?>

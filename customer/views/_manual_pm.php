@@ -103,6 +103,7 @@ return [
     ]],
     ['id' => 'system_budgets', 'title' => 'System Budgets (v1.123.0)', 'body' => [
       'System Budgets (v1.123.0): Work › System Budgets holds the internal estimate of a system before the offer — you see it as a project manager, together with Sales and management. Create one with a title, or import the GLD-BUD budget working file of the technical department: the portal shows what it read and fills the labour lines, the parts, the other costs and the description after you confirm.',
+      'System Budgets from tickets, revisions and templates (v1.124.0): on a customer\'s request press "Convert to System Budget" on the ticket — the ticket is resolved and linked, and the customer reads only that the request is being quoted. Keep revisions with New revision when prices or hours change, copy an older budget or start from a template instead of typing the lines again, and download the Excel for your file.',
       'In a System Budget: choose the sub-project (needed before Finish), enter hours per section and discipline or per rate card — normal, travelling, overtime and allowance days — the parts (free or from inventory, up to 124 lines, cost and sale side by side) and the travelling expenses. Use the comments to talk to Sales and the technical department. Finish locks the figures; management can reopen.',
     ]],
     ['id' => 'procurement', 'title' => 'Sales and Procurement tabs of the sub-project (v1.91.0)', 'body' => [

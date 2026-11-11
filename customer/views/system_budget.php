@@ -3,8 +3,11 @@
 require __DIR__ . '/_layout.php';
 $u = sb_require(); $id = (int)($_GET['id'] ?? 0); $B = sb_get($id);
 if (!$B) { http_response_code(404); layout_head(t('err.notfound'), 'system_budgets'); echo '<h1>' . tt('err.notfound') . '</h1>'; layout_foot(); return; }
-$ed = sb_editable($B); $T = sb_totals($B); $cur = (string)$B['currency']; $self = url('system_budget', ['id' => $id]);
-$sec = sb_sections(); $dis = sb_disciplines(); $cards = sb_cards((string)$B['zone']); $staff = staff_users(); $blk = $ed ? sb_finish_blockers($B) : [];
+$CUR = $B; $rvN = isset($_GET['rev']) && $_GET['rev'] !== '' ? (int)$_GET['rev'] : null; $isRev = false;
+if ($rvN !== null) { $V = sb_revision_get($B, $rvN); if ($V) { $B = $V; $isRev = true; } }   // R97-002: a stored revision is shown read-only
+$tpl = !empty($B['is_template']); $r2 = function_exists('sb_r2') && sb_r2(); $revs = $r2 && !$tpl ? sb_revisions($id) : []; $tkL = !empty($B['ticket_id']) && function_exists('tk_load') ? one('SELECT id, ticket_no, title FROM tickets WHERE id = ?', [(int)$B['ticket_id']]) : null;
+$ed = !$isRev && sb_editable($B); $T = sb_totals($B); $cur = (string)$B['currency']; $self = url('system_budget', ['id' => $id]);
+$sec = sb_sections(); $dis = sb_disciplines(); $cards = sb_cards((string)$B['zone']); $staff = staff_users(); $blk = $ed && !$tpl ? sb_finish_blockers($B) : [];
 $subs = $ed ? all("SELECT s.id, s.code, s.name, p.project_code, p.name AS pname FROM subprojects s JOIN projects p ON p.id = s.project_id ORDER BY p.project_code DESC, s.sort_order, s.code LIMIT 3000") : [];
 $n2 = fn(float $v) => number_format($v, 2, ',', '.'); $hv = fn($v) => (float)$v > 0 ? sb_h((float)$v) : ''; $ro = $ed ? '' : ' readonly';
 $nNewL = 3; $nNewP = min(5, max(0, SB_MAX_PARTS - count($B['parts']))); $com = sb_comments($id); $ev = sb_events($id);
@@ -12,19 +15,41 @@ layout_head(sb_label($B) . ' · ' . $B['title'], 'system_budgets');
 ?>
 <p class="eyebrow"><a href="<?= url('system_budgets') ?>"><?= tt('sb.title') ?></a> › <?= e(sb_label($B)) ?></p>
 <div class="page-head">
-  <div><h1>🧮 <?= e(sb_label($B)) ?> <?= sb_pill($B['status']) ?></h1><p class="lede" style="margin-bottom:0;"><?= e($B['title']) ?><?= $B['source_ref'] ? ' · <span class="hint">' . e(t('sb.from_file', ['r' => (string)$B['source_ref']])) . '</span>' : '' ?></p></div>
+  <div><h1>🧮 <?= e(sb_label($B)) ?> <?= sb_pill($B['status']) ?></h1><p class="lede" style="margin-bottom:0;"><?= e($B['title']) ?><?= $B['source_ref'] ? ' · <span class="hint">' . e(t('sb.from_file', ['r' => (string)$B['source_ref']])) . '</span>' : '' ?><?= $tkL ? ' · <a href="' . url('ticket', ['id' => (int)$tkL['id']]) . '">🎫 ' . e((string)$tkL['ticket_no']) . '</a>' : '' ?><?= $tpl ? ' ' . pill('navy', t('sb.tpl_one')) : '' ?></p></div>
   <div class="btn-row">
-    <?php if ($ed): ?>
+    <?php if ($r2): ?><a class="btn btn--ghost btn--sm" href="<?= url('system_budget_export', ['id' => $id] + ($isRev ? ['rev' => $rvN] : [])) ?>">⬇ Excel</a><?php endif; ?>
+    <?php if ($isRev): ?><a class="btn btn--sm" href="<?= $self ?>">‹ <?= e(t('sb.rev_current', ['r' => 'R' . (int)$CUR['revision']])) ?></a>
+      <?php if (sb_editable($CUR)): ?><form method="post" action="<?= $self ?>" class="inline" data-lock data-confirm="<?= e(t('sb.restore_confirm', ['r' => 'R' . $rvN])) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="sb_restore"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="rev" value="<?= $rvN ?>"><button class="btn btn--gold btn--sm" type="submit">↺ <?= tt('sb.restore') ?></button></form><?php endif; ?>
+    <?php elseif ($ed && !$tpl): ?>
       <form method="post" action="<?= $self ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_status"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="to" value="finished"><button class="btn btn--gold btn--sm" type="submit"<?= $blk ? ' disabled title="' . e(implode(' ', $blk)) . '"' : '' ?>>✔ <?= tt('sb.finish') ?></button></form>
       <form method="post" action="<?= $self ?>" class="inline" data-lock data-confirm="<?= tt('sb.cancel_confirm') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="sb_status"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="to" value="cancelled"><button class="btn btn--ghost btn--sm" type="submit"><?= tt('sb.cancel_it') ?></button></form>
     <?php elseif (in_array($B['status'], ['finished', 'cancelled'], true) && sb_can_reopen()): ?>
       <form method="post" action="<?= $self ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_status"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="to" value="working"><button class="btn btn--sm" type="submit">↺ <?= tt('sb.reopen') ?></button></form>
     <?php endif; ?>
-    <?php if (is_cp_admin() && in_array($B['status'], ['draft', 'cancelled'], true)): ?><form method="post" action="<?= $self ?>" class="inline" data-lock data-confirm="<?= tt('sb.delete_confirm') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="sb_delete"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost btn--sm" type="submit">🗑 <?= tt('btn.delete') ?></button></form><?php endif; ?>
+    <?php if ($tpl && sb_can_reopen()): ?><form method="post" action="<?= $self ?>" class="inline" data-lock data-confirm="<?= tt('sb.delete_confirm') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="sb_tpl_delete"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost btn--sm" type="submit">🗑 <?= tt('btn.delete') ?></button></form><?php endif; ?>
+    <?php if (!$isRev && !$tpl && is_cp_admin() && in_array($B['status'], ['draft', 'cancelled'], true)): ?><form method="post" action="<?= $self ?>" class="inline" data-lock data-confirm="<?= tt('sb.delete_confirm') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="sb_delete"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost btn--sm" type="submit">🗑 <?= tt('btn.delete') ?></button></form><?php endif; ?>
   </div>
 </div>
 <?php if ($ed && $blk): ?><p class="flash flash--info"><?= e(t('sb.to_finish') . ' ' . implode(' ', $blk)) ?></p><?php endif; ?>
-<?php if (!$ed): ?><p class="flash flash--info"><?= tt($B['status'] === 'finished' ? 'sb.locked_finished' : 'sb.locked') ?></p><?php endif; ?>
+<?php if ($isRev): ?><p class="flash flash--info"><?= e(t('sb.rev_viewing', ['r' => 'R' . $rvN, 'd' => fmt_datetime((string)$B['_rev']['created_at']), 'c' => 'R' . (int)$CUR['revision']])) ?><?= $B['_rev']['note'] ? ' — ' . e((string)$B['_rev']['note']) : '' ?></p>
+<?php elseif (!$ed): ?><p class="flash flash--info"><?= tt($B['status'] === 'finished' ? 'sb.locked_finished' : 'sb.locked') ?></p><?php endif; ?>
+<?php if ($tpl): ?><p class="flash flash--info"><?= tt('sb.tpl_banner') ?></p><?php endif; ?>
+
+<?php if ($r2): ?><div class="card" id="revisions">
+  <div class="card-head"><h2>🗂 <?= tt($tpl ? 'sb.use_title' : 'sb.rev_title') ?><?php if (!$tpl): ?> <span class="count"><?= count($revs) + 1 ?></span><?php endif; ?></h2><span class="hint"><?= tt($tpl ? 'sb.use_hint' : 'sb.rev_hint') ?></span></div>
+  <?php if (!$tpl): ?><div class="table-scroll"><table class="tbl" data-nosort style="max-width:1000px;"><thead><tr><th><?= tt('sb.rev') ?></th><th class="date"><?= tt('sb.rev_closed') ?></th><th><?= tt('th.by') ?></th><th><?= tt('sb.rev_note') ?></th><th class="num"><?= tt('sb.hours') ?></th><th class="num"><?= tt('sb.cost') ?></th><th class="num"><?= tt('sb.sale') ?></th><th></th></tr></thead><tbody>
+    <tr><td><b>R<?= (int)$CUR['revision'] ?></b> <?= pill('gold', t('sb.rev_cur')) ?></td><td class="date hint">—</td><td></td><td></td><td class="num"><?= e(sb_h((float)$CUR['tot_hours'])) ?></td><td class="num"><?= e(sb_money((float)$CUR['tot_cost'], $cur)) ?></td><td class="num"><b><?= e(sb_money((float)$CUR['tot_sale'], $cur)) ?></b></td><td><?= $isRev ? '<a class="btn btn--ghost btn--sm" href="' . $self . '">' . tt('btn.open') . '</a>' : '' ?></td></tr>
+    <?php foreach ($revs as $rv): ?><tr<?= $isRev && (int)$rv['revision'] === $rvN ? ' style="background:rgba(200,155,60,.10);"' : '' ?>><td><b>R<?= (int)$rv['revision'] ?></b></td><td class="date"><?= e(fmt_datetime((string)$rv['created_at'])) ?></td><td class="hint"><?= e((string)$rv['full_name']) ?></td><td class="hint"><?= e((string)$rv['note']) ?></td><td class="num"><?= e(sb_h((float)$rv['tot_hours'])) ?></td><td class="num"><?= e(sb_money((float)$rv['tot_cost'], $cur)) ?></td><td class="num"><?= e(sb_money((float)$rv['tot_sale'], $cur)) ?></td><td><a class="btn btn--ghost btn--sm" href="<?= url('system_budget', ['id' => $id, 'rev' => (int)$rv['revision']]) ?>"><?= tt('btn.open') ?></a></td></tr><?php endforeach; ?>
+  </tbody></table></div><?php endif; ?>
+  <div class="grid grid-2" style="align-items:end;margin-top:10px;">
+    <?php if ($ed && !$tpl): ?><form method="post" action="<?= $self ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_revise"><input type="hidden" name="id" value="<?= $id ?>">
+      <div class="field"><label><?= e(t('sb.rev_new_lbl', ['r' => 'R' . (int)$CUR['revision'], 'n' => 'R' . ((int)$CUR['revision'] + 1)])) ?></label><div style="display:flex;gap:8px;"><input name="note" maxlength="200" placeholder="<?= tt('sb.rev_note_ph') ?>"><button class="btn btn--sm" type="submit" style="white-space:nowrap;">＋ <?= tt('sb.rev_new') ?></button></div></div>
+    </form><?php else: ?><div></div><?php endif; ?>
+    <form method="post" action="<?= $self ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_copy"><input type="hidden" name="id" value="<?= $id ?>"><?php if ($isRev): ?><input type="hidden" name="rev" value="<?= $rvN ?>"><?php endif; ?>
+      <div class="field"><label><?= tt($tpl ? 'sb.use_lbl' : 'sb.copy_lbl') ?></label><div style="display:flex;gap:8px;"><input name="title" maxlength="200" placeholder="<?= tt('sb.copy_ph') ?>"><button class="btn btn--sm" type="submit" style="white-space:nowrap;">⧉ <?= tt($tpl ? 'sb.use_btn' : 'sb.copy_btn') ?></button><?php if (!$tpl): ?><button class="btn btn--ghost btn--sm" type="submit" name="template" value="1" style="white-space:nowrap;">★ <?= tt('sb.tpl_save') ?></button><?php endif; ?></div></div>
+    </form>
+  </div>
+</div><?php endif; ?>
 
 <div class="card" id="totals">
   <div class="card-head"><h2>Σ <?= tt('sb.totals') ?></h2><span class="hint"><?= tt('sb.totals_hint') ?></span></div>
@@ -143,7 +168,7 @@ layout_head(sb_label($B) . ' · ' . $B['title'], 'system_budgets');
   </form>
 </div>
 
-<?php if ($ed): ?><div class="card" id="import">
+<?php if ($ed && !$isRev): ?><div class="card" id="import">
   <h2>📥 <?= tt('sb.imp_title') ?></h2>
   <form method="post" action="<?= $self ?>#import" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_import_upload"><input type="hidden" name="into" value="<?= $id ?>">
     <div class="field"><input type="file" name="file" accept=".xlsx" required><p class="hint" style="margin:4px 0 0;"><?= tt('sb.imp_into_hint') ?></p></div>

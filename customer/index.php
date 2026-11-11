@@ -254,7 +254,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'sf_save': { require_staff(); $pid = sf_save_from_post(); flash('good', t('sf.saved')); redirect('project_ms', ['project' => $pid, '_r' => uniqid()], '#sf'); }
             case 'sf_delete': { require_staff(); $pid = sf_delete((int)($_POST['id'] ?? 0)); flash('good', t('sf.deleted')); redirect('project_ms', ['project' => $pid, '_r' => uniqid()], '#sf'); }
             // R97-001 System Budgets — every action re-checks sb_can() in app/sb.php
-            case 'sb_create': { require_staff(); $bid = sb_create((string)($_POST['title'] ?? '')); $b = sb_get($bid); flash('good', t('sb.created_ok', ['n' => sb_label($b)])); redirect('system_budget', ['id' => $bid]); }
+            case 'sb_create': { require_staff(); $from = (int)($_POST['from'] ?? 0); $src = $from ? sb_get($from) : null; if ($from && (!$src || !sb_can())) throw new RuntimeException(t('err.notfound')); $bid = $src ? sb_copy($src, (string)($_POST['title'] ?? '')) : sb_create((string)($_POST['title'] ?? '')); $b = sb_get($bid); flash('good', t('sb.created_ok', ['n' => sb_label($b)])); redirect('system_budget', ['id' => $bid]); }
             case 'sb_head': { require_staff(); $bid = (int)($_POST['id'] ?? 0); sb_save_head_from_post($bid); flash('good', t('sb.saved')); redirect('system_budget', ['id' => $bid, '_r' => uniqid()], '#head'); }
             case 'sb_descr': { require_staff(); $bid = (int)($_POST['id'] ?? 0); sb_save_description_from_post($bid); flash('good', t('sb.saved')); redirect('system_budget', ['id' => $bid, '_r' => uniqid()], '#descr'); }
             case 'sb_labour': { require_staff(); $bid = (int)($_POST['id'] ?? 0); $n = sb_save_labour_from_post($bid); flash('good', t('sb.lines_saved', ['n' => $n])); redirect('system_budget', ['id' => $bid, '_r' => uniqid()], '#labour'); }
@@ -264,6 +264,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'sb_status': { require_staff(); $bid = (int)($_POST['id'] ?? 0); sb_set_status($bid, (string)($_POST['to'] ?? '')); flash('good', t('sb.status_ok')); redirect('system_budget', ['id' => $bid, '_r' => uniqid()]); }
             case 'sb_comment': { require_staff(); $bid = (int)($_POST['id'] ?? 0); sb_comment_add($bid, (string)($_POST['body'] ?? '')); flash('good', t('sb.comment_ok')); redirect('system_budget', ['id' => $bid, '_r' => uniqid()], '#comments'); }
             case 'sb_delete': { require_staff(); sb_delete((int)($_POST['id'] ?? 0)); flash('good', t('sb.deleted_ok')); redirect('system_budgets'); }
+            // R97-002 revisions, copy, templates, ticket
+            case 'sb_revise': { require_staff(); $bid = (int)($_POST['id'] ?? 0); $n = sb_revise($bid, (string)($_POST['note'] ?? '')); flash('good', t('sb.rev_ok', ['r' => 'R' . $n])); redirect('system_budget', ['id' => $bid, '_r' => uniqid()]); }
+            case 'sb_restore': { require_staff(); $bid = (int)($_POST['id'] ?? 0); $n = sb_restore($bid, (int)($_POST['rev'] ?? -1)); flash('good', t('sb.restore_ok', ['r' => 'R' . (int)$_POST['rev'], 'n' => 'R' . $n])); redirect('system_budget', ['id' => $bid, '_r' => uniqid()]); }
+            case 'sb_copy': { require_staff(); sb_guard(); $bid = (int)($_POST['id'] ?? 0); $src = sb_get($bid); if (!$src) throw new RuntimeException(t('err.notfound')); if (isset($_POST['rev']) && $_POST['rev'] !== '') { $src = sb_revision_get($src, (int)$_POST['rev']); if (!$src) throw new RuntimeException(t('err.notfound')); }
+                $tpl = !empty($_POST['template']); $nid = sb_copy($src, (string)($_POST['title'] ?? ''), $tpl); $b = sb_get($nid); flash('good', t($tpl ? 'sb.tpl_ok' : 'sb.copy_ok', ['n' => sb_label($b)])); redirect('system_budget', ['id' => $nid]); }
+            case 'sb_tpl_delete': { require_staff(); sb_delete_template((int)($_POST['id'] ?? 0)); flash('good', t('sb.deleted_ok')); redirect('system_budgets', ['tab' => 'templates']); }
+            case 'sb_from_ticket': { require_staff(); $bid = sb_from_ticket((int)($_POST['ticket_id'] ?? 0)); $b = sb_get($bid); flash('good', t('sb.tk_ok', ['n' => sb_label($b)])); redirect('system_budget', ['id' => $bid]); }
             case 'sb_import_upload': { require_staff(); $into = (int)($_POST['into'] ?? 0); if ($into) sb_load_editable($into); $tk = sb_imp_stash($_FILES['file'] ?? []); redirect('system_budget_import', ['t' => $tk] + ($into ? ['into' => $into] : [])); }
             case 'sb_import_apply': { require_staff(); require_once __DIR__ . '/app/xlsx.php'; $tk = (string)($_POST['t'] ?? ''); $into = (int)($_POST['into'] ?? 0); $path = sb_imp_path($tk); if (!$path) throw new RuntimeException(t('sb.imp_expired'));
                 $X = sb_xlsx_parse($path); $fn = (string)($_SESSION['sb_imp'][$tk] ?? 'budget.xlsx'); $bs = []; foreach ((array)($_POST['bs'] ?? []) as $bk => $sv) if (in_array($bk, SB_BUCKETS, true)) $bs[$bk] = (int)$sv;
@@ -395,6 +402,7 @@ if ($page === 'tfile') { require_login(); tk_stream_file((int)($_GET['id'] ?? 0)
 if ($page === 'permit_file') { require_login(); pmt_stream_file((int)($_GET['id'] ?? 0)); }   // R93-001
 if ($page === 'bom_template') { require_staff(); bom_import_template(); }   // R93-006
 if ($page === 'avatar') { require_login(); avatar_stream((int)($_GET['id'] ?? 0)); }
+if ($page === 'system_budget_export') { require_staff(); if (!sb_can()) { http_response_code(403); exit(t('err.noaccess')); } $xb = sb_get((int)($_GET['id'] ?? 0)); if ($xb && isset($_GET['rev'])) $xb = sb_revision_get($xb, (int)$_GET['rev']); if (!$xb) { http_response_code(404); exit(t('err.notfound')); } sb_export_xlsx($xb); }   // R97-002
 if ($page === 'contacts_export') { ex_contacts(ct_filters_from_request($_GET)); }
 if ($page === 'vessels_export') { ex_vessels($_GET); }
 if ($page === 'projects_export') { ex_projects($_GET); }

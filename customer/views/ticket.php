@@ -112,6 +112,12 @@ layout_head($t['ticket_no'] . ' · ' . $t['title'], 'tickets');
           </div>
           <p class="hint" style="margin-top:8px;"><?= tt('tk.actions_hint_staff') ?></p>
         </form>
+        <?php if (function_exists('sb_can') && sb_can()): $sbx = sb_of_ticket($id);   // R97-002: convert the request to a System Budget (Sales, PMs, management) ?>
+        <div class="btn-row" style="margin-top:12px;">
+          <?php if ($sbx): ?><a class="btn btn--sm" href="<?= url('system_budget', ['id' => (int)$sbx['id']]) ?>">🧮 <?= e($sbx['sb_no'] . ' R' . (int)$sbx['revision']) ?></a> <?= sb_pill($sbx['status']) ?>
+          <?php else: ?><form method="post" action="<?= url('ticket', ['id' => $id]) ?>" class="inline" data-lock data-confirm="<?= tt($isOpen ? 'sb.tk_confirm' : 'sb.tk_confirm_closed') ?>" data-confirm-title="<?= tt('dlg.title') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="sb_from_ticket"><input type="hidden" name="ticket_id" value="<?= $id ?>"><button class="btn btn--sm" type="submit">🧮 <?= tt('sb.tk_convert') ?></button></form><span class="hint"><?= tt('sb.tk_hint') ?></span><?php endif; ?>
+        </div>
+        <?php endif; ?>
         <div class="btn-row" style="margin-top:12px;">
           <?php if ($t['project_id']): ?>
             <a class="btn btn--ghost btn--sm" href="<?= url('jo_edit', ['project' => $t['project_id'], 'ticket' => $id]) ?>">+ <?= tt('jo.new') ?></a>

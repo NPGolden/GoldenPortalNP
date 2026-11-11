@@ -89,7 +89,7 @@ function sb_comments(int $id): array { return all('SELECT c.*, u.full_name FROM 
 
 function sb_list(array $f = []): array {
     if (!sb_has()) return [];
-    $w = ['1=1']; $b = [];
+    $w = [sb_r2() ? 'b.is_template = 0' : '1=1']; $b = [];
     $st = (string)($f['status'] ?? 'open');
     if ($st === 'open') $w[] = "b.status IN ('draft','working')"; elseif (in_array($st, SB_STATUSES, true)) { $w[] = 'b.status = ?'; $b[] = $st; }
     if (!empty($f['project'])) { $w[] = 'b.project_id = ?'; $b[] = (int)$f['project']; }
@@ -104,7 +104,7 @@ function sb_list(array $f = []): array {
 function sb_dash(): array {
     $D = ['open' => 0, 'finished' => 0, 'converted' => 0, 'late' => 0, 'avg_days' => null, 'open_sale' => 0.0, 'finished_sale' => 0.0];
     if (!sb_has()) return $D;
-    foreach (all("SELECT status, COUNT(*) n, COALESCE(SUM(tot_sale),0) s, SUM(target_date IS NOT NULL AND target_date < CURDATE()) late FROM sb_budgets WHERE status IN ('draft','working','finished') GROUP BY status") as $r) {
+    foreach (all("SELECT status, COUNT(*) n, COALESCE(SUM(tot_sale),0) s, SUM(target_date IS NOT NULL AND target_date < CURDATE()) late FROM sb_budgets WHERE status IN ('draft','working','finished')" . (sb_r2() ? ' AND is_template = 0' : '') . " GROUP BY status") as $r) {
         if ($r['status'] === 'finished') { $D['finished'] = (int)$r['n']; $D['finished_sale'] = (float)$r['s']; } else { $D['open'] += (int)$r['n']; $D['open_sale'] += (float)$r['s']; $D['late'] += (int)$r['late']; }
     }
     $D['converted'] = (int) scalar("SELECT COUNT(*) FROM sb_budgets WHERE status = 'converted' AND YEAR(updated_at) = YEAR(CURDATE())");
@@ -227,7 +227,7 @@ function sb_finish_blockers(array $B): array {
     return $x;
 }
 function sb_set_status(int $id, string $to): void {
-    sb_guard(); $B = sb_get($id); if (!$B) throw new RuntimeException(t('err.notfound')); $from = (string)$B['status']; $uid = (int)(current_user()['id'] ?? 0);
+    sb_guard(); $B = sb_get($id); if (!$B) throw new RuntimeException(t('err.notfound')); if (!empty($B['is_template'])) throw new RuntimeException(t('sb.bad_status')); $from = (string)$B['status']; $uid = (int)(current_user()['id'] ?? 0);
     if ($to === 'finished' && in_array($from, ['draft', 'working'], true)) { $x = sb_finish_blockers($B); if ($x) throw new RuntimeException(t('sb.cannot_finish') . ' ' . implode(' ', $x)); q("UPDATE sb_budgets SET status = 'finished', finished_at = NOW(), finished_by = ? WHERE id = ?", [$uid ?: null, $id]); }
     elseif ($to === 'working' && in_array($from, ['finished', 'cancelled'], true)) { if (!sb_can_reopen()) throw new RuntimeException(t('sb.reopen_mgmt')); q("UPDATE sb_budgets SET status = 'working', finished_at = NULL, finished_by = NULL WHERE id = ?", [$id]); }
     elseif ($to === 'cancelled' && in_array($from, ['draft', 'working'], true)) q("UPDATE sb_budgets SET status = 'cancelled' WHERE id = ?", [$id]);
@@ -382,3 +382,108 @@ function sb_import_apply(array $X, string $fileName, int $intoId = 0, array $buc
 }
 /** Default section per ERP bucket: the first active section of the matching stage. */
 function sb_bucket_defaults(): array { $d = []; foreach (SB_BUCKET_STAGE as $b => $stage) foreach (sb_sections() as $sid => $s) if ($s['stage'] === $stage) { $d[$b] = $sid; break; } return $d; }
+
+/* ───────────── Release 2 (GAS-CP-R97-002): revisions, copy, templates, start from a ticket, Excel export ───────────── */
+
+function sb_r2(): bool { static $h = null; if ($h === null) { try { $h = sb_has() && (bool) scalar("SHOW TABLES LIKE 'sb_revisions'"); } catch (Throwable $e) { $h = false; } } return $h; }
+const SB_SNAP_HEAD = ['title', 'description', 'currency', 'zone', 'parts_margin', 'flat_on', 'flat_rate', 'cost_rate', 'allow_rate', 'allow_cost', 'commission_pct', 'target_date', 'source_ref', 'source_file'];
+const SB_SNAP_LAB = ['sort_order', 'code', 'descr', 'section_id', 'discipline_id', 'card', 'bucket', 'h_normal', 'h_travel', 'h_overtime', 'allow_days', 'rate', 'rate_ot', 'remarks'];
+const SB_SNAP_PART = ['sort_order', 'code', 'item_id', 'descr', 'qty', 'unit', 'unit_cost', 'margin_pct', 'cost_origin', 'remarks'];
+const SB_SNAP_EXP = ['sort_order', 'kind', 'descr', 'cost', 'sale', 'in_total'];
+/** The state of a budget as plain data: header settings and the three line lists (no ids). */
+function sb_snapshot(array $B): array {
+    $pick = fn(array $r, array $keys) => array_intersect_key($r, array_flip($keys));
+    return ['head' => $pick($B, SB_SNAP_HEAD), 'labour' => array_map(fn($r) => $pick($r, SB_SNAP_LAB), $B['labour']), 'parts' => array_map(fn($r) => $pick($r, SB_SNAP_PART), $B['parts']), 'expenses' => array_map(fn($r) => $pick($r, SB_SNAP_EXP), $B['expenses'])];
+}
+/** Write the lines (and, when asked, the header settings) of a snapshot into a budget, replacing what is there. */
+function sb_write_snapshot(int $id, array $S, bool $withHead): void {
+    foreach (['sb_labour', 'sb_parts', 'sb_expenses'] as $tb) q("DELETE FROM $tb WHERE budget_id = ?", [$id]);
+    $ins = function (string $tb, array $keys, array $rows) use ($id) { foreach ($rows as $r) { if (!is_array($r)) continue; $vals = []; foreach ($keys as $k) $vals[] = $r[$k] ?? null; q("INSERT INTO $tb (budget_id, " . implode(', ', $keys) . ') VALUES (?' . str_repeat(',?', count($keys)) . ')', array_merge([$id], $vals)); } };
+    $ins('sb_labour', SB_SNAP_LAB, array_slice((array)($S['labour'] ?? []), 0, 500)); $ins('sb_parts', SB_SNAP_PART, array_slice((array)($S['parts'] ?? []), 0, SB_MAX_PARTS)); $ins('sb_expenses', SB_SNAP_EXP, array_slice((array)($S['expenses'] ?? []), 0, 200));
+    if ($withHead && is_array($S['head'] ?? null)) { $set = []; $b = []; foreach (SB_SNAP_HEAD as $k) if (array_key_exists($k, $S['head']) && $k !== 'title') { $set[] = "$k = ?"; $b[] = $S['head'][$k]; } if ($set) { $b[] = $id; q('UPDATE sb_budgets SET ' . implode(', ', $set) . ' WHERE id = ?', $b); } }
+    sb_recalc($id);
+}
+/** Close the current revision (kept as a snapshot) and continue on the next one: R0 → R1 … Only while the budget is not finished. */
+function sb_revise(int $id, string $note = ''): int {
+    $B = sb_load_editable($id); if (!sb_r2()) throw new RuntimeException(t('err.noaccess')); if (!empty($B['is_template'])) throw new RuntimeException(t('sb.tpl_no_rev'));
+    $T = sb_totals($B); $rev = (int)$B['revision'];
+    q('INSERT INTO sb_revisions (budget_id, revision, note, snapshot, tot_hours, tot_cost, tot_sale, created_by) VALUES (?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE note = VALUES(note), snapshot = VALUES(snapshot), tot_hours = VALUES(tot_hours), tot_cost = VALUES(tot_cost), tot_sale = VALUES(tot_sale)',
+      [$id, $rev, mb_substr(trim($note), 0, 200) ?: null, json_encode(sb_snapshot($B), JSON_UNESCAPED_UNICODE), $T['hours'], $T['cost'], $T['sale'], (int)(current_user()['id'] ?? 0) ?: null]);
+    q('UPDATE sb_budgets SET revision = ? WHERE id = ?', [$rev + 1, $id]); sb_event($id, 'revision', 'R' . $rev . ' → R' . ($rev + 1) . (trim($note) !== '' ? ' · ' . trim($note) : '')); return $rev + 1;
+}
+function sb_revisions(int $id): array { return sb_r2() ? all('SELECT r.id, r.revision, r.note, r.tot_hours, r.tot_cost, r.tot_sale, r.created_at, u.full_name FROM sb_revisions r LEFT JOIN customer_users u ON u.id = r.created_by WHERE r.budget_id = ? ORDER BY r.revision DESC', [$id]) : []; }
+/** A stored revision shaped like a budget (read-only): the budget's identity with the snapshot's settings and lines. */
+function sb_revision_get(array $B, int $rev): ?array {
+    if (!sb_r2()) return null; $r = one('SELECT * FROM sb_revisions WHERE budget_id = ? AND revision = ?', [(int)$B['id'], $rev]); if (!$r) return null;
+    $S = json_decode((string)$r['snapshot'], true); if (!is_array($S)) return null;
+    $V = array_merge($B, array_intersect_key((array)($S['head'] ?? []), array_flip(SB_SNAP_HEAD))); $V['revision'] = $rev; $V['_rev'] = $r; $n = 0;
+    $V['labour'] = array_map(function ($l) use (&$n) { return $l + ['id' => 'r' . (++$n)]; }, array_values((array)($S['labour'] ?? [])));
+    $V['parts'] = array_map(function ($p) use (&$n) { return $p + ['id' => 'r' . (++$n), 'item_code' => null]; }, array_values((array)($S['parts'] ?? [])));
+    $V['expenses'] = array_map(function ($x) use (&$n) { return $x + ['id' => 'r' . (++$n)]; }, array_values((array)($S['expenses'] ?? [])));
+    return $V;
+}
+/** Bring a stored revision back as the working state: the current state is first kept as its own revision, so nothing is lost. */
+function sb_restore(int $id, int $rev): int {
+    $B = sb_load_editable($id); $V = sb_revision_get($B, $rev); if (!$V) throw new RuntimeException(t('err.notfound'));
+    $pdo = db(); $pdo->beginTransaction();
+    try { $new = sb_revise($id, t('sb.rev_before_restore', ['r' => 'R' . $rev])); sb_write_snapshot($id, sb_snapshot($V), true); sb_event($id, 'restore', 'R' . $rev . ' → R' . $new); $pdo->commit(); return $new; }
+    catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+}
+function sb_next_tpl_no(): string { $last = (string) scalar("SELECT sb_no FROM sb_budgets WHERE sb_no LIKE 'SBT-%' ORDER BY sb_no DESC LIMIT 1"); return sprintf('SBT-%04d', $last !== '' ? (int) substr($last, -4) + 1 : 1); }
+/** A new draft (or a template) with the settings, description and lines of $src — a budget, a stored revision or a template. */
+function sb_copy(array $src, string $title, bool $asTemplate = false): int {
+    sb_guard(); if (!sb_r2()) throw new RuntimeException(t('err.noaccess'));
+    $title = mb_substr(trim($title), 0, 200); if ($title === '') $title = mb_substr((string)$src['title'], 0, 200);
+    $pdo = db(); $own = !$pdo->inTransaction(); if ($own) $pdo->beginTransaction();
+    try {
+        $id = sb_create($title); $S = sb_snapshot($src); unset($S['head']['target_date']); if ($asTemplate) { unset($S['head']['source_ref'], $S['head']['source_file']); }
+        sb_write_snapshot($id, $S, true);
+        if ($asTemplate) { for ($try = 0; $try < 5; $try++) { try { q('UPDATE sb_budgets SET is_template = 1, sb_no = ?, copied_from = ? WHERE id = ?', [sb_next_tpl_no(), (int)$src['id'], $id]); break; } catch (Throwable $e) { if ($try === 4) throw $e; } } }
+        else q('UPDATE sb_budgets SET copied_from = ? WHERE id = ?', [(int)$src['id'], $id]);
+        sb_event($id, 'copy', sb_label($src) . ' · ' . mb_substr((string)$src['title'], 0, 120));
+        if ($own) $pdo->commit(); return $id;
+    } catch (Throwable $e) { if ($own && $pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+}
+function sb_templates(): array { return sb_r2() ? all('SELECT b.*, (SELECT COUNT(*) FROM sb_labour l WHERE l.budget_id = b.id) AS n_lab, (SELECT COUNT(*) FROM sb_parts x WHERE x.budget_id = b.id) AS n_parts FROM sb_budgets b WHERE b.is_template = 1 ORDER BY b.title') : []; }
+function sb_delete_template(int $id): void { if (!sb_can_reopen()) throw new RuntimeException(t('sb.tpl_del_mgmt')); $B = sb_get($id); if (!$B || empty($B['is_template'])) throw new RuntimeException(t('err.notfound')); foreach (['sb_labour', 'sb_parts', 'sb_expenses', 'sb_comments', 'sb_events'] as $tb) q("DELETE FROM $tb WHERE budget_id = ?", [$id]); q('DELETE FROM sb_budgets WHERE id = ? AND is_template = 1', [$id]); }
+
+/** The live System Budget of a ticket (not cancelled), if any. */
+function sb_of_ticket(int $ticketId): ?array { if (!sb_has() || $ticketId <= 0) return null; return one("SELECT id, sb_no, revision, title, status FROM sb_budgets WHERE ticket_id = ? AND status <> 'cancelled' ORDER BY id DESC LIMIT 1", [$ticketId]); }
+/**
+ * Convert a ticket request to a System Budget: the budget takes the ticket's title, text, project and sub-project and is linked to it;
+ * an open ticket is resolved automatically. The customer reads only "your request is being quoted" — no number, no link (design OP-08).
+ */
+function sb_from_ticket(int $ticketId): int {
+    sb_guard(); if (!function_exists('tk_load')) throw new RuntimeException(t('err.noaccess'));
+    $tk = tk_load($ticketId); if (!$tk) throw new RuntimeException(t('err.notfound'));
+    if ($ex = sb_of_ticket($ticketId)) return (int)$ex['id'];
+    $pdo = db(); $pdo->beginTransaction();
+    try {
+        $id = sb_create(mb_substr(trim((string)$tk['ticket_no'] . ' · ' . (string)$tk['title']), 0, 200));
+        $pid = (int)($tk['project_id'] ?? 0); $sid = (int)($tk['subproject_id'] ?? 0); if ($sid && !$pid) $pid = (int) scalar('SELECT project_id FROM subprojects WHERE id = ?', [$sid]);
+        $desc = '**' . t('sb.tk_request', ['n' => (string)$tk['ticket_no']]) . '**' . "\n" . trim((string)$tk['description']);
+        q('UPDATE sb_budgets SET ticket_id = ?, project_id = ?, subproject_id = ?, description = ? WHERE id = ?', [$ticketId, $pid ?: null, $sid ?: null, mb_substr($desc, 0, 60000), $id]);
+        if (in_array($tk['status'], tk_open_statuses(), true)) tk_set_status($ticketId, 'resolved', t('sb.tk_resolution'));
+        sb_event($id, 'ticket', (string)$tk['ticket_no']);   // nothing is written on the ticket's own timeline — the customer reads it
+        $pdo->commit(); return $id;
+    } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+}
+
+/** Excel of a budget or a stored revision: Summary, Labour, Parts, Other costs — cost and sale columns side by side. Internal document. */
+function sb_export_xlsx(array $B): void {
+    sb_guard(); require_once __DIR__ . '/xlsxw.php'; $T = sb_totals($B); $sec = sb_sections(); $dis = sb_disciplines(); $r2 = fn(float $v) => round($v, 2);
+    $sum = [[t('sb.no'), sb_label($B)], [t('sb.f_title'), (string)$B['title']], [t('th.status'), t('sb.st_' . $B['status'])], [t('sb.project'), trim((string)($B['project_code'] ?? '') . ' ' . (string)($B['sub_code'] ?? '') . ' ' . (string)($B['sub_name'] ?? ''))], [t('sb.owner'), (string)($B['owner_name'] ?? '')], [t('sb.target'), (string)($B['target_date'] ?? '')],
+            [t('sb.parts_margin'), (float)$B['parts_margin']], [t('sb.flat'), (int)$B['flat_on'] ? (float)$B['flat_rate'] : '—'], [t('sb.cost_rate'), (float)$B['cost_rate']], [t('sb.commission'), (float)$B['commission_pct']], ['', ''],
+            [t('sb.labour') . ' — ' . t('sb.hours'), $r2($T['hours'])], [t('sb.labour') . ' — ' . t('sb.cost'), $r2($T['lab_cost'])], [t('sb.labour') . ' — ' . t('sb.sale'), $r2($T['lab_sale'])], [t('sb.parts') . ' — ' . t('sb.cost'), $r2($T['parts_cost'])], [t('sb.parts') . ' — ' . t('sb.sale'), $r2($T['parts_sale'])],
+            [t('sb.expenses') . ' — ' . t('sb.cost'), $r2($T['exp_cost'])], [t('sb.expenses') . ' — ' . t('sb.sale'), $r2($T['exp_sale'])], [t('sb.total') . ' — ' . t('sb.cost'), $r2($T['cost'])], [t('sb.total') . ' — ' . t('sb.sale'), $r2($T['sale'])], [t('sb.margin') . ' %', $T['margin_pct']]];
+    if ((float)$B['commission_pct'] > 0) $sum[] = [t('sb.with_comm', ['p' => (string)(float)$B['commission_pct']]), $r2($T['with_commission'])];
+    $lab = []; foreach ($B['labour'] as $l) { $c = sb_labour_calc($B, $l); $lab[] = [(string)$l['code'], (string)$l['descr'], (string)($sec[(int)$l['section_id']]['name'] ?? ''), (string)($dis[(int)$l['discipline_id']] ?? ''), (string)$l['card'], (float)$l['h_normal'], (float)$l['h_travel'], (float)$l['h_overtime'], (float)$l['allow_days'], $c['rate'], $c['rate_ot'], $c['cost'], $c['sale'], (string)$l['remarks']]; }
+    $par = []; $n = 0; foreach ($B['parts'] as $p) { $c = sb_part_calc($B, $p); $par[] = [++$n, (string)$p['code'], (string)$p['descr'], (float)$p['qty'], (string)$p['unit'], round((float)$p['unit_cost'], 4), $c['margin'], round($c['unit_sale'], 4), $c['cost'], $c['sale'], (string)($p['cost_origin'] ?? ''), (string)$p['remarks']]; }
+    $exp = []; foreach ($B['expenses'] as $x) $exp[] = [t('sb.xk_' . $x['kind']), (string)$x['descr'], (float)$x['cost'], (float)$x['sale'], (int)$x['in_total'] ? '' : t('sb.x_outside')];
+    xlsx_download(preg_replace('/[^A-Za-z0-9._-]+/', '_', sb_label($B)) . '.xlsx', [
+        ['name' => 'Summary', 'header' => [t('sb.title'), sb_label($B)], 'rows' => $sum, 'widths' => [44, 44]],
+        ['name' => 'Labour', 'header' => [t('th.code'), t('sb.l_descr'), t('sb.section'), t('sb.discipline'), t('sb.card'), t('sb.h_normal'), t('sb.h_travel'), t('sb.h_overtime'), t('sb.days'), t('sb.rate'), t('sb.rate_ot'), t('sb.cost'), t('sb.sale'), t('th.remarks')], 'rows' => $lab, 'widths' => [10, 50, 20, 22, 10, 10, 10, 11, 11, 10, 10, 12, 12, 40]],
+        ['name' => 'Parts', 'header' => ['#', t('th.code'), t('sb.p_descr'), t('sb.qty'), t('sb.unit'), t('sb.unit_cost'), t('sb.margin_pct'), t('sb.unit_sale'), t('sb.cost'), t('sb.sale'), t('sb.origin'), t('th.remarks')], 'rows' => $par, 'widths' => [5, 14, 54, 9, 7, 12, 10, 12, 12, 12, 34, 34]],
+        ['name' => 'Other costs', 'header' => [t('sb.x_kind'), t('sb.l_descr'), t('sb.cost'), t('sb.sale'), ''], 'rows' => $exp, 'widths' => [26, 50, 12, 12, 20]],
+    ]);
+}
