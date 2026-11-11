@@ -4,10 +4,12 @@ require __DIR__ . '/_layout.php';
 $u = sb_require();
 $f = ['status' => (string)($_GET['status'] ?? 'open'), 'q' => trim((string)($_GET['q'] ?? '')), 'owner' => (int)($_GET['owner'] ?? 0)];
 $rows = sb_list($f); $D = sb_dash(); $staff = staff_users(); $tpls = function_exists('sb_templates') ? sb_templates() : [];
+if (function_exists('sb_housekeeping') && function_exists('cache_get') && cache_get('sb_hk') === null) { sb_housekeeping(); cache_set('sb_hk', 1, 86400); }   // R97-005: daily clean-up of abandoned reviews and uploads
 layout_head(t('sb.title'), 'system_budgets');
 ?>
 <div class="page-head">
   <div><h1>🧮 <?= tt('sb.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('sb.lede') ?></p></div>
+  <?php if (sb_can_reopen() && function_exists('sb_audit_xlsx')): ?><div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('system_budget_audit') ?>" title="<?= tt('sb.aud_hint') ?>">🛡 <?= tt('sb.aud_btn') ?></a></div><?php endif; ?>
 </div>
 
 <div class="kpi kpi--4">

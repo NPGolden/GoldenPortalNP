@@ -26,3 +26,14 @@ Releases go live from GitHub, through the portal's own updater — nobody upload
 
 ## Store builds of the mobile apps
 Actions › **Build Android app** / **Build iOS app** (input: engineer | pm | customer) build the Capacitor shells of `mobile-native/` on GitHub runners — signed AAB to the Play Console track, IPA to TestFlight — with the certificates and keys held as repository secrets. Accounts, secrets and the release sequence: `mobile-native/README.md`; test plan and store checklist: GAS-2026-PORTAL-APP-002.
+
+## Release checklist — security (GAS-CP-R97-005)
+
+Run after every release; each takes under a minute.
+
+1. **Diagnostics** — Settings › About › ▶ Run diagnostics: "Storage folder closed to the web" and "Request-token check" must be OK.
+2. **Storage from outside** — open `https://<site>/customer/storage/.htaccess` and `https://<site>/customer/storage/php-errors.log` in a private window: both must answer 403 (or the firewall's block page), never a file.
+3. **Fresh-session token test** — sign in with a script that does not load any page after the sign-in (so the session has issued no token yet), POST any action with no `_csrf` field and with an empty one: both must be answered by a redirect and change nothing. In the sandbox: `login.sh`, then `curl -X POST "$B?p=system_budgets" -d "action=sb_create&title=NoToken"` → 0 rows with that title.
+4. **Self-check** — `php customer/install/cp_selfcheck.php` shows no `[WARN]` for the storage line or the migrations of the release.
+5. **Audit trail** — System Budgets › 🛡 Audit trail (Excel) opens for management and is refused (403) for a project manager.
+

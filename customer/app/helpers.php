@@ -84,11 +84,25 @@ function up_overflow_check(): void {
     $back = (string)($_SERVER['REQUEST_URI'] ?? ''); if ($back !== '' && $back[0] === '/' && !str_starts_with($back, '//')) { header('Location: ' . $back); exit; } redirect('dashboard');
 }
 
+/** The request token is valid only when the session has issued one and the posted one equals it — never two empty strings (R97-004; self-tested in Settings › About › Diagnostics). */
+function csrf_ok(string $own, string $posted): bool { return $own !== '' && $posted !== '' && hash_equals($own, $posted); }
+/**
+ * R97-005: the storage folder (uploads, backups with the database dump, sessions, logs, cached tokens) must never be served by the web
+ * server. Writes storage/.htaccess (deny all, Apache 2.4 and 2.2 syntax) into the portal's storage folder and into a configured upload
+ * path when it is missing or was altered. Returns the folders that could not be protected.
+ */
+function cp_storage_guard(): array {
+    $want = "# written by the portal — do not remove (GAS-CP-R97-005)\n<IfModule mod_authz_core.c>\n  Require all denied\n</IfModule>\n<IfModule !mod_authz_core.c>\n  Order allow,deny\n  Deny from all\n</IfModule>\n";
+    $dirs = [dirname(__DIR__) . '/storage']; if (function_exists('cp_storage')) { $up = cp_storage(); if (!str_starts_with($up, $dirs[0] . '/') && $up !== $dirs[0]) $dirs[] = $up; }
+    $bad = [];
+    foreach ($dirs as $d) { if (!is_dir($d)) continue; $f = $d . '/.htaccess'; if (is_file($f) && strpos((string) @file_get_contents($f), 'Require all denied') !== false) continue; if (@file_put_contents($f, $want) === false) $bad[] = $d; else @chmod($f, 0644); }
+    return $bad;
+}
 function csrf_check(): void {
     $s = $_POST['_csrf'] ?? '';
     if (is_string($s)) {
         if (cp_is_gate() && gate_token_ok($s)) return;      // stateless gate token
-        $own = (string)($_SESSION['csrf'] ?? ''); if ($own !== '' && $s !== '' && hash_equals($own, $s)) return;   // R97-004: a session that has not issued a token yet must not accept an empty one
+        if (csrf_ok((string)($_SESSION['csrf'] ?? ''), $s)) return;
     }
     // Stale login page (cached tab, expired session): self-heal with a
     // fresh page + notice rather than a dead-end error.

@@ -43,6 +43,13 @@ layout_head(t('ai.settings'), 'admin_ai');
 </div>
 <div class="cols">
 <div class="card">
+  <?php $byPage = all("SELECT page, COUNT(*) n, COALESCE(SUM(cost_eur),0) c, SUM(ok = 0) bad FROM ai_log WHERE created_at >= DATE_FORMAT(NOW(), '%Y-%m-01') GROUP BY page ORDER BY c DESC"); $apl = ai_all_pages();   // R97-005: where the month's cost comes from ?>
+  <h2><?= tt('ai.by_page') ?></h2>
+  <?php if (!$byPage): ?><p class="hint"><?= tt('ai.no_usage') ?></p><?php else: ?>
+  <div class="table-scroll" style="margin-bottom:14px;"><table class="tbl" style="max-width:700px;"><thead><tr><th><?= tt('ai.page') ?></th><th class="num"><?= tt('ai.requests') ?></th><th class="num"><?= tt('ai.failed_n') ?></th><th class="num">€</th><th class="num">%</th></tr></thead><tbody>
+  <?php foreach ($byPage as $r): ?><tr><td><?= e(isset($apl[$r['page']]) ? t($apl[$r['page']]) : (string)$r['page']) ?> <span class="hint mono"><?= e((string)$r['page']) ?></span></td><td class="num"><?= (int)$r['n'] ?></td><td class="num"><?= (int)$r['bad'] ?: '' ?></td><td class="num"><?= e(number_format((float)$r['c'], 2, ',', '.')) ?></td><td class="num hint"><?= $month > 0 ? e(number_format(100 * (float)$r['c'] / $month, 0)) : '0' ?></td></tr><?php endforeach; ?>
+  </tbody></table></div>
+  <?php endif; ?>
   <h2><?= tt('ai.usage') ?></h2>
   <?php if (!$usage): ?><p class="hint"><?= tt('ai.no_usage') ?></p><?php else: ?>
   <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('th.date') ?></th><th class="num"><?= tt('ai.calls') ?></th><th class="num"><?= tt('ai.tokens_in') ?></th><th class="num"><?= tt('ai.tokens_out') ?></th><th class="num">€</th></tr></thead><tbody>

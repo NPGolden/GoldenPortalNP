@@ -1482,3 +1482,21 @@ Migration `install/migrate_cp_r97_004_sb_convert.sql`: `sb_budgets.offer_id`, `b
 
 Language keys 9 120 each.
 
+## §291 v1.126.1 (R97-005) — security measures accepted on 11/11/2026
+
+| Proposal (section) | What was done |
+|---|---|
+| Deny rule on `storage/uploads/sbimp/` (§287) | The repository never shipped a rule for `customer/storage/` (it is git-ignored) — its protection depended on a file placed by hand at installation. `cp_storage_guard()` (`app/helpers.php`) now writes `storage/.htaccess` (deny all, Apache 2.4 and 2.2) into the storage folder and into a configured upload path outside it; called from `index.php` once a day and after each release (cache key carries the version), from `tools/cron.php`, and by Diagnostics (row "Storage folder closed to the web") and `cp_selfcheck.php`. Nothing is served from the folder by URL — files are streamed by PHP and logos are read from disk — so no feature changes. |
+| System Budget actions in the audit trail (§287, §288, §290) | `sb_events.ip` (migration `migrate_cp_r97_005_sb_audit.sql`), written by `sb_event()`; events are no longer deleted with a budget or a template — a `deleted` line is added instead. Restore, template deletion, conversion, uploads and the export itself are lines of the trail. Export `?p=system_budget_audit` → `sb_audit_xlsx()` (management / administrators; 24 months, 20 000 lines). |
+| Upload rate limit (§287) | `sb_upload_guard()`: 20 uploads per person and hour (`SB_UPLOADS_HOUR`), counted from the `upload` events; applies to the working file and the BOM. |
+| Cap of stored revisions (§288) | `SB_MAX_REVISIONS` = 50 in `sb_revise()`. |
+| Purge of staged rows (§289) | `sb_housekeeping()` once a day from the System Budgets page (cache flag) and in `tools/cron.php`: `sb_import_rows` older than 30 days, uploaded workbooks older than a day. |
+| Assistant cost per page (§289) | Settings › AI assistant: "This month by page" (requests, failed, €, share). |
+| Conversions in the audit trail (§290) | Covered by the trail above (`converted` event with the offer number and the budget mode). |
+| System Budget tables in the backup check (§290) | Verified: `install/update.php` dumps every table returned by `SHOW TABLES` into `storage/backups/<stamp>/db.sql.gz` before each update — the `sb_*` tables are included without a list to maintain. No change. |
+| Fresh-session token test (§290) | `csrf_ok()` extracted from `csrf_check()`; Diagnostics row "Request-token check" asserts that empty and wrong tokens are refused; DEPLOY.md has the release checklist with the manual test. |
+
+Not done, waiting for a decision: restricting "Remove link" and payment edits on invoices to the accounting role (§286) — it changes who may do today's work in Proformas and invoices.
+
+**Tested**: guard file written after deletion; audit line with IP; trail kept after delete; export for administrator, 403 for PM and customer; 51st revision refused; 21st upload refused; old staged row purged, recent one kept; cron output; Diagnostics rows OK. Language keys 9 141 each.
+

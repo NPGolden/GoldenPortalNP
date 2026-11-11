@@ -113,6 +113,8 @@ session_boot();
 i18n_boot();
 // R95-004: one-off ledger conversion (proforma_invoices → invoice rows + links) on the first request after the migration; guarded by the ledger_v2 setting
 if (function_exists('pi_ledger_convert') && function_exists('cp_setting') && cp_setting('ledger_v2', '') !== '1') { try { pi_ledger_convert(); } catch (Throwable $e) { error_log('[ledger_v2] ' . $e->getMessage()); } }
+// R97-005: the storage folder is closed to the web — checked once a day (and right after every release: the cache key carries the version)
+if (function_exists('cache_get') && cache_get('stg_guard') === null) { try { cp_storage_guard(); cache_set('stg_guard', 1, 86400); } catch (Throwable $e) { error_log('storage_guard: ' . $e->getMessage()); } }
 // R96-003: payments now keep the proforma they were received for — refresh the paid / part-paid status of the ledger once after the update
 if (function_exists('ppay_for_col') && function_exists('cp_setting') && cp_setting('pay_origin', '') !== '1' && ppay_for_col()) { try { cp_setting_set('pay_origin', '1'); foreach (all("SELECT id FROM proformas WHERE kind = 'proforma' AND status NOT IN ('draft','cancelled') AND id IN (SELECT proforma_id FROM pi_links)") as $x) pi_refresh_status((int)$x['id']); } catch (Throwable $e) { error_log('pay_origin: ' . $e->getMessage()); } }
 
@@ -412,6 +414,7 @@ if ($page === 'tfile') { require_login(); tk_stream_file((int)($_GET['id'] ?? 0)
 if ($page === 'permit_file') { require_login(); pmt_stream_file((int)($_GET['id'] ?? 0)); }   // R93-001
 if ($page === 'bom_template') { require_staff(); bom_import_template(); }   // R93-006
 if ($page === 'avatar') { require_login(); avatar_stream((int)($_GET['id'] ?? 0)); }
+if ($page === 'system_budget_audit') { require_staff(); sb_audit_xlsx(); }   // R97-005
 if ($page === 'system_budget_export') { require_staff(); if (!sb_can()) { http_response_code(403); exit(t('err.noaccess')); } $xb = sb_get((int)($_GET['id'] ?? 0)); if ($xb && isset($_GET['rev'])) $xb = sb_revision_get($xb, (int)$_GET['rev']); if (!$xb) { http_response_code(404); exit(t('err.notfound')); } sb_export_xlsx($xb); }   // R97-002
 if ($page === 'contacts_export') { ex_contacts(ct_filters_from_request($_GET)); }
 if ($page === 'vessels_export') { ex_vessels($_GET); }

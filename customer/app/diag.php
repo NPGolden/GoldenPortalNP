@@ -118,6 +118,9 @@ function diag_run(): array {
     $try(function () use (&$R, $storage) {
         $bad = []; foreach (['', '/uploads', '/hr', '/updates', '/backups', '/sessions', '/private', '/import'] as $d) { $p = $storage . $d; if (!is_dir($p)) @mkdir($p, 0750, true); if (!is_dir($p) || !is_writable($p)) $bad[] = 'storage' . $d; }
         $R[] = $bad ? diag_row('app', t('dg.storage'), 'fail', t('dg.not_writable') . ': ' . implode(', ', $bad), t('dg.fix_storage')) : diag_row('app', t('dg.storage'), 'ok', t('dg.all_writable'));
+        $hb = function_exists('cp_storage_guard') ? cp_storage_guard() : [$storage]; $hf = $storage . '/.htaccess';   // R97-005
+        $R[] = !$hb && is_file($hf) ? diag_row('app', t('dg.storage_web'), 'ok', t('dg.storage_web_ok')) : diag_row('app', t('dg.storage_web'), 'fail', implode(', ', $hb ?: [$storage]), t('dg.fix_storage_web'));
+        $R[] = function_exists('csrf_ok') && !csrf_ok('', '') && !csrf_ok('a', '') && !csrf_ok('', 'a') && !csrf_ok('a', 'b') && csrf_ok('a', 'a') ? diag_row('app', t('dg.csrf'), 'ok', t('dg.csrf_ok')) : diag_row('app', t('dg.csrf'), 'fail', '', t('dg.fix_csrf'));
         $free = @disk_free_space($storage); if ($free !== false) $R[] = diag_row('app', t('dg.disk'), $free < 300 * 1048576 ? 'fail' : ($free < 1024 * 1048576 ? 'warn' : 'ok'), diag_fmt_bytes((int)$free) . ' ' . t('dg.free'), $free < 1024 * 1048576 ? t('dg.fix_disk') : '');
         $n = 0; $old = 0; $cut = time() - 7 * 86400; foreach ((array) @glob($storage . '/sessions/sess_*') as $f) { $n++; if (@filemtime($f) < $cut) $old++; }
         $R[] = diag_row('app', t('dg.sessions'), $old > 2000 ? 'warn' : 'ok', t('dg.sessions_detail', ['n' => $n, 'o' => $old]), $old > 2000 ? t('dg.fix_sessions') : '');

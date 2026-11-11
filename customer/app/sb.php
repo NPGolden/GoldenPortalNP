@@ -17,6 +17,8 @@ const SB_EXP_KINDS = ['travel', 'logistics', 'pass', 'permit', 'other'];
 const SB_BUCKETS = ['Engineering', 'Site', 'Workshop', 'Commissioning', 'PM'];
 const SB_BUCKET_STAGE = ['Engineering' => 'engineering', 'Workshop' => 'production', 'Site' => 'installation', 'Commissioning' => 'commissioning'];
 const SB_IMPORT_MAX = 5242880;   // 5 MB workbook
+const SB_UPLOADS_HOUR = 20;      // R97-005: workbook uploads per person and hour
+const SB_MAX_REVISIONS = 50;     // R97-005: stored revisions per budget
 
 function sb_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'sb_budgets'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Sales, project managers, management (CEO / GM / owner scope) and administrators. */
@@ -83,7 +85,12 @@ function sb_get(int $id): ?array {
     return $B;
 }
 function sb_recalc(int $id): void { $B = sb_get($id); if (!$B) return; $T = sb_totals($B); q('UPDATE sb_budgets SET tot_hours = ?, tot_cost = ?, tot_sale = ? WHERE id = ?', [$T['hours'], $T['cost'], $T['sale'], $id]); }
-function sb_event(int $id, string $kind, ?string $note = null): void { try { q('INSERT INTO sb_events (budget_id, user_id, kind, note) VALUES (?,?,?,?)', [$id, (int)(current_user()['id'] ?? 0) ?: null, $kind, $note !== null ? mb_substr($note, 0, 300) : null]); } catch (Throwable $e) {} }
+function sb_ev_ip(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM sb_events LIKE 'ip'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** One line of the module's audit trail: who, what, on which budget, from which address (R97-005). Kept when the budget is deleted. */
+function sb_event(int $id, string $kind, ?string $note = null): void {
+    $uid = (int)(current_user()['id'] ?? 0) ?: null; $note = $note !== null ? mb_substr($note, 0, 300) : null;
+    try { if (sb_ev_ip()) q('INSERT INTO sb_events (budget_id, user_id, kind, note, ip) VALUES (?,?,?,?,?)', [$id, $uid, $kind, $note, function_exists('tk_ip') ? mb_substr((string) tk_ip(), 0, 45) : mb_substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45)]); else q('INSERT INTO sb_events (budget_id, user_id, kind, note) VALUES (?,?,?,?)', [$id, $uid, $kind, $note]); } catch (Throwable $e) {}
+}
 function sb_events(int $id): array { return all('SELECT v.*, u.full_name FROM sb_events v LEFT JOIN customer_users u ON u.id = v.user_id WHERE v.budget_id = ? ORDER BY v.id DESC LIMIT 60', [$id]); }
 function sb_comments(int $id): array { return all('SELECT c.*, u.full_name FROM sb_comments c LEFT JOIN customer_users u ON u.id = c.user_id WHERE c.budget_id = ? ORDER BY c.id', [$id]); }
 
@@ -240,15 +247,21 @@ function sb_set_status(int $id, string $to): void {
     sb_event($id, 'status', $from . ' → ' . $to);
 }
 function sb_comment_add(int $id, string $body): void { sb_guard(); if (!sb_get($id)) throw new RuntimeException(t('err.notfound')); $body = mb_substr(trim($body), 0, 4000); if ($body === '') throw new RuntimeException(t('sb.need_comment')); q('INSERT INTO sb_comments (budget_id, user_id, body) VALUES (?,?,?)', [$id, (int)(current_user()['id'] ?? 0) ?: null, $body]); }
-function sb_delete(int $id): void { require_cp_admin(); $B = sb_get($id); if (!$B) throw new RuntimeException(t('err.notfound')); if (!in_array($B['status'], ['draft', 'cancelled'], true)) throw new RuntimeException(t('sb.del_only_draft')); foreach (['sb_labour', 'sb_parts', 'sb_expenses', 'sb_comments', 'sb_events'] as $tb) q("DELETE FROM $tb WHERE budget_id = ?", [$id]); q('DELETE FROM sb_budgets WHERE id = ?', [$id]); }
+function sb_delete(int $id): void { require_cp_admin(); $B = sb_get($id); if (!$B) throw new RuntimeException(t('err.notfound')); if (!in_array($B['status'], ['draft', 'cancelled'], true)) throw new RuntimeException(t('sb.del_only_draft')); sb_event($id, 'deleted', sb_label($B) . ' · ' . mb_substr((string)$B['title'], 0, 200)); foreach (['sb_labour', 'sb_parts', 'sb_expenses', 'sb_comments'] as $tb) q("DELETE FROM $tb WHERE budget_id = ?", [$id]); if (function_exists('sb_r2') && sb_r2()) q('DELETE FROM sb_revisions WHERE budget_id = ?', [$id]); if (function_exists('sb_r3') && sb_r3()) q('DELETE FROM sb_import_rows WHERE budget_id = ?', [$id]); q('DELETE FROM sb_budgets WHERE id = ?', [$id]); }   // R97-005: the events stay as the audit trail
 
 /* ───────────── Import of the GLD-BUD budget working file (Excel built by the golden-budget-workfile skill) ───────────── */
 
 function sb_imp_dir(): string { $d = cp_storage() . '/sbimp'; if (!is_dir($d)) @mkdir($d, 0750, true); return $d; }
 function sb_imp_path(string $token): ?string { if (!preg_match('/^[a-f0-9]{32}$/', $token)) return null; $own = $_SESSION['sb_imp'][$token] ?? null; if (!$own) return null; $p = sb_imp_dir() . '/' . $token . '.xlsx'; return is_file($p) ? $p : null; }
 /** Keep the uploaded workbook for the review step; returns its token (session-bound, random, files older than a day are removed). */
+/** At most SB_UPLOADS_HOUR workbook uploads per person and hour (working file and BOM) — each attempt is an audit line. */
+function sb_upload_guard(int $budgetId = 0, string $name = ''): void {
+    $uid = (int)(current_user()['id'] ?? 0); $n = 0; try { $n = (int) scalar("SELECT COUNT(*) FROM sb_events WHERE user_id = ? AND kind = 'upload' AND created_at >= NOW() - INTERVAL 1 HOUR", [$uid]); } catch (Throwable $e) {}
+    if ($n >= SB_UPLOADS_HOUR) throw new RuntimeException(t('sb.upload_limit', ['n' => SB_UPLOADS_HOUR]));
+    sb_event($budgetId, 'upload', mb_substr(basename($name), 0, 200));
+}
 function sb_imp_stash(array $file): string {
-    sb_guard();
+    sb_guard(); sb_upload_guard((int)($_POST['into'] ?? 0), (string)($file['name'] ?? ''));
     if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string)$file['tmp_name'])) throw new RuntimeException(t('sb.imp_nofile'));
     if ((int)$file['size'] > SB_IMPORT_MAX || strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION)) !== 'xlsx') throw new RuntimeException(t('sb.imp_badfile'));
     $fh = fopen((string)$file['tmp_name'], 'rb'); $sig = $fh ? (string) fread($fh, 4) : ''; if ($fh) fclose($fh); if ($sig !== "PK\x03\x04") throw new RuntimeException(t('sb.imp_badfile'));
@@ -412,6 +425,7 @@ function sb_write_snapshot(int $id, array $S, bool $withHead): void {
 function sb_revise(int $id, string $note = ''): int {
     $B = sb_load_editable($id); if (!sb_r2()) throw new RuntimeException(t('err.noaccess')); if (!empty($B['is_template'])) throw new RuntimeException(t('sb.tpl_no_rev'));
     $T = sb_totals($B); $rev = (int)$B['revision'];
+    if ((int) scalar('SELECT COUNT(*) FROM sb_revisions WHERE budget_id = ?', [$id]) >= SB_MAX_REVISIONS) throw new RuntimeException(t('sb.rev_max', ['n' => SB_MAX_REVISIONS]));
     q('INSERT INTO sb_revisions (budget_id, revision, note, snapshot, tot_hours, tot_cost, tot_sale, created_by) VALUES (?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE note = VALUES(note), snapshot = VALUES(snapshot), tot_hours = VALUES(tot_hours), tot_cost = VALUES(tot_cost), tot_sale = VALUES(tot_sale)',
       [$id, $rev, mb_substr(trim($note), 0, 200) ?: null, json_encode(sb_snapshot($B), JSON_UNESCAPED_UNICODE), $T['hours'], $T['cost'], $T['sale'], (int)(current_user()['id'] ?? 0) ?: null]);
     q('UPDATE sb_budgets SET revision = ? WHERE id = ?', [$rev + 1, $id]); sb_event($id, 'revision', 'R' . $rev . ' → R' . ($rev + 1) . (trim($note) !== '' ? ' · ' . trim($note) : '')); return $rev + 1;
@@ -450,7 +464,7 @@ function sb_copy(array $src, string $title, bool $asTemplate = false): int {
     } catch (Throwable $e) { if ($own && $pdo->inTransaction()) $pdo->rollBack(); throw $e; }
 }
 function sb_templates(): array { return sb_r2() ? all('SELECT b.*, (SELECT COUNT(*) FROM sb_labour l WHERE l.budget_id = b.id) AS n_lab, (SELECT COUNT(*) FROM sb_parts x WHERE x.budget_id = b.id) AS n_parts FROM sb_budgets b WHERE b.is_template = 1 ORDER BY b.title') : []; }
-function sb_delete_template(int $id): void { if (!sb_can_reopen()) throw new RuntimeException(t('sb.tpl_del_mgmt')); $B = sb_get($id); if (!$B || empty($B['is_template'])) throw new RuntimeException(t('err.notfound')); foreach (['sb_labour', 'sb_parts', 'sb_expenses', 'sb_comments', 'sb_events'] as $tb) q("DELETE FROM $tb WHERE budget_id = ?", [$id]); q('DELETE FROM sb_budgets WHERE id = ? AND is_template = 1', [$id]); }
+function sb_delete_template(int $id): void { if (!sb_can_reopen()) throw new RuntimeException(t('sb.tpl_del_mgmt')); $B = sb_get($id); if (!$B || empty($B['is_template'])) throw new RuntimeException(t('err.notfound')); sb_event($id, 'deleted', (string)$B['sb_no'] . ' · ' . mb_substr((string)$B['title'], 0, 200)); foreach (['sb_labour', 'sb_parts', 'sb_expenses', 'sb_comments'] as $tb) q("DELETE FROM $tb WHERE budget_id = ?", [$id]); if (sb_r3()) q('DELETE FROM sb_import_rows WHERE budget_id = ?', [$id]); q('DELETE FROM sb_budgets WHERE id = ? AND is_template = 1', [$id]); }
 
 /** The live System Budget of a ticket (not cancelled), if any. */
 function sb_of_ticket(int $ticketId): ?array { if (!sb_has() || $ticketId <= 0) return null; return one("SELECT id, sb_no, revision, title, status FROM sb_budgets WHERE ticket_id = ? AND status <> 'cancelled' ORDER BY id DESC LIMIT 1", [$ticketId]); }
@@ -533,7 +547,7 @@ function sb_stage_ai(int $id): int {
 }
 /** Stage a BOM file (the Engineering BOM template; a unit price / cost column is read when present): parse, match, keep for review. Nothing is written to the budget. */
 function sb_bom_stage(int $id, array $file): array {
-    $B = sb_load_editable($id); if (!sb_r3() || !function_exists('bom_imp_norm')) throw new RuntimeException(t('err.noaccess'));
+    $B = sb_load_editable($id); if (!sb_r3() || !function_exists('bom_imp_norm')) throw new RuntimeException(t('err.noaccess')); sb_upload_guard($id, (string)($file['name'] ?? ''));
     if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string)$file['tmp_name'])) throw new RuntimeException(t('sb.imp_nofile'));
     if ((int)$file['size'] > SB_IMPORT_MAX || strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION)) !== 'xlsx') throw new RuntimeException(t('sb.imp_badfile'));
     require_once __DIR__ . '/xlsx.php'; $rows = xlsx_rows((string)$file['tmp_name']); if (count($rows) < 2) throw new RuntimeException(t('sb.bom_empty'));
@@ -710,4 +724,23 @@ function sb_convert(int $id, array $opt): int {
         q("UPDATE sb_budgets SET status = 'converted', offer_id = ?, budget_rev_id = ?, converted_at = NOW() WHERE id = ?", [$oid, $brev, $id]);
         sb_event($id, 'converted', $no . ($brev ? ' · ' . t('sb.cv_ev_bg', ['m' => $mode]) : '')); cache_bump_later('fs'); $pdo->commit(); return $oid;
     } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+}
+
+/* ───────────── R97-005: audit trail export, housekeeping ───────────── */
+
+/** Excel of the module's audit trail (management and administrators): every event of the last 24 months, newest first, at most 20 000 lines. */
+function sb_audit_xlsx(): void {
+    if (!sb_can_reopen()) { http_response_code(403); exit(t('err.noaccess')); } require_once __DIR__ . '/xlsxw.php'; $ip = sb_ev_ip(); $rows = [];
+    foreach (all('SELECT v.created_at, u.full_name, v.kind, v.note, ' . ($ip ? 'v.ip' : "'' AS ip") . ', v.budget_id, b.sb_no, b.title, b.status FROM sb_events v LEFT JOIN customer_users u ON u.id = v.user_id LEFT JOIN sb_budgets b ON b.id = v.budget_id WHERE v.created_at >= NOW() - INTERVAL 24 MONTH ORDER BY v.id DESC LIMIT 20000') as $r) {
+        $lbl = t('sb.ev_' . $r['kind']); $rows[] = [(string)$r['created_at'], (string)$r['full_name'], $lbl === 'sb.ev_' . $r['kind'] ? (string)$r['kind'] : $lbl, (string)($r['sb_no'] ?? ((int)$r['budget_id'] ? '#' . (int)$r['budget_id'] . ' (' . t('sb.aud_gone') . ')' : '')), (string)($r['title'] ?? ''), $r['status'] ? t('sb.st_' . $r['status']) : '', (string)$r['note'], (string)$r['ip']];
+    }
+    sb_event(0, 'audit_export', (string)count($rows));
+    xlsx_download('GAS-SB-audit-' . date('Y-m-d') . '.xlsx', [['name' => 'Audit trail', 'header' => [t('sb.aud_when'), t('sb.aud_who'), t('sb.aud_what'), t('sb.no'), t('sb.f_title'), t('th.status'), t('sb.aud_detail'), 'IP'], 'rows' => $rows, 'widths' => [20, 26, 30, 18, 44, 18, 60, 16]]]);
+}
+/** Housekeeping, at most once a day: review rows left unapplied for 30 days and uploaded workbooks older than a day are removed. Returns [rows, files]. */
+function sb_housekeeping(): array {
+    $n = 0; $f = 0;
+    try { if (sb_r3()) $n = q('DELETE FROM sb_import_rows WHERE created_at < NOW() - INTERVAL 30 DAY')->rowCount(); } catch (Throwable $e) {}
+    try { foreach ((array) @glob(sb_imp_dir() . '/*.xlsx') as $old) if (@filemtime($old) < time() - 86400 && @unlink($old)) $f++; } catch (Throwable $e) {}
+    return [$n, $f];
 }
