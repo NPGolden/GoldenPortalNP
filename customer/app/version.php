@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.127.3';
+const CP_VERSION = '1.127.4';
 const CP_BUILD   = '2026-11-11';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-010', 'version' => '1.127.4', 'date' => '2026-11-11', 'title' => 'Entry page goldensas.com: the Employee Portal door was removed — procurement, warehouse and dispatch are part of the portal; one door, centred.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-009', 'version' => '1.127.3', 'date' => '2026-11-11', 'title' => 'Website statistics: the trend chart keeps a fixed size — with only a few days or months of data the bars are no longer stretched over the whole page.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-008', 'version' => '1.127.2', 'date' => '2026-11-11', 'title' => 'System Budgets: the rate-card selector of a labour line shows the description of the card and its hourly rate beside the letter (A — Service technician · 75,00 €/h); the Excel export carries the description too.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-007', 'version' => '1.127.1', 'date' => '2026-11-11', 'title' => 'System Budgets: every labour hour reaches the sub-project budget — lines without a section or discipline are listed on the conversion preview with a section / discipline to choose, a converted budget shows the hours that were not written and adds them (new Budget & actual revision) after the choice, a warning on the budget while it is in work, and the import finds the section of the Site bucket by name.', 'db' => 'install/migrate_cp_r97_007_sb_feed.sql', 'check' => 'r97g'],

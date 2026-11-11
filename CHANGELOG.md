@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.127.3** (build 2026-11-11). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.127.4** (build 2026-11-11). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.127.4 | GAS-CP-R97-010 | 2026-11-11 | Entry page goldensas.com: the Employee Portal door was removed — procurement, warehouse and dispatch are part of the portal; one door, centred. | — |
 | 1.127.3 | GAS-CP-R97-009 | 2026-11-11 | Website statistics: the trend chart keeps a fixed size — with only a few days or months of data the bars are no longer stretched over the whole page. | — |
 | 1.127.2 | GAS-CP-R97-008 | 2026-11-11 | System Budgets: the rate-card selector of a labour line shows the description of the card and its hourly rate beside the letter (A — Service technician · 75,00 €/h); the Excel export carries the description too. | — |
 | 1.127.1 | GAS-CP-R97-007 | 2026-11-11 | System Budgets: every labour hour reaches the sub-project budget — lines without a section or discipline are listed on the conversion preview with a section / discipline to choose, a converted budget shows the hours that were not written and adds them (new Budget & actual revision) after the choice, a warning on the budget while it is in work, and the import finds the section of the Site bucket by name. | `install/migrate_cp_r97_007_sb_feed.sql` |

@@ -5,7 +5,7 @@ One domain, two portals, one MySQL server. Doc ref **GAS-DOC-PORTAL-001**.
 ```
 goldensas.com/                 Landing page — choose your portal
 goldensas.com/customer/        Customer Portal   (project status, documents, signatures, support)
-goldensas.com/employee/        Employee Portal   (Parts Order Management System — POMS)
+goldensas.com/employee/        Employee Portal   (Parts Order Management System — POMS)   ← no longer linked from the entry page since v1.127.4 (procurement lives in the Customer Portal)
 ```
 
 Both portals share the brand system in `assets/` (navy `#0A1B2E`, gold `#D7B56D`, the

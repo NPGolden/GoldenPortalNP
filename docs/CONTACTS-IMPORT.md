@@ -1538,3 +1538,9 @@ No SQL. `ws_bars()` in `views/web_stats.php` shrank the SVG viewBox to the width
 
 **Security review**: display only; no input involved. No proposals.
 
+## §296 v1.127.4 (R97-010) — entry page: Employee Portal door removed
+
+No SQL. Root `index.php`: the second door (`employee/`) and the sentence about employees are gone; `.doors--one` in `assets/portal.css` centres the remaining door. Nothing under `/employee/` was changed: the old parts-order application still answers at its own address for anyone who has it bookmarked.
+
+**Security review**: an application that is no longer used but still reachable is attack surface that nobody watches (its own login, its own database `goldensas_poms`, its own storage folder). Proposal, no performance cost: once the team confirms nobody needs it, close `/employee/` — answer every request with a redirect to the portal (one `.htaccess` line), keep the files and the database for the record, and remove them after an agreed retention time.
+
