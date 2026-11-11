@@ -9354,4 +9354,5 @@ Cordiali saluti,
 'sb.ev_fed' => 'ore aggiunte al budget del sottoprogetto',
 'sb.blk_nosec' => '{n} righe con ore non hanno sezione né disciplina — le ore non arriveranno al budget del sottoprogetto senza una scelta.',
 'sb.imp_w_nosec' => 'Il bucket «{b}» non ha sezione — le sue righe saranno importate senza sezione.',
+'sb.card_gone' => 'non nel listino attivo',
 ];

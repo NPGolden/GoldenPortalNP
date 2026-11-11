@@ -1524,3 +1524,11 @@ Language keys 9 152 each.
 
 Language keys 9 177 each.
 
+## §294 v1.127.2 (R97-008) — System Budgets: rate cards shown by name
+
+No SQL. `views/system_budget.php`: the options of the Rate card select are `<letter> — <card_name> · <normal rate> €/h` from `sb_cards()` (active rate list, zone of the budget); a stored card that is not in the list any more is shown as `<letter> — not in the active rate list`; the select is 230 px wide at least. `sb_export_xlsx()`: the Rate card column carries `<letter> — <card_name>`.
+
+**Security review**: display only — the card names come from the rate list and are escaped; the posted value is still checked against the cards of the list. No proposals.
+
+Language keys 9 178 each.
+

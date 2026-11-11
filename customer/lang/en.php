@@ -9354,4 +9354,5 @@ Best regards,
 'sb.ev_fed' => 'hours added to the sub-project budget',
 'sb.blk_nosec' => '{n} labour line(s) with hours have no section and no discipline — their hours will not reach the sub-project budget unless you choose one (here or at the conversion).',
 'sb.imp_w_nosec' => 'Bucket "{b}" has no section chosen — its lines will be imported without a section.',
+'sb.card_gone' => 'not in the active rate list',
 ];
