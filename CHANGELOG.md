@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.122.2** (build 2026-11-11). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.123.0** (build 2026-11-11). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.123.0 | GAS-CP-R97-001 | 2026-11-11 | System Budgets (Work menu; Sales, project managers, management): internal estimate of a system before the offer — labour lines per section, discipline or rate card with normal, travelling and overtime hours and daily allowances, up to 124 part lines (free or from inventory, cost and sale side by side, 40 % margin on cost), travelling expenses and other costs, rich-text description, optional flat labour rate, dashboard, comments, history; import of the GLD-BUD budget working file (Excel) with a review step, into a new or an existing budget. | `install/migrate_cp_r97_001_system_budgets.sql` |
 | 1.122.2 | GAS-CP-R96-003 | 2026-11-11 | Payments keep the proforma they were received for: an advance moved to an accounting invoice that settles several proformas is no longer spread pro rata over all of them; a payment on such an invoice can be assigned to one proforma or shared; unlinking returns the money to its proforma. | `install/migrate_cp_r96_003_payment_origin.sql` |
 | 1.122.1 | GAS-CP-R96-002 | 2026-11-11 | Offers: filter by branch (sub-project branch, else project, else default) — list, tiles and remembered filter; branch code on every row. | — |
 | 1.122.0 | GAS-CP-R96-001 | 2026-11-11 | Weekly and monthly project reports open with an executive block: the summary paragraph (AI draft the project manager edits and releases; generated sentences until then), six tiles (progress actual, progress planned, SPI, drawings approved, open risks, LTI of the period), the progress S-curve (planned vs actual per week) and the milestones table (plan, forecast, status). New per project: Milestones (pre-filled from the sub-project deadlines) and the Safety log. On screen, in the printed monthly report and in the weekly PDF and Word. | `install/migrate_cp_r96_001_exec_summary.sql` |

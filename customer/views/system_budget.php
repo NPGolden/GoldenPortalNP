@@ -1,0 +1,172 @@
+<?php
+/** System Budget — one budget: header, description, labour, parts, other costs, totals (cost and sale side by side), comments, history (GAS-CP-R97-001). ?p=system_budget&id=N */
+require __DIR__ . '/_layout.php';
+$u = sb_require(); $id = (int)($_GET['id'] ?? 0); $B = sb_get($id);
+if (!$B) { http_response_code(404); layout_head(t('err.notfound'), 'system_budgets'); echo '<h1>' . tt('err.notfound') . '</h1>'; layout_foot(); return; }
+$ed = sb_editable($B); $T = sb_totals($B); $cur = (string)$B['currency']; $self = url('system_budget', ['id' => $id]);
+$sec = sb_sections(); $dis = sb_disciplines(); $cards = sb_cards((string)$B['zone']); $staff = staff_users(); $blk = $ed ? sb_finish_blockers($B) : [];
+$subs = $ed ? all("SELECT s.id, s.code, s.name, p.project_code, p.name AS pname FROM subprojects s JOIN projects p ON p.id = s.project_id ORDER BY p.project_code DESC, s.sort_order, s.code LIMIT 3000") : [];
+$n2 = fn(float $v) => number_format($v, 2, ',', '.'); $hv = fn($v) => (float)$v > 0 ? sb_h((float)$v) : ''; $ro = $ed ? '' : ' readonly';
+$nNewL = 3; $nNewP = min(5, max(0, SB_MAX_PARTS - count($B['parts']))); $com = sb_comments($id); $ev = sb_events($id);
+layout_head(sb_label($B) . ' · ' . $B['title'], 'system_budgets');
+?>
+<p class="eyebrow"><a href="<?= url('system_budgets') ?>"><?= tt('sb.title') ?></a> › <?= e(sb_label($B)) ?></p>
+<div class="page-head">
+  <div><h1>🧮 <?= e(sb_label($B)) ?> <?= sb_pill($B['status']) ?></h1><p class="lede" style="margin-bottom:0;"><?= e($B['title']) ?><?= $B['source_ref'] ? ' · <span class="hint">' . e(t('sb.from_file', ['r' => (string)$B['source_ref']])) . '</span>' : '' ?></p></div>
+  <div class="btn-row">
+    <?php if ($ed): ?>
+      <form method="post" action="<?= $self ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_status"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="to" value="finished"><button class="btn btn--gold btn--sm" type="submit"<?= $blk ? ' disabled title="' . e(implode(' ', $blk)) . '"' : '' ?>>✔ <?= tt('sb.finish') ?></button></form>
+      <form method="post" action="<?= $self ?>" class="inline" data-lock data-confirm="<?= tt('sb.cancel_confirm') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="sb_status"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="to" value="cancelled"><button class="btn btn--ghost btn--sm" type="submit"><?= tt('sb.cancel_it') ?></button></form>
+    <?php elseif (in_array($B['status'], ['finished', 'cancelled'], true) && sb_can_reopen()): ?>
+      <form method="post" action="<?= $self ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_status"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="to" value="working"><button class="btn btn--sm" type="submit">↺ <?= tt('sb.reopen') ?></button></form>
+    <?php endif; ?>
+    <?php if (is_cp_admin() && in_array($B['status'], ['draft', 'cancelled'], true)): ?><form method="post" action="<?= $self ?>" class="inline" data-lock data-confirm="<?= tt('sb.delete_confirm') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="sb_delete"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost btn--sm" type="submit">🗑 <?= tt('btn.delete') ?></button></form><?php endif; ?>
+  </div>
+</div>
+<?php if ($ed && $blk): ?><p class="flash flash--info"><?= e(t('sb.to_finish') . ' ' . implode(' ', $blk)) ?></p><?php endif; ?>
+<?php if (!$ed): ?><p class="flash flash--info"><?= tt($B['status'] === 'finished' ? 'sb.locked_finished' : 'sb.locked') ?></p><?php endif; ?>
+
+<div class="card" id="totals">
+  <div class="card-head"><h2>Σ <?= tt('sb.totals') ?></h2><span class="hint"><?= tt('sb.totals_hint') ?></span></div>
+  <div class="table-scroll"><table class="tbl" data-nosort style="max-width:900px;"><thead><tr><th><?= tt('sb.group') ?></th><th class="num"><?= tt('sb.hours') ?></th><th class="num"><?= tt('sb.cost') ?></th><th class="num"><?= tt('sb.sale') ?></th><th class="num"><?= tt('sb.margin') ?></th></tr></thead><tbody>
+    <?php foreach ([['sb.labour', $T['hours'], $T['lab_cost'], $T['lab_sale']], ['sb.parts', null, $T['parts_cost'], $T['parts_sale']], ['sb.expenses', null, $T['exp_cost'], $T['exp_sale']]] as [$k, $h, $c, $s]): ?>
+    <tr><td><?= tt($k) ?></td><td class="num"><?= $h === null ? '' : e(sb_h($h)) ?></td><td class="num"><?= e(sb_money($c, $cur)) ?></td><td class="num"><?= e(sb_money($s, $cur)) ?></td><td class="num hint"><?= $s > 0.005 ? e(number_format(100 * ($s - $c) / $s, 1, ',', '')) . ' %' : '—' ?></td></tr><?php endforeach; ?>
+    <tr><td><b><?= tt('sb.total') ?></b></td><td class="num"><b><?= e(sb_h($T['hours'])) ?></b></td><td class="num"><b><?= e(sb_money($T['cost'], $cur)) ?></b></td><td class="num"><b><?= e(sb_money($T['sale'], $cur)) ?></b></td><td class="num"><b><?= e(number_format($T['margin_pct'], 1, ',', '')) ?> %</b></td></tr>
+    <?php if ((float)$B['commission_pct'] > 0): ?><tr><td><?= e(t('sb.with_comm', ['p' => rtrim(rtrim(number_format((float)$B['commission_pct'], 1, ',', ''), '0'), ',')])) ?></td><td></td><td></td><td class="num"><?= e(sb_money($T['with_commission'], $cur)) ?></td><td></td></tr><?php endif; ?>
+    <?php if ($T['out_sale'] > 0.005 || $T['out_cost'] > 0.005): ?><tr class="hint"><td><?= tt('sb.outside') ?></td><td></td><td class="num"><?= e(sb_money($T['out_cost'], $cur)) ?></td><td class="num"><?= e(sb_money($T['out_sale'], $cur)) ?></td><td></td></tr><?php endif; ?>
+  </tbody></table></div>
+  <p class="hint" style="margin:8px 0 0;"><?= e(t('sb.hours_split', ['n' => sb_h($T['h_normal']), 't' => sb_h($T['h_travel']), 'o' => sb_h($T['h_overtime']), 'd' => sb_h($T['days'])])) ?></p>
+</div>
+
+<div class="card" id="head">
+  <h2>⚙ <?= tt('sb.header') ?></h2>
+  <form method="post" action="<?= $self ?>#head" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_head"><input type="hidden" name="id" value="<?= $id ?>">
+    <div class="grid grid-3">
+      <div class="field" style="grid-column:span 2;"><label><?= tt('sb.f_title') ?> *</label><input name="title" maxlength="200" required value="<?= e($B['title']) ?>"<?= $ro ?>></div>
+      <div class="field"><label><?= tt('sb.owner') ?></label><select name="owner_user_id"<?= $ed ? '' : ' disabled' ?>><option value="0">—</option><?php foreach ($staff as $s): ?><option value="<?= (int)$s['id'] ?>"<?= (int)$B['owner_user_id'] === (int)$s['id'] ? ' selected' : '' ?>><?= e($s['full_name']) ?></option><?php endforeach; ?></select></div>
+      <div class="field" style="grid-column:span 2;"><label><?= tt('sb.subproject') ?></label><?php if ($ed): ?><select name="subproject_id"><option value="0">—</option><?php foreach ($subs as $s): ?><option value="<?= (int)$s['id'] ?>"<?= (int)$B['subproject_id'] === (int)$s['id'] ? ' selected' : '' ?>><?= e($s['project_code'] . ' · ' . $s['pname'] . ' › ' . $s['code'] . ' ' . $s['name']) ?></option><?php endforeach; ?></select><p class="hint" style="margin:4px 0 0;"><?= tt('sb.sub_hint') ?></p><?php else: ?><input readonly value="<?= e(trim((string)$B['project_code'] . ' · ' . (string)$B['project_name'] . ' › ' . (string)$B['sub_code'] . ' ' . (string)$B['sub_name'], ' ·›')) ?>"><?php endif; ?></div>
+      <div class="field"><label><?= tt('sb.target') ?></label><input type="date" name="target_date" value="<?= e((string)$B['target_date']) ?>"<?= $ro ?>></div>
+      <div class="field"><label><?= tt('sb.parts_margin') ?></label><input name="parts_margin" inputmode="decimal" value="<?= e($n2((float)$B['parts_margin'])) ?>"<?= $ro ?>><p class="hint" style="margin:4px 0 0;"><?= tt('sb.parts_margin_hint') ?></p></div>
+      <div class="field"><label><?= tt('sb.flat') ?></label><div style="display:flex;gap:8px;align-items:center;"><label style="display:flex;gap:6px;align-items:center;margin:0;"><input type="checkbox" name="flat_on" value="1"<?= (int)$B['flat_on'] ? ' checked' : '' ?><?= $ed ? '' : ' disabled' ?>> <?= tt('sb.flat_use') ?></label><input name="flat_rate" inputmode="decimal" value="<?= e($n2((float)$B['flat_rate'])) ?>" style="width:90px;text-align:right;"<?= $ro ?>> €/h</div><p class="hint" style="margin:4px 0 0;"><?= tt('sb.flat_hint') ?></p></div>
+      <div class="field"><label><?= tt('sb.cost_rate') ?></label><input name="cost_rate" inputmode="decimal" value="<?= e($n2((float)$B['cost_rate'])) ?>"<?= $ro ?>></div>
+      <div class="field"><label><?= tt('sb.zone') ?></label><select name="zone" data-nosearch<?= $ed ? '' : ' disabled' ?>><option value="local"<?= $B['zone'] === 'local' ? ' selected' : '' ?>><?= tt('sb.zone_local') ?></option><option value="overseas"<?= $B['zone'] === 'overseas' ? ' selected' : '' ?>><?= tt('sb.zone_overseas') ?></option></select></div>
+      <div class="field"><label><?= tt('sb.allow') ?></label><div style="display:flex;gap:8px;align-items:center;"><input name="allow_cost" inputmode="decimal" value="<?= e($n2((float)$B['allow_cost'])) ?>" style="text-align:right;" title="<?= tt('sb.cost') ?>"<?= $ro ?>><input name="allow_rate" inputmode="decimal" value="<?= e($n2((float)$B['allow_rate'])) ?>" style="text-align:right;" title="<?= tt('sb.sale') ?>"<?= $ro ?>></div><p class="hint" style="margin:4px 0 0;"><?= tt('sb.allow_hint') ?></p></div>
+      <div class="field"><label><?= tt('sb.commission') ?></label><input name="commission_pct" inputmode="decimal" value="<?= e($n2((float)$B['commission_pct'])) ?>"<?= $ro ?>></div>
+    </div>
+    <?php if ($ed): ?><div class="btn-row"><button class="btn btn--gold btn--sm" type="submit"><?= tt('btn.save') ?></button></div><?php endif; ?>
+  </form>
+</div>
+
+<div class="card" id="descr">
+  <div class="card-head"><h2>📝 <?= tt('sb.description') ?></h2></div>
+  <?php if ($ed): ?><form method="post" action="<?= $self ?>#descr" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_descr"><input type="hidden" name="id" value="<?= $id ?>">
+    <div class="field"><textarea name="description" rows="<?= max(6, min(24, substr_count((string)$B['description'], "\n") + 3)) ?>" maxlength="60000" placeholder="<?= tt('sb.descr_ph') ?>"><?= e((string)$B['description']) ?></textarea></div>
+    <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit"><?= tt('btn.save') ?></button></div>
+  </form><?php else: ?><div class="rt"><?= trim((string)$B['description']) !== '' ? rt_html((string)$B['description']) : '<p class="hint">—</p>' ?></div><?php endif; ?>
+</div>
+
+<div class="card" id="labour">
+  <div class="card-head"><h2>👷 <?= tt('sb.labour') ?> <span class="count"><?= count($B['labour']) ?></span></h2><span class="hint"><?= tt((int)$B['flat_on'] ? 'sb.lab_hint_flat' : 'sb.lab_hint') ?></span></div>
+  <form method="post" action="<?= $self ?>#labour" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_labour"><input type="hidden" name="id" value="<?= $id ?>">
+  <div class="table-scroll"><table class="tbl" data-nosort><thead><tr><th><?= tt('th.code') ?></th><th style="min-width:220px;"><?= tt('sb.l_descr') ?></th><th><?= tt('sb.section') ?></th><th><?= tt('sb.discipline') ?></th><th><?= tt('sb.card') ?></th><th class="num"><?= tt('sb.h_normal') ?></th><th class="num"><?= tt('sb.h_travel') ?></th><th class="num"><?= tt('sb.h_overtime') ?></th><th class="num"><?= tt('sb.days') ?></th><th class="num"><?= tt('sb.rate') ?></th><th class="num"><?= tt('sb.rate_ot') ?></th><th class="num"><?= tt('sb.cost') ?></th><th class="num"><?= tt('sb.sale') ?></th><th style="min-width:150px;"><?= tt('th.remarks') ?></th><?php if ($ed): ?><th title="<?= tt('btn.delete') ?>">🗑</th><?php endif; ?></tr></thead><tbody>
+  <?php $lrows = $B['labour']; if ($ed) for ($i = 0; $i < $nNewL; $i++) $lrows[] = ['id' => 'n' . $i, '_new' => true, 'code' => '', 'descr' => '', 'section_id' => 0, 'discipline_id' => 0, 'card' => '', 'h_normal' => 0, 'h_travel' => 0, 'h_overtime' => 0, 'allow_days' => 0, 'rate' => 0, 'rate_ot' => null, 'remarks' => ''];
+  foreach ($lrows as $l): $k = 'l[' . $l['id'] . ']'; $new = !empty($l['_new']); $c = $new ? null : sb_labour_calc($B, $l); $w = 'style="width:64px;text-align:right;"'; ?>
+  <tr<?= $new ? ' class="hint"' : '' ?>>
+    <td><input name="<?= $k ?>[code]" maxlength="12" value="<?= e((string)$l['code']) ?>" style="width:62px;"<?= $ro ?>></td>
+    <td><input name="<?= $k ?>[descr]" maxlength="400" style="width:100%;min-width:230px;" value="<?= e((string)$l['descr']) ?>"<?= $new ? ' placeholder="' . tt('sb.new_line') . '"' : '' ?><?= $ro ?>><?= !$new && !empty($l['bucket']) ? '<br><span class="hint">' . e((string)$l['bucket']) . '</span>' : '' ?></td>
+    <td><select name="<?= $k ?>[section_id]" data-nosearch<?= $ed ? '' : ' disabled' ?>><option value="0">—</option><?php foreach ($sec as $sid => $s): ?><option value="<?= $sid ?>"<?= (int)$l['section_id'] === $sid ? ' selected' : '' ?>><?= e($s['name']) ?></option><?php endforeach; ?></select></td>
+    <td><select name="<?= $k ?>[discipline_id]" data-nosearch<?= $ed ? '' : ' disabled' ?>><option value="0">—</option><?php foreach ($dis as $did => $dn): ?><option value="<?= $did ?>"<?= (int)$l['discipline_id'] === $did ? ' selected' : '' ?>><?= e($dn) ?></option><?php endforeach; ?></select></td>
+    <td><select name="<?= $k ?>[card]" data-nosearch<?= $ed ? '' : ' disabled' ?>><option value="">—</option><?php $seen = false; foreach ($cards as $ck => $cd): if ((string)$l['card'] === (string)$ck) $seen = true; ?><option value="<?= e((string)$ck) ?>"<?= (string)$l['card'] === (string)$ck ? ' selected' : '' ?> title="<?= e($cd['name']) ?>"><?= e($ck . ' · ' . $n2((float)$cd['normal'])) ?></option><?php endforeach; if (!$seen && (string)$l['card'] !== ''): ?><option value="<?= e((string)$l['card']) ?>" selected><?= e((string)$l['card']) ?></option><?php endif; ?></select></td>
+    <td class="num"><input name="<?= $k ?>[h_normal]" inputmode="decimal" value="<?= e($hv($l['h_normal'])) ?>" <?= $w ?><?= $ro ?>></td>
+    <td class="num"><input name="<?= $k ?>[h_travel]" inputmode="decimal" value="<?= e($hv($l['h_travel'])) ?>" <?= $w ?><?= $ro ?>></td>
+    <td class="num"><input name="<?= $k ?>[h_overtime]" inputmode="decimal" value="<?= e($hv($l['h_overtime'])) ?>" <?= $w ?><?= $ro ?>></td>
+    <td class="num"><input name="<?= $k ?>[allow_days]" inputmode="decimal" value="<?= e($hv($l['allow_days'])) ?>" <?= $w ?><?= $ro ?>></td>
+    <td class="num"><input name="<?= $k ?>[rate]" inputmode="decimal" value="<?= (float)$l['rate'] > 0 ? e($n2((float)$l['rate'])) : '' ?>" style="width:74px;text-align:right;"<?= $ro ?>><?= $c && $c['flat'] ? '<br><span class="hint">' . e(t('sb.flat_applies', ['v' => $n2($c['rate'])])) . '</span>' : '' ?></td>
+    <td class="num"><input name="<?= $k ?>[rate_ot]" inputmode="decimal" value="<?= $l['rate_ot'] !== null && (float)$l['rate_ot'] > 0 ? e($n2((float)$l['rate_ot'])) : '' ?>" style="width:74px;text-align:right;"<?= $ro ?>></td>
+    <td class="num"><?= $c ? e($n2($c['cost'])) : '' ?></td><td class="num"><b><?= $c ? e($n2($c['sale'])) : '' ?></b></td>
+    <td><input name="<?= $k ?>[remarks]" maxlength="500" style="width:100%;min-width:150px;" value="<?= e((string)$l['remarks']) ?>"<?= $ro ?>></td>
+    <?php if ($ed): ?><td><?= $new ? '' : '<input type="checkbox" name="' . $k . '[del]" value="1">' ?></td><?php endif; ?>
+  </tr><?php endforeach; ?>
+  <tr><td></td><td><b><?= tt('sb.total') ?></b></td><td></td><td></td><td></td><td class="num"><b><?= e(sb_h($T['h_normal'])) ?></b></td><td class="num"><b><?= e(sb_h($T['h_travel'])) ?></b></td><td class="num"><b><?= e(sb_h($T['h_overtime'])) ?></b></td><td class="num"><b><?= e(sb_h($T['days'])) ?></b></td><td></td><td></td><td class="num"><b><?= e($n2($T['lab_cost'])) ?></b></td><td class="num"><b><?= e($n2($T['lab_sale'])) ?></b></td><td></td><?php if ($ed): ?><td></td><?php endif; ?></tr>
+  </tbody></table></div>
+  <?php if ($ed): ?><div class="btn-row" style="margin-top:8px;"><button class="btn btn--gold btn--sm" type="submit"><?= tt('sb.save_lines') ?></button><span class="hint"><?= tt('sb.lines_hint') ?></span></div><?php endif; ?>
+  </form>
+</div>
+
+<div class="card" id="parts">
+  <div class="card-head"><h2>🔩 <?= tt('sb.parts') ?> <span class="count"><?= count($B['parts']) ?> / <?= SB_MAX_PARTS ?></span></h2><span class="hint"><?= e(t('sb.parts_hint', ['m' => rtrim(rtrim(number_format((float)$B['parts_margin'], 2, ',', ''), '0'), ',')])) ?></span></div>
+  <form method="post" action="<?= $self ?>#parts" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_parts"><input type="hidden" name="id" value="<?= $id ?>">
+  <div class="table-scroll"><table class="tbl" data-nosort><thead><tr><th>#</th><th><?= tt('th.code') ?></th><th style="min-width:260px;"><?= tt('sb.p_descr') ?></th><th class="num"><?= tt('sb.qty') ?></th><th><?= tt('sb.unit') ?></th><th class="num"><?= tt('sb.unit_cost') ?></th><th class="num"><?= tt('sb.margin_pct') ?></th><th class="num"><?= tt('sb.unit_sale') ?></th><th class="num"><?= tt('sb.cost') ?></th><th class="num"><?= tt('sb.sale') ?></th><th style="min-width:150px;"><?= tt('th.remarks') ?></th><?php if ($ed): ?><th title="<?= tt('btn.delete') ?>">🗑</th><?php endif; ?></tr></thead><tbody>
+  <?php $prows = $B['parts']; if ($ed) for ($i = 0; $i < $nNewP; $i++) $prows[] = ['id' => 'n' . $i, '_new' => true, 'code' => '', 'descr' => '', 'qty' => 0, 'unit' => '', 'unit_cost' => 0, 'margin_pct' => null, 'remarks' => '', 'item_id' => null, 'cost_origin' => ''];
+  $pn = 0; foreach ($prows as $p): $k = 'p[' . $p['id'] . ']'; $new = !empty($p['_new']); $c = $new ? null : sb_part_calc($B, $p); $bad = !$new && (float)$p['qty'] > 0 && (float)$p['unit_cost'] <= 0 && !sb_part_excluded($p); ?>
+  <tr<?= $new ? ' class="hint"' : '' ?>>
+    <td class="hint"><?= $new ? '+' : ++$pn ?></td>
+    <td><input name="<?= $k ?>[code]" maxlength="20" value="<?= e((string)$p['code']) ?>" style="width:90px;"<?= $ro ?>></td>
+    <td><input name="<?= $k ?>[descr]" maxlength="400" style="width:100%;min-width:260px;" value="<?= e((string)$p['descr']) ?>"<?= $new ? ' placeholder="' . tt('sb.new_part') . '"' : '' ?><?= $ro ?>><?php if (!$new && ((int)$p['item_id'] || (string)$p['cost_origin'] !== '')): ?><br><span class="hint"><?= (int)$p['item_id'] ? '📦 <a href="' . url('inventory_item', ['id' => (int)$p['item_id']]) . '">' . e((string)$p['item_code']) . '</a> · ' : '' ?><?= e((string)$p['cost_origin']) ?></span><?php endif; ?></td>
+    <td class="num"><input name="<?= $k ?>[qty]" inputmode="decimal" value="<?= e($hv($p['qty'])) ?>" style="width:70px;text-align:right;"<?= $ro ?>></td>
+    <td><input name="<?= $k ?>[unit]" maxlength="12" value="<?= e((string)$p['unit']) ?>" style="width:54px;"<?= $ro ?>></td>
+    <td class="num"><input name="<?= $k ?>[unit_cost]" inputmode="decimal" value="<?= (float)$p['unit_cost'] > 0 ? e($n2((float)$p['unit_cost'])) : '' ?>" style="width:92px;text-align:right;<?= $bad ? 'border-color:#9B2C2C;' : '' ?>"<?= $ro ?>></td>
+    <td class="num"><input name="<?= $k ?>[margin_pct]" inputmode="decimal" value="<?= $p['margin_pct'] !== null ? e($n2((float)$p['margin_pct'])) : '' ?>" placeholder="<?= e($n2((float)$B['parts_margin'])) ?>" style="width:66px;text-align:right;"<?= $ro ?>></td>
+    <td class="num"><?php if ($new): ?><input name="<?= $k ?>[unit_sale]" inputmode="decimal" value="" style="width:92px;text-align:right;"><?php else: ?><?= e($n2($c['unit_sale'])) ?><?php endif; ?></td>
+    <td class="num"><?= $c ? e($n2($c['cost'])) : '' ?></td><td class="num"><b><?= $c ? e($n2($c['sale'])) : '' ?></b></td>
+    <td><input name="<?= $k ?>[remarks]" maxlength="500" style="width:100%;min-width:150px;" value="<?= e((string)$p['remarks']) ?>"<?= $ro ?>></td>
+    <?php if ($ed): ?><td><?= $new ? '' : '<input type="checkbox" name="' . $k . '[del]" value="1">' ?></td><?php endif; ?>
+  </tr><?php endforeach; ?>
+  <tr><td></td><td></td><td><b><?= tt('sb.total') ?></b></td><td></td><td></td><td></td><td></td><td></td><td class="num"><b><?= e($n2($T['parts_cost'])) ?></b></td><td class="num"><b><?= e($n2($T['parts_sale'])) ?></b></td><td></td><?php if ($ed): ?><td></td><?php endif; ?></tr>
+  </tbody></table></div>
+  <?php if ($ed): ?><div class="btn-row" style="margin-top:8px;"><button class="btn btn--gold btn--sm" type="submit"><?= tt('sb.save_lines') ?></button><span class="hint"><?= tt('sb.parts_lines_hint') ?></span></div><?php endif; ?>
+  </form>
+  <?php if ($ed && count($B['parts']) < SB_MAX_PARTS && ($inv = sb_inv_options())): ?>
+  <form method="post" action="<?= $self ?>#parts" data-lock style="margin-top:12px;"><?= csrf_field() ?><input type="hidden" name="action" value="sb_part_inv"><input type="hidden" name="id" value="<?= $id ?>">
+    <h3 style="margin:0 0 6px;">📦 <?= tt('sb.inv_add') ?></h3>
+    <div class="grid grid-3"><div class="field" style="grid-column:span 2;"><select name="item_id" required><option value=""><?= tt('sb.inv_pick') ?></option><?php foreach ($inv as $i): ?><option value="<?= (int)$i['id'] ?>"><?= e($i['code'] . ' · ' . mb_substr((string)$i['description'], 0, 90)) ?></option><?php endforeach; ?></select><p class="hint" style="margin:4px 0 0;"><?= tt('sb.inv_hint') ?></p></div>
+      <div class="field"><div style="display:flex;gap:8px;"><input name="qty" inputmode="decimal" value="1" style="width:90px;text-align:right;" aria-label="<?= tt('sb.qty') ?>"><button class="btn btn--sm" type="submit"><?= tt('sb.inv_btn') ?></button></div></div></div>
+  </form><?php endif; ?>
+</div>
+
+<div class="card" id="expenses">
+  <div class="card-head"><h2>🧾 <?= tt('sb.expenses') ?> <span class="count"><?= count($B['expenses']) ?></span></h2><span class="hint"><?= tt('sb.exp_hint') ?></span></div>
+  <form method="post" action="<?= $self ?>#expenses" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_exp"><input type="hidden" name="id" value="<?= $id ?>">
+  <div class="table-scroll"><table class="tbl" data-nosort style="max-width:1000px;"><thead><tr><th><?= tt('sb.x_kind') ?></th><th style="min-width:260px;"><?= tt('sb.l_descr') ?></th><th class="num"><?= tt('sb.cost') ?></th><th class="num"><?= tt('sb.sale') ?></th><th><?= tt('sb.x_outside') ?></th><?php if ($ed): ?><th title="<?= tt('btn.delete') ?>">🗑</th><?php endif; ?></tr></thead><tbody>
+  <?php $xrows = $B['expenses']; if ($ed) for ($i = 0; $i < 2; $i++) $xrows[] = ['id' => 'n' . $i, '_new' => true, 'kind' => 'travel', 'descr' => '', 'cost' => 0, 'sale' => 0, 'in_total' => 1];
+  foreach ($xrows as $x): $k = 'x[' . $x['id'] . ']'; $new = !empty($x['_new']); ?>
+  <tr<?= $new ? ' class="hint"' : '' ?>>
+    <td><select name="<?= $k ?>[kind]" data-nosearch<?= $ed ? '' : ' disabled' ?>><?php foreach (SB_EXP_KINDS as $xk): ?><option value="<?= $xk ?>"<?= $x['kind'] === $xk ? ' selected' : '' ?>><?= tt('sb.xk_' . $xk) ?></option><?php endforeach; ?></select></td>
+    <td><input name="<?= $k ?>[descr]" maxlength="300" style="width:100%;min-width:260px;" value="<?= e((string)$x['descr']) ?>"<?= $new ? ' placeholder="' . tt('sb.new_exp') . '"' : '' ?><?= $ro ?>></td>
+    <td class="num"><input name="<?= $k ?>[cost]" inputmode="decimal" value="<?= (float)$x['cost'] > 0 ? e($n2((float)$x['cost'])) : '' ?>" style="width:110px;text-align:right;"<?= $ro ?>></td>
+    <td class="num"><input name="<?= $k ?>[sale]" inputmode="decimal" value="<?= (float)$x['sale'] > 0 ? e($n2((float)$x['sale'])) : '' ?>" style="width:110px;text-align:right;"<?= $ro ?>></td>
+    <td><input type="checkbox" name="<?= $k ?>[out]" value="1"<?= (int)$x['in_total'] ? '' : ' checked' ?><?= $ed ? '' : ' disabled' ?>></td>
+    <?php if ($ed): ?><td><?= $new ? '' : '<input type="checkbox" name="' . $k . '[del]" value="1">' ?></td><?php endif; ?>
+  </tr><?php endforeach; ?>
+  </tbody></table></div>
+  <?php if ($ed): ?><div class="btn-row" style="margin-top:8px;"><button class="btn btn--gold btn--sm" type="submit"><?= tt('sb.save_lines') ?></button><span class="hint"><?= tt('sb.exp_lines_hint') ?></span></div><?php endif; ?>
+  </form>
+</div>
+
+<?php if ($ed): ?><div class="card" id="import">
+  <h2>📥 <?= tt('sb.imp_title') ?></h2>
+  <form method="post" action="<?= $self ?>#import" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_import_upload"><input type="hidden" name="into" value="<?= $id ?>">
+    <div class="field"><input type="file" name="file" accept=".xlsx" required><p class="hint" style="margin:4px 0 0;"><?= tt('sb.imp_into_hint') ?></p></div>
+    <div class="btn-row"><button class="btn btn--sm" type="submit"><?= tt('sb.imp_review') ?></button></div>
+  </form>
+</div><?php endif; ?>
+
+<div class="grid grid-2" style="align-items:start;">
+<div class="card" id="comments">
+  <h2>💬 <?= tt('sb.comments') ?> <span class="count"><?= count($com) ?></span></h2>
+  <?php if (!$com): ?><p class="hint"><?= tt('sb.no_comments') ?></p><?php endif; ?>
+  <?php foreach ($com as $cm): ?><div style="border-bottom:1px solid var(--line, #E3E8EE);padding:8px 0;"><p style="margin:0 0 4px;"><b><?= e((string)$cm['full_name']) ?></b> <span class="hint"><?= e(fmt_datetime((string)$cm['created_at'])) ?></span></p><div class="rt"><?= rt_html((string)$cm['body']) ?></div></div><?php endforeach; ?>
+  <form method="post" action="<?= $self ?>#comments" data-lock style="margin-top:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="sb_comment"><input type="hidden" name="id" value="<?= $id ?>">
+    <div class="field"><textarea name="body" rows="3" maxlength="4000" required placeholder="<?= tt('sb.comment_ph') ?>"></textarea></div>
+    <div class="btn-row"><button class="btn btn--sm" type="submit"><?= tt('sb.comment_add') ?></button></div>
+  </form>
+</div>
+<div class="card" id="history">
+  <h2>🕘 <?= tt('sb.history') ?></h2>
+  <div class="table-scroll"><table class="tbl" data-nosort><tbody>
+  <?php foreach ($ev as $v): ?><tr><td class="date hint"><?= e(fmt_datetime((string)$v['created_at'])) ?></td><td><?= e((string)$v['full_name']) ?></td><td><?= tt('sb.ev_' . $v['kind']) ?><?= $v['note'] !== null && $v['note'] !== '' ? ' <span class="hint">· ' . e((string)$v['note']) . '</span>' : '' ?></td></tr><?php endforeach; ?>
+  </tbody></table></div>
+  <p class="hint" style="margin:8px 0 0;"><?= e(t('sb.created_by', ['n' => (string)$B['created_name'], 'd' => fmt_date(substr((string)$B['created_at'], 0, 10))])) ?></p>
+</div>
+</div>
+<?php layout_foot(); ?>
