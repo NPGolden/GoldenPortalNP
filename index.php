@@ -24,6 +24,11 @@
       <span>Project status &amp; documents · Πρόοδος έργων · Stato progetti</span>
     </a>
   </div>
+  <a class="land-banner" href="https://www.goldenas.com.gr/" target="_blank" rel="noopener">
+    <span class="lb-ico" aria-hidden="true">🌐</span>
+    <span class="lb-txt"><b>Visit our website</b><span>Company, services and careers · www.goldenas.com.gr</span></span>
+    <span class="lb-go" aria-hidden="true">→</span>
+  </a>
 </div>
 </body>
 </html>

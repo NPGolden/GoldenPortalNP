@@ -1544,3 +1544,9 @@ No SQL. Root `index.php`: the second door (`employee/`) and the sentence about e
 
 **Security review**: an application that is no longer used but still reachable is attack surface that nobody watches (its own login, its own database `goldensas_poms`, its own storage folder). Proposal, no performance cost: once the team confirms nobody needs it, close `/employee/` — answer every request with a redirect to the portal (one `.htaccess` line), keep the files and the database for the record, and remove them after an agreed retention time.
 
+## §297 v1.127.5 (R97-011) — entry page: banner to the company website
+
+No SQL. Root `index.php`: `<a class="land-banner" href="https://www.goldenas.com.gr/" target="_blank" rel="noopener">` under the door; styles `.land-banner` in `assets/portal.css` (gold-tinted strip, same width as the door row, stacks on a phone).
+
+**Security review**: a plain outbound link — `rel="noopener"` keeps the opened page from reaching back into the entry page; no script, no tracking parameter, no third-party resource is loaded. The proposal of §296 (close `/employee/` once confirmed unused) stays open.
+
