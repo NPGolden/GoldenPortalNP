@@ -17,7 +17,7 @@ $presets = ['today', 'yesterday', '7d', '30d', 'month', 'lastmonth', 'year', 'la
 /* ---- tiny inline SVG helpers (no JS library; prints cleanly) ---- */
 function ws_bars(array $rows, string $kx, string $kv, string $kv2 = '', int $w = 980, int $h = 220): string {
     if (!$rows) return '<p class="hint">' . tt('ws.no_data') . '</p>';
-    $max = max(1, max(array_map(fn($r) => (int)$r[$kv], $rows))); $n = count($rows); $gap = 4; $bw = min(56, max(2, ($w - 40) / $n - $gap)); $w = (int)min($w, 40 + $n * ($bw + $gap) + 8); $o = '<svg class="ws-chart" viewBox="0 0 ' . $w . ' ' . $h . '" role="img">';
+    $max = max(1, max(array_map(fn($r) => (int)$r[$kv], $rows))); $n = count($rows); $gap = 4; $bw = min(56, max(2, ($w - 40) / $n - $gap)); $o = '<svg class="ws-chart" viewBox="0 0 ' . $w . ' ' . $h . '" width="' . $w . '" height="' . $h . '" role="img">';   // R97-009: the drawing keeps its full width and its natural size — a period with few days no longer blows two bars up to the whole card
     foreach ([0.25, 0.5, 0.75, 1] as $g) { $y = round(($h - 30) - ($h - 40) * $g, 1); $o .= '<line x1="36" x2="' . $w . '" y1="' . $y . '" y2="' . $y . '" stroke="var(--line)" stroke-width="1"/><text x="32" y="' . ($y + 4) . '" font-size="10" text-anchor="end" fill="var(--mute)">' . round($max * $g) . '</text>'; }
     $step = max(1, (int)ceil($n / 14));
     foreach ($rows as $i => $r) { $x = round(40 + $i * ($bw + $gap), 1); $v = (int)$r[$kv]; $bh = round(($h - 40) * $v / $max, 1);

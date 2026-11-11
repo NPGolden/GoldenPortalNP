@@ -1532,3 +1532,9 @@ No SQL. `views/system_budget.php`: the options of the Rate card select are `<let
 
 Language keys 9 178 each.
 
+## §295 v1.127.3 (R97-009) — Website statistics: trend chart size
+
+No SQL. `ws_bars()` in `views/web_stats.php` shrank the SVG viewBox to the width of the bars (two days → 168 units) while the element had no width, so the browser stretched it to the card: two bars filled the page. The viewBox now keeps the full drawing width (980 × 220) and the element carries `width` / `height`, so it shows at its natural size (and still shrinks on a narrow screen through `max-width:100%`). Bars stay at most 56 units wide, from the left.
+
+**Security review**: display only; no input involved. No proposals.
+
