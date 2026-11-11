@@ -180,11 +180,13 @@ function sb_save_parts_from_post(int $id): int {
         if (!$pid && trim((string)($r['unit_sale'] ?? '')) !== '' && $m === null && $cost > 0) { $us = $f('unit_sale'); if ($us > 0) $m = round(($us / $cost - 1) * 100, 2); }   // a typed sale price becomes the line's margin
         $vals = [$s('code', 20) ?: null, $descr, $qty, $s('unit', 12) ?: null, $cost, $m, $s('remarks', 500) ?: null];
         if ($pid) q('UPDATE sb_parts SET code = ?, descr = ?, qty = ?, unit = ?, unit_cost = ?, margin_pct = ?, remarks = ?, sort_order = ? WHERE id = ? AND budget_id = ?', array_merge($vals, [++$sort * 10, $pid, $id]));
-        else { if ($count >= SB_MAX_PARTS) throw new RuntimeException(t('sb.parts_max', ['n' => SB_MAX_PARTS])); q('INSERT INTO sb_parts (code, descr, qty, unit, unit_cost, margin_pct, remarks, sort_order, budget_id) VALUES (?,?,?,?,?,?,?,?,?)', array_merge($vals, [9000 + (++$sort), $id])); $count++; }
+        else { if ($count >= SB_MAX_PARTS) { $over = true; continue; } q('INSERT INTO sb_parts (code, descr, qty, unit, unit_cost, margin_pct, remarks, sort_order, budget_id) VALUES (?,?,?,?,?,?,?,?,?)', array_merge($vals, [9000 + (++$sort), $id])); $count++; }
         $n++;
     }
     if ($B['status'] === 'draft') q("UPDATE sb_budgets SET status = 'working' WHERE id = ?", [$id]);
-    sb_recalc($id); sb_event($id, 'parts', (string)$n); return $n;
+    sb_recalc($id); sb_event($id, 'parts', (string)$n);
+    if (!empty($over)) throw new RuntimeException(t('sb.parts_max', ['n' => SB_MAX_PARTS]));   // what fitted is saved and totalled; the lines beyond the limit are refused
+    return $n;
 }
 /** Lowest known unit cost of an inventory item and where it comes from (lowest price on record, else last price, else average cost). */
 function sb_item_cost(array $i): array {
@@ -230,6 +232,9 @@ function sb_set_status(int $id, string $to): void {
     sb_guard(); $B = sb_get($id); if (!$B) throw new RuntimeException(t('err.notfound')); if (!empty($B['is_template'])) throw new RuntimeException(t('sb.bad_status')); $from = (string)$B['status']; $uid = (int)(current_user()['id'] ?? 0);
     if ($to === 'finished' && in_array($from, ['draft', 'working'], true)) { $x = sb_finish_blockers($B); if ($x) throw new RuntimeException(t('sb.cannot_finish') . ' ' . implode(' ', $x)); q("UPDATE sb_budgets SET status = 'finished', finished_at = NOW(), finished_by = ? WHERE id = ?", [$uid ?: null, $id]); }
     elseif ($to === 'working' && in_array($from, ['finished', 'cancelled'], true)) { if (!sb_can_reopen()) throw new RuntimeException(t('sb.reopen_mgmt')); q("UPDATE sb_budgets SET status = 'working', finished_at = NULL, finished_by = NULL WHERE id = ?", [$id]); }
+    elseif ($to === 'working' && $from === 'converted') {   // R97-004: only when the offer it became no longer exists (deleted draft) — management
+        if (!sb_can_reopen()) throw new RuntimeException(t('sb.reopen_mgmt')); if ((int)($B['offer_id'] ?? 0) && scalar('SELECT id FROM offers WHERE id = ?', [(int)$B['offer_id']])) throw new RuntimeException(t('sb.cv_reopen_offer'));
+        q("UPDATE sb_budgets SET status = 'working', finished_at = NULL, finished_by = NULL, offer_id = NULL, converted_at = NULL WHERE id = ?", [$id]); }
     elseif ($to === 'cancelled' && in_array($from, ['draft', 'working'], true)) q("UPDATE sb_budgets SET status = 'cancelled' WHERE id = ?", [$id]);
     else throw new RuntimeException(t('sb.bad_status'));
     sb_event($id, 'status', $from . ' → ' . $to);
@@ -616,4 +621,93 @@ function sb_ai_description(int $id, string $ask = ''): string {
             . "Use only the data below; do not invent quantities, makers, standards or dates; do not mention prices. Plain text with '- ' bullets and **bold** headings, at most 250 words." . (trim($ask) !== '' ? "\nExtra instruction from the user: " . mb_substr(trim($ask), 0, 400) : '') . "\n\n" . implode("\n", $L);
     $res = ai_run('write', ['title' => t('sb.title'), 'headline' => sb_label($B)], $prompt, null, 'system_budget'); if (empty($res['ok'])) throw new RuntimeException((string)($res['error'] ?? 'AI'));
     $txt = trim((string)$res['text']); if ($txt === '') throw new RuntimeException(t('ai.failed')); sb_event($id, 'ai_descr'); return mb_substr($txt, 0, 20000);
+}
+
+/* ───────────── Release 4 (GAS-CP-R97-004): convert a finished budget to an offer; feed the sub-project budget ───────────── */
+
+function sb_r4(): bool { static $h = null; if ($h === null) { try { $h = sb_has() && (bool) scalar("SHOW COLUMNS FROM sb_budgets LIKE 'offer_id'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function sb_can_convert(): bool { return sb_can() && sb_r4() && function_exists('ob_can') && ob_can(); }
+/** Discipline that carries the hours of a labour line in the sub-project budget: its own; else the first discipline mapped to its section; else the discipline of its rate card. Null = cannot be fed. */
+function sb_line_discipline(array $l): ?int {
+    static $bySec = null, $byCard = null;
+    if ($bySec === null) { $bySec = []; $byCard = []; try { foreach (all('SELECT sd.section_id, sd.discipline_id FROM eng_section_disciplines sd JOIN disciplines d ON d.id = sd.discipline_id AND d.is_active = 1 ORDER BY d.sort_order, d.id') as $r) $bySec[(int)$r['section_id']] = $bySec[(int)$r['section_id']] ?? (int)$r['discipline_id']; foreach (all("SELECT id, rate_card FROM disciplines WHERE is_active = 1 AND rate_card IS NOT NULL AND rate_card <> '' ORDER BY sort_order, id") as $r) $byCard[(string)$r['rate_card']] = $byCard[(string)$r['rate_card']] ?? (int)$r['id']; } catch (Throwable $e) {} }
+    if ((int)($l['discipline_id'] ?? 0)) return (int)$l['discipline_id'];
+    if ((int)($l['section_id'] ?? 0) && isset($bySec[(int)$l['section_id']])) return $bySec[(int)$l['section_id']];
+    $c = trim((string)($l['card'] ?? '')); return $c !== '' && isset($byCard[$c]) ? $byCard[$c] : null;
+}
+/** Hours for the sub-project budget: normal + overtime of every labour line (travelling time is not production time — design OP-05), grouped by discipline and section. */
+function sb_feed_plan(array $B): array {
+    $rows = []; $un = []; $dis = sb_disciplines(); $sec = sb_sections(); $tot = 0.0;
+    foreach ($B['labour'] as $l) {
+        $h = (float)$l['h_normal'] + (float)$l['h_overtime']; if ($h <= 0) continue; $d = sb_line_discipline($l);
+        if (!$d) { $un[] = ['descr' => (string)$l['descr'], 'hours' => $h]; continue; }
+        $s = (int)($l['section_id'] ?? 0); $k = $d . ':' . $s; if (!isset($rows[$k])) $rows[$k] = ['discipline_id' => $d, 'discipline' => (string)($dis[$d] ?? ('#' . $d)), 'section_id' => $s ?: null, 'section' => (string)($sec[$s]['name'] ?? ''), 'hours' => 0.0];
+        $rows[$k]['hours'] += $h; $tot += $h;
+    }
+    $T = sb_totals($B); return ['rows' => array_values($rows), 'unmapped' => $un, 'hours' => $tot, 'parts' => $T['parts_cost'], 'rate' => (float)$B['cost_rate']];
+}
+/** Offer lines a budget becomes. $opt: labour = line|section|lump, parts = line|lump, commission = bool (prices lifted to include the commission). */
+function sb_offer_lines(array $B, array $opt): array {
+    $c = (float)$B['commission_pct']; $up = !empty($opt['commission']) && $c > 0 && $c < 100 ? 1 / (1 - $c / 100) : 1.0; $L = []; $sec = sb_sections(); $T = sb_totals($B);
+    $add = function (string $kind, string $desc, string $unit, float $qty, float $price, ?float $cost = null, ?float $margin = null, ?int $item = null, string $erp = '', ?string $note = null) use (&$L, $up) { if ($kind !== 'text' && $qty <= 0) return; $L[] = ['kind' => $kind, 'description' => mb_substr($desc, 0, 400), 'unit' => $unit, 'qty' => round($qty, 2), 'unit_price' => round($price * $up, 2), 'cost_price' => $cost, 'margin_pct' => $margin !== null && $up !== 1.0 && $cost !== null && $cost > 0 ? round((round($price * $up, 2) / $cost - 1) * 100, 2) : $margin, 'item_id' => $item, 'erp_code' => mb_substr($erp, 0, 30), 'notes' => $note !== null ? mb_substr($note, 0, 255) : null]; };
+    $lm = (string)($opt['labour'] ?? 'line'); $days = 0.0; $grp = [];
+    foreach ($B['labour'] as $l) {
+        $x = sb_labour_calc($B, $l); $days += (float)$l['allow_days']; $nt = (float)$l['h_normal'] + (float)$l['h_travel']; $ot = (float)$l['h_overtime']; if ($nt + $ot <= 0) continue;
+        if ($lm === 'line') { $add('free', (string)$l['descr'], 'h', $nt, $x['rate'], (float)$B['cost_rate'], null, null, (string)$l['code']); $add('free', (string)$l['descr'] . ' — ' . t('sb.cv_overtime'), 'h', $ot, $x['rate_ot'], (float)$B['cost_rate'], null, null, (string)$l['code']); }
+        else { $k = $lm === 'section' ? (int)($l['section_id'] ?? 0) : 0; $grp[$k] = $grp[$k] ?? ['h' => 0.0, 'sale' => 0.0]; $grp[$k]['h'] += $nt + $ot; $grp[$k]['sale'] += $nt * $x['rate'] + $ot * $x['rate_ot']; }
+    }
+    foreach ($grp as $k => $g) { if ($g['h'] <= 0) continue; $name = $lm === 'section' ? t('sb.cv_labour_sec', ['s' => (string)($sec[$k]['name'] ?? t('sb.cv_other_sec'))]) : t('sb.cv_labour_all'); $add('free', $name, 'h', $g['h'], $g['sale'] / $g['h'], (float)$B['cost_rate']); }
+    $add('free', t('sb.cv_allowance'), t('sb.cv_day'), $days, (float)$B['allow_rate'], (float)$B['allow_cost']);
+    if (($opt['parts'] ?? 'line') === 'lump') { if ($T['parts_sale'] > 0) $add('free', t('sb.cv_parts_lump'), 'lot', 1, $T['parts_sale'], $T['parts_cost'], $T['parts_cost'] > 0 ? round(($T['parts_sale'] / $T['parts_cost'] - 1) * 100, 2) : null); }
+    else foreach ($B['parts'] as $p) { $x = sb_part_calc($B, $p); if (sb_part_excluded($p) || (float)$p['qty'] <= 0) continue; $add((int)($p['item_id'] ?? 0) ? 'item' : 'free', (string)$p['descr'], (string)($p['unit'] ?: 'pcs'), (float)$p['qty'], $x['unit_sale'], (float)$p['unit_cost'], $x['margin'], (int)($p['item_id'] ?? 0) ?: null, (string)$p['code']); }
+    foreach ($B['expenses'] as $e) { if ((int)$e['in_total']) $add('free', (string)$e['descr'], 'lot', 1, (float)$e['sale'], (float)$e['cost']); }
+    foreach ($B['expenses'] as $e) { if (!(int)$e['in_total'] && (float)$e['sale'] > 0) $L[] = ['kind' => 'text', 'description' => mb_substr((string)$e['descr'] . ' — ' . sb_money((float)$e['sale'], (string)$B['currency']) . ' — ' . t('sb.cv_separately'), 0, 400), 'unit' => '', 'qty' => 0, 'unit_price' => 0, 'cost_price' => null, 'margin_pct' => null, 'item_id' => null, 'erp_code' => '', 'notes' => null]; }
+    $ex = []; foreach ($B['labour'] as $l) if ((float)$l['h_normal'] + (float)$l['h_travel'] + (float)$l['h_overtime'] <= 0 && trim((string)$l['descr']) !== '') $ex[] = (string)$l['descr']; foreach ($B['parts'] as $p) if (sb_part_excluded($p)) $ex[] = (string)$p['descr'];
+    $net = 0.0; foreach ($L as $x) if ($x['kind'] !== 'text') $net += round($x['qty'] * $x['unit_price'], 2);
+    return ['lines' => $L, 'net' => round($net, 2), 'excluded' => $ex, 'uplift' => $up];
+}
+/** The description as it goes to the offer's Scope block: the team's own text only — the block imported from a budget working file (internal document control, internal notes) and the ticket header stay inside. */
+function sb_scope_text(array $B): string {
+    $d = (string)($B['description'] ?? ''); $mk = '**' . t('sb.imp_d_source') . '**'; $at = strpos($d, $mk); if ($at !== false) $d = substr($d, 0, $at);
+    return trim($d);
+}
+/**
+ * Convert a finished System Budget: a DRAFT offer on its sub-project (lines, scope text, exclusions) and — as chosen — a new revision of the
+ * sub-project's Budget & actual (hours per discipline and section, parts budget = parts cost). Existing budget revisions are never edited.
+ * $opt: labour, parts, commission (see sb_offer_lines), budget = replace|add|none. One transaction. Returns the offer id.
+ */
+function sb_convert(int $id, array $opt): int {
+    if (!sb_can_convert()) throw new RuntimeException(t('sb.cv_no_right'));
+    $B = sb_get($id); if (!$B) throw new RuntimeException(t('err.notfound'));
+    if ($B['status'] !== 'finished' || !empty($B['is_template'])) throw new RuntimeException(t('sb.cv_need_finished'));
+    $pid = (int)$B['project_id']; $sid = (int)$B['subproject_id']; $sp = $sid ? one('SELECT s.*, p.vessel_id FROM subprojects s JOIN projects p ON p.id = s.project_id WHERE s.id = ? AND s.project_id = ?', [$sid, $pid]) : null; if (!$sp) throw new RuntimeException(t('sb.blk_sub'));
+    $P = sb_offer_lines($B, $opt); if (!$P['lines']) throw new RuntimeException(t('sb.cv_no_lines'));
+    $u = current_user(); $pdo = db(); $pdo->beginTransaction();
+    try {
+        $no = function_exists('br_offer_no') ? br_offer_no($pid, $sid) : ''; if ($no === '') $no = ob_offer_no($pid, $sid);
+        q('INSERT INTO offers (project_id, subproject_id, offer_no, revision, title, amount, currency, status, status_at, notes, created_by, vessel_id, ticket_id, layout, vat_pct, validity_days) VALUES (?,?,?,?,?,?,?,?,CURDATE(),?,?,?,?,?,?,?)',
+          [$pid, $sid, $no, 'R0', mb_substr((string)$B['title'], 0, 200), $P['net'], (string)$B['currency'], 'draft', mb_substr(t('sb.cv_offer_note', ['n' => sb_label($B)]), 0, 4000), (int)($u['id'] ?? 0), (int)($sp['vessel_id'] ?? 0) ?: null, (int)($B['ticket_id'] ?? 0) ?: null, 'system', 0, 30]);
+        $oid = (int) db()->lastInsertId();
+        try { if (function_exists('num_sq') && function_exists('num_has') && num_has() && ($sq = num_sq($pid, $sid))) q('UPDATE offers SET sq_no = ? WHERE id = ?', [$sq, $oid]); } catch (Throwable $e) {}
+        try { if (function_exists('rl_current')) { $br = function_exists('br_of') ? br_of($pid, $sid) : []; $rl = rl_current((int)($br['id'] ?? 0) ?: null, (string)($br['code'] ?? '')); if ($rl) q('UPDATE offers SET rate_list_id = ? WHERE id = ?', [(int)$rl['id'], $oid]); } } catch (Throwable $e) {}
+        $seq = 0; foreach ($P['lines'] as $x) q('INSERT INTO offer_lines (offer_id, seq, kind, rate_item_id, item_id, cost_price, margin_pct, erp_code, description, unit, zone, qty, unit_price, discount_pct, line_total, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+            [$oid, $seq += 10, $x['kind'], null, $x['item_id'], $x['cost_price'], $x['margin_pct'], $x['erp_code'], $x['description'], $x['unit'], (string)$B['zone'] === 'overseas' ? 'overseas' : 'local', $x['qty'], $x['unit_price'], 0, $x['kind'] === 'text' ? 0 : ob_line_total((float)$x['qty'], (float)$x['unit_price'], 0), $x['notes']]);
+        ob_recalc($oid); $o = of_load($oid); if ($o) { ob_blocks_init($o); $scope = sb_scope_text($B); if ($scope !== '') ob_block_save($oid, 'scope', ob_block_label('scope'), $scope);
+            if ($P['excluded']) { $cur = (string) scalar("SELECT body FROM offer_blocks WHERE offer_id = ? AND block_key = 'exclusions'", [$oid]); ob_block_save($oid, 'exclusions', ob_block_label('exclusions'), trim($cur . "\n" . implode("\n", array_map(fn($e) => '- ' . $e, $P['excluded'])))); } }
+        of_event($oid, 'draft', t('sb.cv_offer_ev', ['n' => sb_label($B)]));
+        $brev = null; $mode = (string)($opt['budget'] ?? 'replace');
+        if (in_array($mode, ['replace', 'add'], true) && function_exists('bg_has') && bg_has()) {
+            $F = sb_feed_plan($B); $curB = bg_current($sid); $rows = [];
+            if ($mode === 'add' && $curB) foreach (all('SELECT discipline_id, section_id, hours, rate FROM sp_budget_hours WHERE budget_id = ?', [(int)$curB['id']]) as $h) $rows[(int)$h['discipline_id'] . ':' . (int)$h['section_id']] = ['d' => (int)$h['discipline_id'], 's' => (int)$h['section_id'] ?: null, 'h' => (float)$h['hours'], 'r' => (float)$h['rate']];
+            foreach ($F['rows'] as $r) { $k = $r['discipline_id'] . ':' . (int)$r['section_id']; if (isset($rows[$k])) $rows[$k]['h'] += $r['hours']; else $rows[$k] = ['d' => $r['discipline_id'], 's' => $r['section_id'], 'h' => $r['hours'], 'r' => $F['rate']]; }
+            $parts = $F['parts'] + ($mode === 'add' && $curB ? (float)$curB['parts_budget'] : 0.0); $ov = $P['net'] + ($mode === 'add' && $curB ? (float)($curB['offer_value'] ?? 0) : 0.0);
+            $rev = (int) scalar('SELECT COALESCE(MAX(revision), -1) + 1 FROM sp_budgets WHERE subproject_id = ?', [$sid]);
+            q('INSERT INTO sp_budgets (subproject_id, revision, parts_budget, offer_value, notes, created_by, created_name) VALUES (?,?,?,?,?,?,?)', [$sid, $rev, round($parts, 2), round($ov, 2), mb_substr(t($mode === 'add' ? 'sb.cv_bg_note_add' : 'sb.cv_bg_note', ['n' => sb_label($B), 'o' => $no]), 0, 500), (int)($u['id'] ?? 0), (string)($u['full_name'] ?? '')]);
+            $brev = (int) db()->lastInsertId(); $hasSec = function_exists('bg_has_sections') && bg_has_sections();
+            foreach ($rows as $r) { if ($r['h'] <= 0) continue; if ($hasSec) q('INSERT INTO sp_budget_hours (budget_id, discipline_id, hours, rate, section_id) VALUES (?,?,?,?,?)', [$brev, $r['d'], round($r['h'], 2), $r['r'], $r['s']]); else q('INSERT INTO sp_budget_hours (budget_id, discipline_id, hours, rate) VALUES (?,?,?,?)', [$brev, $r['d'], round($r['h'], 2), $r['r']]); }
+            $GLOBALS['_bg_cur'] = []; if (function_exists('eng_rows_reset')) eng_rows_reset(); cache_bump_later('eng');
+        }
+        q("UPDATE sb_budgets SET status = 'converted', offer_id = ?, budget_rev_id = ?, converted_at = NOW() WHERE id = ?", [$oid, $brev, $id]);
+        sb_event($id, 'converted', $no . ($brev ? ' · ' . t('sb.cv_ev_bg', ['m' => $mode]) : '')); cache_bump_later('fs'); $pdo->commit(); return $oid;
+    } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
 }

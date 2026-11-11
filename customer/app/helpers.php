@@ -88,7 +88,7 @@ function csrf_check(): void {
     $s = $_POST['_csrf'] ?? '';
     if (is_string($s)) {
         if (cp_is_gate() && gate_token_ok($s)) return;      // stateless gate token
-        if (hash_equals($_SESSION['csrf'] ?? '', $s)) return;
+        $own = (string)($_SESSION['csrf'] ?? ''); if ($own !== '' && $s !== '' && hash_equals($own, $s)) return;   // R97-004: a session that has not issued a token yet must not accept an empty one
     }
     // Stale login page (cached tab, expired session): self-heal with a
     // fresh page + notice rather than a dead-end error.

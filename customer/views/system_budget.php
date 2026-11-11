@@ -6,6 +6,7 @@ if (!$B) { http_response_code(404); layout_head(t('err.notfound'), 'system_budge
 $CUR = $B; $rvN = isset($_GET['rev']) && $_GET['rev'] !== '' ? (int)$_GET['rev'] : null; $isRev = false;
 if ($rvN !== null) { $V = sb_revision_get($B, $rvN); if ($V) { $B = $V; $isRev = true; } }   // R97-002: a stored revision is shown read-only
 $tpl = !empty($B['is_template']); $r2 = function_exists('sb_r2') && sb_r2(); $revs = $r2 && !$tpl ? sb_revisions($id) : []; $tkL = !empty($B['ticket_id']) && function_exists('tk_load') ? one('SELECT id, ticket_no, title FROM tickets WHERE id = ?', [(int)$B['ticket_id']]) : null;
+$ofL = !empty($CUR['offer_id']) ? one('SELECT id, offer_no, revision, status FROM offers WHERE id = ?', [(int)$CUR['offer_id']]) : null;   // R97-004: the offer this budget became
 $ed = !$isRev && sb_editable($B); $T = sb_totals($B); $cur = (string)$B['currency']; $self = url('system_budget', ['id' => $id]);
 $sec = sb_sections(); $dis = sb_disciplines(); $cards = sb_cards((string)$B['zone']); $staff = staff_users(); $blk = $ed && !$tpl ? sb_finish_blockers($B) : [];
 $subs = $ed ? all("SELECT s.id, s.code, s.name, p.project_code, p.name AS pname FROM subprojects s JOIN projects p ON p.id = s.project_id ORDER BY p.project_code DESC, s.sort_order, s.code LIMIT 3000") : [];
@@ -26,6 +27,12 @@ layout_head(sb_label($B) . ' · ' . $B['title'], 'system_budgets');
     <?php elseif ($ed && !$tpl): ?>
       <form method="post" action="<?= $self ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_status"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="to" value="finished"><button class="btn btn--gold btn--sm" type="submit"<?= $blk ? ' disabled title="' . e(implode(' ', $blk)) . '"' : '' ?>>✔ <?= tt('sb.finish') ?></button></form>
       <form method="post" action="<?= $self ?>" class="inline" data-lock data-confirm="<?= tt('sb.cancel_confirm') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="sb_status"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="to" value="cancelled"><button class="btn btn--ghost btn--sm" type="submit"><?= tt('sb.cancel_it') ?></button></form>
+    <?php elseif (!$tpl && $B['status'] === 'finished' && function_exists('sb_can_convert') && sb_can_convert()): ?>
+      <a class="btn btn--gold btn--sm" href="<?= url('system_budget_convert', ['id' => $id]) ?>">➜ <?= tt('sb.cv_title') ?></a>
+    <?php endif; ?>
+    <?php if ($isRev || $ed): ?>
+    <?php elseif ($B['status'] === 'converted' && sb_can_reopen() && !$ofL): ?>
+      <form method="post" action="<?= $self ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_status"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="to" value="working"><button class="btn btn--sm" type="submit">↺ <?= tt('sb.reopen') ?></button></form>
     <?php elseif (in_array($B['status'], ['finished', 'cancelled'], true) && sb_can_reopen()): ?>
       <form method="post" action="<?= $self ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_status"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="to" value="working"><button class="btn btn--sm" type="submit">↺ <?= tt('sb.reopen') ?></button></form>
     <?php endif; ?>
@@ -37,6 +44,7 @@ layout_head(sb_label($B) . ' · ' . $B['title'], 'system_budgets');
 <?php if ($isRev): ?><p class="flash flash--info"><?= e(t('sb.rev_viewing', ['r' => 'R' . $rvN, 'd' => fmt_datetime((string)$B['_rev']['created_at']), 'c' => 'R' . (int)$CUR['revision']])) ?><?= $B['_rev']['note'] ? ' — ' . e((string)$B['_rev']['note']) : '' ?></p>
 <?php elseif (!$ed): ?><p class="flash flash--info"><?= tt($B['status'] === 'finished' ? 'sb.locked_finished' : 'sb.locked') ?></p><?php endif; ?>
 <?php if ($tpl): ?><p class="flash flash--info"><?= tt('sb.tpl_banner') ?></p><?php endif; ?>
+<?php if (!$isRev && $CUR['status'] === 'converted'): ?><p class="flash flash--good"><?= $ofL ? e(t('sb.cv_done', ['d' => fmt_date(substr((string)($CUR['converted_at'] ?? ''), 0, 10))])) . ' <a href="' . url('offer', ['id' => (int)$ofL['id']]) . '"><b>' . e($ofL['offer_no'] . ' ' . $ofL['revision']) . '</b></a> ' . (function_exists('of_status_pill') ? of_status_pill((string)$ofL['status']) : '') : tt('sb.cv_offer_gone') ?><?= !empty($CUR['budget_rev_id']) && (int)$CUR['subproject_id'] ? ' · <a href="' . url('subproject', ['id' => (int)$CUR['subproject_id'], 'tab' => 'budget']) . '">' . tt('sb.cv_bg_link') . '</a>' : '' ?></p><?php endif; ?>
 
 <?php if ($r2): ?><div class="card" id="revisions">
   <div class="card-head"><h2>🗂 <?= tt($tpl ? 'sb.use_title' : 'sb.rev_title') ?><?php if (!$tpl): ?> <span class="count"><?= count($revs) + 1 ?></span><?php endif; ?></h2><span class="hint"><?= tt($tpl ? 'sb.use_hint' : 'sb.rev_hint') ?></span></div>
