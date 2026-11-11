@@ -260,12 +260,13 @@
   function read() { try { return JSON.parse(localStorage.getItem(LS) || 'null'); } catch (e) { return null; } }
   function write() { if (!ok) return; try { localStorage.setItem(LS, JSON.stringify({ k: key, t: now() })); } catch (e) {} }
   var m = read();
-  if (b.getAttribute('data-wnew') === '1') write();
+  if (b.getAttribute('data-wnew') === '1') { b.classList.add('w-ok'); write(); }
   else if (!m || m.k !== key || now() - m.t > 45000) {
     ok = false; try { localStorage.removeItem(LS); } catch (e) {}
     fetch('index.php?p=relock', { method: 'POST', credentials: 'same-origin', cache: 'no-store' }).catch(function () {}).then(function () { location.replace('index.php?p=login'); });
     return;
   }
+  b.classList.add('w-ok');                                             // R97-013: the page is shown only once the window check has passed
   write(); setInterval(write, 10000);
   ['focus', 'pageshow', 'visibilitychange'].forEach(function (ev) { window.addEventListener(ev, write); });
 })();

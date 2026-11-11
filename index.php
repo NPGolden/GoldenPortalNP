@@ -33,5 +33,6 @@ $cssV = (int) @filemtime(__DIR__ . '/assets/portal.css'); ?>
     <span class="lb-go" aria-hidden="true">→</span>
   </a>
 </div>
+<script src="assets/landing.js?v=<?= (int) @filemtime(__DIR__ . '/assets/landing.js') ?>"></script>
 </body>
 </html>

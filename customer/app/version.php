@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.127.6';
+const CP_VERSION = '1.127.7';
 const CP_BUILD   = '2026-11-11';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-013', 'version' => '1.127.7', 'date' => '2026-11-11', 'title' => 'Sign-out when the browser was closed: the dashboard no longer shows for a moment before the sign-in page — a signed-in page appears only after the check; stepping from the portal to the entry page and back keeps the session.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-012', 'version' => '1.127.6', 'date' => '2026-11-11', 'title' => 'Entry page goldensas.com: the door is named "Golden A/S Portal"; the page is never cached (browser, firewall) and its stylesheet carries a version, so a change shows at once.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-011', 'version' => '1.127.5', 'date' => '2026-11-11', 'title' => 'Entry page goldensas.com: banner with a link to the company website www.goldenas.com.gr under the portal door.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-010', 'version' => '1.127.4', 'date' => '2026-11-11', 'title' => 'Entry page goldensas.com: the Employee Portal door was removed — procurement, warehouse and dispatch are part of the portal; one door, centred.', 'db' => null, 'check' => null],

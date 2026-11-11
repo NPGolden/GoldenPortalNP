@@ -1914,3 +1914,10 @@ details.inline-edit{display:inline-block;margin-left:4px}details.inline-edit>sum
 .xs-edit textarea { width: 100%; }
 @media (max-width: 900px) { .xs-tiles { grid-template-columns: repeat(3, minmax(0, 1fr)); } .xs-two { grid-template-columns: minmax(0, 1fr); } }
 @media print { .xs-tiles { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; } .xs-tile b { font-size: 20px; } .xs-two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; } .xs { break-inside: avoid; } .xs-pill, .xs-ms th { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+
+/* R97-013: a signed-in page stays hidden until the "browser was closed" check has passed, so a session that is about to be
+   dropped never flashes the dashboard first. Falls back to visible after 1.5 s if the script could not run. */
+body[data-wchk]:not(.w-ok) { visibility: hidden; animation: w-show 0s 1.5s forwards; }
+@keyframes w-show { to { visibility: visible; } }
+@media print { body[data-wchk]:not(.w-ok) { visibility: visible; animation: none; } }
+

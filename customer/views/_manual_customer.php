@@ -6,6 +6,7 @@ return [
   'lede'  => 'How to follow your vessels and projects, approve documents, raise tickets, accept service reports and keep track of what changed — from any browser, on a computer, tablet or phone.',
   'sections' => [
     ['id' => 'signin', 'title' => 'Signing in', 'body' => [
+      'Signed out when you come back (v1.127.7): for your security the portal signs you out when its last tab has been closed for more than about 45 seconds — the same as closing the browser. If you then open the portal again you go straight to the sign-in page with the message "The browser was closed — for your security you were signed out"; sign in again and continue.',
       'Your Golden A/S project manager creates your account and sends you the address of the portal, your e-mail address as user name and a first password. Open the address in any modern browser (Edge, Chrome, Safari, Firefox) — nothing is installed on your device.',
       ['fig' => 'c-login.jpg', 'cap' => 'The sign-in page — e-mail and password, then the six-digit code from your authenticator app'],
       ['ol' => ['Enter your e-mail address and password and press Sign in.', 'The first time, the portal asks you to set up two-factor authentication: scan the QR code with an authenticator app (Microsoft Authenticator, Google Authenticator, Authy …) and type the six-digit code it shows.', 'On every later sign-in, type the current six-digit code from the app after your password.']],

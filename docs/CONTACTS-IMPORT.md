@@ -1558,3 +1558,13 @@ The copy the firewall already holds is not removed by a release: it expires by i
 
 **Security review**: no-store on a page without personal data costs one small PHP response per visit; nothing else changes. The proposal of §296 stays open.
 
+## §299 v1.127.7 (R97-013) — "logged in and automatically out" from the entry page
+
+**Report**: pressing the portal door on the entry page showed the portal signed in and then signed the person out.
+
+**Cause** (reproduced): the rule of R49-001 — every signed-in tab refreshes a marker in `localStorage` (`gascp_w`) every 10 s; a signed-in page that loads with a marker older than 45 s asks the server to drop the session (`?p=relock`) and goes to the sign-in page with "The browser was closed …". The server session was still valid, so the dashboard was rendered first and replaced a moment later. Not introduced today; the new entry page only made the path (no portal tab for a while → door) common.
+
+**Change**: `assets/portal.css` — `body[data-wchk]:not(.w-ok) { visibility: hidden }` with a 1,5 s fallback to visible; `assets/portal.js` adds `w-ok` once the marker check has passed (or the page is the first after sign-in), so a session about to be dropped never shows the dashboard. `assets/landing.js` on the root entry page: when the marker is still fresh on arrival it is refreshed while the page is open — portal → entry page → portal keeps the session; a marker already stale is left alone. Manuals of all five audiences carry the explanation.
+
+**Security review**: the policy itself is unchanged (setting `sec_close_signout`, Settings › Login history). The entry page only prolongs a marker that was valid when it was opened, in the same browser profile, and cannot create one; the server-side idle time-out (`sec_idle_minutes`) and the maximum session length still apply. No proposals.
+
