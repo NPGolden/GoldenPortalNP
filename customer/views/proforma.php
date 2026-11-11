@@ -120,6 +120,7 @@ layout_head($r['pi_no'], 'proformas');
   // R95-004: the cap is the document — an invoice: its gross; a proforma: its not-yet-invoiced part (advances); once fully invoiced, payments are logged on the invoices
   $cap = $isInv ? max(0.0, (float)$r['gross'] - $crSum) : max(0.0, (float)$r['gross'] - $invSum); $offerPaid = $advSum; $capLeft = max(0, $cap - $offerPaid);
   if ($isCr) { $cap = max(0.0, -(float)$r['gross'] - $crSum); $offerPaid = -$advSum; $paid = $offerPaid; $capLeft = max(0, $cap - $offerPaid); $open = $capLeft; }   // R95-006: on a credit note the "payments" are refunds to the customer $ep = (int)($_GET['pay'] ?? 0); $exp = null; foreach ($pays as $x) if ((int)$x['id'] === $ep) $exp = $x; ?>
+<?php $forOn = function_exists('ppay_for_col') && ppay_for_col(); $forMap = []; if ($isInv) foreach ($r['settles'] ?? [] as $fx) $forMap[(int)$fx['id']] = (string)$fx['pi_no'];   // R96-003: the proformas a payment on this invoice may count for ?>
 <div class="card" id="payments">
   <div class="card-head"><h2>💳 <?= $isCr ? tt('cn.refunds') : tt('pay.title') ?> <span class="hint">(<?= count($pays) ?>)</span></h2><span class="hint"><?= $isCr ? tt('cn.refunds_hint') : tt('pay.hint') ?></span></div>
   <div class="kpi kpi--4" style="margin-bottom:10px;">
@@ -131,7 +132,7 @@ layout_head($r['pi_no'], 'proformas');
   <?php if (!$pays): ?><p class="hint"><?= tt('pay.none') ?></p><?php else: ?>
   <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('th.date') ?></th><th class="num"><?= tt('pt.amount') ?></th><th><?= tt('pay.method') ?></th><th><?= tt('pay.reference') ?></th><th><?= tt('pd.note') ?></th><th><?= tt('pay.invoiced') ?></th><th><?= tt('th.by') ?></th><?php if ($canInv): ?><th></th><?php endif; ?></tr></thead><tbody>
   <?php foreach ($pays as $x): ?><tr><td class="date"><?= e(fmt_date($x['paid_on'])) ?></td><td class="num"><b><?= e(pi_money($isCr ? -(float)$x['amount'] : (float)$x['amount'], $cur)) ?></b></td><td><?= e(t('pay.m_' . $x['method'])) ?></td><td class="mono"><?= e((string)$x['reference']) ?></td><td class="hint"><?= e((string)$x['note']) ?></td>
-    <td><?= $isCr ? pill('gold', t('cn.refund')) : ($isInv ? pill('green', t('pi.k_invoice')) : pill('gold', t('pay.advance'))) ?></td><td class="hint"><?= e((string)$x['by_name']) ?></td>
+    <td><?= $isCr ? pill('gold', t('cn.refund')) : ($isInv ? pill('green', t('pi.k_invoice')) : pill('gold', t('pay.advance'))) ?><?php if ($isInv && $forOn && count($forMap) > 1): ?> <span class="hint"><?= isset($forMap[(int)($x['for_pi'] ?? 0)]) ? '→ ' . e($forMap[(int)$x['for_pi']]) : tt('pay.for_shared') ?></span><?php endif; ?></td><td class="hint"><?= e((string)$x['by_name']) ?></td>
     <?php if ($canInv): ?><td class="row-actions stack"><a class="btn btn--ghost btn--sm" href="<?= url('proforma', ['id' => $id, 'pay' => (int)$x['id']]) ?>#pay-form">✎</a><form method="post" action="<?= $backTo ?>#payments" class="inline" data-lock data-confirm="<?= tt('pay.delete_confirm') ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('btn.delete') ?>" data-confirm-danger><?= csrf_field() ?><input type="hidden" name="action" value="ppay_delete"><input type="hidden" name="pay_id" value="<?= (int)$x['id'] ?>"><button class="btn btn--ghost btn--sm btn--danger-ghost" type="submit">🗑</button></form></td><?php endif; ?></tr><?php endforeach; ?>
   </tbody></table></div>
   <?php endif; ?>
@@ -145,6 +146,7 @@ layout_head($r['pi_no'], 'proformas');
       <div class="field"><label><?= tt('pay.method') ?></label><select name="method" data-nosearch><?php foreach (PPAY_METHODS as $m): ?><option value="<?= $m ?>"<?= ($exp['method'] ?? 'bank') === $m ? ' selected' : '' ?>><?= e(t('pay.m_' . $m)) ?></option><?php endforeach; ?></select></div>
       <div class="field"><label><?= tt('pay.reference') ?></label><input name="reference" maxlength="80" value="<?= e((string)($exp['reference'] ?? '')) ?>" placeholder="<?= tt('pay.reference_ph') ?>"></div>
       <div class="field" style="grid-column:span 2;"><label><?= tt('pd.note') ?></label><input name="note" maxlength="255" value="<?= e((string)($exp['note'] ?? '')) ?>"></div>
+      <?php if ($isInv && $forOn && count($forMap) > 1): ?><div class="field"><label><?= tt('pay.for_lbl') ?></label><select name="for_pi" data-nosearch><option value="0"><?= tt('pay.for_all') ?></option><?php foreach ($forMap as $fk => $fn): ?><option value="<?= $fk ?>"<?= (int)($exp['for_pi'] ?? 0) === $fk ? ' selected' : '' ?>><?= e($fn) ?></option><?php endforeach; ?></select><p class="hint" style="margin:4px 0 0;"><?= tt('pay.for_hint') ?></p></div><?php endif; ?>
     </div>
     <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit"><?= $exp ? tt('btn.save') : tt('pay.record') ?></button><?php if ($exp): ?><a class="btn btn--ghost btn--sm" href="<?= $backTo ?>#payments"><?= tt('btn.cancel') ?></a><?php endif; ?></div>
   </form>

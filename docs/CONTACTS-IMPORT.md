@@ -1408,3 +1408,13 @@ Decisions of 11/11/2026: milestones = a list per project kept by the PM, pre-fil
 
 **Security review**: the value is cast to int, checked against the active branches and bound as a parameter; customers never get the filter (their list stays scoped by `scope_sql`). No proposals beyond those of §284.
 
+## §286 v1.122.2 (R96-003) — payments keep the proforma they were received for
+
+**Report**: a payment added to one proforma appeared split over the open proformas of the project.
+
+**Cause**: since v1.119.0 an advance moves from the proforma to the accounting invoice when the invoice is linked. `PI_INVPAID_SQL` then gave every proforma the invoice settles a share of the invoice's payments in proportion to its allocation (`l.amount × paid / gross`). With one invoice number settling several proformas, 1 565,00 received for the first proforma showed as 816,41 / 521,67 / 226,93 on three proformas, all "partly paid". Recording a payment itself never split anything — one row is written on the document it is entered on.
+
+**Change**: `proforma_payments.for_pi` (migration `install/migrate_cp_r96_003_payment_origin.sql`) = the proforma a payment on an invoice counts for; NULL = shared. `ppay_for_col()` (positive result cached) switches `PI_INVPAID_SQL`: per link, own money first (`PI_LNKOWN_SQL`, capped by the allocation), then the rest of the invoice's payments pro rata over what is still uncovered (`PI_INVOWN_SQL`). Writers: `pi_register_invoice` (moved advances and the "paid" of the link form get `for_pi`), `ppay_save_from_post` (`for_pi` from the form, accepted only for a proforma the invoice settles; a single-proforma invoice always its own), `pinv_delete` (money received for the unlinked proforma returns to it). `views/proforma.php`: "Counts for" select and the → label on invoices settling more than one proforma. Backfill: single-proforma invoices; on shared invoices a payment whose amount equals exactly one allocation and is the only payment of that amount. One-off status refresh on the first request (`cp_setting` `pay_origin`). Collections and statements list invoices as lines and were not affected. `pay.max_hint` reworded (it still described the offer-level cap removed in v1.119.0). Language keys 8 763 each.
+
+**Security review**: `for_pi` is cast to int and accepted only when it is one of the invoice's linked proformas (a foreign id is stored as NULL — tested); writes stay behind `pi_can_invoices()` and CSRF; the new SQL has no user input; the form adds no inline script. Proposal (no performance cost): restrict "Remove link" and payment edits on invoices to the accounting role and write them to the audit trail — still open from §283.
+

@@ -112,6 +112,8 @@ session_boot();
 i18n_boot();
 // R95-004: one-off ledger conversion (proforma_invoices → invoice rows + links) on the first request after the migration; guarded by the ledger_v2 setting
 if (function_exists('pi_ledger_convert') && function_exists('cp_setting') && cp_setting('ledger_v2', '') !== '1') { try { pi_ledger_convert(); } catch (Throwable $e) { error_log('[ledger_v2] ' . $e->getMessage()); } }
+// R96-003: payments now keep the proforma they were received for — refresh the paid / part-paid status of the ledger once after the update
+if (function_exists('ppay_for_col') && function_exists('cp_setting') && cp_setting('pay_origin', '') !== '1' && ppay_for_col()) { try { cp_setting_set('pay_origin', '1'); foreach (all("SELECT id FROM proformas WHERE kind = 'proforma' AND status NOT IN ('draft','cancelled') AND id IN (SELECT proforma_id FROM pi_links)") as $x) pi_refresh_status((int)$x['id']); } catch (Throwable $e) { error_log('pay_origin: ' . $e->getMessage()); } }
 
 header('X-Frame-Options: SAMEORIGIN');
 /* Dynamic pages must never be cached: a cached copy re-shows stale flash

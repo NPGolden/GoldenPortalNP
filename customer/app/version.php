@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.122.1';
+const CP_VERSION = '1.122.2';
 const CP_BUILD   = '2026-11-11';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R96-003', 'version' => '1.122.2', 'date' => '2026-11-11', 'title' => 'Payments keep the proforma they were received for: an advance moved to an accounting invoice that settles several proformas is no longer spread pro rata over all of them; a payment on such an invoice can be assigned to one proforma or shared; unlinking returns the money to its proforma.', 'db' => 'install/migrate_cp_r96_003_payment_origin.sql', 'check' => 'r96b'],
         ['ref' => 'GAS-CP-R96-002', 'version' => '1.122.1', 'date' => '2026-11-11', 'title' => 'Offers: filter by branch (sub-project branch, else project, else default) — list, tiles and remembered filter; branch code on every row.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R96-001', 'version' => '1.122.0', 'date' => '2026-11-11', 'title' => 'Weekly and monthly project reports open with an executive block: the summary paragraph (AI draft the project manager edits and releases; generated sentences until then), six tiles (progress actual, progress planned, SPI, drawings approved, open risks, LTI of the period), the progress S-curve (planned vs actual per week) and the milestones table (plan, forecast, status). New per project: Milestones (pre-filled from the sub-project deadlines) and the Safety log. On screen, in the printed monthly report and in the weekly PDF and Word.', 'db' => 'install/migrate_cp_r96_001_exec_summary.sql', 'check' => 'r96a'],
         ['ref' => 'GAS-CP-R95-006', 'version' => '1.121.0', 'date' => '2026-11-11', 'title' => 'Customer credit notes in the one ledger: registered by number like a direct invoice (Register credit note), for an invoice or standalone; applied to one or more invoices of the same billing party; the amount not applied is refunded to the customer (refunds recorded on the credit note) or carried forward as a credit — the accountant chooses and can change it; invoices show their credit notes and what is still open; collections, statement of account, sub-project invoicing, financial report and cash flow count credit notes negative.', 'db' => 'install/migrate_cp_r95_006_credit_notes.sql', 'check' => 'r95e'],
@@ -425,6 +426,7 @@ function cp_migration_state(): array {
         'r95d' => $has("SHOW TABLES LIKE 'vessel_owners'"),
         'r95e' => $has("SHOW TABLES LIKE 'pi_credits'"),
         'r96a' => $has("SHOW TABLES LIKE 'pm_milestones'"),
+        'r96b' => $has("SHOW COLUMNS FROM proforma_payments LIKE 'for_pi'"),
         'r93b' => $has("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_inquiries' AND COLUMN_NAME = 'kind' AND COLUMN_TYPE LIKE '%contact%'"),
         'r93a' => $has("SHOW TABLES LIKE 'work_permits'"),
         'r92f' => $has("SHOW COLUMNS FROM rc_applications LIKE 'keep_until'"),

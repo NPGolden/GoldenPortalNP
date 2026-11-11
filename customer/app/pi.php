@@ -116,12 +116,23 @@ function pt_seed(int $offerId, array $o): void { if (pt_of($offerId)) return; $b
 /* R95-004 ledger v2 — amounts of a ledger row:
  *   PI_ADV_SQL      Σ payments logged on the row itself (an invoice: its payments; a proforma: advances received before invoicing)
  *   PI_INV_SQL      Σ amounts of the invoices linked to a proforma (pi_links)
- *   PI_INVPAID_SQL  the part of those invoices' payments allocated to the proforma (pro rata of the link amount)
+ *   PI_INVPAID_SQL  the part of those invoices' payments allocated to the proforma (R96-003: first what was received for it, the rest pro rata)
  *   PI_PAID_SQL     paid for status purposes: invoice → own payments; proforma → advances + allocated invoice payments
  *   PI_OPEN_SQL     open amount for collections: invoice → gross − paid; proforma → gross − invoiced − advances (the invoices carry the rest) */
 const PI_ADV_SQL = "(SELECT COALESCE(SUM(pp.amount),0) FROM proforma_payments pp WHERE pp.proforma_id = pi.id)";
 const PI_INV_SQL = "(SELECT COALESCE(SUM(l.amount),0) FROM pi_links l WHERE l.proforma_id = pi.id)";
-const PI_INVPAID_SQL = "(SELECT COALESCE(SUM(LEAST(l.amount, l.amount * (SELECT COALESCE(SUM(pq.amount),0) FROM proforma_payments pq WHERE pq.proforma_id = l.invoice_id) / NULLIF(x.gross, 0))),0) FROM pi_links l JOIN proformas x ON x.id = l.invoice_id WHERE l.proforma_id = pi.id)";
+/** R96-003: does a payment remember the proforma it was received for (proforma_payments.for_pi)? Positive answer cached — no query per request. */
+function ppay_for_col(): bool { static $h = null; if ($h !== null) return $h;
+    $c = function_exists('cache_get') ? cache_get('pp_for_pi') : null; if ($c === 1) return $h = true;
+    try { $h = (bool) scalar("SHOW COLUMNS FROM proforma_payments LIKE 'for_pi'"); } catch (Throwable $e) { $h = false; }
+    if ($h && function_exists('cache_set')) cache_set('pp_for_pi', 1, 86400); return $h; }
+/* R96-003: of an invoice's payments, a proforma gets first what was received FOR it (for_pi — an advance moved to the invoice, or a payment
+ * the accountant assigned), capped by its allocation; only the rest of the invoice's money is shared pro rata over what is still uncovered. */
+if (ppay_for_col()) {
+    define('PI_LNKOWN_SQL', "LEAST(l.amount, (SELECT COALESCE(SUM(p3.amount),0) FROM proforma_payments p3 WHERE p3.proforma_id = l.invoice_id AND p3.for_pi = l.proforma_id))");
+    define('PI_INVOWN_SQL', "(SELECT COALESCE(SUM(LEAST(l2.amount, (SELECT COALESCE(SUM(p2.amount),0) FROM proforma_payments p2 WHERE p2.proforma_id = l2.invoice_id AND p2.for_pi = l2.proforma_id))),0) FROM pi_links l2 WHERE l2.invoice_id = l.invoice_id)");
+    define('PI_INVPAID_SQL', "(SELECT COALESCE(SUM(LEAST(l.amount, " . PI_LNKOWN_SQL . " + (l.amount - " . PI_LNKOWN_SQL . ") * GREATEST(0, (SELECT COALESCE(SUM(pq.amount),0) FROM proforma_payments pq WHERE pq.proforma_id = l.invoice_id) - " . PI_INVOWN_SQL . ") / NULLIF(x.gross - " . PI_INVOWN_SQL . ", 0))),0) FROM pi_links l JOIN proformas x ON x.id = l.invoice_id WHERE l.proforma_id = pi.id)");
+} else define('PI_INVPAID_SQL', "(SELECT COALESCE(SUM(LEAST(l.amount, l.amount * (SELECT COALESCE(SUM(pq.amount),0) FROM proforma_payments pq WHERE pq.proforma_id = l.invoice_id) / NULLIF(x.gross, 0))),0) FROM pi_links l JOIN proformas x ON x.id = l.invoice_id WHERE l.proforma_id = pi.id)");
 // R95-006 credit notes: kind 'credit' rows carry NEGATIVE amounts; pi_credits = what a credit note settles of an invoice; refunds = negative payments on the credit note
 const PI_CRIN_SQL = "(SELECT COALESCE(SUM(k.amount),0) FROM pi_credits k WHERE k.invoice_id = pi.id)";    // credit notes applied to this invoice
 const PI_CROUT_SQL = "(SELECT COALESCE(SUM(k.amount),0) FROM pi_credits k WHERE k.credit_id = pi.id)";    // of this credit note, applied to invoices
@@ -254,8 +265,8 @@ function pi_register_invoice(int $piId, string $no, ?string $date, float $amount
     q('INSERT INTO pi_links (invoice_id, proforma_id, amount) VALUES (?,?,?)', [$invId, $piId, $amount]);
     // advances received on the proforma move to the invoice (oldest first, while they fit)
     $room = (float) scalar('SELECT gross - ' . PI_ADV_SQL . ' FROM proformas pi WHERE pi.id = ?', [$invId]);
-    foreach (all('SELECT id, amount FROM proforma_payments WHERE proforma_id = ? ORDER BY paid_on, id', [$piId]) as $pp) { if ((float)$pp['amount'] <= $room + 0.005) { q('UPDATE proforma_payments SET proforma_id = ? WHERE id = ?', [$invId, (int)$pp['id']]); $room -= (float)$pp['amount']; } }
-    if ($paidOn && ($paidAmt === null || $paidAmt > 0)) { $amt = $paidAmt ?? $amount; q('INSERT INTO proforma_payments (proforma_id, paid_on, amount, method, reference, note, created_by) VALUES (?,?,?,?,?,?,?)', [$invId, $paidOn, $amt, 'bank', null, null, (int)(current_user()['id'] ?? 0)]); }
+    foreach (all('SELECT id, amount FROM proforma_payments WHERE proforma_id = ? ORDER BY paid_on, id', [$piId]) as $pp) { if ((float)$pp['amount'] <= $room + 0.005) { if (ppay_for_col()) q('UPDATE proforma_payments SET proforma_id = ?, for_pi = ? WHERE id = ?', [$invId, $piId, (int)$pp['id']]); else q('UPDATE proforma_payments SET proforma_id = ? WHERE id = ?', [$invId, (int)$pp['id']]); $room -= (float)$pp['amount']; } }
+    if ($paidOn && ($paidAmt === null || $paidAmt > 0)) { $amt = $paidAmt ?? $amount; q('INSERT INTO proforma_payments (proforma_id, paid_on, amount, method, reference, note, created_by) VALUES (?,?,?,?,?,?,?)', [$invId, $paidOn, $amt, 'bank', null, null, (int)(current_user()['id'] ?? 0)]); if (ppay_for_col()) q('UPDATE proforma_payments SET for_pi = ? WHERE id = ?', [$piId, (int) db()->lastInsertId()]); }
     of_event((int)$r['offer_id'], 'invoice', $no . ' · ' . pi_money($amount, $r['currency']));
     pi_refresh_status($invId); pi_refresh_status($piId);
     $sum = (float) scalar('SELECT COALESCE(SUM(amount),0) FROM pi_links WHERE proforma_id = ?', [$piId]);
@@ -276,10 +287,12 @@ function pinv_delete(int $linkId): int { cache_bump_later('fs');
     $invId = (int)$l['invoice_id']; $piId = (int)$l['proforma_id'];
     $paid = (float) scalar('SELECT COALESCE(SUM(amount),0) FROM proforma_payments WHERE proforma_id = ?', [$invId]);
     q('DELETE FROM pi_links WHERE id = ?', [$linkId]);
+    if (ppay_for_col()) q('UPDATE proforma_payments SET proforma_id = ?, for_pi = NULL WHERE proforma_id = ? AND for_pi = ?', [$piId, $invId, $piId]);   // R96-003: what was received for this proforma returns to it as advances
+    $paid = (float) scalar('SELECT COALESCE(SUM(amount),0) FROM proforma_payments WHERE proforma_id = ?', [$invId]);
     $left = (int) scalar('SELECT COUNT(*) FROM pi_links WHERE invoice_id = ?', [$invId]);
     $invRow = one('SELECT * FROM proformas WHERE id = ?', [$invId]);
     if (!$invRow || !pi_from_links($invRow)) { if ($invRow) pi_refresh_status($invId); pi_refresh_status($piId); return $piId; }   // R95-005: a direct invoice is never shrunk or deleted by an unlink — it keeps its gross and its payments
-    if (!$left) { if ($paid > 0.005) q('UPDATE proforma_payments SET proforma_id = ? WHERE proforma_id = ?', [$piId, $invId]);   // its payments go back to the proforma as advances
+    if (!$left) { if ($paid > 0.005) q('UPDATE proforma_payments SET proforma_id = ?' . (ppay_for_col() ? ', for_pi = NULL' : '') . ' WHERE proforma_id = ?', [$piId, $invId]);   // its payments go back to the proforma as advances
                   q("DELETE FROM proformas WHERE id = ? AND kind = 'invoice' AND offer_id IS NULL", [$invId]); }
     else { $inv = one('SELECT vat_pct FROM proformas WHERE id = ?', [$invId]); q('UPDATE proformas SET gross = gross - ?, amount_net = amount_net - ?, vat_amount = gross - amount_net WHERE id = ?', [(float)$l['amount'], round((float)$l['amount'] / (1 + (float)($inv['vat_pct'] ?? 0) / 100), 2), $invId]); pi_refresh_status($invId); }
     pi_refresh_status($piId); return $piId;
@@ -383,8 +396,10 @@ function ppay_save_from_post(int $piId): void { cache_bump_later('fs');
     if (!pi_is_invoice($r) && (float)$r['inv_sum'] > 0.005 && $cap <= 0.005) throw new RuntimeException(t('pay.on_invoice', ['n' => (string)$r['invoice_nos']]));
     if ($cap > 0 && $already + $amt > $cap + 0.005) throw new RuntimeException(t('pay.exceeds', ['paid' => pi_money($already, $r['currency']), 'cap' => pi_money($cap, $r['currency']), 'left' => pi_money(max(0, $cap - $already), $r['currency'])]));
     if ($isCr) $amt = -$amt;
+    $for = null; if (pi_is_invoice($r) && ppay_for_col()) { $f = (int)($_POST['for_pi'] ?? 0); foreach ($r['settles'] ?? [] as $x) if ((int)$x['id'] === $f) $for = $f; if (!$for && count($r['settles'] ?? []) === 1) $for = (int)$r['settles'][0]['id']; }   // R96-003: only a proforma this invoice settles; one proforma → always its own
     if ($id) q('UPDATE proforma_payments SET paid_on = ?, amount = ?, method = ?, reference = ?, note = ? WHERE id = ? AND proforma_id = ?', [$d, $amt, $method, $ref, $note, $id, $piId]);
     else q('INSERT INTO proforma_payments (proforma_id, paid_on, amount, method, reference, note, created_by) VALUES (?,?,?,?,?,?,?)', [$piId, $d, $amt, $method, $ref, $note, (int)(current_user()['id'] ?? 0)]);
+    if (pi_is_invoice($r) && ppay_for_col()) q('UPDATE proforma_payments SET for_pi = ? WHERE id = ? AND proforma_id = ?', [$for, $id ?: (int) db()->lastInsertId(), $piId]);
     of_event((int)$r['offer_id'], 'payment', $r['pi_no'] . ' · ' . pi_money($amt, $r['currency']) . ' · ' . t('pay.m_' . $method) . ($ref ? ' · ' . $ref : ''));
     pi_refresh_status($piId);
 }
