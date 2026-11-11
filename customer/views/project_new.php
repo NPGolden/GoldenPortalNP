@@ -27,7 +27,7 @@ if ($mode === 'project_edit') {
 $pid = (int)($parent['id'] ?? 0);
 
 $customers = all('SELECT id, name FROM customers WHERE is_active = 1 ORDER BY name');
-$vessels   = all('SELECT id, name, customer_id FROM vessels WHERE is_active = 1 ORDER BY name');
+$vessels   = all('SELECT id, name, customer_id FROM vessels WHERE is_active = 1 ORDER BY name'); $vcm = vessel_customer_map();   // R97-014: a vessel is offered for its own customer and for the customers of the organisations linked to it
 $systems   = sys_options();
 
 $title = $isSub ? ($edit ? t('sp.edit') : t('pr.addsub')) : ($edit ? t('pr.edit') : t('pr.new'));
@@ -59,7 +59,7 @@ layout_head($title, 'projects');
         </select></div>
       <div class="field"><label><?= tt('th.vessel') ?></label>
         <select name="vessel_id" id="vessel_id"><option value=""><?= tt('pr.novessel') ?></option>
-          <?php foreach ($vessels as $ve): ?><option value="<?= $ve['id'] ?>" data-customer="<?= (int)$ve['customer_id'] ?>"<?= $sel($ve['id'], $v['vessel_id'] ?? '') ?>><?= e($ve['name']) ?></option><?php endforeach; ?>
+          <?php foreach ($vessels as $ve): ?><option value="<?= $ve['id'] ?>" data-customers=",<?= implode(',', $vcm[(int)$ve['id']] ?? []) ?>,"<?= $sel($ve['id'], $v['vessel_id'] ?? '') ?>><?= e($ve['name']) ?></option><?php endforeach; ?>
         </select><p class="hint"><?= tt('pr.vessel_hint') ?></p></div>
       <?php if (function_exists('pty_has') && pty_has() && fin_visible()): $curOrg = (int)($v['billing_org_id'] ?? 0) ?: ($edit ? pty_project($id)['org_id'] : null); $cands = pty_candidates($edit ? $id : null, (int)($v['vessel_id'] ?? 0) ?: null, (int)($v['customer_id'] ?? 0) ?: null, $curOrg); $ivs = pty_identities($curOrg, (int)($v['vessel_id'] ?? 0) ?: null, $edit ? $id : null); ?>
       <div class="field"><label><?= tt('pty.party') ?></label><select name="billing_org_id" data-nosearch><option value=""><?= tt('pty.party_default') ?></option><?php foreach ($cands as $c): ?><option value="<?= (int)$c['id'] ?>"<?= (int)$c['id'] === (int)$curOrg ? ' selected' : '' ?>><?= e($c['name'] . ' · ' . pty_role_label($c['role'])) ?></option><?php endforeach; ?></select><p class="hint"><?= tt('pty.party_hint') ?></p></div>
@@ -95,7 +95,7 @@ layout_head($title, 'projects');
       var cid = c.value, keep = v.value;
       Array.prototype.forEach.call(v.options, function (o) {
         if (!o.value) return;
-        o.hidden = o.dataset.customer !== cid; if (o.hidden && o.value === keep) v.value = '';
+        o.hidden = !cid || (o.dataset.customers || '').indexOf(',' + cid + ',') < 0; if (o.hidden && o.value === keep) v.value = '';
       });
     }
     c.addEventListener('change', sync); sync();

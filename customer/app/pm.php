@@ -608,3 +608,23 @@ function pr_vessel_guess(array $p): ?array {
     }
     return null;
 }
+
+/**
+ * R97-014: the customers a vessel may have projects for — its own customer, and every customer reached through the organisations and
+ * parties linked to it (related parties of the vessel, ownership history; an organisation counts through the customer it is linked to).
+ * @return array<int, int[]> vessel id => customer ids
+ */
+function vessel_customer_map(): array {
+    static $m = null; if ($m !== null) return $m; $m = [];
+    foreach (all('SELECT id, customer_id FROM vessels') as $r) { $m[(int)$r['id']] = []; if ((int)$r['customer_id']) $m[(int)$r['id']][(int)$r['customer_id']] = true; }
+    $add = function (string $sql) use (&$m) { try { foreach (all($sql) as $r) if ((int)$r['c'] && isset($m[(int)$r['v']])) $m[(int)$r['v']][(int)$r['c']] = true; } catch (Throwable $e) {} };
+    $add('SELECT vessel_id v, customer_id c FROM vessel_companies WHERE customer_id IS NOT NULL');
+    $add('SELECT vc.vessel_id v, co.customer_id c FROM vessel_companies vc JOIN companies co ON co.id = vc.company_id WHERE co.customer_id IS NOT NULL');
+    $add('SELECT vc.vessel_id v, cu.id c FROM vessel_companies vc JOIN companies co ON co.id = vc.company_id AND co.customer_id IS NULL JOIN customers cu ON LOWER(TRIM(cu.name)) = LOWER(TRIM(co.name))');   // an organisation not yet linked to its customer record: same name
+    $add('SELECT vessel_id v, customer_id c FROM vessel_owners WHERE customer_id IS NOT NULL');
+    $add('SELECT vo.vessel_id v, co.customer_id c FROM vessel_owners vo JOIN companies co ON co.id = vo.company_id WHERE co.customer_id IS NOT NULL');
+    foreach ($m as $k => $set) $m[$k] = array_keys($set);
+    return $m;
+}
+function vessel_of_customer(int $vid, int $cid): bool { return $vid > 0 && $cid > 0 && in_array($cid, vessel_customer_map()[$vid] ?? [], true); }
+

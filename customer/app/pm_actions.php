@@ -56,7 +56,7 @@ function pm_handle_action(string $action, string $page): bool {
             if (scalar('SELECT COUNT(*) FROM projects WHERE erp_code = ? AND id <> ?', [$erp, $id])) throw new RuntimeException(t('pr.dup_code'));
             $cid = (int)$_POST['customer_id'];
             $vid = (int)($_POST['vessel_id'] ?? 0) ?: null;
-            if ($vid && !one('SELECT id FROM vessels WHERE id = ? AND customer_id = ?', [$vid, $cid])) $vid = null;   // vessel must belong to the customer
+            if ($vid && !vessel_of_customer($vid, $cid)) $vid = null;   // vessel must belong to the customer — directly or through an organisation / party linked to it (R97-014)
             [$pmId, $pmName] = pm_from_post((string) scalar('SELECT project_manager FROM projects WHERE id = ?', [$id]));
             q('UPDATE projects SET erp_code = ?, project_code = ?, name = ?, customer_id = ?, vessel_id = ?, status = ?,
                                    pm_user_id = ?, project_manager = ?, category = ?, next_milestone = ? WHERE id = ?',

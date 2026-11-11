@@ -1568,3 +1568,13 @@ The copy the firewall already holds is not removed by a release: it expires by i
 
 **Security review**: the policy itself is unchanged (setting `sec_close_signout`, Settings › Login history). The entry page only prolongs a marker that was valid when it was opened, in the same browser profile, and cannot create one; the server-side idle time-out (`sec_idle_minutes`) and the maximum session length still apply. No proposals.
 
+## §300 v1.127.8 (R97-014) — project form: vessels of the customer's organisation
+
+**Report**: customer = an organisation (BESECKE GmbH & Co. KG) with the vessel HADAR under it; New project offered "No vessel" only.
+
+**Cause**: the form listed a vessel only for `vessels.customer_id` = the chosen customer (`data-customer`), and `project_update` dropped a vessel that failed the same test. A vessel attached to the organisation through the related parties of the vessel or its ownership history has another (or no) `customer_id`.
+
+**Change**: `vessel_customer_map()` / `vessel_of_customer()` in `app/pm.php` — vessel → customers: its own customer; `vessel_companies.customer_id`; the customer of a linked organisation (`companies.customer_id`), or the customer with the same name when the organisation is not linked to a customer record yet; the same for `vessel_owners`. `views/project_new.php`: options carry `data-customers=",1,7,"` and the script shows a vessel when the chosen customer is in the list; `project_update` uses `vessel_of_customer()`.
+
+**Security review**: staff-only form; the server-side check on update is widened only to vessels that have a recorded link to the customer; customers' own view of vessels and projects (`scope_sql`, related-party visibility) is unchanged. No proposals.
+

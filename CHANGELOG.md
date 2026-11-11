@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.127.7** (build 2026-11-11). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.127.8** (build 2026-11-11). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.127.8 | GAS-CP-R97-014 | 2026-11-11 | New / edit project: the vessel list of a customer also offers the vessels linked to the customer's organisation (related parties of the vessel, ownership history), not only the vessels registered under the customer itself. | — |
 | 1.127.7 | GAS-CP-R97-013 | 2026-11-11 | Sign-out when the browser was closed: the dashboard no longer shows for a moment before the sign-in page — a signed-in page appears only after the check; stepping from the portal to the entry page and back keeps the session. | — |
 | 1.127.6 | GAS-CP-R97-012 | 2026-11-11 | Entry page goldensas.com: the door is named "Golden A/S Portal"; the page is never cached (browser, firewall) and its stylesheet carries a version, so a change shows at once. | — |
 | 1.127.5 | GAS-CP-R97-011 | 2026-11-11 | Entry page goldensas.com: banner with a link to the company website www.goldenas.com.gr under the portal door. | — |
