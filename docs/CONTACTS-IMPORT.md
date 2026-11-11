@@ -1510,3 +1510,17 @@ Migration `install/migrate_cp_r97_006_sb_priority.sql`: `sb_budgets.priority` (`
 
 Language keys 9 152 each.
 
+## §293 v1.127.1 (R97-007) — System Budgets: no labour hour lost on the way to the sub-project budget
+
+**Report**: a converted budget of 1 138 h showed 612 h in "Sections — budgeted hours per stage" (Electrical 120, Production 40, Commissioning 452).
+
+**Cause**: `sb_feed_plan()` writes a line only when it has a discipline — its own, the first discipline of its section, or the discipline of its rate card. On the live sections the working-file bucket **Site** found no default section (no section has the stage `installation`; the Field section is of stage engineering), and the PM bucket found no discipline called exactly "Project Management"; these lines were imported without a section and left out at the conversion, with a notice on the preview only. Travelling time is never fed (design OP-05), and a discipline without a section is written to Budget & actual but shows in no section card.
+
+**Change**: `sb_labour.fed` (migration `migrate_cp_r97_007_sb_feed.sql`) marks at conversion which lines were written. `sb_assign_lines()` stores a section / discipline on lines that have none (only these two fields, also on finished / converted budgets; never on a line already fed). Conversion preview: table of the lines without a discipline with Section (pre-selected from the bucket) and Discipline selects, posted as `as[line][…]` and applied by `sb_convert()` before the feed. `sb_feed_state()` / `sb_feed_rest()` and page `views/system_budget_feed.php` (`?p=system_budget_feed&id=N`): for a converted budget the hours of the budget, those that count (normal + overtime), those written and those outside; after the choice a new `sp_budgets` revision = current rows + these hours, lines marked fed, in one transaction. Budgets converted before this release carry no marks: a line that can be written now is taken as written then (derived once, then stored). Notices: budget in work (`sb.blk_nosec`), converted budget (`sb.fd_warn`). `sb_bucket_defaults()` also matches the section by name / code (Site → field / install; Workshop → production; Commissioning; Engineering → electrical); PM discipline by `/project\s*manag|^pm$/i`.
+
+**For the two budgets already converted** (same working file on two sub-projects): open each, follow "Assign and add them", choose the section for the lines listed and add — the sections then show the full hours as revision R1.
+
+**Security review**: the new page and action behind `sb_require()` / `sb_guard()`; line ids are taken from the budget's own lines, section and discipline ids checked against the active lists; amounts of a locked budget cannot be changed through the assignment (two columns only); audit lines `assigned` and `fed`. No new proposals.
+
+Language keys 9 177 each.
+

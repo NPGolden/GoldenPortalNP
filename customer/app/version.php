@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.127.0';
+const CP_VERSION = '1.127.1';
 const CP_BUILD   = '2026-11-11';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-007', 'version' => '1.127.1', 'date' => '2026-11-11', 'title' => 'System Budgets: every labour hour reaches the sub-project budget — lines without a section or discipline are listed on the conversion preview with a section / discipline to choose, a converted budget shows the hours that were not written and adds them (new Budget & actual revision) after the choice, a warning on the budget while it is in work, and the import finds the section of the Site bucket by name.', 'db' => 'install/migrate_cp_r97_007_sb_feed.sql', 'check' => 'r97g'],
         ['ref' => 'GAS-CP-R97-006', 'version' => '1.127.0', 'date' => '2026-11-11', 'title' => 'System Budgets: priority (Urgent, High, Normal, Low) — set at creation or on the budget, taken from the ticket when a request is converted; the list shows the open budgets first by priority and then by the nearest target date; priority filter; urgent and high counts on the dashboard.', 'db' => 'install/migrate_cp_r97_006_sb_priority.sql', 'check' => 'r97f'],
         ['ref' => 'GAS-CP-R97-005', 'version' => '1.126.1', 'date' => '2026-11-11', 'title' => 'Security measures accepted on 11/11/2026: the storage folder is closed to the web by the portal itself (storage/.htaccess written and checked daily, row in Diagnostics); audit trail of System Budgets with IP address, kept after deletion, Excel export for management; at most 20 workbook uploads per person and hour; at most 50 stored revisions per budget; daily clean-up of abandoned reviews and uploads; assistant cost per page; request-token self-test in Diagnostics and in the release checklist.', 'db' => 'install/migrate_cp_r97_005_sb_audit.sql', 'check' => 'r97e'],
         ['ref' => 'GAS-CP-R97-004', 'version' => '1.126.0', 'date' => '2026-11-11', 'title' => 'System Budgets — release 4: convert a finished budget to a draft offer on its sub-project (labour per work package, per section or as one line; parts per line or as one line; prices with or without the commission; scope text and exclusions) and feed the sub-project budget as a new Budget & actual revision (hours per discipline and section, parts budget = parts cost; replace, add or leave). Module test: the 124-line limit keeps the totals right; the request check no longer accepts an empty token on a session that has not issued one.', 'db' => 'install/migrate_cp_r97_004_sb_convert.sql', 'check' => 'r97d'],
@@ -439,6 +440,7 @@ function cp_migration_state(): array {
         'r97d' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'offer_id'"),
         'r97e' => $has("SHOW COLUMNS FROM sb_events LIKE 'ip'"),
         'r97f' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'priority'"),
+        'r97g' => $has("SHOW COLUMNS FROM sb_labour LIKE 'fed'"),
         'r93b' => $has("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_inquiries' AND COLUMN_NAME = 'kind' AND COLUMN_TYPE LIKE '%contact%'"),
         'r93a' => $has("SHOW TABLES LIKE 'work_permits'"),
         'r92f' => $has("SHOW COLUMNS FROM rc_applications LIKE 'keep_until'"),

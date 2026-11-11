@@ -389,7 +389,7 @@ function sb_imp_description(array $X): string {
  * REPLACED (its project, sub-project, owner and comments stay). Everything in one transaction. Returns the budget id.
  */
 function sb_import_apply(array $X, string $fileName, int $intoId = 0, array $bucketSection = []): int {
-    sb_guard(); $h = $X['head']; $sec = sb_sections(); $dis = sb_disciplines(); $pmDisc = 0; foreach ($dis as $did => $nm) if (preg_match('/project management/i', $nm)) $pmDisc = $did;
+    sb_guard(); $h = $X['head']; $sec = sb_sections(); $dis = sb_disciplines(); $pmDisc = 0; foreach ($dis as $did => $nm) if (!$pmDisc && preg_match('/project\s*manag|^pm$/i', $nm)) $pmDisc = $did;
     $cards = sb_cards('local'); $pdo = db(); $pdo->beginTransaction();
     try {
         $title = mb_substr($h['title'] !== '' ? $h['title'] : ($h['doc_ref'] ?: $fileName), 0, 200); $ref = mb_substr(trim($h['doc_ref'] . ' ' . $h['rev_no']), 0, 80) ?: null;
@@ -412,7 +412,14 @@ function sb_import_apply(array $X, string $fileName, int $intoId = 0, array $buc
     } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
 }
 /** Default section per ERP bucket: the first active section of the matching stage. */
-function sb_bucket_defaults(): array { $d = []; foreach (SB_BUCKET_STAGE as $b => $stage) foreach (sb_sections() as $sid => $s) if ($s['stage'] === $stage) { $d[$b] = $sid; break; } return $d; }
+function sb_bucket_defaults(): array {
+    $d = []; $S = sb_sections();
+    foreach (SB_BUCKET_STAGE as $b => $stage) foreach ($S as $sid => $s) if ($s['stage'] === $stage) { $d[$b] = $sid; break; }
+    // R97-007: the stage names differ between installations — find the section by what it is called as well, so no bucket is left without one
+    $byName = ['Site' => '/field|install|site|fld/i', 'Workshop' => '/production|workshop|prd/i', 'Commissioning' => '/commission|com$/i', 'Engineering' => '/electrical|engineering|ele$/i'];
+    foreach ($byName as $b => $rx) if (!isset($d[$b])) foreach ($S as $sid => $s) if (preg_match($rx, (string)$s['name']) || preg_match($rx, (string)$s['code'])) { $d[$b] = $sid; break; }
+    return $d;
+}
 
 /* ───────────── Release 2 (GAS-CP-R97-002): revisions, copy, templates, start from a ticket, Excel export ───────────── */
 
@@ -668,7 +675,7 @@ function sb_feed_plan(array $B): array {
     $rows = []; $un = []; $dis = sb_disciplines(); $sec = sb_sections(); $tot = 0.0;
     foreach ($B['labour'] as $l) {
         $h = (float)$l['h_normal'] + (float)$l['h_overtime']; if ($h <= 0) continue; $d = sb_line_discipline($l);
-        if (!$d) { $un[] = ['descr' => (string)$l['descr'], 'hours' => $h]; continue; }
+        if (!$d) { $un[] = ['id' => (int)$l['id'], 'code' => (string)($l['code'] ?? ''), 'descr' => (string)$l['descr'], 'hours' => $h, 'bucket' => (string)($l['bucket'] ?? ''), 'section_id' => (int)($l['section_id'] ?? 0)]; continue; }
         $s = (int)($l['section_id'] ?? 0); $k = $d . ':' . $s; if (!isset($rows[$k])) $rows[$k] = ['discipline_id' => $d, 'discipline' => (string)($dis[$d] ?? ('#' . $d)), 'section_id' => $s ?: null, 'section' => (string)($sec[$s]['name'] ?? ''), 'hours' => 0.0];
         $rows[$k]['hours'] += $h; $tot += $h;
     }
@@ -708,6 +715,7 @@ function sb_convert(int $id, array $opt): int {
     if (!sb_can_convert()) throw new RuntimeException(t('sb.cv_no_right'));
     $B = sb_get($id); if (!$B) throw new RuntimeException(t('err.notfound'));
     if ($B['status'] !== 'finished' || !empty($B['is_template'])) throw new RuntimeException(t('sb.cv_need_finished'));
+    if (!empty($opt['assign']) && sb_assign_lines($B, (array)$opt['assign'])) $B = sb_get($id);   // R97-007: section / discipline chosen on the preview for lines that had none
     $pid = (int)$B['project_id']; $sid = (int)$B['subproject_id']; $sp = $sid ? one('SELECT s.*, p.vessel_id FROM subprojects s JOIN projects p ON p.id = s.project_id WHERE s.id = ? AND s.project_id = ?', [$sid, $pid]) : null; if (!$sp) throw new RuntimeException(t('sb.blk_sub'));
     $P = sb_offer_lines($B, $opt); if (!$P['lines']) throw new RuntimeException(t('sb.cv_no_lines'));
     $u = current_user(); $pdo = db(); $pdo->beginTransaction();
@@ -726,6 +734,7 @@ function sb_convert(int $id, array $opt): int {
         $brev = null; $mode = (string)($opt['budget'] ?? 'replace');
         if (in_array($mode, ['replace', 'add'], true) && function_exists('bg_has') && bg_has()) {
             $F = sb_feed_plan($B); $curB = bg_current($sid); $rows = [];
+            if (sb_fed_col()) { $unIds = array_column($F['unmapped'], 'id'); foreach ($B['labour'] as $l) if ((float)$l['h_normal'] + (float)$l['h_overtime'] > 0) q('UPDATE sb_labour SET fed = ? WHERE id = ? AND budget_id = ?', [in_array((int)$l['id'], $unIds, true) ? 0 : 1, (int)$l['id'], $id]); }   // R97-007: remember what reached the budget
             if ($mode === 'add' && $curB) foreach (all('SELECT discipline_id, section_id, hours, rate FROM sp_budget_hours WHERE budget_id = ?', [(int)$curB['id']]) as $h) $rows[(int)$h['discipline_id'] . ':' . (int)$h['section_id']] = ['d' => (int)$h['discipline_id'], 's' => (int)$h['section_id'] ?: null, 'h' => (float)$h['hours'], 'r' => (float)$h['rate']];
             foreach ($F['rows'] as $r) { $k = $r['discipline_id'] . ':' . (int)$r['section_id']; if (isset($rows[$k])) $rows[$k]['h'] += $r['hours']; else $rows[$k] = ['d' => $r['discipline_id'], 's' => $r['section_id'], 'h' => $r['hours'], 'r' => $F['rate']]; }
             $parts = $F['parts'] + ($mode === 'add' && $curB ? (float)$curB['parts_budget'] : 0.0); $ov = $P['net'] + ($mode === 'add' && $curB ? (float)($curB['offer_value'] ?? 0) : 0.0);
@@ -757,4 +766,63 @@ function sb_housekeeping(): array {
     try { if (sb_r3()) $n = q('DELETE FROM sb_import_rows WHERE created_at < NOW() - INTERVAL 30 DAY')->rowCount(); } catch (Throwable $e) {}
     try { foreach ((array) @glob(sb_imp_dir() . '/*.xlsx') as $old) if (@filemtime($old) < time() - 86400 && @unlink($old)) $f++; } catch (Throwable $e) {}
     return [$n, $f];
+}
+
+/* ───────────── R97-007: no labour hour is lost on the way to the sub-project budget ───────────── */
+
+function sb_fed_col(): bool { static $h = null; if ($h === null) { try { $h = sb_has() && (bool) scalar("SHOW COLUMNS FROM sb_labour LIKE 'fed'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/**
+ * Give a section and / or a discipline to labour lines that have nothing to be written under (posted as [line id => [section_id, discipline_id]]).
+ * Only these two fields are touched — hours, rates and amounts of a finished or converted budget stay as they are. Returns the lines changed.
+ */
+function sb_assign_lines(array $B, array $as): int {
+    sb_guard(); $sec = sb_sections(); $dis = sb_disciplines(); $own = array_column($B['labour'], null, 'id'); $n = 0;
+    foreach ($as as $lid => $a) {
+        $lid = (int)$lid; if (!isset($own[$lid]) || !is_array($a)) continue; $l = $own[$lid]; if (sb_fed_col() && (int)($l['fed'] ?? 0) === 1) continue;   // already in the budget — not re-assigned
+        $s = (int)($a['section_id'] ?? 0); $d = (int)($a['discipline_id'] ?? 0); if (!isset($sec[$s])) $s = 0; if (!isset($dis[$d])) $d = 0; if (!$s && !$d) continue;
+        q('UPDATE sb_labour SET section_id = COALESCE(?, section_id), discipline_id = COALESCE(?, discipline_id) WHERE id = ? AND budget_id = ?', [$s ?: null, $d ?: null, $lid, (int)$B['id']]); $n++;
+    }
+    if ($n) sb_event((int)$B['id'], 'assigned', (string)$n); return $n;
+}
+/**
+ * State of the feed of a converted budget: hours of the budget that count (normal + overtime), hours already written, and the lines still
+ * outside (never written). For budgets converted before the lines were marked, the mark is derived once: a line that can be written now was written then.
+ */
+function sb_feed_state(array $B): array {
+    $F = sb_feed_plan($B); $unIds = array_column($F['unmapped'], 'id'); $rest = []; $fed = 0.0; $all = 0.0; $marked = false;
+    foreach ($B['labour'] as $l) if ($l['fed'] ?? null) { $marked = true; break; } foreach ($B['labour'] as $l) if (($l['fed'] ?? null) !== null) $marked = true;
+    foreach ($B['labour'] as $l) {
+        $h = (float)$l['h_normal'] + (float)$l['h_overtime']; if ($h <= 0) continue; $all += $h;
+        $wasFed = $marked ? (int)($l['fed'] ?? 0) === 1 : !in_array((int)$l['id'], $unIds, true);
+        if ($wasFed) $fed += $h; else $rest[] = ['id' => (int)$l['id'], 'code' => (string)($l['code'] ?? ''), 'descr' => (string)$l['descr'], 'hours' => $h, 'bucket' => (string)($l['bucket'] ?? ''), 'section_id' => (int)($l['section_id'] ?? 0), 'discipline_id' => (int)($l['discipline_id'] ?? 0), 'ready' => sb_line_discipline($l) !== null];
+    }
+    $travel = 0.0; foreach ($B['labour'] as $l) $travel += (float)$l['h_travel'];
+    return ['all' => $all, 'fed' => $fed, 'rest' => $rest, 'rest_hours' => array_sum(array_column($rest, 'hours')), 'travel' => $travel, 'marked' => $marked];
+}
+/**
+ * Add the labour hours of a converted budget that never reached the sub-project budget: the chosen section / discipline is stored on the
+ * lines, then a new Budget & actual revision = the current figures + these hours. Existing revisions are not edited. Returns the hours added.
+ */
+function sb_feed_rest(int $id, array $as): float {
+    sb_guard(); if (!sb_fed_col() || !function_exists('bg_has') || !bg_has()) throw new RuntimeException(t('err.noaccess'));
+    $B = sb_get($id); if (!$B || $B['status'] !== 'converted' || !(int)$B['subproject_id']) throw new RuntimeException(t('sb.fd_need_conv'));
+    $sid = (int)$B['subproject_id']; $u = current_user(); $pdo = db(); $pdo->beginTransaction();
+    try {
+        $st0 = sb_feed_state($B); if (!$st0['marked']) { $restIds = array_column($st0['rest'], 'id'); foreach ($B['labour'] as $l) if ((float)$l['h_normal'] + (float)$l['h_overtime'] > 0) q('UPDATE sb_labour SET fed = ? WHERE id = ? AND budget_id = ?', [in_array((int)$l['id'], $restIds, true) ? 0 : 1, (int)$l['id'], $id]); $B = sb_get($id); }
+        if (sb_assign_lines($B, $as)) $B = sb_get($id);
+        $add = []; $hours = 0.0; $done = [];
+        foreach ($B['labour'] as $l) { $h = (float)$l['h_normal'] + (float)$l['h_overtime']; if ($h <= 0 || (int)($l['fed'] ?? 0) === 1) continue; $d = sb_line_discipline($l); if (!$d) continue;
+            $k = $d . ':' . (int)($l['section_id'] ?? 0); $add[$k] = $add[$k] ?? ['d' => $d, 's' => (int)($l['section_id'] ?? 0) ?: null, 'h' => 0.0]; $add[$k]['h'] += $h; $hours += $h; $done[] = (int)$l['id']; }
+        if (!$add) throw new RuntimeException(t('sb.fd_nothing'));
+        $curB = bg_current($sid); $rows = [];
+        if ($curB) foreach (all('SELECT discipline_id, section_id, hours, rate FROM sp_budget_hours WHERE budget_id = ?', [(int)$curB['id']]) as $h) { $k = (int)$h['discipline_id'] . ':' . (int)$h['section_id']; if (isset($rows[$k])) $rows[$k]['h'] += (float)$h['hours']; else $rows[$k] = ['d' => (int)$h['discipline_id'], 's' => (int)$h['section_id'] ?: null, 'h' => (float)$h['hours'], 'r' => (float)$h['rate']]; }
+        foreach ($add as $k => $r) { if (isset($rows[$k])) $rows[$k]['h'] += $r['h']; else $rows[$k] = ['d' => $r['d'], 's' => $r['s'], 'h' => $r['h'], 'r' => (float)$B['cost_rate']]; }
+        $rev = (int) scalar('SELECT COALESCE(MAX(revision), -1) + 1 FROM sp_budgets WHERE subproject_id = ?', [$sid]);
+        q('INSERT INTO sp_budgets (subproject_id, revision, parts_budget, offer_value, notes, created_by, created_name) VALUES (?,?,?,?,?,?,?)', [$sid, $rev, $curB ? (float)$curB['parts_budget'] : 0, $curB ? $curB['offer_value'] : null, mb_substr(t('sb.fd_bg_note', ['n' => sb_label($B), 'h' => sb_h($hours)]), 0, 500), (int)($u['id'] ?? 0), (string)($u['full_name'] ?? '')]);
+        $brev = (int) db()->lastInsertId(); $hasSec = function_exists('bg_has_sections') && bg_has_sections();
+        foreach ($rows as $r) { if ($r['h'] <= 0) continue; if ($hasSec) q('INSERT INTO sp_budget_hours (budget_id, discipline_id, hours, rate, section_id) VALUES (?,?,?,?,?)', [$brev, $r['d'], round($r['h'], 2), $r['r'], $r['s']]); else q('INSERT INTO sp_budget_hours (budget_id, discipline_id, hours, rate) VALUES (?,?,?,?)', [$brev, $r['d'], round($r['h'], 2), $r['r']]); }
+        q('UPDATE sb_labour SET fed = 1 WHERE budget_id = ? AND id IN (' . implode(',', $done) . ')', [$id]); q('UPDATE sb_budgets SET budget_rev_id = ? WHERE id = ?', [$brev, $id]);
+        $GLOBALS['_bg_cur'] = []; if (function_exists('eng_rows_reset')) eng_rows_reset(); cache_bump_later('eng'); cache_bump_later('fs');
+        sb_event($id, 'fed', sb_h($hours) . ' h · R' . $rev); $pdo->commit(); return $hours;
+    } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
 }

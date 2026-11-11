@@ -53,7 +53,15 @@ layout_head(t('sb.cv_title') . ' · ' . sb_label($B), 'system_budgets');
   <?php foreach ($F['rows'] as $r): ?><tr><td><?= e($r['discipline']) ?></td><td><?= $r['section'] !== '' ? e($r['section']) : '<span class="hint">—</span>' ?></td><td class="num"><?= e(sb_h($r['hours'])) ?></td></tr><?php endforeach; ?>
   <tr><td><b><?= tt('sb.total') ?></b></td><td class="hint"><?= e(t('sb.cv_bg_parts', ['v' => sb_money($F['parts'], $cur)])) ?></td><td class="num"><b><?= e(sb_h($F['hours'])) ?></b></td></tr>
   </tbody></table></div>
-  <?php if ($F['unmapped']): ?><p class="flash flash--warn" style="margin:10px 0 0;"><?= e(t('sb.cv_unmapped', ['n' => count($F['unmapped']), 'h' => sb_h(array_sum(array_column($F['unmapped'], 'hours')))])) ?> <?= e(implode(' · ', array_map(fn($x) => mb_substr($x['descr'], 0, 50), array_slice($F['unmapped'], 0, 6)))) ?></p><?php endif; ?>
+  <?php if ($F['unmapped']): $secs = sb_sections(); $diss = sb_disciplines(); $bdef = sb_bucket_defaults(); ?>
+  <p class="flash flash--warn" style="margin:10px 0 6px;"><?= e(t('sb.cv_unmapped2', ['n' => count($F['unmapped']), 'h' => sb_h(array_sum(array_column($F['unmapped'], 'hours')))])) ?></p>
+  <div class="table-scroll"><table class="tbl" data-nosort style="max-width:1000px;"><thead><tr><th><?= tt('th.code') ?></th><th><?= tt('sb.l_descr') ?></th><th class="num"><?= tt('sb.hours') ?></th><th><?= tt('sb.section') ?></th><th><?= tt('sb.discipline') ?></th></tr></thead><tbody>
+  <?php foreach ($F['unmapped'] as $x): $ds = (int)($x['section_id'] ?: ($bdef[$x['bucket']] ?? 0)); ?><tr><td class="mono"><?= e($x['code']) ?></td><td><?= e($x['descr']) ?><?= $x['bucket'] !== '' ? ' <span class="hint">' . e($x['bucket']) . '</span>' : '' ?></td><td class="num"><?= e(sb_h($x['hours'])) ?></td>
+    <td><select name="as[<?= (int)$x['id'] ?>][section_id]" data-nosearch><option value="0">—</option><?php foreach ($secs as $sk => $sv): ?><option value="<?= $sk ?>"<?= $ds === $sk ? ' selected' : '' ?>><?= e($sv['name']) ?></option><?php endforeach; ?></select></td>
+    <td><select name="as[<?= (int)$x['id'] ?>][discipline_id]" data-nosearch><option value="0"><?= tt('sb.fd_by_section') ?></option><?php foreach ($diss as $dk => $dn): ?><option value="<?= $dk ?>"><?= e($dn) ?></option><?php endforeach; ?></select></td></tr><?php endforeach; ?>
+  </tbody></table></div>
+  <p class="hint" style="margin:6px 0 0;"><?= tt('sb.fd_assign_hint') ?></p>
+  <?php endif; ?>
   <p class="hint" style="margin:10px 0 6px;"><?= $curB ? e(t('sb.cv_bg_cur', ['r' => 'R' . (int)$curB['revision'], 'h' => sb_h($curH), 'p' => sb_money((float)$curB['parts_budget'], $cur)])) : tt('sb.cv_bg_nocur') ?></p>
   <div class="field"><label style="display:block;margin-bottom:4px;"><input type="radio" name="budget" value="replace" checked> <?= tt('sb.cv_bm_replace') ?></label><?php if ($curB): ?><label style="display:block;margin-bottom:4px;"><input type="radio" name="budget" value="add"> <?= tt('sb.cv_bm_add') ?></label><?php endif; ?><label style="display:block;"><input type="radio" name="budget" value="none"> <?= tt('sb.cv_bm_none') ?></label></div>
   <?php endif; ?>

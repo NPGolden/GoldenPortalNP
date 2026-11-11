@@ -43,9 +43,11 @@ layout_head(sb_label($B) . ' · ' . $B['title'], 'system_budgets');
   </div>
 </div>
 <?php if ($ed && $blk): ?><p class="flash flash--info"><?= e(t('sb.to_finish') . ' ' . implode(' ', $blk)) ?></p><?php endif; ?>
+<?php if (!$isRev && !$tpl && in_array($B['status'], ['draft', 'working', 'finished'], true) && function_exists('sb_feed_plan')): $FPu = sb_feed_plan($B)['unmapped']; if ($FPu): ?><p class="flash flash--warn"><?= e(t('sb.blk_nosec', ['n' => count($FPu)])) ?></p><?php endif; endif; ?>
 <?php if ($isRev): ?><p class="flash flash--info"><?= e(t('sb.rev_viewing', ['r' => 'R' . $rvN, 'd' => fmt_datetime((string)$B['_rev']['created_at']), 'c' => 'R' . (int)$CUR['revision']])) ?><?= $B['_rev']['note'] ? ' — ' . e((string)$B['_rev']['note']) : '' ?></p>
 <?php elseif (!$ed): ?><p class="flash flash--info"><?= tt($B['status'] === 'finished' ? 'sb.locked_finished' : 'sb.locked') ?></p><?php endif; ?>
 <?php if ($tpl): ?><p class="flash flash--info"><?= tt('sb.tpl_banner') ?></p><?php endif; ?>
+<?php if (!$isRev && $CUR['status'] === 'converted' && function_exists('sb_feed_state') && sb_fed_col() && (int)$CUR['subproject_id'] && !empty($CUR['budget_rev_id'])): $FS = sb_feed_state($CUR); if ($FS['rest_hours'] > 0.005): ?><p class="flash flash--warn"><?= e(t('sb.fd_warn', ['r' => sb_h($FS['rest_hours']), 'a' => sb_h($FS['all']), 'n' => count($FS['rest'])])) ?> <a href="<?= url('system_budget_feed', ['id' => $id]) ?>"><b><?= tt('sb.fd_open') ?> ›</b></a></p><?php endif; endif; ?>
 <?php if (!$isRev && $CUR['status'] === 'converted'): ?><p class="flash flash--good"><?= $ofL ? e(t('sb.cv_done', ['d' => fmt_date(substr((string)($CUR['converted_at'] ?? ''), 0, 10))])) . ' <a href="' . url('offer', ['id' => (int)$ofL['id']]) . '"><b>' . e($ofL['offer_no'] . ' ' . $ofL['revision']) . '</b></a> ' . (function_exists('of_status_pill') ? of_status_pill((string)$ofL['status']) : '') : tt('sb.cv_offer_gone') ?><?= !empty($CUR['budget_rev_id']) && (int)$CUR['subproject_id'] ? ' · <a href="' . url('subproject', ['id' => (int)$CUR['subproject_id'], 'tab' => 'budget']) . '">' . tt('sb.cv_bg_link') . '</a>' : '' ?></p><?php endif; ?>
 
 <?php if ($r2): ?><div class="card" id="revisions">
