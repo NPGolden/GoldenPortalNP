@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.127.9';
+const CP_VERSION = '1.128.0';
 const CP_BUILD   = '2026-11-11';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-016', 'version' => '1.128.0', 'date' => '2026-11-12', 'title' => 'Vessels: a web link to the information about the vessel that is kept online — entered in the vessel form, shown as a button on the vessel page to Golden A/S staff.', 'db' => 'install/migrate_cp_r97_016_vessel_link.sql', 'check' => 'r97h'],
         ['ref' => 'GAS-CP-R97-015', 'version' => '1.127.9', 'date' => '2026-11-12', 'title' => 'Customers: a Vessels card on the customer page — the vessels registered under the customer and those linked to it as a related party, with Assign a vessel (role owner, manager, yard …) and Remove.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-014', 'version' => '1.127.8', 'date' => '2026-11-11', 'title' => 'New / edit project: the vessel list of a customer also offers the vessels linked to the customer\'s organisation (related parties of the vessel, ownership history), not only the vessels registered under the customer itself.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-013', 'version' => '1.127.7', 'date' => '2026-11-11', 'title' => 'Sign-out when the browser was closed: the dashboard no longer shows for a moment before the sign-in page — a signed-in page appears only after the check; stepping from the portal to the entry page and back keeps the session.', 'db' => null, 'check' => null],
@@ -449,6 +450,7 @@ function cp_migration_state(): array {
         'r97e' => $has("SHOW COLUMNS FROM sb_events LIKE 'ip'"),
         'r97f' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'priority'"),
         'r97g' => $has("SHOW COLUMNS FROM sb_labour LIKE 'fed'"),
+        'r97h' => $has("SHOW COLUMNS FROM vessels LIKE 'info_url'"),
         'r93b' => $has("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_inquiries' AND COLUMN_NAME = 'kind' AND COLUMN_TYPE LIKE '%contact%'"),
         'r93a' => $has("SHOW TABLES LIKE 'work_permits'"),
         'r92f' => $has("SHOW COLUMNS FROM rc_applications LIKE 'keep_until'"),

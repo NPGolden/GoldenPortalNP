@@ -1588,3 +1588,11 @@ No SQL. `app/vm.php`: `vm_customer_vessels($cid)` — vessels with `customer_id`
 
 Language keys 9 191 each.
 
+## §302 v1.128.0 (R97-016) — Vessels: web link to online information
+
+Migration `install/migrate_cp_r97_016_vessel_link.sql`: `vessels.info_url VARCHAR(500)`. `vm_url_col()` guards the column; `vm_url_clean()` accepts http / https only (a bare `www…` gets `https://`), refuses spaces, control characters, quotes, angle brackets and backslashes, needs a host with a dot, at most 500 characters. `vessel_save` stores it (empty clears); `views/vessel_form.php` field; `views/vessel_view.php` button "Online information" + host name, `target="_blank" rel="noopener noreferrer"`, for staff.
+
+**Security review**: the stored address can only be an http(s) URL — `javascript:`, `data:`, `ftp:` and addresses with quotes are refused (tested), and the page checks the scheme again before printing the link, escaped. `noreferrer` keeps the portal's address (with ids) from being sent to the other site. Shown to staff only, so an internal folder address is not disclosed to customer accounts (tested). No proposals.
+
+Language keys 9 195 each.
+

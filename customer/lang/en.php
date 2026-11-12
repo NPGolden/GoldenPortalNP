@@ -9368,4 +9368,8 @@ Best regards,
 'cu.v_hint' => 'The customer\'s organisation becomes a related party of the vessel with the chosen role (owner, manager, yard …). A vessel that hangs under no customer yet is also registered under this one; a vessel that already has a customer keeps it. The vessel can then be chosen in the customer\'s projects.',
 'cu.v_linked' => 'Vessel assigned to the customer.',
 'cu.inactive' => 'inactive',
+'v.url' => 'Online information (web link)',
+'v.url_hint' => 'A web address where information about the vessel is kept — a shared folder, the yard\'s or the manager\'s page, a register entry. Shown as a button on the vessel\'s page to Golden A/S staff only.',
+'v.url_open' => 'Online information',
+'v.url_bad' => 'The web link is not a valid address — it must start with http:// or https:// and contain no spaces.',
 ];

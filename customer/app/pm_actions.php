@@ -863,6 +863,7 @@ function pm_handle_action(string $action, string $page): bool {
                 q('UPDATE vessels SET former_names = ? WHERE id = ?', [$str('former_names', 255) ?: null, $id]);
                 foreach (preg_split('/[\r\n;]+/', (string)($_POST['aliases'] ?? '')) as $al) if (trim($al) !== '') vm_alias_add($id, trim($al), 'manual');
             }
+            if (function_exists('vm_url_col') && vm_url_col() && isset($_POST['info_url'])) { $iu = vm_url_clean((string)$_POST['info_url']); if ($iu === null) throw new RuntimeException(t('v.url_bad')); q('UPDATE vessels SET info_url = ? WHERE id = ?', [$iu !== '' ? $iu : null, $id]); }   // R97-016
             if (function_exists('vo_sync')) vo_sync($id);   // R95-005: a changed customer becomes an ownership period
             flash('good', t('v.saved'));
             redirect('vessels', ['_r' => uniqid()]);

@@ -9368,4 +9368,8 @@ Cordiali saluti,
 'cu.v_hint' => 'L\'organizzazione del cliente diventa parte correlata dell\'imbarcazione con il ruolo scelto. Un\'imbarcazione senza cliente viene anche registrata sotto questo; una con cliente lo mantiene. L\'imbarcazione potrà poi essere scelta nei progetti del cliente.',
 'cu.v_linked' => 'Imbarcazione assegnata al cliente.',
 'cu.inactive' => 'inattiva',
+'v.url' => 'Informazioni online (link)',
+'v.url_hint' => 'Un indirizzo web dove sono conservate informazioni sull\'imbarcazione — cartella condivisa, pagina del cantiere o del gestore, registro. Mostrato come pulsante nella pagina dell\'imbarcazione solo al personale Golden A/S.',
+'v.url_open' => 'Informazioni online',
+'v.url_bad' => 'Il link non è un indirizzo valido — deve iniziare con http:// o https:// e non contenere spazi.',
 ];

@@ -264,3 +264,12 @@ function vm_customer_vessel_unlink(int $cid, int $linkId): void {
     if (!$ok) throw new RuntimeException(t('err.notfound')); vm_related_remove($linkId);
 }
 
+/* ───────────── R97-016: a web link to information about the vessel kept online ───────────── */
+function vm_url_col(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM vessels LIKE 'info_url'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** A web address as it may be stored: http(s) only (a bare www… gets https://), no spaces or control characters, at most 500 characters; '' when empty; null when it is not acceptable. */
+function vm_url_clean(string $u): ?string {
+    $u = trim($u); if ($u === '') return ''; if (!preg_match('~^[a-z][a-z0-9+.-]*:~i', $u)) $u = 'https://' . ltrim($u, '/');
+    if (strlen($u) > 500 || preg_match('/[\x00-\x20<>"\'`\\\\]/', $u) || !preg_match('~^https?://[^/]+\.[^/]+~i', $u) || filter_var($u, FILTER_VALIDATE_URL) === false) return null;
+    return $u;
+}
+
