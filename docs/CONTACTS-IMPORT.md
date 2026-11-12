@@ -1612,3 +1612,11 @@ Cause of the report "changed to Abroad, the preview brings the same rates": a la
 **Security review**: the new action runs behind `require_staff()`, `sb_load_editable()` (rights + not finished) and the CSRF token; rates come from the active rate list only, nothing from the request. No new input, no new query on page view beyond a loop over lines already loaded. No finding, no proposal.
 
 Language keys 9 204 each.
+
+## §305 v1.128.3 (R97-019) — System Budgets: out-of-Attica rate of a rate card
+
+Report: zone Outside Attica selected, the rate card still shows and applies 80,00 €/h. Cause: the imported rate list keeps the zones on separate rows (a local row with `price_local` only, an out-of-Attica row with `price_overseas` only — the shape `acc_rate_item()` already handles for service reports). `sb_cards()` took the first row of the card and `rl_price()` fell back to the other zone's price, so the local row answered for both zones. `sb_cards()` now reads in two passes: rows that carry the zone's own price first, the other zone only for what is still missing. Reproduced and tested with both list shapes (one row with two prices; separate rows). Budgets already priced wrong show the R97-018 note and are corrected with "Apply the rate-card rates".
+
+**Security review**: read-only change of a price lookup; no input, no new query. No finding.
+
+Language keys 9 204 each.

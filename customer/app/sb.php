@@ -48,11 +48,14 @@ function sb_sections(): array { static $c = null; if ($c === null) { $c = []; tr
 function sb_disciplines(): array { static $c = null; if ($c === null) { $c = []; try { foreach (all('SELECT id, name FROM disciplines WHERE is_active = 1 ORDER BY sort_order, name') as $r) $c[(int)$r['id']] = (string)$r['name']; } catch (Throwable $e) {} } return $c; }
 /** Hourly rate cards of the active rate list: card => [name, normal, overtime] for the zone (local / overseas). */
 function sb_cards(string $zone = 'local'): array {
-    static $m = []; if (isset($m[$zone])) return $m[$zone]; $out = [];
+    static $m = []; if (isset($m[$zone])) return $m[$zone]; $out = []; $col = $zone === 'overseas' ? 'price_overseas' : 'price_local';
     try {
-        $l = function_exists('rl_current') ? rl_current() : null;
-        if ($l) foreach (rl_items((int)$l['id'], 'hourly') as $i) {
-            if (!(int)($i['is_active'] ?? 1)) continue; $k = (string)$i['card']; $p = rl_price($i, $zone); if ($p === null) continue;
+        $l = function_exists('rl_current') ? rl_current() : null; $items = $l ? rl_items((int)$l['id'], 'hourly') : [];
+        // R97-019: a rate list may keep the two zones on separate rows (a local row with only the local price, an out-of-Attica row with only
+        // the other price). First pass takes the rows that carry the zone's own price; the second fills what is still missing from the other zone.
+        foreach ([true, false] as $own) foreach ($items as $i) {
+            if (!(int)($i['is_active'] ?? 1)) continue; $k = (string)$i['card'];
+            $p = $own ? ($i[$col] ?? null) : rl_price($i, $zone); if ($p === null) continue; $p = (float)$p;
             if (!isset($out[$k])) $out[$k] = ['name' => (string)$i['card_name'], 'normal' => null, 'overtime' => null];
             $isOt = (bool) preg_match('/overtime|υπερωρ/iu', (string)$i['description']); $isHol = (bool) preg_match('/holiday|sunday|night|αργ/iu', (string)$i['description']);
             if ($isOt && !$isHol) { if ($out[$k]['overtime'] === null) $out[$k]['overtime'] = $p; } elseif (!$isHol && $out[$k]['normal'] === null) $out[$k]['normal'] = $p;
@@ -60,8 +63,6 @@ function sb_cards(string $zone = 'local'): array {
     } catch (Throwable $e) {}
     return $m[$zone] = array_filter($out, fn($c) => $c['normal'] !== null);
 }
-
-/** Amounts of one labour line under the rules of its budget: [hours, cost, sale, rate, rate_ot, flat]. */
 function sb_labour_calc(array $B, array $l): array {
     $n = (float)$l['h_normal']; $tv = (float)$l['h_travel']; $ot = (float)$l['h_overtime']; $d = (float)$l['allow_days']; $h = $n + $tv + $ot;
     $flat = (int)$B['flat_on'] === 1 && trim((string)($l['card'] ?? '')) === '';   // the flat rate prices the discipline rows — all their hours (design OP-02)
