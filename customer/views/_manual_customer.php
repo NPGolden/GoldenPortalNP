@@ -31,6 +31,7 @@ return [
       ['ul' => ['Click a figure to open the corresponding list already filtered.', 'Each sub-project bar shows the seven stages ENG · PROC · PROD · FAT · INST · SAT/HAT · COMM; green segments are complete, the gold one is in progress.', 'The Fleet block at the bottom shows every vessel with its progress ring and open-ticket count.']],
     ]],
     ['id' => 'vessels', 'title' => 'Vessels', 'body' => [
+      'Yard, flag and class (v1.132.1): the vessel list shows the yard, the flag and the classification society of each of your vessels where Golden A/S has them on record; the search box finds them too.',
       'Fleet › Vessels lists your vessels with their projects and open tickets. Open a vessel for its technical history: the projects and sub-projects on board, the systems installed, tickets, work orders and service reports in date order, and the weekly reports.',
       'Documents (v1.112.0): the Documents tab of a vessel gathers everything shared with you across its projects — weekly and monthly reports, service and inspection reports, drawings, documents you approved, class and test documents and other files — grouped and searchable by year or text.',
       ['ul' => ['The Projects filter narrows the list to vessels with active projects, with any project, or without projects; the Projects column shows the total and the active count.']],
