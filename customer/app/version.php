@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.130.0';
+const CP_VERSION = '1.130.1';
 const CP_BUILD   = '2026-11-12';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-022', 'version' => '1.130.1', 'date' => '2026-11-12', 'title' => 'System Budgets: the percentage on parts is named "Markup on cost", and the Totals card shows both readings of the profit side by side — Markup on cost and Margin on sale. No price changes.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-021', 'version' => '1.130.0', 'date' => '2026-11-12', 'title' => 'System Budgets: request one straight from a sub-project — it is created under the sub-project with the title [PROJECT]-[SUB-PROJECT]-[Description]; the person asking only sets the priority and the date the offer must be ready. The sub-project page lists its System Budgets.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-020', 'version' => '1.129.0', 'date' => '2026-11-12', 'title' => 'System Budgets: a discount % on every labour line and every part line — it lowers the sale of the line (the cost stays), shows in the totals and the Excel export, is kept in revisions, copies and templates, and is carried to the offer line at conversion. Travelling expenses and other costs: a percentage on cost per line (at cost + x %).', 'db' => 'install/migrate_cp_r97_020_sb_line_discount.sql', 'check' => 'r97j'],
         ['ref' => 'GAS-CP-R97-019', 'version' => '1.128.3', 'date' => '2026-11-12', 'title' => 'System Budgets: the rate cards of the zone Outside Attica / Abroad / Greek islands show and apply the out-of-Attica rate — a rate list that keeps the two zones on separate rows gave the local rate for both.', 'db' => null, 'check' => null],

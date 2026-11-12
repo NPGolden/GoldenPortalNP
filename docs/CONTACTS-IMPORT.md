@@ -1638,3 +1638,11 @@ Language keys 9 209 each.
 **Security review**: the action runs behind `require_staff()`, `sb_guard()` and CSRF; a customer account gets 403 and does not see the card (tested); the sub-project id is looked up, an unknown id answers "Not found"; the title is built on the server from stored values — nothing typed by the user reaches it; date and priority are validated. No finding, no proposal.
 
 Language keys 9 218 each.
+
+## §308 v1.130.1 (R97-022) — System Budgets: markup on cost and margin on sale named apart
+
+Report: parts set to 50 %, Totals show 33,3 %. Both are right — the typed percentage is a markup on cost (`sb_part_calc()`: unit sale = unit cost × (1 + m/100), design OP-03), the Totals column is the margin on sale. Labels changed: `sb.parts_margin` "Markup on parts (% on cost)", `sb.margin_pct` "Markup on cost %", hints; Totals card (`views/system_budget.php`) gets the column "Markup on cost" = (sale − cost) ÷ cost beside "Margin on sale", with a note; Excel Summary gets the row. No calculation changed.
+
+**Security review**: labels and one displayed ratio; no input, no query. No finding.
+
+Language keys 9 222 each.
