@@ -232,3 +232,35 @@ function vm_merge_map(string $path, bool $dry): array {
     foreach ($plan as $mid => $dups) { $r = vm_merge((int)$mid, $dups); $res['merged'] += count($dups); }
     return $res;
 }
+
+/* ───────────── R97-015: vessels of a customer, managed from the customer's own page ───────────── */
+
+/** The vessels a customer has: registered under it (vessels.customer_id), and linked to it or to its organisations as a related party. */
+function vm_customer_vessels(int $cid): array {
+    if ($cid <= 0) return []; $out = [];
+    foreach (all('SELECT id, name, imo, is_active FROM vessels WHERE customer_id = ? ORDER BY name', [$cid]) as $v) $out[(int)$v['id']] = $v + ['own' => true, 'links' => []];
+    if (vm_has()) {
+        $orgs = vm_orgs_has();
+        $rows = all('SELECT vc.id AS link_id, vc.role, vc.note, v.id, v.name, v.imo, v.is_active' . ($orgs ? ', co.name AS org_name' : ", NULL AS org_name") . ' FROM vessel_companies vc JOIN vessels v ON v.id = vc.vessel_id' . ($orgs ? ' LEFT JOIN companies co ON co.id = vc.company_id' : '')
+                  . ' WHERE vc.customer_id = ?' . ($orgs ? ' OR vc.company_id IN (SELECT id FROM companies WHERE customer_id = ?)' : '') . ' ORDER BY v.name', $orgs ? [$cid, $cid] : [$cid]);
+        foreach ($rows as $r) { $k = (int)$r['id']; if (!isset($out[$k])) $out[$k] = ['id' => $k, 'name' => $r['name'], 'imo' => $r['imo'], 'is_active' => $r['is_active'], 'own' => false, 'links' => []]; $out[$k]['links'][] = ['id' => (int)$r['link_id'], 'role' => (string)$r['role'], 'note' => (string)$r['note'], 'org' => (string)$r['org_name']]; }
+    }
+    uasort($out, fn($a, $b) => strcasecmp((string)$a['name'], (string)$b['name'])); return array_values($out);
+}
+/**
+ * Give a customer a vessel: the vessel gets the customer's organisation as a related party with the chosen role; a vessel that hangs
+ * under no customer yet is also registered under this one. An existing customer of the vessel is never replaced here.
+ */
+function vm_customer_vessel_link(int $cid, int $vid, string $role, ?string $note = null): void {
+    if (!vm_has()) throw new RuntimeException(t('err.noaccess'));
+    $v = one('SELECT id, customer_id FROM vessels WHERE id = ?', [$vid]); if (!$v || !scalar('SELECT id FROM customers WHERE id = ?', [$cid])) throw new RuntimeException(t('err.notfound'));
+    if (!(int)$v['customer_id']) q('UPDATE vessels SET customer_id = ? WHERE id = ?', [$cid, $vid]);
+    vm_related_set_customer($vid, $cid, $role, $note);
+}
+/** Remove one related-party link — only a link that belongs to this customer (or to one of its organisations). */
+function vm_customer_vessel_unlink(int $cid, int $linkId): void {
+    if (!vm_has()) return; $orgs = vm_orgs_has();
+    $ok = scalar('SELECT vc.id FROM vessel_companies vc WHERE vc.id = ? AND (vc.customer_id = ?' . ($orgs ? ' OR vc.company_id IN (SELECT id FROM companies WHERE customer_id = ?)' : '') . ')', $orgs ? [$linkId, $cid, $cid] : [$linkId, $cid]);
+    if (!$ok) throw new RuntimeException(t('err.notfound')); vm_related_remove($linkId);
+}
+

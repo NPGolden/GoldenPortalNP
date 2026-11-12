@@ -525,6 +525,9 @@ function pm_handle_action(string $action, string $page): bool {
             redirect('admin_about', ['tab' => 'archive', '_r' => uniqid()]);
         }
         /* ------------------------- customers + invoicing details (R19) */
+        // R97-015: vessels of a customer, from the customer's page (same people who may edit customers)
+        case 'cu_vessel_link': { require_ct_manage(); $cid = (int)($_POST['customer_id'] ?? 0); vm_customer_vessel_link($cid, (int)($_POST['vessel_id'] ?? 0), (string)($_POST['role'] ?? 'owner')); flash('good', t('cu.v_linked')); redirect('admin_customers', ['edit' => $cid, '_r' => uniqid()], '#cu-vessels'); }
+        case 'cu_vessel_unlink': { require_ct_manage(); $cid = (int)($_POST['customer_id'] ?? 0); vm_customer_vessel_unlink($cid, (int)($_POST['link_id'] ?? 0)); flash('good', t('vm.related_removed')); redirect('admin_customers', ['edit' => $cid, '_r' => uniqid()], '#cu-vessels'); }
         case 'cu_customer_save': {
             $id = (int)($_POST['id'] ?? 0); $new = !$id;
             $id = cu_save_from_post($id);

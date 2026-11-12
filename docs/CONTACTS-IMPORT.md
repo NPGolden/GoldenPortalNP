@@ -1578,3 +1578,13 @@ The copy the firewall already holds is not removed by a release: it expires by i
 
 **Security review**: staff-only form; the server-side check on update is widened only to vessels that have a recorded link to the customer; customers' own view of vessels and projects (`scope_sql`, related-party visibility) is unchanged. No proposals.
 
+## §301 v1.127.9 (R97-015) — Customers: vessels assigned from the customer's page
+
+**Request**: the customer page showed "0 vessels" and had no way to assign one; with an organisation the path (related companies of the vessel) was clear.
+
+No SQL. `app/vm.php`: `vm_customer_vessels($cid)` — vessels with `customer_id` = the customer plus `vessel_companies` rows of the customer or of its organisations; `vm_customer_vessel_link()` — `vm_related_set_customer()` with the chosen role (the customer's organisation is created if missing) and `vessels.customer_id` set only when the vessel had none; `vm_customer_vessel_unlink()` — removes a link only when it belongs to that customer. `views/admin_customers.php`: card "Vessels" (`#cu-vessels`) with list, Assign a vessel (vessel + role) and Remove. Actions `cu_vessel_link` / `cu_vessel_unlink` in `app/pm_actions.php`, `require_ct_manage()`. Together with §300 the assigned vessel appears in the project form of the customer.
+
+**Security review**: the actions need the right to manage customers (administrators, Owner, Personal Assistant — a project manager gets 403, tested); the unlink checks that the link belongs to the customer named in the form (a link of another customer is refused, tested); the role is checked against `VM_ROLES`; an existing customer of a vessel is never replaced from here. Visibility for the customer's own users follows the existing related-party rules. No proposals.
+
+Language keys 9 191 each.
+

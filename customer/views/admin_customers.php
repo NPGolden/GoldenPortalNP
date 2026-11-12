@@ -99,6 +99,23 @@ layout_head(t('cu.title'), 'admin_customers');
       <?php if (!$cos): ?><p class="hint" style="margin:0;"><?= tt('cu.no_companies') ?></p><?php else: ?><p style="margin:0;"><?php foreach ($cos as $c): ?><a class="btn btn--ghost btn--sm" style="margin:0 6px 6px 0;" href="<?= url('companies', ['edit' => $c['id']]) ?>#form"><?= e($c['name']) ?>&nbsp; <?= co_kind_pill($c['kind']) ?></a><?php endforeach; ?></p><?php endif; ?>
     </div>
     <?php endif; ?>
+    <?php if (function_exists('vm_customer_vessels')): $cvs = vm_customer_vessels($editId); $cvIds = array_column($cvs, 'id'); $allV = all('SELECT v.id, v.name, c.name AS cname FROM vessels v LEFT JOIN customers c ON c.id = v.customer_id WHERE v.is_active = 1 ORDER BY v.name LIMIT 5000');   // R97-015: vessels, from the customer's side ?>
+    <div class="card card--flat" id="cu-vessels"><h3 class="ed-h">⚓ <?= tt('cu.vessels') ?> <span class="hint" style="display:inline;margin-left:6px;"><?= count($cvs) ?></span></h3>
+      <?php if (!$cvs): ?><p class="hint" style="margin:0 0 10px;"><?= tt('cu.vessels_none') ?></p><?php else: ?>
+      <div class="table-scroll" style="margin-bottom:10px;"><table class="tbl" data-nosort><thead><tr><th><?= tt('th.vessel') ?></th><th><?= tt('cu.v_how') ?></th><th></th></tr></thead><tbody>
+      <?php foreach ($cvs as $cv): ?><tr><td><a href="<?= url('vessel', ['id' => (int)$cv['id']]) ?>"><b><?= e($cv['name']) ?></b></a><?= $cv['imo'] ? ' <span class="hint">IMO ' . e((string)$cv['imo']) . '</span>' : '' ?><?= (int)$cv['is_active'] ? '' : ' ' . pill('mute', t('cu.inactive')) ?></td>
+        <td><?= $cv['own'] ? pill('green', t('cu.v_own')) . ' ' : '' ?><?php foreach ($cv['links'] as $lk): ?><?= pill('gold', vm_role_label($lk['role'])) ?><?= $lk['org'] !== '' ? ' <span class="hint">' . e($lk['org']) . '</span>' : '' ?> <?php endforeach; ?></td>
+        <td style="white-space:nowrap;"><?php foreach ($cv['links'] as $lk): ?><form method="post" action="<?= $back ?>#cu-vessels" class="inline" data-lock data-confirm="<?= e(t('cu.v_unlink_confirm', ['v' => $cv['name']])) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="cu_vessel_unlink"><input type="hidden" name="customer_id" value="<?= $editId ?>"><input type="hidden" name="link_id" value="<?= (int)$lk['id'] ?>"><button class="btn btn--ghost btn--sm" type="submit" title="<?= e(vm_role_label($lk['role'])) ?>">✕ <?= tt('cu.v_unlink') ?></button></form> <?php endforeach; ?></td></tr><?php endforeach; ?>
+      </tbody></table></div><?php endif; ?>
+      <?php if (function_exists('vm_has') && vm_has()): ?><form method="post" action="<?= $back ?>#cu-vessels" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="cu_vessel_link"><input type="hidden" name="customer_id" value="<?= $editId ?>">
+        <div class="grid grid-3" style="align-items:end;">
+          <div class="field" style="grid-column:span 2;"><label><?= tt('cu.v_add') ?></label><select name="vessel_id" required><option value=""><?= tt('cu.v_pick') ?></option><?php foreach ($allV as $av): if (in_array((int)$av['id'], $cvIds, true)) continue; ?><option value="<?= (int)$av['id'] ?>"><?= e($av['name'] . ($av['cname'] ? ' · ' . $av['cname'] : ' · ' . t('cu.v_free'))) ?></option><?php endforeach; ?></select></div>
+          <div class="field"><label><?= tt('vm.role') ?></label><div style="display:flex;gap:8px;"><select name="role" data-nosearch><?php foreach (VM_ROLES as $vr): ?><option value="<?= $vr ?>"><?= e(vm_role_label($vr)) ?></option><?php endforeach; ?></select><button class="btn btn--sm" type="submit" style="white-space:nowrap;">＋ <?= tt('cu.v_btn') ?></button></div></div>
+        </div>
+        <p class="hint" style="margin:6px 0 0;"><?= tt('cu.v_hint') ?></p>
+      </form><?php endif; ?>
+    </div>
+    <?php endif; ?>
     <?php iv_section('customer', $editId, $back, (int)($_GET['iv'] ?? 0)); ?>
   <?php endif; ?>
   <?php else: ?>
