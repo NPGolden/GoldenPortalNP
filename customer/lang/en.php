@@ -9372,4 +9372,8 @@ Best regards,
 'v.url_hint' => 'A web address where information about the vessel is kept — a shared folder, the yard\'s or the manager\'s page, a register entry. Shown as a button on the vessel\'s page to Golden A/S staff only.',
 'v.url_open' => 'Online information',
 'v.url_bad' => 'The web link is not a valid address — it must start with http:// or https:// and contain no spaces.',
+'v.url_go' => 'Open the page',
+'v.url_noprev' => 'No preview could be read from this page — use the button to open it.',
+'v.url_refresh' => 'Read the preview again',
+'v.url_refreshed' => 'Preview updated.',
 ];

@@ -115,7 +115,7 @@ layout_head(t('v.title'), 'vessels');
     <tbody>
     <?php foreach ($vessels as $v): ?>
       <tr>
-        <td><b><a href="<?= url('vessel', ['id' => $v['id']]) ?>"><?= e($v['name']) ?></a></b></td>
+        <td><b><a href="<?= url('vessel', ['id' => $v['id']]) ?>"><?= e($v['name']) ?></a></b><?php if (is_staff() && !empty($v['info_url']) && preg_match('~^https?://~i', (string)$v['info_url'])): ?> <a href="<?= e((string)$v['info_url']) ?>" target="_blank" rel="noopener noreferrer" class="vlink-ico" title="<?= e(trim((string)($v['info_title'] ?? '') . ' — ' . (string)(parse_url((string)$v['info_url'], PHP_URL_HOST) ?: ''), ' —')) ?>">🌐</a><?php if (!empty($v['info_title'])): ?><br><span class="hint"><?= e(mb_strimwidth((string)$v['info_title'], 0, 70, '…')) ?></span><?php endif; ?><?php endif; ?></td>
         <?php if ($staff): ?><td><?= $v['customer_name'] ? e($v['customer_name']) : '<span class="pill pill--gold">' . tt('v.unassigned') . '</span>' ?></td><?php endif; ?>
         <td class="num"><?= e($v['imo'] ?: '—') ?></td>
         <td><?= e($v['yard'] ?: '—') ?></td>

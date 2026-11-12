@@ -526,6 +526,7 @@ function pm_handle_action(string $action, string $page): bool {
         }
         /* ------------------------- customers + invoicing details (R19) */
         // R97-015: vessels of a customer, from the customer's page (same people who may edit customers)
+        case 'vessel_link_refresh': { require_staff(); $vid = (int)($_POST['id'] ?? 0); if (!scalar('SELECT id FROM vessels WHERE id = ?', [$vid])) throw new RuntimeException(t('err.notfound')); flash(vm_url_preview_store($vid) ? 'good' : 'warn', t(scalar('SELECT info_title FROM vessels WHERE id = ?', [$vid]) || scalar('SELECT info_desc FROM vessels WHERE id = ?', [$vid]) ? 'v.url_refreshed' : 'v.url_noprev')); redirect('vessel', ['id' => $vid, '_r' => uniqid()]); }   // R97-017
         case 'cu_vessel_link': { require_ct_manage(); $cid = (int)($_POST['customer_id'] ?? 0); vm_customer_vessel_link($cid, (int)($_POST['vessel_id'] ?? 0), (string)($_POST['role'] ?? 'owner')); flash('good', t('cu.v_linked')); redirect('admin_customers', ['edit' => $cid, '_r' => uniqid()], '#cu-vessels'); }
         case 'cu_vessel_unlink': { require_ct_manage(); $cid = (int)($_POST['customer_id'] ?? 0); vm_customer_vessel_unlink($cid, (int)($_POST['link_id'] ?? 0)); flash('good', t('vm.related_removed')); redirect('admin_customers', ['edit' => $cid, '_r' => uniqid()], '#cu-vessels'); }
         case 'cu_customer_save': {
@@ -863,7 +864,8 @@ function pm_handle_action(string $action, string $page): bool {
                 q('UPDATE vessels SET former_names = ? WHERE id = ?', [$str('former_names', 255) ?: null, $id]);
                 foreach (preg_split('/[\r\n;]+/', (string)($_POST['aliases'] ?? '')) as $al) if (trim($al) !== '') vm_alias_add($id, trim($al), 'manual');
             }
-            if (function_exists('vm_url_col') && vm_url_col() && isset($_POST['info_url'])) { $iu = vm_url_clean((string)$_POST['info_url']); if ($iu === null) throw new RuntimeException(t('v.url_bad')); q('UPDATE vessels SET info_url = ? WHERE id = ?', [$iu !== '' ? $iu : null, $id]); }   // R97-016
+            if (function_exists('vm_url_col') && vm_url_col() && isset($_POST['info_url'])) { $iu = vm_url_clean((string)$_POST['info_url']); if ($iu === null) throw new RuntimeException(t('v.url_bad')); $wasU = (string) scalar('SELECT info_url FROM vessels WHERE id = ?', [$id]); q('UPDATE vessels SET info_url = ? WHERE id = ?', [$iu !== '' ? $iu : null, $id]);
+                if (function_exists('vm_prev_col') && vm_prev_col() && ($wasU !== $iu || ($iu !== '' && !scalar('SELECT info_checked_at FROM vessels WHERE id = ?', [$id])))) { try { vm_url_preview_store($id, true); } catch (Throwable $e) {} } }   // R97-016 / R97-017: the preview is read once, when the link changes
             if (function_exists('vo_sync')) vo_sync($id);   // R95-005: a changed customer becomes an ownership period
             flash('good', t('v.saved'));
             redirect('vessels', ['_r' => uniqid()]);

@@ -41,7 +41,7 @@ layout_head($v['name'], 'vessels');
   <div>
     <h1>⚓ <?= e($v['name']) ?></h1>
     <p class="lede" style="margin-bottom:0;"><?= $v['imo'] ? 'IMO ' . e($v['imo']) . ' · ' : '' ?><?= $v['yard'] ? e($v['yard']) . ' · ' : '' ?><?= $staff ? e($v['customer_name'] ?: t('v.unassigned')) : tt('vh.lede') ?></p>
-    <?php if ($staff && !empty($v['info_url']) && preg_match('~^https?://~i', (string)$v['info_url'])): ?><p style="margin:6px 0 0;"><a class="btn btn--ghost btn--sm" href="<?= e((string)$v['info_url']) ?>" target="_blank" rel="noopener noreferrer">🌐 <?= tt('v.url_open') ?></a> <span class="hint"><?= e(mb_strimwidth((string)(parse_url((string)$v['info_url'], PHP_URL_HOST) ?: ''), 0, 60, '…')) ?></span></p><?php endif;   // R97-016 ?>
+    <?php if ($staff && function_exists('vm_url_block')) echo vm_url_block($v, true);   // R97-016 / R97-017: preview of the vessel's web link ?>
   </div>
   <div class="btn-row">
     <form method="get" action="index.php" class="inline" style="display:inline-flex;align-items:center;gap:6px;">

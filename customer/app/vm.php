@@ -273,3 +273,65 @@ function vm_url_clean(string $u): ?string {
     return $u;
 }
 
+/* ───────────── R97-017: preview of a vessel's web link ───────────── */
+function vm_prev_col(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM vessels LIKE 'info_title'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** Public address? Every address the host resolves to must be a routable public one — never this server, the local network or a metadata address. Returns the address to connect to, or null. */
+function vm_public_ip(string $host): ?string {
+    $host = trim($host, '[]'); if ($host === '' || strcasecmp($host, 'localhost') === 0) return null;
+    $ips = filter_var($host, FILTER_VALIDATE_IP) ? [$host] : (array) @gethostbynamel($host); if (!$ips) return null;
+    foreach ($ips as $ip) if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4 | FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE)) return null;
+    return (string)$ips[0];
+}
+/** Title and description out of a page's HTML (Open Graph first, then <title> / meta description), as short plain text. */
+function vm_url_meta(string $buf, string $ct = ''): ?array {
+    if (preg_match('/charset=["\']?([\w-]+)/i', $ct . ' ' . substr($buf, 0, 2000), $m) && strcasecmp($m[1], 'utf-8') !== 0) { try { $conv = @mb_convert_encoding($buf, 'UTF-8', $m[1]); if (is_string($conv) && $conv !== '') $buf = $conv; } catch (\Throwable $e) { /* unknown character set: keep the bytes */ } }
+    if (!mb_check_encoding($buf, 'UTF-8')) $buf = mb_convert_encoding($buf, 'UTF-8', 'ISO-8859-1');
+    $txt = function (?string $v, int $len): string { $v = html_entity_decode(strip_tags((string)$v), ENT_QUOTES | ENT_HTML5, 'UTF-8'); $v = trim(preg_replace('/[\x00-\x1F\x7F]+|\s+/u', ' ', $v) ?? ''); return mb_substr($v, 0, $len); };
+    $meta = function (string $name) use ($buf): ?string { foreach (['~<meta[^>]+(?:property|name)\s*=\s*["\']' . preg_quote($name, '~') . '["\'][^>]*content\s*=\s*["\']([^"\']*)["\']~i', '~<meta[^>]+content\s*=\s*["\']([^"\']*)["\'][^>]*(?:property|name)\s*=\s*["\']' . preg_quote($name, '~') . '["\']~i'] as $rx) if (preg_match($rx, $buf, $m)) return $m[1]; return null; };
+    $title = $txt($meta('og:title') ?? (preg_match('~<title[^>]*>(.*?)</title>~is', $buf, $m) ? $m[1] : ''), 200); $desc = $txt($meta('og:description') ?? $meta('description') ?? '', 600);
+    return $title === '' && $desc === '' ? null : ['title' => $title, 'desc' => $desc];
+}
+/**
+ * Read the title and the description of a public web page for the preview: http(s) on the standard ports only, the connection is pinned
+ * to the address that was checked, at most 3 redirects (each checked again), 5 s, 300 KB, HTML only. Nothing from the page is executed or
+ * stored except two short plain texts. Returns ['title' => …, 'desc' => …] or null.
+ */
+function vm_url_preview(string $url): ?array {
+    if (!function_exists('curl_init')) return null;
+    for ($hop = 0; $hop < 4; $hop++) {
+        $p = parse_url($url); $sch = strtolower((string)($p['scheme'] ?? '')); $host = (string)($p['host'] ?? ''); $port = (int)($p['port'] ?? ($sch === 'https' ? 443 : 80));
+        if (!in_array($sch, ['http', 'https'], true) || $host === '' || !in_array($port, [80, 443], true) || isset($p['user'])) return null;
+        $ip = vm_public_ip($host); if ($ip === null) return null;
+        $buf = ''; $ch = curl_init($url);
+        curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => false, CURLOPT_FOLLOWLOCATION => false, CURLOPT_CONNECTTIMEOUT => 4, CURLOPT_TIMEOUT => 5, CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
+            CURLOPT_RESOLVE => [$host . ':' . $port . ':' . $ip], CURLOPT_USERAGENT => 'GoldenAS-Portal link preview', CURLOPT_HTTPHEADER => ['Accept: text/html,application/xhtml+xml', 'Accept-Language: en'], CURLOPT_ENCODING => '',
+            CURLOPT_WRITEFUNCTION => function ($c, $d) use (&$buf) { $buf .= $d; return strlen($buf) > 300000 ? 0 : strlen($d); }]);
+        curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE); $ct = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE); $loc = (string) curl_getinfo($ch, CURLINFO_REDIRECT_URL); curl_close($ch);
+        if ($code >= 300 && $code < 400 && $loc !== '') { $url = $loc; continue; }
+        if ($code < 200 || $code >= 300 || $buf === '' || ($ct !== '' && stripos($ct, 'html') === false)) return null;
+        return vm_url_meta($buf, $ct);
+    }
+    return null;
+}
+/** Read the preview of a vessel's link again and store it (empty when the page cannot be read — the link itself stays). */
+function vm_url_preview_store(int $vid, bool $clear = false): bool {
+    if (!vm_url_col() || !vm_prev_col()) return false; $u = (string) scalar('SELECT info_url FROM vessels WHERE id = ?', [$vid]);
+    $pv = $u !== '' ? vm_url_preview($u) : null;
+    if ($pv !== null) q('UPDATE vessels SET info_title = ?, info_desc = ?, info_checked_at = NOW() WHERE id = ?', [$pv['title'] !== '' ? $pv['title'] : null, $pv['desc'] !== '' ? $pv['desc'] : null, $vid]);
+    elseif ($clear || $u === '') q('UPDATE vessels SET info_title = NULL, info_desc = NULL, info_checked_at = NOW() WHERE id = ?', [$vid]);   // a new link whose page cannot be read must not keep the old page's text
+    else q('UPDATE vessels SET info_checked_at = NOW() WHERE id = ?', [$vid]);                                                              // a refresh that fails keeps what was read before
+    return $pv !== null;
+}
+/** The preview block of a vessel's link for staff pages: site, title, description and the button — nothing is loaded from the other site by the browser. */
+function vm_url_block(array $v, bool $refresh = false): string {
+    $u = (string)($v['info_url'] ?? ''); if ($u === '' || !preg_match('~^https?://~i', $u)) return '';
+    $host = (string)(parse_url($u, PHP_URL_HOST) ?: ''); $t = trim((string)($v['info_title'] ?? '')); $d = trim((string)($v['info_desc'] ?? ''));
+    $o = '<div class="vlink"><div class="vlink-txt"><span class="vlink-host">🌐 ' . e(mb_strimwidth($host, 0, 60, '…')) . '</span>';
+    $o .= '<a class="vlink-title" href="' . e($u) . '" target="_blank" rel="noopener noreferrer">' . e($t !== '' ? $t : t('v.url_open')) . '</a>';
+    if ($d !== '') $o .= '<span class="vlink-desc">' . e(mb_strimwidth($d, 0, 320, '…')) . '</span>';
+    elseif ($t === '') $o .= '<span class="vlink-desc hint">' . e(t('v.url_noprev')) . '</span>';
+    $o .= '</div><div class="vlink-act"><a class="btn btn--gold btn--sm" href="' . e($u) . '" target="_blank" rel="noopener noreferrer">' . e(t('v.url_go')) . ' ↗</a>';
+    if ($refresh && vm_prev_col()) $o .= '<form method="post" action="' . url('vessel', ['id' => (int)$v['id']]) . '" class="inline" data-lock>' . csrf_field() . '<input type="hidden" name="action" value="vessel_link_refresh"><input type="hidden" name="id" value="' . (int)$v['id'] . '"><button class="btn btn--ghost btn--sm" type="submit" title="' . e(t('v.url_refresh')) . '">↻</button></form>';
+    return $o . '</div></div>';
+}
+

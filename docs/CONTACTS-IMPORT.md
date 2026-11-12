@@ -1596,3 +1596,11 @@ Migration `install/migrate_cp_r97_016_vessel_link.sql`: `vessels.info_url VARCHA
 
 Language keys 9 195 each.
 
+
+## §303 v1.128.1 (R97-017) — Vessels: preview of the web link
+
+Migration `install/migrate_cp_r97_017_vessel_link_preview.sql`: `vessels.info_title VARCHAR(200)`, `info_desc VARCHAR(600)`, `info_checked_at DATETIME`. `vm_prev_col()` guards the columns. `vm_url_preview()` reads the linked page once on the server and `vm_url_meta()` keeps two plain texts — `og:title` or `<title>`, `og:description` or the meta description (other character sets are converted to UTF-8). `vm_url_preview_store()` runs from `vessel_save` when the link changed (the old texts are cleared) and from the new action `vessel_link_refresh` (↻; a failed read keeps the texts already stored). `vm_url_block()` prints the card on `views/vessel_view.php`: site, title (a link), description, "Open the page ↗", ↻. `views/vessels.php` shows a 🌐 link beside the vessel name. Staff only, as the link itself. A page that needs a sign-in or refuses automatic readers gives no texts — the card then shows the site and the button.
+
+**Security review**: the portal now makes an outgoing request to an address typed by a user, so the request is fenced (server-side request forgery): http / https on ports 80 / 443 only, no user:password in the address, every address the host resolves to must be public (private, loopback, link-local and reserved ranges are refused — tested with 127.0.0.1, 10.x, 192.168.x, 169.254.169.254), the connection is pinned to the address that was checked (no DNS re-binding), at most 3 redirects and each one is checked again, 5 s time limit, 300 KB, HTML only, no cookies or credentials are sent. Nothing from the other site is loaded by the browser (no iframe, no remote image), so the content-security policy is unchanged and the other site learns nothing about the person viewing; the two texts are stripped of tags and escaped on output. The read happens only on save or ↻ (staff, CSRF-protected), never on page view — no effect on page speed. Proposal: none new. Not testable in the build environment (no internet): the read of a real page — check on live with one vessel.
+
+Language keys 9 199 each.

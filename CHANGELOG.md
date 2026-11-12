@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.128.0** (build 2026-11-11). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.128.1** (build 2026-11-11). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.128.1 | GAS-CP-R97-017 | 2026-11-12 | Vessels: the vessel page shows a preview of the web link — the title and the description of the linked page with an "Open the page" button — and the vessel list carries a link icon, so the particulars are one click away without opening Edit. | `install/migrate_cp_r97_017_vessel_link_preview.sql` |
 | 1.128.0 | GAS-CP-R97-016 | 2026-11-12 | Vessels: a web link to the information about the vessel that is kept online — entered in the vessel form, shown as a button on the vessel page to Golden A/S staff. | `install/migrate_cp_r97_016_vessel_link.sql` |
 | 1.127.9 | GAS-CP-R97-015 | 2026-11-12 | Customers: a Vessels card on the customer page — the vessels registered under the customer and those linked to it as a related party, with Assign a vessel (role owner, manager, yard …) and Remove. | — |
 | 1.127.8 | GAS-CP-R97-014 | 2026-11-11 | New / edit project: the vessel list of a customer also offers the vessels linked to the customer's organisation (related parties of the vessel, ownership history), not only the vessels registered under the customer itself. | — |

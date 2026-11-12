@@ -9372,4 +9372,8 @@ Cordiali saluti,
 'v.url_hint' => 'Un indirizzo web dove sono conservate informazioni sull\'imbarcazione — cartella condivisa, pagina del cantiere o del gestore, registro. Mostrato come pulsante nella pagina dell\'imbarcazione solo al personale Golden A/S.',
 'v.url_open' => 'Informazioni online',
 'v.url_bad' => 'Il link non è un indirizzo valido — deve iniziare con http:// o https:// e non contenere spazi.',
+'v.url_go' => 'Apri la pagina',
+'v.url_noprev' => 'Non è stato possibile leggere un\'anteprima — aprire la pagina con il pulsante.',
+'v.url_refresh' => 'Rileggi l\'anteprima',
+'v.url_refreshed' => 'Anteprima aggiornata.',
 ];
