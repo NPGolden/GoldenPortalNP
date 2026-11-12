@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.128.1';
-const CP_BUILD   = '2026-11-11';
+const CP_VERSION = '1.128.2';
+const CP_BUILD   = '2026-11-12';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-018', 'version' => '1.128.2', 'date' => '2026-11-12', 'title' => 'System Budgets: changing the rate zone re-prices the rate-card labour lines (rates typed by hand are kept and flagged, with a button to apply the rate-card rates); the zones are named Local (Attica) and Outside Attica / Abroad / Greek islands.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-017', 'version' => '1.128.1', 'date' => '2026-11-12', 'title' => 'Vessels: the vessel page shows a preview of the web link — the title and the description of the linked page with an "Open the page" button — and the vessel list carries a link icon, so the particulars are one click away without opening Edit.', 'db' => 'install/migrate_cp_r97_017_vessel_link_preview.sql', 'check' => 'r97i'],
         ['ref' => 'GAS-CP-R97-016', 'version' => '1.128.0', 'date' => '2026-11-12', 'title' => 'Vessels: a web link to the information about the vessel that is kept online — entered in the vessel form, shown as a button on the vessel page to Golden A/S staff.', 'db' => 'install/migrate_cp_r97_016_vessel_link.sql', 'check' => 'r97h'],
         ['ref' => 'GAS-CP-R97-015', 'version' => '1.127.9', 'date' => '2026-11-12', 'title' => 'Customers: a Vessels card on the customer page — the vessels registered under the customer and those linked to it as a related party, with Assign a vessel (role owner, manager, yard …) and Remove.', 'db' => null, 'check' => null],

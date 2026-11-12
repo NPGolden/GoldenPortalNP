@@ -150,7 +150,7 @@ function sb_create(string $title, array $extra = []): int {
 }
 function sb_load_editable(int $id): array { sb_guard(); $B = sb_get($id); if (!$B) throw new RuntimeException(t('err.notfound')); if (!sb_editable($B)) throw new RuntimeException(t('sb.locked')); return $B; }
 
-function sb_save_head_from_post(int $id): void {
+function sb_save_head_from_post(int $id): ?array {
     $B = sb_load_editable($id);
     $title = mb_substr(trim((string)($_POST['title'] ?? '')), 0, 200); if ($title === '') throw new RuntimeException(t('sb.need_title'));
     $sid = (int)($_POST['subproject_id'] ?? 0); $pid = (int)($_POST['project_id'] ?? 0);
@@ -162,8 +162,36 @@ function sb_save_head_from_post(int $id): void {
     q('UPDATE sb_budgets SET title = ?, project_id = ?, subproject_id = ?, owner_user_id = ?, target_date = ?, zone = ?, parts_margin = ?, flat_on = ?, flat_rate = ?, cost_rate = ?, allow_rate = ?, allow_cost = ?, commission_pct = ? WHERE id = ?',
       [$title, $pid ?: null, $sid ?: null, $own ?: null, $d, ($_POST['zone'] ?? '') === 'overseas' ? 'overseas' : 'local', $pct('parts_margin', 40, 900), empty($_POST['flat_on']) ? 0 : 1, $pct('flat_rate', 52, 9999), $pct('cost_rate', 35, 9999), $pct('allow_rate', 75, 9999), $pct('allow_cost', 75, 9999), $pct('commission_pct', 0, 90), $id]);
     if ($B['status'] === 'draft') q("UPDATE sb_budgets SET status = 'working' WHERE id = ?", [$id]);
-    sb_recalc($id); sb_event($id, 'header');
+    $zNew = ($_POST['zone'] ?? '') === 'overseas' ? 'overseas' : 'local'; $rr = null;
+    if ($zNew !== (string)$B['zone']) $rr = sb_rerate($id, (string)$B['zone'], $zNew);   // R97-018: a new rate zone re-prices the rate-card lines
+    sb_recalc($id); sb_event($id, 'header', $rr ? 'zone ' . $B['zone'] . ' > ' . $zNew . ' · ' . $rr['changed'] . ' re-priced · ' . $rr['kept'] . ' kept' : null);
+    return $rr;
 }
+/**
+ * Re-price the labour lines that carry a rate card for another rate zone (R97-018). A line whose rate is the card's rate of the old zone
+ * (or empty) takes the card's rate of the new zone; a rate typed by hand is kept — unless $all, which sets every rate-card line.
+ * Returns ['changed' => n, 'kept' => n, 'nocard' => n].
+ */
+function sb_rerate(int $id, string $from, string $to, bool $all = false): array {
+    $old = sb_cards($from); $new = sb_cards($to); $r = ['changed' => 0, 'kept' => 0, 'nocard' => 0]; $eq = fn($a, $b) => $a !== null && $b !== null && abs((float)$a - (float)$b) < 0.005;
+    foreach (all('SELECT id, card, rate, rate_ot FROM sb_labour WHERE budget_id = ?', [$id]) as $l) {
+        $c = trim((string)$l['card']); if ($c === '' || !isset($new[$c])) { $r['nocard']++; continue; }
+        $n = (float)$new[$c]['normal']; $o = $new[$c]['overtime'] !== null ? (float)$new[$c]['overtime'] : null; $rate = (float)$l['rate']; $rot = $l['rate_ot'] !== null ? (float)$l['rate_ot'] : null;
+        $nr = $all || $rate <= 0 || $eq($rate, $old[$c]['normal'] ?? null) ? $n : $rate;
+        $no = $all || $rot === null || $rot <= 0 || $eq($rot, $old[$c]['overtime'] ?? null) ? $o : $rot;
+        if ($eq($nr, $rate) && ($no === $rot || $eq($no, $rot))) { if (!$eq($rate, $n) || ($o !== null && !$eq($rot, $o))) $r['kept']++; continue; }
+        q('UPDATE sb_labour SET rate = ?, rate_ot = ? WHERE id = ? AND budget_id = ?', [$nr, $no, (int)$l['id'], $id]); $r['changed']++;
+    }
+    return $r;
+}
+/** Rate-card lines whose rate is not the card's rate of the budget's zone: [lines, of them with a different normal rate]. */
+function sb_rate_drift(array $B): int {
+    $cards = sb_cards((string)$B['zone']); $n = 0;
+    foreach ($B['labour'] as $l) { $c = trim((string)($l['card'] ?? '')); if ($c === '' || !isset($cards[$c])) continue; if (abs((float)$l['rate'] - (float)$cards[$c]['normal']) >= 0.005 || ($cards[$c]['overtime'] !== null && ($l['rate_ot'] ?? null) !== null && abs((float)$l['rate_ot'] - (float)$cards[$c]['overtime']) >= 0.005)) $n++; }
+    return $n;
+}
+/** Set every rate-card line to the card's rate of the budget's zone (button on the labour card). */
+function sb_rerate_all(int $id): array { $B = sb_load_editable($id); $r = sb_rerate($id, (string)$B['zone'], (string)$B['zone'], true); sb_recalc($id); sb_event($id, 'labour', 'rate card ' . $B['zone'] . ' · ' . $r['changed'] . ' re-priced'); return $r; }
 function sb_save_description_from_post(int $id): void { sb_load_editable($id); q('UPDATE sb_budgets SET description = ? WHERE id = ?', [mb_substr(trim((string)($_POST['description'] ?? '')), 0, 60000) ?: null, $id]); sb_event($id, 'description'); }
 
 /** Labour rows posted as l[<id|new index>][field]; a row with del=1 is removed; a new row with no text and no hours is ignored. */
