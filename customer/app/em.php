@@ -53,7 +53,9 @@ function em_card_html(array $o): string {
     $u = current_user(); $tx = em_text($o['kind'], $o['ctx']); $id = 'em' . substr(md5($o['kind'] . $tx['subject']), 0, 6);
     $kinds = $o['kinds'] ?? [];   // R84-001: several templates in one card — [kind => label]; the choice swaps subject and text
     $txs = []; foreach ($kinds as $k => $label) $txs[$k] = $k === $o['kind'] ? ['s' => $tx['subject'], 'b' => $tx['body']] : (function () use ($k, $o) { $t = em_text($k, $o['ctx']); return ['s' => $t['subject'], 'b' => $t['body']]; })();
-    $h = '<details class="card em-card" id="' . $id . '"><summary class="btn btn--ghost btn--sm">✉ ' . tt('em.title') . '</summary>';
+    $dl = $_SESSION['em_odraft'] ?? null; if ($dl !== null) unset($_SESSION['em_odraft']);   // R97-024: the draft just created in the person's Outlook
+    $h = ($dl !== null ? '<p class="flash flash--good" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;"><span style="flex:1 1 320px;">' . tt('em.odraft_ok') . '</span>' . ($dl !== '' ? '<a class="btn btn--sm" href="' . e($dl) . '" target="_blank" rel="noopener noreferrer">' . tt('em.odraft_open') . ' ↗</a>' : '') . '</p>' : '')
+       . '<details class="card em-card" id="' . $id . '"><summary class="btn btn--ghost btn--sm">✉ ' . tt('em.title') . '</summary>';
     $h .= '<form method="post" action="' . e($o['back']) . '" class="em-form"' . ($txs ? ' data-em-tx="' . e(json_encode($txs, JSON_UNESCAPED_UNICODE)) . '"' : '') . '>' . csrf_field() . '<input type="hidden" name="action" value="em_draft">' . (string)($o['hidden'] ?? '');
     if (count($kinds) > 1) { $h .= '<div class="field" style="margin-bottom:8px;"><label>' . tt('em.template') . '</label><select name="em_kind" class="js-em-kind" data-nosearch>'; foreach ($kinds as $k => $label) $h .= '<option value="' . e($k) . '"' . ($k === $o['kind'] ? ' selected' : '') . '>' . e($label) . '</option>'; $h .= '</select></div>'; }
     $h .= '<div class="em-people"><label class="em-l">' . tt('em.to') . '</label>';
@@ -71,7 +73,7 @@ function em_card_html(array $o): string {
         $h .= '</div>';
     }
     $snd = em_can_send();   // R97-023: send straight from the sender's own Microsoft 365 mailbox
-    $h .= '<div class="btn-row" style="margin-top:10px;">' . ($snd ? '<button class="btn btn--gold btn--sm" type="submit" name="action" value="em_send" data-confirm="' . e(t('em.send_confirm', ['m' => (string)($u['email'] ?? '')])) . '" data-confirm-title="' . tt('dlg.title') . '">➤ ' . tt('em.send_now') . '</button>' : '') . '<button class="btn ' . ($snd ? 'btn--ghost' : 'btn--gold') . ' btn--sm" type="submit">⤓ ' . tt('em.eml') . '</button><button class="btn btn--ghost btn--sm js-em-mailto" type="button">' . tt('em.mailto') . '</button></div>';
+    $h .= '<div class="btn-row" style="margin-top:10px;">' . ($snd ? '<button class="btn btn--gold btn--sm" type="submit" name="action" value="em_send" data-confirm="' . e(t('em.send_confirm', ['m' => (string)($u['email'] ?? '')])) . '" data-confirm-title="' . tt('dlg.title') . '">➤ ' . tt('em.send_now') . '</button><button class="btn btn--sm" type="submit" name="action" value="em_odraft">✎ ' . tt('em.odraft') . '</button>' : '') . '<button class="btn ' . ($snd ? 'btn--ghost' : 'btn--gold') . ' btn--sm" type="submit">⤓ ' . tt('em.eml') . '</button><button class="btn btn--ghost btn--sm js-em-mailto" type="button">' . tt('em.mailto') . '</button></div>';
     $h .= '<p class="hint" style="margin:8px 0 0;">' . ($snd ? e(t('em.send_hint', ['m' => (string)($u['email'] ?? '')])) . ' ' : '') . tt('em.hint') . ($tx['template_id'] && is_cp_admin() ? ' <a href="' . url('admin_email_templates', ['id' => $tx['template_id']]) . '#form">' . tt('em.edit_template') . '</a>' : (is_cp_admin() ? ' <a href="' . url('admin_email_templates', ['kind' => $o['kind']]) . '#form">' . tt('em.edit_template') . '</a>' : '')) . '</p></form></details>';
     return $h;
 }
@@ -185,6 +187,19 @@ function em_send_from_post(): array {
     if (!$ok) throw new RuntimeException(t($code === 403 || $code === 404 ? 'em.send_denied' : 'em.send_fail', ['m' => $mailbox]));
     em_after($to, $subject);
     return $to;
+}
+/** POST em_odraft → a draft in the Drafts folder of the signed-in person's own mailbox, to finish and send from Outlook (R97-024). Returns the web link ('' when none). */
+function em_odraft_from_post(): string {
+    $u = require_staff(); if (!em_can_send()) throw new RuntimeException(t('em.send_off'));
+    [$to, $cc, $subject, $body, $atts] = em_post_parts(); $mailbox = strtolower(trim((string)$u['email'])); $uid = (int)$u['id'];
+    $bytes = 0; foreach ($atts as $a) $bytes += strlen((string)$a[0]);
+    if ($bytes > 25 * 1024 * 1024) throw new RuntimeException(t('em.odraft_big', ['mb' => number_format($bytes / 1048576, 1, ',', '')]));
+    if (em_sent_has() && (int) scalar('SELECT COUNT(*) FROM em_sent WHERE user_id = ? AND created_at > (NOW() - INTERVAL 1 HOUR)', [$uid]) >= EM_SEND_PER_HOUR) throw new RuntimeException(t('em.send_rate'));
+    [$ok, $code, $err, $link] = cp_graph_create_draft($mailbox, $to, $cc, $subject, em_html($body), $atts);
+    if (em_sent_has()) { try { q('INSERT INTO em_sent (user_id, mailbox, to_list, cc_list, subject, n_atts, bytes, ok, note, ip) VALUES (?,?,?,?,?,?,?,?,?,?)', [$uid, $mailbox, mb_substr(implode(', ', $to), 0, 2000), $cc ? mb_substr(implode(', ', $cc), 0, 1000) : null, $subject, count($atts), $bytes, $ok ? 1 : 0, mb_substr($ok ? 'draft' : 'draft ' . $code . ' ' . $err, 0, 200), mb_substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45)]); } catch (Throwable $e) {} }
+    if (!$ok) throw new RuntimeException(t($code === 403 ? 'em.odraft_denied' : ($code === 404 ? 'em.send_denied' : 'em.odraft_fail'), ['m' => $mailbox]));
+    em_after($to, $subject);
+    return $link;
 }
 /** POST em_draft → the .eml download. */
 function em_draft_from_post(): void {

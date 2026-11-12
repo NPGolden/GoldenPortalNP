@@ -74,6 +74,53 @@ function cp_graph_send_message(string $mailbox, string $fromName, array $to, arr
     return [false, $code, trim($err)];
 }
 
+/** R97-024 — one Graph call with the application token: [http code, decoded body]. A 401 or 403 is retried once with a fresh token (a permission granted in Entra reaches only new tokens). */
+function cp_graph_call(string $method, string $path, ?array $json = null, int $timeout = 40): array {
+    $tok = cp_graph_token(); if (!$tok) return [0, ['error' => ['code' => 'token']]];
+    $do = function (string $tok) use ($method, $path, $json, $timeout): array {
+        $ch = curl_init('https://graph.microsoft.com/v1.0' . $path);
+        $opt = [CURLOPT_CUSTOMREQUEST => $method, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => 8, CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $tok, 'Content-Type: application/json']];
+        if ($json !== null) $opt[CURLOPT_POSTFIELDS] = json_encode($json, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        curl_setopt_array($ch, $opt); $res = curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+        $j = is_string($res) && $res !== '' ? json_decode($res, true) : null; return [$code, is_array($j) ? $j : []];
+    };
+    [$code, $j] = $do($tok);
+    if ($code === 401 || $code === 403) { $t2 = cp_graph_token(true); if ($t2 && $t2 !== $tok) [$code, $j] = $do($t2); }
+    return [$code, $j];
+}
+/**
+ * R97-024 — create a draft in a mailbox of the tenant (Drafts folder; visible in the new Outlook, Outlook on the web, classic Outlook and
+ * the phone): HTML body, To / Cc, attachments ($atts = [[bytes, name, mime], …]; up to 3 MB each in one call, larger ones through an upload
+ * session). Needs the application permission Mail.ReadWrite. Returns [ok, http code, short error, webLink].
+ */
+function cp_graph_create_draft(string $mailbox, array $to, array $cc, string $subject, string $html, array $atts = []): array {
+    $rcp = fn(array $l) => array_map(fn($a) => ['emailAddress' => ['address' => (string)$a]], array_values($l)); $base = '/users/' . rawurlencode($mailbox);
+    $msg = ['subject' => preg_replace('/[\r\n]/', ' ', $subject), 'body' => ['contentType' => 'HTML', 'content' => $html], 'toRecipients' => $rcp($to)]; if ($cc) $msg['ccRecipients'] = $rcp($cc);
+    $fail = function (int $code, array $j, string $at): array { $err = trim(preg_replace('/\s+/', ' ', mb_substr((string)($j['error']['code'] ?? '') . ' ' . (string)($j['error']['message'] ?? ''), 0, 160))); error_log('[cp_mail] Graph draft (' . $at . ') → ' . $code . ' ' . $err); return [false, $code, $err, '']; };
+    [$code, $j] = cp_graph_call('POST', $base . '/messages', $msg);
+    if ($code !== 201 || empty($j['id'])) return $fail($code, $j, 'create');
+    $mid = (string)$j['id']; $link = (string)($j['webLink'] ?? ''); $mp = $base . '/messages/' . rawurlencode($mid);
+    foreach ($atts as [$bytes, $name, $mime]) {
+        $bytes = (string)$bytes; $size = strlen($bytes);
+        if ($size <= 2900000) {
+            [$c, $r] = cp_graph_call('POST', $mp . '/attachments', ['@odata.type' => '#microsoft.graph.fileAttachment', 'name' => (string)$name, 'contentType' => (string)($mime ?: 'application/octet-stream'), 'contentBytes' => base64_encode($bytes)], 60);
+            if ($c !== 201) { cp_graph_call('DELETE', $mp); return $fail($c, $r, 'attachment'); }
+            continue;
+        }
+        [$c, $r] = cp_graph_call('POST', $mp . '/attachments/createUploadSession', ['AttachmentItem' => ['attachmentType' => 'file', 'name' => (string)$name, 'size' => $size, 'contentType' => (string)($mime ?: 'application/octet-stream')]]);
+        $up = (string)($r['uploadUrl'] ?? ''); if ($c !== 201 || !preg_match('~^https://[a-z0-9.-]+\.(office\.com|office365\.com|microsoft\.com)/~i', $up)) { cp_graph_call('DELETE', $mp); return $fail($c, $r, 'upload session'); }
+        $chunk = 3 * 1024 * 1024;   // the upload URL carries its own authorisation — no bearer token is sent to it
+        for ($o = 0; $o < $size; $o += $chunk) {
+            $part = substr($bytes, $o, $chunk); $end = $o + strlen($part) - 1; $ch = curl_init($up);
+            curl_setopt_array($ch, [CURLOPT_CUSTOMREQUEST => 'PUT', CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 90, CURLOPT_CONNECTTIMEOUT => 8, CURLOPT_POSTFIELDS => $part,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/octet-stream', 'Content-Length: ' . strlen($part), 'Content-Range: bytes ' . $o . '-' . $end . '/' . $size]]);
+            curl_exec($ch); $pc = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+            if (!in_array($pc, [200, 201, 202], true)) { cp_graph_call('DELETE', $mp); return $fail($pc, [], 'upload'); }
+        }
+    }
+    return [true, 201, '', preg_match('~^https://outlook\.(office\.com|office365\.com|live\.com)/~i', $link) ? $link : ''];
+}
+
 /** Plain-text mail. $fromName/$from default to the SMTP mailbox; Reply-To optional. */
 function cp_mail(string $to, string $subject, string $body, string $fromName = 'Golden A/S', ?string $from = null, ?string $replyTo = null): bool {
     if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return false;

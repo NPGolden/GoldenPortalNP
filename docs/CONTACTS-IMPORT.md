@@ -1660,3 +1660,15 @@ Report: the message prepared by the portal is plain text and is not sent through
 **Security review**: the portal can now send as a staff mailbox. Fences: only the signed-in person's own address (from the session), staff only, CSRF, confirmation, hourly limit, recipient limit, every message logged with IP, administrators can switch it off; customers get 403 (tested). Attachments come only through `em_attachment()` with its existing access checks. HTML is built from escaped text — no markup from the user reaches the message. Proposals: (1) apply the application access policy with a group of the staff mailboxes, so the application cannot send as any other mailbox of the tenant; (2) keep two-factor sign-in on for every account that may send, since a stolen portal session could now send mail in that person's name. Not testable in the build environment (no Microsoft 365 access): the real send — test with one message to yourself.
 
 Language keys 9 242 each.
+
+## §310 v1.131.1 (R97-024) — E-mail card: draft in the person's own Outlook
+
+Report: the `.eml` draft opens in the classic Outlook, where the user cannot send; the draft is wanted in the new Outlook. The new Outlook does not open a `.eml` as an editable message, so the draft is now created in the mailbox itself.
+
+- `cp_graph_call()` (one Graph request; a 401 / 403 is retried once with a fresh token, because a newly granted permission reaches only new tokens) and `cp_graph_create_draft()` in `app/mailer.php`: `POST /users/{mailbox}/messages` (HTML body, To, Cc) → attachments up to 2,9 MB with `POST …/attachments`, larger ones with `createUploadSession` and 3 MB chunks (the upload URL must be a Microsoft host; no bearer token is sent to it); a failed attachment deletes the half-made draft. Returns the `webLink` (accepted only for outlook.office.com / office365.com / live.com).
+- Action `em_odraft` (`em_odraft_from_post()`, also in `HR_ACTIONS`): same fences as `em_send` — own mailbox from the session, staff, CSRF, 40 per hour, logged in `em_sent` (note `draft`), 25 MB of attachments. After success the card shows where the draft is and a button to open it in Outlook on the web.
+- **Microsoft Entra**: the portal mailer needs the application permission **Mail.ReadWrite** (admin consent) in addition to `Mail.Send`. Without it Graph answers 403 and the portal says so.
+
+**Security review**: `Mail.ReadWrite` as an application permission lets the application read and change mail in every mailbox of the tenant, not only write drafts — the portal code only creates one draft in the signed-in person's own mailbox and never reads mail, but the permission itself is wider. Strong proposal, no performance cost: apply the application access policy (setup guide step B) with a group that holds only the staff mailboxes that use the portal, before or together with granting `Mail.ReadWrite`; and keep the client secret only in the server `config.php` as now. Not testable in the build environment: the Graph calls — test on live after the permission is granted.
+
+Language keys 9 249 each.

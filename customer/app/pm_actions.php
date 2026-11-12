@@ -400,6 +400,7 @@ function pm_handle_action(string $action, string $page): bool {
         }
         /* ------------------------------------- file archive (R20) */
         case 'em_draft': { em_draft_from_post(); }
+        case 'em_odraft': { $_SESSION['em_odraft'] = em_odraft_from_post(); header('Location: ' . (preg_match('~^[A-Za-z0-9_./?&=%#:-]*$~', (string)($_SERVER['REQUEST_URI'] ?? '')) ? (string)$_SERVER['REQUEST_URI'] : url('dashboard'))); exit; }
         case 'em_send': { $sent = em_send_from_post(); flash('good', t('em.sent_ok', ['to' => implode(', ', $sent)])); header('Location: ' . (preg_match('~^[A-Za-z0-9_./?&=%#:-]*$~', (string)($_SERVER['REQUEST_URI'] ?? '')) ? (string)$_SERVER['REQUEST_URI'] : url('dashboard'))); exit; }
         /* ------------------------------------------------ R38-001: accounting register and reports */
         case 'rk_save':    { $rid = rk_save_from_post(); flash('good', t('rk.saved')); $sid = (int)($_POST['subproject_id'] ?? 0); $pid = (int)($_POST['project_id'] ?? 0); redirect($sid ? 'subproject' : 'risks', ($sid ? ['id' => $sid, 'tab' => 'risks'] : ['project' => $pid]) + ['_r' => uniqid()], '#rk' . $rid); }
