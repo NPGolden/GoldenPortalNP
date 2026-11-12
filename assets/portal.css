@@ -1944,3 +1944,8 @@ body[data-wchk]:not(.w-ok) { visibility: hidden; animation: w-show 0s 1.5s forwa
 .mi-list .mi-a { display: flex; gap: 14px; align-items: center; margin-top: 4px; font-size: 12.5px; }
 .mi-list .mi-a form { display: inline-flex; gap: 6px; align-items: center; margin: 0; }
 .mi-list .mi-a select { padding: 2px 6px; font-size: 12.5px; height: auto; width: auto; }
+
+/* group header rows in lists (R97-028) */
+.tbl tr.grp-row td { background: var(--cp-gold-dim); border-top: 2px solid var(--cp-gold); font-size: 14px; padding-top: 9px; padding-bottom: 9px; }
+.tbl tr.grp-row td a { text-decoration: none; color: var(--navy-text); }
+html[data-theme="dark"] .tbl tr.grp-row td { background: rgba(200,155,60,.14); }

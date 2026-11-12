@@ -120,11 +120,17 @@ function sb_list(array $f = []): array {
     if (!empty($f['project'])) { $w[] = 'b.project_id = ?'; $b[] = (int)$f['project']; }
     if (!empty($f['owner'])) { $w[] = 'b.owner_user_id = ?'; $b[] = (int)$f['owner']; }
     $pr = sb_prio(); if ($pr && in_array($f['priority'] ?? '', SB_PRIORITIES, true)) { $w[] = 'b.priority = ?'; $b[] = $f['priority']; }
-    $qq = trim((string)($f['q'] ?? '')); if ($qq !== '') { $w[] = '(b.sb_no LIKE ? OR b.title LIKE ? OR b.source_ref LIKE ? OR p.project_code LIKE ?)'; $like = '%' . $qq . '%'; array_push($b, $like, $like, $like, $like); }
-    return all('SELECT b.*, p.project_code, p.name AS project_name, s.code AS sub_code, s.name AS sub_name, ou.full_name AS owner_name,
+    $qq = trim((string)($f['q'] ?? '')); if ($qq !== '') { $w[] = '(b.sb_no LIKE ? OR b.title LIKE ? OR b.source_ref LIKE ? OR p.project_code LIKE ? OR v.name LIKE ?)'; $like = '%' . $qq . '%'; array_push($b, $like, $like, $like, $like, $like); }   // R97-028: the vessel name too
+    return all('SELECT b.*, p.project_code, p.name AS project_name, p.vessel_id, v.name AS vessel_name, s.code AS sub_code, s.name AS sub_name, ou.full_name AS owner_name,
                        (SELECT COUNT(*) FROM sb_labour l WHERE l.budget_id = b.id) AS n_lab, (SELECT COUNT(*) FROM sb_parts x WHERE x.budget_id = b.id) AS n_parts, (SELECT COUNT(*) FROM sb_comments c WHERE c.budget_id = b.id) AS n_com
-                FROM sb_budgets b LEFT JOIN projects p ON p.id = b.project_id LEFT JOIN subprojects s ON s.id = b.subproject_id LEFT JOIN customer_users ou ON ou.id = b.owner_user_id
+                FROM sb_budgets b LEFT JOIN projects p ON p.id = b.project_id LEFT JOIN vessels v ON v.id = p.vessel_id LEFT JOIN subprojects s ON s.id = b.subproject_id LEFT JOIN customer_users ou ON ou.id = b.owner_user_id
                 WHERE ' . implode(' AND ', $w) . ' ORDER BY ' . ($pr ? "(b.status IN ('draft','working','finished')) DESC, CASE WHEN b.status IN ('draft','working','finished') THEN FIELD(b.priority,'urgent','high','normal','low') ELSE 9 END, CASE WHEN b.status IN ('draft','working','finished') THEN COALESCE(b.target_date, '9999-12-31') ELSE '9999-12-31' END, " : '') . 'b.updated_at DESC, b.id DESC LIMIT 500', $b);   // R97-006: what to handle first — priority, then the nearest target date
+}
+/** The list grouped per vessel (R97-028): groups in the order of their first — most urgent — budget; budgets without a vessel last. [[vessel id, vessel name, rows, hours, sale], …] */
+function sb_group_by_vessel(array $rows): array {
+    $g = []; foreach ($rows as $r) { $k = (int)($r['vessel_id'] ?? 0); if (!isset($g[$k])) $g[$k] = [$k, (string)($r['vessel_name'] ?? ''), [], 0.0, 0.0]; $g[$k][2][] = $r; $g[$k][3] += (float)$r['tot_hours']; $g[$k][4] += (float)$r['tot_sale']; }
+    if (isset($g[0])) { $none = $g[0]; unset($g[0]); $g[0] = $none; }
+    return array_values($g);
 }
 /** Dashboard figures: working / finished not converted / converted this year / past target / average days to finish. */
 function sb_dash(): array {

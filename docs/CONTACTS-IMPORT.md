@@ -1705,3 +1705,11 @@ Language keys 9 283 each.
 **Security review**: a second place where the portal fetches outside addresses — same fences as the vessel link preview, and the addresses come only from administrators. XML is parsed without network access and without entities (XXE and entity-expansion documents are refused — tested). Nothing from a feed is shown as markup: headline, source and extract are stripped to text and escaped; links are limited to http(s) (a `javascript:` link was refused in the test) and open with `noopener noreferrer`. Customers get 403 and do not see the menu entry (tested). All actions behind CSRF. Performance: one source per sweep, never the whole list in a page request; the page itself only reads the database. Proposal (no cost): none new. Note: only headline, source, link and a short extract are stored — articles stay on the publishers' sites.
 
 Language keys 9 345 each.
+
+## §314 v1.133.1 (R97-028) — System Budgets: the list grouped per vessel
+
+`sb_list()` joins `vessels` through the project (`vessel_id`, `vessel_name`) and searches the vessel name; `sb_group_by_vessel()` groups the already ordered rows — groups in the order of their first (most urgent) budget, budgets without a vessel last — with hours and sale per group. `views/system_budgets.php`: filter `group` = `vessel` (default) | `none`; group heading rows `tr.grp-row`; the grouped table is `data-nosort` (the flat list stays sortable).
+
+**Security review**: one more join and one more bound LIKE parameter in an existing query; the `group` parameter is compared against two fixed values; output escaped. No finding.
+
+Language keys 9 349 each.
