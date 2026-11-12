@@ -400,6 +400,7 @@ function pm_handle_action(string $action, string $page): bool {
         }
         /* ------------------------------------- file archive (R20) */
         case 'em_draft': { em_draft_from_post(); }
+        case 'em_send': { $sent = em_send_from_post(); flash('good', t('em.sent_ok', ['to' => implode(', ', $sent)])); header('Location: ' . (preg_match('~^[A-Za-z0-9_./?&=%#:-]*$~', (string)($_SERVER['REQUEST_URI'] ?? '')) ? (string)$_SERVER['REQUEST_URI'] : url('dashboard'))); exit; }
         /* ------------------------------------------------ R38-001: accounting register and reports */
         case 'rk_save':    { $rid = rk_save_from_post(); flash('good', t('rk.saved')); $sid = (int)($_POST['subproject_id'] ?? 0); $pid = (int)($_POST['project_id'] ?? 0); redirect($sid ? 'subproject' : 'risks', ($sid ? ['id' => $sid, 'tab' => 'risks'] : ['project' => $pid]) + ['_r' => uniqid()], '#rk' . $rid); }
         case 'rk_delete':  { require_staff(); $r = one('SELECT * FROM sp_risks WHERE id = ?', [(int)$_POST['id']]); if (!$r) throw new RuntimeException(t('err.notfound')); rk_delete((int)$r['id']); flash('good', t('rk.deleted')); redirect($r['subproject_id'] ? 'subproject' : 'risks', ($r['subproject_id'] ? ['id' => (int)$r['subproject_id'], 'tab' => 'risks'] : ['project' => (int)$r['project_id']]) + ['_r' => uniqid()]); }

@@ -139,6 +139,7 @@ function web_handle_action(string $action): bool {
         $ok = function_exists('cp_mail') && cp_mail($to, '[Golden A/S Portal] ' . t('web.mail_test_subject'), str_replace('\\n', "\n", t('web.mail_test_body', ['t' => cp_mail_transport(), 'at' => date('Y-m-d H:i:s'), 'host' => (string) parse_url((string) cfg('app.base_url'), PHP_URL_HOST)])), 'Golden A/S Portal');
         $_SESSION['mail_test'] = ['ok' => $ok, 'to' => $to]; redirect('admin_website', ['_r' => uniqid()]);
     }
+    if ($action === 'em_send_toggle') { require_cp_admin(); cp_setting_set('em_graph_send', !empty($_POST['on']) ? '1' : '0'); flash('good', t('sys.saved')); redirect('admin_website', ['_r' => uniqid()]); }   // R97-023
     if ($action !== 'web_settings_save') return false;
     require_cp_admin();
     if (!empty($_POST['web_rotate_key'])) { $nk = bin2hex(random_bytes(24)); cp_setting_set('web_site_key', $nk); $_SESSION['web_key_once'] = $nk; }   // shown in full once, on the next page view only

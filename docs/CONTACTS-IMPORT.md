@@ -1646,3 +1646,17 @@ Report: parts set to 50 %, Totals show 33,3 %. Both are right — the typed perc
 **Security review**: labels and one displayed ratio; no input, no query. No finding.
 
 Language keys 9 222 each.
+
+## §309 v1.131.0 (R97-023) — E-mail card: HTML, and sending from the person's own mailbox
+
+Report: the message prepared by the portal is plain text and is not sent through / visible in the user's Outlook. The card (`app/em.php`, R31-008) only prepared a `.eml` draft (text/plain) or a `mailto:` link; the new Outlook and Outlook on the web do not open a `.eml` as an editable draft.
+
+- `em_html()` turns the text into an HTML document (paragraphs, line breaks, links, `**bold**`, Aptos 11 pt). `em_build()` now writes `multipart/alternative` (text + HTML) inside the `multipart/mixed` draft.
+- New action `em_send` (`em_send_from_post()`): `cp_graph_send_message()` in `app/mailer.php` posts `/users/{mailbox}/sendMail` with `saveToSentItems`, HTML body, To / Cc and file attachments, where `{mailbox}` is the e-mail address of the signed-in staff account — never a value from the request. `em_can_send()`: Graph configured, setting `em_graph_send` not `0`, staff, address in the same domain as `graph.from`. Shared `em_post_parts()` / `em_after()` keep the document marks (proforma sent, PO / RFQ sent, recruiting log, accounting report) identical for draft and send.
+- Limits: attachments 2,9 MB together (Graph accepts 4 MB per request), 30 recipients, 40 messages per person per hour. A refusal by Microsoft 365 (403 / 404) or any failure is reported; nothing is marked as sent.
+- Migration `install/migrate_cp_r97_023_em_sent.sql`: table `em_sent` (who, mailbox, recipients, subject, attachments, size, result, IP). Settings › System › Website shows the switch and the last 25 messages.
+- Entra: the application permission `Mail.Send` (already granted) covers it. If the application access policy of the setup guide (step B) is applied, the staff mailboxes must be members of its group — otherwise "Send now" answers "Microsoft 365 refused".
+
+**Security review**: the portal can now send as a staff mailbox. Fences: only the signed-in person's own address (from the session), staff only, CSRF, confirmation, hourly limit, recipient limit, every message logged with IP, administrators can switch it off; customers get 403 (tested). Attachments come only through `em_attachment()` with its existing access checks. HTML is built from escaped text — no markup from the user reaches the message. Proposals: (1) apply the application access policy with a group of the staff mailboxes, so the application cannot send as any other mailbox of the tenant; (2) keep two-factor sign-in on for every account that may send, since a stolen portal session could now send mail in that person's name. Not testable in the build environment (no Microsoft 365 access): the real send — test with one message to yourself.
+
+Language keys 9 242 each.

@@ -70,8 +70,9 @@ function em_card_html(array $o): string {
         foreach ($o['atts'] as $i => [$k, $label]) $h .= '<label class="chk em-a"><input type="checkbox" name="att[]" value="' . e($k) . '"' . ($i === 0 ? ' checked' : '') . '> 📎 ' . e($label) . '</label>';
         $h .= '</div>';
     }
-    $h .= '<div class="btn-row" style="margin-top:10px;"><button class="btn btn--gold btn--sm" type="submit">⤓ ' . tt('em.eml') . '</button><button class="btn btn--ghost btn--sm js-em-mailto" type="button">' . tt('em.mailto') . '</button></div>';
-    $h .= '<p class="hint" style="margin:8px 0 0;">' . tt('em.hint') . ($tx['template_id'] && is_cp_admin() ? ' <a href="' . url('admin_email_templates', ['id' => $tx['template_id']]) . '#form">' . tt('em.edit_template') . '</a>' : (is_cp_admin() ? ' <a href="' . url('admin_email_templates', ['kind' => $o['kind']]) . '#form">' . tt('em.edit_template') . '</a>' : '')) . '</p></form></details>';
+    $snd = em_can_send();   // R97-023: send straight from the sender's own Microsoft 365 mailbox
+    $h .= '<div class="btn-row" style="margin-top:10px;">' . ($snd ? '<button class="btn btn--gold btn--sm" type="submit" name="action" value="em_send" data-confirm="' . e(t('em.send_confirm', ['m' => (string)($u['email'] ?? '')])) . '" data-confirm-title="' . tt('dlg.title') . '">➤ ' . tt('em.send_now') . '</button>' : '') . '<button class="btn ' . ($snd ? 'btn--ghost' : 'btn--gold') . ' btn--sm" type="submit">⤓ ' . tt('em.eml') . '</button><button class="btn btn--ghost btn--sm js-em-mailto" type="button">' . tt('em.mailto') . '</button></div>';
+    $h .= '<p class="hint" style="margin:8px 0 0;">' . ($snd ? e(t('em.send_hint', ['m' => (string)($u['email'] ?? '')])) . ' ' : '') . tt('em.hint') . ($tx['template_id'] && is_cp_admin() ? ' <a href="' . url('admin_email_templates', ['id' => $tx['template_id']]) . '#form">' . tt('em.edit_template') . '</a>' : (is_cp_admin() ? ' <a href="' . url('admin_email_templates', ['kind' => $o['kind']]) . '#form">' . tt('em.edit_template') . '</a>' : '')) . '</p></form></details>';
     return $h;
 }
 
@@ -121,7 +122,11 @@ function em_build(array $to, array $cc, string $subject, string $body, array $at
     if ($cc) $h .= 'Cc: ' . implode(', ', $cc) . $nl;
     $h .= 'Subject: ' . $enc($subject) . $nl . 'Date: ' . date(DATE_RFC2822) . $nl . 'MIME-Version: 1.0' . $nl;
     $h .= 'Content-Type: multipart/mixed; boundary="' . $bnd . '"' . $nl . $nl;
-    $m  = $h . '--' . $bnd . $nl . 'Content-Type: text/plain; charset=UTF-8' . $nl . 'Content-Transfer-Encoding: base64' . $nl . $nl . chunk_split(base64_encode(str_replace("\r\n", "\n", $body))) . $nl;
+    $alt = 'GASA-' . bin2hex(random_bytes(12));   // R97-023: the text travels as HTML too (multipart/alternative) — Outlook opens the draft in HTML format
+    $m  = $h . '--' . $bnd . $nl . 'Content-Type: multipart/alternative; boundary="' . $alt . '"' . $nl . $nl
+        . '--' . $alt . $nl . 'Content-Type: text/plain; charset=UTF-8' . $nl . 'Content-Transfer-Encoding: base64' . $nl . $nl . chunk_split(base64_encode(str_replace("\r\n", "\n", $body))) . $nl
+        . '--' . $alt . $nl . 'Content-Type: text/html; charset=UTF-8' . $nl . 'Content-Transfer-Encoding: base64' . $nl . $nl . chunk_split(base64_encode(em_html($body))) . $nl
+        . '--' . $alt . '--' . $nl;
     foreach ($atts as [$bytes, $fname, $mime]) {
         $m .= '--' . $bnd . $nl . 'Content-Type: ' . $mime . '; name="' . $enc($fname) . '"' . $nl . 'Content-Transfer-Encoding: base64' . $nl
             . 'Content-Disposition: attachment; filename="' . $enc($fname) . '"' . $nl . $nl . chunk_split(base64_encode($bytes)) . $nl;
@@ -129,22 +134,62 @@ function em_build(array $to, array $cc, string $subject, string $body, array $at
     return $m . '--' . $bnd . '--' . $nl;
 }
 
-/** POST em_draft → the .eml download. */
-function em_draft_from_post(): void {
-    require_staff();
+/** The message text as an HTML document: paragraphs, line breaks, links and **bold**; Aptos like Outlook's own default. */
+function em_html(string $body): string {
+    $body = trim(str_replace(["\r\n", "\r"], "\n", $body)); $out = '';
+    foreach (preg_split('/\n{2,}/', $body) ?: [] as $par) {
+        $p = htmlspecialchars($par, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
+        $p = preg_replace('/\*\*(.+?)\*\*/su', '<b>$1</b>', $p);
+        $p = preg_replace('~(?<![\w"=/>])(https?://[^\s<]+[^\s<.,;:!?)\]])~u', '<a href="$1">$1</a>', $p);
+        $out .= '<p style="margin:0 0 12px 0;">' . nl2br($p, false) . '</p>';
+    }
+    return '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body><div style="font-family:Aptos,Calibri,Arial,Helvetica,sans-serif;font-size:11pt;color:#1f2937;line-height:1.4;">' . $out . '</div></body></html>';
+}
+/** R97-023: sending from the portal is possible — Graph configured, not switched off, and the signed-in person's address is a mailbox of the same domain. */
+function em_send_on(): bool { return function_exists('cp_graph_configured') && cp_graph_configured() && (!function_exists('cp_setting') || cp_setting('em_graph_send', '1') !== '0'); }
+function em_can_send(): bool {
+    if (!is_staff() || !em_send_on()) return false; $m = strtolower(trim((string)(current_user()['email'] ?? ''))); $d = strtolower((string) substr((string) strrchr((string) cfg('graph.from'), '@'), 1));
+    return $d !== '' && filter_var($m, FILTER_VALIDATE_EMAIL) && str_ends_with($m, '@' . $d);
+}
+function em_sent_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'em_sent'"); } catch (Throwable $e) { $h = false; } } return $h; }
+const EM_SEND_MAX = 2900000;   // bytes of attachments in one direct send (Graph accepts 4 MB per request, base64 included)
+const EM_SEND_PER_HOUR = 40;   // messages one person may send through the portal per hour
+/** The posted message: [to, cc, subject, body, attachments]. */
+function em_post_parts(): array {
     $to = array_values(array_unique(array_merge(em_addresses(implode(',', (array)($_POST['to'] ?? []))), em_addresses((string)($_POST['to_more'] ?? '')))));
-    $cc = array_diff(em_addresses((string)($_POST['cc'] ?? '')), $to);
+    $cc = array_values(array_diff(em_addresses((string)($_POST['cc'] ?? '')), $to));
     $subject = mb_substr(trim((string)($_POST['subject'] ?? '')), 0, 200) ?: 'Golden A/S';
     $body = mb_substr((string)($_POST['body'] ?? ''), 0, 20000);
     if (!$to) throw new RuntimeException(t('em.need_to'));
-    $atts = [];
-    foreach ((array)($_POST['att'] ?? []) as $k) { $a = em_attachment((string)$k); if ($a) $atts[] = $a; }
-    $eml = em_build($to, array_values($cc), $subject, $body, $atts);
+    $atts = []; foreach ((array)($_POST['att'] ?? []) as $k) { $a = em_attachment((string)$k); if ($a) $atts[] = $a; }
+    return [$to, $cc, $subject, $body, $atts];
+}
+/** What a prepared / sent message marks on its document (proforma sent, PO sent, recruiting log, accounting report). */
+function em_after(array $to, string $subject): void {
     if (!empty($_POST['proforma']) && function_exists('pi_mark_sent')) pi_mark_sent((int)$_POST['proforma']);   // R44-003
     if (!empty($_POST['po_id']) && !empty($_POST['rfq_sup']) && function_exists('rfo_mark_sent') && po_admin()) { try { rfo_mark_sent((int)$_POST['po_id'], (int)$_POST['rfq_sup'], $to); } catch (Throwable $e) {} }   // R88-001: RFO to this invited supplier
     elseif (!empty($_POST['po_id']) && function_exists('po_mark_sent') && po_admin()) { try { po_mark_sent((int)$_POST['po_id'], $to); } catch (Throwable $e) {} }   // R80-003: the PO / RFQ counts as sent once the draft is prepared
     if (!empty($_POST['rc_app']) && function_exists('rcr_log') && function_exists('rcr_application')) { $ra = rcr_application((int)$_POST['rc_app']); if ($ra && rcr_can_view((int)$ra['vacancy_id'])) rcr_log('email_drafted', ['application_id' => (int)$ra['id']], implode(', ', $to) . ' — ' . $subject); }   // R92-005
     if (!empty($_POST['acc_report']) && function_exists('acc_mark_sent')) acc_mark_sent((int)$_POST['acc_report'], implode(', ', $to));   // R38-001: the accounting report is now with accounting
+}
+/** POST em_send → the message leaves through Microsoft Graph from the signed-in person's own mailbox and lands in its Sent Items (R97-023). Returns the recipients. */
+function em_send_from_post(): array {
+    $u = require_staff(); if (!em_can_send()) throw new RuntimeException(t('em.send_off'));
+    [$to, $cc, $subject, $body, $atts] = em_post_parts(); $mailbox = strtolower(trim((string)$u['email'])); $uid = (int)$u['id'];
+    if (count($to) + count($cc) > 30) throw new RuntimeException(t('em.send_many'));
+    $bytes = 0; foreach ($atts as $a) $bytes += strlen((string)$a[0]);
+    if ($bytes > EM_SEND_MAX) throw new RuntimeException(t('em.send_big', ['mb' => number_format($bytes / 1048576, 1, ',', '')]));
+    if (em_sent_has() && (int) scalar('SELECT COUNT(*) FROM em_sent WHERE user_id = ? AND created_at > (NOW() - INTERVAL 1 HOUR)', [$uid]) >= EM_SEND_PER_HOUR) throw new RuntimeException(t('em.send_rate'));
+    [$ok, $code, $err] = cp_graph_send_message($mailbox, (string)$u['full_name'], $to, $cc, $subject, em_html($body), $atts);
+    if (em_sent_has()) { try { q('INSERT INTO em_sent (user_id, mailbox, to_list, cc_list, subject, n_atts, bytes, ok, note, ip) VALUES (?,?,?,?,?,?,?,?,?,?)', [$uid, $mailbox, mb_substr(implode(', ', $to), 0, 2000), $cc ? mb_substr(implode(', ', $cc), 0, 1000) : null, $subject, count($atts), $bytes, $ok ? 1 : 0, $ok ? null : mb_substr($code . ' ' . $err, 0, 200), mb_substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 45)]); } catch (Throwable $e) {} }
+    if (!$ok) throw new RuntimeException(t($code === 403 || $code === 404 ? 'em.send_denied' : 'em.send_fail', ['m' => $mailbox]));
+    em_after($to, $subject);
+    return $to;
+}
+/** POST em_draft → the .eml download. */
+function em_draft_from_post(): void {
+    require_staff();
+    [$to, $cc, $subject, $body, $atts] = em_post_parts(); $eml = em_build($to, $cc, $subject, $body, $atts); em_after($to, $subject);
     $fn = preg_replace('/[^A-Za-z0-9._-]+/', '_', $subject); $fn = trim(mb_substr($fn, 0, 80), '_') ?: 'message';
     header('Content-Type: message/rfc822'); header('Content-Length: ' . strlen($eml)); header('Cache-Control: private, no-store');
     header('Content-Disposition: attachment; filename="' . $fn . '.eml"');

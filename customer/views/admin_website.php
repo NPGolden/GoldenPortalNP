@@ -13,6 +13,16 @@ layout_head(t('web.title'), 'admin_website');
   <p class="hint"><?= tt('web.mail_hint') ?></p>
   <?php if (isset($_SESSION['mail_test'])): $mt = $_SESSION['mail_test']; unset($_SESSION['mail_test']); ?><p class="flash flash--<?= $mt['ok'] ? 'good' : 'bad' ?>" style="margin:8px 0;"><?= e($mt['ok'] ? t('web.mail_test_ok', ['to' => $mt['to']]) : t('web.mail_test_fail')) ?></p><?php endif; ?>
   <form method="post" class="btn-row" style="margin-top:8px;" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="web_mail_test"><button class="btn btn--sm" type="submit">✉ <?= e(t('web.mail_test_btn', ['to' => (string)(current_user()['email'] ?? '')])) ?></button><span class="hint"><?= tt('web.mail_test_hint') ?></span></form>
+  <?php if ($tr === 'graph' && function_exists('em_send_on')): $emOn = em_send_on(); ?>
+  <hr style="margin:14px 0;border:0;border-top:1px solid var(--line);">
+  <h3 style="margin:0 0 6px;">➤ <?= tt('em.adm_title') ?> <?= pill($emOn ? 'green' : 'mute', t($emOn ? 'em.adm_on' : 'em.adm_off')) ?></h3>
+  <p class="hint"><?= tt('em.adm_hint') ?></p>
+  <form method="post" class="btn-row" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="em_send_toggle"><input type="hidden" name="on" value="<?= $emOn ? '0' : '1' ?>"><button class="btn btn--sm<?= $emOn ? ' btn--ghost' : '' ?>" type="submit"><?= tt($emOn ? 'em.adm_switch_off' : 'em.adm_switch_on') ?></button></form>
+  <?php $emRows = function_exists('em_sent_has') && em_sent_has() ? all('SELECT s.*, u.full_name FROM em_sent s LEFT JOIN customer_users u ON u.id = s.user_id ORDER BY s.id DESC LIMIT 25') : []; if ($emRows): ?>
+  <div class="table-scroll" style="margin-top:10px;"><table class="tbl" data-nosort><thead><tr><th class="date"><?= tt('em.adm_when') ?></th><th><?= tt('em.adm_who') ?></th><th><?= tt('em.to') ?></th><th><?= tt('em.subject') ?></th><th class="num">📎</th><th></th></tr></thead><tbody>
+  <?php foreach ($emRows as $r): ?><tr><td class="date hint"><?= e(fmt_datetime((string)$r['created_at'])) ?></td><td><?= e((string)($r['full_name'] ?: $r['mailbox'])) ?></td><td class="hint"><?= e(mb_strimwidth((string)$r['to_list'], 0, 90, '…')) ?></td><td><?= e((string)$r['subject']) ?></td><td class="num"><?= (int)$r['n_atts'] ?></td><td><?= (int)$r['ok'] ? pill('green', t('em.adm_sent')) : pill('red', t('em.adm_failed')) . ' <span class="hint">' . e((string)$r['note']) . '</span>' ?></td></tr><?php endforeach; ?>
+  </tbody></table></div><?php endif; ?>
+  <?php endif; ?>
 </div>
 <h2 class="settings-h"><?= tt('web.title') ?></h2>
 <div class="card">

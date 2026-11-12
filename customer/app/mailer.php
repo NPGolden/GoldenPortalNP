@@ -49,6 +49,31 @@ function cp_graph_send(string $from, string $fromName, string $to, string $subje
     return false;
 }
 
+/**
+ * R97-023 — send a complete message through Graph from a given mailbox of the tenant: several To / Cc, HTML body, attachments; saved to
+ * that mailbox's Sent Items. $atts = [[bytes, name, mime], …]. Returns [ok, http code, short error]. The whole request must stay under
+ * Graph's 4 MB limit — the caller checks the attachment size first.
+ */
+function cp_graph_send_message(string $mailbox, string $fromName, array $to, array $cc, string $subject, string $html, array $atts = []): array {
+    $tok = cp_graph_token(); if (!$tok) return [false, 0, 'token'];
+    $rcp = fn(array $l) => array_map(fn($a) => ['emailAddress' => ['address' => (string)$a]], array_values($l));
+    $msg = ['subject' => preg_replace('/[\r\n]/', ' ', $subject), 'body' => ['contentType' => 'HTML', 'content' => $html], 'toRecipients' => $rcp($to)];
+    if ($cc) $msg['ccRecipients'] = $rcp($cc);
+    foreach ($atts as [$bytes, $name, $mime]) $msg['attachments'][] = ['@odata.type' => '#microsoft.graph.fileAttachment', 'name' => (string)$name, 'contentType' => (string)($mime ?: 'application/octet-stream'), 'contentBytes' => base64_encode((string)$bytes)];
+    $post = function (string $tok) use ($mailbox, $msg): array {
+        $ch = curl_init('https://graph.microsoft.com/v1.0/users/' . rawurlencode($mailbox) . '/sendMail');
+        curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 40, CURLOPT_CONNECTTIMEOUT => 8,
+            CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $tok, 'Content-Type: application/json'], CURLOPT_POSTFIELDS => json_encode(['message' => $msg, 'saveToSentItems' => true], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE)]);
+        $res = curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch); return [$code, is_string($res) ? $res : ''];
+    };
+    [$code, $res] = $post($tok);
+    if ($code === 401) { $tok = cp_graph_token(true); if ($tok) [$code, $res] = $post($tok); }
+    if ($code === 202) return [true, 202, ''];
+    $j = json_decode($res, true); $err = preg_replace('/\s+/', ' ', mb_substr((string)($j['error']['code'] ?? '') . ' ' . (string)($j['error']['message'] ?? ''), 0, 180));
+    error_log('[cp_mail] Graph sendMail (own mailbox) → ' . $code . ' ' . $err);
+    return [false, $code, trim($err)];
+}
+
 /** Plain-text mail. $fromName/$from default to the SMTP mailbox; Reply-To optional. */
 function cp_mail(string $to, string $subject, string $body, string $fromName = 'Golden A/S', ?string $from = null, ?string $replyTo = null): bool {
     if (!filter_var($to, FILTER_VALIDATE_EMAIL)) return false;

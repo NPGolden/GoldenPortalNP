@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.130.1';
+const CP_VERSION = '1.131.0';
 const CP_BUILD   = '2026-11-12';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-023', 'version' => '1.131.0', 'date' => '2026-11-12', 'title' => 'E-mail card: "Send now from my mailbox" sends the message in HTML format with its attachments straight from the signed-in person\'s own Microsoft 365 mailbox (kept in the Sent Items of Outlook); the Outlook draft (.eml) now opens in HTML format too.', 'db' => 'install/migrate_cp_r97_023_em_sent.sql', 'check' => 'r97k'],
         ['ref' => 'GAS-CP-R97-022', 'version' => '1.130.1', 'date' => '2026-11-12', 'title' => 'System Budgets: the percentage on parts is named "Markup on cost", and the Totals card shows both readings of the profit side by side — Markup on cost and Margin on sale. No price changes.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-021', 'version' => '1.130.0', 'date' => '2026-11-12', 'title' => 'System Budgets: request one straight from a sub-project — it is created under the sub-project with the title [PROJECT]-[SUB-PROJECT]-[Description]; the person asking only sets the priority and the date the offer must be ready. The sub-project page lists its System Budgets.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-020', 'version' => '1.129.0', 'date' => '2026-11-12', 'title' => 'System Budgets: a discount % on every labour line and every part line — it lowers the sale of the line (the cost stays), shows in the totals and the Excel export, is kept in revisions, copies and templates, and is carried to the offer line at conversion. Travelling expenses and other costs: a percentage on cost per line (at cost + x %).', 'db' => 'install/migrate_cp_r97_020_sb_line_discount.sql', 'check' => 'r97j'],
@@ -459,6 +460,7 @@ function cp_migration_state(): array {
         'r97h' => $has("SHOW COLUMNS FROM vessels LIKE 'info_url'"),
         'r97i' => $has("SHOW COLUMNS FROM vessels LIKE 'info_title'"),
         'r97j' => $has("SHOW COLUMNS FROM sb_labour LIKE 'discount_pct'"),
+        'r97k' => $has("SHOW TABLES LIKE 'em_sent'"),
         'r93b' => $has("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_inquiries' AND COLUMN_NAME = 'kind' AND COLUMN_TYPE LIKE '%contact%'"),
         'r93a' => $has("SHOW TABLES LIKE 'work_permits'"),
         'r92f' => $has("SHOW COLUMNS FROM rc_applications LIKE 'keep_until'"),
