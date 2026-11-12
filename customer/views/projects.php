@@ -169,7 +169,8 @@ layout_head(t('pr.title'), 'projects');
             </a>
           <?php endforeach; ?>
           </details>
-          <?php if (is_staff()): ?>
+        <?php endif; ?>
+          <?php if (is_staff() && ($p['subs'] || !empty($p['subs_hidden']))): ?>
             <p style="margin:10px 0 0;"><a class="btn btn--ghost btn--sm" href="<?= url('project_edit', ['id' => $p['id']]) ?>">✎ <?= tt('pr.edit') ?></a>
                <a class="btn btn--ghost btn--sm" href="<?= url('subproject_new', ['project' => $p['id']]) ?>">+ <?= tt('pr.addsub') ?></a>
                <a class="btn btn--ghost btn--sm" href="<?= url('drawings', ['project' => $p['id']]) ?>"><?= tt('dr.title') ?></a>
@@ -193,7 +194,7 @@ layout_head(t('pr.title'), 'projects');
                  <button class="btn btn--ghost btn--sm btn--danger-ghost" type="submit">🗑 <?= tt('btn.delete') ?></button>
                </form>
                <?php endif; ?></p>
-          <?php else: ?>
+          <?php elseif (!is_staff() && ($p['subs'] || !empty($p['subs_hidden']))): ?>
             <p style="margin:10px 0 0;">
                <a class="btn btn--ghost btn--sm" href="<?= url('drawings', ['project' => $p['id']]) ?>"><?= tt('dr.title') ?></a>
                <a class="btn btn--ghost btn--sm" href="<?= url('overlay', ['project' => $p['id']]) ?>"><?= tt('ga.title') ?></a>
@@ -203,7 +204,6 @@ layout_head(t('pr.title'), 'projects');
                <a class="btn btn--ghost btn--sm" href="<?= url('fsr_list', ['project' => $p['id']]) ?>"><?= tt('fsr.plural') ?></a>
                <a class="btn btn--ghost btn--sm" href="<?= url('isr_list', ['project' => $p['id']]) ?>"><?= tt('isr.plural') ?></a></p>
           <?php endif; ?>
-        <?php endif; ?>
         <?php if (is_staff() && !empty($p['vessel_id']) && function_exists('ct_has') && ct_has()): ?>
         <details class="cv-details"><summary><?= tt('ct.title') ?> — <?= e($p['vessel']) ?> <?= pill('navy', t('tk.internal')) ?></summary>
           <?php $cvVesselId = (int)$p['vessel_id']; $cvCompact = true; require __DIR__ . '/_contacts_vessel.php'; ?>

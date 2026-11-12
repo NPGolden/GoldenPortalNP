@@ -1713,3 +1713,11 @@ Language keys 9 345 each.
 **Security review**: one more join and one more bound LIKE parameter in an existing query; the `group` parameter is compared against two fixed values; output escaped. No finding.
 
 Language keys 9 349 each.
+
+## §315 v1.133.2 (R97-029) — Projects page: buttons kept when all sub-projects are completed
+
+`views/projects.php`: the button row of a project card (Edit project, Add sub-project, Drawings, reports, Offers, Job Orders, Service Reports, Delete) sat inside the branch that lists the visible sub-projects. Completed sub-projects are hidden by default (R93), so a project with only completed sub-projects showed the hint "n completed hidden · Show completed" and nothing else. The row is now printed whenever the project has sub-projects, visible or hidden; customers get their own (reports) row on the same condition. A project with no sub-project at all keeps its "Add sub-project · Edit" line. No database step.
+
+**Security review**: view-only change; the links are the same ones, behind the same staff / administrator checks, and the pages they open check access themselves. No finding.
+
+Language keys 9 349 each.
