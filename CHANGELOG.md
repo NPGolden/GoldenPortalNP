@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.129.0** (build 2026-11-12). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.130.0** (build 2026-11-12). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.130.0 | GAS-CP-R97-021 | 2026-11-12 | System Budgets: request one straight from a sub-project — it is created under the sub-project with the title [PROJECT]-[SUB-PROJECT]-[Description]; the person asking only sets the priority and the date the offer must be ready. The sub-project page lists its System Budgets. | — |
 | 1.129.0 | GAS-CP-R97-020 | 2026-11-12 | System Budgets: a discount % on every labour line and every part line — it lowers the sale of the line (the cost stays), shows in the totals and the Excel export, is kept in revisions, copies and templates, and is carried to the offer line at conversion. Travelling expenses and other costs: a percentage on cost per line (at cost + x %). | `install/migrate_cp_r97_020_sb_line_discount.sql` |
 | 1.128.3 | GAS-CP-R97-019 | 2026-11-12 | System Budgets: the rate cards of the zone Outside Attica / Abroad / Greek islands show and apply the out-of-Attica rate — a rate list that keeps the two zones on separate rows gave the local rate for both. | — |
 | 1.128.2 | GAS-CP-R97-018 | 2026-11-12 | System Budgets: changing the rate zone re-prices the rate-card labour lines (rates typed by hand are kept and flagged, with a button to apply the rate-card rates); the zones are named Local (Attica) and Outside Attica / Abroad / Greek islands. | — |

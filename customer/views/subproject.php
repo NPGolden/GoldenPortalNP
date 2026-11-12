@@ -98,6 +98,26 @@ layout_head($sp['code'] . ' · ' . $sp['name'], 'projects');
 </div>
 <?php endif; ?>
 <?php if (function_exists('of_has') && of_has() && of_visible()): ?><div class="card"><?php $otRows = of_list(['sub' => $id]); $otShowSub = false; $otNewUrl = url('offer_edit', ['project' => $pid, 'sub' => $id]); require __DIR__ . '/_offers_table.php'; ?></div><?php endif; ?>
+<?php if ($staff && function_exists('sb_from_sub') && sb_can()): $sbRows = sb_of_sub($id); $sbPr = sb_prio(); $sbOpen = count(array_filter($sbRows, fn($r) => in_array($r['status'], ['draft', 'working'], true))); ?>
+<div class="card" id="sb">
+  <div class="card-head"><h2>🧮 <?= tt('sb.title') ?> <span class="count"><?= count($sbRows) ?></span></h2><span class="hint"><?= tt('sb.sub_lede') ?></span></div>
+  <?php if ($sbRows): ?><div class="table-scroll"><table class="tbl" data-nosort><thead><tr><th><?= tt('sb.no') ?></th><th><?= tt('sb.f_title') ?></th><?php if ($sbPr): ?><th><?= tt('sb.priority') ?></th><?php endif; ?><th><?= tt('th.status') ?></th><th class="date"><?= tt('sb.sub_deadline') ?></th><th><?= tt('sb.owner') ?></th><th><?= tt('sb.sub_by') ?></th><th class="num"><?= tt('sb.sale') ?></th></tr></thead><tbody>
+  <?php foreach ($sbRows as $r): $sbLate = $r['target_date'] && $r['target_date'] < date('Y-m-d') && in_array($r['status'], ['draft', 'working'], true); ?><tr>
+    <td class="mono"><a href="<?= url('system_budget', ['id' => (int)$r['id']]) ?>"><b><?= e(sb_label($r)) ?></b></a></td><td><?= e((string)$r['title']) ?></td>
+    <?php if ($sbPr): ?><td><?= in_array($r['status'], ['draft', 'working', 'finished'], true) ? sb_prio_pill((string)$r['priority']) : '<span class="hint">—</span>' ?></td><?php endif; ?>
+    <td><?= sb_pill((string)$r['status']) ?></td><td class="date<?= $sbLate ? ' bad' : '' ?>"><?= $r['target_date'] ? e(fmt_date($r['target_date'])) : '—' ?></td>
+    <td class="hint"><?= e((string)$r['owner_name']) ?></td><td class="hint"><?= e((string)$r['created_name']) ?></td><td class="num"><?= (float)$r['tot_sale'] > 0 ? e(sb_money((float)$r['tot_sale'], (string)$r['currency'])) : '<span class="hint">—</span>' ?></td>
+  </tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
+  <form method="post" action="<?= url('subproject', ['id' => $id]) ?>#sb" data-lock<?= $sbOpen ? ' data-confirm="' . e(t('sb.sub_confirm', ['n' => $sbOpen])) . '" data-confirm-title="' . tt('dlg.title') . '"' : '' ?> style="margin-top:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="sb_from_sub"><input type="hidden" name="sub_id" value="<?= $id ?>">
+    <div class="fltbar" style="grid-template-columns: 2.2fr 1fr 1fr auto;margin:0;">
+      <div class="field"><label><?= tt('sb.f_title') ?></label><input value="<?= e(sb_sub_title($sp + ['project_code' => (string) scalar('SELECT project_code FROM projects WHERE id = ?', [$pid])])) ?>" readonly disabled></div>
+      <?php if ($sbPr): ?><div class="field"><label><?= tt('sb.priority') ?> *</label><select name="priority" data-nosearch><?php foreach (SB_PRIORITIES as $pk): ?><option value="<?= $pk ?>"<?= $pk === 'normal' ? ' selected' : '' ?>><?= tt('sb.pr_' . $pk) ?></option><?php endforeach; ?></select></div><?php else: ?><div></div><?php endif; ?>
+      <div class="field"><label><?= tt('sb.sub_deadline') ?></label><input type="date" name="target_date" min="<?= date('Y-m-d') ?>"></div>
+      <div class="field"><label>&nbsp;</label><button class="btn btn--gold btn--sm" type="submit">＋ <?= tt('sb.sub_request') ?></button></div>
+    </div>
+  </form>
+</div>
+<?php endif; ?>
 <?php if (function_exists('td_card_html') && ($tdc = td_card_html(['sub' => $id], url('task_edit', ['project' => $pid, 'sub' => $id]), false)) !== ''): ?><div class="card"><?= $tdc ?></div><?php endif; ?>
 <div class="card">
   <h2><?= tt('tab.process') ?></h2>

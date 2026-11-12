@@ -1630,3 +1630,11 @@ Other costs (travelling expenses): the same migration adds `sb_expenses.markup_p
 **Security review**: numeric fields (discount clamped 0–100, on-cost 0–900) on the server, written with bound parameters behind `require_staff()`, `sb_load_editable()` and CSRF; no new page, no new query on page view. The discount is in the budget audit trail through the line-save events and the revisions. No finding. Proposal (optional, no performance cost): a ceiling for line discounts above which only management may save (for example 20 %) — say if wanted.
 
 Language keys 9 209 each.
+
+## §307 v1.130.0 (R97-021) — System Budgets: request from a sub-project
+
+`views/subproject.php`: card `#sb` (staff with `sb_can()`), after the offers card — `sb_of_sub()` lists the sub-project's budgets; the form posts `sb_from_sub` with `sub_id`, `priority`, `target_date`. `sb_from_sub()`: `sb_guard()`, loads sub-project + project, title from `sb_sub_title()` = project code - sub-project code - sub-project name (200 characters), `sb_create()` with `project_id` / `subproject_id`, priority (unknown value = normal), `target_date` (valid calendar date, not in the past — otherwise refused or ignored), event `subproject`, notification `sb:request` to the project's manager (`projects.pm_user_id`; never blocks). The request lands as a draft in Work › System Budgets (ordered by priority, overdue date red). A second request while one is open asks for confirmation. No database step — `target_date` and `priority` exist.
+
+**Security review**: the action runs behind `require_staff()`, `sb_guard()` and CSRF; a customer account gets 403 and does not see the card (tested); the sub-project id is looked up, an unknown id answers "Not found"; the title is built on the server from stored values — nothing typed by the user reaches it; date and priority are validated. No finding, no proposal.
+
+Language keys 9 218 each.

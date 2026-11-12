@@ -549,6 +549,34 @@ function sb_from_ticket(int $ticketId): int {
     } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
 }
 
+/* ───────────── R97-021: a System Budget requested straight from a sub-project ───────────── */
+/** The title a budget gets when it is requested from a sub-project: [PROJECT]-[SUB-PROJECT]-[Description]. */
+function sb_sub_title(array $sp): string { return mb_substr(implode('-', array_filter([trim((string)($sp['project_code'] ?? '')), trim((string)($sp['code'] ?? '')), trim((string)($sp['name'] ?? ''))], fn($v) => $v !== '')), 0, 200); }
+/** The budgets of a sub-project (templates excluded), newest first. */
+function sb_of_sub(int $sid): array {
+    if (!sb_has() || $sid <= 0) return [];
+    try { return all('SELECT b.*, ou.full_name AS owner_name, cu.full_name AS created_name FROM sb_budgets b LEFT JOIN customer_users ou ON ou.id = b.owner_user_id LEFT JOIN customer_users cu ON cu.id = b.created_by WHERE b.subproject_id = ?' . (sb_r2() ? ' AND b.is_template = 0' : '') . ' ORDER BY b.id DESC LIMIT 50', [$sid]); } catch (Throwable $e) { return []; }
+}
+/**
+ * Request a System Budget for a sub-project: created under the sub-project with the title [PROJECT]-[SUB-PROJECT]-[Description]; the person
+ * asking only sets the priority and (optionally) the date the offer must be ready. The project manager of the project is notified.
+ */
+function sb_from_sub(int $sid, string $priority, ?string $target): int {
+    sb_guard(); $sp = one('SELECT s.id, s.code, s.name, s.project_id, p.project_code, p.pm_user_id FROM subprojects s JOIN projects p ON p.id = s.project_id WHERE s.id = ?', [$sid]); if (!$sp) throw new RuntimeException(t('err.notfound'));
+    $target = $target !== null && preg_match('/^\d{4}-\d{2}-\d{2}$/', $target) && checkdate((int)substr($target, 5, 2), (int)substr($target, 8, 2), (int)substr($target, 0, 4)) ? $target : null;
+    if ($target !== null && $target < date('Y-m-d')) throw new RuntimeException(t('sb.sub_past'));
+    $pdo = db(); $own = !$pdo->inTransaction(); if ($own) $pdo->beginTransaction();
+    try {
+        $id = sb_create(sb_sub_title($sp), ['project_id' => (int)$sp['project_id'], 'subproject_id' => $sid]);
+        if ($target !== null) q('UPDATE sb_budgets SET target_date = ? WHERE id = ?', [$target, $id]);
+        if (sb_prio() && in_array($priority, SB_PRIORITIES, true)) q('UPDATE sb_budgets SET priority = ? WHERE id = ?', [$priority, $id]);
+        sb_event($id, 'subproject', trim((string)$sp['project_code'] . ' ' . (string)$sp['code']) . (sb_prio() && in_array($priority, SB_PRIORITIES, true) ? ' · ' . t('sb.pr_' . $priority) : '') . ($target ? ' · ' . $target : ''));
+        if ($own) $pdo->commit();
+    } catch (Throwable $e) { if ($own && $pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+    try { $u = current_user(); $pm = (int)($sp['pm_user_id'] ?? 0); if ($pm && function_exists('nf_push')) { $B = sb_get($id); nf_push([$pm], 'sb:request', 'sb:' . $id, t('sb.sub_nf', ['n' => sb_label($B)]), (string)$B['title'] . (sb_prio() ? ' · ' . t('sb.pr_' . (in_array($priority, SB_PRIORITIES, true) ? $priority : 'normal')) : '') . ($target ? ' · ' . fmt_date($target) : ''), url('system_budget', ['id' => $id]), (int)($u['id'] ?? 0), (string)($u['full_name'] ?? '')); } } catch (Throwable $e) { /* the notification never blocks the request */ }
+    return $id;
+}
+
 /** Excel of a budget or a stored revision: Summary, Labour, Parts, Other costs — cost and sale columns side by side. Internal document. */
 function sb_export_xlsx(array $B): void {
     sb_guard(); require_once __DIR__ . '/xlsxw.php'; $T = sb_totals($B); $sec = sb_sections(); $dis = sb_disciplines(); $r2 = fn(float $v) => round($v, 2);
