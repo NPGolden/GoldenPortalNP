@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.132.1** (build 2026-11-12). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.133.0** (build 2026-11-12). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.133.0 | GAS-CP-R97-027 | 2026-11-12 | Commercial › Web Sales: one page with the tabs Website inbox, Website statistics and the new Marine intelligence — the week's headlines from public yachting and marine news sources in five groups (new-build yachts Europe and Middle East, refit Europe, marine energy storage, hybrid vessels, yachting technology). | `install/migrate_cp_r97_027_marine_intel.sql` |
 | 1.132.1 | GAS-CP-R97-026 | 2026-11-12 | Vessel list: Yard, Flag and Class as their own columns; the search also finds flag and class. | — |
 | 1.132.0 | GAS-CP-R97-025 | 2026-11-12 | Vessels: fields Class and Flag; "Import particulars" fills IMO, class, flag, yard and web link from a workbook after a review — only empty fields, nothing entered by hand is replaced. The vessel export carries Class, Flag and Link. | `install/migrate_cp_r97_025_vessel_class_flag.sql` |
 | 1.131.1 | GAS-CP-R97-024 | 2026-11-12 | E-mail card: "Draft in my Outlook" places the message — HTML, recipients, attachments — in the Drafts folder of the signed-in person's own mailbox, to finish and send from the new Outlook, Outlook on the web or the phone. | — |

@@ -1,7 +1,7 @@
 <?php
 /** Work › Website statistics (GAS-CP-R95-001): goldenas.com.gr visitor statistics, pulled from the website's own store.  ?p=web_stats[&p=30d|today|7d|month|lastmonth|year|lastyear|12m|custom&from=&to=] */
 require __DIR__ . '/_layout.php';
-$u = require_staff(); if (!function_exists('ws_has') || !ws_has()) { http_response_code(404); layout_head(t('ws.title'), 'web_stats'); echo '<h1>' . tt('err.notfound') . '</h1>'; layout_foot(); return; }
+$u = require_staff(); if (!function_exists('ws_has') || !ws_has()) { http_response_code(404); layout_head(t('ws.title'), 'web_sales'); echo '<h1>' . tt('err.notfound') . '</h1>'; layout_foot(); return; }
 [$from, $to, $pfrom, $pto, $per] = ws_period((string)($_GET['per'] ?? '30d'), (string)($_GET['from'] ?? ''), (string)($_GET['to'] ?? ''));
 $S = ws_summary($from, $to); $P = ws_summary($pfrom, $pto);
 $series = $S['days'] > 62 ? ws_monthly($from, $to) : ws_series($from, $to); $monthly = $S['days'] > 62;
@@ -33,7 +33,7 @@ function ws_hbars(array $rows, callable $label, string $kv = 'n', ?callable $ext
     return $o . '</table>';
 }
 function ws_heat(array $hours): string { $max = max(1, max(array_map(fn($x) => $x['n'], $hours))); $o = '<div class="ws-heat">'; foreach ($hours as $h => $x) { $a = $x['n'] / $max; $o .= '<div title="' . sprintf('%02d:00 UTC · %d', $h, $x['n']) . '"><i style="opacity:' . max(.08, round($a, 2)) . '"></i><span>' . sprintf('%02d', $h) . '</span></div>'; } return $o . '</div>'; }
-layout_head(t('ws.title'), 'web_stats');
+layout_head(t('ws.title'), 'web_sales');
 ?>
 <style>
 .ws-per{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:10px 0}.ws-per a{padding:6px 11px;border-radius:999px;border:1px solid var(--line);font-size:12.5px;font-weight:600;color:var(--navy-text);text-decoration:none}.ws-per a.on{background:var(--navy);color:#fff;border-color:var(--navy)}
@@ -46,7 +46,7 @@ table.ws-h{width:100%;border-collapse:collapse}.ws-h td{padding:5px 6px;border-b
 @media(max-width:900px){.ws-grid,.ws-grid3{grid-template-columns:1fr}}
 @media print{.ws-per,.filters,.btn-row{display:none!important}.card{break-inside:avoid}}
 </style>
-<p class="eyebrow"><?= tt('nav.g_work') ?></p>
+<?php web_sales_tabs('web_stats'); ?>
 <div class="page-head"><div><h1>📈 <?= tt('ws.title') ?></h1><p class="lede"><?= tt('ws.lede') ?></p></div>
   <div class="btn-row no-print">
     <form method="post" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="ws_pull_now"><button class="btn btn--sm" type="submit">⟳ <?= tt('ws.pull_now') ?></button></form>

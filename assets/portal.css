@@ -1932,3 +1932,15 @@ body[data-wchk]:not(.w-ok) { visibility: hidden; animation: w-show 0s 1.5s forwa
 .vlink-ico { text-decoration: none; }
 @media (max-width: 640px) { .vlink { flex-direction: column; align-items: stretch; } }
 
+
+/* Marine intelligence (R97-027) */
+.mi-list { list-style: none; margin: 0; padding: 0; }
+.mi-list li { padding: 10px 0; border-top: 1px solid var(--line); }
+.mi-list li:first-child { border-top: 0; padding-top: 2px; }
+.mi-list li.is-hidden { opacity: .45; }
+.mi-list .mi-t { font-weight: 600; text-decoration: none; color: var(--navy-text); }
+.mi-list .mi-t:hover { text-decoration: underline; }
+.mi-list .mi-s { margin: 4px 0 0; font-size: 13.5px; color: var(--ink-2); text-align: justify; }
+.mi-list .mi-a { display: flex; gap: 14px; align-items: center; margin-top: 4px; font-size: 12.5px; }
+.mi-list .mi-a form { display: inline-flex; gap: 6px; align-items: center; margin: 0; }
+.mi-list .mi-a select { padding: 2px 6px; font-size: 12.5px; height: auto; width: auto; }

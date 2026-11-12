@@ -1690,3 +1690,18 @@ Language keys 9 283 each.
 **Security review**: two more bound LIKE parameters in an existing query; output escaped. No finding.
 
 Language keys 9 283 each.
+
+## §313 v1.133.0 (R97-027) — Commercial › Web Sales and Marine intelligence
+
+**Menu**: `nav_groups()` drops `web_inbox` and `web_stats` from Work and adds `web_sales` to Commercial. `?p=web_sales` redirects to the first available tab (`web_sales_home()`); the pages keep their addresses (`web_inbox`, `web_stats`), so notification links are unchanged; `web_sales_tabs()` prints the eyebrow and the tab bar on all three.
+
+**Marine intelligence** (`app/mi.php`, `views/marine_intel.php`): migration `install/migrate_cp_r97_027_marine_intel.sql` — `mi_feeds` (name, url, grp, kind, status of the last reading) and `mi_items` (grp, title, url, source, summary, published_at, `url_hash` unique, `title_hash`, hidden, added_by). Groups `MI_GROUPS`: newbuild, refit, ess, hybrid, tech.
+- Reading: `mi_http_get()` (public http(s) only through `vm_public_ip()`, ports 80 / 443, pinned address, ≤ 4 redirects each re-checked, 9 s, 1,5 MB) → `mi_parse()` (RSS 2.0 / RDF, Atom, Google-News sitemap; DOCTYPE stripped, a document with an ENTITY declaration refused, `LIBXML_NONET`) → if the address is a web page, `mi_discover()` follows its announced feed once → `mi_file_items()`.
+- Filing: plain text only (`mi_text()`), link through `vm_url_clean()`, items older than 45 days skipped, `mi_junk()` drops market-research and share-price blurbs, group by `mi_fits()` / `mi_classify()` (a group-bound search must still fit its group by its words, or — read strictly — another one; an open yachting title may feed all groups, a general shipping title only energy storage and hybrid), duplicates by link and by normalised headline, extract cut to 280 characters.
+- Schedule: `mi_sweep()` in the notification sweep reads ONE source per run — the one that waited longest and was not read in the last 20 hours; `mi_fetch` ("Read the sources now", once per two minutes) reads all within 40 s. Items older than 180 days are removed.
+- Sources seeded by `mi_default_feeds()`: five Google News searches bound to the groups, two site searches (SuperYacht Times, BOAT International — their own feeds refuse automatic readers) and the feeds of Superyacht News, Megayacht News, Superyacht Investor, Superyacht Content, CharterWorld, Marine Industry News, Electric & Hybrid Marine Technology, The Maritime Executive, Splash247, Marine Log, MarineLink, Offshore Energy. Read from the build environment on 12/11/2026: 19 sources, all answered, about 60 headlines filed for the week.
+- Rights: staff read; management / sales / administrators hide, move, add by hand and read now; administrators manage the sources.
+
+**Security review**: a second place where the portal fetches outside addresses — same fences as the vessel link preview, and the addresses come only from administrators. XML is parsed without network access and without entities (XXE and entity-expansion documents are refused — tested). Nothing from a feed is shown as markup: headline, source and extract are stripped to text and escaped; links are limited to http(s) (a `javascript:` link was refused in the test) and open with `noopener noreferrer`. Customers get 403 and do not see the menu entry (tested). All actions behind CSRF. Performance: one source per sweep, never the whole list in a page request; the page itself only reads the database. Proposal (no cost): none new. Note: only headline, source, link and a short extract are stored — articles stay on the publishers' sites.
+
+Language keys 9 345 each.

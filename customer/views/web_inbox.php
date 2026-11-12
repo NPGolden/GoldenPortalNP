@@ -1,15 +1,15 @@
 <?php
 /** Work › Website inbox (GAS-CP-R90-002): support requests and portal access requests posted by goldenas.com.gr.  ?p=web_inbox[&id=] */
 require __DIR__ . '/_layout.php';
-$u = require_staff(); if (!function_exists('web_inbox_has') || !web_inbox_has()) { http_response_code(404); layout_head(t('web.inbox'), 'web_inbox'); echo '<h1>' . tt('err.notfound') . '</h1>'; layout_foot(); return; }
+$u = require_staff(); if (!function_exists('web_inbox_has') || !web_inbox_has()) { http_response_code(404); layout_head(t('web.inbox'), 'web_sales'); echo '<h1>' . tt('err.notfound') . '</h1>'; layout_foot(); return; }
 $id = (int)($_GET['id'] ?? 0); $cur = $id ? web_inquiry($id) : null;
 $fk = in_array($_GET['kind'] ?? '', ['ticket', 'access', 'contact'], true) ? (string)$_GET['kind'] : ''; $fs = in_array($_GET['status'] ?? 'open', ['open', 'new', 'in_progress', 'done', 'spam', 'all'], true) ? (string)($_GET['status'] ?? 'open') : 'open';
 $rows = web_inquiries(['kind' => $fk, 'status' => $fs === 'all' ? '' : $fs]);
 $tone = fn(string $s) => pill($s === 'new' ? 'gold' : ($s === 'done' ? 'green' : ($s === 'spam' ? 'grey' : 'blue')), t('web.st_' . $s));
 $prio = fn(string $p) => $p === '' ? '' : pill($p === 'vessel_stopped' ? 'red' : ($p === 'high' ? 'gold' : 'grey'), t('web.pr_' . $p));
-layout_head(t('web.inbox'), 'web_inbox');
+layout_head(t('web.inbox'), 'web_sales');
 ?>
-<p class="eyebrow"><?= tt('nav.g_work') ?></p>
+<?php web_sales_tabs('web_inbox'); ?>
 <div class="page-head"><div><h1>🌐 <?= tt('web.inbox') ?></h1><p class="lede"><?= tt('web.inbox_hint') ?></p></div></div>
 <form method="get" class="filters"><input type="hidden" name="p" value="web_inbox">
   <select name="kind" data-nosearch data-js-submit="1"><option value=""><?= tt('web.all_kinds') ?></option><option value="ticket"<?= $fk === 'ticket' ? ' selected' : '' ?>><?= tt('web.kind_ticket') ?></option><option value="access"<?= $fk === 'access' ? ' selected' : '' ?>><?= tt('web.kind_access') ?></option><option value="contact"<?= $fk === 'contact' ? ' selected' : '' ?>><?= tt('web.kind_contact') ?></option></select>
