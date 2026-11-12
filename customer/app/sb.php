@@ -63,24 +63,30 @@ function sb_cards(string $zone = 'local'): array {
     } catch (Throwable $e) {}
     return $m[$zone] = array_filter($out, fn($c) => $c['normal'] !== null);
 }
+/** R97-020: the discount columns exist (migration run). */
+function sb_disc(): bool { static $h = null; if ($h === null) { try { $h = sb_has() && (bool) scalar("SHOW COLUMNS FROM sb_labour LIKE 'discount_pct'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** Discount of a line as a factor base: 0 … 100 percent (empty = 0). */
+function sb_disc_pct(array $r): float { $d = $r['discount_pct'] ?? null; return $d === null || $d === '' ? 0.0 : max(0.0, min(100.0, (float)$d)); }
 function sb_labour_calc(array $B, array $l): array {
     $n = (float)$l['h_normal']; $tv = (float)$l['h_travel']; $ot = (float)$l['h_overtime']; $d = (float)$l['allow_days']; $h = $n + $tv + $ot;
     $flat = (int)$B['flat_on'] === 1 && trim((string)($l['card'] ?? '')) === '';   // the flat rate prices the discipline rows — all their hours (design OP-02)
     $rate = $flat ? (float)$B['flat_rate'] : (float)$l['rate']; $rot = $flat ? $rate : (($l['rate_ot'] ?? null) !== null && (float)$l['rate_ot'] > 0 ? (float)$l['rate_ot'] : $rate);
-    return ['hours' => $h, 'cost' => round($h * (float)$B['cost_rate'] + $d * (float)$B['allow_cost'], 2), 'sale' => round(($n + $tv) * $rate + $ot * $rot + $d * (float)$B['allow_rate'], 2), 'rate' => $rate, 'rate_ot' => $rot, 'flat' => $flat];
+    $gross = round(($n + $tv) * $rate + $ot * $rot + $d * (float)$B['allow_rate'], 2); $dp = sb_disc_pct($l); $sale = round($gross * (1 - $dp / 100), 2);   // R97-020: the line discount lowers the whole sale of the line (hours and allowance); the cost stays
+    return ['hours' => $h, 'cost' => round($h * (float)$B['cost_rate'] + $d * (float)$B['allow_cost'], 2), 'sale' => $sale, 'gross' => $gross, 'disc' => $dp, 'disc_amt' => round($gross - $sale, 2), 'rate' => $rate, 'rate_ot' => $rot, 'flat' => $flat];
 }
 function sb_part_calc(array $B, array $p): array {
     $m = ($p['margin_pct'] ?? null) !== null && $p['margin_pct'] !== '' ? (float)$p['margin_pct'] : (float)$B['parts_margin'];
     $cost = round((float)$p['qty'] * (float)$p['unit_cost'], 2); $unitSale = round((float)$p['unit_cost'] * (1 + $m / 100), 4);   // margin on cost (design OP-03)
-    return ['margin' => $m, 'cost' => $cost, 'unit_sale' => $unitSale, 'sale' => round((float)$p['qty'] * $unitSale, 2)];
+    $gross = round((float)$p['qty'] * $unitSale, 2); $dp = sb_disc_pct($p); $sale = round($gross * (1 - $dp / 100), 2);
+    return ['margin' => $m, 'cost' => $cost, 'unit_sale' => $unitSale, 'sale' => $sale, 'gross' => $gross, 'disc' => $dp, 'disc_amt' => round($gross - $sale, 2)];
 }
 function sb_totals(array $B): array {
-    $T = ['hours' => 0.0, 'h_normal' => 0.0, 'h_travel' => 0.0, 'h_overtime' => 0.0, 'days' => 0.0, 'lab_cost' => 0.0, 'lab_sale' => 0.0, 'parts_cost' => 0.0, 'parts_sale' => 0.0, 'exp_cost' => 0.0, 'exp_sale' => 0.0, 'out_cost' => 0.0, 'out_sale' => 0.0, 'unpriced' => 0];
-    foreach ($B['labour'] ?? [] as $l) { $c = sb_labour_calc($B, $l); $T['hours'] += $c['hours']; $T['h_normal'] += (float)$l['h_normal']; $T['h_travel'] += (float)$l['h_travel']; $T['h_overtime'] += (float)$l['h_overtime']; $T['days'] += (float)$l['allow_days']; $T['lab_cost'] += $c['cost']; $T['lab_sale'] += $c['sale']; }
-    foreach ($B['parts'] ?? [] as $p) { $c = sb_part_calc($B, $p); $T['parts_cost'] += $c['cost']; $T['parts_sale'] += $c['sale']; if ((float)$p['qty'] > 0 && (float)$p['unit_cost'] <= 0 && !sb_part_excluded($p)) $T['unpriced']++; }
+    $T = ['hours' => 0.0, 'h_normal' => 0.0, 'h_travel' => 0.0, 'h_overtime' => 0.0, 'days' => 0.0, 'lab_cost' => 0.0, 'lab_sale' => 0.0, 'parts_cost' => 0.0, 'parts_sale' => 0.0, 'exp_cost' => 0.0, 'exp_sale' => 0.0, 'out_cost' => 0.0, 'out_sale' => 0.0, 'unpriced' => 0, 'lab_disc' => 0.0, 'parts_disc' => 0.0];
+    foreach ($B['labour'] ?? [] as $l) { $c = sb_labour_calc($B, $l); $T['hours'] += $c['hours']; $T['h_normal'] += (float)$l['h_normal']; $T['h_travel'] += (float)$l['h_travel']; $T['h_overtime'] += (float)$l['h_overtime']; $T['days'] += (float)$l['allow_days']; $T['lab_cost'] += $c['cost']; $T['lab_sale'] += $c['sale']; $T['lab_disc'] += $c['disc_amt']; }
+    foreach ($B['parts'] ?? [] as $p) { $c = sb_part_calc($B, $p); $T['parts_cost'] += $c['cost']; $T['parts_sale'] += $c['sale']; $T['parts_disc'] += $c['disc_amt']; if ((float)$p['qty'] > 0 && (float)$p['unit_cost'] <= 0 && !sb_part_excluded($p)) $T['unpriced']++; }
     foreach ($B['expenses'] ?? [] as $x) { if ((int)$x['in_total']) { $T['exp_cost'] += (float)$x['cost']; $T['exp_sale'] += (float)$x['sale']; } else { $T['out_cost'] += (float)$x['cost']; $T['out_sale'] += (float)$x['sale']; } }
     $T['cost'] = round($T['lab_cost'] + $T['parts_cost'] + $T['exp_cost'], 2); $T['sale'] = round($T['lab_sale'] + $T['parts_sale'] + $T['exp_sale'], 2);
-    $T['margin'] = $T['sale'] - $T['cost']; $T['margin_pct'] = $T['sale'] > 0.005 ? round(100 * $T['margin'] / $T['sale'], 1) : 0.0;
+    $T['disc'] = round($T['lab_disc'] + $T['parts_disc'], 2); $T['margin'] = $T['sale'] - $T['cost']; $T['margin_pct'] = $T['sale'] > 0.005 ? round(100 * $T['margin'] / $T['sale'], 1) : 0.0;
     $c = (float)$B['commission_pct']; $T['with_commission'] = $c > 0 && $c < 100 ? round($T['sale'] / (1 - $c / 100), 2) : $T['sale'];
     return $T;
 }
@@ -210,8 +216,10 @@ function sb_save_labour_from_post(int $id): int {
         if ($card !== '' && isset($cards[$card])) { if ($rate <= 0) $rate = (float)$cards[$card]['normal']; if ($rot === null && $cards[$card]['overtime'] !== null) $rot = (float)$cards[$card]['overtime']; }   // an empty rate follows the rate card
         if ($descr === '') $descr = trim(($sid ? $sec[$sid]['name'] : '') . ($did ? ' · ' . $dis[$did] : '') . ($card !== '' ? ' · ' . t('sb.card') . ' ' . $card : ''), ' ·');
         $vals = [$s('code', 12) ?: null, $descr, $sid ?: null, $did ?: null, $card !== '' ? $card : null, $hn, $ht, $ho, $days, $rate, $rot, $s('remarks', 500) ?: null];
-        if ($lid) { q('UPDATE sb_labour SET code = ?, descr = ?, section_id = ?, discipline_id = ?, card = ?, h_normal = ?, h_travel = ?, h_overtime = ?, allow_days = ?, rate = ?, rate_ot = ?, remarks = ?, sort_order = ? WHERE id = ? AND budget_id = ?', array_merge($vals, [++$sort * 10, $lid, $id])); }
-        else { q('INSERT INTO sb_labour (code, descr, section_id, discipline_id, card, h_normal, h_travel, h_overtime, allow_days, rate, rate_ot, remarks, sort_order, budget_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)', array_merge($vals, [9000 + (++$sort), $id])); }
+        $dv = sb_disc() ? (trim((string)($r['discount_pct'] ?? '')) === '' ? null : (min(100.0, $f('discount_pct')) ?: null)) : false;
+        if ($lid) { q('UPDATE sb_labour SET code = ?, descr = ?, section_id = ?, discipline_id = ?, card = ?, h_normal = ?, h_travel = ?, h_overtime = ?, allow_days = ?, rate = ?, rate_ot = ?, remarks = ?, sort_order = ? WHERE id = ? AND budget_id = ?', array_merge($vals, [++$sort * 10, $lid, $id])); $rowId = $lid; }
+        else { q('INSERT INTO sb_labour (code, descr, section_id, discipline_id, card, h_normal, h_travel, h_overtime, allow_days, rate, rate_ot, remarks, sort_order, budget_id) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)', array_merge($vals, [9000 + (++$sort), $id])); $rowId = (int) db()->lastInsertId(); }
+        if ($dv !== false && $rowId && array_key_exists('discount_pct', $r)) q('UPDATE sb_labour SET discount_pct = ? WHERE id = ? AND budget_id = ?', [$dv, $rowId, $id]);
         $n++;
     }
     if ($B['status'] === 'draft') q("UPDATE sb_budgets SET status = 'working' WHERE id = ?", [$id]);
@@ -228,8 +236,9 @@ function sb_save_parts_from_post(int $id): int {
         $m = trim((string)($r['margin_pct'] ?? '')) === '' ? null : min(900.0, $f('margin_pct'));
         if (!$pid && trim((string)($r['unit_sale'] ?? '')) !== '' && $m === null && $cost > 0) { $us = $f('unit_sale'); if ($us > 0) $m = round(($us / $cost - 1) * 100, 2); }   // a typed sale price becomes the line's margin
         $vals = [$s('code', 20) ?: null, $descr, $qty, $s('unit', 12) ?: null, $cost, $m, $s('remarks', 500) ?: null];
-        if ($pid) q('UPDATE sb_parts SET code = ?, descr = ?, qty = ?, unit = ?, unit_cost = ?, margin_pct = ?, remarks = ?, sort_order = ? WHERE id = ? AND budget_id = ?', array_merge($vals, [++$sort * 10, $pid, $id]));
-        else { if ($count >= SB_MAX_PARTS) { $over = true; continue; } q('INSERT INTO sb_parts (code, descr, qty, unit, unit_cost, margin_pct, remarks, sort_order, budget_id) VALUES (?,?,?,?,?,?,?,?,?)', array_merge($vals, [9000 + (++$sort), $id])); $count++; }
+        if ($pid) { q('UPDATE sb_parts SET code = ?, descr = ?, qty = ?, unit = ?, unit_cost = ?, margin_pct = ?, remarks = ?, sort_order = ? WHERE id = ? AND budget_id = ?', array_merge($vals, [++$sort * 10, $pid, $id])); $rowId = $pid; }
+        else { if ($count >= SB_MAX_PARTS) { $over = true; continue; } q('INSERT INTO sb_parts (code, descr, qty, unit, unit_cost, margin_pct, remarks, sort_order, budget_id) VALUES (?,?,?,?,?,?,?,?,?)', array_merge($vals, [9000 + (++$sort), $id])); $rowId = (int) db()->lastInsertId(); $count++; }
+        if (sb_disc() && $rowId && array_key_exists('discount_pct', $r)) q('UPDATE sb_parts SET discount_pct = ? WHERE id = ? AND budget_id = ?', [trim((string)$r['discount_pct']) === '' ? null : (min(100.0, $f('discount_pct')) ?: null), $rowId, $id]);
         $n++;
     }
     if ($B['status'] === 'draft') q("UPDATE sb_budgets SET status = 'working' WHERE id = ?", [$id]);
@@ -262,9 +271,11 @@ function sb_save_expenses_from_post(int $id): int {
         $descr = mb_substr(trim((string)($r['descr'] ?? '')), 0, 300); $cost = max(0.0, sb_num((string)($r['cost'] ?? ''))); $sale = trim((string)($r['sale'] ?? '')) === '' ? $cost : max(0.0, sb_num((string)$r['sale']));
         if (!$xid && $descr === '' && $cost <= 0 && $sale <= 0) continue;
         $kind = in_array($r['kind'] ?? '', SB_EXP_KINDS, true) ? $r['kind'] : 'other'; if ($descr === '') $descr = t('sb.xk_' . $kind);
+        $mk = sb_disc() && trim((string)($r['markup_pct'] ?? '')) !== '' ? min(900.0, max(0.0, sb_num((string)$r['markup_pct']))) : null; if ($mk !== null) $sale = round($cost * (1 + $mk / 100), 2);   // R97-020: at cost + x % — the percentage decides the sale
         $vals = [$kind, $descr, $cost, $sale, empty($r['out']) ? 1 : 0];
         if ($xid) q('UPDATE sb_expenses SET kind = ?, descr = ?, cost = ?, sale = ?, in_total = ?, sort_order = ? WHERE id = ? AND budget_id = ?', array_merge($vals, [++$sort * 10, $xid, $id]));
-        else q('INSERT INTO sb_expenses (kind, descr, cost, sale, in_total, sort_order, budget_id) VALUES (?,?,?,?,?,?,?)', array_merge($vals, [9000 + (++$sort), $id]));
+        else { q('INSERT INTO sb_expenses (kind, descr, cost, sale, in_total, sort_order, budget_id) VALUES (?,?,?,?,?,?,?)', array_merge($vals, [9000 + (++$sort), $id])); $xid = (int) db()->lastInsertId(); }
+        if (sb_disc() && $xid && array_key_exists('markup_pct', $r)) q('UPDATE sb_expenses SET markup_pct = ? WHERE id = ? AND budget_id = ?', [$mk, $xid, $id]);
         $n++;
     }
     sb_recalc($id); sb_event($id, 'expenses', (string)$n); return $n;
@@ -454,9 +465,9 @@ function sb_bucket_defaults(): array {
 
 function sb_r2(): bool { static $h = null; if ($h === null) { try { $h = sb_has() && (bool) scalar("SHOW TABLES LIKE 'sb_revisions'"); } catch (Throwable $e) { $h = false; } } return $h; }
 const SB_SNAP_HEAD = ['title', 'description', 'currency', 'zone', 'parts_margin', 'flat_on', 'flat_rate', 'cost_rate', 'allow_rate', 'allow_cost', 'commission_pct', 'target_date', 'source_ref', 'source_file'];
-const SB_SNAP_LAB = ['sort_order', 'code', 'descr', 'section_id', 'discipline_id', 'card', 'bucket', 'h_normal', 'h_travel', 'h_overtime', 'allow_days', 'rate', 'rate_ot', 'remarks'];
-const SB_SNAP_PART = ['sort_order', 'code', 'item_id', 'descr', 'qty', 'unit', 'unit_cost', 'margin_pct', 'cost_origin', 'remarks'];
-const SB_SNAP_EXP = ['sort_order', 'kind', 'descr', 'cost', 'sale', 'in_total'];
+const SB_SNAP_LAB = ['sort_order', 'code', 'descr', 'section_id', 'discipline_id', 'card', 'bucket', 'h_normal', 'h_travel', 'h_overtime', 'allow_days', 'rate', 'rate_ot', 'discount_pct', 'remarks'];
+const SB_SNAP_PART = ['sort_order', 'code', 'item_id', 'descr', 'qty', 'unit', 'unit_cost', 'margin_pct', 'discount_pct', 'cost_origin', 'remarks'];
+const SB_SNAP_EXP = ['sort_order', 'kind', 'descr', 'cost', 'markup_pct', 'sale', 'in_total'];
 /** The state of a budget as plain data: header settings and the three line lists (no ids). */
 function sb_snapshot(array $B): array {
     $pick = fn(array $r, array $keys) => array_intersect_key($r, array_flip($keys));
@@ -465,7 +476,7 @@ function sb_snapshot(array $B): array {
 /** Write the lines (and, when asked, the header settings) of a snapshot into a budget, replacing what is there. */
 function sb_write_snapshot(int $id, array $S, bool $withHead): void {
     foreach (['sb_labour', 'sb_parts', 'sb_expenses'] as $tb) q("DELETE FROM $tb WHERE budget_id = ?", [$id]);
-    $ins = function (string $tb, array $keys, array $rows) use ($id) { foreach ($rows as $r) { if (!is_array($r)) continue; $vals = []; foreach ($keys as $k) $vals[] = $r[$k] ?? null; q("INSERT INTO $tb (budget_id, " . implode(', ', $keys) . ') VALUES (?' . str_repeat(',?', count($keys)) . ')', array_merge([$id], $vals)); } };
+    $ins = function (string $tb, array $keys, array $rows) use ($id) { if (!sb_disc()) $keys = array_values(array_diff($keys, ['discount_pct', 'markup_pct'])); foreach ($rows as $r) { if (!is_array($r)) continue; $vals = []; foreach ($keys as $k) $vals[] = $r[$k] ?? null; q("INSERT INTO $tb (budget_id, " . implode(', ', $keys) . ') VALUES (?' . str_repeat(',?', count($keys)) . ')', array_merge([$id], $vals)); } };
     $ins('sb_labour', SB_SNAP_LAB, array_slice((array)($S['labour'] ?? []), 0, 500)); $ins('sb_parts', SB_SNAP_PART, array_slice((array)($S['parts'] ?? []), 0, SB_MAX_PARTS)); $ins('sb_expenses', SB_SNAP_EXP, array_slice((array)($S['expenses'] ?? []), 0, 200));
     if ($withHead && is_array($S['head'] ?? null)) { $set = []; $b = []; foreach (SB_SNAP_HEAD as $k) if (array_key_exists($k, $S['head']) && $k !== 'title') { $set[] = "$k = ?"; $b[] = $S['head'][$k]; } if ($set) { $b[] = $id; q('UPDATE sb_budgets SET ' . implode(', ', $set) . ' WHERE id = ?', $b); } }
     sb_recalc($id);
@@ -544,16 +555,16 @@ function sb_export_xlsx(array $B): void {
     $sum = [[t('sb.no'), sb_label($B)], [t('sb.f_title'), (string)$B['title']], [t('th.status'), t('sb.st_' . $B['status'])], [t('sb.priority'), t('sb.pr_' . (in_array($B['priority'] ?? '', SB_PRIORITIES, true) ? $B['priority'] : 'normal'))], [t('sb.project'), trim((string)($B['project_code'] ?? '') . ' ' . (string)($B['sub_code'] ?? '') . ' ' . (string)($B['sub_name'] ?? ''))], [t('sb.owner'), (string)($B['owner_name'] ?? '')], [t('sb.target'), (string)($B['target_date'] ?? '')],
             [t('sb.parts_margin'), (float)$B['parts_margin']], [t('sb.flat'), (int)$B['flat_on'] ? (float)$B['flat_rate'] : '—'], [t('sb.cost_rate'), (float)$B['cost_rate']], [t('sb.commission'), (float)$B['commission_pct']], ['', ''],
             [t('sb.labour') . ' — ' . t('sb.hours'), $r2($T['hours'])], [t('sb.labour') . ' — ' . t('sb.cost'), $r2($T['lab_cost'])], [t('sb.labour') . ' — ' . t('sb.sale'), $r2($T['lab_sale'])], [t('sb.parts') . ' — ' . t('sb.cost'), $r2($T['parts_cost'])], [t('sb.parts') . ' — ' . t('sb.sale'), $r2($T['parts_sale'])],
-            [t('sb.expenses') . ' — ' . t('sb.cost'), $r2($T['exp_cost'])], [t('sb.expenses') . ' — ' . t('sb.sale'), $r2($T['exp_sale'])], [t('sb.total') . ' — ' . t('sb.cost'), $r2($T['cost'])], [t('sb.total') . ' — ' . t('sb.sale'), $r2($T['sale'])], [t('sb.margin') . ' %', $T['margin_pct']]];
+            [t('sb.expenses') . ' — ' . t('sb.cost'), $r2($T['exp_cost'])], [t('sb.expenses') . ' — ' . t('sb.sale'), $r2($T['exp_sale'])], [t('sb.total') . ' — ' . t('sb.cost'), $r2($T['cost'])], [t('sb.total') . ' — ' . t('sb.sale'), $r2($T['sale'])], [t('sb.disc_total'), $r2($T['disc'])], [t('sb.margin') . ' %', $T['margin_pct']]];
     if ((float)$B['commission_pct'] > 0) $sum[] = [t('sb.with_comm', ['p' => (string)(float)$B['commission_pct']]), $r2($T['with_commission'])];
-    $xc = sb_cards((string)$B['zone']); $lab = []; foreach ($B['labour'] as $l) { $c = sb_labour_calc($B, $l); $lab[] = [(string)$l['code'], (string)$l['descr'], (string)($sec[(int)$l['section_id']]['name'] ?? ''), (string)($dis[(int)$l['discipline_id']] ?? ''), trim((string)$l['card'] . (isset($xc[(string)$l['card']]) && $xc[(string)$l['card']]['name'] !== '' ? ' — ' . $xc[(string)$l['card']]['name'] : '')), (float)$l['h_normal'], (float)$l['h_travel'], (float)$l['h_overtime'], (float)$l['allow_days'], $c['rate'], $c['rate_ot'], $c['cost'], $c['sale'], (string)$l['remarks']]; }
-    $par = []; $n = 0; foreach ($B['parts'] as $p) { $c = sb_part_calc($B, $p); $par[] = [++$n, (string)$p['code'], (string)$p['descr'], (float)$p['qty'], (string)$p['unit'], round((float)$p['unit_cost'], 4), $c['margin'], round($c['unit_sale'], 4), $c['cost'], $c['sale'], (string)($p['cost_origin'] ?? ''), (string)$p['remarks']]; }
-    $exp = []; foreach ($B['expenses'] as $x) $exp[] = [t('sb.xk_' . $x['kind']), (string)$x['descr'], (float)$x['cost'], (float)$x['sale'], (int)$x['in_total'] ? '' : t('sb.x_outside')];
+    $xc = sb_cards((string)$B['zone']); $lab = []; foreach ($B['labour'] as $l) { $c = sb_labour_calc($B, $l); $lab[] = [(string)$l['code'], (string)$l['descr'], (string)($sec[(int)$l['section_id']]['name'] ?? ''), (string)($dis[(int)$l['discipline_id']] ?? ''), trim((string)$l['card'] . (isset($xc[(string)$l['card']]) && $xc[(string)$l['card']]['name'] !== '' ? ' — ' . $xc[(string)$l['card']]['name'] : '')), (float)$l['h_normal'], (float)$l['h_travel'], (float)$l['h_overtime'], (float)$l['allow_days'], $c['rate'], $c['rate_ot'], $c['disc'], $c['cost'], $c['sale'], (string)$l['remarks']]; }
+    $par = []; $n = 0; foreach ($B['parts'] as $p) { $c = sb_part_calc($B, $p); $par[] = [++$n, (string)$p['code'], (string)$p['descr'], (float)$p['qty'], (string)$p['unit'], round((float)$p['unit_cost'], 4), $c['margin'], round($c['unit_sale'], 4), $c['disc'], $c['cost'], $c['sale'], (string)($p['cost_origin'] ?? ''), (string)$p['remarks']]; }
+    $exp = []; foreach ($B['expenses'] as $x) $exp[] = [t('sb.xk_' . $x['kind']), (string)$x['descr'], (float)$x['cost'], ($x['markup_pct'] ?? null) !== null ? (float)$x['markup_pct'] : '', (float)$x['sale'], (int)$x['in_total'] ? '' : t('sb.x_outside')];
     xlsx_download(preg_replace('/[^A-Za-z0-9._-]+/', '_', sb_label($B)) . '.xlsx', [
         ['name' => 'Summary', 'header' => [t('sb.title'), sb_label($B)], 'rows' => $sum, 'widths' => [44, 44]],
-        ['name' => 'Labour', 'header' => [t('th.code'), t('sb.l_descr'), t('sb.section'), t('sb.discipline'), t('sb.card'), t('sb.h_normal'), t('sb.h_travel'), t('sb.h_overtime'), t('sb.days'), t('sb.rate'), t('sb.rate_ot'), t('sb.cost'), t('sb.sale'), t('th.remarks')], 'rows' => $lab, 'widths' => [10, 50, 20, 22, 30, 10, 10, 11, 11, 10, 10, 12, 12, 40]],
-        ['name' => 'Parts', 'header' => ['#', t('th.code'), t('sb.p_descr'), t('sb.qty'), t('sb.unit'), t('sb.unit_cost'), t('sb.margin_pct'), t('sb.unit_sale'), t('sb.cost'), t('sb.sale'), t('sb.origin'), t('th.remarks')], 'rows' => $par, 'widths' => [5, 14, 54, 9, 7, 12, 10, 12, 12, 12, 34, 34]],
-        ['name' => 'Other costs', 'header' => [t('sb.x_kind'), t('sb.l_descr'), t('sb.cost'), t('sb.sale'), ''], 'rows' => $exp, 'widths' => [26, 50, 12, 12, 20]],
+        ['name' => 'Labour', 'header' => [t('th.code'), t('sb.l_descr'), t('sb.section'), t('sb.discipline'), t('sb.card'), t('sb.h_normal'), t('sb.h_travel'), t('sb.h_overtime'), t('sb.days'), t('sb.rate'), t('sb.rate_ot'), t('sb.disc_pct'), t('sb.cost'), t('sb.sale'), t('th.remarks')], 'rows' => $lab, 'widths' => [10, 50, 20, 22, 30, 10, 10, 11, 11, 10, 10, 9, 12, 12, 40]],
+        ['name' => 'Parts', 'header' => ['#', t('th.code'), t('sb.p_descr'), t('sb.qty'), t('sb.unit'), t('sb.unit_cost'), t('sb.margin_pct'), t('sb.unit_sale'), t('sb.disc_pct'), t('sb.cost'), t('sb.sale'), t('sb.origin'), t('th.remarks')], 'rows' => $par, 'widths' => [5, 14, 54, 9, 7, 12, 10, 12, 9, 12, 12, 34, 34]],
+        ['name' => 'Other costs', 'header' => [t('sb.x_kind'), t('sb.l_descr'), t('sb.cost'), t('sb.x_markup'), t('sb.sale'), ''], 'rows' => $exp, 'widths' => [26, 50, 12, 11, 12, 20]],
     ]);
 }
 
@@ -713,21 +724,21 @@ function sb_feed_plan(array $B): array {
 /** Offer lines a budget becomes. $opt: labour = line|section|lump, parts = line|lump, commission = bool (prices lifted to include the commission). */
 function sb_offer_lines(array $B, array $opt): array {
     $c = (float)$B['commission_pct']; $up = !empty($opt['commission']) && $c > 0 && $c < 100 ? 1 / (1 - $c / 100) : 1.0; $L = []; $sec = sb_sections(); $T = sb_totals($B);
-    $add = function (string $kind, string $desc, string $unit, float $qty, float $price, ?float $cost = null, ?float $margin = null, ?int $item = null, string $erp = '', ?string $note = null) use (&$L, $up) { if ($kind !== 'text' && $qty <= 0) return; $L[] = ['kind' => $kind, 'description' => mb_substr($desc, 0, 400), 'unit' => $unit, 'qty' => round($qty, 2), 'unit_price' => round($price * $up, 2), 'cost_price' => $cost, 'margin_pct' => $margin !== null && $up !== 1.0 && $cost !== null && $cost > 0 ? round((round($price * $up, 2) / $cost - 1) * 100, 2) : $margin, 'item_id' => $item, 'erp_code' => mb_substr($erp, 0, 30), 'notes' => $note !== null ? mb_substr($note, 0, 255) : null]; };
-    $lm = (string)($opt['labour'] ?? 'line'); $days = 0.0; $grp = [];
+    $add = function (string $kind, string $desc, string $unit, float $qty, float $price, ?float $cost = null, ?float $margin = null, ?int $item = null, string $erp = '', ?string $note = null, float $disc = 0.0) use (&$L, $up) { if ($kind !== 'text' && $qty <= 0) return; $L[] = ['discount_pct' => round(max(0.0, min(100.0, $disc)), 2), 'kind' => $kind, 'description' => mb_substr($desc, 0, 400), 'unit' => $unit, 'qty' => round($qty, 2), 'unit_price' => round($price * $up, 2), 'cost_price' => $cost, 'margin_pct' => $margin !== null && $up !== 1.0 && $cost !== null && $cost > 0 ? round((round($price * $up, 2) / $cost - 1) * 100, 2) : $margin, 'item_id' => $item, 'erp_code' => mb_substr($erp, 0, 30), 'notes' => $note !== null ? mb_substr($note, 0, 255) : null]; };
+    $lm = (string)($opt['labour'] ?? 'line'); $days = []; $grp = [];   // allowance days per discount percent (R97-020)
     foreach ($B['labour'] as $l) {
-        $x = sb_labour_calc($B, $l); $days += (float)$l['allow_days']; $nt = (float)$l['h_normal'] + (float)$l['h_travel']; $ot = (float)$l['h_overtime']; if ($nt + $ot <= 0) continue;
-        if ($lm === 'line') { $add('free', (string)$l['descr'], 'h', $nt, $x['rate'], (float)$B['cost_rate'], null, null, (string)$l['code']); $add('free', (string)$l['descr'] . ' — ' . t('sb.cv_overtime'), 'h', $ot, $x['rate_ot'], (float)$B['cost_rate'], null, null, (string)$l['code']); }
-        else { $k = $lm === 'section' ? (int)($l['section_id'] ?? 0) : 0; $grp[$k] = $grp[$k] ?? ['h' => 0.0, 'sale' => 0.0]; $grp[$k]['h'] += $nt + $ot; $grp[$k]['sale'] += $nt * $x['rate'] + $ot * $x['rate_ot']; }
+        $x = sb_labour_calc($B, $l); $dk = number_format($x['disc'], 2, '.', ''); $days[$dk] = ($days[$dk] ?? 0.0) + (float)$l['allow_days']; $df = 1 - $x['disc'] / 100; $nt = (float)$l['h_normal'] + (float)$l['h_travel']; $ot = (float)$l['h_overtime']; if ($nt + $ot <= 0) continue;
+        if ($lm === 'line') { $add('free', (string)$l['descr'], 'h', $nt, $x['rate'], (float)$B['cost_rate'], null, null, (string)$l['code'], null, $x['disc']); $add('free', (string)$l['descr'] . ' — ' . t('sb.cv_overtime'), 'h', $ot, $x['rate_ot'], (float)$B['cost_rate'], null, null, (string)$l['code'], null, $x['disc']); }
+        else { $k = $lm === 'section' ? (int)($l['section_id'] ?? 0) : 0; $grp[$k] = $grp[$k] ?? ['h' => 0.0, 'sale' => 0.0]; $grp[$k]['h'] += $nt + $ot; $grp[$k]['sale'] += ($nt * $x['rate'] + $ot * $x['rate_ot']) * $df; }   // grouped lines carry the discounted value
     }
     foreach ($grp as $k => $g) { if ($g['h'] <= 0) continue; $name = $lm === 'section' ? t('sb.cv_labour_sec', ['s' => (string)($sec[$k]['name'] ?? t('sb.cv_other_sec'))]) : t('sb.cv_labour_all'); $add('free', $name, 'h', $g['h'], $g['sale'] / $g['h'], (float)$B['cost_rate']); }
-    $add('free', t('sb.cv_allowance'), t('sb.cv_day'), $days, (float)$B['allow_rate'], (float)$B['allow_cost']);
+    ksort($days); foreach ($days as $dk => $dd) $add('free', t('sb.cv_allowance'), t('sb.cv_day'), $dd, (float)$B['allow_rate'], (float)$B['allow_cost'], null, null, '', null, (float)$dk);
     if (($opt['parts'] ?? 'line') === 'lump') { if ($T['parts_sale'] > 0) $add('free', t('sb.cv_parts_lump'), 'lot', 1, $T['parts_sale'], $T['parts_cost'], $T['parts_cost'] > 0 ? round(($T['parts_sale'] / $T['parts_cost'] - 1) * 100, 2) : null); }
-    else foreach ($B['parts'] as $p) { $x = sb_part_calc($B, $p); if (sb_part_excluded($p) || (float)$p['qty'] <= 0) continue; $add((int)($p['item_id'] ?? 0) ? 'item' : 'free', (string)$p['descr'], (string)($p['unit'] ?: 'pcs'), (float)$p['qty'], $x['unit_sale'], (float)$p['unit_cost'], $x['margin'], (int)($p['item_id'] ?? 0) ?: null, (string)$p['code']); }
+    else foreach ($B['parts'] as $p) { $x = sb_part_calc($B, $p); if (sb_part_excluded($p) || (float)$p['qty'] <= 0) continue; $add((int)($p['item_id'] ?? 0) ? 'item' : 'free', (string)$p['descr'], (string)($p['unit'] ?: 'pcs'), (float)$p['qty'], $x['unit_sale'], (float)$p['unit_cost'], $x['margin'], (int)($p['item_id'] ?? 0) ?: null, (string)$p['code'], null, $x['disc']); }
     foreach ($B['expenses'] as $e) { if ((int)$e['in_total']) $add('free', (string)$e['descr'], 'lot', 1, (float)$e['sale'], (float)$e['cost']); }
-    foreach ($B['expenses'] as $e) { if (!(int)$e['in_total'] && (float)$e['sale'] > 0) $L[] = ['kind' => 'text', 'description' => mb_substr((string)$e['descr'] . ' — ' . sb_money((float)$e['sale'], (string)$B['currency']) . ' — ' . t('sb.cv_separately'), 0, 400), 'unit' => '', 'qty' => 0, 'unit_price' => 0, 'cost_price' => null, 'margin_pct' => null, 'item_id' => null, 'erp_code' => '', 'notes' => null]; }
+    foreach ($B['expenses'] as $e) { if (!(int)$e['in_total'] && (float)$e['sale'] > 0) $L[] = ['kind' => 'text', 'description' => mb_substr((string)$e['descr'] . ' — ' . sb_money((float)$e['sale'], (string)$B['currency']) . ' — ' . t('sb.cv_separately'), 0, 400), 'unit' => '', 'qty' => 0, 'unit_price' => 0, 'discount_pct' => 0.0, 'cost_price' => null, 'margin_pct' => null, 'item_id' => null, 'erp_code' => '', 'notes' => null]; }
     $ex = []; foreach ($B['labour'] as $l) if ((float)$l['h_normal'] + (float)$l['h_travel'] + (float)$l['h_overtime'] <= 0 && trim((string)$l['descr']) !== '') $ex[] = (string)$l['descr']; foreach ($B['parts'] as $p) if (sb_part_excluded($p)) $ex[] = (string)$p['descr'];
-    $net = 0.0; foreach ($L as $x) if ($x['kind'] !== 'text') $net += round($x['qty'] * $x['unit_price'], 2);
+    $net = 0.0; foreach ($L as $x) if ($x['kind'] !== 'text') $net += round($x['qty'] * $x['unit_price'] * (1 - $x['discount_pct'] / 100), 2);
     return ['lines' => $L, 'net' => round($net, 2), 'excluded' => $ex, 'uplift' => $up];
 }
 /** The description as it goes to the offer's Scope block: the team's own text only — the block imported from a budget working file (internal document control, internal notes) and the ticket header stay inside. */
@@ -756,7 +767,7 @@ function sb_convert(int $id, array $opt): int {
         try { if (function_exists('num_sq') && function_exists('num_has') && num_has() && ($sq = num_sq($pid, $sid))) q('UPDATE offers SET sq_no = ? WHERE id = ?', [$sq, $oid]); } catch (Throwable $e) {}
         try { if (function_exists('rl_current')) { $br = function_exists('br_of') ? br_of($pid, $sid) : []; $rl = rl_current((int)($br['id'] ?? 0) ?: null, (string)($br['code'] ?? '')); if ($rl) q('UPDATE offers SET rate_list_id = ? WHERE id = ?', [(int)$rl['id'], $oid]); } } catch (Throwable $e) {}
         $seq = 0; foreach ($P['lines'] as $x) q('INSERT INTO offer_lines (offer_id, seq, kind, rate_item_id, item_id, cost_price, margin_pct, erp_code, description, unit, zone, qty, unit_price, discount_pct, line_total, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
-            [$oid, $seq += 10, $x['kind'], null, $x['item_id'], $x['cost_price'], $x['margin_pct'], $x['erp_code'], $x['description'], $x['unit'], (string)$B['zone'] === 'overseas' ? 'overseas' : 'local', $x['qty'], $x['unit_price'], 0, $x['kind'] === 'text' ? 0 : ob_line_total((float)$x['qty'], (float)$x['unit_price'], 0), $x['notes']]);
+            [$oid, $seq += 10, $x['kind'], null, $x['item_id'], $x['cost_price'], $x['margin_pct'], $x['erp_code'], $x['description'], $x['unit'], (string)$B['zone'] === 'overseas' ? 'overseas' : 'local', $x['qty'], $x['unit_price'], (float)$x['discount_pct'], $x['kind'] === 'text' ? 0 : ob_line_total((float)$x['qty'], (float)$x['unit_price'], (float)$x['discount_pct']), $x['notes']]);
         ob_recalc($oid); $o = of_load($oid); if ($o) { ob_blocks_init($o); $scope = sb_scope_text($B); if ($scope !== '') ob_block_save($oid, 'scope', ob_block_label('scope'), $scope);
             if ($P['excluded']) { $cur = (string) scalar("SELECT body FROM offer_blocks WHERE offer_id = ? AND block_key = 'exclusions'", [$oid]); ob_block_save($oid, 'exclusions', ob_block_label('exclusions'), trim($cur . "\n" . implode("\n", array_map(fn($e) => '- ' . $e, $P['excluded'])))); } }
         of_event($oid, 'draft', t('sb.cv_offer_ev', ['n' => sb_label($B)]));

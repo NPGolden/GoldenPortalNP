@@ -1620,3 +1620,13 @@ Report: zone Outside Attica selected, the rate card still shows and applies 80,0
 **Security review**: read-only change of a price lookup; no input, no new query. No finding.
 
 Language keys 9 204 each.
+
+## §306 v1.129.0 (R97-020) — System Budgets: discount per line
+
+Migration `install/migrate_cp_r97_020_sb_line_discount.sql`: `sb_labour.discount_pct`, `sb_parts.discount_pct` (DECIMAL(5,2), NULL = none). `sb_disc()` guards the columns (before the migration the column is hidden and nothing is written). `sb_labour_calc()` / `sb_part_calc()` return `gross`, `disc`, `disc_amt` and the net `sale` = gross × (1 − disc/100); the cost is untouched. A labour discount covers the whole line (hours and daily allowance). `sb_totals()` adds `lab_disc`, `parts_disc`, `disc`. Saved by `sb_save_labour_from_post()` / `sb_save_parts_from_post()` (0–100, empty or 0 = NULL). `SB_SNAP_LAB` / `SB_SNAP_PART` carry the field, so revisions, restore, copy and templates keep it (older snapshots without the key restore as no discount). Excel export: column "Disc. %" on Labour and Parts, "Line discounts given" on Summary. Conversion (`sb_offer_lines()`): in line mode the offer line gets `discount_pct` and `line_total` through `ob_line_total()`; allowance days are grouped per discount percentage; grouped labour and lump parts use the discounted value; the preview shows the column and the net is discounted. Tested: 10 % on a labour line with overtime and allowance, 100 % line, 5 % part, value above 100 capped, copy, export, the three conversion modes (net equal in all), conversion to an offer.
+
+Other costs (travelling expenses): the same migration adds `sb_expenses.markup_pct` (DECIMAL(6,2), NULL = sale typed by hand). `sb_save_expenses_from_post()`: with a percentage the sale is cost × (1 + pct/100), 0–900, and replaces a typed sale; `SB_SNAP_EXP` carries it; Excel sheet "Other costs" has the column. Tested: 400,00 + 10 % = 440,00 with a typed sale ignored; a line without percentage keeps its typed sale; copy keeps the percentage.
+
+**Security review**: numeric fields (discount clamped 0–100, on-cost 0–900) on the server, written with bound parameters behind `require_staff()`, `sb_load_editable()` and CSRF; no new page, no new query on page view. The discount is in the budget audit trail through the line-save events and the revisions. No finding. Proposal (optional, no performance cost): a ceiling for line discounts above which only management may save (for example 20 %) — say if wanted.
+
+Language keys 9 209 each.

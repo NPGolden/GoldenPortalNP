@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.128.3';
+const CP_VERSION = '1.129.0';
 const CP_BUILD   = '2026-11-12';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-020', 'version' => '1.129.0', 'date' => '2026-11-12', 'title' => 'System Budgets: a discount % on every labour line and every part line — it lowers the sale of the line (the cost stays), shows in the totals and the Excel export, is kept in revisions, copies and templates, and is carried to the offer line at conversion. Travelling expenses and other costs: a percentage on cost per line (at cost + x %).', 'db' => 'install/migrate_cp_r97_020_sb_line_discount.sql', 'check' => 'r97j'],
         ['ref' => 'GAS-CP-R97-019', 'version' => '1.128.3', 'date' => '2026-11-12', 'title' => 'System Budgets: the rate cards of the zone Outside Attica / Abroad / Greek islands show and apply the out-of-Attica rate — a rate list that keeps the two zones on separate rows gave the local rate for both.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-018', 'version' => '1.128.2', 'date' => '2026-11-12', 'title' => 'System Budgets: changing the rate zone re-prices the rate-card labour lines (rates typed by hand are kept and flagged, with a button to apply the rate-card rates); the zones are named Local (Attica) and Outside Attica / Abroad / Greek islands.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-017', 'version' => '1.128.1', 'date' => '2026-11-12', 'title' => 'Vessels: the vessel page shows a preview of the web link — the title and the description of the linked page with an "Open the page" button — and the vessel list carries a link icon, so the particulars are one click away without opening Edit.', 'db' => 'install/migrate_cp_r97_017_vessel_link_preview.sql', 'check' => 'r97i'],
@@ -455,6 +456,7 @@ function cp_migration_state(): array {
         'r97g' => $has("SHOW COLUMNS FROM sb_labour LIKE 'fed'"),
         'r97h' => $has("SHOW COLUMNS FROM vessels LIKE 'info_url'"),
         'r97i' => $has("SHOW COLUMNS FROM vessels LIKE 'info_title'"),
+        'r97j' => $has("SHOW COLUMNS FROM sb_labour LIKE 'discount_pct'"),
         'r93b' => $has("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_inquiries' AND COLUMN_NAME = 'kind' AND COLUMN_TYPE LIKE '%contact%'"),
         'r93a' => $has("SHOW TABLES LIKE 'work_permits'"),
         'r92f' => $has("SHOW COLUMNS FROM rc_applications LIKE 'keep_until'"),
