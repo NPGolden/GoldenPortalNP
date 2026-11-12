@@ -1682,3 +1682,11 @@ Import (`views/vessels_import.php`, administrators): `vm_imp_stash()` keeps the 
 **Security review**: administrators only (`require_cp_admin()` on page, upload and apply; PM and customer accounts get 403 — tested), CSRF, upload limited by type signature and size, stored outside the web root's reach under the guarded `storage/` folder with a random name and removed after use; column names written to SQL come from the fixed list `VM_IMP_FIELDS`, values are bound; links are limited to http(s) by `vm_url_clean()` (a `javascript:` link was refused in the test); cell text is escaped on the review page. No finding. No performance effect on normal pages.
 
 Language keys 9 283 each.
+
+## §312 v1.132.1 (R97-026) — Vessel list: yard, flag and class columns
+
+`views/vessels.php`: columns Yard, Flag, Class (shown when `vm_cf_col()`), replacing the small line under the yard; the search adds `v.class_society` and `v.flag`. Customers see the same columns for their own vessels. First import workbook from the web research of 12/11/2026 prepared outside the portal: 76 rows (31 high, 41 medium, 4 low confidence), dry-run against the exported names — 76 matched, 74 with something to fill, 1 IMO difference flagged (PAUSE).
+
+**Security review**: two more bound LIKE parameters in an existing query; output escaped. No finding.
+
+Language keys 9 283 each.

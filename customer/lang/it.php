@@ -488,7 +488,7 @@ return [
 'v.customer_hint' => 'Lasciare non assegnata se l\'armatore non è ancora registrato; la nave sarà visibile solo al personale Golden A/S.',
 'v.new' => 'Nuova nave',
 'v.edit' => 'Modifica nave',
-'v.search_ph' => 'Nave, IMO, cantiere o cliente',
+'v.search_ph' => 'Nave, IMO, cantiere, bandiera, classe o cliente',
 'v.active' => 'Attiva',
 'v.inactive' => 'Inattiva',
 'v.need_name' => 'La nave deve avere un nome.',

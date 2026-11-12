@@ -488,7 +488,7 @@ return [
 'v.customer_hint' => 'Leave unassigned if the owner is not registered yet; the vessel then shows only to Golden A/S staff.',
 'v.new' => 'New vessel',
 'v.edit' => 'Edit vessel',
-'v.search_ph' => 'Vessel, IMO, yard or customer',
+'v.search_ph' => 'Vessel, IMO, yard, flag, class or customer',
 'v.active' => 'Active',
 'v.inactive' => 'Inactive',
 'v.need_name' => 'The vessel needs a name.',

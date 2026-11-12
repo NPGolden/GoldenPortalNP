@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.132.0';
+const CP_VERSION = '1.132.1';
 const CP_BUILD   = '2026-11-12';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-026', 'version' => '1.132.1', 'date' => '2026-11-12', 'title' => 'Vessel list: Yard, Flag and Class as their own columns; the search also finds flag and class.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-025', 'version' => '1.132.0', 'date' => '2026-11-12', 'title' => 'Vessels: fields Class and Flag; "Import particulars" fills IMO, class, flag, yard and web link from a workbook after a review — only empty fields, nothing entered by hand is replaced. The vessel export carries Class, Flag and Link.', 'db' => 'install/migrate_cp_r97_025_vessel_class_flag.sql', 'check' => 'r97l'],
         ['ref' => 'GAS-CP-R97-024', 'version' => '1.131.1', 'date' => '2026-11-12', 'title' => 'E-mail card: "Draft in my Outlook" places the message — HTML, recipients, attachments — in the Drafts folder of the signed-in person\'s own mailbox, to finish and send from the new Outlook, Outlook on the web or the phone.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-023', 'version' => '1.131.0', 'date' => '2026-11-12', 'title' => 'E-mail card: "Send now from my mailbox" sends the message in HTML format with its attachments straight from the signed-in person\'s own Microsoft 365 mailbox (kept in the Sent Items of Outlook); the Outlook draft (.eml) now opens in HTML format too.', 'db' => 'install/migrate_cp_r97_023_em_sent.sql', 'check' => 'r97k'],

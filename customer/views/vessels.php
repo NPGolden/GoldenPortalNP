@@ -30,7 +30,8 @@ if (function_exists('vm_has') && vm_has()) $w[] = 'v.merged_into IS NULL';   // 
 if ($fProj === 'active') $w[] = "EXISTS (SELECT 1 FROM projects p WHERE p.vessel_id = v.id AND p.status = 'active')";
 elseif ($fProj === 'any') $w[] = 'EXISTS (SELECT 1 FROM projects p WHERE p.vessel_id = v.id)';
 elseif ($fProj === 'none') $w[] = 'NOT EXISTS (SELECT 1 FROM projects p WHERE p.vessel_id = v.id)';
-if ($q !== '') { $w[] = '(v.name LIKE ? OR v.imo LIKE ? OR v.yard LIKE ? OR c.name LIKE ?)'; array_push($args, ...array_fill(0, 4, '%' . $q . '%')); }
+$cfOn = function_exists('vm_cf_col') && vm_cf_col();   // R97-026: class and flag as columns, and in the search
+if ($q !== '') { $w[] = '(v.name LIKE ? OR v.imo LIKE ? OR v.yard LIKE ? OR c.name LIKE ?' . ($cfOn ? ' OR v.class_society LIKE ? OR v.flag LIKE ?' : '') . ')'; array_push($args, ...array_fill(0, $cfOn ? 6 : 4, '%' . $q . '%')); }
 $where = $w ? 'WHERE ' . implode(' AND ', $w) : '';
 $from  = "FROM vessels v LEFT JOIN customers c ON c.id = v.customer_id {$where}";
 $total = (int) scalar("SELECT COUNT(*) {$from}", $args);
@@ -108,7 +109,7 @@ layout_head(t('v.title'), 'vessels');
     <thead><tr>
       <th><?= tt('nav.vessels') ?></th>
       <?php if ($staff): ?><th><?= tt('v.customer') ?></th><?php endif; ?>
-      <th><?= tt('v.imo') ?></th><th><?= tt('v.yard') ?></th><th><?= tt('v.projects') ?></th>
+      <th><?= tt('v.imo') ?></th><th><?= tt('v.yard') ?></th><?php if ($cfOn): ?><th><?= tt('v.flag') ?></th><th><?= tt('v.class') ?></th><?php endif; ?><th><?= tt('v.projects') ?></th>
       <?php if ($staff): ?><th><?= tt('th.status') ?></th><?php endif; ?>
       <th></th>
     </tr></thead>
@@ -118,7 +119,8 @@ layout_head(t('v.title'), 'vessels');
         <td><b><a href="<?= url('vessel', ['id' => $v['id']]) ?>"><?= e($v['name']) ?></a></b><?php if (is_staff() && !empty($v['info_url']) && preg_match('~^https?://~i', (string)$v['info_url'])): ?> <a href="<?= e((string)$v['info_url']) ?>" target="_blank" rel="noopener noreferrer" class="vlink-ico" title="<?= e(trim((string)($v['info_title'] ?? '') . ' — ' . (string)(parse_url((string)$v['info_url'], PHP_URL_HOST) ?: ''), ' —')) ?>">🌐</a><?php if (!empty($v['info_title'])): ?><br><span class="hint"><?= e(mb_strimwidth((string)$v['info_title'], 0, 70, '…')) ?></span><?php endif; ?><?php endif; ?></td>
         <?php if ($staff): ?><td><?= $v['customer_name'] ? e($v['customer_name']) : '<span class="pill pill--gold">' . tt('v.unassigned') . '</span>' ?></td><?php endif; ?>
         <td class="num"><?= e($v['imo'] ?: '—') ?></td>
-        <td><?= e($v['yard'] ?: '—') ?><?php if (!empty($v['class_society']) || !empty($v['flag'])): ?><br><span class="hint"><?= e(implode(' · ', array_filter([(string)($v['class_society'] ?? ''), (string)($v['flag'] ?? '')]))) ?></span><?php endif; ?></td>
+        <td><?= e($v['yard'] ?: '—') ?></td>
+        <?php if ($cfOn): ?><td><?= e((string)($v['flag'] ?? '') ?: '—') ?></td><td><?= e((string)($v['class_society'] ?? '') ?: '—') ?></td><?php endif; ?>
         <td class="num"><?= (int)$v['n_projects'] ?><?= (int)$v['n_active'] ? ' <span class="hint" title="' . tt('v.f_active_projects') . '">(' . (int)$v['n_active'] . ' ' . tt('pr.active') . ')</span>' : '' ?></td>
         <?php if ($staff): ?><td><?= $v['is_active'] ? pill('green', t('v.active')) : pill('mute', t('v.inactive')) ?></td><?php endif; ?>
         <td class="row-actions" style="text-align:right;white-space:nowrap;">

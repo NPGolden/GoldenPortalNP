@@ -480,7 +480,7 @@ return [
 'v.customer_hint' => 'Залиште непризначеним, якщо власник ще не зареєстрований; тоді судно бачить лише персонал Golden A/S.',
 'v.new' => 'Нове судно',
 'v.edit' => 'Редагувати судно',
-'v.search_ph' => 'Судно, IMO, верф або замовник',
+'v.search_ph' => 'Vessel, IMO, yard, flag, class or customer',
 'v.active' => 'Активне',
 'v.inactive' => 'Неактивне',
 'v.need_name' => 'Судно має мати назву.',

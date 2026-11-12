@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.132.0** (build 2026-11-12). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.132.1** (build 2026-11-12). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.132.1 | GAS-CP-R97-026 | 2026-11-12 | Vessel list: Yard, Flag and Class as their own columns; the search also finds flag and class. | — |
 | 1.132.0 | GAS-CP-R97-025 | 2026-11-12 | Vessels: fields Class and Flag; "Import particulars" fills IMO, class, flag, yard and web link from a workbook after a review — only empty fields, nothing entered by hand is replaced. The vessel export carries Class, Flag and Link. | `install/migrate_cp_r97_025_vessel_class_flag.sql` |
 | 1.131.1 | GAS-CP-R97-024 | 2026-11-12 | E-mail card: "Draft in my Outlook" places the message — HTML, recipients, attachments — in the Drafts folder of the signed-in person's own mailbox, to finish and send from the new Outlook, Outlook on the web or the phone. | — |
 | 1.131.0 | GAS-CP-R97-023 | 2026-11-12 | E-mail card: "Send now from my mailbox" sends the message in HTML format with its attachments straight from the signed-in person's own Microsoft 365 mailbox (kept in the Sent Items of Outlook); the Outlook draft (.eml) now opens in HTML format too. | `install/migrate_cp_r97_023_em_sent.sql` |
