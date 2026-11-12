@@ -1721,3 +1721,15 @@ Language keys 9 349 each.
 **Security review**: view-only change; the links are the same ones, behind the same staff / administrator checks, and the pages they open check access themselves. No finding.
 
 Language keys 9 349 each.
+
+## §316 v1.133.3 (R97-030) — Mobile apps: "Sync error"
+
+Cause: `app/col.php` builds its constant `COL_SELECT` from the ledger amount constants of `app/pi.php` (R95-004, v1.119.0). The web front controller was changed then to load `pi.php` first; the headless loader of the app service (`api/v1/bootstrap.php`) still loaded `col` before `pi`, so every request to `/customer/api/v1/…` ended in a fatal error (HTTP 500, empty body) and the apps reported "Sync error". The web portal was not affected.
+
+Fix: `api/v1/bootstrap.php` loads `pi` before `col`, and `col.php` itself now does `require_once pi.php`, so no entry point depends on the order again. No database step, no app update.
+
+Tested: sign-in and every read route plus `/sync` for the Service Engineer, Golden PM and Golden HR apps with an administrator, a project manager and an HR account — all HTTP 200 (and the expected 403 where the account may not use an app).
+
+**Security review**: no change of access rules; the failure exposed nothing (errors are not displayed, the body was empty). Added: the deploy now calls the app service once after applying a release (`/api/v1/me` without a token must answer 401) and fails when it does not — one request per deploy, nothing at run time.
+
+Language keys 9 349 each.

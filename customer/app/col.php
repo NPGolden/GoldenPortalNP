@@ -30,6 +30,7 @@ function col_money(float $v, string $cur = 'EUR'): string { return number_format
 function col_bucket(int $age): string { return $age <= 0 ? 'current' : ($age <= 30 ? 'd30' : ($age <= 60 ? 'd60' : ($age <= 90 ? 'd90' : 'd90p'))); }
 function col_bucket_pill(string $b): string { $m = ['current' => 'green', 'd30' => 'gold', 'd60' => 'gold', 'd90' => 'bad', 'd90p' => 'bad']; return pill($m[$b] ?? 'mute', t('col.b_' . $b)); }
 
+require_once __DIR__ . '/pi.php';   // R97-030: COL_SELECT is built from the ledger amount constants of pi.php — never depend on the caller's load order
 const COL_SELECT = "SELECT pi.id, pi.kind, pi.pi_no, pi.title, pi.term_n, pi.issue_date, pi.due_date, pi.gross, pi.currency, pi.status, pi.sent_at, pi.paid_at, pi.offer_id, pi.project_id, pi.subproject_id, pi.vessel_id,
                    o.offer_no, p.project_code, p.name AS project_name, p.pm_user_id, COALESCE(p.customer_id, pi.customer_id, v.customer_id) AS customer_id, s.code AS sub_code, v.name AS vessel, c.name AS customer_name, cu.full_name AS pm_name,
                    pi.billing_org_id, bo.name AS party_name,

@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.133.2';
+const CP_VERSION = '1.133.3';
 const CP_BUILD   = '2026-11-12';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-030', 'version' => '1.133.3', 'date' => '2026-11-12', 'title' => 'Mobile apps: "Sync error" fixed — the app service (Service Engineer, Golden PM, Golden HR, customer app) failed to start since v1.119.0 because of the order two portal files were loaded in; nothing queued on the phones is lost, it is sent on the next sync.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-029', 'version' => '1.133.2', 'date' => '2026-11-12', 'title' => 'Projects page: a project whose sub-projects are all completed (and hidden) keeps its buttons — Edit project, Add sub-project, Drawings, Reports, Offers, Delete — instead of showing only "completed hidden".', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-028', 'version' => '1.133.1', 'date' => '2026-11-12', 'title' => 'System Budgets: the list is grouped per vessel — one heading per vessel with its number of budgets, hours and sale — and the search also finds the vessel name; "Group by" switches the grouping off.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-027', 'version' => '1.133.0', 'date' => '2026-11-12', 'title' => 'Commercial › Web Sales: one page with the tabs Website inbox, Website statistics and the new Marine intelligence — the week\'s headlines from public yachting and marine news sources in five groups (new-build yachts Europe and Middle East, refit Europe, marine energy storage, hybrid vessels, yachting technology).', 'db' => 'install/migrate_cp_r97_027_marine_intel.sql', 'check' => 'r97m'],

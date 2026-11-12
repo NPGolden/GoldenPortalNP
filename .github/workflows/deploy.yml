@@ -93,6 +93,15 @@ jobs:
           print(f"portal {r['from']} -> {r['to']}  backup in {[s for s in r['steps'] if s['step']=='backup'][0].get('folder')}")
           assert r['ok'], 'self-check reported FAIL — see lines above'
           PY
+      - name: App service answers (mobile apps)
+        if: ${{ github.event.inputs.dry != 'true' }}
+        env: { URL: "${{ vars.PORTAL_URL }}", ORIGIN: "${{ secrets.ORIGIN_IP }}" }
+        run: |
+          set -e; H=$(echo "$URL" | sed -E 's#^https?://([^/]+).*#\1#'); R=(); O=$(echo "$ORIGIN" | tr -d '[:space:]' | sed -E 's#^[a-z]+://##; s#[/:].*$##')
+          if [ -n "$O" ]; then echo "$O" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || O=$(getent ahostsv4 "$O" | awk 'NR==1{print $1}'); [ -n "$O" ] && R=(--resolve "$H:443:$O"); fi
+          C=$(curl -sS -o /tmp/api.json -w '%{http_code}' "${R[@]}" -A "GAS-deploy/1.0" -H "X-App: engineer" -H "X-App-Version: 99.0.0" "$URL/api/v1/me" || true)
+          echo "app service: HTTP $C $(head -c 200 /tmp/api.json)"
+          [ "$C" = "401" ] || { echo "The app service does not start (expected 401 Unauthorized without a token) - the mobile apps will show Sync error"; exit 1; }
       - name: Summary
         if: always()
         run: |

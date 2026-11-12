@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.133.2** (build 2026-11-12). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.133.3** (build 2026-11-12). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.133.3 | GAS-CP-R97-030 | 2026-11-12 | Mobile apps: "Sync error" fixed — the app service (Service Engineer, Golden PM, Golden HR, customer app) failed to start since v1.119.0 because of the order two portal files were loaded in; nothing queued on the phones is lost, it is sent on the next sync. | — |
 | 1.133.2 | GAS-CP-R97-029 | 2026-11-12 | Projects page: a project whose sub-projects are all completed (and hidden) keeps its buttons — Edit project, Add sub-project, Drawings, Reports, Offers, Delete — instead of showing only "completed hidden". | — |
 | 1.133.1 | GAS-CP-R97-028 | 2026-11-12 | System Budgets: the list is grouped per vessel — one heading per vessel with its number of budgets, hours and sale — and the search also finds the vessel name; "Group by" switches the grouping off. | — |
 | 1.133.0 | GAS-CP-R97-027 | 2026-11-12 | Commercial › Web Sales: one page with the tabs Website inbox, Website statistics and the new Marine intelligence — the week's headlines from public yachting and marine news sources in five groups (new-build yachts Europe and Middle East, refit Europe, marine energy storage, hybrid vessels, yachting technology). | `install/migrate_cp_r97_027_marine_intel.sql` |
