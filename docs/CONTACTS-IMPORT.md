@@ -1672,3 +1672,13 @@ Report: the `.eml` draft opens in the classic Outlook, where the user cannot sen
 **Security review**: `Mail.ReadWrite` as an application permission lets the application read and change mail in every mailbox of the tenant, not only write drafts — the portal code only creates one draft in the signed-in person's own mailbox and never reads mail, but the permission itself is wider. Strong proposal, no performance cost: apply the application access policy (setup guide step B) with a group that holds only the staff mailboxes that use the portal, before or together with granting `Mail.ReadWrite`; and keep the client secret only in the server `config.php` as now. Not testable in the build environment: the Graph calls — test on live after the permission is granted.
 
 Language keys 9 249 each.
+
+## §311 v1.132.0 (R97-025) — Vessels: class, flag and the import of particulars
+
+Migration `install/migrate_cp_r97_025_vessel_class_flag.sql`: `vessels.class_society`, `vessels.flag` (VARCHAR(80)); guard `vm_cf_col()`. Form, vessel page (lede), list (under the yard) and `ex_vessels()` (columns Class, Flag, Link).
+
+Import (`views/vessels_import.php`, administrators): `vm_imp_stash()` keeps the workbook under `storage/vmimp/` with a random session-bound name (xlsx signature, 3 MB, a day at most); `vm_imp_plan()` finds the columns by header (Vessel / Our name / Name, IMO, Class, Flag, Yard / Builder, Link / URL, Confidence, Note), matches the vessel by exact name, then by `vm_norm()` when that is unique, and proposes a value only for an empty field; `vm_imo_ok()` checks the IMO check digit; links pass `vm_url_clean()`; dashes and "not found" wording count as empty; a vessel that appears twice is taken once. `vm_imp_apply()` re-reads the file, writes the ticked rows inside one transaction with `WHERE field IS NULL OR field = ''`, skips an IMO another vessel carries, logs the totals and deletes the file. The preview of an imported link is not fetched at import (hundreds of outgoing requests in one page load) — ↻ on the vessel page reads it.
+
+**Security review**: administrators only (`require_cp_admin()` on page, upload and apply; PM and customer accounts get 403 — tested), CSRF, upload limited by type signature and size, stored outside the web root's reach under the guarded `storage/` folder with a random name and removed after use; column names written to SQL come from the fixed list `VM_IMP_FIELDS`, values are bound; links are limited to http(s) by `vm_url_clean()` (a `javascript:` link was refused in the test); cell text is escaped on the review page. No finding. No performance effect on normal pages.
+
+Language keys 9 283 each.

@@ -33,6 +33,8 @@ layout_head($title, 'vessels');
         </select><p class="hint"><?= tt('v.customer_hint') ?></p></div>
       <div class="field"><label><?= tt('v.imo') ?></label><input name="imo" maxlength="16" value="<?= e($v['imo'] ?? '') ?>"></div>
       <div class="field"><label><?= tt('v.yard') ?></label><input name="yard" maxlength="120" value="<?= e($v['yard'] ?? '') ?>"></div>
+      <?php if (function_exists('vm_cf_col') && vm_cf_col()): ?><div class="field"><label><?= tt('v.class') ?></label><input name="class_society" maxlength="80" list="v-class-list" value="<?= e((string)($v['class_society'] ?? '')) ?>"><datalist id="v-class-list"><?php foreach (['ABS', 'Bureau Veritas', 'DNV', "Lloyd's Register", 'RINA', 'Hellenic Register of Shipping', 'Not classed'] as $cs): ?><option value="<?= e($cs) ?>"><?php endforeach; ?></datalist></div>
+      <div class="field"><label><?= tt('v.flag') ?></label><input name="flag" maxlength="80" value="<?= e((string)($v['flag'] ?? '')) ?>"></div><?php endif; ?>
       <?php if (function_exists('vm_url_col') && vm_url_col()): ?><div class="field" style="grid-column:1 / -1;"><label>🌐 <?= tt('v.url') ?></label><input name="info_url" type="url" inputmode="url" maxlength="500" placeholder="https://…" value="<?= e((string)($v['info_url'] ?? '')) ?>"><p class="hint" style="margin:4px 0 0;"><?= tt('v.url_hint') ?></p></div><?php endif; ?>
       <div class="field"><label><?= tt('th.status') ?></label>
         <select name="is_active"><option value="1"<?= $sel(1, $v['is_active'] ?? 1) ?>><?= tt('v.active') ?></option><option value="0"<?= $sel(0, $v['is_active'] ?? 1) ?>><?= tt('v.inactive') ?></option></select></div>

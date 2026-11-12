@@ -30,17 +30,17 @@ function ex_vessels(array $g): void {
     $hasTk = function_exists('tk_has') && tk_has(); $hasCt = function_exists('ct_has') && ct_has() && $staff;
     $rows = [];
     foreach ($vs as $v) {
-        $row = [$v['name'], $v['imo'], $v['customer_name'], $v['yard'], (int)$v['n_projects'], (int)$v['n_active'], $v['project_list']];
+        $row = [$v['name'], $v['imo'], $v['customer_name'], $v['yard'], (string)($v['class_society'] ?? ''), (string)($v['flag'] ?? ''), (string)($v['info_url'] ?? ''), (int)$v['n_projects'], (int)$v['n_active'], $v['project_list']];
         if ($hasTk) $row[] = (int)scalar("SELECT COUNT(*) FROM tickets WHERE vessel_id = ? AND status NOT IN ('closed','cancelled','resolved')", [$v['id']]);
         if ($hasCt) $row[] = (string)scalar("SELECT GROUP_CONCAT(CONCAT(ct.full_name, IF(cv.role IS NULL OR cv.role = '', '', CONCAT(' (', cv.role, ')'))) ORDER BY cv.is_primary DESC, ct.full_name SEPARATOR '; ') FROM contact_vessels cv JOIN contacts ct ON ct.id = cv.contact_id AND ct.is_active = 1 WHERE cv.vessel_id = ?", [$v['id']]);
         $row[] = $v['is_active'] ? 'yes' : 'no'; $row[] = $v['created_at'] ? substr($v['created_at'], 0, 10) : '';
         $rows[] = $row;
     }
-    $header = ['Vessel', 'IMO', 'Customer', 'Yard', 'Projects', 'Active projects', 'Project codes']; $widths = [28, 12, 24, 22, 10, 12, 30];
+    $header = ['Vessel', 'IMO', 'Customer', 'Yard', 'Class', 'Flag', 'Link', 'Projects', 'Active projects', 'Project codes']; $widths = [28, 12, 24, 22, 16, 14, 40, 10, 12, 30];
     if ($hasTk) { $header[] = 'Open tickets'; $widths[] = 12; }
     if ($hasCt) { $header[] = 'Contacts'; $widths[] = 44; }
     array_push($header, 'Active', 'Created'); array_push($widths, 8, 12);
-    xlsx_download('GAS-vessels-' . date('Ymd') . '.xlsx', [['name' => t('v.title'), 'first' => true, 'header' => $header, 'rows' => $rows, 'widths' => $widths, 'wrap' => [6, 8]]]);
+    xlsx_download('GAS-vessels-' . date('Ymd') . '.xlsx', [['name' => t('v.title'), 'first' => true, 'header' => $header, 'rows' => $rows, 'widths' => $widths, 'wrap' => [9, 11]]]);
 }
 
 function ex_projects(array $g): void {

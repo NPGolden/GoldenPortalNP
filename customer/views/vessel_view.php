@@ -40,7 +40,7 @@ layout_head($v['name'], 'vessels');
 <div class="page-head">
   <div>
     <h1>⚓ <?= e($v['name']) ?></h1>
-    <p class="lede" style="margin-bottom:0;"><?= $v['imo'] ? 'IMO ' . e($v['imo']) . ' · ' : '' ?><?= $v['yard'] ? e($v['yard']) . ' · ' : '' ?><?= $staff ? e($v['customer_name'] ?: t('v.unassigned')) : tt('vh.lede') ?></p>
+    <p class="lede" style="margin-bottom:0;"><?= $v['imo'] ? 'IMO ' . e($v['imo']) . ' · ' : '' ?><?= $v['yard'] ? e($v['yard']) . ' · ' : '' ?><?= !empty($v['class_society']) ? e(t('v.class') . ' ' . $v['class_society']) . ' · ' : '' ?><?= !empty($v['flag']) ? e(t('v.flag') . ' ' . $v['flag']) . ' · ' : '' ?><?= $staff ? e($v['customer_name'] ?: t('v.unassigned')) : tt('vh.lede') ?></p>
     <?php if ($staff && function_exists('vm_url_block')) echo vm_url_block($v, true);   // R97-016 / R97-017: preview of the vessel's web link ?>
   </div>
   <div class="btn-row">

@@ -335,3 +335,96 @@ function vm_url_block(array $v, bool $refresh = false): string {
     return $o . '</div></div>';
 }
 
+
+/* ───────────── R97-025: class and flag of a vessel; import of particulars (IMO, class, flag, yard, web link) with review ───────────── */
+function vm_cf_col(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM vessels LIKE 'class_society'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** A valid IMO number: 7 digits whose last digit is the check digit (digits 1–6 × 7…2, sum mod 10). */
+function vm_imo_ok(string $imo): bool {
+    if (!preg_match('/^\d{7}$/', $imo)) return false; $s = 0; for ($i = 0; $i < 6; $i++) $s += (int)$imo[$i] * (7 - $i); return $s % 10 === (int)$imo[6];
+}
+const VM_IMP_MAX = 3 * 1048576;   // the particulars workbook
+const VM_IMP_ROWS = 2000;
+const VM_IMP_FIELDS = ['imo' => 16, 'class_society' => 80, 'flag' => 80, 'yard' => 120, 'info_url' => 500];
+function vm_imp_dir(): string { $d = cp_storage() . '/vmimp'; if (!is_dir($d)) @mkdir($d, 0750, true); return $d; }
+function vm_imp_path(string $token): ?string { if (!preg_match('/^[a-f0-9]{32}$/', $token) || empty($_SESSION['vm_imp'][$token])) return null; $p = vm_imp_dir() . '/' . $token . '.xlsx'; return is_file($p) ? $p : null; }
+/** Keep the uploaded workbook for the review step (administrators; session-bound random name; files older than a day are removed). */
+function vm_imp_stash(array $file): string {
+    require_cp_admin();
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file((string)$file['tmp_name'])) throw new RuntimeException(t('vi.nofile'));
+    if ((int)$file['size'] > VM_IMP_MAX || strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION)) !== 'xlsx') throw new RuntimeException(t('vi.badfile'));
+    $fh = fopen((string)$file['tmp_name'], 'rb'); $sig = $fh ? (string) fread($fh, 4) : ''; if ($fh) fclose($fh); if ($sig !== "PK\x03\x04") throw new RuntimeException(t('vi.badfile'));
+    foreach ((array) @glob(vm_imp_dir() . '/*.xlsx') as $old) if (@filemtime($old) < time() - 86400) @unlink($old);
+    $token = bin2hex(random_bytes(16)); if (!move_uploaded_file((string)$file['tmp_name'], vm_imp_dir() . '/' . $token . '.xlsx')) throw new RuntimeException(t('err.upload'));
+    $_SESSION['vm_imp'] = [$token => mb_substr(basename((string)$file['name']), 0, 200)]; return $token;
+}
+function vm_imp_drop(string $token): void { $p = vm_imp_path($token); if ($p) @unlink($p); unset($_SESSION['vm_imp'][$token]); }
+/** A cell of the workbook as a clean value: dashes and "not found" wording count as empty. */
+function vm_imp_val($v, int $max): string {
+    $v = trim(preg_replace('/\s+/u', ' ', (string)$v)); if ($v === '' || preg_match('/^(—|–|-|n\/?a|none|none found|not found|unknown|\?)$/iu', $v)) return ''; return mb_substr($v, 0, $max);
+}
+/**
+ * Read the workbook and compare it with the vessel register. Columns are found by their header (any order): Vessel / Our name / Name ·
+ * IMO · Class · Flag · Yard / Builder · Link / URL / Web link · Confidence · Note. A value is PROPOSED only where the vessel's field is
+ * empty — nothing a person entered is ever replaced. Returns ['rows' => [...], 'n' => counts, 'cols' => found columns].
+ */
+function vm_imp_plan(string $path): array {
+    require_once __DIR__ . '/xlsx.php'; $rows = xlsx_rows($path); if (!$rows) throw new RuntimeException(t('vi.empty'));
+    $hdr = array_map(fn($h) => mb_strtolower(trim((string)$h)), (array) array_shift($rows)); $col = [];
+    foreach ($hdr as $i => $h) {
+        if ($h === '') continue;
+        if (!isset($col['name']) && preg_match('/^(our name|vessel|name|vessel name)\b/u', $h)) $col['name'] = $i;
+        elseif (!isset($col['imo']) && preg_match('/^imo\b/u', $h)) $col['imo'] = $i;
+        elseif (!isset($col['class_society']) && preg_match('/^class/u', $h)) $col['class_society'] = $i;
+        elseif (!isset($col['flag']) && preg_match('/^flag/u', $h)) $col['flag'] = $i;
+        elseif (!isset($col['yard']) && preg_match('/^(yard|builder|shipyard)/u', $h)) $col['yard'] = $i;
+        elseif (!isset($col['info_url']) && preg_match('/^(link|url|web ?link|web)/u', $h)) $col['info_url'] = $i;
+        elseif (!isset($col['conf']) && preg_match('/^confidence/u', $h)) $col['conf'] = $i;
+        elseif (!isset($col['note']) && preg_match('/^(note|remark)/u', $h)) $col['note'] = $i;
+    }
+    if (!isset($col['name'])) throw new RuntimeException(t('vi.no_name_col'));
+    if (count($rows) > VM_IMP_ROWS) throw new RuntimeException(t('vi.too_many', ['n' => VM_IMP_ROWS]));
+    $cf = vm_cf_col(); $uc = vm_url_col(); $byName = []; $byNorm = [];
+    foreach (all('SELECT id, name, imo, yard, ' . ($cf ? 'class_society, flag' : 'NULL AS class_society, NULL AS flag') . ', ' . ($uc ? 'info_url' : 'NULL AS info_url') . ' FROM vessels' . (vm_has() ? ' WHERE merged_into IS NULL' : '')) as $v) {
+        $byName[mb_strtolower(trim((string)$v['name']))] = $v; $k = function_exists('vm_norm') ? vm_norm((string)$v['name']) : ''; if ($k !== '') $byNorm[$k][] = $v;
+    }
+    $out = []; $n = ['rows' => 0, 'matched' => 0, 'unmatched' => 0, 'fill' => 0, 'nothing' => 0, 'bad' => 0]; $seen = [];
+    foreach ($rows as $ri => $r) {
+        $name = trim(preg_replace('/\s+/u', ' ', (string)($r[$col['name']] ?? ''))); if ($name === '') continue; $n['rows']++;
+        $v = $byName[mb_strtolower($name)] ?? null;
+        if (!$v && function_exists('vm_norm')) { $c = $byNorm[vm_norm($name)] ?? []; if (count($c) === 1) $v = $c[0]; }
+        $conf = strtoupper(vm_imp_val($r[$col['conf'] ?? -1] ?? '', 20)); $note = vm_imp_val($r[$col['note'] ?? -1] ?? '', 300);
+        $row = ['i' => $ri, 'name' => $name, 'vessel' => $v, 'conf' => $conf, 'note' => $note, 'set' => [], 'warn' => []];
+        if (!$v) { $n['unmatched']++; $out[] = $row; continue; }
+        $n['matched']++; if (isset($seen[(int)$v['id']])) { $row['warn'][] = t('vi.w_twice'); $out[] = $row; continue; } $seen[(int)$v['id']] = 1;
+        foreach (VM_IMP_FIELDS as $f => $max) {
+            if (!isset($col[$f]) || (!$cf && ($f === 'class_society' || $f === 'flag')) || (!$uc && $f === 'info_url')) continue;
+            $new = vm_imp_val($r[$col[$f]] ?? '', $max); if ($new === '') continue; $cur = trim((string)($v[$f] ?? ''));
+            if ($f === 'imo') { $new = preg_replace('/\D/', '', $new); if (!vm_imo_ok($new)) { $row['warn'][] = t('vi.w_imo', ['v' => mb_substr((string)($r[$col[$f]] ?? ''), 0, 20)]); $n['bad']++; continue; } }
+            if ($f === 'info_url') { $u = vm_url_clean($new); if ($u === null || $u === '') { $row['warn'][] = t('vi.w_url'); $n['bad']++; continue; } $new = $u; }
+            if ($cur !== '') { if ($f === 'imo' && $cur !== $new) $row['warn'][] = t('vi.w_imo_diff', ['a' => $cur, 'b' => $new]); continue; }   // filled fields stay
+            $row['set'][$f] = $new;
+        }
+        if ($row['set']) $n['fill']++; else $n['nothing']++;
+        $out[] = $row;
+    }
+    return ['rows' => $out, 'n' => $n, 'cols' => array_keys($col)];
+}
+/** Apply the ticked rows of a reviewed workbook: empty fields only (checked again at write time). Returns [vessels changed, fields filled]. */
+function vm_imp_apply(string $token, array $pick): array {
+    $u = require_cp_admin(); $path = vm_imp_path($token); if (!$path) throw new RuntimeException(t('vi.expired'));
+    $P = vm_imp_plan($path); $pick = array_flip(array_map('intval', $pick)); $nv = 0; $nf = 0; $pdo = db(); $pdo->beginTransaction();
+    try {
+        foreach ($P['rows'] as $r) {
+            if (!$r['vessel'] || !$r['set'] || !isset($pick[(int)$r['i']])) continue; $vid = (int)$r['vessel']['id']; $did = 0;
+            foreach ($r['set'] as $f => $val) {
+                if (!isset(VM_IMP_FIELDS[$f])) continue;
+                if ($f === 'imo' && scalar('SELECT COUNT(*) FROM vessels WHERE imo = ? AND id <> ?', [$val, $vid])) continue;   // one hull, one IMO
+                $did += q("UPDATE vessels SET `$f` = ? WHERE id = ? AND (`$f` IS NULL OR `$f` = '')", [$val, $vid])->rowCount();
+            }
+            if ($did) { $nv++; $nf += $did; }
+        }
+        $pdo->commit();
+    } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+    error_log('[vm_imp] ' . (int)$u['id'] . ' filled ' . $nf . ' fields on ' . $nv . ' vessels from ' . (string)($_SESSION['vm_imp'][$token] ?? ''));
+    vm_imp_drop($token); return [$nv, $nf];
+}

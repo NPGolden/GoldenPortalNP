@@ -866,6 +866,7 @@ function pm_handle_action(string $action, string $page): bool {
                 q('UPDATE vessels SET former_names = ? WHERE id = ?', [$str('former_names', 255) ?: null, $id]);
                 foreach (preg_split('/[\r\n;]+/', (string)($_POST['aliases'] ?? '')) as $al) if (trim($al) !== '') vm_alias_add($id, trim($al), 'manual');
             }
+            if (function_exists('vm_cf_col') && vm_cf_col() && (isset($_POST['class_society']) || isset($_POST['flag']))) q('UPDATE vessels SET class_society = ?, flag = ? WHERE id = ?', [$str('class_society', 80) ?: null, $str('flag', 80) ?: null, $id]);   // R97-025
             if (function_exists('vm_url_col') && vm_url_col() && isset($_POST['info_url'])) { $iu = vm_url_clean((string)$_POST['info_url']); if ($iu === null) throw new RuntimeException(t('v.url_bad')); $wasU = (string) scalar('SELECT info_url FROM vessels WHERE id = ?', [$id]); q('UPDATE vessels SET info_url = ? WHERE id = ?', [$iu !== '' ? $iu : null, $id]);
                 if (function_exists('vm_prev_col') && vm_prev_col() && ($wasU !== $iu || ($iu !== '' && !scalar('SELECT info_checked_at FROM vessels WHERE id = ?', [$id])))) { try { vm_url_preview_store($id, true); } catch (Throwable $e) {} } }   // R97-016 / R97-017: the preview is read once, when the link changes
             if (function_exists('vo_sync')) vo_sync($id);   // R95-005: a changed customer becomes an ownership period
