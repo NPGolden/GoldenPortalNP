@@ -1853,3 +1853,15 @@ Website R17: the sign-up form has "My role" (owner, owner's representative, capt
 **Security review**: list actions behind staff check, CSRF and `nl_can()`; filter values taken from fixed lists; all statements bound; a subscriber can create one contact only after confirming the e-mail address, with text fields cut and escaped on display, and can never create or change an organisation; the role value is checked against the category list. No finding.
 
 Language keys 9 680 each.
+
+## §327 v1.140.1 (R97-041) — Contacts import: fill-only mode, Country column; more categories
+
+`ct_categories()` gains `technical`, `service`, `executive`. `ct_cat_guess()` is now an ordered list of [category, words] (a category may appear twice): electrical / automation titles are caught as `technical` before the design words; purchasing, production, project, service, design, sales and executive words extended (EN / IT / NL / ES / EL); `sales` is tested before `executive` ("Sales Director" → sales); new `consultant` words.
+
+`ct_import()`: header `Country` (also Nation, Country of work) → `companies.country` when empty; `$GLOBALS['ct_import_fill_only']` (tick `fill_only` on the import form, default on): for a matched contact only blank fields are written, the category only when it is `other`, organisation / customer only when missing, name and active flag never; values equal to the stored ones are not written, and such contacts are counted as `contacts_same`. No database step.
+
+Worldwide contacts workbook of 09/10/2026 (1 098 people, 563 companies) converted to the template with categories from the job titles — `GAS-contacts-import_worldwide_R0_20261114.xlsx`; sandbox: dry run writes nothing; real run creates 1 085 contacts and 563 organisations with country; an existing contact with the same e-mail kept its name, title and category; a second run changes nothing.
+
+**Security review**: the tick is read as a boolean; the Country value is cut to 80 characters and bound; the import stays behind the same staff and CSRF checks; no personal data of the workbook was sent to the assistant or stored in the repository. No finding.
+
+Language keys 9 685 each.

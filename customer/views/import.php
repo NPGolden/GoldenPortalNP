@@ -25,7 +25,7 @@ $res = $_SESSION['cp_import_result'] ?? null;
 unset($_SESSION['cp_import_result']);
 
 $counts = function (array $r): array {
-    $keys = ['rows', 'proposed', 'customers_matched', 'companies_matched', 'customers_new', 'customers_upd', 'invoicing_new', 'invoicing_upd', 'vessels_new', 'vessels_unassigned', 'vessels_upd', 'projects_new', 'projects_upd', 'subs_new', 'subs_upd', 'systems_new', 'systems_upd', 'offers_new', 'offers_upd', 'contacts_new', 'contacts_upd', 'companies_new', 'companies_upd', 'links_new', 'notes_new', 'users_new', 'users_upd'];
+    $keys = ['rows', 'proposed', 'customers_matched', 'companies_matched', 'customers_new', 'customers_upd', 'invoicing_new', 'invoicing_upd', 'vessels_new', 'vessels_unassigned', 'vessels_upd', 'projects_new', 'projects_upd', 'subs_new', 'subs_upd', 'systems_new', 'systems_upd', 'offers_new', 'offers_upd', 'contacts_new', 'contacts_upd', 'contacts_same', 'companies_new', 'companies_upd', 'links_new', 'notes_new', 'users_new', 'users_upd'];
     if (!empty($r['warnings'])) $out['warnings'] = count($r['warnings']);
     $out = [];
     foreach ($keys as $k) if (array_key_exists($k, $r)) $out[$k] = (int)$r[$k];
@@ -105,6 +105,7 @@ layout_head(t('im.title'), 'import');
       <?= csrf_field() ?><input type="hidden" name="action" value="ct_import">
       <div class="field"><label><?= tt('im.file') ?></label><input name="xlsx" type="file" accept=".xlsx" required></div>
       <label class="chk"><input type="checkbox" name="dry" value="1" checked> <?= tt('im.dry') ?></label>
+      <label class="chk"><input type="checkbox" name="fill_only" value="1" checked> <?= tt('ct.im_fill_only') ?></label>
       <label class="chk"><input type="checkbox" name="create_new" value="1"> <?= tt('im.create_new') ?></label>
       <button class="btn" type="submit"><?= tt('im.run') ?></button>
     </form>

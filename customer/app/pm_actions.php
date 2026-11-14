@@ -1072,7 +1072,7 @@ function pm_handle_action(string $action, string $page): bool {
         case 'eq_import': {
             require_staff();
             if (empty($_FILES['xlsx']['tmp_name']) || !is_uploaded_file($_FILES['xlsx']['tmp_name'])) throw new RuntimeException(t('err.upload'));
-            $dry = !empty($_POST['dry']); if (function_exists('im_set_create')) im_set_create(!empty($_POST['create_new'])); $res = eq_import($_FILES['xlsx']['tmp_name'], (string)($_POST['maker'] ?? ''), $dry);
+            $dry = !empty($_POST['dry']); $GLOBALS['ct_import_fill_only'] = !empty($_POST['fill_only']); if (function_exists('im_set_create')) im_set_create(!empty($_POST['create_new'])); $res = eq_import($_FILES['xlsx']['tmp_name'], (string)($_POST['maker'] ?? ''), $dry);
             $res['kind'] = 'equipment'; $res['dry'] = $dry; $_SESSION['cp_import_result'] = $res;
             redirect('equipment', ['_r' => uniqid()]);
         }
@@ -1310,7 +1310,7 @@ function pm_handle_action(string $action, string $page): bool {
             require_staff(); if ($action === 'of_import') of_require();
             require_once __DIR__ . '/xlsx.php';
             if (empty($_FILES['xlsx']['tmp_name']) || !is_uploaded_file($_FILES['xlsx']['tmp_name'])) throw new RuntimeException(t('err.upload'));
-            $dry = !empty($_POST['dry']); if (function_exists('im_set_create')) im_set_create(!empty($_POST['create_new']));   // R95-002: new organisations / customers / vessels only when ticked
+            $dry = !empty($_POST['dry']); $GLOBALS['ct_import_fill_only'] = !empty($_POST['fill_only']); if (function_exists('im_set_create')) im_set_create(!empty($_POST['create_new']));   // R95-002: new organisations / customers / vessels only when ticked
             $res = match ($action) {
                 'vessel_import' => pm_import_vessels($_FILES['xlsx']['tmp_name'], $dry),
                 'sys_import'    => pm_import_systems($_FILES['xlsx']['tmp_name'], $dry),

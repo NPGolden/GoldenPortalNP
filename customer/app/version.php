@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.140.0';
+const CP_VERSION = '1.140.1';
 const CP_BUILD   = '2026-11-12';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-041', 'version' => '1.140.1', 'date' => '2026-11-14', 'title' => 'Contacts: three more categories (engineering / technical office, service / after-sales, director / executive) and wider job-title recognition; the Excel import accepts a Country column and, for contacts that already exist, fills only the empty fields.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-040', 'version' => '1.140.0', 'date' => '2026-11-14', 'title' => 'Newsletters: saved lists by category (organisation role and person category), website subscribers become contacts, more contact categories (technical manager, purchasing, designer, shipyard manager and others) set automatically from the job title.', 'db' => 'install/migrate_cp_r97_040_nl_lists_contact_categories.sql', 'check' => 'r97q'],
         ['ref' => 'GAS-CP-R97-039', 'version' => '1.139.0', 'date' => '2026-11-14', 'title' => 'Web Sales › Newsletters: prepare an issue from blocks in the Golden A/S template (with a first draft by the assistant), choose the audience by organisation role and website subscribers, send through Microsoft 365 in batches, and follow opens, clicks, unsubscribes per recipient and organisation; website sign-up with confirmation e-mail.', 'db' => 'install/migrate_cp_r97_039_newsletters.sql', 'check' => 'r97p'],
         ['ref' => 'GAS-CP-R97-038', 'version' => '1.138.1', 'date' => '2026-11-14', 'title' => 'Website statistics: card "Networks and organisations" — the registered domain (reverse DNS) and country of the visitors\' connections, e.g. a company network or an internet provider; no IP address is stored (website R15, Privacy Policy R4).', 'db' => null, 'check' => null],

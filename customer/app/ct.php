@@ -13,36 +13,41 @@ function ct_has(): bool {
 }
 function ct_categories(): array {
     $out = [];
-    foreach (['owner', 'owner_rep', 'management', 'yacht_mgr', 'tech_mgr', 'captain', 'chief_eng', 'eto', 'engineer', 'crew', 'yard', 'yard_mgr', 'project_mgr', 'designer', 'purchasing', 'class', 'surveyor', 'supplier', 'sales', 'broker', 'agent', 'consultant', 'other'] as $k) $out[$k] = t('ct.cat_' . $k);   // R97-040: more yachting roles
+    foreach (['owner', 'owner_rep', 'management', 'yacht_mgr', 'tech_mgr', 'captain', 'chief_eng', 'eto', 'engineer', 'crew', 'yard', 'yard_mgr', 'project_mgr', 'designer', 'technical', 'purchasing', 'service', 'executive', 'class', 'surveyor', 'supplier', 'sales', 'broker', 'agent', 'consultant', 'other'] as $k) $out[$k] = t('ct.cat_' . $k);   // R97-040: more yachting roles
     return $out;
 }
 function ct_cat_pill(string $cat): string {
-    $tone = ['owner' => 'gold', 'owner_rep' => 'gold', 'management' => 'navy', 'captain' => 'blue', 'chief_eng' => 'blue', 'eto' => 'blue', 'crew' => 'blue', 'yard' => 'green', 'class' => 'green', 'supplier' => 'mute', 'consultant' => 'mute', 'yacht_mgr' => 'navy', 'tech_mgr' => 'navy', 'engineer' => 'blue', 'yard_mgr' => 'green', 'project_mgr' => 'green', 'designer' => 'green', 'surveyor' => 'green', 'purchasing' => 'navy'][$cat] ?? 'mute';
+    $tone = ['owner' => 'gold', 'owner_rep' => 'gold', 'management' => 'navy', 'captain' => 'blue', 'chief_eng' => 'blue', 'eto' => 'blue', 'crew' => 'blue', 'yard' => 'green', 'class' => 'green', 'supplier' => 'mute', 'consultant' => 'mute', 'yacht_mgr' => 'navy', 'tech_mgr' => 'navy', 'engineer' => 'blue', 'yard_mgr' => 'green', 'project_mgr' => 'green', 'designer' => 'green', 'surveyor' => 'green', 'purchasing' => 'navy', 'technical' => 'green', 'service' => 'blue', 'executive' => 'gold'][$cat] ?? 'mute';
     return pill($tone, ct_categories()[$cat] ?? $cat);
 }
 /** R97-040: the category a job title points to — '' when the title says nothing. First match wins, most specific first. */
 function ct_cat_guess(?string $position): string {
     $p = ' ' . mb_strtolower(trim((string)$position)) . ' '; if (trim($p) === '') return '';
     $rules = [
-        'owner_rep'   => ['owner\'s rep', 'owners rep', 'owner rep', 'owner representative', 'εκπρόσωπος πλοιοκτ', 'rappresentante dell\'armatore', 'build captain'],
-        'eto'         => [' eto ', 'electro-technical', 'electrotechnical', 'avit', ' av/it', 'ηλεκτρονικός'],
-        'chief_eng'   => ['chief engineer', 'chief eng', ' c/e ', 'α\' μηχανικός', 'πρώτος μηχανικός', 'direttore di macchina'],
-        'engineer'    => ['2nd engineer', 'second engineer', '3rd engineer', 'electrician', 'ηλεκτρολόγος', 'elettricista', 'service engineer', 'commissioning engineer'],
-        'captain'     => ['captain', 'master', 'skipper', 'καπετάν', 'πλοίαρχος', 'comandante', 'capitano'],
-        'crew'        => ['bosun', 'deckhand', 'first officer', 'chief officer', 'chief mate', 'stewardess', 'purser', 'υποπλοίαρχος'],
-        'purchasing'  => ['purchas', 'procurement', 'buyer', 'supply chain', 'προμηθει', 'αγορών', 'acquisti'],
-        'tech_mgr'    => ['technical manager', 'technical director', 'technical superintendent', 'superintendent', 'fleet manager', 'τεχνικός διευθυντής', 'direttore tecnico', 'dpa '],
-        'yacht_mgr'   => ['yacht manager', 'yacht management', 'charter manager', 'fleet operations'],
-        'designer'    => ['designer', 'naval architect', 'architect', 'ναυπηγός', 'σχεδιαστ', 'progettista', 'architetto'],
-        'surveyor'    => ['surveyor', 'επιθεωρητής', 'ispettore'],
-        'yard_mgr'    => ['yard manager', 'shipyard manager', 'yard director', 'production manager', 'refit manager', 'head of production', 'διευθυντής ναυπηγείου', 'direttore di cantiere'],
-        'project_mgr' => ['project manager', 'project director', 'project engineer', 'project coordinator', 'διαχειριστής έργου', 'υπεύθυνος έργου', 'capo commessa', 'responsabile di progetto'],
-        'broker'      => ['broker', 'μεσίτης'],
-        'agent'       => ['agent', 'πράκτορας', 'agente'],
-        'sales'       => ['sales', 'business development', 'commercial', 'account manager', 'πωλήσεων', 'vendite', 'commerciale'],
-        'owner'       => [' owner ', 'ship owner', 'shipowner', 'πλοιοκτήτης', 'armatore'],
+        ['owner_rep', ['owner\'s rep', 'owners rep', 'owner rep', 'owner representative', 'εκπρόσωπος πλοιοκτ', 'rappresentante dell\'armatore', 'build captain']],
+        ['eto', [' eto ', 'electro-technical', 'electrotechnical', 'avit', ' av/it', 'ηλεκτρονικός']],
+        ['chief_eng', ['chief engineer', 'chief eng', ' c/e ', 'α\' μηχανικός', 'πρώτος μηχανικός', 'direttore di macchina']],
+        ['engineer', ['2nd engineer', 'second engineer', '3rd engineer', 'electrician', 'ηλεκτρολόγος', 'elettricista', 'service engineer', 'commissioning engineer']],
+        ['captain', ['captain', 'master', 'skipper', 'καπετάν', 'πλοίαρχος', 'comandante', 'capitano']],
+        ['crew', ['bosun', 'deckhand', 'first officer', 'chief officer', 'chief mate', 'stewardess', 'purser', 'υποπλοίαρχος']],
+        ['technical', ['electric', 'automation', 'elettric', 'ηλεκτρολογ', 'αυτοματισμ']],   // our own field first: an electrical designer is engineering, not design
+        ['purchasing', ['purchas', 'procurement', 'buyer', 'supply chain', 'προμηθει', 'αγορών', 'acquisti', 'einkauf', 'import department', 'inkoper', 'inkoop', 'compras', 'aprovisionamiento', 'approvvigionament', 'procurament', 'logistic']],
+        ['tech_mgr', ['technical manager', 'technical director', 'technical superintendent', 'superintendent', 'fleet manager', 'τεχνικός διευθυντής', 'direttore tecnico', 'dpa ']],
+        ['yacht_mgr', ['yacht manager', 'yacht management', 'charter manager', 'fleet operations', 'yacht operations', 'yacht accounts', 'port operations']],
+        ['designer', ['designer', 'naval architect', 'architect', 'ναυπηγός', 'σχεδιαστ', 'progettista', 'architetto', 'design', 'style department', 'interior', 'stile', 'style', 'arredo', 'decor', 'interieur', 'exterieur']],
+        ['surveyor', ['surveyor', 'επιθεωρητής', 'ispettore', 'surveillor', 'surveys']],
+        ['yard_mgr', ['yard manager', 'shipyard manager', 'yard director', 'production manager', 'refit manager', 'head of production', 'διευθυντής ναυπηγείου', 'direttore di cantiere', 'capo cantiere', 'responsabile produzione', 'direttore produzione', 'production', 'site manager']],
+        ['project_mgr', ['project manager', 'project director', 'project engineer', 'project coordinator', 'διαχειριστής έργου', 'υπεύθυνος έργου', 'capo commessa', 'responsabile di progetto', 'project lead', 'project management', 'projectmanagement', 'project assistant', 'project team', 'chief project', 'handover']],
+        ['service', ['service manager', 'after sales', 'after-sales', 'aftersales', 'customer service', 'service coordinator', 'warranty', 'refit', 'assistenza', 'customer care', 'yacht support', 'yacht services', 'manager services', 'service point', 'spare parts', 'parts ']],
+        ['technical', ['technical', 'engineering', 'engineer', 'electrical', 'automation', 'ufficio tecnico', 'τεχνικ', 'μηχανικός', 'ingegner', 'r&d', 'impiant', 'elektr', 'electro', 'tecnic', 'lighting', 'domotica', 'integration', 'quality', 'energy', 'perito']],
+        ['sales', ['sales', 'business development', 'commercial', 'account manager', 'πωλήσεων', 'vendite', 'commerciale', 'marketing', 'brand manager', 'product manager', 'quotation', 'preventivi', 'estimat', 'presupuestos', 'comercial', 'tender']],
+        ['executive', ['ceo', 'chief executive', 'managing director', 'general manager', 'managing partner', 'president', 'chairman', 'founder', 'co-owner', 'director', 'partner', 'chief operating', 'coo ', 'direttore generale', 'amministratore', 'titolare', 'διευθύνων', 'γενικός διευθυντής', 'πρόεδρος', 'executive', 'legale rappresentante', 'branch manager', 'business manager', 'operations manager', 'global operation', 'chief operative', 'senior manager']],
+        ['broker', ['broker', 'μεσίτης']],
+        ['agent', ['agent', 'πράκτορας', 'agente']],
+        ['consultant', ['consult', 'freelance', 'σύμβουλος', 'consulen']],
+        ['owner', [' owner ', 'ship owner', 'shipowner', 'πλοιοκτήτης', 'armatore']],
     ];
-    foreach ($rules as $k => $words) foreach ($words as $w) if (str_contains($p, $w)) return $k;
+    foreach ($rules as [$k, $words]) foreach ($words as $w) if (str_contains($p, $w)) return $k;
     return '';
 }
 /** Give every person still on "Other" the category of the job title, where the title is clear. $dry → only count. Returns the number of people. */
@@ -458,7 +463,7 @@ function ct_import(string $path, bool $dry): array {
     $map += xlsx_header_map($rows[$hi], ['company' => ['Company', 'Customer', 'Organisation', 'Organization', 'Owner', 'Firm'], 'category' => ['Category', 'Type', 'Kind', 'Group'], 'position' => ['Position', 'Title', 'Job title', 'Role', 'Function'],
                                          'email' => ['Email', 'E-mail', 'Mail'], 'phone' => ['Phone', 'Telephone', 'Tel', 'Office phone'], 'mobile' => ['Mobile', 'Cell', 'GSM', 'Mobile phone'],
                                          'vessels' => ['Vessels', 'Vessel', 'Yachts', 'Yacht', 'Ships'], 'birthday' => ['Birthday', 'Date of birth', 'DOB', 'Birth date', 'Born'], 'nameday' => ['Name day', 'Nameday', 'Name-day', 'Saint day'],
-                                         'interests' => ['Interests', 'Hobbies', 'Likes'], 'notes' => ['Notes', 'Note', 'Remarks', 'Comments', 'Comment'], 'active' => ['Active', 'Status'],
+                                         'interests' => ['Interests', 'Hobbies', 'Likes'], 'notes' => ['Notes', 'Note', 'Remarks', 'Comments', 'Comment'], 'active' => ['Active', 'Status'], 'country' => ['Country', 'Nation', 'Country of work'],
                                          'channels' => ['Channels', 'Communication', 'Communication methods', 'Contact by', 'Preferred channels'], 'subscriptions' => ['Subscriptions', 'Lists', 'Mailing lists', 'Opt-in', 'Campaigns']]);
     $g = fn(array $r, string $k) => ($map[$k] ?? null) !== null ? trim((string)($r[$map[$k]] ?? '')) : '';
     $u = current_user();
@@ -478,6 +483,7 @@ function ct_import(string $path, bool $dry): array {
                 if (($res['companies_new'] ?? 0) > $before) $res['warnings'][] = [$line, t('co.im_created', ['v' => $company])];
                 if (!$cid && $coid) { $cc = scalar('SELECT customer_id FROM companies WHERE id = ?', [$coid]); if ($cc) $cid = (int)$cc; }
             }
+            if ($coid && ($ctry = mb_substr($g($r, 'country'), 0, 80)) !== '') q("UPDATE companies SET country = ? WHERE id = ? AND (country IS NULL OR country = '')", [$ctry, $coid]);   // R97-041: the Country column fills the organisation's country when it has none
             $chRaw = $g($r, 'channels'); $channels = $chRaw === '' ? null : implode(',', ct_norm_set($chRaw, ct_channels(), 'ct.ch_'));
             $subRaw = $g($r, 'subscriptions'); $subs = $subRaw === '' ? null : implode(',', ct_norm_set($subRaw, ct_subscriptions(), 'ct.sub_'));
             $catRaw = $g($r, 'category'); $cat = $catRaw === '' ? null : ct_norm_category($catRaw);
@@ -496,13 +502,14 @@ function ct_import(string $path, bool $dry): array {
             if (!$c) $c = one('SELECT * FROM contacts WHERE LOWER(full_name) = LOWER(?) AND (customer_id <=> ? OR LOWER(COALESCE(company, "")) = LOWER(?)' . (co_has() ? ' OR company_id <=> ?' : '') . ') LIMIT 1', co_has() ? [$name, $cid, $company, $coid] : [$name, $cid, $company]);
             if (!$c && $company === '') { $cands = all('SELECT * FROM contacts WHERE LOWER(full_name) = LOWER(?)', [$name]); if (count($cands) === 1) $c = $cands[0]; }
             if ($c) {
-                $sets = ['full_name = ?']; $vals = [$name];
-                if ($cid) { $sets[] = 'customer_id = ?'; $vals[] = $cid; }
-                if (co_has()) { if ($coid) { $sets[] = 'company_id = ?'; $vals[] = $coid; } if ($channels !== null) { $sets[] = 'channels = ?'; $vals[] = $channels ?: null; } if ($subs !== null) { $sets[] = 'subscriptions = ?'; $vals[] = $subs ?: null; } }
-                foreach ($fields as $k => $v) if ($v !== null) { $sets[] = "$k = ?"; $vals[] = $v; }
-                $vals[] = $c['id'];
-                q('UPDATE contacts SET ' . implode(', ', $sets) . ' WHERE id = ?', $vals);
-                $id = (int)$c['id']; $res['contacts_upd']++;
+                $fill = !empty($GLOBALS['ct_import_fill_only']);   // R97-041: for a contact that exists, fill only what is empty (category: only when still "Other")
+                $blank = fn(string $k) => !isset($c[$k]) || trim((string)$c[$k]) === '' || ($k === 'category' && $c[$k] === 'other');
+                $sets = []; $vals = []; if (!$fill) { $sets[] = 'full_name = ?'; $vals[] = $name; }
+                if ($cid && (!$fill || empty($c['customer_id']))) { $sets[] = 'customer_id = ?'; $vals[] = $cid; }
+                if (co_has()) { if ($coid && (int)($c['company_id'] ?? 0) !== (int)$coid && (!$fill || empty($c['company_id']))) { $sets[] = 'company_id = ?'; $vals[] = $coid; } if ($channels !== null && (!$fill || $blank('channels'))) { $sets[] = 'channels = ?'; $vals[] = $channels ?: null; } if ($subs !== null && (!$fill || $blank('subscriptions'))) { $sets[] = 'subscriptions = ?'; $vals[] = $subs ?: null; } }
+                foreach ($fields as $k => $v) if ($v !== null && (string)($c[$k] ?? '') !== (string)$v && (!$fill || ($k !== 'is_active' && $blank($k)))) { $sets[] = "$k = ?"; $vals[] = $v; }
+                if ($sets) { $vals[] = $c['id']; q('UPDATE contacts SET ' . implode(', ', $sets) . ' WHERE id = ?', $vals); $res['contacts_upd']++; } else $res['contacts_same'] = ($res['contacts_same'] ?? 0) + 1;
+                $id = (int)$c['id'];
             } else {
                 q('INSERT INTO contacts (customer_id, company, full_name, position, category, email, phone, mobile, birthday, nameday_md, interests, is_active, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
                   [$cid, $fields['company'], $name, $fields['position'], $cat ?: 'other', $email, $fields['phone'], $fields['mobile'], $bday, $nd, $fields['interests'], $active ?? 1, (int)$u['id']]);

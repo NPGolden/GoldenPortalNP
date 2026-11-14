@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.140.0** (build 2026-11-12). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.140.1** (build 2026-11-12). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.140.1 | GAS-CP-R97-041 | 2026-11-14 | Contacts: three more categories (engineering / technical office, service / after-sales, director / executive) and wider job-title recognition; the Excel import accepts a Country column and, for contacts that already exist, fills only the empty fields. | — |
 | 1.140.0 | GAS-CP-R97-040 | 2026-11-14 | Newsletters: saved lists by category (organisation role and person category), website subscribers become contacts, more contact categories (technical manager, purchasing, designer, shipyard manager and others) set automatically from the job title. | `install/migrate_cp_r97_040_nl_lists_contact_categories.sql` |
 | 1.139.0 | GAS-CP-R97-039 | 2026-11-14 | Web Sales › Newsletters: prepare an issue from blocks in the Golden A/S template (with a first draft by the assistant), choose the audience by organisation role and website subscribers, send through Microsoft 365 in batches, and follow opens, clicks, unsubscribes per recipient and organisation; website sign-up with confirmation e-mail. | `install/migrate_cp_r97_039_newsletters.sql` |
 | 1.138.1 | GAS-CP-R97-038 | 2026-11-14 | Website statistics: card "Networks and organisations" — the registered domain (reverse DNS) and country of the visitors' connections, e.g. a company network or an internet provider; no IP address is stored (website R15, Privacy Policy R4). | — |
