@@ -71,7 +71,7 @@ layout_head(t('ab.title'), 'admin_about');
 </div>
 
 <div class="card" id="diag">
-  <div class="page-head" style="margin-bottom:6px;"><h2 style="margin:0;">🩺 <?= tt('dg.title') ?></h2><div class="btn-row"><a class="btn btn--gold btn--sm" href="<?= url('admin_about', ['diag' => 1]) ?>#diag">▶ <?= $diag ? tt('dg.rerun') : tt('dg.run') ?></a><?php if ($diag): ?><a class="btn btn--ghost btn--sm" href="<?= url('admin_about', ['diag' => 1, 'export' => 'diag']) ?>">⤓ <?= tt('dg.download') ?></a><?php endif; ?></div></div>
+  <div class="page-head" style="margin-bottom:6px;"><h2 style="margin:0;">🩺 <?= tt('dg.title') ?></h2><div class="btn-row"><a class="btn btn--gold btn--sm" href="<?= url('admin_about', ['diag' => 1]) ?>#diag">▶ <?= $diag ? tt('dg.rerun') : tt('dg.run') ?></a><?php if ($diag): ?><a class="btn btn--ghost btn--sm" href="<?= url('admin_about', ['diag' => 1, 'export' => 'diag']) ?>">⤓ <?= tt('dg.download') ?></a><?php endif; ?><a class="btn btn--ghost btn--sm" href="<?= url('admin_health') ?>">🩺 <?= tt('ph.title') ?></a></div></div>
   <p class="hint"><?= tt('dg.lede') ?></p>
   <?php if ($diag): $nF = count(array_filter($diag['rows'], fn($r) => $r['state'] === 'fail')); $nW = count(array_filter($diag['rows'], fn($r) => $r['state'] === 'warn')); ?>
   <p style="margin:0 0 8px;"><?= $nF ? pill('bad', $nF . ' ' . t('dg.fail')) : '' ?> <?= $nW ? pill('gold', $nW . ' ' . t('dg.warn')) : '' ?> <?= !$nF && !$nW ? pill('green', t('dg.all_ok')) : '' ?> <span class="hint">· <?= e($diag['at']) ?> · <?= (int)$diag['ms'] ?> ms</span></p>

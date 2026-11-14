@@ -371,7 +371,7 @@ function rcr_site_purge(): void {
     try {
         $ch = curl_init($origin . '/api/hr.php?r=purge');
         curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => '', CURLOPT_HTTPHEADER => ['X-Site-Key: ' . $key, 'Content-Length: 0'], CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 2, CURLOPT_CONNECTTIMEOUT => 2, CURLOPT_SSL_VERIFYPEER => true]);
-        curl_exec($ch); curl_close($ch);
+        curl_exec($ch); if (function_exists('perf_out')) perf_out($ch, 'Website careers'); curl_close($ch);
     } catch (Throwable $e) {}
 }
 

@@ -28,7 +28,7 @@ function ws_pull(string $from, string $to): array {
     curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8, CURLOPT_CONNECTTIMEOUT => 4, CURLOPT_FOLLOWLOCATION => false,
         CURLOPT_HTTPHEADER => ['X-Stats-Key: ' . ws_key(), 'Accept: application/json', 'User-Agent: GoldenPortal/' . (defined('CP_VERSION') ? CP_VERSION : '1')],
         CURLOPT_MAXFILESIZE => 6 * 1024 * 1024]);
-    $body = curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+    $body = curl_exec($ch); if (function_exists('perf_out')) perf_out($ch, 'Website statistics'); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
     if ($body === false || $code !== 200) { cp_setting_set('ws_last_error', gmdate('c') . ' HTTP ' . $code . ' ' . $err); return [false, 'HTTP ' . $code . ' ' . $err]; }
     if (strlen((string) $body) > 6 * 1024 * 1024) return [false, 'response too large'];
     $j = json_decode((string) $body, true);

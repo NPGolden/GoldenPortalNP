@@ -80,7 +80,7 @@ function mi_http_get(string $url): array {
             CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS, CURLOPT_ENCODING => '', CURLOPT_USERAGENT => 'GoldenAS-Portal/1.0 (news reader; +https://www.goldenas.com.gr)',
             CURLOPT_HTTPHEADER => ['Accept: application/rss+xml, application/atom+xml, application/xml, text/xml, text/html;q=0.8'],
             CURLOPT_WRITEFUNCTION => function ($c, $d) use (&$buf) { $buf .= $d; return strlen($buf) > MI_MAX_BYTES ? 0 : strlen($d); }]);
-        curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); $ct = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE); $loc = (string) curl_getinfo($ch, CURLINFO_REDIRECT_URL); curl_close($ch);
+        curl_exec($ch); if (function_exists('perf_out')) perf_out($ch, 'News feed'); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); $ct = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE); $loc = (string) curl_getinfo($ch, CURLINFO_REDIRECT_URL); curl_close($ch);
         if ($code >= 300 && $code < 400 && $loc !== '') { $url = $loc; continue; }
         if ($code !== 200) return ['', $ct, 'HTTP ' . $code];
         return [$buf, $ct, strlen($buf) > MI_MAX_BYTES ? 'too large' : ''];

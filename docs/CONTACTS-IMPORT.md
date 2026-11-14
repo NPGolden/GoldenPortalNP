@@ -1952,3 +1952,34 @@ Language keys 9 693 each.
 **Security review**: recipients are restricted to active administrators by id (no free-text address), because the report contains server paths and log lines; the user column of the slow-pages log is left out; the mail is plain text; actions are POST + CSRF + administrator only; time is validated by pattern. E-mail is not an encrypted store — the report carries no passwords, tokens or personal data, only technical state.
 
 Language keys 9 704 each (the figure 9 693 in §329–§330 should read 9 694).
+
+## §332 v1.142.0 (R97-046) — Advanced diagnostics: System health
+
+**Request**: "implement 1-6" of the proposal — timing by phase, calls to other servers, background jobs, slow statements, error grouping, 30-day trend.
+
+**New module** `app/perf.php` (loaded by `cache.php`, so every entry point has it). All data in small files under `storage/perf/` — no database step.
+
+| # | What | Functions | File |
+|---|---|---|---|
+| 1 | Phases of a slow page (start / data / draw, database, other servers) | `perf_mark()` (`route` in `index.php`, `head` in `layout_head()`), `perf_phases()` | 8th field of `storage/slow-pages.log` |
+| 2 | Calls to other servers | `perf_out($ch, $what)` after every `curl_exec()` (mailer ×5, webstats, mi, ai, softone, vm, rcr), `perf_out_summary()` | `outbound.log` |
+| 3 | Background jobs | `nf_job()` around each job of `nf_sweep()`, `perf_jobs_save()`, `perf_jobs()` | `jobs.json` |
+| 4 | Slow statements (> 100 ms, max 10 per request) | `perf_slow_query()` from `db_meter()`, `perf_sql_digest()`, `perf_sql_explain()` | `slow-queries.log` |
+| 5 | Errors grouped | `perf_err_handler()` (adds `{p=page v=version}`, max 40 lines per request), `perf_err_shutdown()`, `perf_release_note()`, `perf_errors()` | `storage/php-errors.log` |
+| 6 | Trend | `perf_finish()` from `db_meter_finish()`, `perf_rollup()` (daily, in `hk_tick()`), `perf_trend()` | `<day>.log` → `days.json` (90 days) |
+
+- Page `views/admin_health.php` (`?p=admin_health`, administrators), menu Settings › System › System health, button on the Diagnostics card. Action `perf_clear` (out | sql | jobs | trend).
+- `nf_sweep()` stamps `run_at` at its start as well, so a long sweep is not requested again by the next page.
+- Daily health report: yesterday's typical / slow 5 % against the days before (marked SLOWER at +50 %), new error kinds since the release, failing calls, failing jobs; subject shows the number of new errors.
+
+**Tests (sandbox)**: 30 days of synthetic timings → chart and tables; real failing call logged with host only (path and query absent); statement with an e-mail literal logged as `'?'`; digest groups 6 variants as one; EXPLAIN of a SELECT returns the plan, of an UPDATE is refused; 60 identical warnings in one request → 40 lines, group shows page `offers`, version, "New"; jobs file filled by a sweep; six tabs render without warnings; lint, sweep and API test clean.
+
+**Security review**
+- Page and action administrators only; action POST + CSRF; `what`, `tab`, `pg`, `x` reduced to fixed lists / character classes.
+- EXPLAIN runs only on a statement found in the portal's own log by hash — never on text from the browser — and only when it is a single SELECT; EXPLAIN does not execute the statement.
+- Nothing personal is stored: no user, no parameter values (literals replaced), no URL path or query of a call (host only).
+- `storage/` is closed to the web; the files are size-capped (1.5–3 MB, trimmed in place) and the raw day files are removed after the roll-up.
+- The per-request cap on logged warnings stops one broken loop from filling the disk — the proforma warning had written 440 lines in a week.
+- Cost per page: one file append of about 40 bytes; nothing else unless a call, a slow statement or a warning occurs.
+
+Language keys 9 812 each.

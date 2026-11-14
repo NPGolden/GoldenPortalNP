@@ -1437,6 +1437,7 @@ function pm_handle_action(string $action, string $page): bool {
             flash('good', t('au.unlocked'));
             redirect('admin_users', au_keep() + ['_r' => uniqid()]);
         }
+        case 'perf_clear': { require_cp_admin(); $w = (string)($_POST['what'] ?? ''); if (in_array($w, ['out', 'sql', 'jobs', 'trend'], true)) perf_clear($w); flash('good', t('ph.cleared')); redirect('admin_health', ['tab' => ['out' => 'out', 'sql' => 'sql', 'jobs' => 'jobs', 'trend' => 'trend'][$w] ?? 'trend', '_r' => uniqid()]); }   // R97-046
         case 'dh_save': { dh_save_from_post(); flash('good', t('dh.saved')); redirect('admin_about', ['_r' => uniqid()], '#dh'); }   // R97-045
         case 'dh_send_now': { require_cp_admin(); $n = dh_send(); flash($n ? 'good' : 'bad', t('dh.sent', ['n' => $n])); redirect('admin_about', ['_r' => uniqid()], '#dh'); }
         case 'diag_cache_flush': { diag_cache_flush(); flash('good', t('dg.cache_flushed')); redirect('admin_about', ['diag' => 1, '_r' => uniqid()], '#diag'); }   // R69-002

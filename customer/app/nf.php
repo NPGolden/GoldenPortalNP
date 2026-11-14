@@ -50,6 +50,7 @@ function nf_sweep_detached(): void {
     try {
         if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
         if (function_exists('fastcgi_finish_request')) fastcgi_finish_request(); elseif (function_exists('litespeed_finish_request')) litespeed_finish_request();
+        $GLOBALS['nf_mode'] = (function_exists('fastcgi_finish_request') || function_exists('litespeed_finish_request')) ? 'after the page' : 'background call';
         ignore_user_abort(true); @set_time_limit(120);
         nf_sweep();
     } catch (Throwable $e) { error_log('[nf] ' . $e->getMessage()); }
@@ -60,24 +61,28 @@ function nf_sweep(int $every = 60, bool $force = false): int {
         $run = one('SELECT run_at FROM nf_cursor WHERE source = ?', ['_meta']);
         if (!$force && $run && $run['run_at'] && tz_age((string)$run['run_at']) < $every) return 0;   // R97-044: zone-safe — before, the stored UTC time was read as local time and the sweep ran on every page
         if (!scalar("SELECT GET_LOCK('nf_sweep', 0)")) return 0;
-        $n = 0;
+        $n = 0; $tS = microtime(true); $GLOBALS['cp_jobs'] = [];
         try {
-            foreach (['ticket_events', 'ticket_comments', 'jo_events', 'fsr_events', 'isr_events', 'ts_events', 'offer_events', 'oa_comments', 'owner_approvals',
-                      'class_submittals', 'drawing_requests', 'sp_notes', 'sp_comments', 'documents', 'contact_notes'] as $src) {
-                $fn = 'nf_src_' . $src;
-                try { if (function_exists($fn)) $n += nf_run_source($src, $fn); } catch (Throwable $e) { /* a module not installed on this portal: skip its source */ }
-            }
-            try { if (function_exists('td_remind')) $n += td_remind(); } catch (Throwable $e) {}        // R22-002 task reminders
-            try { if (function_exists('pmt_remind')) $n += pmt_remind(); } catch (Throwable $e) {}      // R93-001 work-permit expiry
-            try { if (function_exists('lic_notify')) lic_notify(); } catch (Throwable $e) {}            // R22-001 licence expiry
-            try { if (function_exists('hra_remind')) { $n += hra_remind(); hra_purge(); } } catch (Throwable $e) {}   // R67-001 HR Assistant reminders + purge of closed flows
-            try { if (function_exists('rcr_has') && rcr_has() && (string) cp_setting('rc_retention_last', '') < date('Y-m-d')) { cp_setting_set('rc_retention_last', date('Y-m-d')); rcr_retention_run(); } } catch (Throwable $e) {}   // R91-002: recruiting GDPR retention once a day, from the portal itself (tools/cron.php is optional)
-            try { if (function_exists('ws_sweep')) ws_sweep(); } catch (Throwable $e) {}                 // R95-001 website statistics pull (15 min)
-            try { if (function_exists('ct_autocat') && function_exists('cp_setting') && cp_setting('ct_autocat_done', '') !== '1') { cp_setting_set('ct_autocat_done', '1'); cp_setting_set('ct_autocat_n', (string) ct_autocat()); } } catch (Throwable $e) {}   // R97-040: once — categories from job titles
-            try { if (function_exists('ct_subscribe_all') && function_exists('cp_setting') && cp_setting('ct_suball_done', '') !== '1') { cp_setting_set('ct_suball_done', '1'); cp_setting_set('ct_suball_n', (string) ct_subscribe_all()); } } catch (Throwable $e) {}   // R97-042: once — all four subscriptions on contacts with an e-mail
-            try { if (function_exists('nl_sweep')) nl_sweep(); } catch (Throwable $e) {}                 // R97-039 newsletters: one small batch per sweep
-            try { if (function_exists('mi_sweep')) mi_sweep(); } catch (Throwable $e) {}
-            try { if (function_exists('dh_maybe')) dh_maybe(); } catch (Throwable $e) { error_log('[dh] ' . $e->getMessage()); }   // R97-045 daily health report by e-mail                 // R97-027 marine intelligence: one news feed per sweep
+            q('INSERT INTO nf_cursor (source, last_id, run_at) VALUES (?, 0, NOW()) ON DUPLICATE KEY UPDATE run_at = NOW()', ['_meta']);   // R97-046: stamped at the start too — a long sweep is not asked for again by the next page
+            if (function_exists('perf_release_note')) { try { perf_release_note(); } catch (Throwable $e) {} }
+            // R97-046: every job is timed and its result kept (Settings › System health › Background jobs)
+            $n += nf_job('notifications', function () { $c = 0;
+                foreach (['ticket_events', 'ticket_comments', 'jo_events', 'fsr_events', 'isr_events', 'ts_events', 'offer_events', 'oa_comments', 'owner_approvals',
+                          'class_submittals', 'drawing_requests', 'sp_notes', 'sp_comments', 'documents', 'contact_notes'] as $src) {
+                    $fn = 'nf_src_' . $src;
+                    try { if (function_exists($fn)) $c += nf_run_source($src, $fn); } catch (Throwable $e) { /* a module not installed on this portal: skip its source */ }
+                } return $c; });
+            $n += nf_job('task_reminders', fn() => function_exists('td_remind') ? td_remind() : 0);                 // R22-002
+            $n += nf_job('permit_expiry', fn() => function_exists('pmt_remind') ? pmt_remind() : 0);                // R93-001
+            nf_job('licence', function () { if (function_exists('lic_notify')) lic_notify(); });                     // R22-001
+            $n += nf_job('hr_assistant', function () { if (!function_exists('hra_remind')) return 0; $c = hra_remind(); hra_purge(); return $c; });   // R67-001
+            nf_job('recruiting_retention', function () { if (function_exists('rcr_has') && rcr_has() && (string) cp_setting('rc_retention_last', '') < date('Y-m-d')) { cp_setting_set('rc_retention_last', date('Y-m-d')); rcr_retention_run(); } });   // R91-002: once a day
+            nf_job('website_statistics', function () { if (function_exists('ws_sweep')) ws_sweep(); });              // R95-001 (15 min)
+            nf_job('contacts_once', function () { if (function_exists('ct_autocat') && function_exists('cp_setting') && cp_setting('ct_autocat_done', '') !== '1') { cp_setting_set('ct_autocat_done', '1'); cp_setting_set('ct_autocat_n', (string) ct_autocat()); } if (function_exists('ct_subscribe_all') && function_exists('cp_setting') && cp_setting('ct_suball_done', '') !== '1') { cp_setting_set('ct_suball_done', '1'); cp_setting_set('ct_suball_n', (string) ct_subscribe_all()); } });   // R97-040 / R97-042: one-time jobs
+            nf_job('newsletters', function () { if (function_exists('nl_sweep')) nl_sweep(); });                     // R97-039: one small batch per sweep
+            nf_job('news_feeds', function () { if (function_exists('mi_sweep')) mi_sweep(); });                      // R97-027: one feed per sweep
+            nf_job('health_report', function () { if (function_exists('dh_maybe')) dh_maybe(); });                   // R97-045
+            if (function_exists('perf_jobs_save')) perf_jobs_save((microtime(true) - $tS) * 1000, (string)($GLOBALS['nf_mode'] ?? 'page'));
             q('INSERT INTO nf_cursor (source, last_id, run_at) VALUES (?, 0, NOW()) ON DUPLICATE KEY UPDATE run_at = NOW()', ['_meta']);
             if (random_int(1, 40) === 1) nf_prune();                         // seen entries older than 90 days, now and then
         } finally { scalar("SELECT RELEASE_LOCK('nf_sweep')"); }

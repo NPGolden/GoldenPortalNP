@@ -113,7 +113,7 @@ function settings_tab_groups(): array {
     if ($staff) $data[] = ['import', t('nav.import')];
     if ($admin && function_exists('fd_has') && fd_has()) $data[] = ['fd_import', t('fd.tab')];
     if ($data) $G[] = [t('stg.data'), $data];
-    if ($admin) $G[] = [t('stg.system'), array_merge([['admin_log', t('nav.loginlog')]], function_exists('web_has') && web_has() ? [['admin_website', t('web.title')]] : [], [['admin_about', t('nav.about')], ['license', t('lic.title')]])];   // R90-001
+    if ($admin) $G[] = [t('stg.system'), array_merge([['admin_log', t('nav.loginlog')]], function_exists('web_has') && web_has() ? [['admin_website', t('web.title')]] : [], [['admin_about', t('nav.about')], ['admin_health', t('ph.title')], ['license', t('lic.title')]])];   // R90-001
     return $G;
 }
 function settings_tabs_list(): array {
@@ -154,6 +154,7 @@ function layout_head(string $title, string $active = ''): void {
     if ($active === 'task_edit') $active = 'tasks';
     // R18-002 notifications sweep (throttled). R97-044: no longer run while the page is built — it reads news feeds, pulls website statistics and sends
     // newsletters, which made one page a minute wait for other servers. Now: after the page is sent (PHP-FPM / LiteSpeed) or by a background call of the browser.
+    if (function_exists('perf_mark')) perf_mark('head');               // R97-046: the page has its data, the HTML starts
     $GLOBALS['nf_bg'] = false;
     if ($u && function_exists('nf_sweep_due') && nf_sweep_due()) { if (nf_can_detach()) register_shutdown_function('nf_sweep_detached'); else $GLOBALS['nf_bg'] = true; }
     ?><!doctype html>

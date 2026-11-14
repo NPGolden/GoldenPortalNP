@@ -306,7 +306,7 @@ function vm_url_preview(string $url): ?array {
         curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => false, CURLOPT_FOLLOWLOCATION => false, CURLOPT_CONNECTTIMEOUT => 4, CURLOPT_TIMEOUT => 5, CURLOPT_PROTOCOLS => CURLPROTO_HTTP | CURLPROTO_HTTPS,
             CURLOPT_RESOLVE => [$host . ':' . $port . ':' . $ip], CURLOPT_USERAGENT => 'GoldenAS-Portal link preview', CURLOPT_HTTPHEADER => ['Accept: text/html,application/xhtml+xml', 'Accept-Language: en'], CURLOPT_ENCODING => '',
             CURLOPT_WRITEFUNCTION => function ($c, $d) use (&$buf) { $buf .= $d; return strlen($buf) > 300000 ? 0 : strlen($d); }]);
-        curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE); $ct = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE); $loc = (string) curl_getinfo($ch, CURLINFO_REDIRECT_URL); curl_close($ch);
+        curl_exec($ch); if (function_exists('perf_out')) perf_out($ch, 'Vessel link preview'); $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE); $ct = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE); $loc = (string) curl_getinfo($ch, CURLINFO_REDIRECT_URL); curl_close($ch);
         if ($code >= 300 && $code < 400 && $loc !== '') { $url = $loc; continue; }
         if ($code < 200 || $code >= 300 || $buf === '' || ($ct !== '' && stripos($ct, 'html') === false)) return null;
         return vm_url_meta($buf, $ct);

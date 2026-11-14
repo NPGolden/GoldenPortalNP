@@ -27,7 +27,7 @@ function s1_post_raw(string $url, array $payload): array {
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_TIMEOUT        => 60,
     ]);
-    $body  = curl_exec($ch);
+    $body  = curl_exec($ch); if (function_exists('perf_out')) perf_out($ch, 'Softone');
     $err   = curl_error($ch);
     $http  = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
     $ctype = (string) curl_getinfo($ch, CURLINFO_CONTENT_TYPE);

@@ -34,19 +34,21 @@ function cache_sweep(): int { if (cache_backend() === 'apcu') return 0; $n = 0; 
 
 /* ------------------------------------------------------------------ query meter */
 $GLOBALS['cp_q'] = ['n' => 0, 'ms' => 0.0, 't0' => microtime(true), 'slow' => []];
-function db_meter(string $sql, float $ms): void { $m = &$GLOBALS['cp_q']; $m['n']++; $m['ms'] += $ms; if ($ms > 300 && count($m['slow']) < 5) $m['slow'][] = [round($ms), mb_substr(preg_replace('/\s+/', ' ', $sql), 0, 160)]; }
+require_once __DIR__ . '/perf.php';   // R97-046 advanced diagnostics (phases, outbound calls, jobs, slow statements, errors, trend)
+function db_meter(string $sql, float $ms): void { $m = &$GLOBALS['cp_q']; $m['n']++; $m['ms'] += $ms; if ($ms > 300 && count($m['slow']) < 5) $m['slow'][] = [round($ms), mb_substr(preg_replace('/\s+/', ' ', $sql), 0, 160)]; if ($ms > PERF_SLOW_SQL_MS) perf_slow_query($sql, $ms); }
 function db_stats(): array { $m = $GLOBALS['cp_q']; return ['queries' => (int)$m['n'], 'db_ms' => (int) round($m['ms']), 'page_ms' => (int) round((microtime(true) - $m['t0']) * 1000), 'slow' => $m['slow']]; }
 /** Called at the end of a page: a slow page (> 2 s or > 150 queries) is logged for Diagnostics. */
 function db_meter_finish(string $page): void {
-    $s = db_stats(); if ($s['page_ms'] < 2000 && $s['queries'] < 150) return;
+    $s = db_stats(); perf_finish($page, $s);   // R97-046: every page feeds the trend
+    if ($s['page_ms'] < 2000 && $s['queries'] < 150) return; $ph = perf_phases();
     $f = dirname(__DIR__) . '/storage/slow-pages.log'; $u = function_exists('current_user') ? current_user() : null;
-    @file_put_contents($f, date('Y-m-d H:i:s') . "\t" . $page . "\t" . $s['page_ms'] . " ms\t" . $s['queries'] . " q\t" . $s['db_ms'] . " db ms\t" . (string)($u['email'] ?? '-') . ($s['slow'] ? "\t" . implode(' | ', array_map(fn($x) => $x[0] . ' ms ' . $x[1], $s['slow'])) : '') . "\n", FILE_APPEND | LOCK_EX);
+    @file_put_contents($f, date('Y-m-d H:i:s') . "\t" . $page . "\t" . $s['page_ms'] . " ms\t" . $s['queries'] . " q\t" . $s['db_ms'] . " db ms\t" . (string)($u['email'] ?? '-') . "\t" . implode(' | ', array_map(fn($x) => $x[0] . ' ms ' . $x[1], $s['slow'])) . "\tboot=" . $ph['boot'] . ';prep=' . $ph['prep'] . ';render=' . $ph['render'] . ';out=' . $ph['out'] . ';outn=' . $ph['outn'] . "\n", FILE_APPEND | LOCK_EX);   // R97-046: 8th field = where the time went
 }
 /** Slowest pages for Diagnostics: last 200 lines, sorted by ms. */
 function db_slow_pages(int $n = 8): array {
     $f = dirname(__DIR__) . '/storage/slow-pages.log'; if (!is_file($f)) return [];
     $lines = array_slice(array_filter(explode("\n", (string) @file_get_contents($f))), -200); $rows = [];
-    foreach ($lines as $l) { $p = explode("\t", $l); if (count($p) < 5) continue; $rows[] = ['at' => $p[0], 'page' => $p[1], 'ms' => (int)$p[2], 'q' => (int)$p[3], 'db' => (int)$p[4], 'who' => $p[5] ?? '', 'slow' => $p[6] ?? '']; }
+    foreach ($lines as $l) { $p = explode("\t", $l); if (count($p) < 5) continue; $rows[] = ['at' => $p[0], 'page' => $p[1], 'ms' => (int)$p[2], 'q' => (int)$p[3], 'db' => (int)$p[4], 'who' => $p[5] ?? '', 'slow' => $p[6] ?? '', 'ph' => isset($p[7]) ? perf_phase_text($p[7]) : []]; }
     usort($rows, fn($a, $b) => $b['ms'] <=> $a['ms']); return array_slice($rows, 0, $n);
 }
 
@@ -61,6 +63,7 @@ function hk_tick(): void {
         try { $log[] = 'push_queue ' . q('DELETE FROM mob_push_queue WHERE sent_at IS NOT NULL AND sent_at < NOW() - INTERVAL 30 DAY LIMIT 5000')->rowCount(); } catch (Throwable $e) {}
         $n = 0; $cut = time() - 7 * 86400; foreach ((array) @glob($storage . '/sessions/sess_*') as $f) if (@filemtime($f) < $cut && @unlink($f)) $n++; $log[] = 'sessions ' . $n;
         $log[] = 'cache ' . cache_sweep();
+        try { $log[] = 'perf ' . perf_rollup(); } catch (Throwable $e) {}   // R97-046: yesterday's page timings into the trend
         try { if (function_exists('pp_daily')) $log[] = pp_daily(); } catch (Throwable $e) { $log[] = 'pipeline err'; }   // R75-001
         try { if (function_exists('hr_doc_daily')) $log[] = hr_doc_daily(); } catch (Throwable $e) { $log[] = 'hr-doc err'; }   // R77-007
         $dirs = (array) @glob($storage . '/backups/*', GLOB_ONLYDIR); rsort($dirs); $n = 0; foreach (array_slice($dirs, 3) as $d) { foreach ((array) @glob($d . '/*') as $f) @unlink($f); if (@rmdir($d)) $n++; } $log[] = 'backups ' . $n;

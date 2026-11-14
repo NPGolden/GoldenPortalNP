@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.141.0';
+const CP_VERSION = '1.142.0';
 const CP_BUILD   = '2026-11-14';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-046', 'version' => '1.142.0', 'date' => '2026-11-14', 'title' => 'System health (Settings › System): 30-day trend of page times, where slow pages spent their time, calls to other servers, background jobs, slow database statements with examination, PHP errors grouped with page and version and “new since this release”; the daily health report carries the same findings.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-045', 'version' => '1.141.0', 'date' => '2026-11-14', 'title' => 'Daily health report by e-mail to the portal administrators (default 07:00, schedule and recipients in Settings › About / Versions › Diagnostics): failed checks and warnings, slow pages and PHP log of the last 24 hours grouped, background work, full diagnostics; timesheet PDF footer shows the branch line again.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-044', 'version' => '1.140.4', 'date' => '2026-11-14', 'title' => 'Speed: the background sweep (notifications, reminders, website statistics, news feeds, newsletter batches) ran on every page because its once-a-minute rule compared a UTC time with local time — fixed, and the sweep now runs after the page is shown; presence stamp and sign-up confirmation rules fixed the same way; Projects page alert cache kept 10 minutes; editing a recorded payment on a proforma / invoice works again.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-043', 'version' => '1.140.3', 'date' => '2026-11-14', 'title' => 'Newsletter lists: organisation type and person category now add up (either one is enough) instead of narrowing each other, so a list with both ticked is no longer empty; a choice per list keeps the narrow rule; several countries per list and the countries in use are proposed.', 'db' => null, 'check' => null],

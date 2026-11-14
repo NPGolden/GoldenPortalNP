@@ -23,7 +23,7 @@ function cp_graph_token(bool $fresh = false): ?string {
     $ch = curl_init('https://login.microsoftonline.com/' . rawurlencode($tenant) . '/oauth2/v2.0/token');
     curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 15, CURLOPT_CONNECTTIMEOUT => 8,
         CURLOPT_POSTFIELDS => http_build_query(['client_id' => $cid, 'client_secret' => $sec, 'scope' => 'https://graph.microsoft.com/.default', 'grant_type' => 'client_credentials'])]);
-    $res = curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+    $res = curl_exec($ch); if (function_exists('perf_out')) perf_out($ch, 'Microsoft 365 token'); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
     $j = is_string($res) ? json_decode($res, true) : null;
     if ($code !== 200 || empty($j['access_token'])) { error_log('[cp_mail] Graph token failed (' . $code . ') ' . ($err ?: (string) ($j['error'] ?? '')) . ' ' . preg_replace('/\s+/', ' ', mb_substr((string) ($j['error_description'] ?? ''), 0, 160))); return null; }
     @file_put_contents($cache, json_encode(['t' => $j['access_token'], 'exp' => time() + (int) ($j['expires_in'] ?? 3600)]), LOCK_EX); @chmod($cache, 0600);
@@ -40,7 +40,7 @@ function cp_graph_send(string $from, string $fromName, string $to, string $subje
         $ch = curl_init('https://graph.microsoft.com/v1.0/users/' . rawurlencode($from) . '/sendMail');
         curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20, CURLOPT_CONNECTTIMEOUT => 8,
             CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $tok, 'Content-Type: application/json'], CURLOPT_POSTFIELDS => json_encode(['message' => $msg, 'saveToSentItems' => true], JSON_UNESCAPED_UNICODE)]);
-        $res = curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch); return [$code, is_string($res) ? $res : ''];
+        $res = curl_exec($ch); if (function_exists('perf_out')) perf_out($ch, 'Microsoft 365 mail'); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch); return [$code, is_string($res) ? $res : ''];
     };
     [$code, $res] = $post($tok);
     if ($code === 401) { $tok = cp_graph_token(true); if ($tok) [$code, $res] = $post($tok); }   // expired / revoked token → one retry
@@ -64,7 +64,7 @@ function cp_graph_send_message(string $mailbox, string $fromName, array $to, arr
         $ch = curl_init('https://graph.microsoft.com/v1.0/users/' . rawurlencode($mailbox) . '/sendMail');
         curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 40, CURLOPT_CONNECTTIMEOUT => 8,
             CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $tok, 'Content-Type: application/json'], CURLOPT_POSTFIELDS => json_encode(['message' => $msg, 'saveToSentItems' => true], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE)]);
-        $res = curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch); return [$code, is_string($res) ? $res : ''];
+        $res = curl_exec($ch); if (function_exists('perf_out')) perf_out($ch, 'Microsoft 365 mail'); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch); return [$code, is_string($res) ? $res : ''];
     };
     [$code, $res] = $post($tok);
     if ($code === 401) { $tok = cp_graph_token(true); if ($tok) [$code, $res] = $post($tok); }
@@ -81,7 +81,7 @@ function cp_graph_call(string $method, string $path, ?array $json = null, int $t
         $ch = curl_init('https://graph.microsoft.com/v1.0' . $path);
         $opt = [CURLOPT_CUSTOMREQUEST => $method, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => 8, CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $tok, 'Content-Type: application/json']];
         if ($json !== null) $opt[CURLOPT_POSTFIELDS] = json_encode($json, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
-        curl_setopt_array($ch, $opt); $res = curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+        curl_setopt_array($ch, $opt); $res = curl_exec($ch); if (function_exists('perf_out')) perf_out($ch, 'Microsoft 365'); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
         $j = is_string($res) && $res !== '' ? json_decode($res, true) : null; return [$code, is_array($j) ? $j : []];
     };
     [$code, $j] = $do($tok);
@@ -114,7 +114,7 @@ function cp_graph_create_draft(string $mailbox, array $to, array $cc, string $su
             $part = substr($bytes, $o, $chunk); $end = $o + strlen($part) - 1; $ch = curl_init($up);
             curl_setopt_array($ch, [CURLOPT_CUSTOMREQUEST => 'PUT', CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 90, CURLOPT_CONNECTTIMEOUT => 8, CURLOPT_POSTFIELDS => $part,
                 CURLOPT_HTTPHEADER => ['Content-Type: application/octet-stream', 'Content-Length: ' . strlen($part), 'Content-Range: bytes ' . $o . '-' . $end . '/' . $size]]);
-            curl_exec($ch); $pc = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
+            curl_exec($ch); if (function_exists('perf_out')) perf_out($ch, 'Microsoft 365 upload'); $pc = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
             if (!in_array($pc, [200, 201, 202], true)) { cp_graph_call('DELETE', $mp); return $fail($pc, [], 'upload'); }
         }
     }

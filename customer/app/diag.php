@@ -142,7 +142,7 @@ function diag_run(): array {
         $R[] = diag_row('app', t('dg.cache'), is_writable(cache_dir()) || cache_backend() === 'apcu' ? 'ok' : 'warn', (cache_backend() === 'apcu' ? 'APCu' : t('dg.cache_files')) . ($n === '-' ? '' : ' · ' . $n . ' ' . t('dg.cache_entries')), is_writable(cache_dir()) || cache_backend() === 'apcu' ? '' : t('dg.fix_storage'));
         $hk = (string) cp_setting('hk_last', ''); $R[] = diag_row('app', t('dg.housekeeping'), $hk === '' ? 'warn' : (substr($hk, 0, 10) < date('Y-m-d', strtotime('-2 days')) ? 'warn' : 'ok'), $hk === '' ? t('dg.hk_never') : $hk);
         $sp = db_slow_pages(8); if (!$sp) { $R[] = diag_row('app', t('dg.slow_pages'), 'ok', t('dg.slow_none')); return; }
-        $R[] = diag_row('app', t('dg.slow_pages'), $sp[0]['ms'] > 8000 ? 'warn' : 'ok', implode("\n", array_map(fn($r) => $r['at'] . ' · ' . $r['page'] . ' · ' . $r['ms'] . ' ms · ' . $r['q'] . ' q · db ' . $r['db'] . ' ms' . ($r['slow'] ? ' · ' . mb_substr($r['slow'], 0, 160) : ''), $sp)), $sp[0]['ms'] > 8000 ? t('dg.fix_slow') : '');
+        $R[] = diag_row('app', t('dg.slow_pages'), $sp[0]['ms'] > 8000 ? 'warn' : 'ok', implode("\n", array_map(fn($r) => $r['at'] . ' · ' . $r['page'] . ' · ' . $r['ms'] . ' ms · ' . $r['q'] . ' q · db ' . $r['db'] . ' ms' . (!empty($r['ph']) ? ' · other servers ' . (int)($r['ph']['out'] ?? 0) . ' ms · start ' . (int)($r['ph']['boot'] ?? 0) . ' / data ' . (int)($r['ph']['prep'] ?? 0) . ' / draw ' . (int)($r['ph']['render'] ?? 0) . ' ms' : '') . ($r['slow'] ? ' · ' . mb_substr($r['slow'], 0, 160) : ''), $sp)), $sp[0]['ms'] > 8000 ? t('dg.fix_slow') : '');
     }, 'app', t('dg.slow_pages'));
 
     // the error log the portal keeps since R69-001
@@ -203,12 +203,22 @@ function dh_build(): array {
     try { $run = (string) scalar("SELECT run_at FROM nf_cursor WHERE source = '_meta'"); $L[] = '  Background sweep last ran: ' . ($run !== '' ? fmt_datetime($run) : 'never'); } catch (Throwable $e) {}
     try { if (function_exists('nl_has') && nl_has()) $L[] = '  Newsletters: ' . (int) scalar("SELECT COUNT(*) FROM nl_sends WHERE status IN ('queued','sending')") . ' queued · ' . (int) scalar("SELECT COUNT(*) FROM nl_sends WHERE status = 'failed'") . ' failed · ' . (int) scalar("SELECT COUNT(*) FROM nl_sends WHERE status = 'sent' AND sent_at >= NOW() - INTERVAL 1 DAY") . ' sent in 24 h'; } catch (Throwable $e) {}
     try { $L[] = '  Sign-ins in 24 h: ' . (int) scalar("SELECT COUNT(*) FROM login_log WHERE created_at >= NOW() - INTERVAL 1 DAY AND outcome IN ('success','passkey')") . ' · refused: ' . (int) scalar("SELECT COUNT(*) FROM login_log WHERE created_at >= NOW() - INTERVAL 1 DAY AND outcome IN ('failed','locked','disabled','twofa_failed','passkey_failed','device')"); } catch (Throwable $e) {}
+    // R97-046: trend, new errors since the release, failing calls and jobs
+    $newE = []; $outBad = []; $jobBad = [];
+    try { $tr = perf_trend(8); $days = array_keys($tr); $y = date('Y-m-d', time() - 86400); if (isset($tr[$y]) && $tr[$y]['all']['n']) { $a = $tr[$y]['all']; $prev = array_filter(array_map(fn($d) => $tr[$d]['all']['p50'], array_filter($days, fn($d) => $d < $y))); $base = $prev ? (int) round(array_sum($prev) / count($prev)) : 0;
+        $L[] = '  Yesterday: ' . $a['n'] . ' pages · typical ' . $a['p50'] . ' ms · slow 5 % ' . $a['p95'] . ' ms · ' . $a['q'] . ' statements per page' . ($base ? ' · typical of the days before ' . $base . ' ms' . ($a['p50'] > $base * 1.5 && $a['p50'] - $base > 80 ? '  <-- SLOWER' : '') : ''); } } catch (Throwable $e) {}
+    try { foreach (perf_errors() as $g) if ($g['new']) $newE[] = $g; $L[] = '  New kinds of PHP error since v' . CP_VERSION . ' went live: ' . count($newE); } catch (Throwable $e) {}
+    try { foreach (perf_out_summary(24) as $o) if ($o['fail']) $outBad[] = $o; $L[] = '  Calls to other servers failing: ' . count($outBad) . ' purpose(s)'; } catch (Throwable $e) {}
+    try { foreach (perf_jobs() as $k => $j) if ($k !== '_sweep' && empty($j['ok'])) $jobBad[$k] = $j; $L[] = '  Background jobs failing: ' . count($jobBad); } catch (Throwable $e) {}
     $L[] = '';
+    if ($newE) { $L[] = 'NEW ERRORS SINCE THIS RELEASE — times · pages · message'; foreach (array_slice($newE, 0, 10) as $g) $L[] = '  ' . str_pad((string)$g['n'], 5, ' ', STR_PAD_LEFT) . '  ' . (implode(',', array_slice(array_keys($g['pages']), 0, 3)) ?: '-') . '  ' . mb_substr($g['sample'], 0, 220); $L[] = ''; }
+    if ($outBad) { $L[] = 'OTHER SERVERS (24 h) — purpose · server · calls · failed · last failure'; foreach ($outBad as $o) $L[] = '  ' . $o['what'] . ' · ' . $o['host'] . ' · ' . $o['n'] . ' · ' . $o['fail'] . ' · ' . $o['last_fail']; $L[] = ''; }
+    if ($jobBad) { $L[] = 'BACKGROUND JOBS FAILING'; foreach ($jobBad as $k => $j) $L[] = '  ' . $k . ' · ' . ($j['err_at'] ?? '') . ' · ' . ($j['err'] ?? ''); $L[] = ''; }
     if ($nF || $nW) { $L[] = 'NEEDS ATTENTION'; foreach ($res['rows'] as $r) if ($r['state'] !== 'ok') $L[] = '  [' . strtoupper($r['state']) . '] ' . $r['name'] . ': ' . mb_substr(str_replace("\n", ' | ', $r['detail']), 0, 400) . ($r['fix'] !== '' ? "\n      -> " . $r['fix'] : ''); $L[] = ''; }
     if ($by) { $L[] = 'SLOW PAGES (24 h) — page · times · slowest · average'; foreach (array_slice($by, 0, 10, true) as $pg => $b) $L[] = '  ' . str_pad((string)$pg, 24) . str_pad((string)$b['n'], 6, ' ', STR_PAD_LEFT) . str_pad($b['max'] . ' ms', 11, ' ', STR_PAD_LEFT) . str_pad((int) round($b['sum'] / $b['n']) . ' ms', 11, ' ', STR_PAD_LEFT); $L[] = ''; }
     if ($grp) { $L[] = 'PHP LOG (24 h) — times · message'; foreach (array_slice($grp, 0, 12, true) as $m => $n) $L[] = '  ' . str_pad((string)$n, 5, ' ', STR_PAD_LEFT) . '  ' . $m; $L[] = ''; }
-    $L[] = 'FULL DIAGNOSTICS'; $L[] = diag_text($res); $L[] = 'Schedule and recipients: Settings › About / Versions › Diagnostics › Daily health report.';
-    $state = $nF ? $nF . ' failed' : ($nW || $fatal ? ($nW + ($fatal ? 1 : 0)) . ' warning(s)' : 'all OK');
+    $L[] = 'FULL DIAGNOSTICS'; $L[] = diag_text($res); $L[] = 'Details: Settings › System health (trend, slow pages, other servers, background jobs, slow statements, errors). Schedule and recipients: Settings › About / Versions › Diagnostics › Daily health report.';
+    $state = $nF ? $nF . ' failed' : ($nW || $fatal ? ($nW + ($fatal ? 1 : 0)) . ' warning(s)' : 'all OK'); if ($newE) $state .= ' · ' . count($newE) . ' new error(s)';
     return ['Golden A/S Portal — health report ' . date('d/m/Y') . ' — ' . $state, implode("\n", $L)];
 }
 /** Send now; returns the number of e-mails accepted. */
