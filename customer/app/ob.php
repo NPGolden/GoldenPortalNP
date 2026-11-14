@@ -10,7 +10,7 @@
 
 const OB_LAYOUTS = ['service', 'system', 'remote'];
 const OB_BLOCK_KEYS = ['intro', 'scope', 'exclusions', 'validity', 'payment', 'terms', 'closing'];   // 'lines' sits between scope and exclusions
-const OB_PLACEHOLDERS = ['no', 'title', 'vessel', 'customer', 'project', 'ticket', 'validity_days', 'valid_until', 'user', 'branch', 'date', 'currency', 'rate_list'];
+const OB_PLACEHOLDERS = ['no', 'title', 'vessel', 'customer', 'project', 'ticket', 'validity_days', 'valid_until', 'user', 'branch', 'date', 'currency', 'rate_list', 'delivery_parts', 'delivery_labour'];
 
 function ob_has(): bool {
     static $h = null;
@@ -107,9 +107,18 @@ function ob_vars(array $o): array {
             '{project}' => trim(($o['project_code'] ?? '') . ' ' . ($o['project_name'] ?? '')) . ($o['sub_code'] ?? '' ? ' › ' . $o['sub_code'] : ''), '{ticket}' => (string)($o['ticket_no'] ?? ''),
             '{validity_days}' => (string)(int)($o['validity_days'] ?? 30), '{valid_until}' => fmt_date($valid), '{user}' => (string)($u['full_name'] ?? ''),
             '{branch}' => (string)(($b['trade_name'] ?? '') ?: (($b['legal_name'] ?? '') ?: ($b['name'] ?? 'Golden A/S'))), '{date}' => fmt_date($o['sent_at'] ?: date('Y-m-d')), '{currency}' => (string)$o['currency'],
-            '{rate_list}' => $rl ? $rl['doc_ref'] . ' ' . $rl['revision'] : ''];
+            '{rate_list}' => $rl ? $rl['doc_ref'] . ' ' . $rl['revision'] : '', '{delivery_parts}' => trim((string)($o['delivery_parts'] ?? '')), '{delivery_labour}' => trim((string)($o['delivery_labour'] ?? ''))];   // R97-036
 }
 function ob_fill(string $s, array $vars): string { return strtr($s, $vars); }
+/** R97-036: estimated delivery time on offers — two free texts (parts, labour) in offers.delivery_parts / delivery_labour. */
+function ob_delivery_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW COLUMNS FROM offers LIKE 'delivery_parts'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+/** The "Delivery time" section of the document: [title, [lines]] — null when nothing was filled in, or when a text block of the offer already prints
+ *  the values through {delivery_parts} / {delivery_labour} (then the wording of that block rules and nothing is printed twice). */
+function ob_delivery_section(array $o, callable $T): ?array {
+    if (!empty($o['delivery_in_text'])) return null; $p = trim((string)($o['delivery_parts'] ?? '')); $l = trim((string)($o['delivery_labour'] ?? '')); if ($p === '' && $l === '') return null;
+    $lines = []; if ($p !== '') $lines[] = $T('ob.dl_parts') . ': ' . $p; if ($l !== '') $lines[] = $T('ob.dl_labour') . ': ' . $l;
+    return [$T('ob.dl_title'), $lines];
+}
 /** R77-020: the instalments of the offer (offer_terms) as document rows — seeded from the branch defaults when the offer has none yet. */
 function ob_schedule_rows(array $o, string $loc): array {
     if (!function_exists('pt_of') || !function_exists('pi_has') || !pi_has()) return [];
@@ -207,6 +216,7 @@ function ob_line_move(int $offerId, int $lineId, int $dir): void {
 function ob_money(float $v, string $cur): string { return number_format($v, 2, ',', '.') . ' ' . $cur; }
 function ob_doc_data(array $o): array {
     $o['lines'] = ob_lines((int)$o['id']); ob_blocks_init($o); $o['blocks'] = ob_blocks((int)$o['id']); $o['vars'] = ob_vars($o);
+    $o['delivery_in_text'] = false; foreach ($o['blocks'] as $bx) if (trim((string)$bx['body']) !== '' && (str_contains((string)$bx['body'], '{delivery_parts}') || str_contains((string)$bx['body'], '{delivery_labour}'))) $o['delivery_in_text'] = true;   // R97-036
     foreach ($o['blocks'] as &$b) { $b['title'] = ob_fill($b['title'], $o['vars']); $b['body'] = ob_fill($b['body'], $o['vars']); } unset($b);
     return $o;
 }
@@ -264,7 +274,8 @@ function ob_render_pdf(array $o): string {
     foreach ($tot as [$k, $v, $b]) { $pdf->setFont($b ? 'B' : 'R', 8.5); $pdf->setColor($b ? $navy : $ink); $pdf->text($R - 100, $y + 4, $k, 'R', 60); $pdf->text($R - 40, $y + 4, $v, 'R', 38.5); $y += 5.5; }
     $y += 2;
     if (trim((string)($o['notes'] ?? '')) !== '') { $n++; $h1($n . '. ' . $T('of.notes')); $para((string)$o['notes']); }   // R72-005: the offer's Notes field goes into the document
-    foreach ($after as $k) { $block($k); if ($k === 'payment' && ($sch = ob_schedule_rows($o, $loc))) {   // R77-020: payment schedule right after the payment text
+    foreach ($after as $k) { if ($k === 'validity' && ($ds = ob_delivery_section($o, $T))) { $n++; $h1($n . '. ' . $ds[0]); $para(implode("\n", $ds[1])); }   // R97-036: delivery time before validity
+        $block($k); if ($k === 'payment' && ($sch = ob_schedule_rows($o, $loc))) {   // R77-020: payment schedule right after the payment text
         $n++; $h1($n . '. ' . $T('pt.schedule'));
         $sc = [[$T('ob.c_no'), 8, 'C'], [$T('pt.instalment_c'), 30, 'L'], ['%', 14, 'R'], [$T('pt.amount'), 30, 'R'], [$T('pt.trigger'), 68, 'L'], [$T('pt.due'), 30, 'L']]; $sc = function_exists('rc_fit_cols') ? rc_fit_cols($sc, $W) : $sc;
         $need(14); $pdf->setFont('B', 7.2); $x = $L; $pdf->setColor($head); $pdf->rect($x, $y, array_sum(array_column($sc, 1)), 6, 'F'); foreach ($sc as [$lab, $cw, $al]) { $pdf->setColor($line); $pdf->setLineWidth(0.25); $pdf->rect($x, $y, $cw, 6); $pdf->setColor($navy); $pdf->text($x + 1.5, $y + 4, $lab, $al, $cw - 3); $x += $cw; } $y += 6;
@@ -294,7 +305,8 @@ function ob_render_docx(array $o): string {
     else $rows[] = ['', '', $T('ob.vat_excl'), '', '', '', '', ''];
     $d->table([$T('ob.c_no'), $T('ob.c_code'), $T('ob.c_desc'), $T('ob.c_unit'), $T('ob.c_qty'), $T('ob.c_price') . ' (' . $cur . ')', $T('ob.c_disc'), $T('ob.c_total') . ' (' . $cur . ')'], $rows);
     if (trim((string)($o['notes'] ?? '')) !== '') { $n++; $d->heading($n . '. ' . $T('of.notes'), 2); foreach (preg_split('/\n{2,}/', trim((string)$o['notes'])) as $p) if (trim($p) !== '') $d->para(trim($p)); }   // R72-005
-    foreach (['exclusions', 'validity', 'payment', 'terms', 'closing'] as $k) { $block($k); if ($k === 'payment' && ($sch = ob_schedule_rows($o, $loc))) { $n++; $d->heading($n . '. ' . $T('pt.schedule'), 2); $d->table([$T('ob.c_no'), $T('pt.instalment_c'), '%', $T('pt.amount'), $T('pt.trigger'), $T('pt.due')], $sch); $d->para($T('pt.schedule_note')); } }   // R77-020
+    foreach (['exclusions', 'validity', 'payment', 'terms', 'closing'] as $k) { if ($k === 'validity' && ($ds = ob_delivery_section($o, $T))) { $n++; $d->heading($n . '. ' . $ds[0], 2); foreach ($ds[1] as $dl) $d->para($dl); }   // R97-036
+        $block($k); if ($k === 'payment' && ($sch = ob_schedule_rows($o, $loc))) { $n++; $d->heading($n . '. ' . $T('pt.schedule'), 2); $d->table([$T('ob.c_no'), $T('pt.instalment_c'), '%', $T('pt.amount'), $T('pt.trigger'), $T('pt.due')], $sch); $d->para($T('pt.schedule_note')); } }   // R77-020
     return $d->bytes($o['offer_no'] . ' ' . $o['revision'], (string)($bd['footer'] ?? $bd['name'] ?? ''));
 }
 

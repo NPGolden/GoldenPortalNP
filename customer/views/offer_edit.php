@@ -58,6 +58,10 @@ layout_head($title, 'offers');
       <div class="field"><label for="vat_pct"><?= tt('ob.vat_pct') ?></label><input id="vat_pct" name="vat_pct" inputmode="decimal" value="<?= $o ? e(rtrim(rtrim(number_format((float)$o['vat_pct'], 2, '.', ''), '0'), '.')) : '0' ?>"></div>
       <div class="field"><label for="validity_days"><?= tt('ob.validity_days') ?></label><input id="validity_days" name="validity_days" type="number" min="1" max="365" value="<?= (int)($o['validity_days'] ?? 30) ?>"></div>
     </div>
+    <?php if (function_exists('ob_delivery_has') && ob_delivery_has()): ?><div class="grid grid-2">
+      <div class="field"><label for="delivery_parts"><?= tt('ob.dl_parts_f') ?></label><input id="delivery_parts" name="delivery_parts" maxlength="160" value="<?= e((string)($o['delivery_parts'] ?? '')) ?>" placeholder="<?= tt('ob.dl_parts_ph') ?>"></div>
+      <div class="field"><label for="delivery_labour"><?= tt('ob.dl_labour_f') ?></label><input id="delivery_labour" name="delivery_labour" maxlength="160" value="<?= e((string)($o['delivery_labour'] ?? '')) ?>" placeholder="<?= tt('ob.dl_labour_ph') ?>"></div>
+    </div><p class="hint" style="margin:-6px 0 10px;"><?= tt('ob.dl_hint') ?></p><?php endif; ?>
     <?php endif; ?>
     <div class="grid grid-3">
       <?php if (function_exists('sl_has') && sl_has()): ?><div class="field"><label for="requested_at"><?= tt('sl.requested_at') ?> <span class="hint"><?= tt('sl.requested_hint') ?></span></label><input id="requested_at" name="requested_at" type="date" value="<?= $v('requested_at') ?>"></div><?php endif; ?>

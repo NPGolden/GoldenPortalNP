@@ -1783,3 +1783,13 @@ New page `?p=acc_vessel[&vessel=N]` (`views/acc_vessel.php`, gate `acc_visible()
 **Security review**: read-only page behind the staff check and the accounting gate; the vessel id is checked against the vessels the user may see; one bound parameter and integer-cast id lists in the statements; output escaped; amounts masked for people without the finance view. No finding.
 
 Language keys 9 427 each.
+
+## §322 v1.137.0 (R97-036) — Offers: estimated delivery time for parts and labour
+
+Migration `install/migrate_cp_r97_036_offer_delivery_time.sql`: `offers.delivery_parts`, `offers.delivery_labour` (VARCHAR 160, free text). Guard `ob_delivery_has()`. `views/offer_edit.php` shows the two fields for builder offers; `of_save_from_post()` stores them (new and edited offers); `pi` conversion budgetary → firm copies them. `ob_vars()` offers `{delivery_parts}` / `{delivery_labour}` to the text blocks. `ob_delivery_section()` builds the section "Delivery time" (title + one line per filled field); `ob_render_pdf()` and `ob_render_docx()` print it before the Validity block. When a text block of the offer already contains one of the two placeholders, the automatic section is not printed (`delivery_in_text`), so nothing appears twice.
+
+Tested: saved through the form; PDF and Word show "6. Delivery time" with both lines between Exclusions and Validity; numbering of the following sections follows.
+
+**Security review**: two text fields, trimmed to 160 characters, bound parameters, written only by the people who may edit the offer; printed as text in PDF / Word (no HTML). No finding.
+
+Language keys 9 435 each.

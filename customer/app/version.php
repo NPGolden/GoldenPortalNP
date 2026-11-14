@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.136.0';
+const CP_VERSION = '1.137.0';
 const CP_BUILD   = '2026-11-12';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-036', 'version' => '1.137.0', 'date' => '2026-11-14', 'title' => 'Offers: estimated delivery time for parts and for labour — two fields on the offer, printed in the section "Delivery time" of the PDF and Word document; also available to the text blocks as {delivery_parts} and {delivery_labour}.', 'db' => 'install/migrate_cp_r97_036_offer_delivery_time.sql', 'check' => 'r97n'],
         ['ref' => 'GAS-CP-R97-035', 'version' => '1.136.0', 'date' => '2026-11-14', 'title' => 'Accounting: "To invoice per vessel" — clicking a vessel shows everything still to be invoiced for it: contracts not fully invoiced with the final invoices that close a project, proformas without an invoice, hours not reported, reports waiting at accounting and materials of service reports.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-034', 'version' => '1.135.1', 'date' => '2026-11-14', 'title' => 'Accounting reports: accounting can correct the invoice number or the invoice date of a report afterwards (wrong entry); the history keeps the old and the new values.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-033', 'version' => '1.135.0', 'date' => '2026-11-14', 'title' => 'Organisations: separate ERP codes for the customer ledger and the supplier ledger — two fields on the organisation, no copying between them, and a tidy-up list on Contacts › Organisations for codes earlier versions mixed up.', 'db' => null, 'check' => null],
@@ -475,6 +476,7 @@ function cp_migration_state(): array {
         'r97k' => $has("SHOW TABLES LIKE 'em_sent'"),
         'r97l' => $has("SHOW COLUMNS FROM vessels LIKE 'class_society'"),
         'r97m' => $has("SHOW TABLES LIKE 'mi_items'"),
+        'r97n' => $has("SHOW COLUMNS FROM offers LIKE 'delivery_parts'"),
         'r93b' => $has("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_inquiries' AND COLUMN_NAME = 'kind' AND COLUMN_TYPE LIKE '%contact%'"),
         'r93a' => $has("SHOW TABLES LIKE 'work_permits'"),
         'r92f' => $has("SHOW COLUMNS FROM rc_applications LIKE 'keep_until'"),
