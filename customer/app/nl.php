@@ -273,29 +273,36 @@ function nl_list(int $id): ?array { $r = nl_lists_has() && $id ? one('SELECT * F
 function nl_lists(): array { $out = []; if (!nl_lists_has()) return $out; foreach (all('SELECT * FROM nl_lists ORDER BY name') as $r) { $r['filter'] = json_decode((string)($r['filter'] ?? ''), true) ?: []; $out[] = $r; } return $out; }
 /** Members of a list: contacts matching its categories (organisation role AND person category AND country AND subscription, each only when set),
  *  plus the addresses added by hand, minus the addresses excluded by hand. Dynamic — computed every time. Opt-outs are removed later, by nl_audience(). */
+/** R97-043: how organisation type and person category combine in a list — 'any' (union, default) or 'all' (both must fit). */
+function nl_list_match(array $f): string { return ($f['match'] ?? 'any') === 'all' ? 'all' : 'any'; }
 function nl_list_members(array $L): array {
     $f = $L['filter']; $roles = array_values(array_intersect(array_keys(nl_groups()), (array)($f['roles'] ?? []))); $cats = function_exists('ct_categories') ? array_values(array_intersect(array_keys(ct_categories()), (array)($f['cats'] ?? []))) : [];
     $subs = array_values(array_intersect(NL_TOPICS, (array)($f['subs'] ?? []))); $country = trim((string)($f['country'] ?? '')); $out = [];
     $skip = []; foreach (preg_split('/[\s,;]+/', mb_strtolower((string)($L['skip_emails'] ?? ''))) ?: [] as $e) if ($e !== '') $skip[$e] = 1;
     $put = function (array $r) use (&$out, $skip) { $e = mb_strtolower(trim((string)$r['email'])); if ($e === '' || isset($skip[$e]) || isset($out[$e])) return; $out[$e] = ['email' => $e, 'name' => (string)$r['full_name'], 'contact_id' => (int)$r['id'], 'company_id' => $r['coid'] ? (int)$r['coid'] : null, 'company' => (string)($r['coname'] ?? ''), 'grp' => 'c:' . ((string)$r['category'] ?: 'other')]; };
+    $ctry = array_values(array_filter(array_map('trim', preg_split('/[,;]+/', $country) ?: []), fn($x) => $x !== ''));   // R97-043: several countries, separated by commas
     if (($roles || $cats || $subs) && function_exists('co_has') && co_has()) {
-        $w = ["ct.is_active = 1 AND ct.email IS NOT NULL AND ct.email <> ''"]; $a = [];
-        if ($cats) { $w[] = 'ct.category IN (' . implode(',', array_fill(0, count($cats), '?')) . ')'; $a = array_merge($a, $cats); }
-        if ($subs) { $w[] = '(' . implode(' OR ', array_fill(0, count($subs), 'FIND_IN_SET(?, ct.subscriptions)')) . ')'; $a = array_merge($a, $subs); }
-        $rw = []; $ra = []; foreach ($roles as $g) { $rw[] = '(FIND_IN_SET(?, co.roles) OR co.kind = ?' . ($g === 'supplier' ? ' OR co.is_supplier = 1' : '') . ($g === 'customer' ? ' OR co.customer_id IS NOT NULL' : '') . ')'; array_push($ra, $g, $g); }
-        $cw = 'co.is_active = 1' . ($rw ? ' AND (' . implode(' OR ', $rw) . ')' : '') . ($country !== '' ? ' AND co.country = ?' : ''); $ca = array_merge($ra, $country !== '' ? [$country] : []);
         $sel = 'SELECT ct.id, ct.full_name, ct.email, ct.category, co.id AS coid, co.name AS coname FROM contacts ct ';
-        if ($roles || $country !== '') {
-            foreach (all($sel . 'JOIN companies co ON co.id = ct.company_id WHERE ' . implode(' AND ', $w) . ' AND ' . $cw . ' ORDER BY co.name, ct.full_name', array_merge($a, $ca)) as $r) $put($r);
-            if (function_exists('cc_has') && cc_has()) foreach (all($sel . 'JOIN contact_companies x ON x.contact_id = ct.id JOIN companies co ON co.id = x.company_id WHERE ' . implode(' AND ', $w) . ' AND ' . $cw . ' ORDER BY co.name, ct.full_name', array_merge($a, $ca)) as $r) $put($r);
-        } else foreach (all($sel . 'LEFT JOIN companies co ON co.id = ct.company_id WHERE ' . implode(' AND ', $w) . ' ORDER BY co.name, ct.full_name', $a) as $r) $put($r);
+        $run = function (array $cats, array $roles) use ($subs, $ctry, $sel, $put) {
+            $w = ["ct.is_active = 1 AND ct.email IS NOT NULL AND ct.email <> ''"]; $a = [];
+            if ($cats) { $w[] = 'ct.category IN (' . implode(',', array_fill(0, count($cats), '?')) . ')'; $a = array_merge($a, $cats); }
+            if ($subs) { $w[] = '(' . implode(' OR ', array_fill(0, count($subs), 'FIND_IN_SET(?, ct.subscriptions)')) . ')'; $a = array_merge($a, $subs); }
+            $rw = []; $ra = []; foreach ($roles as $g) { $rw[] = '(FIND_IN_SET(?, co.roles) OR co.kind = ?' . ($g === 'supplier' ? ' OR co.is_supplier = 1' : '') . ($g === 'customer' ? ' OR co.customer_id IS NOT NULL' : '') . ')'; array_push($ra, $g, $g); }
+            $cw = 'co.is_active = 1' . ($rw ? ' AND (' . implode(' OR ', $rw) . ')' : '') . ($ctry ? ' AND co.country IN (' . implode(',', array_fill(0, count($ctry), '?')) . ')' : ''); $ca = array_merge($ra, $ctry);
+            if ($roles || $ctry) {
+                foreach (all($sel . 'JOIN companies co ON co.id = ct.company_id WHERE ' . implode(' AND ', $w) . ' AND ' . $cw . ' ORDER BY co.name, ct.full_name', array_merge($a, $ca)) as $r) $put($r);
+                if (function_exists('cc_has') && cc_has()) foreach (all($sel . 'JOIN contact_companies x ON x.contact_id = ct.id JOIN companies co ON co.id = x.company_id WHERE ' . implode(' AND ', $w) . ' AND ' . $cw . ' ORDER BY co.name, ct.full_name', array_merge($a, $ca)) as $r) $put($r);
+            } else foreach (all($sel . 'LEFT JOIN companies co ON co.id = ct.company_id WHERE ' . implode(' AND ', $w) . ' ORDER BY co.name, ct.full_name', $a) as $r) $put($r);
+        };
+        // R97-043: "any" (default) = the people of the ticked organisation types PLUS the people with the ticked categories; "all" = only those who are both.
+        if ($roles && $cats && nl_list_match($f) === 'any') { $run([], $roles); $run($cats, []); } else $run($cats, $roles);
     }
     foreach (preg_split('/[\s,;]+/', (string)($L['add_emails'] ?? '')) ?: [] as $e) { $e = mb_strtolower(trim($e)); if ($e === '' || !filter_var($e, FILTER_VALIDATE_EMAIL) || isset($skip[$e]) || isset($out[$e])) continue; $c = one('SELECT ct.id, ct.full_name, ct.email, ct.category, co.id AS coid, co.name AS coname FROM contacts ct LEFT JOIN companies co ON co.id = ct.company_id WHERE LOWER(ct.email) = ? LIMIT 1', [$e]); if ($c) $put($c); else $out[$e] = ['email' => $e, 'name' => '', 'contact_id' => null, 'company_id' => null, 'company' => '', 'grp' => 'extra']; }
     return $out;
 }
 function nl_list_save_from_post(int $id): int {
     $s = fn(string $k, int $max) => mb_substr(trim((string)($_POST[$k] ?? '')), 0, $max); $name = $s('name', 120); if ($name === '') throw new RuntimeException(t('nl.l_need_name'));
-    $f = ['roles' => array_values(array_intersect(array_keys(nl_groups()), (array)($_POST['roles'] ?? []))), 'cats' => array_values(array_intersect(array_keys(ct_categories()), (array)($_POST['cats'] ?? []))), 'subs' => array_values(array_intersect(NL_TOPICS, (array)($_POST['subs'] ?? []))), 'country' => $s('country', 80)];
+    $f = ['roles' => array_values(array_intersect(array_keys(nl_groups()), (array)($_POST['roles'] ?? []))), 'cats' => array_values(array_intersect(array_keys(ct_categories()), (array)($_POST['cats'] ?? []))), 'subs' => array_values(array_intersect(NL_TOPICS, (array)($_POST['subs'] ?? []))), 'country' => $s('country', 80), 'match' => ($_POST['match'] ?? 'any') === 'all' ? 'all' : 'any'];
     $u = current_user(); $v = [$name, $s('descr', 300) ?: null, json_encode($f, JSON_UNESCAPED_UNICODE), $s('add_emails', 20000) ?: null, $s('skip_emails', 20000) ?: null];
     if ($id) { q('UPDATE nl_lists SET name = ?, descr = ?, filter = ?, add_emails = ?, skip_emails = ? WHERE id = ?', array_merge($v, [$id])); return $id; }
     q('INSERT INTO nl_lists (name, descr, filter, add_emails, skip_emails, created_by, created_name) VALUES (?,?,?,?,?,?,?)', array_merge($v, [(int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? '')])); return (int) db()->lastInsertId();

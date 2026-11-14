@@ -1886,3 +1886,22 @@ Language keys 9 685 each.
 **Security review**: the action is POST with CSRF token and limited to those who may send newsletters; addresses are validated with `FILTER_VALIDATE_EMAIL`; the suppression list is honoured before any tick is set, so an unsubscribe can not be undone by the rule; queries are bound or constant. Compliance note: the subscriptions are set by the company, not by the person — the mailings rely on legitimate interest towards business contacts, so every issue must keep the unsubscribe link (it does) and the Privacy Policy R5 wording covers it; contacts who are private persons should be un-ticked. No performance cost: one query on the Lists tab, one run in the sweep.
 
 Language keys 9 688 each.
+
+## §329 v1.140.3 (R97-043) — Newsletter lists: organisation type OR person category
+
+**Report**: on Newsletters › Lists the first list showed 71 members and the three others 0 although categories were ticked.
+
+**Cause**: `nl_list_members()` combined organisation role AND person category. "Yard" + "Shipyard manager" kept only shipyard managers whose organisation carries the role Yard; most organisations have no role yet and most people in a yard carry another category, so the result was empty.
+
+**What changed**
+
+- `nl_list_match($f)` — filter key `match`: `any` (default, also for lists saved before) or `all`.
+- `nl_list_members()`: with both roles and categories and `any`, two selections are merged (people of the organisation types; people with the categories); `all` keeps the former behaviour. Subscription and country stay restrictions in both modes.
+- Country accepts several values separated by commas (`co.country IN (…)`); the form field proposes the countries in use (`<datalist>`), new hint `nl.l_country_hint`.
+- List form: select "Organisation type and person category" (Either / Both); list table shows "(either)" / "(both)" and marks the country.
+
+**Tests (sandbox)**: yard + shipyard manager/captain → either: 5 people, both: 2; with country Italy → 2; "Italy, greece" + both → 2; one side only unchanged; page renders; lint clean; sweep and API test as before.
+
+**Security review**: `match` is reduced to two literals; countries are bound parameters; datalist values are escaped; action unchanged (POST, CSRF, `nl_can()`). No finding. Performance: at most one extra query pair per list.
+
+Language keys 9 693 each.

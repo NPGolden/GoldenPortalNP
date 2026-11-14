@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.140.2';
+const CP_VERSION = '1.140.3';
 const CP_BUILD   = '2026-11-14';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-043', 'version' => '1.140.3', 'date' => '2026-11-14', 'title' => 'Newsletter lists: organisation type and person category now add up (either one is enough) instead of narrowing each other, so a list with both ticked is no longer empty; a choice per list keeps the narrow rule; several countries per list and the countries in use are proposed.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-042', 'version' => '1.140.2', 'date' => '2026-11-14', 'title' => 'Contacts: every active contact with a valid e-mail is subscribed to Newsletter, Campaigns, Events and Greetings (once, automatically; unsubscribed and bounced addresses are left out); new and imported contacts get the four ticks by default; a button on Newsletters › Lists applies it again.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-041', 'version' => '1.140.1', 'date' => '2026-11-14', 'title' => 'Contacts: three more categories (engineering / technical office, service / after-sales, director / executive) and wider job-title recognition; the Excel import accepts a Country column and, for contacts that already exist, fills only the empty fields.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-040', 'version' => '1.140.0', 'date' => '2026-11-14', 'title' => 'Newsletters: saved lists by category (organisation role and person category), website subscribers become contacts, more contact categories (technical manager, purchasing, designer, shipyard manager and others) set automatically from the job title.', 'db' => 'install/migrate_cp_r97_040_nl_lists_contact_categories.sql', 'check' => 'r97q'],
