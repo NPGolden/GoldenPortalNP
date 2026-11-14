@@ -141,6 +141,8 @@ $page = preg_replace('/[^a-z0-9_]/', '', (string)($_GET['p'] ?? 'dashboard'));
 
 /* ------------------------------------------------------------- POST */
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'csp_report') { $raw = (string) file_get_contents('php://input'); if (strlen($raw) < 8192) @file_put_contents(__DIR__ . '/storage/csp.log', date('c') . ' ' . preg_replace('/\s+/', ' ', $raw) . "\n", FILE_APPEND | LOCK_EX); http_response_code(204); exit; }   // R53-001
+// R97-044: background sweep called by the page itself (servers that cannot detach). Signed-in users only, same origin only, throttled and locked inside nf_sweep(); returns nothing.
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'bg') { if (!current_user() || !in_array((string)($_SERVER['HTTP_SEC_FETCH_SITE'] ?? 'same-origin'), ['same-origin', 'none'], true)) { http_response_code(403); exit; } http_response_code(204); header('Cache-Control: no-store'); if (function_exists('nf_sweep_detached')) nf_sweep_detached(); exit; }
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'ai') { require_login(); ai_endpoint(); }
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'pk') { pk_endpoint(); }   // R71-001: passkey JSON endpoint (its own CSRF / challenge checks)   // R50-001: assistant endpoint (JSON; CSRF checked by header inside)
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {

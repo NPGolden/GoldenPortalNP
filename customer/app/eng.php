@@ -130,7 +130,7 @@ function eng_is_pm(): bool { static $v = null; if ($v === null) { $me = (int)(cu
 /** Sub-projects with an engineering section exceeded or a request pending (for the project tree / dashboard). */
 function eng_alerts(?int $pid = null): array {
     if (!eng_has2() || !is_staff()) return [];
-    if (function_exists('cache_remember')) return cache_remember('eng_alerts:' . cache_ver('eng') . ':' . (int)$pid, 180, fn() => eng_alerts_build($pid));   // R77-021
+    if (function_exists('cache_remember')) return cache_remember('eng_alerts:' . cache_ver('eng') . ':' . (int)$pid, 600, fn() => eng_alerts_build($pid));   // R77-021; R97-044: 10 min (was 3) — the rebuild costs ~15 queries per open sub-project and made the Projects page take seconds; any budget / request change still drops it at once
     return eng_alerts_build($pid);
 }
 function eng_alerts_build(?int $pid): array {

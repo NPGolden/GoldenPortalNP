@@ -1905,3 +1905,29 @@ Language keys 9 688 each.
 **Security review**: `match` is reduced to two literals; countries are bound parameters; datalist values are escaped; action unchanged (POST, CSRF, `nl_can()`). No finding. Performance: at most one extra query pair per list.
 
 Language keys 9 693 each.
+
+## §330 v1.140.4 (R97-044) — Portal slow: sweep ran on every page (time-zone slip); proforma `$exp` warnings
+
+**Report**: Diagnostics › Slowest pages listed pages of 3.4–4.6 s with only 136–364 ms in the database; PHP error log full of `Undefined variable $exp` in `views/proforma.php`; "the portal became a bit slow".
+
+**Diagnosis**
+
+1. `nf_sweep()` is throttled to once per 60 s by comparing `nf_cursor.run_at` with the clock. The value is written by the database with `NOW()` in the database zone (`tz_db`, UTC by default) and was read with `strtotime()` in the company zone (Europe/Athens), so it always looked 2–3 hours old: **the sweep ran on every page**, before the first byte of HTML. It runs 15 notification sources, four reminder jobs, the website statistics pull, one news feed (up to 9 s time-out) and one newsletter batch (up to 15 Graph calls). Seconds outside the database with few database milliseconds is exactly this signature. Sandbox: dashboard 343 queries with the sweep, 104 without.
+2. Same slip in `presence_touch()` (one `UPDATE customer_users` per request instead of per minute) and in the newsletter sign-up rule "one confirmation e-mail per ten minutes" (did not hold).
+3. Projects page: `eng_alerts()` rebuilds every 3 minutes with ~15 queries per open sub-project (3 683 queries / 3.9 s in the live log).
+4. `views/proforma.php` line 122: the statement defining `$exp` sat behind a `//` comment since R95-006, so the edit-payment form never received the payment.
+
+**What changed**
+
+- `tz_age($at)` (`app/helpers.php`): seconds since a database moment, zone-safe. Used in `nf_sweep()`, new `nf_sweep_due()`, `presence_touch()`, `nl_subscribe` confirmation rule.
+- The sweep left the page: `layout_head()` only asks `nf_sweep_due()`; when due it runs `nf_sweep_detached()` after the response (PHP-FPM / LiteSpeed: shutdown function with `fastcgi_finish_request()` / `litespeed_finish_request()`), otherwise the page carries `data-bg="1"` and `portal.js` calls `POST index.php?p=bg` after load. The session is released before the work.
+- `eng_alerts()` cache 600 s (still dropped at once by any engineering budget / request change).
+- `proforma.php`: `$ep` / `$exp` on their own line.
+
+**Tests (sandbox)**: with `run_at` 5 minutes old the page shows `data-bg`, `?p=bg` returns 204 and the next pages do not ask again; anonymous and cross-site calls of `?p=bg` get 403; vessels 63 → 47 queries, dashboard 343 → 104; proforma page without warnings; lint, sweep and API test clean.
+
+**Security review**: `?p=bg` takes no parameter, needs a signed-in session, refuses cross-site calls (`Sec-Fetch-Site`), and can do nothing but start the already locked and throttled sweep — it cannot be used to force work more often than once a minute. Fixing the confirmation rule closes a way to make the portal send repeated confirmation e-mails to one address. No new inline script (the call lives in `portal.js`); CSP unchanged.
+
+**Proposed next**: advanced diagnostics (request timing by phase, outbound-call log, background-job panel, slow-query digest with EXPLAIN, error grouping, weekly health e-mail) — offered to Nikos for decision.
+
+Language keys 9 693 each.

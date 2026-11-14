@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.140.3** (build 2026-11-14). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.140.4** (build 2026-11-14). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.140.4 | GAS-CP-R97-044 | 2026-11-14 | Speed: the background sweep (notifications, reminders, website statistics, news feeds, newsletter batches) ran on every page because its once-a-minute rule compared a UTC time with local time — fixed, and the sweep now runs after the page is shown; presence stamp and sign-up confirmation rules fixed the same way; Projects page alert cache kept 10 minutes; editing a recorded payment on a proforma / invoice works again. | — |
 | 1.140.3 | GAS-CP-R97-043 | 2026-11-14 | Newsletter lists: organisation type and person category now add up (either one is enough) instead of narrowing each other, so a list with both ticked is no longer empty; a choice per list keeps the narrow rule; several countries per list and the countries in use are proposed. | — |
 | 1.140.2 | GAS-CP-R97-042 | 2026-11-14 | Contacts: every active contact with a valid e-mail is subscribed to Newsletter, Campaigns, Events and Greetings (once, automatically; unsubscribed and bounced addresses are left out); new and imported contacts get the four ticks by default; a button on Newsletters › Lists applies it again. | — |
 | 1.140.1 | GAS-CP-R97-041 | 2026-11-14 | Contacts: three more categories (engineering / technical office, service / after-sales, director / executive) and wider job-title recognition; the Excel import accepts a Country column and, for contacts that already exist, fills only the empty fields. | — |

@@ -143,6 +143,9 @@ function fmt_date(?string $d): string {
  * company's zone (tz_app, default Europe/Athens) with the zone's abbreviation (EET / EEST). Pure dates are never shifted. */
 function tz_app(): string { static $z = null; if ($z === null) { $v = function_exists('cp_setting') && function_exists('lic_has') ? (string)(cp_setting('tz_app', '') ?? '') : ''; if ($v === '') $v = (string)(cfg('app.tz', 'Europe/Athens') ?: 'Europe/Athens'); $z = in_array($v, timezone_identifiers_list(), true) ? $v : 'Europe/Athens'; } return $z; }
 function tz_db(): string { static $z = null; if ($z === null) { $v = function_exists('cp_setting') && function_exists('lic_has') ? (string)(cp_setting('tz_db', '') ?? '') : ''; if ($v === '') $v = (string)(cfg('app.db_tz', 'UTC') ?: 'UTC'); $z = in_array($v, timezone_identifiers_list(), true) ? $v : 'UTC'; } return $z; }
+/** R97-044: seconds since a moment stored by the database (NOW()). The database keeps its own zone (tz_db, usually UTC) while PHP runs in the company's
+ *  zone, so strtotime() on a stored value is off by the zone difference — every "not more often than every n seconds" rule must use this instead. */
+function tz_age(?string $at): int { if (!$at) return PHP_INT_MAX; try { return time() - (new DateTime($at, new DateTimeZone(tz_db())))->getTimestamp(); } catch (Throwable $e) { return PHP_INT_MAX; } }
 /** A stored date-time as a DateTime in the company's zone (null for an empty value or a pure date). */
 function tz_local(?string $d): ?DateTime { if (!$d || !preg_match('/\d{1,2}:\d{2}/', $d)) return null; try { return (new DateTime($d, new DateTimeZone(tz_db())))->setTimezone(new DateTimeZone(tz_app())); } catch (Throwable $e) { return null; } }
 /** Short zone label of a moment (EET / EEST / CET …). */

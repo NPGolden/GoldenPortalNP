@@ -119,7 +119,8 @@ layout_head($r['pi_no'], 'proformas');
 <?php if (function_exists('ppay_has') && ppay_has() && !($isCr && ($r['credit_mode'] ?? '') !== 'refund' && empty($r['payments']))): $pays = $r['payments'] ?? [];
   // R95-004: the cap is the document — an invoice: its gross; a proforma: its not-yet-invoiced part (advances); once fully invoiced, payments are logged on the invoices
   $cap = $isInv ? max(0.0, (float)$r['gross'] - $crSum) : max(0.0, (float)$r['gross'] - $invSum); $offerPaid = $advSum; $capLeft = max(0, $cap - $offerPaid);
-  if ($isCr) { $cap = max(0.0, -(float)$r['gross'] - $crSum); $offerPaid = -$advSum; $paid = $offerPaid; $capLeft = max(0, $cap - $offerPaid); $open = $capLeft; }   // R95-006: on a credit note the "payments" are refunds to the customer $ep = (int)($_GET['pay'] ?? 0); $exp = null; foreach ($pays as $x) if ((int)$x['id'] === $ep) $exp = $x; ?>
+  if ($isCr) { $cap = max(0.0, -(float)$r['gross'] - $crSum); $offerPaid = -$advSum; $paid = $offerPaid; $capLeft = max(0, $cap - $offerPaid); $open = $capLeft; }   // R95-006: on a credit note the "payments" are refunds to the customer
+  $ep = (int)($_GET['pay'] ?? 0); $exp = null; foreach ($pays as $x) if ((int)$x['id'] === $ep) $exp = $x; ?>
 <?php $forOn = function_exists('ppay_for_col') && ppay_for_col(); $forMap = []; if ($isInv) foreach ($r['settles'] ?? [] as $fx) $forMap[(int)$fx['id']] = (string)$fx['pi_no'];   // R96-003: the proformas a payment on this invoice may count for ?>
 <div class="card" id="payments">
   <div class="card-head"><h2>💳 <?= $isCr ? tt('cn.refunds') : tt('pay.title') ?> <span class="hint">(<?= count($pays) ?>)</span></h2><span class="hint"><?= $isCr ? tt('cn.refunds_hint') : tt('pay.hint') ?></span></div>

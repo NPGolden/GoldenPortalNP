@@ -37,11 +37,28 @@ const NF_GROUP_OF = ['rc' => 'hr', 'wkp' => 'work', 'tk' => 'work', 'wf' => 'wor
 /* ------------------------------------------------------------ sweep */
 
 /** Run the sweep if the last one is older than $every seconds. Safe to call on every page. */
+/** R97-044: is a sweep due? One small query — the page asks this instead of running the sweep while the user waits. */
+function nf_sweep_due(int $every = 60): bool {
+    if (!nf_has()) return false;
+    try { $run = one('SELECT run_at FROM nf_cursor WHERE source = ?', ['_meta']); return !($run && $run['run_at'] && tz_age((string)$run['run_at']) < $every); } catch (Throwable $e) { return false; }
+}
+/** R97-044: can this server send the page to the browser first and keep working afterwards? (PHP-FPM / LiteSpeed) */
+function nf_can_detach(): bool { return function_exists('fastcgi_finish_request') || function_exists('litespeed_finish_request'); }
+/** R97-044: the sweep, run after the page has reached the browser (shutdown function) or from the background call ?p=bg.
+ *  The session is released first, so the user's next click is not held back while feeds are read or e-mails are sent. */
+function nf_sweep_detached(): void {
+    try {
+        if (session_status() === PHP_SESSION_ACTIVE) session_write_close();
+        if (function_exists('fastcgi_finish_request')) fastcgi_finish_request(); elseif (function_exists('litespeed_finish_request')) litespeed_finish_request();
+        ignore_user_abort(true); @set_time_limit(120);
+        nf_sweep();
+    } catch (Throwable $e) { error_log('[nf] ' . $e->getMessage()); }
+}
 function nf_sweep(int $every = 60, bool $force = false): int {
     if (!nf_has()) return 0;
     try {
         $run = one('SELECT run_at FROM nf_cursor WHERE source = ?', ['_meta']);
-        if (!$force && $run && $run['run_at'] && strtotime((string)$run['run_at']) > time() - $every) return 0;
+        if (!$force && $run && $run['run_at'] && tz_age((string)$run['run_at']) < $every) return 0;   // R97-044: zone-safe — before, the stored UTC time was read as local time and the sweep ran on every page
         if (!scalar("SELECT GET_LOCK('nf_sweep', 0)")) return 0;
         $n = 0;
         try {

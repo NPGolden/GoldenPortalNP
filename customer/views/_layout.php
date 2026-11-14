@@ -152,7 +152,10 @@ function layout_head(string $title, string $active = ''): void {
     if ($active === 'kb_q') $active = 'kb';
     if ($active === 'request' || $active === 'requests') $active = 'support';
     if ($active === 'task_edit') $active = 'tasks';
-    if ($u && function_exists('nf_sweep')) nf_sweep();                 // R18-002: derive new notifications (throttled)
+    // R18-002 notifications sweep (throttled). R97-044: no longer run while the page is built — it reads news feeds, pulls website statistics and sends
+    // newsletters, which made one page a minute wait for other servers. Now: after the page is sent (PHP-FPM / LiteSpeed) or by a background call of the browser.
+    $GLOBALS['nf_bg'] = false;
+    if ($u && function_exists('nf_sweep_due') && nf_sweep_due()) { if (nf_can_detach()) register_shutdown_function('nf_sweep_detached'); else $GLOBALS['nf_bg'] = true; }
     ?><!doctype html>
 <html lang="<?= e(locale()) ?>" data-theme="<?= e(theme_current()) ?>" data-flt-restored="<?= e(t('flt.restored')) ?>" data-flt-hidden="<?= e(t('flt.hidden')) ?>" data-ss-search="<?= e(t('ss.search')) ?>" data-ss-none="<?= e(t('ss.none')) ?>" data-rt-labels="<?= e(json_encode(['b' => t('rt.bold'), 'i' => t('rt.italic'), 'u' => t('rt.underline'), 'ul' => t('rt.ul'), 'ol' => t('rt.ol'), 'hint' => t('rt.hint')], JSON_UNESCAPED_UNICODE)) ?>"<?= function_exists('mt_users_json') && ($mtJ = mt_users_json()) !== '' ? ' data-mt-users="' . e($mtJ) . '" data-mt-hint="' . e(t('mt.hint')) . '"' : '' ?>>
 <head>
@@ -165,7 +168,7 @@ function layout_head(string $title, string $active = ''): void {
 <link rel="apple-touch-icon" href="../assets/favicon.png">
 <link rel="stylesheet" href="../assets/portal.css?v=<?= @filemtime(__DIR__ . '/../../assets/portal.css') ?: 1 ?>">
 </head>
-<body<?php if (function_exists('up_limits')) { $UL = up_limits(); echo ' data-up-file="' . min($UL['file'], PHP_INT_MAX) . '" data-up-total="' . $UL['total'] . '" data-up-files="' . $UL['files'] . '" data-up-msg="' . e(t('up.too_many', ['n' => '{n}', 'max' => $UL['files']]) . '|' . t('up.too_big', ['size' => '{size}', 'max' => up_mb($UL['total'])]) . '|' . t('up.file_big', ['name' => '{name}', 'max' => up_mb($UL['file'])])) . '"'; } ?><?= function_exists('flt_restored') && flt_restored() ? ' data-flt="1"' : '' ?><?php if (!empty($_SESSION['cu_id']) && !empty($_SESSION['wkey']) && function_exists('sec_cfg') && sec_cfg('sec_close_signout')): ?> data-wchk="<?= e((string)$_SESSION['wkey']) ?>"<?= !empty($_SESSION['wkey_new']) ? ' data-wnew="1"' : '' ?><?php $_SESSION['wkey_new'] = false; endif; ?>>
+<body<?php if (function_exists('up_limits')) { $UL = up_limits(); echo ' data-up-file="' . min($UL['file'], PHP_INT_MAX) . '" data-up-total="' . $UL['total'] . '" data-up-files="' . $UL['files'] . '" data-up-msg="' . e(t('up.too_many', ['n' => '{n}', 'max' => $UL['files']]) . '|' . t('up.too_big', ['size' => '{size}', 'max' => up_mb($UL['total'])]) . '|' . t('up.file_big', ['name' => '{name}', 'max' => up_mb($UL['file'])])) . '"'; } ?><?= function_exists('flt_restored') && flt_restored() ? ' data-flt="1"' : '' ?><?php if (!empty($_SESSION['cu_id']) && !empty($_SESSION['wkey']) && function_exists('sec_cfg') && sec_cfg('sec_close_signout')): ?> data-wchk="<?= e((string)$_SESSION['wkey']) ?>"<?= !empty($_SESSION['wkey_new']) ? ' data-wnew="1"' : '' ?><?php $_SESSION['wkey_new'] = false; endif; ?><?= !empty($GLOBALS['nf_bg']) ? ' data-bg="1"' : '' ?>>
 <a class="skip" href="#main"><?= tt('nav.skip') ?></a>
 
 <header class="topbar">

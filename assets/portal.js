@@ -651,3 +651,6 @@ document.addEventListener('change', function (e) { var c = e.target; if (!c.matc
 
 /* R93-009: remember open / closed state of details[data-fold] */
 (function(){ try { var K='cp.fold.'; document.querySelectorAll('details[data-fold]').forEach(function(d){ var k=K+d.dataset.fold, v=localStorage.getItem(k); if(v==='1') d.open=true; else if(v==='0') d.open=false; d.addEventListener('toggle',function(){ try{ localStorage.setItem(k, d.open?'1':'0'); }catch(e){} }); }); } catch(e){} })();
+
+/* R97-044: background work (notifications, website statistics, news feeds, newsletter batches) is started by the page after it is shown, never while it loads */
+(function(){ try { if (!document.body || document.body.dataset.bg !== '1') return; var go = function(){ try { fetch('index.php?p=bg', { method: 'POST', credentials: 'same-origin', keepalive: true, headers: { 'X-Requested-With': 'fetch' } }).catch(function(){}); } catch (e) {} }; if (document.readyState === 'complete') setTimeout(go, 400); else window.addEventListener('load', function(){ setTimeout(go, 400); }); } catch (e) {} })();

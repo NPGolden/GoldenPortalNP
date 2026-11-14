@@ -238,7 +238,7 @@ function nl_pub_subscribe(array $b, string $ip): array {
     $kind = in_array($b['kind'] ?? '', ['yard', 'owner', 'customer', 'supplier', 'management', 'other'], true) ? (string)$b['kind'] : null; $role = function_exists('ct_categories') && isset(ct_categories()[(string)($b['role'] ?? '')]) ? (string)$b['role'] : null;
     $cur = one('SELECT * FROM nl_subs WHERE email = ?', [$email]);
     if ($cur && $cur['status'] === 'confirmed') { $set = array_unique(array_merge(explode(',', (string)$cur['topics']), $topics)); q('UPDATE nl_subs SET topics = ? WHERE id = ?', [implode(',', array_intersect(NL_TOPICS, $set)), (int)$cur['id']]); return ['status' => 'ok']; }
-    if ($cur && strtotime((string)$cur['created_at']) > time() - 600 && $cur['status'] === 'pending') return ['status' => 'ok'];   // one confirmation e-mail per ten minutes
+    if ($cur && tz_age((string)$cur['created_at']) < 600 && $cur['status'] === 'pending') return ['status' => 'ok'];   // one confirmation e-mail per ten minutes
     $tok = nl_token();
     if ($cur) q("UPDATE nl_subs SET name = ?, company = ?, kind = ?, topics = ?, lang = ?, status = 'pending', token = ?, source = ?, ip = ?, created_at = NOW(), unsub_at = NULL WHERE id = ?", [$f('name', 160) ?: null, $f('company', 160) ?: null, $kind, implode(',', $topics), $lang, $tok, $f('source', 40) ?: null, mb_substr($ip, 0, 64), (int)$cur['id']]);
     else q('INSERT INTO nl_subs (email, name, company, kind, topics, lang, token, source, ip) VALUES (?,?,?,?,?,?,?,?,?)', [$email, $f('name', 160) ?: null, $f('company', 160) ?: null, $kind, implode(',', $topics), $lang, $tok, $f('source', 40) ?: null, mb_substr($ip, 0, 64)]);
