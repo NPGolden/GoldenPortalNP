@@ -97,7 +97,7 @@ layout_head($title, 'tasks');
 (function(){
   var ps = document.getElementById('project_id'), ss = document.getElementById('subproject_id');
   // sub-project list is complete in the HTML (grouped per project); choosing a project narrows it, choosing a sub-project sets its project
-  function narrow() { var p = ps.value; ss.querySelectorAll('optgroup').forEach(function (g) { g.hidden = !!p && g.getAttribute('data-p') !== p; }); var o = ss.selectedOptions[0]; if (o && o.value && p && o.getAttribute('data-p') !== p) ss.value = ''; }
+  function narrow() { var p = ps.value; ss.querySelectorAll('optgroup').forEach(function (g) { g.hidden = !!p && g.getAttribute('data-p') !== p; }); ss.querySelectorAll('option[data-p]').forEach(function (o) { var off = !!p && o.getAttribute('data-p') !== p; o.hidden = off; o.disabled = off; }); var o = ss.selectedOptions[0]; if (o && o.value && p && o.getAttribute('data-p') !== p) ss.value = ''; }
   var PV = <?= json_encode(array_map('intval', array_column($projects, 'vessel_id', 'id'))) ?>, VN = <?= json_encode(array_column(all('SELECT id, name FROM vessels'), 'name', 'id'), JSON_UNESCAPED_UNICODE) ?>, ep = document.getElementById('eq-pick'), en = document.getElementById('eq-none'), ev = document.getElementById('eq-vessel');
   // the register lists the units of every active project's vessel; only the units of the chosen project's vessel are offered (ticked ones always stay visible)
   function eqNarrow() { if (!ep) return; var v = String(PV[ps.value] || 0), shown = 0;

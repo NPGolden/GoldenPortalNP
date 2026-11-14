@@ -189,6 +189,11 @@ layout_head($title, 'planning');
     if (lt) lt.addEventListener('change', typeUi);
     kind.addEventListener('change', kindUi); kindUi();
     sub.addEventListener('change', function () { var o = sub.options[sub.selectedIndex]; if (sub.value) proj.value = o.dataset.project; loadItems(openBox, proj.value, sub.value, <?= json_encode(t('pl.open_items')) ?>); });
+    /* R97-032: a chosen project narrows the sub-project list to its own sub-projects */
+    function subNarrow() { var pv = proj.value; Array.prototype.forEach.call(sub.options, function (o) { if (!o.value) return; var off = !!pv && pv !== '0' && o.dataset.project !== pv; o.hidden = off; o.disabled = off; });
+      sub.querySelectorAll('optgroup').forEach(function (g) { g.hidden = !g.querySelector('option:not([hidden])'); });
+      var c = sub.options[sub.selectedIndex]; if (c && c.value && c.hidden) sub.value = ''; }
+    proj.addEventListener('change', subNarrow); subNarrow();
     proj.addEventListener('change', function () { if (!sub.value) loadItems(openBox, proj.value, 0, <?= json_encode(t('pl.open_items')) ?>); });
     // a click on an empty cell or on the "+" next to the name pre-fills the editor
     var plBox = document.getElementById('pl_people'), plNames = JSON.parse(plBox.dataset.names || '{}');

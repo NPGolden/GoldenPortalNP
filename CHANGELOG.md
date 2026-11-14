@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.134.0** (build 2026-11-12). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.134.1** (build 2026-11-12). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.134.1 | GAS-CP-R97-032 | 2026-11-14 | Sub-project drop-down follows the chosen project: the New task form and the Planning form listed the sub-projects of every project in the search list; they now offer only those of the selected project, and grouped lists show their group headings. | — |
 | 1.134.0 | GAS-CP-R97-031 | 2026-11-14 | System Budgets: red ▼ mark when the profit is below the company minimum (40 % on cost by default) — on the totals, on the labour and part lines, in the list and in the preview before converting to an offer; management sets the minimum on the list page. | — |
 | 1.133.3 | GAS-CP-R97-030 | 2026-11-12 | Mobile apps: "Sync error" fixed — the app service (Service Engineer, Golden PM, Golden HR, customer app) failed to start since v1.119.0 because of the order two portal files were loaded in; nothing queued on the phones is lost, it is sent on the next sync. | — |
 | 1.133.2 | GAS-CP-R97-029 | 2026-11-12 | Projects page: a project whose sub-projects are all completed (and hidden) keeps its buttons — Edit project, Add sub-project, Drawings, Reports, Offers, Delete — instead of showing only "completed hidden". | — |

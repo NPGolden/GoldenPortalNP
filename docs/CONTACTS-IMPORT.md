@@ -1743,3 +1743,15 @@ Where it shows: `views/system_budget.php` — notice at the top of the Totals ca
 **Security review**: the new action is behind the staff check, the CSRF token and the management gate (a project manager's post is refused — tested); the value is parsed as a number and clamped to 0–900; output escaped. The cost figures appear only on pages that already show costs to the same people. No finding.
 
 Language keys 9 360 each.
+
+## §318 v1.134.1 (R97-032) — Sub-project drop-down follows the chosen project
+
+Cause: the task form narrows its sub-project list by hiding the `<optgroup>` of the other projects, but the searchable drop-down of `assets/portal.js` (R30-007) only skipped options that are hidden themselves — so its list still showed every sub-project. The Planning form did not narrow at all.
+
+Fix: `portal.js` treats an option of a hidden group as hidden and prints the group label as a heading in the list (`.ss-group`); `views/task_edit.php` also hides and disables the options themselves; `views/planning.php` gets `subNarrow()` (project chosen → only its sub-projects; a sub-project of another project is cleared). No database step, no new language keys.
+
+Tested with three projects in a browser: for each project chosen, sub-projects of other projects offered = 0 on task, ticket, function check, service report, inspection report, offer, production order, direct invoice, purchase order, requisition, planning, accounting reports and external service report — in the native list and in the search list.
+
+**Security review**: display only; the server still checks on save that the sub-project belongs to the project. No finding.
+
+Language keys 9 360 each.

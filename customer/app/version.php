@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.134.0';
+const CP_VERSION = '1.134.1';
 const CP_BUILD   = '2026-11-12';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-032', 'version' => '1.134.1', 'date' => '2026-11-14', 'title' => 'Sub-project drop-down follows the chosen project: the New task form and the Planning form listed the sub-projects of every project in the search list; they now offer only those of the selected project, and grouped lists show their group headings.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-031', 'version' => '1.134.0', 'date' => '2026-11-14', 'title' => 'System Budgets: red ▼ mark when the profit is below the company minimum (40 % on cost by default) — on the totals, on the labour and part lines, in the list and in the preview before converting to an offer; management sets the minimum on the list page.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-030', 'version' => '1.133.3', 'date' => '2026-11-12', 'title' => 'Mobile apps: "Sync error" fixed — the app service (Service Engineer, Golden PM, Golden HR, customer app) failed to start since v1.119.0 because of the order two portal files were loaded in; nothing queued on the phones is lost, it is sent on the next sync.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-029', 'version' => '1.133.2', 'date' => '2026-11-12', 'title' => 'Projects page: a project whose sub-projects are all completed (and hidden) keeps its buttons — Edit project, Add sub-project, Drawings, Reports, Offers, Delete — instead of showing only "completed hidden".', 'db' => null, 'check' => null],

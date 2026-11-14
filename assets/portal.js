@@ -362,9 +362,10 @@
     }
     function place() { var r = btn.getBoundingClientRect(); var w = Math.max(r.width, 260); panel.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + 'px'; panel.style.width = w + 'px'; var below = window.innerHeight - r.bottom; panel.style.maxHeight = Math.max(160, Math.min(360, (below > 220 ? below : r.top) - 12)) + 'px'; if (below > 220) { panel.style.top = (r.bottom + 4) + 'px'; panel.style.bottom = ''; } else { panel.style.bottom = (window.innerHeight - r.top + 4) + 'px'; panel.style.top = ''; } }
     function render(q) {
-      list.innerHTML = ''; items = []; cur = -1; var k = q.trim().toLowerCase(); var n = 0;
+      list.innerHTML = ''; items = []; cur = -1; var k = q.trim().toLowerCase(); var n = 0; var lastG = null;
       Array.prototype.forEach.call(sel.options, function (o, i) {
-        var l = optLabel(o); if (o.hidden) return; if (k && l.toLowerCase().indexOf(k) < 0) return; if (o.disabled && o.value === '') return;
+        var l = optLabel(o), g = o.parentNode && o.parentNode.tagName === 'OPTGROUP' ? o.parentNode : null; if (o.hidden || (g && g.hidden)) return;   /* R97-032: an option of a hidden group is hidden too */ if (k && l.toLowerCase().indexOf(k) < 0) return; if (o.disabled && o.value === '') return;
+        if (g && g !== lastG && !k) { var gh = document.createElement('div'); gh.className = 'ss-group'; gh.textContent = g.label || ''; list.appendChild(gh); } lastG = g;
         var d = document.createElement('div'); d.className = 'ss-item' + (o.selected ? ' is-sel' : '') + (o.value === '' ? ' is-empty' : ''); d.setAttribute('role', 'option'); d.dataset.i = i;
         if (k) { var p = l.toLowerCase().indexOf(k); d.appendChild(document.createTextNode(l.slice(0, p))); var m = document.createElement('mark'); m.textContent = l.slice(p, p + k.length); d.appendChild(m); d.appendChild(document.createTextNode(l.slice(p + k.length))); } else d.textContent = l;
         d.addEventListener('mousedown', function (e) { e.preventDefault(); pick(d); }); list.appendChild(d); items.push(d); n++;

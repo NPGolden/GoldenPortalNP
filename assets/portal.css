@@ -1954,3 +1954,6 @@ html[data-theme="dark"] .tbl tr.grp-row td { background: rgba(200,155,60,.14); }
 .sb-low { color: #9B2C2C; font-weight: 700; font-size: 12px; white-space: nowrap; cursor: help; }
 .sb-low-cell, .sb-low-cell b { color: #9B2C2C; font-weight: 700; }
 html[data-theme="dark"] .sb-low, html[data-theme="dark"] .sb-low-cell, html[data-theme="dark"] .sb-low-cell b { color: #F3B4B4; }
+/* R97-032 searchable drop-down: group headings (optgroup labels) */
+.ss-group { padding: 6px 10px 3px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); border-top: 1px solid var(--line, #E5E7EB); }
+.ss-group:first-child { border-top: 0; }
