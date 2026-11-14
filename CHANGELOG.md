@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.135.1** (build 2026-11-12). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.136.0** (build 2026-11-12). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.136.0 | GAS-CP-R97-035 | 2026-11-14 | Accounting: "To invoice per vessel" — clicking a vessel shows everything still to be invoiced for it: contracts not fully invoiced with the final invoices that close a project, proformas without an invoice, hours not reported, reports waiting at accounting and materials of service reports. | — |
 | 1.135.1 | GAS-CP-R97-034 | 2026-11-14 | Accounting reports: accounting can correct the invoice number or the invoice date of a report afterwards (wrong entry); the history keeps the old and the new values. | — |
 | 1.135.0 | GAS-CP-R97-033 | 2026-11-14 | Organisations: separate ERP codes for the customer ledger and the supplier ledger — two fields on the organisation, no copying between them, and a tidy-up list on Contacts › Organisations for codes earlier versions mixed up. | — |
 | 1.134.1 | GAS-CP-R97-032 | 2026-11-14 | Sub-project drop-down follows the chosen project: the New task form and the Planning form listed the sub-projects of every project in the search list; they now offer only those of the selected project, and grouped lists show their group headings. | — |

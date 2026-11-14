@@ -479,6 +479,61 @@ function acc_correct_invoice(int $id, string $old, string $new, string $date, ?s
         db()->commit();
     } catch (Throwable $e) { db()->rollBack(); throw $e; }
 }
+/** R97-035: everything that is still to be invoiced for a vessel — not only the hours.
+ *   hours      open lines of the register (not yet on a report), per project / sub-project
+ *   reports    accounting reports not closed yet (draft, returned, with accounting, partly invoiced)
+ *   contracts  sub-projects (and project-level offers) with an approved offer that is not fully invoiced: contract, invoiced, remaining;
+ *              "final" = the sub-project or the project is completed, so this invoice closes it
+ *   proformas  proformas issued / paid that have no accounting invoice for their whole amount yet
+ *   materials  parts marked "I" (to be invoiced) on service reports that are not invoiced yet
+ *  Amounts are gross as in the ledger; the caller hides them from people without the finance view. */
+function acc_vessel_due(int $vid): array {
+    $out = ['vessel' => null, 'projects' => [], 'hours' => [], 'reports' => [], 'contracts' => [], 'proformas' => [], 'materials' => [], 'tot' => ['hours' => 0.0, 'reports' => 0.0, 'contracts' => 0.0, 'final' => 0.0, 'proformas' => 0.0, 'materials' => 0]];
+    $out['vessel'] = one('SELECT id, name FROM vessels WHERE id = ?', [$vid]); if (!$out['vessel']) return $out;
+    $P = []; foreach (all('SELECT id, project_code, name, status FROM projects WHERE vessel_id = ? ORDER BY project_code, name', [$vid]) as $p) $P[(int)$p['id']] = $p; $out['projects'] = $P;
+    $in = $P ? implode(',', array_keys($P)) : '0'; $plab = fn($pid) => isset($P[(int)$pid]) ? trim((string)$P[(int)$pid]['project_code'] . ' ' . (string)$P[(int)$pid]['name']) : '';
+    if (acc_has()) {
+        $out['hours'] = all("SELECT a.project_id, a.subproject_id, p.project_code, p.name AS project_name, s.code AS sub_code, s.name AS sub_name, COUNT(*) n, COALESCE(SUM(a.hours),0) h, MIN(a.work_date) oldest, MAX(a.work_date) newest, SUM(a.source = 'ts') n_ts, SUM(a.source = 'fsr') n_fsr
+                               FROM acc_lines a LEFT JOIN projects p ON p.id = a.project_id LEFT JOIN subprojects s ON s.id = a.subproject_id
+                              WHERE a.state = 'open' AND (a.vessel_id = ? OR a.project_id IN ($in)) GROUP BY a.project_id, a.subproject_id ORDER BY oldest", [$vid]);
+        foreach ($out['hours'] as $h) $out['tot']['hours'] += (float)$h['h'];
+        $out['reports'] = all("SELECT r.id, r.report_no, r.revision, r.status, r.total_hours, r.total_net, r.currency, r.period_start, r.period_end, r.issued_at, r.invoice_ref, p.project_code, p.name AS project_name
+                                 FROM acc_reports r LEFT JOIN projects p ON p.id = r.project_id WHERE (r.vessel_id = ? OR r.project_id IN ($in)) AND r.status IN ('draft','returned','issued','sent','partly_invoiced') ORDER BY r.id", [$vid]);
+        foreach ($out['reports'] as $r) $out['tot']['reports'] += (float)$r['total_net'];
+    }
+    if ($P && function_exists('inv_compute_many')) {
+        $subs = all("SELECT id, project_id, code, name, status FROM subprojects WHERE project_id IN ($in) ORDER BY project_id, SUBSTRING_INDEX(code, '.', 1), CAST(SUBSTRING_INDEX(code, '.', -1) AS UNSIGNED), code");
+        $c = inv_compute_many(array_column($subs, 'id'));
+        foreach ($subs as $s) { $x = $c[(int)$s['id']] ?? null; if (!$x || $x['contract'] <= 0.005 || $x['override'] === 'full') continue; $rem = round($x['contract'] - $x['invoiced'], 2); if ($rem <= 0.01) continue;
+            $final = $s['status'] === 'completed' || ($P[(int)$s['project_id']]['status'] ?? '') === 'completed';
+            $out['contracts'][] = ['project_id' => (int)$s['project_id'], 'subproject_id' => (int)$s['id'], 'project' => $plab($s['project_id']), 'sub' => trim((string)$s['code'] . ' ' . (string)$s['name']), 'sub_status' => (string)$s['status'], 'contract' => $x['contract'], 'invoiced' => $x['invoiced'], 'remaining' => $rem, 'pct' => $x['raw_pct'], 'final' => $final, 'n_pi' => $x['n_pi']];
+            $out['tot']['contracts'] += $rem; if ($final) $out['tot']['final'] += $rem; }
+        try {   // offers approved on the project itself, without a sub-project
+            if (function_exists('of_has') && of_has()) { $pc = [];
+                foreach (all("SELECT project_id, status, gross_total, amount, vat_pct FROM offers WHERE project_id IN ($in) AND subproject_id IS NULL AND kind <> 'budget' AND converted_to IS NULL") as $o) { if ((function_exists('of_status_behaves') ? of_status_behaves((string)$o['status']) : 'open') !== 'approved') continue; $pc[(int)$o['project_id']] = ($pc[(int)$o['project_id']] ?? 0.0) + (float)($o['gross_total'] ?: (float)$o['amount'] * (1 + (float)($o['vat_pct'] ?? 0) / 100)); }
+                foreach ($pc as $pid => $contract) { $inv = function_exists('pi_has') && pi_has() ? (float) scalar("SELECT COALESCE(SUM(gross),0) FROM proformas WHERE project_id = ? AND subproject_id IS NULL AND kind IN ('invoice','credit') AND status <> 'cancelled'", [$pid]) : 0.0; $rem = round($contract - $inv, 2); if ($rem <= 0.01) continue; $final = ($P[$pid]['status'] ?? '') === 'completed';
+                    $out['contracts'][] = ['project_id' => $pid, 'subproject_id' => 0, 'project' => $plab($pid), 'sub' => '', 'sub_status' => '', 'contract' => $contract, 'invoiced' => $inv, 'remaining' => $rem, 'pct' => $contract > 0 ? (int) min(100, round($inv / $contract * 100)) : 0, 'final' => $final, 'n_pi' => 0]; $out['tot']['contracts'] += $rem; if ($final) $out['tot']['final'] += $rem; }
+            }
+        } catch (Throwable $e) {}
+        usort($out['contracts'], fn($a, $b) => [(int)!$a['final'], $a['project'], $a['sub']] <=> [(int)!$b['final'], $b['project'], $b['sub']]);
+    }
+    if (function_exists('pi_has') && pi_has()) { try {
+        $out['proformas'] = all("SELECT pi.id, pi.pi_no, pi.title, pi.issue_date, pi.gross, pi.currency, pi.status, pi.project_id, " . PI_INV_SQL . " AS inv_sum, " . PI_ADV_SQL . " AS adv_sum, p.project_code, s.code AS sub_code
+                                   FROM proformas pi LEFT JOIN projects p ON p.id = pi.project_id LEFT JOIN subprojects s ON s.id = pi.subproject_id
+                                  WHERE pi.kind = 'proforma' AND pi.status IN ('issued','sent','partly_paid','paid') AND (pi.vessel_id = ? OR pi.project_id IN ($in)) HAVING pi.gross - inv_sum > 0.005 ORDER BY pi.issue_date, pi.id", [$vid]);
+        foreach ($out['proformas'] as $r) $out['tot']['proformas'] += (float)$r['gross'] - (float)$r['inv_sum'];
+    } catch (Throwable $e) { $out['proformas'] = []; } }
+    if ($P && function_exists('fsr_part_types')) { try {
+        foreach (all("SELECT r.id, r.report_no, r.report_date, r.project_id, r.invoicing, w.parts FROM fsr_reports r JOIN fsr_works w ON w.report_id = r.id WHERE r.project_id IN ($in) AND r.status <> 'draft' AND COALESCE(r.invoicing, 'none') <> 'invoiced' AND w.parts IS NOT NULL AND w.parts <> '' AND w.parts <> '[]' ORDER BY r.report_date, r.id") as $w) {
+            foreach ((json_decode((string)$w['parts'], true) ?: []) as $p) { if (trim((string)($p['d'] ?? '')) === '' && trim((string)($p['c'] ?? '')) === '') continue; if (strtoupper((string)($p['t'] ?? 'I')) !== 'I') continue;
+                $out['materials'][] = ['report_id' => (int)$w['id'], 'report_no' => (string)$w['report_no'], 'date' => (string)$w['report_date'], 'project' => $plab($w['project_id']), 'code' => (string)($p['c'] ?? ''), 'descr' => (string)($p['d'] ?? ''), 'qty' => (float)($p['q'] ?? 1) ?: 1.0, 'stock' => !empty($p['m'])]; }
+        }
+        $out['tot']['materials'] = count($out['materials']);
+    } catch (Throwable $e) {} }
+    return $out;
+}
+/** Vessels that have something to invoice in the register or with accounting — for the picker of the per-vessel page. */
+function acc_vessel_list(): array { return all("SELECT v.id, v.name FROM vessels v WHERE v.is_active = 1 ORDER BY v.name"); }
 function acc_answer_from_post(int $id): void {
     if (!acc_is_accounting()) throw new RuntimeException(t('err.noaccess'));
     $R = acc_load($id); if (!$R || !in_array($R['status'], ['issued', 'sent', 'partly_invoiced'], true)) throw new RuntimeException(t('acc.not_answerable'));

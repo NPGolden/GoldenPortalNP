@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.135.1';
+const CP_VERSION = '1.136.0';
 const CP_BUILD   = '2026-11-12';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-035', 'version' => '1.136.0', 'date' => '2026-11-14', 'title' => 'Accounting: "To invoice per vessel" — clicking a vessel shows everything still to be invoiced for it: contracts not fully invoiced with the final invoices that close a project, proformas without an invoice, hours not reported, reports waiting at accounting and materials of service reports.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-034', 'version' => '1.135.1', 'date' => '2026-11-14', 'title' => 'Accounting reports: accounting can correct the invoice number or the invoice date of a report afterwards (wrong entry); the history keeps the old and the new values.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-033', 'version' => '1.135.0', 'date' => '2026-11-14', 'title' => 'Organisations: separate ERP codes for the customer ledger and the supplier ledger — two fields on the organisation, no copying between them, and a tidy-up list on Contacts › Organisations for codes earlier versions mixed up.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-032', 'version' => '1.134.1', 'date' => '2026-11-14', 'title' => 'Sub-project drop-down follows the chosen project: the New task form and the Planning form listed the sub-projects of every project in the search list; they now offer only those of the selected project, and grouped lists show their group headings.', 'db' => null, 'check' => null],

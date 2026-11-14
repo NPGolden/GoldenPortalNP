@@ -1775,3 +1775,11 @@ Tested: change of number and date; no change refused; invalid date refused; unkn
 **Security review**: accounting gate on the server, CSRF, bound statements, the date validated with `checkdate`, every correction in the report history with the user. No finding.
 
 Language keys 9 385 each.
+
+## §321 v1.136.0 (R97-035) — Accounting: to invoice per vessel
+
+New page `?p=acc_vessel[&vessel=N]` (`views/acc_vessel.php`, gate `acc_visible()`, vessels limited by `tk_scope()`); the vessel names of "Waiting to be reported" on Accounting and a new button lead to it. `acc_vessel_due()` in `app/acc.php` gathers, for the projects of the vessel: open register lines per project / sub-project; accounting reports in draft, returned, issued, sent or partly invoiced; sub-projects and project-level offers with an approved offer not fully invoiced (`inv_compute_many()` — contract, invoiced, remaining; "final" when the sub-project or project is completed; a manual "fully invoiced" override removes the row); proformas issued / paid whose gross is not covered by linked invoices (`PI_INV_SQL`), with the advances received; and the parts typed "I" on service reports that are not invoiced (`fsr_works.parts`). Read-only: no new action, no database step. Amounts appear only with `fin_visible()` or `acc_is_accounting()`.
+
+**Security review**: read-only page behind the staff check and the accounting gate; the vessel id is checked against the vessels the user may see; one bound parameter and integer-cast id lists in the statements; output escaped; amounts masked for people without the finance view. No finding.
+
+Language keys 9 427 each.
