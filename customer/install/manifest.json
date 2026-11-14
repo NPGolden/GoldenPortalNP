@@ -1,17 +1,17 @@
 {
     "name": "Golden A/S Customer Portal",
-    "version": "1.139.0",
+    "version": "1.140.0",
     "build": "2026-11-12",
-    "generated_at": "2026-11-14T10:03:15+00:00",
-    "count": 805,
+    "generated_at": "2026-11-14T14:18:54+00:00",
+    "count": 806,
     "files": {
         ".htaccess": {
             "sha256": "1bf5deb26fd95b271e85398d6ceba8a7389b3918d9ebe946e627ffa06a69f423",
             "size": 181
         },
         "CHANGELOG.md": {
-            "sha256": "9e7f444f604295e497e8197527c57d37298c5f1adb15b4538a1b3e8eee07087c",
-            "size": 158629
+            "sha256": "ce4f4a774856557171bc767c334f277879d69d4418699e649371b9351e01b09f",
+            "size": 158984
         },
         "README.md": {
             "sha256": "aaac31c2a33e616de5c3dc217d5e2f5b7803f116db21e3d4a01cfb1b96e4b974",
@@ -606,8 +606,8 @@
             "size": 15348
         },
         "customer/app/ct.php": {
-            "sha256": "3fc832cb9190d5888e408c25f990badca9eac6910937909a77b3f08143262f45",
-            "size": 60316
+            "sha256": "4335b56debdcc525e5ecb2dd59d454ee5afe48eddcf9585b18e21bdd8b9337ec",
+            "size": 64499
         },
         "customer/app/db.php": {
             "sha256": "ae63723f5090ebd659c2a27430aee340a99876f3a374e2380b71b6eeaa400269",
@@ -778,12 +778,12 @@
             "size": 4119
         },
         "customer/app/nf.php": {
-            "sha256": "e1fbf80a2cf36d6c4a36a8767a79af9e52128a95389d8aea8e50d7161d6b26cc",
-            "size": 28317
+            "sha256": "17958a9bc8f0893bbc8bad683b744dc4e82ddb9c4f4d11801a9da6455ea10c5d",
+            "size": 28623
         },
         "customer/app/nl.php": {
-            "sha256": "83bec43690a5edc6c913117eb77200502688a5017792d048e0dfe354271072e7",
-            "size": 39883
+            "sha256": "9b4c7047f372ef3dc78bbb8d5974ce8498e7bb31ed9bcb2dc4443499d5a40883",
+            "size": 49134
         },
         "customer/app/num.php": {
             "sha256": "3a0f7e9c71325f90f9bc84ae30b57447a79ee2afbc2290c07e851f9497b3f4b9",
@@ -942,8 +942,8 @@
             "size": 6873
         },
         "customer/app/version.php": {
-            "sha256": "25b5fe54ecf8faca66e0a403ee40e13f04b7b06f4d5da82ae9dfbea4693fa765",
-            "size": 204779
+            "sha256": "cbb844bd5c0f1f77c4f2546c443c7587051ef7841daf7ca063b74d72a33f2058",
+            "size": 205270
         },
         "customer/app/vh.php": {
             "sha256": "e48f7d44763f6ac11691f44d3be783d532dc2788a159710b6bd796808936ac76",
@@ -1002,8 +1002,8 @@
             "size": 4713
         },
         "customer/install/cp_selfcheck.php": {
-            "sha256": "c0846f078c521e7b25e6ec1186f42d46ee5edf460a65fa08063a91d2beb935a7",
-            "size": 48890
+            "sha256": "f64ab80265b5cf82b205f65ece8b21ee8dd3bb4d91f2365c778b9ea45602e740",
+            "size": 49237
         },
         "customer/install/migrate_cp_r10_approvals_invoicing.sql": {
             "sha256": "d9f0affe01937019e43d9f76e389f28d3e0aa89190ef17896fec56a80b237933",
@@ -1685,6 +1685,10 @@
             "sha256": "3346df8299cc4ff6e070d3f018cca8735b84f752b5d6eb1e197af47ea5309071",
             "size": 3122
         },
+        "customer/install/migrate_cp_r97_040_nl_lists_contact_categories.sql": {
+            "sha256": "1e93d332e50f076f5021f656d88d8c31012381892d973428cce92c65ad77e332",
+            "size": 788
+        },
         "customer/install/migrate_cp_r9_systems.sql": {
             "sha256": "d6247bb4bdb0ced9ec4b083ecec39ec51e602b83cc95bd8321141c7430aabe97",
             "size": 5253
@@ -1770,24 +1774,24 @@
             "size": 11023
         },
         "customer/lang/bg.php": {
-            "sha256": "eb35d17efce2478b063b48c029a27c5f0bf90af36c94ce88dd843e7b5fc32649",
-            "size": 817135
+            "sha256": "400d3b90c5de79592d5f19525e505529b1e69c252f18fcd57b445f6b18266a82",
+            "size": 819449
         },
         "customer/lang/el.php": {
-            "sha256": "182c7a48b8312308bc6974c2794cb32d63421ff4c5ffcc131c17499bfded8737",
-            "size": 896736
+            "sha256": "05e966324bb7ba7449df2bda310ffc4ac9df4418015eaa644202ab667520fab5",
+            "size": 900448
         },
         "customer/lang/en.php": {
-            "sha256": "ea81da8d9158b91508f8522086fdc2c389e3190015d97b5e6f3fd2690f8a8c9b",
-            "size": 559122
+            "sha256": "9d682a3930b8eed324034f93c66dd2dfb878df9b0dcd6189ccd34d9798f468ad",
+            "size": 561425
         },
         "customer/lang/it.php": {
-            "sha256": "11792ab19292763517dd0b6cc34b37d2855232e03e393b389b8f3c2dbfe5e178",
-            "size": 589184
+            "sha256": "63a9f2df3bb6710ef9c545c91c077401ac466105f18cd5d9b52dcc07a02027ce",
+            "size": 591631
         },
         "customer/lang/uk.php": {
-            "sha256": "e4c56a4f9a6b3bf536dd365e9e0de1b84987bf5b03274287bea39a3ca96963dd",
-            "size": 804973
+            "sha256": "e2bd809430e7efcd213c3221cdce900ee5e23ec991c1a266e3b07dc380a3d769",
+            "size": 807287
         },
         "customer/mobile-customer/.htaccess": {
             "sha256": "bad5fce9c0d087a572ee16e3e3a6ae01812894b96fbf9ff6a6b0be85dc5fea8b",
@@ -2154,8 +2158,8 @@
             "size": 3099
         },
         "customer/nl.php": {
-            "sha256": "d33c3ce89a968294aad101c7c2d9cb74a85abc538ba25673f777a46439b84818",
-            "size": 5914
+            "sha256": "1867521de8d4068012c2813e0a04c73b7e742900c0128bb8084e832f0fbb651c",
+            "size": 5927
         },
         "customer/rcr_feed.php": {
             "sha256": "43ff0474c8b619150893437e98be0138f4292704aae243f5b0c2ae2114e5b751",
@@ -2222,20 +2226,20 @@
             "size": 33992
         },
         "customer/views/_manual_golden.php": {
-            "sha256": "f6b204ee148746fba9a2b36aae88e6440009f9e3f107530b35ebf68b090c16e2",
-            "size": 302397
+            "sha256": "d2106b967c16aa1275aee2b5cf0a9dcdc044bc74bee1cf180a966c12f210d241",
+            "size": 304432
         },
         "customer/views/_manual_hr.php": {
             "sha256": "f877993ab2530ae7a0c03bdc7fa55d5b91fe801d489094ac7d793a6eb71264d9",
             "size": 48138
         },
         "customer/views/_manual_pm.php": {
-            "sha256": "9145f43ca3832be31253ba834a1bd74e981e4e6100467dceaeefd70b37dc4cf5",
-            "size": 77192
+            "sha256": "b28b683eb7709683e2895ddf5d391e96ac1341636fdb15ce8d4ecf5f006514f4",
+            "size": 79227
         },
         "customer/views/_manual_staff.php": {
-            "sha256": "f26cd1da027cf05ac5acec38fb76bf18591d8a121af5c475457dae47f117e75c",
-            "size": 44957
+            "sha256": "46af2c8a97e330d6a2f42b942a71fda57b0bb91f11f99c112bd89d6dfa71cc1a",
+            "size": 46992
         },
         "customer/views/_offer_builder.php": {
             "sha256": "1aade6a8f2a6f6210b8d6c374df961dcd7be0b52b771f1d85903ca40b7d60797",
@@ -2650,12 +2654,12 @@
             "size": 5267
         },
         "customer/views/newsletter.php": {
-            "sha256": "5ade2b84c3d0cb92b956925b8395dfec44d9366f72bc51c7b4a01b5401cfd28a",
-            "size": 17927
+            "sha256": "1a3b38de08725f7791da8c9646c2ce15348caf3100e7785673ff4b50b4e12f15",
+            "size": 18794
         },
         "customer/views/newsletters.php": {
-            "sha256": "4c0f3339bf1a209f39199076ae81ec283b954e7ba0a7e8e35fa289f9dd9cdbcc",
-            "size": 7799
+            "sha256": "f1767ea267eb656e681bcff9e34f0a7b86bc78580b50d3e155890c96d924766d",
+            "size": 14227
         },
         "customer/views/notifications.php": {
             "sha256": "b4ffff743fc4a07479cc72daf304d89fc9be5b0322fa3f69ee096f8d0077bcad",
@@ -2982,8 +2986,8 @@
             "size": 5695
         },
         "customer/web_feed.php": {
-            "sha256": "4df2db980383a1747ca118caa0906024bd39e5bce159c76a685bc68c8a657b4c",
-            "size": 4022
+            "sha256": "9ecebe4ece9ed15a551b17660f5eeff1043739cb573fea4d4fb0e8274f26203e",
+            "size": 4035
         },
         "employee/.htaccess": {
             "sha256": "5e8963c763f79af442578cec13f9a0840375f45d2b5a07665f5131262d90c5c6",

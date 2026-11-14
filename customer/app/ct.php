@@ -13,13 +13,44 @@ function ct_has(): bool {
 }
 function ct_categories(): array {
     $out = [];
-    foreach (['owner', 'owner_rep', 'management', 'captain', 'chief_eng', 'eto', 'crew', 'yard', 'class', 'supplier', 'consultant', 'other'] as $k) $out[$k] = t('ct.cat_' . $k);
+    foreach (['owner', 'owner_rep', 'management', 'yacht_mgr', 'tech_mgr', 'captain', 'chief_eng', 'eto', 'engineer', 'crew', 'yard', 'yard_mgr', 'project_mgr', 'designer', 'purchasing', 'class', 'surveyor', 'supplier', 'sales', 'broker', 'agent', 'consultant', 'other'] as $k) $out[$k] = t('ct.cat_' . $k);   // R97-040: more yachting roles
     return $out;
 }
 function ct_cat_pill(string $cat): string {
-    $tone = ['owner' => 'gold', 'owner_rep' => 'gold', 'management' => 'navy', 'captain' => 'blue', 'chief_eng' => 'blue', 'eto' => 'blue', 'crew' => 'blue', 'yard' => 'green', 'class' => 'green', 'supplier' => 'mute', 'consultant' => 'mute'][$cat] ?? 'mute';
+    $tone = ['owner' => 'gold', 'owner_rep' => 'gold', 'management' => 'navy', 'captain' => 'blue', 'chief_eng' => 'blue', 'eto' => 'blue', 'crew' => 'blue', 'yard' => 'green', 'class' => 'green', 'supplier' => 'mute', 'consultant' => 'mute', 'yacht_mgr' => 'navy', 'tech_mgr' => 'navy', 'engineer' => 'blue', 'yard_mgr' => 'green', 'project_mgr' => 'green', 'designer' => 'green', 'surveyor' => 'green', 'purchasing' => 'navy'][$cat] ?? 'mute';
     return pill($tone, ct_categories()[$cat] ?? $cat);
 }
+/** R97-040: the category a job title points to — '' when the title says nothing. First match wins, most specific first. */
+function ct_cat_guess(?string $position): string {
+    $p = ' ' . mb_strtolower(trim((string)$position)) . ' '; if (trim($p) === '') return '';
+    $rules = [
+        'owner_rep'   => ['owner\'s rep', 'owners rep', 'owner rep', 'owner representative', 'εκπρόσωπος πλοιοκτ', 'rappresentante dell\'armatore', 'build captain'],
+        'eto'         => [' eto ', 'electro-technical', 'electrotechnical', 'avit', ' av/it', 'ηλεκτρονικός'],
+        'chief_eng'   => ['chief engineer', 'chief eng', ' c/e ', 'α\' μηχανικός', 'πρώτος μηχανικός', 'direttore di macchina'],
+        'engineer'    => ['2nd engineer', 'second engineer', '3rd engineer', 'electrician', 'ηλεκτρολόγος', 'elettricista', 'service engineer', 'commissioning engineer'],
+        'captain'     => ['captain', 'master', 'skipper', 'καπετάν', 'πλοίαρχος', 'comandante', 'capitano'],
+        'crew'        => ['bosun', 'deckhand', 'first officer', 'chief officer', 'chief mate', 'stewardess', 'purser', 'υποπλοίαρχος'],
+        'purchasing'  => ['purchas', 'procurement', 'buyer', 'supply chain', 'προμηθει', 'αγορών', 'acquisti'],
+        'tech_mgr'    => ['technical manager', 'technical director', 'technical superintendent', 'superintendent', 'fleet manager', 'τεχνικός διευθυντής', 'direttore tecnico', 'dpa '],
+        'yacht_mgr'   => ['yacht manager', 'yacht management', 'charter manager', 'fleet operations'],
+        'designer'    => ['designer', 'naval architect', 'architect', 'ναυπηγός', 'σχεδιαστ', 'progettista', 'architetto'],
+        'surveyor'    => ['surveyor', 'επιθεωρητής', 'ispettore'],
+        'yard_mgr'    => ['yard manager', 'shipyard manager', 'yard director', 'production manager', 'refit manager', 'head of production', 'διευθυντής ναυπηγείου', 'direttore di cantiere'],
+        'project_mgr' => ['project manager', 'project director', 'project engineer', 'project coordinator', 'διαχειριστής έργου', 'υπεύθυνος έργου', 'capo commessa', 'responsabile di progetto'],
+        'broker'      => ['broker', 'μεσίτης'],
+        'agent'       => ['agent', 'πράκτορας', 'agente'],
+        'sales'       => ['sales', 'business development', 'commercial', 'account manager', 'πωλήσεων', 'vendite', 'commerciale'],
+        'owner'       => [' owner ', 'ship owner', 'shipowner', 'πλοιοκτήτης', 'armatore'],
+    ];
+    foreach ($rules as $k => $words) foreach ($words as $w) if (str_contains($p, $w)) return $k;
+    return '';
+}
+/** Give every person still on "Other" the category of the job title, where the title is clear. $dry → only count. Returns the number of people. */
+function ct_autocat(bool $dry = false): int {
+    $n = 0; foreach (all("SELECT id, position FROM contacts WHERE (category IS NULL OR category IN ('', 'other')) AND position IS NOT NULL AND position <> ''") as $r) { $c = ct_cat_guess((string)$r['position']); if ($c === '') continue; $n++; if (!$dry) q('UPDATE contacts SET category = ? WHERE id = ?', [$c, (int)$r['id']]); }
+    return $n;
+}
+function ct_origin_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW COLUMNS FROM contacts LIKE 'needs_review'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Normalise a free-text category (English or the portal language) to a key. */
 function ct_norm_category(string $v): ?string {
     $n = mb_strtolower(trim($v)); if ($n === '') return 'other';
@@ -355,7 +386,7 @@ function ct_save_from_post(int $id): int {
     } else $coName = $str('company', 160);
     $channels = co_has() ? implode(',', array_intersect(array_keys(ct_channels()), (array)($_POST['channels'] ?? []))) : null;
     $subs = co_has() ? implode(',', array_intersect(array_keys(ct_subscriptions()), (array)($_POST['subscriptions'] ?? []))) : null;
-    $cat = ct_norm_category((string)($_POST['category'] ?? '')) ?? 'other';
+    $cat = ct_norm_category((string)($_POST['category'] ?? '')) ?? 'other'; if ($cat === 'other' && ($gc = ct_cat_guess((string)($_POST['position'] ?? ''))) !== '') $cat = $gc;   // R97-040: a clear job title sets the category
     $email = $str('email', 190); if ($email && !filter_var($email, FILTER_VALIDATE_EMAIL)) throw new RuntimeException(t('ct.bad_email'));
     $bday = ct_parse_birthday((string)($_POST['birthday'] ?? ''));
     if (($bd = trim((string)($_POST['birthday_md'] ?? ''))) !== '' && !$bday) { $md = ct_parse_md($bd); $bday = $md ? '1900-' . $md : null; }
@@ -373,6 +404,7 @@ function ct_save_from_post(int $id): int {
     }
     if (cc_has()) { $others = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['other_companies'] ?? []))))); q('DELETE FROM contact_companies WHERE contact_id = ?', [$id]); foreach (array_unique(array_merge($coid ? [$coid] : [], $others)) as $oc) if (scalar('SELECT 1 FROM companies WHERE id = ?', [$oc])) q('INSERT IGNORE INTO contact_companies (contact_id, company_id) VALUES (?, ?)', [$id, $oc]); }   // R85-002: a person may belong to several organisations
     if (co_has()) q('UPDATE contacts SET company_id = ?, channels = ?, subscriptions = ? WHERE id = ?', [$coid, $channels ?: null, $subs ?: null, $id]);
+    if (ct_origin_has()) q('UPDATE contacts SET needs_review = 0 WHERE id = ? AND needs_review = 1', [$id]);   // R97-040: saved by a person = reviewed
     // vessels: vessel[] with role[vid] and primary
     if (isset($_POST['vessel'])) {
         q('DELETE FROM contact_vessels WHERE contact_id = ?', [$id]);

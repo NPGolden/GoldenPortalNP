@@ -1837,3 +1837,19 @@ Limits: Microsoft Graph does not accept a `List-Unsubscribe` header, so the unsu
 **Security review**: tokens are 24 random letters / digits (not hex), compared by exact match; the click endpoint redirects only to an address stored for that issue (open-redirect attempt tested); unsubscribe changes state only by POST; public endpoint rate-limited, sets no cookie, answers nothing personal; pictures checked by content, stored under `storage/nl` and served by token; e-mail HTML built from escaped text only (script in a block is printed as text — tested); link addresses must be http(s) (`javascript:` refused — tested); sending rights checked on the server (a project manager gets 403 / no change — tested); the assistant never receives contact data; sign-up needs the site key and double opt-in. Proposal: a dedicated mailbox (e.g. news@) for newsletters, so a complaint cannot affect the mailbox that sends portal notifications — needs the Exchange application access policy to include it.
 
 Language keys 9 640 each.
+
+## §326 v1.140.0 (R97-040) — Newsletter lists; subscribers into Contacts; contact categories
+
+Decisions of 14/11/2026: combined approach — one register (Contacts), lists by category; existing business contacts included; categories applied to people.
+
+Migration `install/migrate_cp_r97_040_nl_lists_contact_categories.sql`: `contacts.origin`, `contacts.needs_review`, `nl_subs.contact_id`, `nl_subs.role`, table `nl_lists` (name, note, filter JSON `{roles, cats, subs, country}`, `add_emails`, `skip_emails`). Check key `r97q`.
+
+`app/ct.php`: `ct_categories()` gains yacht_mgr, tech_mgr, engineer, yard_mgr, project_mgr, designer, purchasing, surveyor, sales, broker, agent; `ct_cat_guess()` maps a job title (EN / EL / IT words) to a category; `ct_autocat()` applies it to people on "Other" — run once by `nf_sweep()` (setting `ct_autocat_done`), again from the Lists tab (action `nl_autocat`), and on saving a contact left on Other; saving a contact clears `needs_review`.
+
+`app/nl.php`: `nl_list_members()` — dynamic: active contacts with an e-mail matching organisation role AND person category AND country AND subscription (each only when set; primary organisation and `contact_companies`), plus the added addresses, minus the excluded ones; `nl_audience()` takes `lists`; statistics group label = person category (`c:<key>`); `nl_sub_to_contact()` on confirmation — existing contact by e-mail gets the subscriptions, otherwise a new contact (origin website, to review, category from role / kind, organisation only by `org_find()` name match, never created). `nl.php` and `web_feed.php` now load `ct` and `org`. Views: Lists tab with form and member list; list ticks in the issue's Audience; linked contact and "to review" on the subscribers tab.
+
+Website R17: the sign-up form has "My role" (owner, owner's representative, captain, chief engineer, ETO, technical manager, yacht manager, shipyard manager, project manager, designer, purchasing manager, surveyor, other), passed to the portal.
+
+**Security review**: list actions behind staff check, CSRF and `nl_can()`; filter values taken from fixed lists; all statements bound; a subscriber can create one contact only after confirming the e-mail address, with text fields cut and escaped on display, and can never create or change an organisation; the role value is checked against the category list. No finding.
+
+Language keys 9 680 each.

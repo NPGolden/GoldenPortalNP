@@ -65,7 +65,7 @@ function nl_save_from_post(int $id): void {
     }
     usort($blocks, fn($a, $b) => $a['pos'] <=> $b['pos']); foreach ($blocks as &$x) unset($x['pos']); unset($x);
     $add = (string)($_POST['add'] ?? ''); if (in_array($add, NL_BLOCKS, true) && count($blocks) < NL_MAX_BLOCKS) $blocks[] = ['t' => $add];
-    $aud = ['groups' => array_values(array_intersect(array_keys(nl_groups()), (array)($_POST['groups'] ?? []))), 'topics' => array_values(array_intersect(NL_TOPICS, (array)($_POST['topics'] ?? []))),
+    $aud = ['lists' => array_values(array_filter(array_map('intval', (array)($_POST['lists'] ?? [])))), 'groups' => array_values(array_intersect(array_keys(nl_groups()), (array)($_POST['groups'] ?? []))), 'topics' => array_values(array_intersect(NL_TOPICS, (array)($_POST['topics'] ?? []))),
             'country' => $s('country', 80), 'extra' => $s('extra', 4000)];
     q('UPDATE nl_issues SET title = ?, subject = ?, preheader = ?, lang = ?, blocks = ?, audience = ? WHERE id = ?', [$title, $subject, $s('preheader', 200) ?: null, $lang, json_encode($blocks, JSON_UNESCAPED_UNICODE), json_encode($aud, JSON_UNESCAPED_UNICODE), $id]);
 }
@@ -84,6 +84,7 @@ function nl_copy(int $id): int { $I = nl_issue($id); if (!$I) throw new RuntimeE
 function nl_audience(array $aud): array {
     $out = []; $opt = []; foreach (all('SELECT LOWER(email) e FROM nl_optout') as $r) $opt[$r['e']] = 1;
     $put = function (string $email, string $name, ?int $cid, ?int $coid, string $co, string $grp) use (&$out, $opt) { $e = mb_strtolower(trim($email)); if ($e === '' || !filter_var($e, FILTER_VALIDATE_EMAIL) || isset($opt[$e]) || isset($out[$e]) || count($out) >= NL_MAX_RCPT) return; $out[$e] = ['email' => $e, 'name' => mb_substr(trim($name), 0, 160), 'contact_id' => $cid, 'company_id' => $coid, 'company' => mb_substr($co, 0, 160), 'grp' => $grp]; };
+    foreach (array_map('intval', (array)($aud['lists'] ?? [])) as $lid) { $L = nl_list($lid); if ($L) foreach (nl_list_members($L) as $r) $put($r['email'], $r['name'], $r['contact_id'], $r['company_id'], $r['company'], $r['grp']); }   // R97-040 saved lists
     $groups = array_values(array_intersect(array_keys(nl_groups()), (array)($aud['groups'] ?? []))); $country = trim((string)($aud['country'] ?? ''));
     if ($groups && function_exists('co_has') && co_has()) {
         $roles = co_roles_has(); $cc = function_exists('cc_has') && cc_has();
@@ -100,7 +101,7 @@ function nl_audience(array $aud): array {
     return $out;
 }
 function nl_audience_counts(array $rcpt): array { $c = []; foreach ($rcpt as $r) $c[$r['grp']] = ($c[$r['grp']] ?? 0) + 1; return $c; }
-function nl_group_label(string $g): string { return $g === 'web' ? t('nl.g_web') : ($g === 'extra' ? t('nl.g_extra') : (nl_groups()[$g] ?? $g)); }
+function nl_group_label(string $g): string { if (str_starts_with($g, 'c:')) return function_exists('ct_categories') ? (ct_categories()[substr($g, 2)] ?? substr($g, 2)) : substr($g, 2); return $g === 'web' ? t('nl.g_web') : ($g === 'extra' ? t('nl.g_extra') : (nl_groups()[$g] ?? $g)); }
 
 /* ---------------------------------------------------------------- template */
 /** Plain text of a block → safe HTML: escaped, paragraphs, **bold**, and http(s) addresses turned into links through $link(url). */
@@ -225,7 +226,7 @@ function nl_pub_unsub(string $tok): bool { $s = one('SELECT id, issue_id, email 
 function nl_pub_confirm(string $tok): bool {
     $b = one("SELECT * FROM nl_subs WHERE token = ?", [$tok]); if (!$b || $b['status'] === 'unsubscribed') return false;
     q("UPDATE nl_subs SET status = 'confirmed', confirmed_at = COALESCE(confirmed_at, NOW()) WHERE id = ?", [(int)$b['id']]); q('DELETE FROM nl_optout WHERE email = ? AND reason <> \'bounce\'', [mb_strtolower((string)$b['email'])]);
-    try { foreach (all('SELECT id, subscriptions FROM contacts WHERE LOWER(email) = ?', [mb_strtolower((string)$b['email'])]) as $c) { $set = array_unique(array_merge(array_filter(explode(',', (string)$c['subscriptions'])), array_intersect(NL_TOPICS, explode(',', (string)$b['topics'])))); q('UPDATE contacts SET subscriptions = ? WHERE id = ?', [implode(',', $set), (int)$c['id']]); } } catch (Throwable $x) {}
+    try { nl_sub_to_contact((int)$b['id']); } catch (Throwable $x) { error_log('[nl] subscriber to contact: ' . $x->getMessage()); }
     return true;
 }
 /** Website sign-up (web_feed.php?r=subscribe): pending row + confirmation e-mail (double opt-in). Always answers the same, whatever the state of the address. */
@@ -234,16 +235,70 @@ function nl_pub_subscribe(array $b, string $ip): array {
     $f = fn(string $k, int $max) => mb_substr(trim(preg_replace('/[\r\n\t]+/', ' ', (string)($b[$k] ?? ''))), 0, $max);
     $email = mb_strtolower($f('email', 190)); if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new RuntimeException('bad email', 422);
     $topics = array_values(array_intersect(NL_TOPICS, array_map('strval', (array)($b['topics'] ?? ['newsletter'])))) ?: ['newsletter']; $lang = in_array($b['lang'] ?? '', ['en', 'el', 'it'], true) ? (string)$b['lang'] : 'en';
-    $kind = in_array($b['kind'] ?? '', ['yard', 'owner', 'customer', 'supplier', 'management', 'other'], true) ? (string)$b['kind'] : null;
+    $kind = in_array($b['kind'] ?? '', ['yard', 'owner', 'customer', 'supplier', 'management', 'other'], true) ? (string)$b['kind'] : null; $role = function_exists('ct_categories') && isset(ct_categories()[(string)($b['role'] ?? '')]) ? (string)$b['role'] : null;
     $cur = one('SELECT * FROM nl_subs WHERE email = ?', [$email]);
     if ($cur && $cur['status'] === 'confirmed') { $set = array_unique(array_merge(explode(',', (string)$cur['topics']), $topics)); q('UPDATE nl_subs SET topics = ? WHERE id = ?', [implode(',', array_intersect(NL_TOPICS, $set)), (int)$cur['id']]); return ['status' => 'ok']; }
     if ($cur && strtotime((string)$cur['created_at']) > time() - 600 && $cur['status'] === 'pending') return ['status' => 'ok'];   // one confirmation e-mail per ten minutes
     $tok = nl_token();
     if ($cur) q("UPDATE nl_subs SET name = ?, company = ?, kind = ?, topics = ?, lang = ?, status = 'pending', token = ?, source = ?, ip = ?, created_at = NOW(), unsub_at = NULL WHERE id = ?", [$f('name', 160) ?: null, $f('company', 160) ?: null, $kind, implode(',', $topics), $lang, $tok, $f('source', 40) ?: null, mb_substr($ip, 0, 64), (int)$cur['id']]);
     else q('INSERT INTO nl_subs (email, name, company, kind, topics, lang, token, source, ip) VALUES (?,?,?,?,?,?,?,?,?)', [$email, $f('name', 160) ?: null, $f('company', 160) ?: null, $kind, implode(',', $topics), $lang, $tok, $f('source', 40) ?: null, mb_substr($ip, 0, 64)]);
+    try { if ($role !== null) q('UPDATE nl_subs SET role = ? WHERE email = ?', [$role, $email]); } catch (Throwable $x) {}
     $T = fn(string $k, array $p = []) => function_exists('t_in') ? t_in($k, $lang, $p) : t($k, $p); $link = nl_base() . '/nl.php?s=' . $tok;
     if (function_exists('cp_mail')) cp_mail($email, $T('nl.cf_subject'), $T('nl.cf_body', ['u' => $link]), 'Golden A/S');
     return ['status' => 'ok'];
+}
+
+/* ---------------------------------------------------------------- R97-040: subscribers become contacts; saved lists */
+/** A confirmed website subscriber joins the Contacts register: the contact with the same e-mail gets the subscriptions; otherwise a new contact is
+ *  created (origin "website", to be reviewed) with the category of the role / kind chosen on the form. The organisation is linked only when the
+ *  company name matches an existing one — never created here. */
+function nl_sub_to_contact(int $subId): ?int {
+    $b = one('SELECT * FROM nl_subs WHERE id = ?', [$subId]); if (!$b || $b['status'] !== 'confirmed') return null; $email = mb_strtolower((string)$b['email']); $topics = array_values(array_intersect(NL_TOPICS, explode(',', (string)$b['topics'])));
+    $cs = all('SELECT id, subscriptions FROM contacts WHERE LOWER(email) = ? ORDER BY is_active DESC, id', [$email]);
+    if ($cs) { foreach ($cs as $c) { $set = array_unique(array_merge(array_filter(explode(',', (string)$c['subscriptions'])), $topics)); q('UPDATE contacts SET subscriptions = ? WHERE id = ?', [implode(',', $set), (int)$c['id']]); } $cid = (int)$cs[0]['id']; }
+    else {
+        $cat = (string)($b['role'] ?? '') !== '' ? (string)$b['role'] : (['yard' => 'yard', 'owner' => 'owner', 'management' => 'management', 'supplier' => 'supplier'][(string)$b['kind']] ?? 'other'); if (function_exists('ct_categories') && !isset(ct_categories()[$cat])) $cat = 'other';
+        $name = trim((string)$b['name']) !== '' ? (string)$b['name'] : ucwords(str_replace(['.', '_', '-'], ' ', (string) strstr($email, '@', true))); $coName = trim((string)$b['company']); $coId = null; $cuId = null;
+        if ($coName !== '' && function_exists('org_find')) { try { $m = org_find($coName); if ($m) { $coId = $m['company_id'] ?: null; $cuId = $m['customer_id'] ?: null; } } catch (Throwable $x) {} }
+        q('INSERT INTO contacts (customer_id, company, full_name, category, email, is_active) VALUES (?,?,?,?,?,1)', [$cuId, $coName !== '' ? mb_substr($coName, 0, 160) : null, mb_substr($name, 0, 160), $cat, $email]); $cid = (int) db()->lastInsertId();
+        if (function_exists('co_has') && co_has()) q('UPDATE contacts SET company_id = ?, channels = ?, subscriptions = ? WHERE id = ?', [$coId, 'email', implode(',', $topics) ?: null, $cid]);
+        if (function_exists('ct_origin_has') && ct_origin_has()) q("UPDATE contacts SET origin = 'website', needs_review = 1 WHERE id = ?", [$cid]);
+        if ($coId && function_exists('cc_has') && cc_has()) { try { q('INSERT IGNORE INTO contact_companies (contact_id, company_id) VALUES (?,?)', [$cid, $coId]); } catch (Throwable $x) {} }
+    }
+    try { q('UPDATE nl_subs SET contact_id = ? WHERE id = ?', [$cid, $subId]); } catch (Throwable $x) {}
+    return $cid;
+}
+function nl_lists_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'nl_lists'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function nl_list(int $id): ?array { $r = nl_lists_has() && $id ? one('SELECT * FROM nl_lists WHERE id = ?', [$id]) : null; if ($r) $r['filter'] = json_decode((string)($r['filter'] ?? ''), true) ?: []; return $r; }
+function nl_lists(): array { $out = []; if (!nl_lists_has()) return $out; foreach (all('SELECT * FROM nl_lists ORDER BY name') as $r) { $r['filter'] = json_decode((string)($r['filter'] ?? ''), true) ?: []; $out[] = $r; } return $out; }
+/** Members of a list: contacts matching its categories (organisation role AND person category AND country AND subscription, each only when set),
+ *  plus the addresses added by hand, minus the addresses excluded by hand. Dynamic — computed every time. Opt-outs are removed later, by nl_audience(). */
+function nl_list_members(array $L): array {
+    $f = $L['filter']; $roles = array_values(array_intersect(array_keys(nl_groups()), (array)($f['roles'] ?? []))); $cats = function_exists('ct_categories') ? array_values(array_intersect(array_keys(ct_categories()), (array)($f['cats'] ?? []))) : [];
+    $subs = array_values(array_intersect(NL_TOPICS, (array)($f['subs'] ?? []))); $country = trim((string)($f['country'] ?? '')); $out = [];
+    $skip = []; foreach (preg_split('/[\s,;]+/', mb_strtolower((string)($L['skip_emails'] ?? ''))) ?: [] as $e) if ($e !== '') $skip[$e] = 1;
+    $put = function (array $r) use (&$out, $skip) { $e = mb_strtolower(trim((string)$r['email'])); if ($e === '' || isset($skip[$e]) || isset($out[$e])) return; $out[$e] = ['email' => $e, 'name' => (string)$r['full_name'], 'contact_id' => (int)$r['id'], 'company_id' => $r['coid'] ? (int)$r['coid'] : null, 'company' => (string)($r['coname'] ?? ''), 'grp' => 'c:' . ((string)$r['category'] ?: 'other')]; };
+    if (($roles || $cats || $subs) && function_exists('co_has') && co_has()) {
+        $w = ["ct.is_active = 1 AND ct.email IS NOT NULL AND ct.email <> ''"]; $a = [];
+        if ($cats) { $w[] = 'ct.category IN (' . implode(',', array_fill(0, count($cats), '?')) . ')'; $a = array_merge($a, $cats); }
+        if ($subs) { $w[] = '(' . implode(' OR ', array_fill(0, count($subs), 'FIND_IN_SET(?, ct.subscriptions)')) . ')'; $a = array_merge($a, $subs); }
+        $rw = []; $ra = []; foreach ($roles as $g) { $rw[] = '(FIND_IN_SET(?, co.roles) OR co.kind = ?' . ($g === 'supplier' ? ' OR co.is_supplier = 1' : '') . ($g === 'customer' ? ' OR co.customer_id IS NOT NULL' : '') . ')'; array_push($ra, $g, $g); }
+        $cw = 'co.is_active = 1' . ($rw ? ' AND (' . implode(' OR ', $rw) . ')' : '') . ($country !== '' ? ' AND co.country = ?' : ''); $ca = array_merge($ra, $country !== '' ? [$country] : []);
+        $sel = 'SELECT ct.id, ct.full_name, ct.email, ct.category, co.id AS coid, co.name AS coname FROM contacts ct ';
+        if ($roles || $country !== '') {
+            foreach (all($sel . 'JOIN companies co ON co.id = ct.company_id WHERE ' . implode(' AND ', $w) . ' AND ' . $cw . ' ORDER BY co.name, ct.full_name', array_merge($a, $ca)) as $r) $put($r);
+            if (function_exists('cc_has') && cc_has()) foreach (all($sel . 'JOIN contact_companies x ON x.contact_id = ct.id JOIN companies co ON co.id = x.company_id WHERE ' . implode(' AND ', $w) . ' AND ' . $cw . ' ORDER BY co.name, ct.full_name', array_merge($a, $ca)) as $r) $put($r);
+        } else foreach (all($sel . 'LEFT JOIN companies co ON co.id = ct.company_id WHERE ' . implode(' AND ', $w) . ' ORDER BY co.name, ct.full_name', $a) as $r) $put($r);
+    }
+    foreach (preg_split('/[\s,;]+/', (string)($L['add_emails'] ?? '')) ?: [] as $e) { $e = mb_strtolower(trim($e)); if ($e === '' || !filter_var($e, FILTER_VALIDATE_EMAIL) || isset($skip[$e]) || isset($out[$e])) continue; $c = one('SELECT ct.id, ct.full_name, ct.email, ct.category, co.id AS coid, co.name AS coname FROM contacts ct LEFT JOIN companies co ON co.id = ct.company_id WHERE LOWER(ct.email) = ? LIMIT 1', [$e]); if ($c) $put($c); else $out[$e] = ['email' => $e, 'name' => '', 'contact_id' => null, 'company_id' => null, 'company' => '', 'grp' => 'extra']; }
+    return $out;
+}
+function nl_list_save_from_post(int $id): int {
+    $s = fn(string $k, int $max) => mb_substr(trim((string)($_POST[$k] ?? '')), 0, $max); $name = $s('name', 120); if ($name === '') throw new RuntimeException(t('nl.l_need_name'));
+    $f = ['roles' => array_values(array_intersect(array_keys(nl_groups()), (array)($_POST['roles'] ?? []))), 'cats' => array_values(array_intersect(array_keys(ct_categories()), (array)($_POST['cats'] ?? []))), 'subs' => array_values(array_intersect(NL_TOPICS, (array)($_POST['subs'] ?? []))), 'country' => $s('country', 80)];
+    $u = current_user(); $v = [$name, $s('descr', 300) ?: null, json_encode($f, JSON_UNESCAPED_UNICODE), $s('add_emails', 20000) ?: null, $s('skip_emails', 20000) ?: null];
+    if ($id) { q('UPDATE nl_lists SET name = ?, descr = ?, filter = ?, add_emails = ?, skip_emails = ? WHERE id = ?', array_merge($v, [$id])); return $id; }
+    q('INSERT INTO nl_lists (name, descr, filter, add_emails, skip_emails, created_by, created_name) VALUES (?,?,?,?,?,?,?)', array_merge($v, [(int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? '')])); return (int) db()->lastInsertId();
 }
 
 /* ---------------------------------------------------------------- assistant (R97-039) */
@@ -285,6 +340,9 @@ function nl_handle_action(string $action): bool {
         case 'nl_retry': $n = nl_retry_failed($id); flash('good', t('nl.retried', ['n' => $n])); $back('#stats');
         case 'nl_bounce': if (!nl_can_send()) throw new RuntimeException(t('err.noaccess')); nl_mark((string)($_POST['email'] ?? ''), 'bounce', $id ?: null); flash('good', t('nl.marked')); if ($id) $back('#stats'); redirect('newsletters', ['tab' => 'optout', '_r' => uniqid()]);
         case 'nl_optin': if (!nl_can_send()) throw new RuntimeException(t('err.noaccess')); q('DELETE FROM nl_optout WHERE email = ?', [mb_strtolower(trim((string)($_POST['email'] ?? '')))]); flash('good', t('nl.restored')); redirect('newsletters', ['tab' => 'optout', '_r' => uniqid()]);
+        case 'nl_list_save': $lid = nl_list_save_from_post((int)($_POST['list_id'] ?? 0)); flash('good', t('nl.l_saved')); redirect('newsletters', ['tab' => 'lists', 'edit' => $lid, '_r' => uniqid()]);
+        case 'nl_list_delete': q('DELETE FROM nl_lists WHERE id = ?', [(int)($_POST['list_id'] ?? 0)]); flash('good', t('nl.l_deleted')); redirect('newsletters', ['tab' => 'lists', '_r' => uniqid()]);
+        case 'nl_autocat': if (!nl_can_send()) throw new RuntimeException(t('err.noaccess')); $n = ct_autocat(); flash('good', t('nl.autocat_done', ['n' => $n])); redirect('newsletters', ['tab' => 'lists', '_r' => uniqid()]);
         case 'nl_settings': if (!nl_can_send()) throw new RuntimeException(t('err.noaccess')); $m = trim((string)($_POST['nl_from'] ?? '')); cp_setting_set('nl_from', $m !== '' && filter_var($m, FILTER_VALIDATE_EMAIL) ? $m : ''); cp_setting_set('nl_batch', (string) max(1, min(50, (int)($_POST['nl_batch'] ?? 15)))); cp_setting_set('nl_daily', (string) max(10, min(5000, (int)($_POST['nl_daily'] ?? 400)))); flash('good', t('nl.settings_saved')); redirect('newsletters', ['tab' => 'settings', '_r' => uniqid()]);
     }
     return false;
