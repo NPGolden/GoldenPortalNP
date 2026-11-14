@@ -1865,3 +1865,24 @@ Worldwide contacts workbook of 09/10/2026 (1 098 people, 563 companies) converte
 **Security review**: the tick is read as a boolean; the Country value is cut to 80 characters and bound; the import stays behind the same staff and CSRF checks; no personal data of the workbook was sent to the assistant or stored in the repository. No finding.
 
 Language keys 9 685 each.
+
+## §328 v1.140.2 (R97-042) — All contacts with a valid e-mail subscribed to the four lists
+
+**Request**: "to all the contacts with a valid email add automatically in the database the selection for Newsletter, Campaigns, Events, Greetings".
+
+**What changed**
+
+- `ct_default_subs($email)` (`app/ct.php`) returns the four subscription keys for a syntactically valid address that is not on the suppression list `nl_optout` (`ct_optout()`), otherwise an empty string.
+- `ct_subscribe_all($dry)` sets the four subscriptions on every active contact with such an address that misses at least one; `$dry` only counts.
+- One-time run in the sweep (`app/nf.php`), guarded by the setting `ct_suball_done`; the number of contacts changed is kept in `ct_suball_n`. No database step.
+- Excel import: a **new** contact with an empty Subscriptions cell gets the default; an existing contact is not changed by the import (fill-only rule of §327).
+- Contact form: a new contact opens with the four ticks set.
+- Web Sales › Newsletters › Lists: button "Subscribe n contact(s) with an e-mail to all lists" (action `nl_suball`, gate `nl_can_send()`), shown only when n > 0.
+
+**Not changed**: unsubscribed and bounced addresses stay excluded from every sending; a contact un-ticked by hand after the one-time run stays un-ticked unless the button is pressed again.
+
+**Tests (sandbox)**: one page load set the four subscriptions on the contact with a valid e-mail that lacked them, left the unsubscribed address and the malformed address untouched and stored `ct_suball_done = 1`; import of the worldwide workbook R1 created 1 086 contacts, all with the four subscriptions; lint clean; sweep and API test as before.
+
+**Security review**: the action is POST with CSRF token and limited to those who may send newsletters; addresses are validated with `FILTER_VALIDATE_EMAIL`; the suppression list is honoured before any tick is set, so an unsubscribe can not be undone by the rule; queries are bound or constant. Compliance note: the subscriptions are set by the company, not by the person — the mailings rely on legitimate interest towards business contacts, so every issue must keep the unsubscribe link (it does) and the Privacy Policy R5 wording covers it; contacts who are private persons should be un-ticked. No performance cost: one query on the Lists tab, one run in the sweep.
+
+Language keys 9 688 each.

@@ -30,6 +30,7 @@ web_sales_tabs('newsletters');
 <?php elseif ($tab === 'lists'): ?>
 <div class="card">
   <div class="card-head"><h2>📋 <?= tt('nl.t_lists') ?> <span class="count"><?= count($lists) ?></span></h2><div class="btn-row"><a class="btn btn--gold btn--sm" href="<?= url('newsletters', ['tab' => 'lists', 'new' => 1]) ?>#list-form">+ <?= tt('nl.l_new') ?></a>
+    <?php if ($send && ($nSa = ct_subscribe_all(true))): ?><form method="post" action="<?= $self ?>" class="inline" data-confirm="<?= e(t('nl.suball_q', ['n' => $nSa])) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="nl_suball"><button class="btn btn--ghost btn--sm" type="submit">✉ <?= e(t('nl.suball_btn', ['n' => $nSa])) ?></button></form><?php endif; ?>
     <?php if ($send && ($nAc = ct_autocat(true))): ?><form method="post" action="<?= $self ?>" class="inline" data-confirm="<?= e(t('nl.autocat_q', ['n' => $nAc])) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="nl_autocat"><button class="btn btn--ghost btn--sm" type="submit">🏷 <?= e(t('nl.autocat_btn', ['n' => $nAc])) ?></button></form><?php endif; ?></div></div>
   <p class="hint" style="margin:0 0 8px;"><?= tt('nl.l_hint') ?></p>
   <?php if (!$lists): ?><p class="hint"><?= tt('nl.none') ?></p><?php else: ?><div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('nl.l_name') ?></th><th><?= tt('nl.l_def') ?></th><th class="num"><?= tt('nl.l_members') ?></th><th></th></tr></thead><tbody>

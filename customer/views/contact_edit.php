@@ -11,7 +11,7 @@ $customers = all('SELECT id, name FROM customers WHERE is_active = 1 ORDER BY na
 $co = co_has(); $companies = $co ? co_all() : [];
 $curCo = $c ? (int)($c['company_id'] ?? 0) : (int)($_GET['company'] ?? 0);
 $curCh = $c ? array_filter(explode(',', (string)($c['channels'] ?? ''))) : ['email'];
-$curSub = $c ? array_filter(explode(',', (string)($c['subscriptions'] ?? ''))) : [];
+$curSub = $c ? array_filter(explode(',', (string)($c['subscriptions'] ?? ''))) : array_keys(ct_subscriptions());   // R97-042: a new contact starts on all four lists
 $vessels = all('SELECT v.id, v.name, v.customer_id, cu.name AS customer FROM vessels v LEFT JOIN customers cu ON cu.id = v.customer_id ORDER BY cu.name, v.name');
 $people = all("SELECT id, full_name, email FROM customer_users WHERE role = 'customer' AND is_active = 1 ORDER BY full_name");
 $links = []; foreach ($c['vessels'] ?? [] as $v) $links[(int)$v['vessel_id']] = $v;

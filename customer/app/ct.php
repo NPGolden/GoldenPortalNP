@@ -55,6 +55,16 @@ function ct_autocat(bool $dry = false): int {
     $n = 0; foreach (all("SELECT id, position FROM contacts WHERE (category IS NULL OR category IN ('', 'other')) AND position IS NOT NULL AND position <> ''") as $r) { $c = ct_cat_guess((string)$r['position']); if ($c === '') continue; $n++; if (!$dry) q('UPDATE contacts SET category = ? WHERE id = ?', [$c, (int)$r['id']]); }
     return $n;
 }
+/** R97-042: is this address on the newsletter suppression list (unsubscribed / bounced)? Such people are never subscribed again by a rule. */
+function ct_optout(string $email): bool { static $o = null; if ($o === null) { $o = []; try { foreach (all('SELECT LOWER(email) e FROM nl_optout') as $r) $o[$r['e']] = 1; } catch (Throwable $e) {} } return isset($o[mb_strtolower(trim($email))]); }
+/** The subscriptions a contact with a valid e-mail gets by default: all four lists — unless the address unsubscribed or bounced. '' when none. */
+function ct_default_subs(?string $email): string { $e = trim((string)$email); return $e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL) && !ct_optout($e) ? implode(',', array_keys(ct_subscriptions())) : ''; }
+/** Tick Newsletter, Campaigns, Events and Greetings on every active contact with a valid e-mail (not on unsubscribed / bounced addresses). $dry → only count. */
+function ct_subscribe_all(bool $dry = false): int {
+    if (!co_has()) return 0; $all = implode(',', array_keys(ct_subscriptions())); $n = 0;
+    foreach (all("SELECT id, email, subscriptions FROM contacts WHERE is_active = 1 AND email IS NOT NULL AND email <> ''") as $r) { if (ct_default_subs((string)$r['email']) === '') continue; $cur = array_filter(explode(',', (string)$r['subscriptions'])); if (!array_diff(array_keys(ct_subscriptions()), $cur)) continue; $n++; if (!$dry) q('UPDATE contacts SET subscriptions = ? WHERE id = ?', [$all, (int)$r['id']]); }
+    return $n;
+}
 function ct_origin_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW COLUMNS FROM contacts LIKE 'needs_review'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Normalise a free-text category (English or the portal language) to a key. */
 function ct_norm_category(string $v): ?string {
@@ -514,7 +524,7 @@ function ct_import(string $path, bool $dry): array {
                 q('INSERT INTO contacts (customer_id, company, full_name, position, category, email, phone, mobile, birthday, nameday_md, interests, is_active, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
                   [$cid, $fields['company'], $name, $fields['position'], $cat ?: 'other', $email, $fields['phone'], $fields['mobile'], $bday, $nd, $fields['interests'], $active ?? 1, (int)$u['id']]);
                 $id = (int) db()->lastInsertId(); $res['contacts_new']++;
-                if (co_has()) q('UPDATE contacts SET company_id = ?, channels = ?, subscriptions = ? WHERE id = ?', [$coid, $channels ?: ($email ? 'email' : null), $subs ?: null, $id]);
+                if (co_has()) q('UPDATE contacts SET company_id = ?, channels = ?, subscriptions = ? WHERE id = ?', [$coid, $channels ?: ($email ? 'email' : null), ($subs ?? ct_default_subs($email)) ?: null, $id]);   // R97-042: all four lists by default
             }
             // vessels: "MY ALPHA (Captain); MY BETA (Owner's rep)" — existing vessels only
             $vs = $g($r, 'vessels');
