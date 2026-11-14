@@ -1949,3 +1949,8 @@ body[data-wchk]:not(.w-ok) { visibility: hidden; animation: w-show 0s 1.5s forwa
 .tbl tr.grp-row td { background: var(--cp-gold-dim); border-top: 2px solid var(--cp-gold); font-size: 14px; padding-top: 9px; padding-bottom: 9px; }
 .tbl tr.grp-row td a { text-decoration: none; color: var(--navy-text); }
 html[data-theme="dark"] .tbl tr.grp-row td { background: rgba(200,155,60,.14); }
+
+/* R97-031 System Budgets: profit below the company minimum */
+.sb-low { color: #9B2C2C; font-weight: 700; font-size: 12px; white-space: nowrap; cursor: help; }
+.sb-low-cell, .sb-low-cell b { color: #9B2C2C; font-weight: 700; }
+html[data-theme="dark"] .sb-low, html[data-theme="dark"] .sb-low-cell, html[data-theme="dark"] .sb-low-cell b { color: #F3B4B4; }

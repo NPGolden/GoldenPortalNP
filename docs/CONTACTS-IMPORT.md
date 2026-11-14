@@ -1733,3 +1733,13 @@ Tested: sign-in and every read route plus `/sync` for the Service Engineer, Gold
 **Security review**: no change of access rules; the failure exposed nothing (errors are not displayed, the body was empty). Added: the deploy now calls the app service once after applying a release (`/api/v1/me` without a token must answer 401) and fails when it does not — one request per deploy, nothing at run time.
 
 Language keys 9 349 each.
+
+## §317 v1.134.0 (R97-031) — System Budgets: red mark when the profit is below the minimum
+
+`app/sb.php`: `sb_min_profit()` (setting `sb_min_profit`, 40 when not set, 0 = off), `sb_profit_pct()`, `sb_low()` (profit on cost below the minimum, 0,05 points tolerance for rounding), `sb_low_mark()` (the red ▼ with the figures in its tooltip). The basis is the markup on cost — the percentage typed on the part lines — so a budget at the standard 40 % is exactly on the line and not marked.
+
+Where it shows: `views/system_budget.php` — notice at the top of the Totals card (red when the total is below, grey when only lines are), red Markup on cost for Labour, Parts and Total, ▼ next to the sale of each labour and part line below the minimum (expenses and excluded parts are not marked); `views/system_budgets.php` — ▼ next to the sale in the list, the legend, and for administrators / management the field "Minimum profit on cost %" (action `sb_min_profit`, gate `sb_can_reopen()`); `views/system_budget_convert.php` — the fourth figure is now Markup on cost (margin on sale below it), red with a notice when the offer would be below the minimum. Warning only: finishing and converting are not blocked. No database step.
+
+**Security review**: the new action is behind the staff check, the CSRF token and the management gate (a project manager's post is refused — tested); the value is parsed as a number and clamped to 0–900; output escaped. The cost figures appear only on pages that already show costs to the same people. No finding.
+
+Language keys 9 360 each.

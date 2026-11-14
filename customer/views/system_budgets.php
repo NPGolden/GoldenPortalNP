@@ -48,6 +48,11 @@ layout_head(t('sb.title'), 'system_budgets');
   <div class="field"><label>&nbsp;</label><button class="btn btn--sm" type="submit"><?= tt('sb.filter') ?></button></div>
 </form>
 
+<?php if (sb_can_reopen()): ?><form method="post" action="<?= url('system_budgets') ?>" class="filters" style="margin:0 0 12px;"><?= csrf_field() ?><input type="hidden" name="action" value="sb_min_profit">
+  <div class="field"><label title="<?= tt('sb.min_hint') ?>"><span class="sb-low">▼</span> <?= tt('sb.min_label') ?></label><input name="min" inputmode="decimal" value="<?= e(rtrim(rtrim(number_format(sb_min_profit(), 1, ',', ''), '0'), ',')) ?>" style="width:90px;text-align:right;"></div>
+  <div class="field"><label>&nbsp;</label><button class="btn btn--ghost btn--sm" type="submit"><?= tt('sb.min_save') ?></button></div>
+  <p class="hint" style="align-self:end;margin:0 0 8px;"><?= tt('sb.min_hint') ?></p>
+</form><?php else: ?><p class="hint" style="margin:0 0 10px;"><span class="sb-low">▼</span> <?= e(t('sb.low_legend', ['m' => rtrim(rtrim(number_format(sb_min_profit(), 1, ',', ''), '0'), ',')])) ?></p><?php endif; ?>
 <div class="card">
   <div class="card-head"><h2><?= tt('sb.list') ?> <span class="count"><?= count($rows) ?></span></h2><?php if ($prOn): ?><span class="hint"><?= tt('sb.pr_order') ?></span><?php endif; ?></div>
   <?php if (!$rows): ?><p class="hint"><?= tt('sb.none') ?></p><?php else: ?>
@@ -60,7 +65,7 @@ layout_head(t('sb.title'), 'system_budgets');
     <td><?= $r['project_id'] ? e(trim((string)$r['project_code'] . ' ' . (string)$r['sub_code'])) . '<br><span class="hint">' . e((string)($r['sub_name'] ?: $r['project_name'])) . '</span>' : '<span class="hint">—</span>' ?></td>
     <td class="hint"><?= e((string)$r['owner_name']) ?></td><?php if ($prOn): ?><td data-sort="<?= array_search($r['priority'], SB_PRIORITIES, true) ?>"><?= in_array($r['status'], ['draft', 'working', 'finished'], true) ? sb_prio_pill((string)$r['priority']) : '<span class="hint">—</span>' ?></td><?php endif; ?><td><?= sb_pill($r['status']) ?></td>
     <td><?= function_exists('bg_bar') ? bg_bar($pg, $pg >= 100 ? 'green' : 'navy') : $pg . ' %' ?><span class="hint"><?= (int)$r['n_lab'] ?> L · <?= (int)$r['n_parts'] ?> P</span></td>
-    <td class="num"><?= e(sb_h((float)$r['tot_hours'])) ?></td><td class="num"><?= e(sb_money((float)$r['tot_cost'], $r['currency'])) ?></td><td class="num"><b><?= e(sb_money((float)$r['tot_sale'], $r['currency'])) ?></b></td>
+    <td class="num"><?= e(sb_h((float)$r['tot_hours'])) ?></td><td class="num"><?= e(sb_money((float)$r['tot_cost'], $r['currency'])) ?></td><td class="num"><b><?= e(sb_money((float)$r['tot_sale'], $r['currency'])) ?></b><?= sb_low_mark((float)$r['tot_cost'], (float)$r['tot_sale']) ?></td>
     <td class="date<?= $late ? ' bad' : '' ?>"><?= $r['target_date'] ? e(fmt_date($r['target_date'])) : '—' ?></td><td class="date hint"><?= e(fmt_date(substr((string)$r['updated_at'], 0, 10))) ?></td>
   </tr><?php endforeach; ?>
   <?php endforeach; ?>

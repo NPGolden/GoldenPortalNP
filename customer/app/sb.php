@@ -80,6 +80,18 @@ function sb_part_calc(array $B, array $p): array {
     $gross = round((float)$p['qty'] * $unitSale, 2); $dp = sb_disc_pct($p); $sale = round($gross * (1 - $dp / 100), 2);
     return ['margin' => $m, 'cost' => $cost, 'unit_sale' => $unitSale, 'sale' => $sale, 'gross' => $gross, 'disc' => $dp, 'disc_amt' => round($gross - $sale, 2)];
 }
+/** R97-031: the company minimum of profit on cost (markup). Budgets, groups and lines below it get a red mark; nothing is blocked. Setting sb_min_profit, 40 when not set. */
+function sb_min_profit(): float { static $v = null; if ($v === null) { $s = function_exists('cp_setting') ? (string)(cp_setting('sb_min_profit', '') ?? '') : ''; $v = $s !== '' && is_numeric($s) ? max(0.0, min(900.0, (float)$s)) : 40.0; } return $v; }
+/** Profit as a percentage of the cost, null when there is no cost to compare with. */
+function sb_profit_pct(float $cost, float $sale): ?float { return $cost > 0.005 ? 100 * ($sale - $cost) / $cost : null; }
+/** True when the profit on cost is below the minimum (0,05 points of rounding tolerance). */
+function sb_low(float $cost, float $sale): bool { $p = sb_profit_pct($cost, $sale); return $p !== null && sb_min_profit() > 0 && $p < sb_min_profit() - 0.05; }
+/** The red mark (with the figures in its tooltip) — empty when the profit is fine. */
+function sb_low_mark(float $cost, float $sale, bool $text = false): string {
+    if (!sb_low($cost, $sale)) return '';
+    $m = rtrim(rtrim(number_format(sb_min_profit(), 1, ',', ''), '0'), ','); $p = number_format((float)sb_profit_pct($cost, $sale), 1, ',', '');
+    return ' <span class="sb-low" title="' . e(t('sb.low_tip', ['p' => $p, 'm' => $m])) . '">▼' . ($text ? ' ' . e(t('sb.low_short', ['m' => $m])) : '') . '</span>';
+}
 function sb_totals(array $B): array {
     $T = ['hours' => 0.0, 'h_normal' => 0.0, 'h_travel' => 0.0, 'h_overtime' => 0.0, 'days' => 0.0, 'lab_cost' => 0.0, 'lab_sale' => 0.0, 'parts_cost' => 0.0, 'parts_sale' => 0.0, 'exp_cost' => 0.0, 'exp_sale' => 0.0, 'out_cost' => 0.0, 'out_sale' => 0.0, 'unpriced' => 0, 'lab_disc' => 0.0, 'parts_disc' => 0.0];
     foreach ($B['labour'] ?? [] as $l) { $c = sb_labour_calc($B, $l); $T['hours'] += $c['hours']; $T['h_normal'] += (float)$l['h_normal']; $T['h_travel'] += (float)$l['h_travel']; $T['h_overtime'] += (float)$l['h_overtime']; $T['days'] += (float)$l['allow_days']; $T['lab_cost'] += $c['cost']; $T['lab_sale'] += $c['sale']; $T['lab_disc'] += $c['disc_amt']; }
