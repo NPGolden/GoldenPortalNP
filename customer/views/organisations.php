@@ -22,6 +22,22 @@ layout_head(t('org.title'), 'contacts');
   <?php if ($C['none']): ?><form method="post" action="<?= $self ?>" data-lock data-confirm="<?= e(t('org.create_all_q', ['n' => $C['none']])) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="org_create_all"><button class="btn btn--sm" type="submit">🏛 <?= e(t('org.create_all', ['n' => $C['none']])) ?></button></form><?php endif; ?>
   <?php if ($C['people_fix']): ?><form method="post" action="<?= $self ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="org_derive_people"><button class="btn btn--sm" type="submit">👤 <?= e(t('org.derive', ['n' => $C['people_fix']])) ?></button></form><?php endif; ?>
 </div>
+<?php $ER = org_erp_review(); if ($ER['move'] || $ER['same']): ?>
+<div class="card" id="erp">
+  <div class="card-head"><h2>🔢 <?= tt('org.s_erp') ?> <span class="count"><?= count($ER['move']) + count($ER['same']) ?></span></h2><span class="hint"><?= tt('org.h_erp') ?></span></div>
+  <?php if ($ER['move']): ?>
+  <h3 style="margin:6px 0;"><?= e(t('org.erp_move_h', ['n' => count($ER['move'])])) ?></h3>
+  <form method="post" action="<?= $self ?>" data-lock data-confirm="<?= e(t('org.erp_move_q', ['n' => count($ER['move'])])) ?>" style="margin-bottom:8px;"><?= csrf_field() ?><input type="hidden" name="action" value="org_erp_move"><button class="btn btn--gold btn--sm" type="submit">➜ <?= e(t('org.erp_move_btn', ['n' => count($ER['move'])])) ?></button></form>
+  <div class="table-scroll" style="max-height:300px;"><table class="tbl"><thead><tr><th><?= tt('co.one') ?></th><th><?= tt('org.erp_now') ?></th><th><?= tt('co.erp_sup') ?></th></tr></thead><tbody>
+  <?php foreach ($ER['move'] as $r): ?><tr><td><a href="<?= url('companies', ['edit' => (int)$r['id']]) ?>"><?= e($r['name']) ?></a></td><td class="mono"><?= e((string)$r['erp_code']) ?></td><td class="mono hint"><?= e((string)($r['sup_erp'] ?: '—')) ?> → <?= e((string)$r['erp_code']) ?></td></tr><?php endforeach; ?>
+  </tbody></table></div><?php endif; ?>
+  <?php if ($ER['same']): ?>
+  <h3 style="margin:12px 0 6px;"><?= e(t('org.erp_same_h', ['n' => count($ER['same'])])) ?></h3><p class="hint" style="margin:0 0 6px;"><?= tt('org.erp_same_hint') ?></p>
+  <div class="table-scroll" style="max-height:300px;"><table class="tbl"><thead><tr><th><?= tt('co.one') ?></th><th><?= tt('co.erp_cust') ?></th><th><?= tt('co.erp_sup') ?></th><th></th></tr></thead><tbody>
+  <?php foreach ($ER['same'] as $r): ?><tr><td><b><?= e($r['name']) ?></b></td><td class="mono"><?= e((string)($r['cust_erp'] ?: $r['erp_code'])) ?></td><td class="mono"><?= e((string)$r['sup_erp']) ?></td><td><a class="btn btn--ghost btn--sm" href="<?= url('companies', ['edit' => (int)$r['id']]) ?>">✎ <?= tt('org.erp_fix') ?></a></td></tr><?php endforeach; ?>
+  </tbody></table></div><?php endif; ?>
+</div>
+<?php endif; ?>
 <div class="card">
   <div class="card-head"><h2><?= tt('org.s_dupes') ?> <span class="count"><?= count($dupes) ?></span></h2><span class="hint"><?= tt('org.h_dupes') ?></span></div>
   <?php if (!$dupes): ?><p class="hint"><?= tt('org.empty') ?></p><?php else: ?>

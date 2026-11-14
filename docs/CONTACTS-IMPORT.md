@@ -1755,3 +1755,23 @@ Tested with three projects in a browser: for each project chosen, sub-projects o
 **Security review**: display only; the server still checks on save that the sub-project belongs to the project. No finding.
 
 Language keys 9 360 each.
+
+## §319 v1.135.0 (R97-033) — Organisations: separate ERP codes for customers and suppliers
+
+The ERP (SoftOne) keeps customers and suppliers in two ledgers with their own code series. The portal had three stores — `companies.erp_code`, `customers.erp_code`, `supplier_details.erp_code` — and copied one into the other: the organisation form wrote one code to all three (`co_sync_roles`), the supplier card and the supplier import wrote the supplier code to `companies.erp_code`, and linking a customer to a company copied in both directions (`org_link`).
+
+Now: `companies.erp_code` = `customers.erp_code` = the **customer** code; `supplier_details.erp_code` = the **supplier** code. `views/companies.php` has the two fields (`erp_code`, `sup_erp_code`); `co_save_from_post()` saves the supplier code only with the role Supplier and refuses a supplier code that another organisation has (`co.dup_sup_erp`), as does `sup_save_from_post()`; `co_sync_roles()`, `sup_save_from_post()`, `sup_import_apply` and `org_link()` no longer copy across; `org_matches()` / `org_dupes()` read the customer code only, so a supplier number never matches a customer. `org_erp_review()` / `org_erp_move()` (action `org_erp_move`, gate `org_can()`): the card "ERP codes to tidy" on Contacts › Organisations — supplier-only organisations with a code in the customer field (moved in one go) and customer-and-supplier organisations with the same code on both sides (by hand). No database step.
+
+**Security review**: new action behind the staff check, CSRF and `org_can()`, listed in `PA_ACTIONS`; all statements bound; output escaped. No finding.
+
+Language keys 9 375 each.
+
+## §320 v1.135.1 (R97-034) — Accounting reports: correcting the invoice number or date
+
+`acc_invoice_refs()` lists the invoices registered on a report; `acc_correct_invoice()` (action `acc_correct`, accounting department only — `acc_is_accounting()`) changes `invoice_ref` / `invoiced_at` of the lines invoiced under the old number, re-links `invoice_id` to the ledger invoice with the new number when one exists, rewrites the report's `invoice_ref` list and `invoice_date`, updates the `invoice_ref` of the invoiced timesheets, and writes the event `corrected` with old → new — in one transaction. States, hours and values are not touched. `views/acc_report.php`: folded card "Correct the invoice number or date" with one row per invoice. No database step.
+
+Tested: change of number and date; no change refused; invalid date refused; unknown number refused; a project manager does not see the card and his post is refused.
+
+**Security review**: accounting gate on the server, CSRF, bound statements, the date validated with `checkdate`, every correction in the report history with the user. No finding.
+
+Language keys 9 385 each.

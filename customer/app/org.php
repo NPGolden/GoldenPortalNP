@@ -17,7 +17,7 @@ function org_vat(?string $v): string { $d = preg_replace('/\D/', '', (string)$v)
 
 /** Every customer with its linked / suggested company. status: linked | match | none. */
 function org_matches(): array {
-    $cos = all('SELECT co.id, co.name, co.kind, co.is_supplier, co.customer_id, co.country, co.city, co.email, co.phone, co.website, ' . (co_roles_has() ? 'COALESCE(NULLIF(co.vat_no, \'\'), sd.vat_no) AS vat_no, COALESCE(co.erp_code, sd.erp_code) AS erp_code' : 'sd.vat_no, sd.erp_code') . ' FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE co.is_active = 1');
+    $cos = all('SELECT co.id, co.name, co.kind, co.is_supplier, co.customer_id, co.country, co.city, co.email, co.phone, co.website, ' . (co_roles_has() ? 'COALESCE(NULLIF(co.vat_no, \'\'), sd.vat_no) AS vat_no, co.erp_code AS erp_code' : 'sd.vat_no, NULL AS erp_code') . ' FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE co.is_active = 1');
     $byCust = []; $byVat = []; $byErp = []; $byKey = [];
     foreach ($cos as $c) { if ($c['customer_id']) $byCust[(int)$c['customer_id']][] = $c; if ($v = org_vat($c['vat_no'])) $byVat[$v][] = $c; if ($c['erp_code']) $byErp[mb_strtolower((string)$c['erp_code'])][] = $c; if (!empty($c['is_supplier'])) continue; $byKey[org_key($c['name'])][] = $c; }   // name matches never against suppliers either
     $out = ['linked' => [], 'match' => [], 'none' => []];
@@ -38,15 +38,15 @@ function org_matches(): array {
 /** Link a company to a customer, back-fill the master data both ways, derive the customer of the company's people. */
 function org_link(int $coId, int $cuId): void {
     if (!org_can()) throw new RuntimeException(t('err.noaccess'));
-    $co = one('SELECT co.*, sd.vat_no, sd.erp_code, sd.address, sd.postal_code FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE co.id = ?', [$coId]); $cu = one('SELECT * FROM customers WHERE id = ?', [$cuId]);
+    $co = one('SELECT co.*, ' . (co_roles_has() ? 'COALESCE(NULLIF(co.vat_no, \'\'), sd.vat_no) AS vat_no, co.erp_code AS erp_code, COALESCE(co.address, sd.address) AS address, COALESCE(co.postal_code, sd.postal_code) AS postal_code' : 'sd.vat_no, NULL AS erp_code, sd.address, sd.postal_code') . ' FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE co.id = ?', [$coId]);   /* R97-033: the supplier code never becomes the customer code */ $cu = one('SELECT * FROM customers WHERE id = ?', [$cuId]);
     if (!$co || !$cu) throw new RuntimeException(t('err.notfound'));
     $other = scalar('SELECT id FROM companies WHERE customer_id = ? AND id <> ?', [$cuId, $coId]); if ($other) throw new RuntimeException(t('org.already_linked'));
     q('UPDATE companies SET customer_id = ?, country = COALESCE(NULLIF(country, \'\'), ?), city = COALESCE(NULLIF(city, \'\'), ?), website = COALESCE(NULLIF(website, \'\'), ?), email = COALESCE(NULLIF(email, \'\'), ?), phone = COALESCE(NULLIF(phone, \'\'), ?) WHERE id = ?',
       [$cuId, $cu['country'] ?: null, $cu['city'] ?: null, $cu['website'] ?: null, $cu['email'] ?: null, $cu['phone'] ?: null, $coId]);
     q('UPDATE customers SET country = COALESCE(NULLIF(country, \'\'), ?), city = COALESCE(NULLIF(city, \'\'), ?), website = COALESCE(NULLIF(website, \'\'), ?), email = COALESCE(NULLIF(email, \'\'), ?), phone = COALESCE(NULLIF(phone, \'\'), ?), vat_no = COALESCE(NULLIF(vat_no, \'\'), ?), erp_code = COALESCE(NULLIF(erp_code, \'\'), ?), address = COALESCE(NULLIF(address, \'\'), ?), postal_code = COALESCE(NULLIF(postal_code, \'\'), ?) WHERE id = ?',
       [$co['country'] ?: null, $co['city'] ?: null, $co['website'] ?: null, $co['email'] ?: null, $co['phone'] ?: null, $co['vat_no'] ?: null, $co['erp_code'] ?: null, $co['address'] ?: null, $co['postal_code'] ?: null, $cuId]);
-    if (($cu['vat_no'] || $cu['erp_code'] || $cu['address']) && ($co['is_supplier'] || scalar('SELECT 1 FROM supplier_details WHERE company_id = ?', [$coId])))
-        q('UPDATE supplier_details SET vat_no = COALESCE(NULLIF(vat_no, \'\'), ?), erp_code = COALESCE(erp_code, ?), address = COALESCE(NULLIF(address, \'\'), ?), postal_code = COALESCE(NULLIF(postal_code, \'\'), ?) WHERE company_id = ?', [$cu['vat_no'] ?: null, $cu['erp_code'] ?: null, $cu['address'] ?: null, $cu['postal_code'] ?: null, $coId]);
+    if (($cu['vat_no'] || $cu['address']) && ($co['is_supplier'] || scalar('SELECT 1 FROM supplier_details WHERE company_id = ?', [$coId])))
+        q('UPDATE supplier_details SET vat_no = COALESCE(NULLIF(vat_no, \'\'), ?), address = COALESCE(NULLIF(address, \'\'), ?), postal_code = COALESCE(NULLIF(postal_code, \'\'), ?) WHERE company_id = ?', [$cu['vat_no'] ?: null, $cu['address'] ?: null, $cu['postal_code'] ?: null, $coId]);   // R97-033: not the ERP code — customer and supplier codes differ
     q('UPDATE contacts SET customer_id = ? WHERE company_id = ? AND customer_id IS NULL', [$cuId, $coId]);
     q('UPDATE contacts SET company_id = ?, company = ? WHERE customer_id = ? AND company_id IS NULL', [$coId, $co['name'], $cuId]);
     if (co_roles_has()) q('UPDATE companies SET roles = TRIM(BOTH \',\' FROM CONCAT_WS(\',\', NULLIF(roles, \'\'), IF(FIND_IN_SET(\'customer\', roles), NULL, \'customer\'))), vat_no = COALESCE(NULLIF(vat_no, \'\'), ?), erp_code = COALESCE(erp_code, ?), address = COALESCE(address, ?), postal_code = COALESCE(postal_code, ?) WHERE id = ?', [$cu['vat_no'] ?: null, $cu['erp_code'] ?: null, $cu['address'] ?: null, $cu['postal_code'] ?: null, $coId]);   // R85-002
@@ -81,8 +81,29 @@ function org_counts(): array {
 }
 
 /** Companies that are duplicates of each other (same VAT, ERP code or normalised name): [[keep, drop], …]. The kept one is the linked / supplier / older record. */
+/** R97-033: the ERP keeps customers and suppliers in two ledgers with their own codes. The organisation code (companies.erp_code) is the CUSTOMER code,
+ *  the supplier card (supplier_details.erp_code) holds the SUPPLIER code. Review of what earlier versions mixed up:
+ *    move — supplier-only organisations (no customer role) that carry an organisation code: it is their supplier code → can be moved in one go;
+ *    same — organisations that are customer and supplier with the same code on both sides: one of the two is wrong → to be checked by hand. */
+function org_erp_review(): array {
+    $out = ['move' => [], 'same' => []]; if (!co_roles_has()) return $out;
+    try {
+        $out['move'] = all("SELECT co.id, co.name, co.erp_code, sd.erp_code AS sup_erp FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE co.is_active = 1 AND co.erp_code IS NOT NULL AND co.erp_code <> '' AND co.customer_id IS NULL AND NOT FIND_IN_SET('customer', COALESCE(co.roles, '')) AND (sd.company_id IS NOT NULL OR FIND_IN_SET('supplier', COALESCE(co.roles, ''))) AND (sd.erp_code IS NULL OR sd.erp_code = '' OR sd.erp_code = co.erp_code) ORDER BY co.name");
+        $out['same'] = all("SELECT co.id, co.name, co.erp_code, sd.erp_code AS sup_erp, c.erp_code AS cust_erp FROM companies co JOIN supplier_details sd ON sd.company_id = co.id LEFT JOIN customers c ON c.id = co.customer_id WHERE co.is_active = 1 AND sd.erp_code IS NOT NULL AND sd.erp_code <> '' AND (co.customer_id IS NOT NULL OR FIND_IN_SET('customer', COALESCE(co.roles, ''))) AND sd.erp_code = COALESCE(NULLIF(c.erp_code, ''), co.erp_code) ORDER BY co.name");
+    } catch (Throwable $e) {}
+    return $out;
+}
+/** Move the organisation code of supplier-only organisations to their supplier card and clear it on the organisation. Returns the number moved. */
+function org_erp_move(): int {
+    if (!org_can()) throw new RuntimeException(t('err.noaccess')); $rows = org_erp_review()['move']; $n = 0;
+    foreach ($rows as $r) { db()->beginTransaction(); try {
+        q("INSERT INTO supplier_details (company_id, erp_code) VALUES (?, ?) ON DUPLICATE KEY UPDATE erp_code = IF(erp_code IS NULL OR erp_code = '', VALUES(erp_code), erp_code)", [(int)$r['id'], $r['erp_code']]);
+        q("UPDATE companies SET erp_code = NULL WHERE id = ? AND customer_id IS NULL", [(int)$r['id']]); db()->commit(); $n++;
+    } catch (Throwable $e) { db()->rollBack(); } }
+    return $n;
+}
 function org_dupes(): array {
-    $cos = all('SELECT co.id, co.name, co.kind, co.is_supplier, co.customer_id, ' . (co_roles_has() ? 'co.roles, COALESCE(NULLIF(co.vat_no, \'\'), sd.vat_no) AS vat_no, COALESCE(co.erp_code, sd.erp_code) AS erp_code' : 'sd.vat_no, sd.erp_code') . ', (SELECT COUNT(*) FROM contacts ct WHERE ct.company_id = co.id) AS n_people FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE co.is_active = 1 ORDER BY co.id');
+    $cos = all('SELECT co.id, co.name, co.kind, co.is_supplier, co.customer_id, ' . (co_roles_has() ? 'co.roles, COALESCE(NULLIF(co.vat_no, \'\'), sd.vat_no) AS vat_no, co.erp_code AS erp_code' : 'sd.vat_no, NULL AS erp_code') . ', (SELECT COUNT(*) FROM contacts ct WHERE ct.company_id = co.id) AS n_people FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id WHERE co.is_active = 1 ORDER BY co.id');
     $groups = []; $seen = [];
     $add = function (string $p, string $k, array $c) use (&$groups) { if ($k === '' || ($p === 'v' && strlen($k) < 6) || ($p === 'n' && mb_strlen($k) < 4)) return; $groups[$p . ':' . $k][$c['id']] = $c; };
     foreach ($cos as $c) $add('v', org_vat($c['vat_no']), $c);   // R85-003: duplicates by VAT only

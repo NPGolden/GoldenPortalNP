@@ -448,6 +448,37 @@ function acc_mark_invoiced(array $R, string $ref, string $date, ?string $note = 
     acc_event($id, $st, $ref . ($note ? ' · ' . $note : ''));
     return $st;
 }
+/** R97-034: the invoices registered on a report — one row per invoice number, with its date and number of lines. */
+function acc_invoice_refs(array $R): array {
+    $out = []; foreach ($R['lines'] as $l) { if ($l['state'] !== 'invoiced' || (string)($l['invoice_ref'] ?? '') === '') continue; $k = (string)$l['invoice_ref']; $out[$k] ??= ['ref' => $k, 'date' => substr((string)($l['invoiced_at'] ?? ''), 0, 10), 'n' => 0]; $out[$k]['n']++; }
+    return array_values($out);
+}
+/** R97-034: correct a wrong entry afterwards — the invoice number and / or the invoice date of lines already marked as invoiced.
+ *  Accounting only. Nothing else changes (state, hours, values); the timesheets carry the new number; the history keeps old → new and who did it. */
+function acc_correct_invoice(int $id, string $old, string $new, string $date, ?string $note = null): void {
+    if (!acc_is_accounting()) throw new RuntimeException(t('err.noaccess'));
+    $R = acc_load($id); if (!$R) throw new RuntimeException(t('err.notfound'));
+    $old = trim($old); $new = mb_substr(trim($new), 0, 120); if ($new === '') throw new RuntimeException(t('ts.ref_req'));
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || !checkdate((int)substr($date, 5, 2), (int)substr($date, 8, 2), (int)substr($date, 0, 4))) throw new RuntimeException(t('acc.cor_bad_date'));
+    $cur = null; foreach (acc_invoice_refs($R) as $x) if ($x['ref'] === $old) $cur = $x; if (!$cur) throw new RuntimeException(t('err.notfound'));
+    if ($cur['ref'] === $new && $cur['date'] === $date) throw new RuntimeException(t('acc.cor_same'));
+    $hasInvCol = (bool) scalar("SHOW COLUMNS FROM acc_lines LIKE 'invoice_id'"); $invoiceId = null;
+    if ($hasInvCol) { try { $invoiceId = (int) scalar("SELECT id FROM proformas WHERE kind = 'invoice' AND pi_no = ?", [$new]) ?: null; } catch (Throwable $e) { $invoiceId = null; } }
+    db()->beginTransaction();
+    try {
+        q("UPDATE acc_lines SET invoice_ref = ?, invoiced_at = ?" . ($hasInvCol ? ', invoice_id = ?' : '') . " WHERE report_id = ? AND state = 'invoiced' AND invoice_ref = ?", array_merge([$new, $date . ' 00:00:00'], $hasInvCol ? [$invoiceId] : [], [$id, $old]));
+        $refs = array_values(array_unique(array_filter(array_map(fn($r) => $r === $old ? $new : $r, array_map('trim', explode(',', (string)$R['invoice_ref'])))))); if (!in_array($new, $refs, true)) $refs[] = $new;
+        $last = (string) scalar("SELECT MAX(DATE(invoiced_at)) FROM acc_lines WHERE report_id = ? AND state = 'invoiced'", [$id]);
+        q('UPDATE acc_reports SET invoice_ref = ?, invoice_date = ? WHERE id = ?', [mb_substr(implode(', ', $refs), 0, 120), $last ?: $date, $id]);
+        foreach (all("SELECT DISTINCT doc_id FROM acc_lines WHERE report_id = ? AND source = 'ts'", [$id]) as $d) {   // the timesheets show the invoice number too
+            $tr = implode(', ', array_unique(array_filter(array_column(all("SELECT invoice_ref FROM acc_lines WHERE source = 'ts' AND doc_id = ? AND state = 'invoiced'", [(int)$d['doc_id']]), 'invoice_ref'))));
+            if ($tr !== '') q("UPDATE timesheets SET invoice_ref = ? WHERE id = ? AND status = 'invoiced'", [mb_substr($tr, 0, 60), (int)$d['doc_id']]);
+        }
+        $chg = []; if ($old !== $new) $chg[] = $old . ' → ' . $new; if ($cur['date'] !== $date) $chg[] = ($cur['date'] !== '' ? fmt_date($cur['date']) : '—') . ' → ' . fmt_date($date);
+        acc_event($id, 'corrected', implode(' · ', $chg) . ($note ? ' · ' . $note : ''));
+        db()->commit();
+    } catch (Throwable $e) { db()->rollBack(); throw $e; }
+}
 function acc_answer_from_post(int $id): void {
     if (!acc_is_accounting()) throw new RuntimeException(t('err.noaccess'));
     $R = acc_load($id); if (!$R || !in_array($R['status'], ['issued', 'sent', 'partly_invoiced'], true)) throw new RuntimeException(t('acc.not_answerable'));

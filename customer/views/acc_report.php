@@ -100,6 +100,23 @@ layout_head(t('acc.report') . ' ' . $title, 'acc_reports');
                      'people' => $acctMail !== '' ? [['name' => t('acc.accounting_dept'), 'email' => $acctMail, 'role' => '', 'on' => true]] : [], 'atts' => array_values(array_filter([$R['pdf_file_id'] ? ['f:' . (int)$R['pdf_file_id'], $R['report_no'] . ' ' . $R['revision'] . '.pdf'] : null, $R['xlsx_file_id'] ? ['f:' . (int)$R['xlsx_file_id'], $R['report_no'] . ' ' . $R['revision'] . '.xlsx'] : null])), 'back' => $self, 'hidden' => '<input type="hidden" name="acc_report" value="' . $id . '">']) ?>
 <?php endif; ?>
 
+<?php if ($isAcc && function_exists('acc_invoice_refs') && ($irefs = acc_invoice_refs($R))): ?>
+<div class="card" id="acc-correct">
+  <details><summary style="cursor:pointer;"><b>✎ <?= tt('acc.cor_title') ?></b> <span class="hint"><?= tt('acc.cor_hint') ?></span></summary>
+  <?php foreach ($irefs as $ir): ?>
+  <form method="post" action="<?= $self ?>" data-lock data-confirm="<?= e(t('acc.cor_q', ['r' => $ir['ref']])) ?>" style="margin-top:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="acc_correct"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="old_ref" value="<?= e($ir['ref']) ?>">
+    <div class="grid grid-4">
+      <div class="field"><label><?= tt('acc.invoice_ref') ?> <span class="hint">(<?= e(t('acc.cor_lines', ['n' => $ir['n']])) ?>)</span></label><input name="invoice_ref" maxlength="120" required value="<?= e($ir['ref']) ?>"></div>
+      <div class="field"><label><?= tt('acc.invoice_date') ?></label><input type="date" name="invoice_date" required value="<?= e($ir['date']) ?>"></div>
+      <div class="field"><label><?= tt('acc.cor_reason') ?></label><input name="note" maxlength="300"></div>
+      <div class="field"><label>&nbsp;</label><button class="btn btn--sm" type="submit">✎ <?= tt('acc.cor_btn') ?></button></div>
+    </div>
+  </form>
+  <?php endforeach; ?>
+  </details>
+</div>
+<?php endif; ?>
+
 <?php if ($isAcc && in_array($R['status'], ['issued', 'sent', 'partly_invoiced'], true)): ?>
 <div class="card" id="acc-answer-card">
   <h2>✓ <?= tt('acc.answer') ?></h2>

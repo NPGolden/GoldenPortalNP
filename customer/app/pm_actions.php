@@ -417,6 +417,7 @@ function pm_handle_action(string $action, string $page): bool {
         case 'acc_close':   { $id = (int)$_POST['id']; acc_close($id); flash('good', t('acc.closed_ok')); redirect('acc_report', ['id' => $id, '_r' => uniqid()]); }
         case 'acc_release': { $id = (int)$_POST['id']; acc_line_release($id, (int)$_POST['line_id']); redirect('acc_report', ['id' => $id, '_r' => uniqid()]); }
         case 'acc_issue':   { $id = (int)$_POST['id']; $r = acc_issue($id); flash('good', t('acc.issued', ['no' => $r['report_no'] . ' ' . $r['revision']])); redirect('acc_report', ['id' => $id, '_r' => uniqid()]); }
+        case 'acc_correct': { $id = (int)$_POST['id']; acc_correct_invoice($id, (string)($_POST['old_ref'] ?? ''), (string)($_POST['invoice_ref'] ?? ''), (string)($_POST['invoice_date'] ?? ''), mb_substr(trim((string)($_POST['note'] ?? '')), 0, 300) ?: null); flash('good', t('acc.cor_done')); redirect('acc_report', ['id' => $id, '_r' => uniqid()], '#acc-correct'); }   // R97-034
         case 'acc_answer':  { $id = (int)$_POST['id']; acc_answer_from_post($id); flash('good', t('acc.answered')); redirect('acc_report', ['id' => $id, '_r' => uniqid()]); }
         case 'acc_delete':  { $id = (int)$_POST['id']; acc_delete_draft($id); flash('good', t('acc.deleted')); redirect('acc_reports', ['_r' => uniqid()]); }
         case 'acc_line_engineer': { acc_line_set_engineer((int)$_POST['line_id'], (string)($_POST['name'] ?? '')); flash('good', t('acc.eng_saved')); redirect((string)($_POST['back'] ?? '') === 'report' ? 'acc_report' : 'acc_register', (string)($_POST['back'] ?? '') === 'report' ? ['id' => (int)$_POST['report_id'], '_r' => uniqid()] : array_filter(['project' => (int)($_POST['project'] ?? 0), 'state' => (string)($_POST['state'] ?? ''), '_r' => uniqid()])); }   // R94-008
@@ -601,6 +602,7 @@ function pm_handle_action(string $action, string $page): bool {
         case 'org_create_co': { org_create_for_customer((int)($_POST['customer_id'] ?? 0), (string)($_POST['kind'] ?? 'owner')); flash('good', t('org.created_ok')); redirect('organisations'); }
         case 'cu_merge': { $d = cu_merge((int)($_POST['keep'] ?? 0), (int)($_POST['drop'] ?? 0)); flash('good', t('org.cu_merged_ok', ['n' => array_sum($d)])); redirect('organisations', ['_r' => uniqid()], '#cu-dupes'); }   // R95-002
         case 'org_merge': { org_merge((int)($_POST['keep'] ?? 0), (int)($_POST['drop'] ?? 0)); flash('good', t('org.merged_ok')); redirect('organisations'); }
+        case 'org_erp_move': { $n = org_erp_move(); flash('good', t('org.erp_moved', ['n' => $n])); redirect('organisations', ['_r' => uniqid()], '#erp'); }   // R97-033
         case 'org_derive_people': { if (!org_can()) throw new RuntimeException(t('err.noaccess')); $n = org_derive_people(); flash('good', t('org.derived_n', ['n' => $n])); redirect('organisations'); }
         case 'co_save': {
             $id = (int)($_POST['id'] ?? 0); $new = !$id;
