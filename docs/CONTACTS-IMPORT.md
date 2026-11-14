@@ -1793,3 +1793,15 @@ Tested: saved through the form; PDF and Word show "6. Delivery time" with both l
 **Security review**: two text fields, trimmed to 160 characters, bound parameters, written only by the people who may edit the offer; printed as text in PDF / Word (no HTML). No finding.
 
 Language keys 9 435 each.
+
+## §323 v1.138.0 (R97-037) — Parts of delivery notes go to accounting
+
+Migration `install/migrate_cp_r97_037_dn_invoicing.sql`: `inv_dn_lines.inv_state` (`open` | `invoice` | `offer` | `invoiced`, default `open`), `inv_price` (unit sale price), `inv_ref`, `inv_date`, `inv_by`, `inv_name`, `inv_at`, `dec_by`, `dec_name`, `dec_at`, index on `inv_state`. Guard `dni_has()`.
+
+`app/dn.php`: `dni_rows()` / `dni_counts()` read the lines of issued delivery notes of kind `project` or `customer` (vessel = the note's vessel, else the project's; cost = unit price of the stock movement, else the item's last price); `dni_decide_from_post()` (action `dni_decide`, gate `pr_admin()`) sets to-be-invoiced / included-in-the-offer / undecided with the unit price and notifies the accounting accounts; `dni_invoice_from_post()` (action `dni_invoice`, gate `acc_is_accounting()`) registers invoice number and date on the ticked waiting lines; `dni_back_from_post()` (action `dni_back`, accounting) returns waiting lines to procurement or invoiced lines to waiting. Page `?p=dn_invoicing[&state=][&vessel=]` (`views/dn_invoicing.php`) with the four tabs; buttons on Delivery notes and on Accounting; section "Parts on delivery notes" on the per-vessel page. The proposed price is cost + the minimum markup of the System Budgets (40 % unless changed).
+
+Tested: decide (invoice with a typed price, offer, left undecided); a project manager without the procurement right gets 403 on the page and his post changes nothing; invoice registration; undo; production delivery notes never listed.
+
+**Security review**: three new actions behind the staff check, CSRF and their role gates on the server; ids cast to integers, values bound; states from a fixed list; the unit cost is shown only to people with the procurement view. No finding.
+
+Language keys 9 475 each.

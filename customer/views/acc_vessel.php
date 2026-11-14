@@ -19,7 +19,7 @@ layout_head(t('acc.vd_title') . ($D && $D['vessel'] ? ' · ' . $D['vessel']['nam
   <div class="field"><label>&nbsp;</label><button class="btn btn--sm" type="submit"><?= tt('acc.vd_show') ?></button></div>
 </form>
 <?php if (!$D || !$D['vessel']): ?><div class="card"><p class="hint"><?= tt('acc.vd_pick_hint') ?></p></div>
-<?php else: $T = $D['tot']; $nothing = !$D['hours'] && !$D['reports'] && !$D['contracts'] && !$D['proformas'] && !$D['materials']; ?>
+<?php else: $T = $D['tot']; $nothing = !$D['hours'] && !$D['reports'] && !$D['contracts'] && !$D['proformas'] && !$D['materials'] && !(function_exists('dni_visible') && dni_visible() && (dni_rows('open', $vid, 1) || dni_rows('invoice', $vid, 1))); ?>
 <div class="kpi" style="margin-bottom:14px;">
   <a class="stat<?= $D['hours'] ? ' gold' : '' ?>" href="#vd-hours"><b><?= e(acc_h($T['hours'])) ?> h</b><?= tt('acc.vd_k_hours') ?></a>
   <a class="stat<?= $D['reports'] ? ' gold' : '' ?>" href="#vd-reports"><b><?= count($D['reports']) ?></b><?= tt('acc.vd_k_reports') ?><span class="s"><?= e($m($T['reports'])) ?></span></a>
@@ -79,6 +79,16 @@ layout_head(t('acc.vd_title') . ($D && $D['vessel'] ? ' · ' . $D['vessel']['nam
   <?php foreach ($D['reports'] as $r): ?><tr><td><a href="<?= url('acc_report', ['id' => (int)$r['id']]) ?>"><b class="mono"><?= e($r['report_no'] . ' ' . $r['revision']) ?></b></a><br><span class="hint"><?= e(fmt_date($r['period_start'])) ?> – <?= e(fmt_date($r['period_end'])) ?></span></td>
     <td class="hint"><?= e(trim((string)$r['project_code'] . ' ' . (string)$r['project_name'])) ?></td><td><?= acc_status_pill((string)$r['status']) ?></td>
     <td class="num"><?= e(acc_h((float)$r['total_hours'])) ?></td><td class="num"><b><?= e($m((float)$r['total_net'], (string)$r['currency'])) ?></b></td><td class="hint"><?= e((string)$r['invoice_ref']) ?></td></tr><?php endforeach; ?>
+  </tbody></table></div>
+</div>
+<?php endif; ?>
+
+<?php $dnO = function_exists('dni_visible') && dni_visible() ? dni_rows('open', $vid) : []; $dnI = function_exists('dni_visible') && dni_visible() ? dni_rows('invoice', $vid) : []; if ($dnO || $dnI): ?>
+<div class="card" id="vd-dn">
+  <div class="card-head"><h2>🚚 <?= tt('dni.vd_title') ?> <span class="count"><?= count($dnO) + count($dnI) ?></span></h2><a class="btn btn--ghost btn--sm" href="<?= url('dn_invoicing', ['state' => $dnI ? 'invoice' : 'open', 'vessel' => $vid]) ?>"><?= tt('dni.title') ?> ›</a></div>
+  <p class="hint" style="margin:0 0 8px;"><?= tt('dni.vd_hint') ?></p>
+  <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('dni.c_dn') ?></th><th><?= tt('pr.one') ?></th><th><?= tt('th.code') ?></th><th><?= tt('dni.c_part') ?></th><th class="num"><?= tt('dni.c_qty') ?></th><th class="num"><?= tt('dni.c_total') ?></th><th><?= tt('th.status') ?></th></tr></thead><tbody>
+  <?php foreach (array_merge($dnI, $dnO) as $x): ?><tr><td><a href="<?= url('delivery_note', ['id' => (int)$x['dn_id']]) ?>"><span class="mono"><?= e($x['dn_no']) ?></span></a><br><span class="hint"><?= e(fmt_date($x['issued_at'])) ?></span></td><td class="hint"><?= e(trim((string)$x['project_code'] . ' ' . (string)$x['sub_code'])) ?></td><td class="mono"><?= e((string)$x['item_code']) ?></td><td><?= e((string)$x['description']) ?></td><td class="num"><?= e(rtrim(rtrim(number_format((float)$x['qty'], 3, ',', '.'), '0'), ',')) ?></td><td class="num"><?= $x['inv_price'] !== null ? e($m((float)$x['inv_price'] * (float)$x['qty'])) : '<span class="hint">—</span>' ?></td><td><?= dni_pill((string)$x['inv_state']) ?></td></tr><?php endforeach; ?>
   </tbody></table></div>
 </div>
 <?php endif; ?>

@@ -129,3 +129,62 @@ function dn_pdf(array $d): string {
     $pdf->setFont('B', 8); $pdf->setColor($navy); $pdf->text($Lm, $y, $T('dn.pdf_issued_by') . ' ' . $bd['name']); $pdf->text(110, $y, $T('dn.pdf_received_by')); $y += 14; $pdf->setColor($line); $pdf->line($Lm, $y, $Lm + 70, $y); $pdf->line(110, $y, 180, $y);
     $footer(); return $pdf->bytes();
 }
+
+/* ------------------------------------------------------------------ R97-037: parts of delivery notes → accounting
+ * Every line of an issued delivery note to a project or a customer carries an invoicing state:
+ *   open     procurement has not decided yet
+ *   invoice  to be invoiced — waits at accounting (with the unit sale price procurement proposes)
+ *   offer    included in the offer — nothing to invoice separately
+ *   invoiced accounting registered the invoice number and date
+ * Procurement (pr_admin) decides, accounting (acc_is_accounting) registers the invoice or sends a line back. */
+const DNI_STATES = ['open', 'invoice', 'offer', 'invoiced'];
+function dni_has(): bool { static $h = null; if ($h === null) { try { $h = dn_has() && (bool) db()->query("SHOW COLUMNS FROM inv_dn_lines LIKE 'inv_state'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function dni_can_decide(): bool { return dni_has() && function_exists('pr_admin') && pr_admin(); }
+function dni_can_invoice(): bool { return dni_has() && function_exists('acc_is_accounting') && acc_is_accounting(); }
+function dni_visible(): bool { return dni_has() && is_staff() && (dni_can_decide() || dni_can_invoice() || (function_exists('pr_can') && pr_can())); }
+function dni_markup(): float { return function_exists('sb_min_profit') && sb_min_profit() > 0 ? sb_min_profit() : 40.0; }
+function dni_pill(string $s): string { return pill(['open' => 'gold', 'invoice' => 'navy', 'offer' => 'mute', 'invoiced' => 'green'][$s] ?? 'mute', t('dni.s_' . $s)); }
+const DNI_FROM = "FROM inv_dn_lines l JOIN inv_delivery_notes d ON d.id = l.dn_id LEFT JOIN projects p ON p.id = d.project_id LEFT JOIN subprojects s ON s.id = d.subproject_id
+                  LEFT JOIN vessels v ON v.id = COALESCE(d.vessel_id, p.vessel_id) LEFT JOIN companies co ON co.id = d.company_id LEFT JOIN inv_items i ON i.id = l.item_id LEFT JOIN inv_moves m ON m.id = l.move_id
+                  WHERE d.status = 'issued' AND d.kind IN ('project','customer')";
+/** Lines in one state (optionally of one vessel), oldest delivery first. cost = unit cost of the stock movement, else the item's last price. */
+function dni_rows(string $state, int $vesselId = 0, int $limit = 600): array {
+    if (!dni_has() || !in_array($state, DNI_STATES, true)) return [];
+    $w = ' AND l.inv_state = ?'; $a = [$state]; if ($vesselId) { $w .= ' AND COALESCE(d.vessel_id, p.vessel_id) = ?'; $a[] = $vesselId; }
+    return all("SELECT l.id, l.dn_id, l.description, l.unit, l.qty, l.inv_state, l.inv_price, l.inv_ref, l.inv_date, l.inv_name, l.dec_name, l.dec_at, d.dn_no, d.issued_at, d.kind, d.project_id, d.subproject_id,
+                       p.project_code, p.name AS project_name, s.code AS sub_code, v.id AS vessel_id, v.name AS vessel, co.name AS company, i.code AS item_code, COALESCE(NULLIF(m.unit_price, 0), i.last_price) AS cost, COALESCE(i.currency, 'EUR') AS currency
+                " . DNI_FROM . $w . ' ORDER BY ' . ($state === 'invoiced' ? 'l.inv_date DESC, l.id DESC' : 'd.issued_at, d.id, l.seq, l.id') . ' LIMIT ' . (int)$limit, $a);
+}
+function dni_counts(): array { $c = array_fill_keys(DNI_STATES, 0); if (!dni_has()) return $c; try { foreach (all("SELECT l.inv_state st, COUNT(*) n " . DNI_FROM . " GROUP BY l.inv_state") as $r) if (isset($c[$r['st']])) $c[$r['st']] = (int)$r['n']; } catch (Throwable $e) {} return $c; }
+function dni_num(string $s): ?float { $s = trim(str_replace(["\xC2\xA0", ' '], '', $s)); if ($s === '') return null; if (str_contains($s, ',')) $s = str_replace(',', '.', str_replace('.', '', $s)); return is_numeric($s) ? max(0.0, min(9999999.0, round((float)$s, 2))) : null; }
+/** Procurement: decide the lines posted (d[lineId] = invoice | offer | open, price[lineId] = unit sale price). Invoiced lines are never touched. */
+function dni_decide_from_post(): array {
+    if (!dni_can_decide()) throw new RuntimeException(t('err.noaccess')); $u = current_user(); $n = ['invoice' => 0, 'offer' => 0, 'open' => 0];
+    foreach ((array)($_POST['d'] ?? []) as $lid => $st) {
+        $lid = (int)$lid; $st = (string)$st; if (!$lid || !in_array($st, ['invoice', 'offer', 'open'], true)) continue;
+        $price = $st === 'invoice' ? dni_num((string)($_POST['price'][$lid] ?? '')) : null;
+        $c = q("UPDATE inv_dn_lines l JOIN inv_delivery_notes d ON d.id = l.dn_id SET l.inv_state = ?, l.inv_price = ?, l.dec_by = ?, l.dec_name = ?, l.dec_at = NOW() WHERE l.id = ? AND l.inv_state <> 'invoiced' AND d.status = 'issued' AND d.kind IN ('project','customer') AND (l.inv_state <> ? OR NOT (l.inv_price <=> ?))",
+               [$st, $price, (int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? ''), $lid, $st, $price]);
+        if ($c && method_exists($c, 'rowCount') && $c->rowCount()) $n[$st]++;
+    }
+    if ($n['invoice'] && function_exists('nf_push')) { try { $to = array_map('intval', array_column(all("SELECT id FROM customer_users WHERE is_active = 1 AND role IN ('staff','admin') AND is_accounting = 1"), 'id')); $to = array_values(array_diff($to, [(int)($u['id'] ?? 0)]));
+        if ($to) nf_push($to, 'dni:invoice', 'dni:' . date('Ymd'), t('dni.nf_title', ['n' => $n['invoice']]), (string)($u['full_name'] ?? ''), url('dn_invoicing', ['state' => 'invoice']), (int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? '')); } catch (Throwable $e) {} }
+    return $n;
+}
+/** Accounting: register the invoice on the ticked lines that wait to be invoiced. */
+function dni_invoice_from_post(): int {
+    if (!dni_can_invoice()) throw new RuntimeException(t('err.noaccess'));
+    $ids = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['ids'] ?? []))))); if (!$ids) throw new RuntimeException(t('dni.none_ticked'));
+    $ref = mb_substr(trim((string)($_POST['invoice_ref'] ?? '')), 0, 120); if ($ref === '') throw new RuntimeException(t('ts.ref_req'));
+    $date = (string)($_POST['invoice_date'] ?? ''); if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || !checkdate((int)substr($date, 5, 2), (int)substr($date, 8, 2), (int)substr($date, 0, 4))) throw new RuntimeException(t('acc.cor_bad_date'));
+    $u = current_user(); $c = q("UPDATE inv_dn_lines SET inv_state = 'invoiced', inv_ref = ?, inv_date = ?, inv_by = ?, inv_name = ?, inv_at = NOW() WHERE inv_state = 'invoice' AND id IN (" . implode(',', array_fill(0, count($ids), '?')) . ')', array_merge([$ref, $date, (int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? '')], $ids));
+    return $c && method_exists($c, 'rowCount') ? $c->rowCount() : count($ids);
+}
+/** Accounting: send ticked lines back — waiting lines return to procurement (open); invoiced lines return to "to be invoiced" (a wrong entry). */
+function dni_back_from_post(): int {
+    if (!dni_can_invoice()) throw new RuntimeException(t('err.noaccess'));
+    $ids = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['ids'] ?? []))))); if (!$ids) throw new RuntimeException(t('dni.none_ticked')); $in = implode(',', $ids);
+    $c1 = q("UPDATE inv_dn_lines SET inv_state = 'invoice', inv_ref = NULL, inv_date = NULL, inv_by = NULL, inv_name = NULL, inv_at = NULL WHERE inv_state = 'invoiced' AND id IN ($in) AND ? = 'invoiced'", [(string)($_POST['from'] ?? '')]);
+    $c2 = q("UPDATE inv_dn_lines SET inv_state = 'open' WHERE inv_state = 'invoice' AND id IN ($in) AND ? = 'invoice'", [(string)($_POST['from'] ?? '')]);
+    return ($c1 && method_exists($c1, 'rowCount') ? $c1->rowCount() : 0) + ($c2 && method_exists($c2, 'rowCount') ? $c2->rowCount() : 0);
+}

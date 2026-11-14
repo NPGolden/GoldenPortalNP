@@ -16,7 +16,7 @@ layout_head(t('dn.title'), 'inventory');
 <p class="eyebrow"><a href="<?= url('inventory') ?>"><?= tt('stk.title') ?></a> › <?= tt('dn.title') ?></p>
 <div class="page-head">
   <div><h1>🚚 <?= tt('dn.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('dn.lede') ?></p></div>
-  <div class="btn-row"><?php if ($wh && !$new): ?><a class="btn btn--gold btn--sm" href="<?= url('delivery_notes', ['new' => 1]) ?>">+ <?= tt('dn.new') ?></a><?php endif; ?><a class="btn btn--ghost btn--sm" href="<?= url('inventory') ?>">📦 <?= tt('stk.title') ?></a></div>
+  <div class="btn-row"><?php if ($wh && !$new): ?><a class="btn btn--gold btn--sm" href="<?= url('delivery_notes', ['new' => 1]) ?>">+ <?= tt('dn.new') ?></a><?php endif; ?><?php if (function_exists('dni_visible') && dni_visible()): $dniC = dni_counts(); ?><a class="btn btn--ghost btn--sm" href="<?= url('dn_invoicing') ?>">🧾 <?= tt('dni.title') ?><?= $dniC['open'] ? ' <span class="count">' . (int)$dniC['open'] . '</span>' : '' ?></a><?php endif; ?><a class="btn btn--ghost btn--sm" href="<?= url('inventory') ?>">📦 <?= tt('stk.title') ?></a></div>
 </div>
 
 <?php if ($new): ?>

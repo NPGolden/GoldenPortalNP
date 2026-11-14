@@ -13,7 +13,7 @@ $counts = []; foreach (acc_reports([]) as $r) $counts[$r['status']] = ($counts[$
 layout_head(t('acc.title'), 'acc_reports');
 ?>
 <div class="page-head"><div><h1>🧾 <?= tt('acc.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('acc.lede') ?></p></div>
-  <div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('acc_vessel', $f['vessel'] ? ['vessel' => $f['vessel']] : []) ?>">⚓ <?= tt('acc.vd_title') ?></a><a class="btn btn--ghost btn--sm" href="<?= url('acc_register') ?>">☰ <?= tt('acc.register') ?> <span class="count"><?= (int)$open['n'] ?></span></a><?php if ($canNew): ?><a class="btn btn--gold btn--sm" href="#acc-new">+ <?= tt('acc.new') ?></a><?php endif; ?></div></div>
+  <div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('acc_vessel', $f['vessel'] ? ['vessel' => $f['vessel']] : []) ?>">⚓ <?= tt('acc.vd_title') ?></a><?php if (function_exists('dni_visible') && dni_visible()): $dniC = dni_counts(); ?><a class="btn btn--ghost btn--sm" href="<?= url('dn_invoicing', ['state' => 'invoice']) ?>">📦 <?= tt('dni.title') ?><?= $dniC['invoice'] ? ' <span class="count">' . (int)$dniC['invoice'] . '</span>' : '' ?></a><?php endif; ?><a class="btn btn--ghost btn--sm" href="<?= url('acc_register') ?>">☰ <?= tt('acc.register') ?> <span class="count"><?= (int)$open['n'] ?></span></a><?php if ($canNew): ?><a class="btn btn--gold btn--sm" href="#acc-new">+ <?= tt('acc.new') ?></a><?php endif; ?></div></div>
 
 <div class="kpi" style="margin-bottom:14px;">
   <a class="stat gold" href="<?= url('acc_register', ['state' => 'open']) ?>"><b><?= acc_h((float)$open['h']) ?> h</b><?= tt('acc.open_hours') ?></a>
