@@ -56,6 +56,7 @@ function nf_sweep(int $every = 60, bool $force = false): int {
             try { if (function_exists('hra_remind')) { $n += hra_remind(); hra_purge(); } } catch (Throwable $e) {}   // R67-001 HR Assistant reminders + purge of closed flows
             try { if (function_exists('rcr_has') && rcr_has() && (string) cp_setting('rc_retention_last', '') < date('Y-m-d')) { cp_setting_set('rc_retention_last', date('Y-m-d')); rcr_retention_run(); } } catch (Throwable $e) {}   // R91-002: recruiting GDPR retention once a day, from the portal itself (tools/cron.php is optional)
             try { if (function_exists('ws_sweep')) ws_sweep(); } catch (Throwable $e) {}                 // R95-001 website statistics pull (15 min)
+            try { if (function_exists('nl_sweep')) nl_sweep(); } catch (Throwable $e) {}                 // R97-039 newsletters: one small batch per sweep
             try { if (function_exists('mi_sweep')) mi_sweep(); } catch (Throwable $e) {}                 // R97-027 marine intelligence: one news feed per sweep
             q('INSERT INTO nf_cursor (source, last_id, run_at) VALUES (?, 0, NOW()) ON DUPLICATE KEY UPDATE run_at = NOW()', ['_meta']);
             if (random_int(1, 40) === 1) nf_prune();                         // seen entries older than 90 days, now and then

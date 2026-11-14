@@ -4,13 +4,14 @@
  *   GET  web_feed.php              the four Fleet & activity counts (integers)
  *   POST web_feed.php?r=ticket     support request from goldenas.com.gr/support   → Website inbox (+ staff notification)
  *   POST web_feed.php?r=access     Customer Portal access request from /portal-access → Website inbox (administrators)
+ *   POST web_feed.php?r=subscribe  newsletter / events sign-up from the website → pending subscriber + confirmation e-mail (R97-039)
  * Returns the four Fleet & activity counts of the dashboard as integers and nothing else. No session, no cookies, no CORS
  * (browsers are not meant to call it — the website's build pipeline does, once a week), key compared in constant time,
  * 10 requests per IP per minute, generic errors. Empty key = feed switched off (503).
  */
 declare(strict_types=1);
 define('CP_ROOT', __DIR__); ini_set('session.use_cookies', '0'); ini_set('session.use_only_cookies', '0'); ini_set('session.cache_limiter', '');
-foreach (['version', 'db', 'cache', 'i18n', 'helpers', 'auth', 'lic', 'mailer', 'nf', 'tk', 'act', 'web'] as $m) { $f = __DIR__ . '/app/' . $m . '.php'; if (is_file($f)) require_once $f; }
+foreach (['version', 'db', 'cache', 'i18n', 'helpers', 'auth', 'lic', 'mailer', 'nf', 'tk', 'act', 'web', 'nl'] as $m) { $f = __DIR__ . '/app/' . $m . '.php'; if (is_file($f)) require_once $f; }
 if (function_exists('tz_app')) date_default_timezone_set(tz_app());   // R92-008: event times carry the Athens offset, as in index.php
 header('Content-Type: application/json; charset=utf-8'); header('Cache-Control: no-store'); header('X-Content-Type-Options: nosniff'); header('X-Robots-Tag: noindex');
 $out = function ($d, int $c = 200): void { http_response_code($c); echo json_encode($d, JSON_UNESCAPED_SLASHES); exit; };
@@ -30,6 +31,7 @@ try {
     if ($r === 'ticket') $out(web_pub_ticket($body, $vip), 201);
     if ($r === 'access') $out(web_pub_access($body, $vip), 201);
     if ($r === 'contact') $out(web_pub_contact($body, $vip), 201);   // R93-002
+    if ($r === 'subscribe' && function_exists('nl_pub_subscribe')) $out(nl_pub_subscribe($body, $vip), 201);   // R97-039 newsletter / events sign-up (double opt-in)
     $out(['error' => 'not found'], 404);
 }
 catch (RuntimeException $e) { $c = (int) $e->getCode(); if ($c >= 400 && $c < 600 && !($e instanceof PDOException)) $out(['error' => $e->getMessage()], $c); error_log('[web_feed] ' . $e->getMessage()); $out(['error' => 'server error'], 500); }

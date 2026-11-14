@@ -168,7 +168,7 @@ function mi_items(string $from, string $to, bool $withHidden = false): array {
 /** The tab bar of Commercial › Web Sales. */
 function web_sales_tabs(string $active): void {
     $tabs = []; if (function_exists('web_inbox_has') && web_inbox_has()) $tabs['web_inbox'] = ['🌐 ' . t('web.inbox'), function_exists('web_inbox_count') ? web_inbox_count() : 0];
-    if (function_exists('ws_has') && ws_has()) $tabs['web_stats'] = ['📈 ' . t('ws.title'), 0]; if (mi_has()) $tabs['marine_intel'] = ['🧭 ' . t('mi.title'), 0];
+    if (function_exists('ws_has') && ws_has()) $tabs['web_stats'] = ['📈 ' . t('ws.title'), 0]; if (mi_has()) $tabs['marine_intel'] = ['🧭 ' . t('mi.title'), 0]; if (function_exists('nl_can') && nl_can()) $tabs['newsletters'] = ['✉ ' . t('nl.title'), 0];   // R97-039
     echo '<p class="eyebrow">' . tt('nav.g_commercial') . ' › ' . tt('nav.web_sales') . '</p><div class="tabs" style="margin-top:6px;">';
     foreach ($tabs as $k => [$l, $n]) echo '<a href="' . url($k) . '"' . ($k === $active ? ' class="is-on"' : '') . '>' . e($l) . ($n ? '<span class="n">' . (int)$n . '</span>' : '') . '</a>';
     echo '</div>';

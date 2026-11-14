@@ -68,6 +68,7 @@ require __DIR__ . '/app/vd.php';     // R93-005 vessel documents
 require __DIR__ . '/app/rcr_actions.php';
 require __DIR__ . '/app/mailer.php'; // R91-003 outgoing mail (SMTP)
 require __DIR__ . '/app/web.php';    // R90-001 website statistics feed
+require __DIR__ . '/app/nl.php';         // R97-039 Web Sales › Newsletters
 require __DIR__ . '/app/mi.php';         // R97-027 Web Sales tabs + marine intelligence (news feeds)
 require __DIR__ . '/app/webstats.php';   // R95-001 website visitor statistics (pulled from goldenas.com.gr)
 require __DIR__ . '/app/hra.php';   // R67-001 HR Assistant — guided flows with HR approval
@@ -154,6 +155,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (lic_locked() && !in_array($action, ['login', 'twofa', 'logout', 'lic_install', 'lic_remove', 'theme_save', 'account_save', 'avatar_save', 'twofa_begin', 'twofa_confirm', 'twofa_off'], true)) { flash('bad', t('lic.locked_title')); redirect('license'); }   // R22-001
         if (function_exists('rcr_handle_action') && rcr_handle_action($action)) exit;
         if (function_exists('mi_handle_action') && mi_handle_action($action)) exit;   // R97-027
+        if (function_exists('nl_handle_action') && nl_handle_action($action)) exit;   // R97-039
         if (function_exists('ws_handle_action') && ws_handle_action($action)) exit;   // R95-001
         if (function_exists('web_handle_action') && web_handle_action($action)) exit;   // R90-001   // R89-001 recruiting actions (always redirect)
         if (pm_handle_action($action, $page)) exit;     // PM-tool actions (always redirect)
@@ -470,7 +472,7 @@ flt_apply($page);                                                               
 if ($page === 'vessel' && function_exists('vm_has') && vm_has() && ($mi = scalar('SELECT merged_into FROM vessels WHERE id = ?', [(int)($_GET['id'] ?? 0)]))) redirect('vessel', ['id' => vm_resolve((int)$mi)] + array_diff_key($_GET, ['p' => 1, 'id' => 1]));   // R30-001: a retired duplicate opens its master
 $views = ['login','twofa','privacy','dashboard','vessels','projects','pipeline','report_fin','collections','statement','inventory','inventory_item','inventory_import','suppliers','admin_procurement','requisitions','requisition','prq_items','bom','purchase_orders','purchase_order','delivery_notes','delivery_note','payables','payable','suppliers_import','documents','reports','cyber','support','account',
           'subproject','drawings','overlay','weekly','monthly','project_ms','report_sp','system_budgets','system_budget','system_budget_import','system_budget_bom','system_budget_convert','system_budget_feed',
-          'project_new','subproject_new','project_edit','subproject_edit','vessel_new','vessel_edit','vessels_import','marine_intel','import',
+          'project_new','subproject_new','project_edit','subproject_edit','vessel_new','vessel_edit','vessels_import','marine_intel','newsletters','newsletter','import',
           'admin_numbering','admin_offer_classes','proformas','proforma','cashflow','report_cf','eng_requests','admin_engineering','admin_ai','admin_hr','hr_person','hr_dashboard','my_leave','hr_requests','hra','hra_flow','production','production_order','production_edit','admin_systems','admin_users','admin_roles','admin_log','settings','approvals','approval','timesheets','timesheet','timesheet_edit','manhours','report_ts','admin_disciplines','admin_about','tickets','permits','permit_edit','ticket','ticket_edit','vessel','report_vessel','offers','offer','offer_edit','weekly_vessel','report_weekly','fsr','fsr_edit','fsr_list','isr','isr_edit','isr_list','jo','jo_edit','jo_list','joborders','contacts','contact','contact_edit','companies','admin_offer_statuses','notifications','admin_customers','manual','kb','kb_q','requests','request','hr_leaves','hr_training','hr_eval','hr_targets','community','license','tasks','task_edit','admin_task_kinds','admin_file_kinds','admin_calendars','admin_branches','planning','equipment','equipment_view','equipment_edit','fd_import','admin_issue_cats','admin_vessel_merge','rs','rs_edit','wf','vessel_decks','admin_email_templates','admin_rate_cards','admin_offer_texts','cost_control','work','myworks','workload','acc_register','acc_reports','acc_report','acc_vessel','dn_invoicing','fsr_ext','kpis','risks','admin_kpis','report_kpi','sales','report_sales','admin_sales', 'fc', 'fc_edit', 'utilization', 'contacts_json', 'organisations', 'rcr_dashboard', 'rcr_vacancy', 'rcr_event', 'rcr_application', 'rcr_sets', 'rcr_cv', 'rcr_settings', 'admin_website', 'web_inbox', 'web_stats', 'invoice_new'];
 $view  = in_array($page, $views, true) ? $page : '404';
 if (in_array($view, ['subproject_new', 'project_edit', 'subproject_edit'], true)) $view = 'project_new';   // one file, four modes

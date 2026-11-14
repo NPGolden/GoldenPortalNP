@@ -1957,3 +1957,7 @@ html[data-theme="dark"] .sb-low, html[data-theme="dark"] .sb-low-cell, html[data
 /* R97-032 searchable drop-down: group headings (optgroup labels) */
 .ss-group { padding: 6px 10px 3px; font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink-3); border-top: 1px solid var(--line, #E5E7EB); }
 .ss-group:first-child { border-top: 0; }
+/* R97-039 newsletters: editor blocks */
+.nl-block { border: 1px solid var(--line, #E3E7EC); border-left: 3px solid var(--cp-gold); border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; }
+.nl-block input:not([type=checkbox]):not([type=number]):not([type=file]), .nl-block textarea { width: 100%; }
+.nl-bhead { display: flex; gap: 14px; align-items: center; margin-bottom: 6px; } .nl-bhead b { margin-right: auto; }

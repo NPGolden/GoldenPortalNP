@@ -1819,3 +1819,21 @@ Limits: a domain is shown only when the network publishes a reverse-DNS name tha
 **Security review**: the address is used for one DNS look-up and discarded; the name is validated as a host name, forward-confirmed and cut to 70 characters before it is stored, and escaped when shown; resolver time-out reduced and the request limited to 6 s after the response; the existing per-address rate limit of the beacon applies. No finding.
 
 Language keys 9 479 each.
+
+## §325 v1.139.0 (R97-039) — Web Sales › Newsletters
+
+Decisions of 14/11/2026: editor in the portal, sending through Microsoft 365 (the portal's Graph connection), individual statistics, unsubscribe link in every message, AI assistance, sign-up on the website.
+
+Migration `install/migrate_cp_r97_039_newsletters.sql`: `nl_issues` (blocks and audience as JSON, status draft / sending / sent / cancelled), `nl_sends` (one row per recipient: token, status, opened_at / opens, clicked_at / clicks, unsub_at), `nl_links`, `nl_clicks`, `nl_subs` (website subscribers, pending / confirmed / unsubscribed), `nl_optout` (unsub / bounce / manual), `nl_images`. Check key `r97p`.
+
+`app/nl.php`: rights `nl_can()` (administrators, management, sales) and `nl_can_send()` (administrators, management); `nl_audience()` — active contacts with an e-mail of organisations by role (primary organisation and `contact_companies`), confirmed website subscribers by topic, extra addresses; opt-outs removed, one row per address, ceiling 5 000; `nl_render()` — table-based HTML e-mail, 600 px, navy / gold, logo from `assets/`; text escaped, `**bold**`, http(s) addresses linked; `nl_queue()` registers the links and the recipients and locks the issue; `nl_send_batch()` — called by `nf_sweep()` and by "Send next batch": claims rows, sends one message per recipient with `cp_graph_call(POST /users/{mailbox}/sendMail, saveToSentItems false)`, respects `nl_batch` (15) and `nl_daily` (400), stops on a token or throttling error; `nl_stats()`; `nl_mark()` (opt-out, also clears the newsletter / events subscriptions of the contact); `nl_ai_draft()` — `ai_run('write', …, 'newsletter')` with the brief, the audience groups and optionally 25 Marine intelligence headlines, answer parsed as JSON into blocks.
+
+Public endpoint `customer/nl.php` (no session): `?o=` open pixel, `?c=&l=` click → redirect to the stored address of that link only, `?u=` unsubscribe page and POST, `?s=` confirmation of a website subscription, `?i=` picture. Links to goldenas.com.gr get `utm_source=newsletter&utm_campaign=nl<id>`, so Website statistics shows the visits per issue. `web_feed.php?r=subscribe` (site key) → `nl_pub_subscribe()`: pending row and confirmation e-mail, same answer whatever the state of the address.
+
+Views `newsletters.php` (issues, website subscribers, unsubscribed and bounced, sending settings) and `newsletter.php` (editor, assistant, audience, preview, test, send, statistics); tab in `web_sales_tabs()`.
+
+Limits: Microsoft Graph does not accept a `List-Unsubscribe` header, so the unsubscribe is the link in the message; bounces are not read automatically (no mailbox read permission) — marked by hand; replies arrive in the sending mailbox; Microsoft 365 is not a bulk-mail service — keep the daily ceiling moderate.
+
+**Security review**: tokens are 24 random letters / digits (not hex), compared by exact match; the click endpoint redirects only to an address stored for that issue (open-redirect attempt tested); unsubscribe changes state only by POST; public endpoint rate-limited, sets no cookie, answers nothing personal; pictures checked by content, stored under `storage/nl` and served by token; e-mail HTML built from escaped text only (script in a block is printed as text — tested); link addresses must be http(s) (`javascript:` refused — tested); sending rights checked on the server (a project manager gets 403 / no change — tested); the assistant never receives contact data; sign-up needs the site key and double opt-in. Proposal: a dedicated mailbox (e.g. news@) for newsletters, so a complaint cannot affect the mailbox that sends portal notifications — needs the Exchange application access policy to include it.
+
+Language keys 9 640 each.
