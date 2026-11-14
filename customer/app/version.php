@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.138.0';
+const CP_VERSION = '1.138.1';
 const CP_BUILD   = '2026-11-12';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-038', 'version' => '1.138.1', 'date' => '2026-11-14', 'title' => 'Website statistics: card "Networks and organisations" — the registered domain (reverse DNS) and country of the visitors\' connections, e.g. a company network or an internet provider; no IP address is stored (website R15, Privacy Policy R4).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-037', 'version' => '1.138.0', 'date' => '2026-11-14', 'title' => 'Parts to invoice: parts delivered with a delivery note go to accounting — procurement decides per line whether it is to be invoiced or included in the offer, accounting registers the invoice; shown on Accounting, on Delivery notes and on the per-vessel page.', 'db' => 'install/migrate_cp_r97_037_dn_invoicing.sql', 'check' => 'r97o'],
         ['ref' => 'GAS-CP-R97-036', 'version' => '1.137.0', 'date' => '2026-11-14', 'title' => 'Offers: estimated delivery time for parts and for labour — two fields on the offer, printed in the section "Delivery time" of the PDF and Word document; also available to the text blocks as {delivery_parts} and {delivery_labour}.', 'db' => 'install/migrate_cp_r97_036_offer_delivery_time.sql', 'check' => 'r97n'],
         ['ref' => 'GAS-CP-R97-035', 'version' => '1.136.0', 'date' => '2026-11-14', 'title' => 'Accounting: "To invoice per vessel" — clicking a vessel shows everything still to be invoiced for it: contracts not fully invoiced with the final invoices that close a project, proformas without an invoice, hours not reported, reports waiting at accounting and materials of service reports.', 'db' => null, 'check' => null],

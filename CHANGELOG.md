@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.138.0** (build 2026-11-12). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.138.1** (build 2026-11-12). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.138.1 | GAS-CP-R97-038 | 2026-11-14 | Website statistics: card "Networks and organisations" — the registered domain (reverse DNS) and country of the visitors' connections, e.g. a company network or an internet provider; no IP address is stored (website R15, Privacy Policy R4). | — |
 | 1.138.0 | GAS-CP-R97-037 | 2026-11-14 | Parts to invoice: parts delivered with a delivery note go to accounting — procurement decides per line whether it is to be invoiced or included in the offer, accounting registers the invoice; shown on Accounting, on Delivery notes and on the per-vessel page. | `install/migrate_cp_r97_037_dn_invoicing.sql` |
 | 1.137.0 | GAS-CP-R97-036 | 2026-11-14 | Offers: estimated delivery time for parts and for labour — two fields on the offer, printed in the section "Delivery time" of the PDF and Word document; also available to the text blocks as {delivery_parts} and {delivery_labour}. | `install/migrate_cp_r97_036_offer_delivery_time.sql` |
 | 1.136.0 | GAS-CP-R97-035 | 2026-11-14 | Accounting: "To invoice per vessel" — clicking a vessel shows everything still to be invoiced for it: contracts not fully invoiced with the final invoices that close a project, proformas without an invoice, hours not reported, reports waiting at accounting and materials of service reports. | — |

@@ -5,7 +5,7 @@ $u = require_staff(); if (!function_exists('ws_has') || !ws_has()) { http_respon
 [$from, $to, $pfrom, $pto, $per] = ws_period((string)($_GET['per'] ?? '30d'), (string)($_GET['from'] ?? ''), (string)($_GET['to'] ?? ''));
 $S = ws_summary($from, $to); $P = ws_summary($pfrom, $pto);
 $series = $S['days'] > 62 ? ws_monthly($from, $to) : ws_series($from, $to); $monthly = $S['days'] > 62;
-$pages = ws_engagement($from, $to); $countries = ws_top('country', $from, $to, 12); $regions = ws_top('region', $from, $to, 12);
+$pages = ws_engagement($from, $to); $countries = ws_top('country', $from, $to, 12); $regions = ws_top('region', $from, $to, 12); $orgs = ws_top('org', $from, $to, 30);   // R97-038: network / organisation domain of the visitors
 $devices = ws_top('device', $from, $to, 5); $browsers = ws_top('browser', $from, $to, 6); $os = ws_top('os', $from, $to, 6); $langs = ws_top('lang', $from, $to, 4);
 $refs = ws_top('ref', $from, $to, 10); $camps = ws_top('campaign', $from, $to, 8); $search = ws_top('search', $from, $to, 20);
 $videos = ws_top('video', $from, $to, 6); $outb = ws_top('outbound', $from, $to, 8); $downloads = ws_top('download', $from, $to, 8); $forms = ws_top('form', $from, $to, 8);
@@ -79,6 +79,7 @@ table.ws-h{width:100%;border-collapse:collapse}.ws-h td{padding:5px 6px;border-b
 <div class="ws-grid">
   <div class="card"><h2>🗺 <?= tt('ws.countries') ?></h2><?= ws_hbars($countries, fn($r) => e(ws_country_name($r['k'])) . ' <small class="hint">' . e($r['k']) . '</small>', 'n', fn($r) => (int)$r['u'] . ' ' . t('ws.visitors_short')) ?></div>
   <div class="card"><h2>📍 <?= tt('ws.regions') ?></h2><?= ws_hbars($regions, fn($r) => e(str_replace('/', ' · ', $r['k'])), 'n', fn($r) => (int)$r['u'] . ' ' . t('ws.visitors_short')) ?></div>
+  <div class="card" id="ws-orgs"><h2>🏢 <?= tt('ws.orgs') ?></h2><p class="hint" style="margin:-4px 0 8px;"><?= tt('ws.orgs_hint') ?></p><?php if (!$orgs): ?><p class="hint"><?= tt('ws.orgs_none') ?></p><?php else: ?><?= ws_hbars($orgs, function ($r) { [$cc, $dom] = array_pad(explode('/', (string)$r['k'], 2), 2, ''); return ($dom === '(no name)' ? '<span class="hint">' . tt('ws.orgs_noname') . '</span>' : '<b>' . e($dom) . '</b>') . ' <small class="hint">' . e($cc === '--' ? '' : ws_country_name($cc)) . '</small>'; }, 'u', fn($r) => (int)$r['u'] . ' ' . t('ws.visitors_short')) ?><?php endif; ?></div>
 </div>
 
 <div class="card"><h2>📄 <?= tt('ws.pages') ?></h2>

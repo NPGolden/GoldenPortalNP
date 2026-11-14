@@ -1805,3 +1805,17 @@ Tested: decide (invoice with a typed price, offer, left undecided); a project ma
 **Security review**: three new actions behind the staff check, CSRF and their role gates on the server; ids cast to integers, values bound; states from a fixed list; the unit cost is shown only to people with the procurement view. No finding.
 
 Language keys 9 475 each.
+
+## §324 v1.138.1 (R97-038) — Website statistics: networks and organisations
+
+Decision of 14/11/2026: organisation level only — no IP address stored.
+
+Website (repository `goldenas-website`, release R15): `api/_stats.php` gains `st_org_domain()` (reverse DNS of the visitor address, confirmed forwards so a self-set PTR name is not trusted, reduced to the registrable domain) and `st_org_record()`; `api/hit.php` calls it once per new visitor per day **after** the response was sent (`fastcgi_finish_request` / `litespeed_finish_request`), so the look-up never delays a page. Stored as a daily aggregate in `st_day`: dim `org`, k = `CC/domain` (`(no name)` when the connection publishes none), n = u = visitors. The feed (`mode=rows`) carries it without change. `privacy.html` → R4 with the added sentence (Italian dictionary updated).
+
+Portal: `views/web_stats.php` — card "Networks and organisations" (`ws_top('org')`, 30 rows, domain + country + visitors). `ws_pull()` needed no change (dimension names are validated by pattern). No database step.
+
+Limits: a domain is shown only when the network publishes a reverse-DNS name that also resolves back; home and mobile connections show the provider; the company name behind a network without its own name is not known (that would need an external address-owner register, which is not used).
+
+**Security review**: the address is used for one DNS look-up and discarded; the name is validated as a host name, forward-confirmed and cut to 70 characters before it is stored, and escaped when shown; resolver time-out reduced and the request limited to 6 s after the response; the existing per-address rate limit of the beacon applies. No finding.
+
+Language keys 9 479 each.
