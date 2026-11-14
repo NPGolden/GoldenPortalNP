@@ -76,7 +76,8 @@ function nf_sweep(int $every = 60, bool $force = false): int {
             try { if (function_exists('ct_autocat') && function_exists('cp_setting') && cp_setting('ct_autocat_done', '') !== '1') { cp_setting_set('ct_autocat_done', '1'); cp_setting_set('ct_autocat_n', (string) ct_autocat()); } } catch (Throwable $e) {}   // R97-040: once — categories from job titles
             try { if (function_exists('ct_subscribe_all') && function_exists('cp_setting') && cp_setting('ct_suball_done', '') !== '1') { cp_setting_set('ct_suball_done', '1'); cp_setting_set('ct_suball_n', (string) ct_subscribe_all()); } } catch (Throwable $e) {}   // R97-042: once — all four subscriptions on contacts with an e-mail
             try { if (function_exists('nl_sweep')) nl_sweep(); } catch (Throwable $e) {}                 // R97-039 newsletters: one small batch per sweep
-            try { if (function_exists('mi_sweep')) mi_sweep(); } catch (Throwable $e) {}                 // R97-027 marine intelligence: one news feed per sweep
+            try { if (function_exists('mi_sweep')) mi_sweep(); } catch (Throwable $e) {}
+            try { if (function_exists('dh_maybe')) dh_maybe(); } catch (Throwable $e) { error_log('[dh] ' . $e->getMessage()); }   // R97-045 daily health report by e-mail                 // R97-027 marine intelligence: one news feed per sweep
             q('INSERT INTO nf_cursor (source, last_id, run_at) VALUES (?, 0, NOW()) ON DUPLICATE KEY UPDATE run_at = NOW()', ['_meta']);
             if (random_int(1, 40) === 1) nf_prune();                         // seen entries older than 90 days, now and then
         } finally { scalar("SELECT RELEASE_LOCK('nf_sweep')"); }

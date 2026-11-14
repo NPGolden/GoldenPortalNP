@@ -83,6 +83,18 @@ layout_head(t('ab.title'), 'admin_about');
   <?php if (is_file(__DIR__ . '/../storage/slow-pages.log') && filesize(__DIR__ . '/../storage/slow-pages.log') > 0): ?><form method="post" action="<?= url('admin_about') ?>" class="inline" style="margin-top:8px;margin-right:6px;" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="diag_slowlog_clear"><button class="btn btn--ghost btn--sm" type="submit">🧹 <?= tt('dg.slowlog_clear') ?></button></form><?php endif; ?>
   <?php if (is_file(diag_error_log_path()) && filesize(diag_error_log_path()) > 0): ?><form method="post" action="<?= url('admin_about') ?>" class="inline" style="margin-top:8px;" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="diag_errlog_clear"><button class="btn btn--ghost btn--sm" type="submit" data-js-confirm="<?= tt('dg.errlog_clear_confirm') ?>">🧹 <?= tt('dg.errlog_clear') ?></button></form><?php endif; ?>
   <?php endif; ?>
+  <?php if (function_exists('dh_on')): $dhA = dh_admins(); $dhC = dh_chosen(); ?>
+  <div id="dh" style="margin-top:16px;border-top:1px solid var(--line,#e3e6ea);padding-top:12px;">
+    <h3 style="margin:0 0 4px;">📧 <?= tt('dh.title') ?></h3><p class="hint" style="margin:0 0 8px;"><?= tt('dh.hint') ?></p>
+    <form method="post" action="<?= url('admin_about') ?>#dh" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="dh_save">
+      <div class="grid grid-2"><div class="field"><label class="chk"><input type="checkbox" name="dh_on" value="1"<?= dh_on() ? ' checked' : '' ?>> <?= tt('dh.on') ?></label></div>
+        <div class="field"><label><?= tt('dh.time') ?></label><input type="time" name="dh_time" value="<?= e(dh_time()) ?>" required style="max-width:140px;"></div></div>
+      <div class="field"><label><?= tt('dh.to') ?></label><div style="display:flex;flex-wrap:wrap;gap:4px 16px;"><?php foreach ($dhA as $aid => $ar): ?><label class="chk" style="margin:0;"><input type="checkbox" name="dh_to[]" value="<?= $aid ?>"<?= in_array($aid, $dhC, true) ? ' checked' : '' ?>> <?= e((string)$ar['full_name']) ?></label><?php endforeach; ?></div><p class="hint"><?= tt('dh.to_hint') ?></p></div>
+      <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit">✓ <?= tt('btn.save') ?></button><button class="btn btn--ghost btn--sm" type="submit" name="action" value="dh_send_now">✉ <?= tt('dh.send_now') ?></button>
+        <?php if (($dhL = (string) cp_setting('dh_last_at', '')) !== ''): ?><span class="hint"><?= e(t('dh.last', ['at' => $dhL, 'n' => (int) cp_setting('dh_last_n', '0')])) ?></span><?php endif; ?></div>
+    </form>
+  </div>
+  <?php endif; ?>
 </div>
 <div class="card">
   <h2><?= tt('ab.patches') ?></h2>

@@ -1931,3 +1931,24 @@ Language keys 9 693 each.
 **Proposed next**: advanced diagnostics (request timing by phase, outbound-call log, background-job panel, slow-query digest with EXPLAIN, error grouping, weekly health e-mail) — offered to Nikos for decision.
 
 Language keys 9 693 each.
+
+## §331 v1.141.0 (R97-045) — Daily health report by e-mail
+
+**Request**: "send to the developer (me) a health report daily at 7.00 AM, create a schedule for this in the settings".
+
+**What changed**
+
+- `app/diag.php`: `dh_on()`, `dh_time()`, `dh_admins()`, `dh_chosen()`, `dh_recipients()`, `dh_recent_lines()`, `dh_build()` → [subject, text], `dh_send()`, `dh_maybe()`, `dh_save_from_post()`.
+- Settings in `cp_settings`: `dh_on` (default 1), `dh_time` (default 07:00, company zone), `dh_to` (administrator ids; empty = all administrators), `dh_last` (day), `dh_last_at`, `dh_last_n`. No database step.
+- Sent from the background sweep (`nf_sweep()` → `dh_maybe()`), once a day at or after the time; since §330 the sweep runs after the page, so nobody waits for the diagnostics run.
+- Settings › About / Versions › Diagnostics: block "Daily health report by e-mail" (on/off, time, recipients, Save, Send now, last sent). Actions `dh_save`, `dh_send_now` (administrators).
+- Report: summary; needs attention; slow pages 24 h grouped per page (ordered by total waiting time); PHP log 24 h grouped by message (numbers and the installation path normalised); background sweep, newsletter queue, sign-ins; full `diag_text()`.
+- Found by the first sample report and fixed: `ts.php` timesheet PDF footer closure did not import `$bd` — empty branch footer line and two warnings per page.
+
+**Limit**: there is no server clock job; with no activity at 07:00 the report leaves at the first page view after it. A cPanel cron job calling the portal every 15 minutes would make it exact — offered.
+
+**Tests (sandbox)**: sample report built (20 checks, grouped slow pages and log); recipients = active administrators; time before the chosen time → nothing sent; second call the same day → nothing sent; lint, sweep, API test clean.
+
+**Security review**: recipients are restricted to active administrators by id (no free-text address), because the report contains server paths and log lines; the user column of the slow-pages log is left out; the mail is plain text; actions are POST + CSRF + administrator only; time is validated by pattern. E-mail is not an encrypted store — the report carries no passwords, tokens or personal data, only technical state.
+
+Language keys 9 704 each (the figure 9 693 in §329–§330 should read 9 694).

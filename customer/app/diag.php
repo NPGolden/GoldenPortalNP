@@ -167,3 +167,57 @@ function diag_text(array $res): string {
 function diag_cache_flush(): int { require_cp_admin(); return cache_flush(); }   // R69-002
 function diag_slowlog_clear(): void { require_cp_admin(); $f = dirname(__DIR__) . '/storage/slow-pages.log'; if (is_file($f)) @file_put_contents($f, ''); }
 function diag_errlog_clear(): void { require_cp_admin(); $f = diag_error_log_path(); if (is_file($f)) @file_put_contents($f, ''); }
+
+/* ================================================================ R97-045: daily health report by e-mail
+ * Settings (cp_settings): dh_on 1|0 (default 1), dh_time HH:MM (default 07:00, company time), dh_to = ids of administrators (empty = every administrator),
+ * dh_last = day of the last report. Sent from the background sweep: on the first sweep at or after dh_time, once a day. Recipients can only be active
+ * portal administrators — the report carries server paths and error lines and must not travel to an arbitrary address. */
+function dh_on(): bool { return (string) cp_setting('dh_on', '1') === '1'; }
+function dh_time(): string { $v = (string) cp_setting('dh_time', '07:00'); return preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $v) ? $v : '07:00'; }
+function dh_admins(): array { $o = []; try { foreach (all("SELECT id, full_name, email FROM customer_users WHERE role = 'admin' AND is_active = 1 ORDER BY full_name") as $r) $o[(int)$r['id']] = $r; } catch (Throwable $e) {} return $o; }
+function dh_chosen(): array { return array_values(array_filter(array_map('intval', explode(',', (string) cp_setting('dh_to', ''))))); }
+/** [id => row] of the people who receive the report. */
+function dh_recipients(): array { $a = dh_admins(); $c = array_intersect_key($a, array_flip(dh_chosen())); return $c ?: $a; }
+/** Lines of a log file not older than $hours, newest last. $re must capture the timestamp in group 1. */
+function dh_recent_lines(string $file, string $re, int $hours = 24, int $maxBytes = 400000): array {
+    if (!is_file($file)) return []; $size = (int) filesize($file); $fh = @fopen($file, 'rb'); if (!$fh) return [];
+    if ($size > $maxBytes) fseek($fh, $size - $maxBytes); $raw = (string) stream_get_contents($fh); fclose($fh); $min = time() - $hours * 3600; $o = [];
+    foreach (explode("\n", $raw) as $l) { if ($l === '' || !preg_match($re, $l, $m)) continue; $ts = strtotime($m[1]); if ($ts !== false && $ts >= $min) $o[] = $l; }
+    return $o;
+}
+/** [subject, plain-text body] */
+function dh_build(): array {
+    $res = diag_run(); $nF = count(array_filter($res['rows'], fn($r) => $r['state'] === 'fail')); $nW = count(array_filter($res['rows'], fn($r) => $r['state'] === 'warn'));
+    $storage = dirname(__DIR__) . '/storage'; $L = [];
+    $L[] = 'Golden A/S Customer Portal — daily health report'; $L[] = date('d/m/Y H:i') . ' ' . (function_exists('tz_abbr') ? tz_abbr() : '') . ' · v' . CP_VERSION . ' (' . CP_BUILD . ')'; $L[] = '';
+    $L[] = 'SUMMARY'; $L[] = '  Checks: ' . count($res['rows']) . ' · failed: ' . $nF . ' · warnings: ' . $nW . ' · diagnostics run: ' . $res['ms'] . ' ms';
+    // slow pages of the last 24 hours (the log keeps: time, page, ms, queries, db ms, user, slow statements — the user is left out of the e-mail)
+    $slow = []; foreach (dh_recent_lines($storage . '/slow-pages.log', '/^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\t/') as $l) { $p = explode("\t", $l); if (count($p) >= 5) $slow[] = ['at' => $p[0], 'page' => $p[1], 'ms' => (int)$p[2], 'q' => (int)$p[3], 'db' => (int)$p[4]]; }
+    $by = []; foreach ($slow as $s) { $b = &$by[$s['page']]; $b = $b ?? ['n' => 0, 'max' => 0, 'sum' => 0]; $b['n']++; $b['max'] = max($b['max'], $s['ms']); $b['sum'] += $s['ms']; unset($b); } uasort($by, fn($a, $b) => $b['sum'] <=> $a['sum']);   // most total waiting time first
+    $L[] = '  Slow pages in the last 24 h (over 2 s or over 150 queries): ' . count($slow);
+    // PHP errors of the last 24 hours, grouped by message
+    $errs = dh_recent_lines(diag_error_log_path(), '/^\[(\d{1,2}-[A-Za-z]{3}-\d{4} \d\d:\d\d:\d\d)[^\]]*\]/'); $grp = []; $fatal = 0;
+    foreach ($errs as $l) { $m = trim((string) preg_replace('/^\[[^\]]*\]\s*/', '', $l)); if (preg_match('/PHP (Fatal|Parse)/', $m)) $fatal++; $k = mb_substr((string) preg_replace('/\d+/', 'N', str_replace(dirname(__DIR__), '', $m)), 0, 200); $grp[$k] = ($grp[$k] ?? 0) + 1; } arsort($grp);
+    $L[] = '  PHP log entries in the last 24 h: ' . count($errs) . ' · fatal: ' . $fatal . ' · different messages: ' . count($grp);
+    // background work
+    try { $run = (string) scalar("SELECT run_at FROM nf_cursor WHERE source = '_meta'"); $L[] = '  Background sweep last ran: ' . ($run !== '' ? fmt_datetime($run) : 'never'); } catch (Throwable $e) {}
+    try { if (function_exists('nl_has') && nl_has()) $L[] = '  Newsletters: ' . (int) scalar("SELECT COUNT(*) FROM nl_sends WHERE status IN ('queued','sending')") . ' queued · ' . (int) scalar("SELECT COUNT(*) FROM nl_sends WHERE status = 'failed'") . ' failed · ' . (int) scalar("SELECT COUNT(*) FROM nl_sends WHERE status = 'sent' AND sent_at >= NOW() - INTERVAL 1 DAY") . ' sent in 24 h'; } catch (Throwable $e) {}
+    try { $L[] = '  Sign-ins in 24 h: ' . (int) scalar("SELECT COUNT(*) FROM login_log WHERE created_at >= NOW() - INTERVAL 1 DAY AND outcome IN ('success','passkey')") . ' · refused: ' . (int) scalar("SELECT COUNT(*) FROM login_log WHERE created_at >= NOW() - INTERVAL 1 DAY AND outcome IN ('failed','locked','disabled','twofa_failed','passkey_failed','device')"); } catch (Throwable $e) {}
+    $L[] = '';
+    if ($nF || $nW) { $L[] = 'NEEDS ATTENTION'; foreach ($res['rows'] as $r) if ($r['state'] !== 'ok') $L[] = '  [' . strtoupper($r['state']) . '] ' . $r['name'] . ': ' . mb_substr(str_replace("\n", ' | ', $r['detail']), 0, 400) . ($r['fix'] !== '' ? "\n      -> " . $r['fix'] : ''); $L[] = ''; }
+    if ($by) { $L[] = 'SLOW PAGES (24 h) — page · times · slowest · average'; foreach (array_slice($by, 0, 10, true) as $pg => $b) $L[] = '  ' . str_pad((string)$pg, 24) . str_pad((string)$b['n'], 6, ' ', STR_PAD_LEFT) . str_pad($b['max'] . ' ms', 11, ' ', STR_PAD_LEFT) . str_pad((int) round($b['sum'] / $b['n']) . ' ms', 11, ' ', STR_PAD_LEFT); $L[] = ''; }
+    if ($grp) { $L[] = 'PHP LOG (24 h) — times · message'; foreach (array_slice($grp, 0, 12, true) as $m => $n) $L[] = '  ' . str_pad((string)$n, 5, ' ', STR_PAD_LEFT) . '  ' . $m; $L[] = ''; }
+    $L[] = 'FULL DIAGNOSTICS'; $L[] = diag_text($res); $L[] = 'Schedule and recipients: Settings › About / Versions › Diagnostics › Daily health report.';
+    $state = $nF ? $nF . ' failed' : ($nW || $fatal ? ($nW + ($fatal ? 1 : 0)) . ' warning(s)' : 'all OK');
+    return ['Golden A/S Portal — health report ' . date('d/m/Y') . ' — ' . $state, implode("\n", $L)];
+}
+/** Send now; returns the number of e-mails accepted. */
+function dh_send(): int { [$sub, $body] = dh_build(); $n = 0; foreach (dh_recipients() as $r) { try { if (cp_mail((string)$r['email'], $sub, $body)) $n++; } catch (Throwable $e) { error_log('[dh] ' . $e->getMessage()); } } cp_setting_set('dh_last_n', (string)$n); cp_setting_set('dh_last_at', date('Y-m-d H:i')); return $n; }
+/** From the sweep: once a day, at or after the chosen time. The day is marked first, so two sweeps can not both send. */
+function dh_maybe(): void { if (!dh_on() || !function_exists('cp_mail') || date('H:i') < dh_time() || (string) cp_setting('dh_last', '') === date('Y-m-d')) return; cp_setting_set('dh_last', date('Y-m-d')); dh_send(); }
+function dh_save_from_post(): void {
+    require_cp_admin(); cp_setting_set('dh_on', !empty($_POST['dh_on']) ? '1' : '0');
+    $tm = (string)($_POST['dh_time'] ?? ''); if (preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $tm)) cp_setting_set('dh_time', $tm);
+    cp_setting_set('dh_to', implode(',', array_values(array_intersect(array_keys(dh_admins()), array_map('intval', (array)($_POST['dh_to'] ?? []))))));
+}
+

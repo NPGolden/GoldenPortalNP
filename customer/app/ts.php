@@ -343,7 +343,7 @@ function ts_render_pdf(array $d): string {
         $pdf->setColor('#D9DEE5'); $pdf->setLineWidth(0.3); $pdf->line($L, 26, $R, 26);
         $y = 31.0;
     };
-    $footer = function () use ($pdf, $ink, $L, $W, $d) {
+    $footer = function () use ($pdf, $ink, $L, $W, $d, $bd) {   // R97-045: $bd was missing here — the branch footer line was empty and every page logged two warnings
         $pdf->setColor($ink); $pdf->setFont('R', 7);
         $pdf->text($L, 291, $bd['footer'] . ' · ' . $d['doc_no'] . ' · ' . date('d.m.Y H:i'));
         $pdf->text($L, 291, t('rp.page') . ' ' . $pdf->pageNo(), 'R', $W);

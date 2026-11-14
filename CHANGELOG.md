@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.140.4** (build 2026-11-14). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.141.0** (build 2026-11-14). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.141.0 | GAS-CP-R97-045 | 2026-11-14 | Daily health report by e-mail to the portal administrators (default 07:00, schedule and recipients in Settings › About / Versions › Diagnostics): failed checks and warnings, slow pages and PHP log of the last 24 hours grouped, background work, full diagnostics; timesheet PDF footer shows the branch line again. | — |
 | 1.140.4 | GAS-CP-R97-044 | 2026-11-14 | Speed: the background sweep (notifications, reminders, website statistics, news feeds, newsletter batches) ran on every page because its once-a-minute rule compared a UTC time with local time — fixed, and the sweep now runs after the page is shown; presence stamp and sign-up confirmation rules fixed the same way; Projects page alert cache kept 10 minutes; editing a recorded payment on a proforma / invoice works again. | — |
 | 1.140.3 | GAS-CP-R97-043 | 2026-11-14 | Newsletter lists: organisation type and person category now add up (either one is enough) instead of narrowing each other, so a list with both ticked is no longer empty; a choice per list keeps the narrow rule; several countries per list and the countries in use are proposed. | — |
 | 1.140.2 | GAS-CP-R97-042 | 2026-11-14 | Contacts: every active contact with a valid e-mail is subscribed to Newsletter, Campaigns, Events and Greetings (once, automatically; unsubscribed and bounced addresses are left out); new and imported contacts get the four ticks by default; a button on Newsletters › Lists applies it again. | — |
