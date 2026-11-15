@@ -22,6 +22,11 @@ function col_has(): bool { static $h = null; if ($h === null) { try { $h = funct
 function cp_role_name(): string { static $n = null; if ($n === null) { $u = current_user(); $n = ''; if ($u && !empty($u['staff_role_id'])) { try { $n = strtolower(trim((string) scalar('SELECT name FROM staff_roles WHERE id = ?', [(int)$u['staff_role_id']]))); } catch (Throwable $e) {} } } return $n; }
 /** Management: the Owner scope, the CEO and the General Manager — the only ones who manage portal accounts (R78-001). */
 function mgmt_can(): bool { static $v = null; if ($v === null) { $v = is_staff() && ((function_exists('hr_owner') && hr_owner()) || in_array(cp_role_name(), ['general manager', 'managing director'], true)); } return $v; }
+/** R97-047: lists of people and customers leave the portal only through the CEO, the General Manager and the developer (staff role names).
+ *  Being an administrator is no longer enough. Every export — and every refused attempt — is written to storage/exports.log. */
+function export_people_can(): bool { static $v = null; if ($v === null) $v = is_staff() && in_array(cp_role_name(), ['ceo', 'general manager', 'developer'], true); return $v; }
+function export_log(string $what, int $rows, bool $ok = true): void { $u = current_user(); @file_put_contents(dirname(__DIR__) . '/storage/exports.log', date('Y-m-d H:i:s') . "\t" . (int)($u['id'] ?? 0) . "\t" . str_replace(["\t", "\n"], ' ', (string)($u['full_name'] ?? '')) . "\t" . $what . "\t" . $rows . "\t" . ($ok ? 'ok' : 'refused') . "\n", FILE_APPEND | LOCK_EX); }
+function require_export_people(string $what): array { $u = require_login(); if (!export_people_can()) { export_log($what, 0, false); http_response_code(403); exit(t('ex.only_mgmt')); } return $u; }
 function require_mgmt(): array { $u = require_login(); if (!mgmt_can()) { http_response_code(403); exit(t('err.noaccess')); } return $u; }
 function col_flag(string $col): bool { $u = current_user(); if (!$u || !is_staff()) return false; static $c = []; $k = $col . (int)$u['id']; if (!isset($c[$k])) { try { $c[$k] = (bool) scalar("SELECT {$col} FROM customer_users WHERE id = ?", [(int)$u['id']]); } catch (Throwable $e) { $c[$k] = false; } } return $c[$k]; }
 /** Accounting · Sales · Owner · CEO · General Manager. */

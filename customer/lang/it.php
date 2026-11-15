@@ -6704,6 +6704,7 @@ Cordiali saluti,
 'ph.l_other' => 'Messaggio',
 'ph.new' => 'Nuovo',
 'ph.quiet' => 'Silenzioso',
+'ex.only_mgmt' => 'L’esportazione di contatti, organizzazioni, clienti e account è riservata al CEO, al Direttore Generale e allo sviluppatore.',
 // ---- GAS-CP-R69-002 performance pass
 'perf.meter_tip' => 'Query · tempo di questa pagina (solo amministratori)',
 'dg.cache' => 'Cache dei blocchi',

@@ -131,7 +131,7 @@ layout_head(t('im.title'), 'import');
   <div class="card imp-card" id="customers">
     <h2><?= tt('cu.title') ?></h2>
     <p class="hint"><?= tt('cu.im_hint') ?></p>
-    <p><a class="btn btn--ghost btn--sm" href="<?= url('import', ['tpl' => 'customers']) ?>">⤓ <?= tt('im.template') ?></a> <a class="btn btn--ghost btn--sm" href="<?= url('customers_export') ?>">⤓ <?= tt('cu.export_current') ?></a></p>
+    <p><a class="btn btn--ghost btn--sm" href="<?= url('import', ['tpl' => 'customers']) ?>">⤓ <?= tt('im.template') ?></a><?php if (export_people_can()): ?> <a class="btn btn--ghost btn--sm" href="<?= url('customers_export') ?>">⤓ <?= tt('cu.export_current') ?></a><?php endif; ?></p>
     <form method="post" action="<?= url('import') ?>" enctype="multipart/form-data" data-lock data-busy="<?= tt('im.running') ?>">
       <?= csrf_field() ?><input type="hidden" name="action" value="cu_import">
       <div class="field"><label><?= tt('im.file') ?></label><input name="xlsx" type="file" accept=".xlsx" required></div>

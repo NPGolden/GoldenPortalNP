@@ -365,7 +365,8 @@ function ct_set_many(array $ids, string $field, ?string $value): int {
 }
 /** Download the filtered list as a UTF-8 CSV (opens in Excel) — for campaigns, newsletters, events. */
 function ct_export_csv(array $f): void {
-    $l = ct_list($f, 0);
+    require_export_people('contacts');   // R97-047
+    $l = ct_list($f, 0); export_log('contacts', count($l['rows']));
     header('Content-Type: text/csv; charset=UTF-8');
     header('Content-Disposition: attachment; filename="GAS-contacts-' . date('Ymd') . '.csv"');
     $out = fopen('php://output', 'w'); fwrite($out, "\xEF\xBB\xBF");

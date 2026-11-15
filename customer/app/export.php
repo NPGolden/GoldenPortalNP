@@ -3,11 +3,12 @@
 require_once __DIR__ . '/xlsxw.php';
 
 function ex_contacts(array $f): void {
-    require_cp_admin();
+    require_export_people('contacts');   // R97-047: CEO, General Manager, developer only
     $l = ct_list($f, 0); $rows = [];
     foreach ($l['rows'] as $r) $rows[] = [$r['full_name'], $r['company_name'], $r['customer_name'], ct_categories()[$r['category']] ?? $r['category'], $r['position'], $r['email'], $r['phone'], $r['mobile'], $r['vessel_list'],
         implode('; ', array_map(fn($k) => ct_channels()[$k] ?? $k, array_filter(explode(',', (string)($r['channels'] ?? ''))))), implode('; ', array_map(fn($k) => ct_subscriptions()[$k] ?? $k, array_filter(explode(',', (string)($r['subscriptions'] ?? ''))))),
         $r['birthday'] ? (ct_year_known($r['birthday']) ? date('d.m.Y', strtotime($r['birthday'])) : substr($r['birthday'], 8, 2) . '.' . substr($r['birthday'], 5, 2)) : '', $r['nameday_md'] ? substr($r['nameday_md'], 3, 2) . '.' . substr($r['nameday_md'], 0, 2) : '', $r['interests'], (int)$r['n_notes'], $r['is_active'] ? 'yes' : 'no'];
+    export_log('contacts', count($rows));
     xlsx_download('GAS-contacts-' . date('Ymd') . '.xlsx', [['name' => t('ct.title'), 'first' => true,
         'header' => ['Full name', 'Company', 'Customer', 'Category', 'Position', 'Email', 'Phone', 'Mobile', 'Vessels', 'Channels', 'Subscriptions', 'Birthday', 'Name day', 'Interests', 'Notes', 'Active'],
         'rows' => $rows, 'widths' => [26, 24, 22, 20, 22, 30, 18, 18, 36, 24, 24, 12, 10, 30, 8, 8], 'wrap' => [8, 13]]]);
@@ -81,7 +82,7 @@ function ex_projects(array $g): void {
 
 /** Portal accounts in the layout the accounts import reads (password column empty — set one to reset it).   R24-004 */
 function ex_users(array $g): void {
-    require_cp_admin();
+    require_export_people('accounts');   // R97-047: CEO, General Manager, developer only
     $hasTotp = (bool)one("SHOW COLUMNS FROM customer_users LIKE 'twofa_required'"); $hasDisc = ts_has();
     $hasCal = function_exists('wc_has') && wc_has(); $hasBr = function_exists('br_has') && br_has();
     $w = []; $b = [];
@@ -103,11 +104,12 @@ function ex_users(array $g): void {
     if ($hasBr) { $header[] = 'Branch'; $header[] = 'Branch scope'; $widths[] = 8; $widths[] = 10; }
     if (function_exists('tm_has') && tm_has()) { $header[] = 'Assigned sub-projects'; $widths[] = 40; }
     $header[] = 'Last login'; $header[] = 'Created'; $widths[] = 16; $widths[] = 12;
+    export_log('accounts', count($rows));
     xlsx_download('GAS-accounts-' . date('Ymd') . '.xlsx', [['name' => 'Accounts', 'first' => true, 'header' => $header, 'rows' => $rows, 'widths' => $widths]]);
 }
 
 function ex_companies(array $g): void {
-    require_cp_admin();
+    require_export_people('organisations');   // R97-047: CEO, General Manager, developer only
     if (!co_has()) { http_response_code(404); exit; }
     $q = trim((string)($g['q'] ?? '')); $fk = (string)($g['kind'] ?? '');
     $w = []; $b = [];
@@ -118,6 +120,7 @@ function ex_companies(array $g): void {
                          (SELECT COUNT(DISTINCT cv.vessel_id) FROM contact_vessels cv JOIN contacts ct ON ct.id = cv.contact_id WHERE ct.company_id = co.id) AS n_vessels
                   FROM companies co LEFT JOIN customers c ON c.id = co.customer_id ' . ($w ? 'WHERE ' . implode(' AND ', $w) : '') . ' ORDER BY co.is_active DESC, co.name', $b) as $r)
         $rows[] = [$r['name'], co_kinds()[$r['kind']] ?? $r['kind'], $r['customer_name'], $r['country'], $r['city'], $r['website'], $r['email'], $r['phone'], (int)$r['n_contacts'], (int)$r['n_vessels'], $r['notes'], $r['is_active'] ? 'yes' : 'no', $r['created_at'] ? substr($r['created_at'], 0, 10) : ''];
+    export_log('organisations', count($rows));
     xlsx_download('GAS-companies-' . date('Ymd') . '.xlsx', [['name' => t('co.title'), 'first' => true,
         'header' => ['Company', 'Kind', 'Customer', 'Country', 'City', 'Website', 'Email', 'Phone', 'Contacts', 'Vessels', 'Notes', 'Active', 'Created'],
         'rows' => $rows, 'widths' => [30, 20, 24, 16, 16, 28, 28, 18, 10, 10, 40, 8, 12], 'wrap' => [10]]]);
@@ -126,7 +129,7 @@ function ex_companies(array $g): void {
 /** Customers with their invoicing details — one row per billing identity (a customer without any = one row);
  *  the same layout the Customers import reads, so the file can be corrected and loaded back.   R19-001 */
 function ex_customers(array $g): void {
-    require_cp_admin();
+    require_export_people('customers');   // R97-047: CEO, General Manager, developer only
     $q = trim((string)($g['q'] ?? '')); $st = (string)($g['status'] ?? 'all'); $ext = cu_cols_ok(); $ivOk = iv_has();
     $w = []; $b = [];
     if ($q !== '') { $l = '%' . $q . '%'; $w[] = '(c.name LIKE ? OR c.erp_code LIKE ? OR c.country LIKE ?' . ($ext ? ' OR c.vat_no LIKE ? OR c.city LIKE ?' : '') . ')'; array_push($b, $l, $l, $l); if ($ext) array_push($b, $l, $l); }
@@ -138,6 +141,7 @@ function ex_customers(array $g): void {
         if (!$ivs) { $rows[] = array_merge($base, array_fill(0, 19, null)); continue; }
         foreach ($ivs as $i) $rows[] = array_merge($base, [$i['label'], $i['legal_name'], $i['vat_no'], $i['tax_office'], $i['reg_no'], $i['attn'], $i['address'], $i['postal_code'], $i['city'], $i['country'], $i['email'], $i['phone'], $i['bank'], $i['iban'], $i['swift'], $i['currency'], $i['payment_terms'], $i['notes'], $i['is_default'] ? 'Yes' : 'No']);
     }
+    export_log('customers', count($rows));
     xlsx_download('GAS-customers-' . date('Ymd') . '.xlsx', [['name' => t('cu.title'), 'first' => true,
         'header' => ['Customer', 'ERP code', 'Country', 'City', 'Postal code', 'Address', 'VAT', 'Email', 'Phone', 'Website', 'Notes', 'Active',
                      'Invoicing label', 'Legal name', 'Invoicing VAT', 'Tax office', 'Registration no', 'Attn', 'Invoicing address', 'Invoicing postal code', 'Invoicing city', 'Invoicing country', 'Invoicing email', 'Invoicing phone', 'Bank', 'IBAN', 'SWIFT', 'Currency', 'Payment terms', 'Invoicing notes', 'Default'],

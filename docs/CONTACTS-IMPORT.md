@@ -1983,3 +1983,21 @@ Language keys 9 704 each (the figure 9 693 in §329–§330 should read 9 694).
 - Cost per page: one file append of about 40 bytes; nothing else unless a call, a slow statement or a warning occurs.
 
 Language keys 9 812 each.
+
+## §333 v1.142.1 (R97-047) — Exports of contacts and customers: CEO, General Manager, Developer only
+
+**Request**: "Export of contacts and customer will be only allowed to CEO, developer and General Manager".
+
+**What changed**
+
+- `export_people_can()` (`app/col.php`): staff account whose Golden A/S role name is `CEO`, `General Manager` or `Developer` (case-insensitive). `require_export_people($what)` answers 403 with `ex.only_mgmt` otherwise.
+- Applied to `ex_contacts()` (`?p=contacts_export`), `ex_companies()` (`companies_export`), `ex_customers()` (`customers_export`), `ex_users()` (`users_export` — it lists the customers' people too) and the unused `ct_export_csv()`. Before: any portal administrator.
+- Export buttons on Contacts, Organisations, Customers, Accounts and Settings › Import are shown only when `export_people_can()`.
+- `export_log()` → `storage/exports.log`: time, user, list, rows, ok / refused. The daily health report counts exports and refused attempts of the last 24 hours and lists them.
+- No database step. Vessels, projects, equipment, planning, HR and finance exports keep their own rules.
+
+**Tests (sandbox)**: CEO → four exports 200; administrator with role Technical Manager → 403 on all four, no buttons; project manager → 403; log shows 4 ok + 5 refused; lint, sweep, API test clean.
+
+**Security review**: this closes the bulk-extraction path for the customer and contact base for every account except three roles; the server refuses the request itself, not only the button; attempts are logged, so a try by a compromised administrator account becomes visible the next morning. Not covered by this rule and worth knowing: a person who may open the Contacts list can still read it on screen page by page, and the mobile app service returns contacts to staff — a per-day view limit or an alert on unusual reading volume can be added if wanted.
+
+Language keys 9 813 each.

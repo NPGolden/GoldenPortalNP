@@ -6690,6 +6690,7 @@ GAS-MSB-2026-002',
 'ph.l_other' => 'Message',
 'ph.new' => 'New',
 'ph.quiet' => 'Quiet',
+'ex.only_mgmt' => 'Exporting contacts, organisations, customers and accounts is reserved for the CEO, the General Manager and the developer.',
 // ---- GAS-CP-R69-002 performance pass
 'perf.meter_tip' => 'Заявки · време на тази страница (само администратори)',
 'dg.cache' => 'Кеш на блоковете',

@@ -19,7 +19,7 @@ layout_head(t('co.title'), 'contacts');
 <p class="eyebrow"><a href="<?= url('contacts') ?>"><?= tt('ct.title') ?></a></p>
 <div class="page-head">
   <div><h1><?= tt('co.title') ?></h1><p class="lede"><?= tt('co.lede') ?></p></div>
-  <?php if ($admin): ?><div class="btn-row"><a class="btn btn--ghost" href="<?= url('settings', ['tab' => 'import']) ?>#companies">⤒ <?= tt('im.title') ?></a><a class="btn btn--ghost" href="<?= url('companies_export', array_filter(['q' => $q, 'kind' => $fk])) ?>">⤓ <?= tt('ct.export') ?></a><a class="btn btn--gold" href="<?= url('companies', ['edit' => 0]) ?>#form">+ <?= tt('co.new') ?></a></div><?php endif; ?>
+  <?php if ($admin): ?><div class="btn-row"><a class="btn btn--ghost" href="<?= url('settings', ['tab' => 'import']) ?>#companies">⤒ <?= tt('im.title') ?></a><?php if (export_people_can()): ?><a class="btn btn--ghost" href="<?= url('companies_export', array_filter(['q' => $q, 'kind' => $fk])) ?>">⤓ <?= tt('ct.export') ?></a><?php endif; ?><a class="btn btn--gold" href="<?= url('companies', ['edit' => 0]) ?>#form">+ <?= tt('co.new') ?></a></div><?php endif; ?>
 </div>
 
 <div class="cols ct-cols">
