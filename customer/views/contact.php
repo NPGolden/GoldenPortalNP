@@ -14,7 +14,7 @@ layout_head($c['full_name'], 'contacts');
 <div class="page-head">
   <div style="display:flex;align-items:center;gap:14px;">
     <span class="ava ava--txt" style="width:56px;height:56px;font-size:20px;"><?= e(initials($c['full_name'])) ?></span>
-    <div><h1 style="margin:0;"><?= e($c['full_name']) ?> <?= $c['is_active'] ? '' : pill('mute', t('ct.inactive')) ?></h1>
+    <div><h1 style="margin:0;"><?= e($c['full_name']) ?> <?= $c['is_active'] ? '' : pill('mute', t('ct.inactive')) ?><?= function_exists('kym_brand_pills') ? kym_brand_pills($c) : '' ?><?= ($c['origin'] ?? '') === 'kyma_website' ? ' ' . pill('mute', t('kym.origin')) : '' ?></h1>
       <p class="lede" style="margin:4px 0 0;"><?= e(implode(' · ', array_filter([$c['position'], $c['company_name'] ?: $c['customer_name']]))) ?> <?= ct_cat_pill($c['category']) ?></p></div>
   </div>
   <div class="btn-row">

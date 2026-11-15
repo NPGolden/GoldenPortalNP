@@ -3,6 +3,11 @@
 require __DIR__ . '/_layout.php';
 $u = require_staff(); if (!function_exists('ws_has') || !ws_has()) { http_response_code(404); layout_head(t('ws.title'), 'web_sales'); echo '<h1>' . tt('err.notfound') . '</h1>'; layout_foot(); return; }
 [$from, $to, $pfrom, $pto, $per] = ws_period((string)($_GET['per'] ?? '30d'), (string)($_GET['from'] ?? ''), (string)($_GET['to'] ?? ''));
+/* R97-050: one card per website; the breakdown below is of the site chosen (?site=golden|kyma). */
+$ks = function_exists('kym_has') && kym_has(); $site = $ks ? kym_site($_GET['site'] ?? 'golden') : 'golden'; $cards = [];
+if ($ks) foreach (ws_sites() as $sk) { ws_use($sk); $cs = ws_summary($from, $to); $cp = ws_summary($pfrom, $pto); $ci = array_sum(array_map(fn($r) => (int)$r['n'], ws_inquiries($from, $to)));
+    $cards[$sk] = ['S' => $cs, 'P' => $cp, 'inq' => $ci, 'series' => ws_series($from, $to), 'on' => ws_configured($sk), 'last' => (string)cp_setting(ws_sk('ws_last_pull', $sk), ''), 'err' => (string)cp_setting(ws_sk('ws_last_error', $sk), '')]; }
+ws_use($site); $keepQ = ['site' => $site, 'per' => $per] + ($per === 'custom' ? ['from' => $from, 'to' => $to] : []);
 $S = ws_summary($from, $to); $P = ws_summary($pfrom, $pto);
 $series = $S['days'] > 62 ? ws_monthly($from, $to) : ws_series($from, $to); $monthly = $S['days'] > 62;
 $pages = ws_engagement($from, $to); $countries = ws_top('country', $from, $to, 12); $regions = ws_top('region', $from, $to, 12); $orgs = ws_top('org', $from, $to, 30);   // R97-038: network / organisation domain of the visitors
@@ -10,7 +15,7 @@ $devices = ws_top('device', $from, $to, 5); $browsers = ws_top('browser', $from,
 $refs = ws_top('ref', $from, $to, 10); $camps = ws_top('campaign', $from, $to, 8); $search = ws_top('search', $from, $to, 20);
 $videos = ws_top('video', $from, $to, 6); $outb = ws_top('outbound', $from, $to, 8); $downloads = ws_top('download', $from, $to, 8); $forms = ws_top('form', $from, $to, 8);
 $hours = ws_hours($from, $to); $wd = ws_weekdays($from, $to); $inq = ws_inquiries($from, $to);
-$last = (string)cp_setting('ws_last_pull', ''); $err = (string)cp_setting('ws_last_error', ''); $live = json_decode((string)cp_setting('ws_live', '{}'), true) ?: [];
+$last = (string)cp_setting(ws_sk('ws_last_pull'), ''); $err = (string)cp_setting(ws_sk('ws_last_error'), ''); $live = json_decode((string)cp_setting(ws_sk('ws_live'), '{}'), true) ?: [];
 $delta = function (int|float $a, int|float $b, bool $pct = true): string { if ($b <= 0) return ''; $d = ($a - $b) / $b * 100; $cls = $d > 2 ? 'green' : ($d < -2 ? 'red' : 'mute'); return '<span class="pill pill--' . $cls . '" title="' . tt('ws.vs_previous') . '">' . ($d >= 0 ? '+' : '') . round($d) . '%</span>'; };
 $fmtT = fn(int $s) => sprintf('%d:%02d', intdiv($s, 60), $s % 60);
 $presets = ['today', 'yesterday', '7d', '30d', 'month', 'lastmonth', 'year', 'lastyear', '12m'];
@@ -49,15 +54,28 @@ table.ws-h{width:100%;border-collapse:collapse}.ws-h td{padding:5px 6px;border-b
 <?php web_sales_tabs('web_stats'); ?>
 <div class="page-head"><div><h1>📈 <?= tt('ws.title') ?></h1><p class="lede"><?= tt('ws.lede') ?></p></div>
   <div class="btn-row no-print">
-    <form method="post" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="ws_pull_now"><button class="btn btn--sm" type="submit">⟳ <?= tt('ws.pull_now') ?></button></form>
-    <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="ws_export"><input type="hidden" name="p" value="<?= e($per) ?>"><input type="hidden" name="from" value="<?= e($from) ?>"><input type="hidden" name="to" value="<?= e($to) ?>"><button class="btn btn--sm" type="submit">⬇ CSV</button></form>
+    <form method="post" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="ws_pull_now"><input type="hidden" name="site" value="<?= e($site) ?>"><button class="btn btn--sm" type="submit">⟳ <?= tt('ws.pull_now') ?></button></form>
+    <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="ws_export"><input type="hidden" name="site" value="<?= e($site) ?>"><input type="hidden" name="p" value="<?= e($per) ?>"><input type="hidden" name="from" value="<?= e($from) ?>"><input type="hidden" name="to" value="<?= e($to) ?>"><button class="btn btn--sm" type="submit">⬇ CSV</button></form>
     <button class="btn btn--sm" type="button" data-print>🖨 <?= tt('ws.print') ?></button>
   </div></div>
-<?php if (!ws_configured()): ?><p class="flash flash--bad"><?= tt('ws.not_configured') ?> <a href="<?= url('settings', ['tab' => 'website']) ?>"><?= tt('web.title') ?> →</a></p><?php endif; ?>
+<?php if ($cards): /* R97-050: the two websites side by side */ $spark = function (array $rows): string { if (count($rows) < 2) return ''; $mx = max(1, max(array_map(fn($r) => (int)$r['visitors'], $rows))); $n = count($rows); $pts = []; foreach ($rows as $i => $r) $pts[] = round($i / ($n - 1) * 200, 1) . ',' . round(34 - (int)$r['visitors'] / $mx * 30, 1); return '<svg viewBox="0 0 200 36" width="200" height="36" role="img" aria-label="trend" style="display:block;max-width:100%;"><polyline points="' . implode(' ', $pts) . '" fill="none" stroke="var(--gold-deep)" stroke-width="2"/></svg>'; }; ?>
+<div class="ws-sites no-print" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin:6px 0 14px;">
+  <?php foreach ($cards as $sk => $c): ?><a href="<?= url('web_stats', ['site' => $sk] + array_diff_key($keepQ, ['site' => 1])) ?>" class="card" style="margin:0;text-decoration:none;color:inherit;<?= $sk === $site ? 'border:2px solid var(--gold);' : '' ?>">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;"><div><h2 style="margin:0 0 2px;"><?= e(KYM_SITES[$sk]) ?></h2><span class="hint"><?= e((string) parse_url(KYM_HOME[$sk], PHP_URL_HOST)) ?></span></div><?= $c['on'] ? ($c['err'] !== '' ? pill('bad', t('kym.feed_error')) : pill('green', t('kym.connected'))) : pill('mute', t('kym.not_connected')) ?></div>
+    <?php if (!$c['on']): ?><p class="hint" style="margin:12px 0 0;"><?= tt('kym.card_off') ?> <b><?= tt('web.title') ?> →</b></p>
+    <?php else: ?><div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:12px;align-items:end;">
+      <div><b style="font-size:24px;"><?= number_format($c['S']['visitors']) ?></b><br><span class="hint"><?= tt('ws.visitors') ?> <?= $delta($c['S']['visitors'], $c['P']['visitors']) ?></span></div>
+      <div><b style="font-size:24px;"><?= number_format($c['S']['views']) ?></b><br><span class="hint"><?= tt('ws.views') ?> <?= $delta($c['S']['views'], $c['P']['views']) ?></span></div>
+      <div><b style="font-size:24px;"><?= number_format($c['inq']) ?></b><br><span class="hint"><?= tt('kym.card_inq') ?></span></div></div>
+    <div style="margin-top:8px;"><?= $spark($c['series']) ?></div><p class="hint" style="margin:4px 0 0;"><?= tt('ws.last_pull') ?>: <?= $c['last'] ? e(fmt_datetime($c['last'])) : '—' ?><?= $sk === $site ? ' · ' . tt('kym.card_shown') : '' ?></p><?php endif; ?>
+  </a><?php endforeach; ?>
+</div><style>@media(max-width:800px){.ws-sites{grid-template-columns:1fr!important}}</style>
+<h2 style="margin:4px 0 0;"><?= e(KYM_SITES[$site]) ?> — <?= tt('kym.breakdown') ?></h2><?php endif; ?>
+<?php if (!ws_configured()): ?><p class="flash flash--bad"><?= tt($site === 'kyma' ? 'kym.ws_not_configured' : 'ws.not_configured') ?> <a href="<?= $site === 'kyma' ? url('admin_website') . '#kyma' : url('settings', ['tab' => 'website']) ?>"><?= tt('web.title') ?> →</a></p><?php endif; ?>
 <?php if ($err): ?><p class="flash flash--bad"><?= tt('ws.last_error') ?>: <?= e($err) ?></p><?php endif; ?>
 <div class="ws-per no-print">
-  <?php foreach ($presets as $k): ?><a class="<?= $per === $k ? 'on' : '' ?>" href="<?= url('web_stats', ['per' => $k]) ?>"><?= tt('ws.p_' . $k) ?></a><?php endforeach; ?>
-  <form method="get"><input type="hidden" name="p" value="web_stats"><input type="hidden" name="per" value="custom"><input type="date" name="from" value="<?= e($from) ?>" max="<?= gmdate('Y-m-d') ?>"><span>–</span><input type="date" name="to" value="<?= e($to) ?>" max="<?= gmdate('Y-m-d') ?>"><button class="btn btn--sm" type="submit"><?= tt('ws.apply') ?></button></form>
+  <?php foreach ($presets as $k): ?><a class="<?= $per === $k ? 'on' : '' ?>" href="<?= url('web_stats', ['per' => $k] + ($ks ? ['site' => $site] : [])) ?>"><?= tt('ws.p_' . $k) ?></a><?php endforeach; ?>
+  <form method="get"><input type="hidden" name="p" value="web_stats"><?php if ($ks): ?><input type="hidden" name="site" value="<?= e($site) ?>"><?php endif; ?><input type="hidden" name="per" value="custom"><input type="date" name="from" value="<?= e($from) ?>" max="<?= gmdate('Y-m-d') ?>"><span>–</span><input type="date" name="to" value="<?= e($to) ?>" max="<?= gmdate('Y-m-d') ?>"><button class="btn btn--sm" type="submit"><?= tt('ws.apply') ?></button></form>
 </div>
 <p class="hint"><?= e(fmt_date($from)) ?> – <?= e(fmt_date($to)) ?> · <?= tt('ws.compared') ?> <?= e(fmt_date($pfrom)) ?> – <?= e(fmt_date($pto)) ?> · <?= tt('ws.last_pull') ?>: <?= $last ? e(fmt_datetime($last)) : '—' ?><?= isset($live['active_last_5min']) ? ' · <b>' . (int)$live['active_last_5min'] . '</b> ' . tt('ws.active_now') : '' ?> · UTC</p>
 

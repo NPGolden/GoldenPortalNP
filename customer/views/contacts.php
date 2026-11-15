@@ -39,6 +39,7 @@ layout_head(t('ct.title'), 'contacts');
     <div class="field"><label for="soon"><?= tt('ct.soon') ?></label><select id="soon" name="soon"><option value=""><?= tt('flt.any') ?></option><option value="birthday"<?= $sel('birthday', $f['soon']) ?>><?= tt('ct.birthdays_30') ?></option><option value="nameday"<?= $sel('nameday', $f['soon']) ?>><?= tt('ct.namedays_30') ?></option></select></div>
     <?php if ($co): ?><div class="field"><label for="channel"><?= tt('ct.channels') ?></label><select id="channel" name="channel"><option value=""><?= tt('flt.any') ?></option><?php foreach (ct_channels() as $k => $lab): ?><option value="<?= $k ?>"<?= $sel($k, $f['channel']) ?>><?= e($lab) ?></option><?php endforeach; ?></select></div>
     <div class="field"><label for="sub"><?= tt('ct.subscriptions') ?></label><select id="sub" name="sub"><option value=""><?= tt('flt.any') ?></option><?php foreach (ct_subscriptions() as $k => $lab): ?><option value="<?= $k ?>"<?= $sel($k, $f['sub']) ?>><?= e($lab) ?></option><?php endforeach; ?></select></div><?php endif; ?>
+    <?php if (function_exists('kym_has') && kym_has()): ?><div class="field"><label for="brand"><?= tt('kym.brand') ?></label><select id="brand" name="brand"><option value=""><?= tt('flt.any') ?></option><?php foreach (KYM_SITES as $bk => $bl): ?><option value="<?= $bk ?>"<?= $sel($bk, $f['brand'] ?? '') ?>><?= e($bl) ?></option><?php endforeach; ?></select></div><?php endif; ?>
     <div class="field"><label for="status"><?= tt('th.status') ?></label><select id="status" name="status"><option value="active"<?= $sel('active', $f['status']) ?>><?= tt('au.active') ?></option><option value="inactive"<?= $sel('inactive', $f['status']) ?>><?= tt('ct.inactive') ?></option><option value="all"<?= $sel('all', $f['status']) ?>><?= tt('flt.any') ?></option></select></div>
     <div class="fltbar-actions"><button class="btn" type="submit"><?= tt('btn.apply') ?></button><a class="btn btn--ghost" href="<?= url('contacts', ['reset' => 1, 'reset' => 1]) ?>"><?= tt('btn.clear') ?></a></div>
   </form>
@@ -67,7 +68,7 @@ layout_head(t('ct.title'), 'contacts');
     <tbody><?php foreach ($l['rows'] as $c): ?>
       <tr<?= $c['is_active'] ? '' : ' class="is-retired"' ?>>
         <td><input type="checkbox" name="ids[]" value="<?= (int)$c['id'] ?>" class="rowchk"></td>
-        <td><a href="<?= url('contact', ['id' => $c['id']]) ?>"><b><?= e($c['full_name']) ?></b></a><?= $c['position'] ? '<br><span class="hint">' . e($c['position']) . '</span>' : '' ?></td>
+        <td><a href="<?= url('contact', ['id' => $c['id']]) ?>"><b><?= e($c['full_name']) ?></b></a><?= function_exists('kym_brand_pills') ? kym_brand_pills($c) : '' ?><?= $c['position'] ? '<br><span class="hint">' . e($c['position']) . '</span>' : '' ?></td>
         <td><?= e($c['company_name'] ?: ($c['customer_name'] ?: '—')) ?><?= $c['customer_name'] && $c['company_name'] && $c['company_name'] !== $c['customer_name'] ? '<br><span class="hint">' . e($c['customer_name']) . '</span>' : '' ?><?= $c['company_kind'] ? '<br>' . co_kind_pill($c['company_kind']) : '' ?></td>
         <td><?= ct_cat_pill($c['category']) ?></td>
         <td class="ct-vs"><?= $c['vessel_list'] ? e($c['vessel_list']) : '<span class="hint">—</span>' ?></td>

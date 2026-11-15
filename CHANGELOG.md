@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.144.0** (build 2026-11-15). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.145.0** (build 2026-11-15). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.145.0 | GAS-CP-R97-050 | 2026-11-15 | KYMA Marine Power website joined to the portal as a second site: its own enquiry inbox with KYM- references, its own statistics card, its own newsletter list with KYMA branding, sender and unsubscribe, and contacts / organisations marked Golden, KYMA or both; the site key decides the site, the KYMA key opens only contact, subscribe and unsubscribe; career applications are seen by administrators and management only. | `install/migrate_cp_r97_050_kyma_site.sql` |
 | 1.144.0 | GAS-CP-R97-049 | 2026-11-15 | System Budgets: procurement step — the engineer sends the budget to procurement, procurement fills cost price, delivery time, supplier, remark and an alternative part per line on its own page (parts only, no sale prices) and returns it; only then can the budget be finished; the longest delivery time goes to the offer. | `install/migrate_cp_r97_049_sb_procurement.sql` |
 | 1.143.0 | GAS-CP-R97-048 | 2026-11-15 | System Budgets: consistency check — ten checks on every budget (arithmetic, completeness, rates and prices against the masters, profit rules, internal ratios, similar budgets, revision to revision, budget to offer, budget to actuals, AI review of the scope), a company overview, limits set by management; “must fix” findings stop Finish and Convert until solved or accepted by management with a reason. | — |
 | 1.142.1 | GAS-CP-R97-047 | 2026-11-15 | Exports of contacts, organisations, customers and accounts are allowed only to the staff roles CEO, General Manager and Developer (no longer to every administrator); each export and each refused attempt is recorded and listed in the daily health report. | — |

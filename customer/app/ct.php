@@ -56,7 +56,7 @@ function ct_autocat(bool $dry = false): int {
     return $n;
 }
 /** R97-042: is this address on the newsletter suppression list (unsubscribed / bounced)? Such people are never subscribed again by a rule. */
-function ct_optout(string $email): bool { static $o = null; if ($o === null) { $o = []; try { foreach (all('SELECT LOWER(email) e FROM nl_optout') as $r) $o[$r['e']] = 1; } catch (Throwable $e) {} } return isset($o[mb_strtolower(trim($email))]); }
+function ct_optout(string $email): bool { static $o = null; if ($o === null) { $o = []; try { foreach (all('SELECT LOWER(email) e FROM nl_optout' . (function_exists('kym_has') && kym_has() ? " WHERE site = 'golden'" : '')) as $r) $o[$r['e']] = 1;   /* R97-050: the Golden A/S list — leaving the KYMA list does not untick a contact */ } catch (Throwable $e) {} } return isset($o[mb_strtolower(trim($email))]); }
 /** The subscriptions a contact with a valid e-mail gets by default: all four lists — unless the address unsubscribed or bounced. '' when none. */
 function ct_default_subs(?string $email): string { $e = trim((string)$email); return $e !== '' && filter_var($e, FILTER_VALIDATE_EMAIL) && !ct_optout($e) ? implode(',', array_keys(ct_subscriptions())) : ''; }
 /** Tick Newsletter, Campaigns, Events and Greetings on every active contact with a valid e-mail (not on unsubscribed / bounced addresses). $dry → only count. */
@@ -191,6 +191,7 @@ function co_save_from_post(int $id): int {
         if ($isSup) q('INSERT IGNORE INTO supplier_details (company_id) VALUES (?)', [$id]);
     }
     if ($cid) q('UPDATE contacts SET customer_id = ? WHERE company_id = ? AND customer_id IS NULL', [$cid, $id]);
+    if (function_exists('kym_has') && kym_has() && isset($_POST['brands_form'])) kym_brand_set('company', $id, (array)($_POST['brands'] ?? []));   // R97-050
     return $id;
 }
 function co_delete(int $id): void {
@@ -301,6 +302,7 @@ function ct_list(array $f, int $per = 50): array {
     if ($co && ctype_digit((string)($f['company'] ?? ''))) { if (cc_has()) { $w[] = '(ct.company_id = ? OR EXISTS (SELECT 1 FROM contact_companies cc WHERE cc.contact_id = ct.id AND cc.company_id = ?))'; $b[] = (int)$f['company']; $b[] = (int)$f['company']; } else { $w[] = 'ct.company_id = ?'; $b[] = (int)$f['company']; } } elseif ($co && ($f['company'] ?? '') === 'none') $w[] = 'ct.company_id IS NULL';
     if ($co && ($f['channel'] ?? '') !== '' && isset(ct_channels()[$f['channel']])) { $w[] = 'FIND_IN_SET(?, ct.channels)'; $b[] = $f['channel']; }
     if ($co && ($f['sub'] ?? '') !== '' && isset(ct_subscriptions()[$f['sub']])) { $w[] = 'FIND_IN_SET(?, ct.subscriptions)'; $b[] = $f['sub']; }
+    if (($f['brand'] ?? '') !== '' && function_exists('kym_has') && kym_has()) { $w[] = 'FIND_IN_SET(?, ct.brands)'; $b[] = kym_site($f['brand']); }   // R97-050
     if (!empty($f['ids'])) { $ids = array_values(array_filter(array_map('intval', (array)$f['ids']))); if ($ids) { $w[] = 'ct.id IN (' . implode(',', $ids) . ')'; } else $w[] = '0'; }
     if (($f['customer'] ?? '') === 'none') $w[] = 'ct.customer_id IS NULL'; elseif (ctype_digit((string)($f['customer'] ?? ''))) { $w[] = 'ct.customer_id = ?'; $b[] = (int)$f['customer']; }
     if (ctype_digit((string)($f['vessel'] ?? ''))) { $w[] = 'EXISTS (SELECT 1 FROM contact_vessels x WHERE x.contact_id = ct.id AND x.vessel_id = ?)'; $b[] = (int)$f['vessel']; }
@@ -334,7 +336,7 @@ function ct_upcoming(int $days = 30): array {
 /** The list filters as they arrive in a GET or POST. */
 function ct_filters_from_request(array $src): array {
     return ['q' => trim((string)($src['q'] ?? '')), 'customer' => (string)($src['customer'] ?? ''), 'company' => (string)($src['company'] ?? ''), 'vessel' => (string)($src['vessel'] ?? ''), 'category' => (string)($src['category'] ?? ''),
-            'status' => (string)($src['status'] ?? 'active'), 'soon' => (string)($src['soon'] ?? ''), 'channel' => (string)($src['channel'] ?? ''), 'sub' => (string)($src['sub'] ?? ''), 'page' => (int)($src['page'] ?? 1)];
+            'status' => (string)($src['status'] ?? 'active'), 'soon' => (string)($src['soon'] ?? ''), 'channel' => (string)($src['channel'] ?? ''), 'sub' => (string)($src['sub'] ?? ''), 'brand' => in_array($src['brand'] ?? '', ['golden', 'kyma'], true) ? (string)$src['brand'] : '', 'page' => (int)($src['page'] ?? 1)];   // R97-050: brand
 }
 /** Ids of every contact matching the filters (bulk actions). */
 function ct_ids(array $f): array {
@@ -421,6 +423,7 @@ function ct_save_from_post(int $id): int {
     if (cc_has()) { $others = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['other_companies'] ?? []))))); q('DELETE FROM contact_companies WHERE contact_id = ?', [$id]); foreach (array_unique(array_merge($coid ? [$coid] : [], $others)) as $oc) if (scalar('SELECT 1 FROM companies WHERE id = ?', [$oc])) q('INSERT IGNORE INTO contact_companies (contact_id, company_id) VALUES (?, ?)', [$id, $oc]); }   // R85-002: a person may belong to several organisations
     if (co_has()) q('UPDATE contacts SET company_id = ?, channels = ?, subscriptions = ? WHERE id = ?', [$coid, $channels ?: null, $subs ?: null, $id]);
     if (ct_origin_has()) q('UPDATE contacts SET needs_review = 0 WHERE id = ? AND needs_review = 1', [$id]);   // R97-040: saved by a person = reviewed
+    if (function_exists('kym_has') && kym_has() && isset($_POST['brands_form'])) kym_brand_set('contact', $id, (array)($_POST['brands'] ?? []));   // R97-050: the brand marking is set by hand on the form
     // vessels: vessel[] with role[vid] and primary
     if (isset($_POST['vessel'])) {
         q('DELETE FROM contact_vessels WHERE contact_id = ?', [$id]);

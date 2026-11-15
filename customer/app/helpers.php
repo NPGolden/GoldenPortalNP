@@ -143,6 +143,25 @@ function fmt_date(?string $d): string {
  * company's zone (tz_app, default Europe/Athens) with the zone's abbreviation (EET / EEST). Pure dates are never shifted. */
 function tz_app(): string { static $z = null; if ($z === null) { $v = function_exists('cp_setting') && function_exists('lic_has') ? (string)(cp_setting('tz_app', '') ?? '') : ''; if ($v === '') $v = (string)(cfg('app.tz', 'Europe/Athens') ?: 'Europe/Athens'); $z = in_array($v, timezone_identifiers_list(), true) ? $v : 'Europe/Athens'; } return $z; }
 function tz_db(): string { static $z = null; if ($z === null) { $v = function_exists('cp_setting') && function_exists('lic_has') ? (string)(cp_setting('tz_db', '') ?? '') : ''; if ($v === '') $v = (string)(cfg('app.db_tz', 'UTC') ?: 'UTC'); $z = in_array($v, timezone_identifiers_list(), true) ? $v : 'UTC'; } return $z; }
+/* ---- R97-050: the portal serves two websites (specification GAS-KYM-SPC-PORTAL-001). Site code 'golden' (goldenas.com.gr) or 'kyma' (kyma-marinepower.eu). ---- */
+const KYM_SITES = ['golden' => 'Golden A/S', 'kyma' => 'KYMA Marine Power'];
+const KYM_HOME = ['golden' => 'https://www.goldenas.com.gr/', 'kyma' => 'https://kyma-marinepower.eu/'];
+const KYM_PRIVACY = ['golden' => 'https://www.goldenas.com.gr/privacy.html', 'kyma' => 'https://kyma-marinepower.eu/privacy.html'];
+/** The migration of R97-050 has run (site / brands columns exist). Until then the portal behaves as a one-site portal. */
+function kym_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW COLUMNS FROM web_inquiries LIKE 'site'")->fetch() && (bool) db()->query("SHOW COLUMNS FROM contacts LIKE 'brands'")->fetch() && (bool) db()->query("SHOW COLUMNS FROM nl_subs LIKE 'site'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function kym_site($s): string { return (string)$s === 'kyma' ? 'kyma' : 'golden'; }
+/** " AND <col> = ?" for a site (binds it) — nothing before the migration, and nothing found for KYMA then. */
+function kym_w(string $col, string $site, array &$b): string { if (!kym_has()) return kym_site($site) === 'kyma' ? ' AND 0' : ''; $b[] = kym_site($site); return ' AND ' . $col . ' = ?'; }
+function kym_pill(?string $site): string { $s = kym_site($site); return function_exists('pill') ? pill($s === 'kyma' ? 'blue' : 'gold', $s === 'kyma' ? 'KYMA' : 'Golden A/S') : ''; }
+/** Brands of a contact / organisation row as pills (only KYMA is shown beside the default). */
+function kym_brands(array $row): array { return array_values(array_intersect(array_keys(KYM_SITES), explode(',', (string)($row['brands'] ?? 'golden')))) ?: ['golden']; }
+function kym_brand_pills(array $row): string { return in_array('kyma', kym_brands($row), true) ? ' ' . kym_pill('kyma') : ''; }
+/** Add a brand to a contact or an organisation (table name is fixed here, never taken from input). */
+function kym_brand_add(string $what, int $id, string $brand): void { if (!kym_has() || $id <= 0) return; $tb = $what === 'company' ? 'companies' : 'contacts'; $brand = kym_site($brand); q("UPDATE $tb SET brands = CONCAT_WS(',', NULLIF(brands, ''), ?) WHERE id = ? AND NOT FIND_IN_SET(?, brands)", [$brand, $id, $brand]); }
+function kym_brand_set(string $what, int $id, array $brands): void { if (!kym_has() || $id <= 0) return; $tb = $what === 'company' ? 'companies' : 'contacts'; $set = array_values(array_intersect(array_keys(KYM_SITES), array_map('strval', $brands))) ?: ['golden']; q("UPDATE $tb SET brands = ? WHERE id = ?", [implode(',', $set), $id]); }
+/** Administrators and management — the only ones who see career applications from the KYMA site. */
+function kym_careers_can(): bool { return function_exists('is_staff') && is_staff() && (is_cp_admin() || (function_exists('mgmt_can') && mgmt_can())); }
+
 /** R97-044: seconds since a moment stored by the database (NOW()). The database keeps its own zone (tz_db, usually UTC) while PHP runs in the company's
  *  zone, so strtotime() on a stored value is off by the zone difference — every "not more often than every n seconds" rule must use this instead. */
 function tz_age(?string $at): int { if (!$at) return PHP_INT_MAX; try { return time() - (new DateTime($at, new DateTimeZone(tz_db())))->getTimestamp(); } catch (Throwable $e) { return PHP_INT_MAX; } }

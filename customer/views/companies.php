@@ -5,11 +5,12 @@ require __DIR__ . '/_layout.php';
 $u = require_staff();
 if (!co_has()) { layout_head(t('co.title'), 'contacts'); echo '<h1>' . tt('co.title') . '</h1><div class="flash flash--warn">' . tt('co.need_r17b') . '</div>'; layout_foot(); return; }
 $admin = ct_manage();   // R75-005
-$q = trim((string)($_GET['q'] ?? '')); $fk = (string)($_GET['kind'] ?? ''); $editId = (int)($_GET['edit'] ?? 0);
+$q = trim((string)($_GET['q'] ?? '')); $fk = (string)($_GET['kind'] ?? ''); $editId = (int)($_GET['edit'] ?? 0); $kb = function_exists('kym_has') && kym_has(); $fb = $kb && in_array($_GET['brand'] ?? '', ['golden', 'kyma'], true) ? (string)$_GET['brand'] : '';   // R97-050: brand filter
 $edit = $editId ? co_load($editId) : null;
 $w = []; $b = [];
 if ($q !== '') { $l = '%' . $q . '%'; $w[] = '(co.name LIKE ? OR co.country LIKE ? OR co.city LIKE ? OR c.name LIKE ?)'; array_push($b, $l, $l, $l, $l); }
 if ($fk === 'is_supplier' && function_exists('sup_flag_has') && sup_flag_has()) $w[] = 'co.is_supplier = 1'; elseif ($fk === 'customer' && co_roles_has()) $w[] = "FIND_IN_SET('customer', co.roles)"; elseif ($fk !== '' && isset(co_kinds()[$fk])) { if (co_roles_has()) { $w[] = '(co.kind = ? OR FIND_IN_SET(?, co.roles))'; $b[] = $fk; $b[] = $fk; } else { $w[] = 'co.kind = ?'; $b[] = $fk; } }   // R84-003 / R85-002 roles
+if ($fb !== '') { $w[] = 'FIND_IN_SET(?, co.brands)'; $b[] = $fb; }
 $rows = all('SELECT co.*, c.name AS customer_name, (SELECT COUNT(*) FROM contacts ct WHERE ct.company_id = co.id) AS n_contacts FROM companies co LEFT JOIN customers c ON c.id = co.customer_id ' . ($w ? 'WHERE ' . implode(' AND ', $w) : '') . ' ORDER BY co.is_active DESC, co.name', $b);
 $customers = all('SELECT id, name FROM customers WHERE is_active = 1 ORDER BY name');
 $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : '';
@@ -19,7 +20,7 @@ layout_head(t('co.title'), 'contacts');
 <p class="eyebrow"><a href="<?= url('contacts') ?>"><?= tt('ct.title') ?></a></p>
 <div class="page-head">
   <div><h1><?= tt('co.title') ?></h1><p class="lede"><?= tt('co.lede') ?></p></div>
-  <?php if ($admin): ?><div class="btn-row"><a class="btn btn--ghost" href="<?= url('settings', ['tab' => 'import']) ?>#companies">⤒ <?= tt('im.title') ?></a><?php if (export_people_can()): ?><a class="btn btn--ghost" href="<?= url('companies_export', array_filter(['q' => $q, 'kind' => $fk])) ?>">⤓ <?= tt('ct.export') ?></a><?php endif; ?><a class="btn btn--gold" href="<?= url('companies', ['edit' => 0]) ?>#form">+ <?= tt('co.new') ?></a></div><?php endif; ?>
+  <?php if ($admin): ?><div class="btn-row"><a class="btn btn--ghost" href="<?= url('settings', ['tab' => 'import']) ?>#companies">⤒ <?= tt('im.title') ?></a><?php if (export_people_can()): ?><a class="btn btn--ghost" href="<?= url('companies_export', array_filter(['q' => $q, 'kind' => $fk, 'brand' => $fb])) ?>">⤓ <?= tt('ct.export') ?></a><?php endif; ?><a class="btn btn--gold" href="<?= url('companies', ['edit' => 0]) ?>#form">+ <?= tt('co.new') ?></a></div><?php endif; ?>
 </div>
 
 <div class="cols ct-cols">
@@ -29,6 +30,7 @@ layout_head(t('co.title'), 'contacts');
       <input type="hidden" name="p" value="companies">
       <div class="field"><label for="q"><?= tt('pr.search') ?></label><input id="q" name="q" value="<?= e($q) ?>"></div>
       <div class="field"><label for="kind"><?= tt('co.kind') ?></label><select id="kind" name="kind"><option value=""><?= tt('flt.any') ?></option><?php foreach (co_kinds() as $k => $lab): ?><option value="<?= $k ?>"<?= $sel($k, $fk) ?>><?= e($lab) ?></option><?php endforeach; ?><?php if (co_roles_has()): ?><option value="customer"<?= $fk === 'customer' ? ' selected' : '' ?>>★ <?= tt('co.role_customer') ?></option><?php endif; ?><?php if (function_exists('sup_flag_has') && sup_flag_has()): ?><option value="is_supplier"<?= $fk === 'is_supplier' ? ' selected' : '' ?>>★ <?= tt('co.suppliers_all') ?></option><?php endif; ?></select></div>
+      <?php if ($kb): ?><div class="field"><label for="brand"><?= tt('kym.brand') ?></label><select id="brand" name="brand"><option value=""><?= tt('flt.any') ?></option><?php foreach (KYM_SITES as $bk => $bl): ?><option value="<?= $bk ?>"<?= $sel($bk, $fb) ?>><?= e($bl) ?></option><?php endforeach; ?></select></div><?php endif; ?>
       <div class="fltbar-actions"><button class="btn" type="submit"><?= tt('btn.apply') ?></button><a class="btn btn--ghost" href="<?= url('companies', ['reset' => 1, 'reset' => 1]) ?>"><?= tt('btn.clear') ?></a></div>
     </form>
   </div>
@@ -40,7 +42,7 @@ layout_head(t('co.title'), 'contacts');
       <tbody><?php [$pageRows, $pager] = page_list($rows, 'companies', ['q' => $q, 'kind' => $fk]); foreach ($pageRows as $r): ?>
         <tr<?= $r['is_active'] ? '' : ' class="is-retired"' ?>>
           <td><a href="<?= url('contacts', ['company' => $r['id'], 'status' => 'all']) ?>"><b><?= e($r['name']) ?></b></a><?= $r['website'] ? '<br><a class="hint" href="' . e(preg_match('#^https?://#', $r['website']) ? $r['website'] : 'https://' . $r['website']) . '" target="_blank" rel="noopener">' . e($r['website']) . '</a>' : '' ?></td>
-          <td><?= co_role_pills($r) ?></td>
+          <td><?= co_role_pills($r) ?><?= $kb ? kym_brand_pills($r) : '' ?></td>
           <td><?= $r['customer_name'] ? e($r['customer_name']) : '<span class="hint">—</span>' ?></td>
           <td><?= e(implode(', ', array_filter([$r['city'], $r['country']]))) ?: '<span class="hint">—</span>' ?></td>
           <td class="ct-reach"><?= $r['email'] ? '<a href="mailto:' . e($r['email']) . '">' . e($r['email']) . '</a><br>' : '' ?><?= e($r['phone'] ?? '') ?></td>
@@ -62,6 +64,7 @@ layout_head(t('co.title'), 'contacts');
     <form method="post" action="<?= url('companies') ?>" data-lock>
       <?= csrf_field() ?><input type="hidden" name="action" value="co_save"><input type="hidden" name="id" value="<?= (int)($edit['id'] ?? 0) ?>">
       <div class="field"><label for="name"><?= tt('co.one') ?> *</label><input id="name" name="name" required maxlength="160" value="<?= $v('name') ?>"></div>
+      <?php if ($kb): $curBr = $edit ? kym_brands($edit) : ['golden']; ?><div class="field"><label><?= tt('kym.brands') ?></label><input type="hidden" name="brands_form" value="1"><div style="display:flex;flex-wrap:wrap;gap:4px 16px;"><?php foreach (KYM_SITES as $bk => $bl): ?><label class="chk" style="margin:0;"><input type="checkbox" name="brands[]" value="<?= $bk ?>"<?= in_array($bk, $curBr, true) ? ' checked' : '' ?>> <?= e($bl) ?></label><?php endforeach; ?></div></div><?php endif; ?>
       <div class="grid grid-2">
         <?php if (co_roles_has()): $cur = $edit ? co_roles($edit) : (isset($_GET['role']) ? [(string)$_GET['role']] : []); ?><div class="field field--full"><label><?= tt('co.roles') ?></label><div style="display:flex; flex-wrap:wrap; gap:4px 14px;"><?php foreach (co_role_list() as $k => $lab): ?><label class="chk" style="margin:0;"><input type="checkbox" name="roles[]" value="<?= $k ?>"<?= in_array($k, $cur, true) ? ' checked' : '' ?>> <?= $k === 'customer' ? '★ ' : '' ?><?= e($lab) ?></label><?php endforeach; ?></div><p class="hint" style="margin:4px 0 0;"><?= tt('co.roles_hint') ?></p></div>
         <?php else: ?>        <div class="field"><label for="kind_f"><?= tt('co.kind') ?></label><select id="kind_f" name="kind"><?php foreach (co_kinds() as $k => $lab): ?><option value="<?= $k ?>"<?= $sel($k, $edit['kind'] ?? 'other') ?>><?= e($lab) ?></option><?php endforeach; ?></select></div><?php endif; ?>

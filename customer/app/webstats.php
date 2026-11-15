@@ -16,46 +16,61 @@
 declare(strict_types=1);
 
 function ws_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'web_stats_day'"); } catch (Throwable $e) { $h = false; } } return $h; }
-function ws_url(): string { return (string) (cp_setting('ws_feed_url', '') ?: 'https://www.goldenas.com.gr/api/stats-feed.php'); }
-function ws_key(): string { return (string) cp_setting('ws_feed_key', ''); }
-function ws_configured(): bool { return ws_has() && ws_key() !== ''; }
+/* R97-050: two websites. Every reader below works on the "current" site — ws_use('kyma') switches it; settings of the KYMA site carry the suffix _kyma. */
+function ws_site(): string { return (string)($GLOBALS['ws_site'] ?? 'golden'); }
+function ws_use(string $site): string { $old = ws_site(); $GLOBALS['ws_site'] = kym_site($site) === 'kyma' && function_exists('kym_has') && kym_has() ? 'kyma' : 'golden'; return $old; }
+function ws_sk(string $name, ?string $site = null): string { return $name . (kym_site($site ?? ws_site()) === 'kyma' ? '_kyma' : ''); }
+/** " AND site = ?" for the current site, with its value appended to $b (nothing before the migration). */
+function ws_w(array &$b, string $col = 'site'): string { return kym_w($col, ws_site(), $b); }
+function ws_url(?string $site = null): string { $k = kym_site($site ?? ws_site()); return (string) (cp_setting(ws_sk('ws_feed_url', $k), '') ?: ($k === 'kyma' ? 'https://kyma-marinepower.eu/api/stats-feed.php' : 'https://www.goldenas.com.gr/api/stats-feed.php')); }
+function ws_key(?string $site = null): string { $k = kym_site($site ?? ws_site()); if ($k === 'kyma' && !(function_exists('kym_has') && kym_has())) return ''; return (string) cp_setting(ws_sk('ws_feed_key', $k), ''); }
+function ws_configured(?string $site = null): bool { return ws_has() && ws_key($site) !== ''; }
+function ws_sites(): array { return function_exists('kym_has') && kym_has() ? ['golden', 'kyma'] : ['golden']; }
 
 /** Fetch rows for a date range from the website and store them (REPLACE → idempotent). Returns [ok, message]. */
-function ws_pull(string $from, string $to): array {
-    if (!ws_configured()) return [false, 'not configured'];
-    $url = ws_url() . (str_contains(ws_url(), '?') ? '&' : '?') . http_build_query(['mode' => 'rows', 'from' => $from, 'to' => $to]);
+function ws_pull(string $from, string $to, ?string $site = null): array {
+    $site = kym_site($site ?? ws_site()); $ks = function_exists('kym_has') && kym_has(); $E = ws_sk('ws_last_error', $site);
+    if (!ws_configured($site)) return [false, 'not configured'];
+    $url = ws_url($site) . (str_contains(ws_url($site), '?') ? '&' : '?') . http_build_query(['mode' => 'rows', 'from' => $from, 'to' => $to]);
     $ch = curl_init($url);
     curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8, CURLOPT_CONNECTTIMEOUT => 4, CURLOPT_FOLLOWLOCATION => false,
-        CURLOPT_HTTPHEADER => ['X-Stats-Key: ' . ws_key(), 'Accept: application/json', 'User-Agent: GoldenPortal/' . (defined('CP_VERSION') ? CP_VERSION : '1')],
+        CURLOPT_HTTPHEADER => ['X-Stats-Key: ' . ws_key($site), 'Accept: application/json', 'User-Agent: GoldenPortal/' . (defined('CP_VERSION') ? CP_VERSION : '1')],
         CURLOPT_MAXFILESIZE => 6 * 1024 * 1024]);
-    $body = curl_exec($ch); if (function_exists('perf_out')) perf_out($ch, 'Website statistics'); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
-    if ($body === false || $code !== 200) { cp_setting_set('ws_last_error', gmdate('c') . ' HTTP ' . $code . ' ' . $err); return [false, 'HTTP ' . $code . ' ' . $err]; }
+    $body = curl_exec($ch); if (function_exists('perf_out')) perf_out($ch, $site === 'kyma' ? 'KYMA website statistics' : 'Website statistics'); $code = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
+    if ($body === false || $code !== 200) { cp_setting_set($E, gmdate('c') . ' HTTP ' . $code . ' ' . $err); return [false, 'HTTP ' . $code . ' ' . $err]; }
     if (strlen((string) $body) > 6 * 1024 * 1024) return [false, 'response too large'];
     $j = json_decode((string) $body, true);
-    if (!is_array($j) || !isset($j['day']) || !is_array($j['day'])) { cp_setting_set('ws_last_error', gmdate('c') . ' bad payload'); return [false, 'bad payload']; }
+    if (!is_array($j) || !isset($j['day']) || !is_array($j['day'])) { cp_setting_set($E, gmdate('c') . ' bad payload'); return [false, 'bad payload']; }
     $db = db(); $db->beginTransaction();
     try {
-        $sd = $db->prepare('REPLACE INTO web_stats_day (d, dim, k, n, u, x) VALUES (?,?,?,?,?,?)');
+        $sd = $db->prepare($ks ? 'REPLACE INTO web_stats_day (d, dim, k, n, u, x, site) VALUES (?,?,?,?,?,?,' . $db->quote($site) . ')' : 'REPLACE INTO web_stats_day (d, dim, k, n, u, x) VALUES (?,?,?,?,?,?)');
         foreach ($j['day'] as $r) { if (!is_array($r) || count($r) < 6) continue; [$d, $dim, $k, $n, $u, $x] = $r;
             if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $d) || !preg_match('/^[a-z]{1,12}$/', (string) $dim)) continue;
             $sd->execute([$d, $dim, mb_substr((string) $k, 0, 80), max(0, (int) $n), max(0, (int) $u), max(0, (int) $x)]); }
-        $sh = $db->prepare('REPLACE INTO web_stats_hour (d, h, n, u) VALUES (?,?,?,?)');
+        $sh = $db->prepare($ks ? 'REPLACE INTO web_stats_hour (d, h, n, u, site) VALUES (?,?,?,?,' . $db->quote($site) . ')' : 'REPLACE INTO web_stats_hour (d, h, n, u) VALUES (?,?,?,?)');
         foreach ($j['hour'] ?? [] as $r) { if (!is_array($r) || count($r) < 4) continue; [$d, $h, $n, $u] = $r; if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) $d)) continue; $sh->execute([$d, max(0, min(23, (int) $h)), max(0, (int) $n), max(0, (int) $u)]); }
         $db->commit();
-    } catch (Throwable $e) { $db->rollBack(); cp_setting_set('ws_last_error', gmdate('c') . ' ' . $e->getMessage()); return [false, $e->getMessage()]; }
-    cp_setting_set('ws_last_pull', gmdate('c')); cp_setting_set('ws_last_error', '');
-    if (isset($j['live']) && is_array($j['live'])) cp_setting_set('ws_live', json_encode(['at' => gmdate('c')] + $j['live']));
+    } catch (Throwable $e) { $db->rollBack(); cp_setting_set($E, gmdate('c') . ' ' . $e->getMessage()); return [false, $e->getMessage()]; }
+    cp_setting_set(ws_sk('ws_last_pull', $site), gmdate('c')); cp_setting_set($E, '');
+    if (isset($j['live']) && is_array($j['live'])) cp_setting_set(ws_sk('ws_live', $site), json_encode(['at' => gmdate('c')] + $j['live']));
     return [true, count($j['day']) . ' rows'];
 }
 
 /** Called from the notification sweep: every 15 minutes the last 3 days; once a day the last 45 days; on Mondays 400 days (fills history / corrections). */
 function ws_sweep(): void {
-    if (!ws_configured()) return;
-    $last = (string) cp_setting('ws_last_pull', ''); $now = time();
-    if ($last !== '' && strtotime($last) > $now - 15 * 60) return;
-    $today = gmdate('Y-m-d'); $daily = (string) cp_setting('ws_daily_pull', '');
-    if ($daily !== $today) { cp_setting_set('ws_daily_pull', $today); ws_pull(gmdate('Y-m-d', $now - (gmdate('N') === '1' ? 400 : 45) * 86400), $today); ws_digest_maybe(); return; }
-    ws_pull(gmdate('Y-m-d', $now - 3 * 86400), $today);
+    $digest = false;
+    foreach (ws_sites() as $site) {   // R97-050: each configured site in turn — a feed that is down does not hold the other one back
+        try {
+            if (!ws_configured($site)) continue;
+            $last = (string) cp_setting(ws_sk('ws_last_pull', $site), ''); $try = (string) cp_setting(ws_sk('ws_last_try', $site), ''); $now = time();
+            if (($last !== '' && strtotime($last) > $now - 15 * 60) || ($try !== '' && strtotime($try) > $now - 15 * 60)) continue;   // a failing feed is retried every 15 minutes too, not on every sweep
+            cp_setting_set(ws_sk('ws_last_try', $site), gmdate('c'));
+            $today = gmdate('Y-m-d'); $daily = (string) cp_setting(ws_sk('ws_daily_pull', $site), '');
+            if ($daily !== $today) { cp_setting_set(ws_sk('ws_daily_pull', $site), $today); ws_pull(gmdate('Y-m-d', $now - (gmdate('N') === '1' ? 400 : 45) * 86400), $today, $site); $digest = true; continue; }
+            ws_pull(gmdate('Y-m-d', $now - 3 * 86400), $today, $site);
+        } catch (Throwable $e) { error_log('[ws] ' . $site . ': ' . $e->getMessage()); }
+    }
+    if ($digest) { try { ws_digest_maybe(); } catch (Throwable $e) { error_log('[ws] digest: ' . $e->getMessage()); } }
 }
 
 /** Monday digest to administrators: last week vs the week before. */
@@ -67,39 +82,43 @@ function ws_digest_maybe(): void {
     $pct = fn($a, $b) => $b > 0 ? sprintf('%+d%%', round(($a - $b) / $b * 100)) : '';
     $top = ws_top('page', $from, $to, 1)[0]['k'] ?? '—';
     $body = t('ws.digest_body', ['visitors' => $p['visitors'], 'dv' => $pct($p['visitors'], $q['visitors']), 'views' => $p['views'], 'dp' => $pct($p['views'], $q['views']), 'top' => $top, 'forms' => $p['forms'], 'countries' => $p['countries']]);
+    if (ws_configured('kyma')) { $old = ws_use('kyma'); try { $kp = ws_summary($from, $to); $kq = ws_summary(gmdate('Y-m-d', strtotime($from . ' -7 days')), gmdate('Y-m-d', strtotime($from . ' -1 day'))); $ktop = ws_top('page', $from, $to, 1)[0]['k'] ?? '—';
+        $body .= ' — KYMA Marine Power: ' . t('ws.digest_body', ['visitors' => $kp['visitors'], 'dv' => $pct($kp['visitors'], $kq['visitors']), 'views' => $kp['views'], 'dp' => $pct($kp['views'], $kq['views']), 'top' => $ktop, 'forms' => $kp['forms'], 'countries' => $kp['countries']]); } finally { ws_use($old); } }   // R97-050
     try { $ids = array_map(fn($r) => (int) $r['id'], all("SELECT id FROM customer_users WHERE role = 'admin' AND is_active = 1")); if (function_exists('nf_push')) nf_push($ids, 'tk', 'ws:' . gmdate('o-W'), t('ws.digest_title', ['from' => $from, 'to' => $to]), $body, url('web_stats', ['p' => 'custom', 'from' => $from, 'to' => $to]), null, 'Website'); } catch (Throwable $e) {}
 }
 
 /* ---------- queries for the page ---------- */
 function ws_summary(string $from, string $to): array {
-    $t = one('SELECT COALESCE(SUM(n),0) views, COALESCE(SUM(u),0) visitors FROM web_stats_day WHERE dim="total" AND d BETWEEN ? AND ?', [$from, $to]) ?: ['views' => 0, 'visitors' => 0];
-    $e = one('SELECT COALESCE(SUM(x),0) sx, COALESCE(SUM(n),0) sn FROM web_stats_day WHERE dim="time" AND d BETWEEN ? AND ?', [$from, $to]);
-    $s = one('SELECT COALESCE(SUM(x),0) sx, COALESCE(SUM(n),0) sn FROM web_stats_day WHERE dim="engage" AND d BETWEEN ? AND ?', [$from, $to]);
-    $forms = (int) scalar('SELECT COALESCE(SUM(n),0) FROM web_stats_day WHERE dim="form" AND d BETWEEN ? AND ?', [$from, $to]);
-    $countries = (int) scalar('SELECT COUNT(DISTINCT k) FROM web_stats_day WHERE dim="country" AND d BETWEEN ? AND ?', [$from, $to]);
-    $searches = (int) scalar('SELECT COALESCE(SUM(n),0) FROM web_stats_day WHERE dim="search" AND d BETWEEN ? AND ?', [$from, $to]);
-    $videos = (int) scalar('SELECT COALESCE(SUM(n),0) FROM web_stats_day WHERE dim="video" AND d BETWEEN ? AND ?', [$from, $to]);
-    $portal = (int) scalar('SELECT COALESCE(SUM(n),0) FROM web_stats_day WHERE dim="outbound" AND k LIKE "goldensas.com%" AND d BETWEEN ? AND ?', [$from, $to]);
+    $W = function (string $extra = '') use ($from, $to): array { $b = [$from, $to]; return [' AND d BETWEEN ? AND ?' . $extra . ws_w($b), $b]; };   // [sql tail, binds] — the current site is always part of it
+    [$w, $b] = $W(); $t = one('SELECT COALESCE(SUM(n),0) views, COALESCE(SUM(u),0) visitors FROM web_stats_day WHERE dim="total"' . $w, $b) ?: ['views' => 0, 'visitors' => 0];
+    $e = one('SELECT COALESCE(SUM(x),0) sx, COALESCE(SUM(n),0) sn FROM web_stats_day WHERE dim="time"' . $w, $b);
+    $s = one('SELECT COALESCE(SUM(x),0) sx, COALESCE(SUM(n),0) sn FROM web_stats_day WHERE dim="engage"' . $w, $b);
+    $forms = (int) scalar('SELECT COALESCE(SUM(n),0) FROM web_stats_day WHERE dim="form"' . $w, $b);
+    $countries = (int) scalar('SELECT COUNT(DISTINCT k) FROM web_stats_day WHERE dim="country"' . $w, $b);
+    $searches = (int) scalar('SELECT COALESCE(SUM(n),0) FROM web_stats_day WHERE dim="search"' . $w, $b);
+    $videos = (int) scalar('SELECT COALESCE(SUM(n),0) FROM web_stats_day WHERE dim="video"' . $w, $b);
+    $portal = (int) scalar('SELECT COALESCE(SUM(n),0) FROM web_stats_day WHERE dim="outbound" AND k LIKE "goldensas.com%"' . $w, $b);
     $v = (int) $t['views']; $u = (int) $t['visitors'];
     return ['views' => $v, 'visitors' => $u, 'pages_per_visit' => $u ? round($v / $u, 1) : 0, 'avg_seconds' => (int) $e['sn'] ? (int) round($e['sx'] / $e['sn']) : 0, 'avg_scroll' => (int) $s['sn'] ? (int) round($s['sx'] / $s['sn']) : 0,
             'forms' => $forms, 'countries' => $countries, 'searches' => $searches, 'videos' => $videos, 'portal_clicks' => $portal,
             'days' => max(1, (int) ((strtotime($to) - strtotime($from)) / 86400) + 1)];
 }
-function ws_series(string $from, string $to): array { return all('SELECT d, n views, u visitors FROM web_stats_day WHERE dim="total" AND d BETWEEN ? AND ? ORDER BY d', [$from, $to]); }
-function ws_monthly(string $from, string $to): array { return all('SELECT DATE_FORMAT(d, "%Y-%m") m, SUM(n) views, SUM(u) visitors FROM web_stats_day WHERE dim="total" AND d BETWEEN ? AND ? GROUP BY m ORDER BY m', [$from, $to]); }
-function ws_top(string $dim, string $from, string $to, int $limit = 12): array { return all('SELECT k, SUM(n) n, SUM(u) u, SUM(x) x FROM web_stats_day WHERE dim = ? AND d BETWEEN ? AND ? GROUP BY k ORDER BY n DESC, k LIMIT ' . (int) $limit, [$dim, $from, $to]); }
-function ws_hours(string $from, string $to): array { $r = array_fill(0, 24, ['n' => 0, 'u' => 0]); foreach (all('SELECT h, SUM(n) n, SUM(u) u FROM web_stats_hour WHERE d BETWEEN ? AND ? GROUP BY h', [$from, $to]) as $x) $r[(int) $x['h']] = ['n' => (int) $x['n'], 'u' => (int) $x['u']]; return $r; }
-function ws_weekdays(string $from, string $to): array { $r = array_fill(0, 7, 0); foreach (all('SELECT WEEKDAY(d) wd, SUM(n) n FROM web_stats_day WHERE dim="total" AND d BETWEEN ? AND ? GROUP BY wd', [$from, $to]) as $x) $r[(int) $x['wd']] = (int) $x['n']; return $r; }
+function ws_series(string $from, string $to): array { $b = [$from, $to]; return all('SELECT d, n views, u visitors FROM web_stats_day WHERE dim="total" AND d BETWEEN ? AND ?' . ws_w($b) . ' ORDER BY d', $b); }
+function ws_monthly(string $from, string $to): array { $b = [$from, $to]; return all('SELECT DATE_FORMAT(d, "%Y-%m") m, SUM(n) views, SUM(u) visitors FROM web_stats_day WHERE dim="total" AND d BETWEEN ? AND ?' . ws_w($b) . ' GROUP BY m ORDER BY m', $b); }
+function ws_top(string $dim, string $from, string $to, int $limit = 12): array { $b = [$dim, $from, $to]; return all('SELECT k, SUM(n) n, SUM(u) u, SUM(x) x FROM web_stats_day WHERE dim = ? AND d BETWEEN ? AND ?' . ws_w($b) . ' GROUP BY k ORDER BY n DESC, k LIMIT ' . (int) $limit, $b); }
+function ws_hours(string $from, string $to): array { $r = array_fill(0, 24, ['n' => 0, 'u' => 0]); $b = [$from, $to]; foreach (all('SELECT h, SUM(n) n, SUM(u) u FROM web_stats_hour WHERE d BETWEEN ? AND ?' . ws_w($b) . ' GROUP BY h', $b) as $x) $r[(int) $x['h']] = ['n' => (int) $x['n'], 'u' => (int) $x['u']]; return $r; }
+function ws_weekdays(string $from, string $to): array { $r = array_fill(0, 7, 0); $b = [$from, $to]; foreach (all('SELECT WEEKDAY(d) wd, SUM(n) n FROM web_stats_day WHERE dim="total" AND d BETWEEN ? AND ?' . ws_w($b) . ' GROUP BY wd', $b) as $x) $r[(int) $x['wd']] = (int) $x['n']; return $r; }
 function ws_engagement(string $from, string $to): array {
+    $b1 = [$from, $to]; $w1 = ws_w($b1); $b2 = [$from, $to]; $w2 = ws_w($b2); $b3 = [$from, $to]; $w3 = ws_w($b3, 'p.site');
     return all('SELECT p.k page, SUM(p.n) views, SUM(p.u) uniq, ROUND(COALESCE(e.sx / NULLIF(e.sn,0),0)) scroll, ROUND(COALESCE(t.sx / NULLIF(t.sn,0),0)) secs
                 FROM web_stats_day p
-                LEFT JOIN (SELECT k, SUM(x) sx, SUM(n) sn FROM web_stats_day WHERE dim="engage" AND d BETWEEN ? AND ? GROUP BY k) e ON e.k = p.k
-                LEFT JOIN (SELECT k, SUM(x) sx, SUM(n) sn FROM web_stats_day WHERE dim="time" AND d BETWEEN ? AND ? GROUP BY k) t ON t.k = p.k
-                WHERE p.dim="page" AND p.d BETWEEN ? AND ? GROUP BY p.k ORDER BY views DESC LIMIT 30', [$from, $to, $from, $to, $from, $to]);
+                LEFT JOIN (SELECT k, SUM(x) sx, SUM(n) sn FROM web_stats_day WHERE dim="engage" AND d BETWEEN ? AND ?' . $w1 . ' GROUP BY k) e ON e.k = p.k
+                LEFT JOIN (SELECT k, SUM(x) sx, SUM(n) sn FROM web_stats_day WHERE dim="time" AND d BETWEEN ? AND ?' . $w2 . ' GROUP BY k) t ON t.k = p.k
+                WHERE p.dim="page" AND p.d BETWEEN ? AND ?' . $w3 . ' GROUP BY p.k ORDER BY views DESC LIMIT 30', array_merge($b1, $b2, $b3));
 }
 /** Conversions from the portal's own inbox (the forms actually received), per kind, for the period. */
 function ws_inquiries(string $from, string $to): array {
-    try { return all('SELECT kind, COUNT(*) n FROM web_inquiries WHERE DATE(created_at) BETWEEN ? AND ? GROUP BY kind', [$from, $to]); } catch (Throwable $e) { return []; }
+    try { $b = [$from, $to]; return all('SELECT kind, COUNT(*) n FROM web_inquiries WHERE DATE(created_at) BETWEEN ? AND ?' . ws_w($b) . ' GROUP BY kind', $b); } catch (Throwable $e) { return []; }
 }
 /** Period presets → [from, to, previous_from, previous_to, label]. */
 function ws_period(string $p, string $from = '', string $to = ''): array {
@@ -122,24 +141,26 @@ function ws_period(string $p, string $from = '', string $to = ''): array {
 /** Human label for a page key. */
 function ws_page_label(string $k): string {
     static $m = ['index' => 'Home', 'about' => 'About Us', 'services' => 'Solutions', 'capabilities' => 'Capabilities', 'project-management' => 'Project Mgmt', 'projects' => 'Projects', 'knowledge' => 'Knowledge', 'service' => 'GTT Service', 'careers' => 'Careers', 'contact' => 'Contact', 'support' => 'Support request', 'portal-access' => 'Portal access', 'privacy' => 'Privacy', 'gdpr' => 'GDPR', 'cookies' => 'Cookies', 'iacms' => 'IACMS', 'eswitchboard' => 'eSWITCHBOARD', 'integrated-bridges' => 'Integrated Bridges', 'shipyards' => 'For Shipyards', 'owners' => 'Owners & Captains', 'cyber-resilience' => 'Cyber resilience', 'other' => 'Other'];
-    return $m[$k] ?? $k;
+    static $km = ['index' => 'Home', 'about' => 'About', 'careers' => 'Careers', 'partners' => 'Partners', 'contact' => 'Contact', 'newsletter' => 'Newsletter', 'privacy' => 'Privacy', 'cookies' => 'Cookies', 'other' => 'Other'];   // R97-050: pages of kyma-marinepower.eu
+    return ws_site() === 'kyma' ? ($km[$k] ?? $k) : ($m[$k] ?? $k);
 }
-function ws_form_label(string $k): string { static $m = ['api/contact.php' => 'web.kind_contact', 'api/ticket.php' => 'web.kind_ticket', 'api/portal-access.php' => 'web.kind_access', 'careers' => 'ws.form_careers']; return $m[$k] ?? $k; }
+function ws_form_label(string $k): string { static $m = ['api/contact.php' => 'web.kind_contact', 'api/ticket.php' => 'web.kind_ticket', 'api/portal-access.php' => 'web.kind_access', 'careers' => 'ws.form_careers',
+    'contact' => 'web.kind_contact', 'partner' => 'ws.form_partner', 'career' => 'ws.form_careers', 'subscribe' => 'ws.form_subscribe', 'unsubscribe' => 'ws.form_unsubscribe', 'api/partner.php' => 'ws.form_partner', 'api/career.php' => 'ws.form_careers', 'api/subscribe.php' => 'ws.form_subscribe', 'api/unsubscribe.php' => 'ws.form_unsubscribe']; return $m[$k] ?? $k; }   // R97-050: KYMA forms
 function ws_country_name(string $cc): string { static $n = ['GR' => 'Greece', 'IT' => 'Italy', 'NL' => 'Netherlands', 'DE' => 'Germany', 'GB' => 'United Kingdom', 'US' => 'United States', 'FR' => 'France', 'ES' => 'Spain', 'MC' => 'Monaco', 'TR' => 'Türkiye', 'AE' => 'UAE', 'ME' => 'Montenegro', 'HR' => 'Croatia', 'CH' => 'Switzerland', 'BE' => 'Belgium', 'DK' => 'Denmark', 'NO' => 'Norway', 'SE' => 'Sweden', 'FI' => 'Finland', 'PL' => 'Poland', 'AT' => 'Austria', 'PT' => 'Portugal', 'MT' => 'Malta', 'CY' => 'Cyprus', 'SA' => 'Saudi Arabia', 'QA' => 'Qatar', 'SG' => 'Singapore', 'AU' => 'Australia', 'CA' => 'Canada', 'CN' => 'China', 'JP' => 'Japan', 'IN' => 'India', 'BR' => 'Brazil', 'RU' => 'Russia', 'UA' => 'Ukraine', 'BG' => 'Bulgaria', 'RO' => 'Romania', 'TW' => 'Taiwan', 'KR' => 'South Korea', 'IE' => 'Ireland', 'NZ' => 'New Zealand', 'ZA' => 'South Africa', 'EG' => 'Egypt', 'IL' => 'Israel', 'LB' => 'Lebanon']; return $n[$cc] ?? $cc; }
 
 /* ---------- actions ---------- */
 function ws_handle_action(string $action): bool {
-    if ($action === 'ws_pull_now') { require_staff(); [$ok, $m] = ws_pull(gmdate('Y-m-d', strtotime('-45 days')), gmdate('Y-m-d')); flash($ok ? 'good' : 'bad', $ok ? t('ws.pulled', ['n' => $m]) : t('ws.pull_failed', ['e' => $m])); redirect('web_stats', ['_r' => uniqid()]); }
-    if ($action === 'ws_settings_save') { require_cp_admin();
+    if ($action === 'ws_pull_now') { require_staff(); $st = kym_site($_POST['site'] ?? 'golden'); [$ok, $m] = ws_pull(gmdate('Y-m-d', strtotime('-45 days')), gmdate('Y-m-d'), $st); flash($ok ? 'good' : 'bad', $ok ? t('ws.pulled', ['n' => $m]) : t('ws.pull_failed', ['e' => $m])); redirect('web_stats', ['site' => $st, '_r' => uniqid()]); }
+    if ($action === 'ws_settings_save') { require_cp_admin(); $st = kym_site($_POST['site'] ?? 'golden'); if ($st === 'kyma' && !kym_has()) throw new RuntimeException(t('err.noaccess'));
         $url = trim((string) ($_POST['ws_feed_url'] ?? '')); if ($url !== '' && !preg_match('#^https://[a-z0-9.-]+/[^\s]*$#i', $url)) $url = '';
-        cp_setting_set('ws_feed_url', $url);
-        $k = trim((string) ($_POST['ws_feed_key'] ?? '')); if ($k !== '' && preg_match('/^[A-Za-z0-9_\-]{16,128}$/', $k)) cp_setting_set('ws_feed_key', $k);
-        if (!empty($_POST['ws_clear_key'])) cp_setting_set('ws_feed_key', '');
-        flash('good', t('sys.saved')); redirect('settings', ['tab' => 'website', '_r' => uniqid()]); }
-    if ($action === 'ws_export') { require_staff(); [$f, $t] = ws_period((string) ($_POST['p'] ?? '30d'), (string) ($_POST['from'] ?? ''), (string) ($_POST['to'] ?? ''));
-        header('Content-Type: text/csv; charset=utf-8'); header('Content-Disposition: attachment; filename="goldenas-website-stats_' . $f . '_' . $t . '.csv"');
+        cp_setting_set(ws_sk('ws_feed_url', $st), $url);
+        $k = trim((string) ($_POST['ws_feed_key'] ?? '')); if ($k !== '' && preg_match('/^[A-Za-z0-9_\-]{16,128}$/', $k)) cp_setting_set(ws_sk('ws_feed_key', $st), $k);
+        if (!empty($_POST['ws_clear_key'])) cp_setting_set(ws_sk('ws_feed_key', $st), '');
+        flash('good', t('sys.saved')); redirect($st === 'kyma' ? 'admin_website' : 'settings', $st === 'kyma' ? ['_r' => uniqid()] : ['tab' => 'website', '_r' => uniqid()], $st === 'kyma' ? '#kyma' : ''); }
+    if ($action === 'ws_export') { require_staff(); ws_use((string)($_POST['site'] ?? 'golden')); [$f, $t] = ws_period((string) ($_POST['p'] ?? '30d'), (string) ($_POST['from'] ?? ''), (string) ($_POST['to'] ?? ''));
+        header('Content-Type: text/csv; charset=utf-8'); header('Content-Disposition: attachment; filename="' . (ws_site() === 'kyma' ? 'kyma' : 'goldenas') . '-website-stats_' . $f . '_' . $t . '.csv"');
         $o = fopen('php://output', 'w'); fputs($o, "\xEF\xBB\xBF"); fputcsv($o, ['date', 'dimension', 'key', 'count', 'visitors', 'extra']);
-        foreach (all('SELECT d, dim, k, n, u, x FROM web_stats_day WHERE d BETWEEN ? AND ? ORDER BY d, dim, n DESC', [$f, $t]) as $r) fputcsv($o, [$r['d'], $r['dim'], $r['k'], $r['n'], $r['u'], $r['x']]);
+        $xb = [$f, $t]; foreach (all('SELECT d, dim, k, n, u, x FROM web_stats_day WHERE d BETWEEN ? AND ?' . ws_w($xb) . ' ORDER BY d, dim, n DESC', $xb) as $r) fputcsv($o, [$r['d'], $r['dim'], $r['k'], $r['n'], $r['u'], $r['x']]);
         fclose($o); exit; }
     return false;
 }

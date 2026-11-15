@@ -4,13 +4,13 @@ require_once __DIR__ . '/xlsxw.php';
 
 function ex_contacts(array $f): void {
     require_export_people('contacts');   // R97-047: CEO, General Manager, developer only
-    $l = ct_list($f, 0); $rows = [];
-    foreach ($l['rows'] as $r) $rows[] = [$r['full_name'], $r['company_name'], $r['customer_name'], ct_categories()[$r['category']] ?? $r['category'], $r['position'], $r['email'], $r['phone'], $r['mobile'], $r['vessel_list'],
+    $l = ct_list($f, 0); $rows = []; $kb = function_exists('kym_has') && kym_has();   // R97-050: the brand marking is part of the export
+    foreach ($l['rows'] as $r) $rows[] = array_merge([$r['full_name'], $r['company_name'], $r['customer_name'], ct_categories()[$r['category']] ?? $r['category'], $r['position'], $r['email'], $r['phone'], $r['mobile'], $r['vessel_list'],
         implode('; ', array_map(fn($k) => ct_channels()[$k] ?? $k, array_filter(explode(',', (string)($r['channels'] ?? ''))))), implode('; ', array_map(fn($k) => ct_subscriptions()[$k] ?? $k, array_filter(explode(',', (string)($r['subscriptions'] ?? ''))))),
-        $r['birthday'] ? (ct_year_known($r['birthday']) ? date('d.m.Y', strtotime($r['birthday'])) : substr($r['birthday'], 8, 2) . '.' . substr($r['birthday'], 5, 2)) : '', $r['nameday_md'] ? substr($r['nameday_md'], 3, 2) . '.' . substr($r['nameday_md'], 0, 2) : '', $r['interests'], (int)$r['n_notes'], $r['is_active'] ? 'yes' : 'no'];
+        $r['birthday'] ? (ct_year_known($r['birthday']) ? date('d.m.Y', strtotime($r['birthday'])) : substr($r['birthday'], 8, 2) . '.' . substr($r['birthday'], 5, 2)) : '', $r['nameday_md'] ? substr($r['nameday_md'], 3, 2) . '.' . substr($r['nameday_md'], 0, 2) : '', $r['interests'], (int)$r['n_notes'], $r['is_active'] ? 'yes' : 'no'], $kb ? [implode('; ', array_map(fn($k) => KYM_SITES[$k], kym_brands($r)))] : []);
     export_log('contacts', count($rows));
     xlsx_download('GAS-contacts-' . date('Ymd') . '.xlsx', [['name' => t('ct.title'), 'first' => true,
-        'header' => ['Full name', 'Company', 'Customer', 'Category', 'Position', 'Email', 'Phone', 'Mobile', 'Vessels', 'Channels', 'Subscriptions', 'Birthday', 'Name day', 'Interests', 'Notes', 'Active'],
+        'header' => array_merge(['Full name', 'Company', 'Customer', 'Category', 'Position', 'Email', 'Phone', 'Mobile', 'Vessels', 'Channels', 'Subscriptions', 'Birthday', 'Name day', 'Interests', 'Notes', 'Active'], $kb ? ['Brands'] : []),
         'rows' => $rows, 'widths' => [26, 24, 22, 20, 22, 30, 18, 18, 36, 24, 24, 12, 10, 30, 8, 8], 'wrap' => [8, 13]]]);
 }
 
@@ -115,14 +115,15 @@ function ex_companies(array $g): void {
     $w = []; $b = [];
     if ($q !== '') { $l = '%' . $q . '%'; $w[] = '(co.name LIKE ? OR co.country LIKE ? OR co.city LIKE ? OR c.name LIKE ?)'; array_push($b, $l, $l, $l, $l); }
     if ($fk !== '' && isset(co_kinds()[$fk])) { $w[] = 'co.kind = ?'; $b[] = $fk; }
+    if (in_array($g['brand'] ?? '', ['golden', 'kyma'], true) && function_exists('kym_has') && kym_has()) { $w[] = 'FIND_IN_SET(?, co.brands)'; $b[] = (string)$g['brand']; }
     $rows = [];
     foreach (all('SELECT co.*, c.name AS customer_name, (SELECT COUNT(*) FROM contacts ct WHERE ct.company_id = co.id) AS n_contacts,
                          (SELECT COUNT(DISTINCT cv.vessel_id) FROM contact_vessels cv JOIN contacts ct ON ct.id = cv.contact_id WHERE ct.company_id = co.id) AS n_vessels
                   FROM companies co LEFT JOIN customers c ON c.id = co.customer_id ' . ($w ? 'WHERE ' . implode(' AND ', $w) : '') . ' ORDER BY co.is_active DESC, co.name', $b) as $r)
-        $rows[] = [$r['name'], co_kinds()[$r['kind']] ?? $r['kind'], $r['customer_name'], $r['country'], $r['city'], $r['website'], $r['email'], $r['phone'], (int)$r['n_contacts'], (int)$r['n_vessels'], $r['notes'], $r['is_active'] ? 'yes' : 'no', $r['created_at'] ? substr($r['created_at'], 0, 10) : ''];
+        $rows[] = array_merge([$r['name'], co_kinds()[$r['kind']] ?? $r['kind'], $r['customer_name'], $r['country'], $r['city'], $r['website'], $r['email'], $r['phone'], (int)$r['n_contacts'], (int)$r['n_vessels'], $r['notes'], $r['is_active'] ? 'yes' : 'no', $r['created_at'] ? substr($r['created_at'], 0, 10) : ''], function_exists('kym_has') && kym_has() ? [implode('; ', array_map(fn($k) => KYM_SITES[$k], kym_brands($r)))] : []);   // R97-050
     export_log('organisations', count($rows));
     xlsx_download('GAS-companies-' . date('Ymd') . '.xlsx', [['name' => t('co.title'), 'first' => true,
-        'header' => ['Company', 'Kind', 'Customer', 'Country', 'City', 'Website', 'Email', 'Phone', 'Contacts', 'Vessels', 'Notes', 'Active', 'Created'],
+        'header' => array_merge(['Company', 'Kind', 'Customer', 'Country', 'City', 'Website', 'Email', 'Phone', 'Contacts', 'Vessels', 'Notes', 'Active', 'Created'], function_exists('kym_has') && kym_has() ? ['Brands'] : []),
         'rows' => $rows, 'widths' => [30, 20, 24, 16, 16, 28, 28, 18, 10, 10, 40, 8, 12], 'wrap' => [10]]]);
 }
 

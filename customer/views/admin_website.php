@@ -46,6 +46,33 @@ layout_head(t('web.title'), 'admin_website');
     <div class="btn-row span2"><button class="btn btn--gold"><?= tt('btn.save') ?></button></div>
   </form>
 </div>
+<?php if (function_exists('kym_has') && kym_has()): $kk = (string)cp_setting('web_site_key_kyma', ''); $konce = (string)($_SESSION['web_key_once_kyma'] ?? ''); unset($_SESSION['web_key_once_kyma']); ?>
+<h2 class="settings-h" id="kyma"><?= tt('kym.set_title') ?></h2>
+<div class="card"><h2>🔑 <?= tt('kym.key_title') ?> <?= pill($kk !== '' ? 'green' : 'mute', t($kk !== '' ? 'kym.connected' : 'kym.not_connected')) ?></h2>
+  <p class="hint"><?= tt('kym.key_hint') ?></p>
+  <form method="post" action="<?= url('admin_website') ?>#kyma" class="form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="web_kyma_key">
+    <?php if ($konce !== '' && hash_equals($kk, $konce)): ?><label class="span2"><?= tt('web.key') ?> — <b><?= tt('rc.key_once') ?></b><input value="<?= e($konce) ?>" readonly class="mono" style="user-select:all"><span class="hint"><?= tt('kym.key_once_hint') ?></span></label>
+    <?php else: ?><label><?= tt('web.key') ?><input value="<?= $kk ? e(substr($kk, 0, 6)) . '…' . e(substr($kk, -4)) : tt('rc.key_none') ?>" readonly></label><?php endif; ?>
+    <label class="check span2"><input type="checkbox" name="rotate" value="1"> <?= $kk ? tt('web.key_rotate') : tt('web.key_create') ?></label>
+    <?php if ($kk): ?><label class="check span2"><input type="checkbox" name="disable" value="1"> <?= tt('kym.key_disable') ?></label><?php endif; ?>
+    <p class="hint span2"><?= tt('web.url') ?>: <code><?= e(rtrim((string)cfg('app.url', ''), '/')) ?>/customer/web_feed.php</code> · <code>X-Site-Key</code> · <code>X-Site: kyma</code></p>
+    <div class="btn-row span2"><button class="btn btn--gold"><?= tt('btn.save') ?></button></div>
+  </form>
+</div>
+<div class="card"><h2>📈 <?= tt('kym.ws_title') ?> <?= pill(ws_configured('kyma') ? 'green' : 'mute', t(ws_configured('kyma') ? 'kym.connected' : 'kym.not_connected')) ?></h2>
+  <p class="hint"><?= tt('kym.ws_hint') ?></p>
+  <?php $kwk = ws_key('kyma'); $kwl = (string)cp_setting('ws_last_pull_kyma', ''); $kwe = (string)cp_setting('ws_last_error_kyma', ''); ?>
+  <form method="post" action="<?= url('admin_website') ?>#kyma" class="form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="ws_settings_save"><input type="hidden" name="site" value="kyma">
+    <label><?= tt('ws.feed_url') ?><input name="ws_feed_url" value="<?= e((string)cp_setting('ws_feed_url_kyma', '')) ?>" placeholder="https://kyma-marinepower.eu/api/stats-feed.php"></label>
+    <label><?= tt('ws.feed_key') ?><input name="ws_feed_key" value="" placeholder="<?= $kwk ? e(substr($kwk, 0, 6)) . '…' . e(substr($kwk, -4)) : tt('rc.key_none') ?>" autocomplete="off"><span class="hint"><?= tt('ws.feed_key_hint') ?></span></label>
+    <label><?= tt('ws.last_pull') ?><input value="<?= $kwl ? e(fmt_datetime($kwl)) : '—' ?>" readonly></label>
+    <label><?= tt('ws.last_error') ?><input value="<?= $kwe ? e($kwe) : '—' ?>" readonly></label>
+    <?php if ($kwk): ?><label class="check span2"><input type="checkbox" name="ws_clear_key" value="1"> <?= tt('ws.clear_key') ?></label><?php endif; ?>
+    <div class="btn-row span2"><button class="btn btn--gold"><?= tt('btn.save') ?></button><?php if ($kwk): ?><a class="btn" href="<?= url('web_stats', ['site' => 'kyma']) ?>"><?= tt('ws.open') ?> →</a><?php endif; ?></div>
+  </form>
+  <p class="hint" style="margin-top:10px;"><?= tt('kym.nl_where') ?></p>
+</div>
+<?php endif; ?>
 <div class="card"><h2>📈 <?= tt('ws.title') ?></h2>
   <p class="hint"><?= tt('ws.settings_hint') ?></p>
   <?php $wsk = function_exists('ws_key') ? ws_key() : ''; $wsl = (string)cp_setting('ws_last_pull', ''); $wse = (string)cp_setting('ws_last_error', ''); ?>
