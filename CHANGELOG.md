@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.146.0** (build 2026-11-15). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.147.0** (build 2026-11-15). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.147.0 | GAS-CP-R97-052 | 2026-11-15 | Organisations: “Known shipyards” — proposes the Yard tick for organisations whose name carries a shipyard word (any language) or the name of a known yard in Europe, the US and worldwide; nothing changes until the proposed rows are approved; only the Yard role is added, the other roles stay. The role “Other” now stays on an organisation only when no other role is ticked. | — |
 | 1.146.0 | GAS-CP-R97-051 | 2026-11-15 | Newsletters: approval before sending — an issue written by anyone other than the CEO or the General Manager is submitted for approval, locked while it waits, approved or returned with a comment, and can be sent only once approved; any later change cancels the approval; the CEO and the General Manager send without approval. | `install/migrate_cp_r97_051_nl_approval.sql` |
 | 1.145.0 | GAS-CP-R97-050 | 2026-11-15 | KYMA Marine Power website joined to the portal as a second site: its own enquiry inbox with KYM- references, its own statistics card, its own newsletter list with KYMA branding, sender and unsubscribe, and contacts / organisations marked Golden, KYMA or both; the site key decides the site, the KYMA key opens only contact, subscribe and unsubscribe; career applications are seen by administrators and management only. | `install/migrate_cp_r97_050_kyma_site.sql` |
 | 1.144.0 | GAS-CP-R97-049 | 2026-11-15 | System Budgets: procurement step — the engineer sends the budget to procurement, procurement fills cost price, delivery time, supplier, remark and an alternative part per line on its own page (parts only, no sale prices) and returns it; only then can the budget be finished; the longest delivery time goes to the offer. | `install/migrate_cp_r97_049_sb_procurement.sql` |

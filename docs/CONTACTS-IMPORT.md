@@ -2103,3 +2103,25 @@ Language keys 10 135 each.
 **Security review**: the gate is enforced in `nl_queue()` on the server, not by the buttons; approval is bound to the content and audience by fingerprint and compared in constant time; approver identity from the staff role, never from the request; all actions POST + CSRF; comments trimmed and length-capped, shown escaped; the switch is limited to the approvers. Proposed next (no cost in speed): list approvals and sends in the daily health report; a second approver for audiences above a set size.
 
 Language keys 10 173 each.
+
+## §338 v1.147.0 (R97-052) — Organisations: known shipyards → Yard role, on approval
+
+**Request**: "check all known Shipyards in europe, US and worldwide and just add the yard tick if the name or part of the name is matching the Company or Organization name" — "ask me to approve the list before any changes". The name list and the rules were shown and approved on 15/11/2026.
+
+**Module** `app/yards.php` (no migration):
+
+- `YD_STEMS` (found anywhere in the name: shipyard, shipbuild, ship repair, dockyard, drydock, boatyard, werft, scheepswerf, cantiere / cantieri, chantier nav, chantiers, astillero, estaleiro, tersane, ναυπηγ, stocznia, brodogradili, skipsverft …), `YD_WORDS` (whole words: yard, yards, werf, verft, varv), `YD_NAMES` (about 270 known yards by region, whole word / phrase), `YD_WEAK` (services, components, trading … → proposed but not ticked).
+- `yd_norm()` lower case, accents folded (Latin and Greek tonos), `&` / `+` → "and", punctuation to spaces. `yd_match()` returns the longest known name, otherwise the first general word.
+- `yd_scan()` read-only: organisations with `kind <> 'yard'` and no `yard` in `roles` whose name matches.
+- `yd_apply($ids)`: re-runs the scan and changes only ids that are proposed now; `roles` gets `yard` (the placeholder `other` is dropped), `kind` = `co_main_kind()`; one line per run in `storage/yards.log` (who, how many, which names).
+- `yd_can()` = `ct_manage()` without the assistant scope.
+
+**Page** `?p=companies_yards` (button on Organisations), action `yd_apply`.
+
+**Tests (sandbox)**: 37 sample names through the matcher (Lürssen with and without umlaut, Blohm+Voss, Abeking & Rasmussen, Greek ναυπηγεία, Oderwerft, 3. Maj; no match for Vineyard, Yardley, Balkan, Christ, Oceania, Admiral Hotel, Viking Line, Riva del Garda); page lists only matches, group company unticked; project manager: page 403, action refused, no button; apply with one matching, one matching with other roles and one non-matching id → 2 changed, roles kept, non-matching id ignored; second visit shows only what is left. Page sweep unchanged.
+
+**Role “Other”** ("other will be ticked only if no other role is ticked"): `co_roles_tidy()` drops `other` whenever another role is present — used by `co_roles()` (display, merges, the yard step) and by `co_save_from_post()`; `co_tidy_other()` applies the same to stored rows (roles appended by supplier / customer links and imports) from the background sweep, at most once an hour (`co_tidy_at`), which also corrects the existing rows after this release. Tests: stored `other,customer` → `customer` after the sweep; save with Other + Yard → `yard`; nothing ticked → `other`.
+
+**Security review**: read-only scan; the change is POST + CSRF, administrators only, and limited on the server to rows the scan proposes at that moment, so a forged id cannot mark an arbitrary organisation; one column pair written through placeholders; every run logged; no personal data leaves the portal — the yard names are a fixed list in the code. Proposed next (no cost in speed): show the runs of `yards.log` and `exports.log` on System health.
+
+Language keys 10 195 each.

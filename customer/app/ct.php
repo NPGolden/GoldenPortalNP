@@ -104,8 +104,12 @@ function co_role_list(): array { return ['customer' => t('co.role_customer')] + 
 function co_roles(array $co): array {
     $r = co_roles_has() ? array_values(array_filter(explode(',', (string)($co['roles'] ?? '')))) : [];
     if (!$r) { $r = [(string)($co['kind'] ?? 'other')]; if (!empty($co['is_supplier']) && !in_array('supplier', $r, true)) $r[] = 'supplier'; if (!empty($co['customer_id'])) $r[] = 'customer'; }
-    return array_values(array_unique($r));
+    return co_roles_tidy($r);
 }
+/** R97-052: “Other” is a role only when the organisation has no other role. */
+function co_roles_tidy(array $r): array { $r = array_values(array_unique(array_filter(array_map('strval', $r)))); $x = array_values(array_diff($r, ['other'])); return $x ?: ($r ? ['other'] : []); }
+/** The same rule on the stored rows, for roles added by imports and links (supplier, customer). Returns the rows changed. */
+function co_tidy_other(): int { if (!co_roles_has()) return 0; try { return q("UPDATE companies SET roles = TRIM(BOTH ',' FROM REPLACE(CONCAT(',', roles, ','), ',other,', ',')) WHERE FIND_IN_SET('other', roles) AND roles <> 'other'")->rowCount(); } catch (Throwable $e) { return 0; } }
 /** The main kind of a role set (what the old single pill shows). */
 function co_main_kind(array $roles): string { foreach (['owner', 'management', 'yard', 'class', 'agent', 'broker', 'consultant', 'supplier', 'other'] as $k) if (in_array($k, $roles, true)) return $k; return 'other'; }
 function co_role_pills(array $co): string {
@@ -179,7 +183,7 @@ function co_save_from_post(int $id): int {
         if (($sc = $str('sup_erp_code', 40)) !== null && ($d = one('SELECT co.name FROM supplier_details sd JOIN companies co ON co.id = sd.company_id WHERE sd.erp_code = ? AND sd.company_id <> ? LIMIT 1', [$sc, $id]))) throw new RuntimeException(t('co.dup_sup_erp', ['v' => $sc, 'name' => $d['name']]));   // R97-033: supplier codes are a ledger of their own
     }
     $roles = []; if (co_roles_has()) { foreach ((array)($_POST['roles'] ?? []) as $r) if (isset(co_role_list()[$r])) $roles[] = (string)$r; if (!empty($_POST['is_supplier']) && !in_array('supplier', $roles, true)) $roles[] = 'supplier'; }
-    $kind = $roles ? co_main_kind($roles) : (co_norm_kind((string)($_POST['kind'] ?? '')) ?? 'other'); if (!$roles) { $roles = [$kind]; if (!empty($_POST['is_supplier'])) $roles[] = 'supplier'; }
+    $kind = $roles ? co_main_kind($roles) : (co_norm_kind((string)($_POST['kind'] ?? '')) ?? 'other'); if (!$roles) { $roles = [$kind]; if (!empty($_POST['is_supplier'])) $roles[] = 'supplier'; } $roles = co_roles_tidy($roles); $kind = co_main_kind($roles);   /* R97-052 */
     $cid = (int)($_POST['customer_id'] ?? 0) ?: null; if ($cid && !in_array('customer', $roles, true)) $roles[] = 'customer';
     if ($cid && !scalar('SELECT COUNT(*) FROM customers WHERE id = ?', [$cid])) $cid = null;
     $vals = [$name, $kind, $cid, $str('country', 80), $str('city', 80), $str('website', 190), $str('email', 190), $str('phone', 60), $str('notes', 4000), isset($_POST['is_active']) ? (int)!empty($_POST['is_active']) : 1];

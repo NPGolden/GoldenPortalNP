@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.146.0';
+const CP_VERSION = '1.147.0';
 const CP_BUILD   = '2026-11-15';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-052', 'version' => '1.147.0', 'date' => '2026-11-15', 'title' => 'Organisations: “Known shipyards” — proposes the Yard tick for organisations whose name carries a shipyard word (any language) or the name of a known yard in Europe, the US and worldwide; nothing changes until the proposed rows are approved; only the Yard role is added, the other roles stay. The role “Other” now stays on an organisation only when no other role is ticked.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-051', 'version' => '1.146.0', 'date' => '2026-11-15', 'title' => 'Newsletters: approval before sending — an issue written by anyone other than the CEO or the General Manager is submitted for approval, locked while it waits, approved or returned with a comment, and can be sent only once approved; any later change cancels the approval; the CEO and the General Manager send without approval.', 'db' => 'install/migrate_cp_r97_051_nl_approval.sql', 'check' => 'r97t'],
         ['ref' => 'GAS-CP-R97-050', 'version' => '1.145.0', 'date' => '2026-11-15', 'title' => 'KYMA Marine Power website joined to the portal as a second site: its own enquiry inbox with KYM- references, its own statistics card, its own newsletter list with KYMA branding, sender and unsubscribe, and contacts / organisations marked Golden, KYMA or both; the site key decides the site, the KYMA key opens only contact, subscribe and unsubscribe; career applications are seen by administrators and management only.', 'db' => 'install/migrate_cp_r97_050_kyma_site.sql', 'check' => 'r97s'],
         ['ref' => 'GAS-CP-R97-049', 'version' => '1.144.0', 'date' => '2026-11-15', 'title' => 'System Budgets: procurement step — the engineer sends the budget to procurement, procurement fills cost price, delivery time, supplier, remark and an alternative part per line on its own page (parts only, no sale prices) and returns it; only then can the budget be finished; the longest delivery time goes to the offer.', 'db' => 'install/migrate_cp_r97_049_sb_procurement.sql', 'check' => 'r97r'],
