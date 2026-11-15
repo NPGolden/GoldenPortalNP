@@ -245,7 +245,8 @@ function sb_save_labour_from_post(int $id): int {
 }
 /** Part rows posted as p[<id|new index>][field] — at most SB_MAX_PARTS lines per budget. */
 function sb_save_parts_from_post(int $id): int {
-    $B = sb_load_editable($id); $rows = is_array($_POST['p'] ?? null) ? $_POST['p'] : []; $own = array_column($B['parts'], null, 'id'); $count = count($own); $n = 0; $sort = 0;
+    $B = sb_load_editable($id); if (function_exists('sbp_state') && sbp_state($B) === 'requested') throw new RuntimeException(t('sbp.locked'));   // R97-049: procurement is pricing these lines
+    $rows = is_array($_POST['p'] ?? null) ? $_POST['p'] : []; $own = array_column($B['parts'], null, 'id'); $count = count($own); $n = 0; $sort = 0;
     foreach ($rows as $key => $r) {
         if (!is_array($r)) continue; $pid = ctype_digit((string)$key) && isset($own[(int)$key]) ? (int)$key : 0;
         if ($pid && !empty($r['del'])) { q('DELETE FROM sb_parts WHERE id = ? AND budget_id = ?', [$pid, $id]); $count--; $n++; continue; }
@@ -274,7 +275,7 @@ function sb_item_cost(array $i): array {
 }
 function sb_inv_options(): array { try { return all("SELECT id, code, description, unit FROM inv_items WHERE status = 'active' ORDER BY code LIMIT 5000"); } catch (Throwable $e) { return []; } }
 function sb_add_inv_part(int $id, int $itemId, float $qty): void {
-    $B = sb_load_editable($id); if (count($B['parts']) >= SB_MAX_PARTS) throw new RuntimeException(t('sb.parts_max', ['n' => SB_MAX_PARTS]));
+    $B = sb_load_editable($id); if (function_exists('sbp_state') && sbp_state($B) === 'requested') throw new RuntimeException(t('sbp.locked')); if (count($B['parts']) >= SB_MAX_PARTS) throw new RuntimeException(t('sb.parts_max', ['n' => SB_MAX_PARTS]));
     $i = one('SELECT * FROM inv_items WHERE id = ?', [$itemId]); if (!$i) throw new RuntimeException(t('err.notfound'));
     [$cost, $org] = sb_item_cost($i);
     q('INSERT INTO sb_parts (budget_id, sort_order, code, item_id, descr, qty, unit, unit_cost, cost_origin) VALUES (?,?,?,?,?,?,?,?,?)', [$id, 9500, mb_substr((string)$i['code'], 0, 20), $itemId, mb_substr((string)($i['description_en'] ?: $i['description']), 0, 400), $qty > 0 ? $qty : 1, $i['unit'] ?: null, $cost, mb_substr($org, 0, 120)]);
@@ -304,6 +305,7 @@ function sb_finish_blockers(array $B): array {
     if (!(int)$B['project_id'] || !(int)$B['subproject_id']) $x[] = t('sb.blk_sub');
     if (!$B['labour'] && !$B['parts']) $x[] = t('sb.blk_lines');
     if ($T['unpriced'] > 0) $x[] = t('sb.blk_unpriced', ['n' => $T['unpriced']]);
+    if (function_exists('sbp_blockers')) foreach (sbp_blockers($B) as $m) $x[] = $m;   // R97-049: procurement step
     if (function_exists('sbc_blocking')) foreach (sbc_blocking($B) as $m) $x[] = $m;   // R97-048: arithmetic and below-cost findings, unless management accepted them
     return $x;
 }
@@ -490,13 +492,13 @@ const SB_SNAP_EXP = ['sort_order', 'kind', 'descr', 'cost', 'markup_pct', 'sale'
 /** The state of a budget as plain data: header settings and the three line lists (no ids). */
 function sb_snapshot(array $B): array {
     $pick = fn(array $r, array $keys) => array_intersect_key($r, array_flip($keys));
-    return ['head' => $pick($B, SB_SNAP_HEAD), 'labour' => array_map(fn($r) => $pick($r, SB_SNAP_LAB), $B['labour']), 'parts' => array_map(fn($r) => $pick($r, SB_SNAP_PART), $B['parts']), 'expenses' => array_map(fn($r) => $pick($r, SB_SNAP_EXP), $B['expenses'])];
+    return ['head' => $pick($B, SB_SNAP_HEAD), 'labour' => array_map(fn($r) => $pick($r, SB_SNAP_LAB), $B['labour']), 'parts' => array_map(fn($r) => $pick($r, array_merge(SB_SNAP_PART, function_exists('sbp_has') && sbp_has() ? SBP_PART_COLS : [])), $B['parts']), 'expenses' => array_map(fn($r) => $pick($r, SB_SNAP_EXP), $B['expenses'])];
 }
 /** Write the lines (and, when asked, the header settings) of a snapshot into a budget, replacing what is there. */
 function sb_write_snapshot(int $id, array $S, bool $withHead): void {
     foreach (['sb_labour', 'sb_parts', 'sb_expenses'] as $tb) q("DELETE FROM $tb WHERE budget_id = ?", [$id]);
     $ins = function (string $tb, array $keys, array $rows) use ($id) { if (!sb_disc()) $keys = array_values(array_diff($keys, ['discount_pct', 'markup_pct'])); foreach ($rows as $r) { if (!is_array($r)) continue; $vals = []; foreach ($keys as $k) $vals[] = $r[$k] ?? null; q("INSERT INTO $tb (budget_id, " . implode(', ', $keys) . ') VALUES (?' . str_repeat(',?', count($keys)) . ')', array_merge([$id], $vals)); } };
-    $ins('sb_labour', SB_SNAP_LAB, array_slice((array)($S['labour'] ?? []), 0, 500)); $ins('sb_parts', SB_SNAP_PART, array_slice((array)($S['parts'] ?? []), 0, SB_MAX_PARTS)); $ins('sb_expenses', SB_SNAP_EXP, array_slice((array)($S['expenses'] ?? []), 0, 200));
+    $ins('sb_labour', SB_SNAP_LAB, array_slice((array)($S['labour'] ?? []), 0, 500)); $ins('sb_parts', array_merge(SB_SNAP_PART, function_exists('sbp_has') && sbp_has() ? SBP_PART_COLS : []), array_slice((array)($S['parts'] ?? []), 0, SB_MAX_PARTS)); $ins('sb_expenses', SB_SNAP_EXP, array_slice((array)($S['expenses'] ?? []), 0, 200));
     if ($withHead && is_array($S['head'] ?? null)) { $set = []; $b = []; foreach (SB_SNAP_HEAD as $k) if (array_key_exists($k, $S['head']) && $k !== 'title') { $set[] = "$k = ?"; $b[] = $S['head'][$k]; } if ($set) { $b[] = $id; q('UPDATE sb_budgets SET ' . implode(', ', $set) . ' WHERE id = ?', $b); } }
     sb_recalc($id);
 }
@@ -534,7 +536,7 @@ function sb_copy(array $src, string $title, bool $asTemplate = false): int {
     $title = mb_substr(trim($title), 0, 200); if ($title === '') $title = mb_substr((string)$src['title'], 0, 200);
     $pdo = db(); $own = !$pdo->inTransaction(); if ($own) $pdo->beginTransaction();
     try {
-        $id = sb_create($title); $S = sb_snapshot($src); unset($S['head']['target_date']); if ($asTemplate) { unset($S['head']['source_ref'], $S['head']['source_file']); }
+        $id = sb_create($title); $S = sb_snapshot($src); unset($S['head']['target_date']); if (defined('SBP_PART_COLS')) foreach ($S['parts'] as &$cp) { foreach (SBP_PART_COLS as $ck) unset($cp[$ck]); } unset($cp);   // R97-049: a copy is priced by procurement again if ($asTemplate) { unset($S['head']['source_ref'], $S['head']['source_file']); }
         sb_write_snapshot($id, $S, true);
         if ($asTemplate) { for ($try = 0; $try < 5; $try++) { try { q('UPDATE sb_budgets SET is_template = 1, sb_no = ?, copied_from = ? WHERE id = ?', [sb_next_tpl_no(), (int)$src['id'], $id]); break; } catch (Throwable $e) { if ($try === 4) throw $e; } } }
         else q('UPDATE sb_budgets SET copied_from = ? WHERE id = ?', [(int)$src['id'], $id]);
@@ -818,6 +820,7 @@ function sb_convert(int $id, array $opt): int {
             [$oid, $seq += 10, $x['kind'], null, $x['item_id'], $x['cost_price'], $x['margin_pct'], $x['erp_code'], $x['description'], $x['unit'], (string)$B['zone'] === 'overseas' ? 'overseas' : 'local', $x['qty'], $x['unit_price'], (float)$x['discount_pct'], $x['kind'] === 'text' ? 0 : ob_line_total((float)$x['qty'], (float)$x['unit_price'], (float)$x['discount_pct']), $x['notes']]);
         ob_recalc($oid); $o = of_load($oid); if ($o) { ob_blocks_init($o); $scope = sb_scope_text($B); if ($scope !== '') ob_block_save($oid, 'scope', ob_block_label('scope'), $scope);
             if ($P['excluded']) { $cur = (string) scalar("SELECT body FROM offer_blocks WHERE offer_id = ? AND block_key = 'exclusions'", [$oid]); ob_block_save($oid, 'exclusions', ob_block_label('exclusions'), trim($cur . "\n" . implode("\n", array_map(fn($e) => '- ' . $e, $P['excluded'])))); } }
+        try { if (function_exists('sbp_lead_max') && function_exists('ob_delivery_has') && ob_delivery_has() && ($lw = sbp_lead_max($B)) !== null) q("UPDATE offers SET delivery_parts = ? WHERE id = ? AND (delivery_parts IS NULL OR delivery_parts = '')", [t('sbp.offer_delivery', ['w' => sbp_weeks($lw)]), $oid]); } catch (Throwable $e) {}   // R97-049: the longest delivery time of the parts
         of_event($oid, 'draft', t('sb.cv_offer_ev', ['n' => sb_label($B)]));
         $brev = null; $mode = (string)($opt['budget'] ?? 'replace');
         if (in_array($mode, ['replace', 'add'], true) && function_exists('bg_has') && bg_has()) {

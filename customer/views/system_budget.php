@@ -20,7 +20,7 @@ layout_head(sb_label($B) . ' · ' . $B['title'], 'system_budgets');
 ?>
 <p class="eyebrow"><a href="<?= url('system_budgets') ?>"><?= tt('sb.title') ?></a> › <?= e(sb_label($B)) ?></p>
 <div class="page-head">
-  <div><h1>🧮 <?= e(sb_label($B)) ?> <?= sb_pill($B['status']) ?><?php if ($prOn && !$tpl && in_array($CUR['status'], ['draft', 'working', 'finished'], true)): ?> <?= sb_prio_pill((string)$CUR['priority']) ?><?php endif; ?></h1><p class="lede" style="margin-bottom:0;"><?= e($B['title']) ?><?= $B['source_ref'] ? ' · <span class="hint">' . e(t('sb.from_file', ['r' => (string)$B['source_ref']])) . '</span>' : '' ?><?= $tkL ? ' · <a href="' . url('ticket', ['id' => (int)$tkL['id']]) . '">🎫 ' . e((string)$tkL['ticket_no']) . '</a>' : '' ?><?= $tpl ? ' ' . pill('navy', t('sb.tpl_one')) : '' ?></p></div>
+  <div><h1>🧮 <?= e(sb_label($B)) ?> <?= sb_pill($B['status']) ?><?= function_exists('sbp_pill') && !$tpl && in_array($CUR['status'], ['draft', 'working'], true) ? ' ' . sbp_pill($CUR) : '' ?><?php if ($prOn && !$tpl && in_array($CUR['status'], ['draft', 'working', 'finished'], true)): ?> <?= sb_prio_pill((string)$CUR['priority']) ?><?php endif; ?></h1><p class="lede" style="margin-bottom:0;"><?= e($B['title']) ?><?= $B['source_ref'] ? ' · <span class="hint">' . e(t('sb.from_file', ['r' => (string)$B['source_ref']])) . '</span>' : '' ?><?= $tkL ? ' · <a href="' . url('ticket', ['id' => (int)$tkL['id']]) . '">🎫 ' . e((string)$tkL['ticket_no']) . '</a>' : '' ?><?= $tpl ? ' ' . pill('navy', t('sb.tpl_one')) : '' ?></p></div>
   <div class="btn-row">
     <?php if ($prOn && !$isRev && !$tpl && in_array($CUR['status'], ['draft', 'working', 'finished'], true)): ?><form method="post" action="<?= $self ?>" class="inline" data-lock style="display:inline-flex;gap:6px;align-items:center;"><?= csrf_field() ?><input type="hidden" name="action" value="sb_priority"><input type="hidden" name="id" value="<?= $id ?>"><select name="priority" data-nosearch aria-label="<?= tt('sb.priority') ?>" style="width:auto;"><?php foreach (SB_PRIORITIES as $pk): ?><option value="<?= $pk ?>"<?= (string)$CUR['priority'] === $pk ? ' selected' : '' ?>><?= tt('sb.pr_' . $pk) ?></option><?php endforeach; ?></select><button class="btn btn--ghost btn--sm" type="submit"><?= tt('sb.pr_set') ?></button></form><?php endif; ?>
     <?php if ($r2): ?><a class="btn btn--ghost btn--sm" href="<?= url('system_budget_export', ['id' => $id] + ($isRev ? ['rev' => $rvN] : [])) ?>">⬇ Excel</a><?php endif; ?>
@@ -192,6 +192,7 @@ layout_head(sb_label($B) . ' · ' . $B['title'], 'system_budgets');
   </form><?php endif; ?>
 </div>
 
+<?php if (function_exists('sbp_has') && sbp_has() && !$tpl) require __DIR__ . '/_sb_proc.php'; ?>
 <div class="card" id="expenses">
   <div class="card-head"><h2>🧾 <?= tt('sb.expenses') ?> <span class="count"><?= count($B['expenses']) ?></span></h2><span class="hint"><?= tt('sb.exp_hint') ?></span></div>
   <form method="post" action="<?= $self ?>#expenses" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_exp"><input type="hidden" name="id" value="<?= $id ?>">

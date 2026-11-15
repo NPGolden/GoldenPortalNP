@@ -2030,3 +2030,29 @@ Language keys 9 813 each.
 **Security review**: read-only module; actions POST + CSRF behind `sb_guard()`; acceptance management only and recorded with name, time, address; AI review sends titles, descriptions, codes, quantities and hours — no prices, no customer or personal data — and follows the existing AI limits and log; the stored answer is stripped of markup. Statement placeholders throughout; IN-lists built from integers or bound values.
 
 Language keys 9 997 each.
+
+## §335 v1.144.0 (R97-049) — System Budgets: procurement step
+
+**Request**: "the procurement should have access to the System budget in the process so to fill prices and delivery time (there should be a new step to send to procurement for pricing and delivery times and alternative parts) and then to be processed in the finished stage".
+
+**Migration** `install/migrate_cp_r97_049_sb_procurement.sql` (key `r97r`): `sb_budgets.proc_state` (NULL · requested · done), `proc_note`, `proc_req_by/at`, `proc_done_by/at`; `sb_parts.lead_weeks`, `proc_cost`, `proc_supplier`, `proc_note`, `alt_descr`, `alt_cost`, `alt_lead_weeks`, `proc_by`, `proc_at`.
+
+**Module** `app/sbp.php` (all guarded by `sbp_has()`):
+
+- `sbp_request()` engineer → procurement (notification `sb:proc` to accounts with `can_procurement`); `sbp_recall()`.
+- `sbp_can()` = procurement accounts (`pr_admin()`), management, administrators. `sbp_get()` returns identity + part lines only.
+- `sbp_save($id, $confirmAll)`: cost becomes `unit_cost` and `proc_cost`, origin "Procurement · name · date · supplier", `proc_at` stamped for lines procurement typed or worked on; on return every posted price is confirmed. Only while `requested` and the budget is draft / working.
+- `sbp_return()` → `done`, notification to requester / owner / creator. `sbp_use_alt()` swaps part and alternative.
+- `sbp_blockers()` in `sb_finish_blockers()`: waiting at procurement; or (rule `sb_proc_required`, default on) part lines with quantity and no `proc_at`.
+- Part lines locked for the engineer while `requested` (`sb_save_parts_from_post`, `sb_add_inv_part`).
+- Revisions keep the procurement columns (`SBP_PART_COLS` merged into the snapshot); a copy / template drops them, so a copy is priced again.
+- `sb_convert()`: longest `lead_weeks` → `offers.delivery_parts` when empty ("n weeks from order").
+- Consistency check 2: at procurement, lines to send, lines added after return, priced lines without delivery time, cost changed after procurement; check 3 skips the inventory comparison for lines freshly priced by procurement.
+
+**Pages**: `?p=system_budgets_proc` (queue, Procurement menu with the number waiting), `?p=system_budget_proc&id=` (pricing form), card `views/_sb_proc.php` on the budget, pill in header and list, switch on the Consistency overview. Actions `sbp_request`, `sbp_recall`, `sbp_save` (+ `return`), `sbp_use_alt`, `sbp_required`.
+
+**Tests (sandbox)**: Finish refused before sending; send → notification to the procurement account; engineer cannot save parts while at procurement; procurement-only account: budget and budget list 403, queue and form open, 124 inputs, no sale / margin text on the form; prices, delivery, supplier, alternative stored and totals recalculated; unknown line id ignored; a budget not at procurement refused; plain Save confirms only touched lines, Return confirms the rest; save after return refused; alternative swap; project manager without the procurement right gets 403 on the form; no PHP warnings.
+
+**Security review**: the pricing form is a separate read model — a procurement account never receives labour, sale prices, margins or totals, and cannot reach the budget pages; writes are limited to nine columns of lines that belong to the budget in the URL, only while the budget is at procurement; actions POST + CSRF; texts trimmed and length-capped, numbers clamped; every step in the budget history with name and address. Note: a procurement account sees the project code, vessel name and title of the budget — needed to quote.
+
+Language keys 10 071 each.

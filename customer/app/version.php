@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.143.0';
+const CP_VERSION = '1.144.0';
 const CP_BUILD   = '2026-11-15';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-049', 'version' => '1.144.0', 'date' => '2026-11-15', 'title' => 'System Budgets: procurement step — the engineer sends the budget to procurement, procurement fills cost price, delivery time, supplier, remark and an alternative part per line on its own page (parts only, no sale prices) and returns it; only then can the budget be finished; the longest delivery time goes to the offer.', 'db' => 'install/migrate_cp_r97_049_sb_procurement.sql', 'check' => 'r97r'],
         ['ref' => 'GAS-CP-R97-048', 'version' => '1.143.0', 'date' => '2026-11-15', 'title' => 'System Budgets: consistency check — ten checks on every budget (arithmetic, completeness, rates and prices against the masters, profit rules, internal ratios, similar budgets, revision to revision, budget to offer, budget to actuals, AI review of the scope), a company overview, limits set by management; “must fix” findings stop Finish and Convert until solved or accepted by management with a reason.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-047', 'version' => '1.142.1', 'date' => '2026-11-15', 'title' => 'Exports of contacts, organisations, customers and accounts are allowed only to the staff roles CEO, General Manager and Developer (no longer to every administrator); each export and each refused attempt is recorded and listed in the daily health report.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-046', 'version' => '1.142.0', 'date' => '2026-11-14', 'title' => 'System health (Settings › System): 30-day trend of page times, where slow pages spent their time, calls to other servers, background jobs, slow database statements with examination, PHP errors grouped with page and version and “new since this release”; the daily health report carries the same findings.', 'db' => null, 'check' => null],
@@ -492,6 +493,7 @@ function cp_migration_state(): array {
         'r97o' => $has("SHOW COLUMNS FROM inv_dn_lines LIKE 'inv_state'"),
         'r97p' => $has("SHOW TABLES LIKE 'nl_issues'"),
         'r97q' => $has("SHOW TABLES LIKE 'nl_lists'"),
+        'r97r' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'proc_state'") && $has("SHOW COLUMNS FROM sb_parts LIKE 'proc_at'"),
         'r93b' => $has("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_inquiries' AND COLUMN_NAME = 'kind' AND COLUMN_TYPE LIKE '%contact%'"),
         'r93a' => $has("SHOW TABLES LIKE 'work_permits'"),
         'r92f' => $has("SHOW COLUMNS FROM rc_applications LIKE 'keep_until'"),

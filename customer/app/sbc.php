@@ -92,6 +92,13 @@ function sbc_c2(array $B, array $T): array {
         foreach (array_unique($names) as $n) { $k = mb_strtolower($n); if ($k === 'pm' || $k === 'site' || mb_strlen($k) < 5 || isset($have[$k])) continue; if (preg_match('/(?<![\p{L}])' . preg_quote($k, '/') . '(?![\p{L}])/iu', $txt)) $miss[] = $n; }
         if ($miss && $B['labour']) $F[] = sbc_f(2, 'info', 'descr_sec', ['l' => mb_substr(implode(', ', $miss), 0, 160)], 'descr');
     }
+    if (!$tpl && function_exists('sbp_has') && sbp_has() && empty($B['_rev'])) {   // R97-049 procurement step
+        $st = sbp_state($B); $open = count(sbp_open_lines($B)); $cnt = array_filter($B['parts'], 'sbp_counts');
+        if ($st === 'requested') $F[] = sbc_f(2, 'warn', 'proc_wait', [], 'procurement');
+        elseif ($open && sbp_required()) $F[] = sbc_f(2, 'warn', $st === 'done' ? 'proc_new' : 'proc_send', ['n' => $open], 'parts');
+        if ($st === 'done') { $nl = count(array_filter($cnt, fn($p) => !empty($p['proc_at']) && (($p['lead_weeks'] ?? null) === null || (float)$p['lead_weeks'] <= 0))); if ($nl) $F[] = sbc_f(2, 'info', 'no_lead', ['n' => $nl], 'procurement'); }
+        $df = []; foreach ($cnt as $p) if (($p['proc_cost'] ?? null) !== null && abs((float)$p['proc_cost'] - (float)$p['unit_cost']) > 0.0049) $df[] = sbc_lbl($p); if ($df) $F[] = sbc_f(2, 'warn', 'proc_cost_diff', ['n' => count($df), 'l' => mb_substr(implode(', ', array_slice($df, 0, 5)), 0, 200)], 'parts');
+    }
     if (!$tpl && empty($B['target_date'])) $F[] = sbc_f(2, 'info', 'no_target', [], 'head');
     if (!$tpl && !(int)($B['owner_user_id'] ?? 0)) $F[] = sbc_f(2, 'info', 'no_owner', [], 'head');
     return $F;
@@ -113,6 +120,7 @@ function sbc_c3(array $B): array {
         if ((string)$i['status'] !== 'active') $ina[] = (string)$i['code'];
         $master = isset($lo[$iid]) ? (float)$lo[$iid]['lo'] : ((float)$i['last_price'] > 0 ? (float)$i['last_price'] : (float)$i['avg_cost']); $uc = (float)$p['unit_cost'];
         if ($master <= 0) { $none++; continue; }
+        if (!empty($p['proc_at']) && ($minTs === 0 || strtotime((string)$p['proc_at']) >= $minTs)) continue;   // R97-049: freshly priced by procurement — the inventory figure is the older one
         if ($uc > 0 && $tol > 0 && abs($uc - $master) / $master * 100 > $tol) $dif[] = sbc_f(3, 'warn', $uc < $master ? 'price_under' : 'price_over', ['l' => sbc_lbl($p), 'b' => sbc_m($uc), 'm' => sbc_m($master), 'p' => number_format(abs($uc - $master) / $master * 100, 0)], 'parts');
         $last = max((int) strtotime((string)($lo[$iid]['last_at'] ?? '')), (int) strtotime((string)($i['last_price_at'] ?? ''))); if ($minTs && $last > 0 && $last < $minTs) $old[] = (string)$i['code'] . ' (' . date('m/Y', $last) . ')'; }
     usort($dif, fn($a, $b) => strcmp($a['code'], $b['code'])); $F = array_merge($F, sbc_cap($dif, 3, 8));
