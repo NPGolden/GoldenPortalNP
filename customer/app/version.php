@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.145.0';
+const CP_VERSION = '1.146.0';
 const CP_BUILD   = '2026-11-15';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-051', 'version' => '1.146.0', 'date' => '2026-11-15', 'title' => 'Newsletters: approval before sending — an issue written by anyone other than the CEO or the General Manager is submitted for approval, locked while it waits, approved or returned with a comment, and can be sent only once approved; any later change cancels the approval; the CEO and the General Manager send without approval.', 'db' => 'install/migrate_cp_r97_051_nl_approval.sql', 'check' => 'r97t'],
         ['ref' => 'GAS-CP-R97-050', 'version' => '1.145.0', 'date' => '2026-11-15', 'title' => 'KYMA Marine Power website joined to the portal as a second site: its own enquiry inbox with KYM- references, its own statistics card, its own newsletter list with KYMA branding, sender and unsubscribe, and contacts / organisations marked Golden, KYMA or both; the site key decides the site, the KYMA key opens only contact, subscribe and unsubscribe; career applications are seen by administrators and management only.', 'db' => 'install/migrate_cp_r97_050_kyma_site.sql', 'check' => 'r97s'],
         ['ref' => 'GAS-CP-R97-049', 'version' => '1.144.0', 'date' => '2026-11-15', 'title' => 'System Budgets: procurement step — the engineer sends the budget to procurement, procurement fills cost price, delivery time, supplier, remark and an alternative part per line on its own page (parts only, no sale prices) and returns it; only then can the budget be finished; the longest delivery time goes to the offer.', 'db' => 'install/migrate_cp_r97_049_sb_procurement.sql', 'check' => 'r97r'],
         ['ref' => 'GAS-CP-R97-048', 'version' => '1.143.0', 'date' => '2026-11-15', 'title' => 'System Budgets: consistency check — ten checks on every budget (arithmetic, completeness, rates and prices against the masters, profit rules, internal ratios, similar budgets, revision to revision, budget to offer, budget to actuals, AI review of the scope), a company overview, limits set by management; “must fix” findings stop Finish and Convert until solved or accepted by management with a reason.', 'db' => null, 'check' => null],
@@ -495,6 +496,7 @@ function cp_migration_state(): array {
         'r97p' => $has("SHOW TABLES LIKE 'nl_issues'"),
         'r97q' => $has("SHOW TABLES LIKE 'nl_lists'"),
         'r97r' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'proc_state'") && $has("SHOW COLUMNS FROM sb_parts LIKE 'proc_at'"),
+        'r97t' => $has("SHOW COLUMNS FROM nl_issues LIKE 'appr_state'"),
         'r97s' => $has("SHOW COLUMNS FROM web_inquiries LIKE 'site'") && $has("SHOW COLUMNS FROM contacts LIKE 'brands'") && $has("SHOW COLUMNS FROM nl_subs LIKE 'site'") && $has("SHOW COLUMNS FROM web_stats_day LIKE 'site'"),
         'r93b' => $has("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'web_inquiries' AND COLUMN_NAME = 'kind' AND COLUMN_TYPE LIKE '%contact%'"),
         'r93a' => $has("SHOW TABLES LIKE 'work_permits'"),

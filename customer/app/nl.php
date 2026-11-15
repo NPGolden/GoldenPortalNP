@@ -62,7 +62,36 @@ function nl_create(string $title, string $site = 'golden'): int {
     $nid = (int) db()->lastInsertId(); if (kym_has()) q('UPDATE nl_issues SET site = ? WHERE id = ?', [$site, $nid]);   // R97-050: an issue belongs to one website
     return $nid;
 }
-function nl_editable(array $I): void { if ($I['status'] !== 'draft') throw new RuntimeException(t('nl.locked')); }
+function nl_editable(array $I): void { if ($I['status'] !== 'draft') throw new RuntimeException(t('nl.locked')); if (($I['appr_state'] ?? '') === 'pending') throw new RuntimeException(t('nl.ap_locked')); }
+/* ---- R97-051: approval by the CEO / General Manager before an issue is sent ---- */
+function nl_appr_has(): bool { static $h = null; if ($h === null) { try { $h = nl_has() && (bool) one("SHOW COLUMNS FROM nl_issues LIKE 'appr_state'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** Those who approve — and who need no approval themselves: Owner scope, CEO, General Manager. */
+function nl_approver(): bool { return is_staff() && ((function_exists('mgmt_can') && mgmt_can()) || (function_exists('cp_role_name') && cp_role_name() === 'ceo')); }
+function nl_appr_ids(): array { static $c = null; if ($c === null) { try { $c = array_map('intval', array_column(all("SELECT cu.id FROM customer_users cu JOIN staff_roles r ON r.id = cu.staff_role_id WHERE cu.is_active = 1 AND cu.role IN ('staff','admin') AND (r.scope = 'owner' OR LOWER(TRIM(r.name)) IN ('ceo','general manager','managing director'))"), 'id')); } catch (Throwable $e) { $c = []; } } return $c; }
+/** The rule is on by default; it rests while no approver account exists, so sending can never be locked out. */
+function nl_appr_on(): bool { return nl_appr_has() && (string) cp_setting('nl_approval', '1') === '1' && nl_appr_ids(); }
+/** Fingerprint of what the readers get and who gets it: an approval is valid for exactly this. */
+function nl_hash(array $I): string { return sha1((string) json_encode([(string)$I['subject'], (string)($I['preheader'] ?? ''), (string)$I['lang'], $I['blocks'], $I['audience'], (string)($I['site'] ?? 'golden')], JSON_UNESCAPED_UNICODE)); }
+function nl_appr_state(array $I): string { $s = (string)($I['appr_state'] ?? ''); if ($s === 'approved' && !hash_equals((string)($I['appr_hash'] ?? ''), nl_hash($I))) return ''; return in_array($s, ['pending', 'approved', 'returned'], true) ? $s : ''; }
+function nl_appr_ok(array $I): bool { return !nl_appr_on() || nl_approver() || nl_appr_state($I) === 'approved'; }
+/** May this account launch the issue? Administrators and management as before; with the rule on, also the author once the issue is approved. */
+function nl_may_send(array $I): bool { if (nl_can_send()) return true; $u = current_user(); $me = (int)($u['id'] ?? 0); return nl_can() && nl_appr_on() && nl_appr_state($I) === 'approved' && $me && ($me === (int)($I['created_by'] ?? 0) || $me === (int)($I['appr_req_by'] ?? 0)); }
+/** After a save: an approved issue that changed loses its approval. */
+function nl_appr_recheck(int $id): bool { if (!nl_appr_has()) return false; $I = nl_issue($id); if (!$I || ($I['appr_state'] ?? '') !== 'approved' || hash_equals((string)$I['appr_hash'], nl_hash($I))) return false; q("UPDATE nl_issues SET appr_state = NULL, appr_hash = NULL WHERE id = ?", [$id]); return true; }
+function nl_appr_pill(array $I): string { if (!nl_appr_has() || ($I['status'] ?? '') !== 'draft') return ''; $s = (string)($I['appr_state'] ?? ''); return $s === 'pending' ? ' ' . pill('gold', t('nl.ap_s_pending')) : ($s === 'approved' ? ' ' . pill('green', t('nl.ap_s_approved')) : ($s === 'returned' ? ' ' . pill('bad', t('nl.ap_s_returned')) : '')); }
+function nl_appr_request(int $id, string $note): void {
+    if (!nl_appr_on()) throw new RuntimeException(t('nl.ap_off')); if (nl_approver()) throw new RuntimeException(t('nl.ap_self')); $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); nl_editable($I);
+    if (!$I['blocks'] || trim((string)$I['subject']) === '') throw new RuntimeException(t('nl.empty')); $n = count(nl_audience($I['audience'], nl_site_of($I))); if (!$n) throw new RuntimeException(t('nl.no_rcpt')); $u = current_user();
+    q("UPDATE nl_issues SET appr_state = 'pending', appr_req_by = ?, appr_req_name = ?, appr_req_at = NOW(), appr_note = ?, appr_by = NULL, appr_name = NULL, appr_at = NULL, appr_reply = NULL, appr_hash = NULL, appr_n = ? WHERE id = ?", [(int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? ''), mb_substr(trim($note), 0, 300) ?: null, $n, $id]);
+    try { if (function_exists('nf_push')) nf_push(nl_appr_ids(), 'nl:appr', 'nl:' . $id, t('nl.ap_nf_request', ['t' => (string)$I['title']]), mb_substr(t('nl.ap_nf_request_b', ['n' => $n, 'u' => (string)($u['full_name'] ?? '')]) . (trim($note) !== '' ? ' — ' . trim($note) : ''), 0, 300), url('newsletter', ['id' => $id]) . '#approval', (int)($u['id'] ?? 0), (string)($u['full_name'] ?? '')); } catch (Throwable $e) {}
+}
+function nl_appr_withdraw(int $id): void { $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); $u = current_user(); if (!nl_can_send() && (int)($u['id'] ?? 0) !== (int)($I['appr_req_by'] ?? 0)) throw new RuntimeException(t('err.noaccess')); q("UPDATE nl_issues SET appr_state = NULL WHERE id = ? AND appr_state = 'pending' AND status = 'draft'", [$id]); }
+function nl_appr_decide(int $id, bool $ok, string $reply): void {
+    if (!nl_approver()) throw new RuntimeException(t('nl.ap_who')); $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); if ($I['status'] !== 'draft' || ($I['appr_state'] ?? '') !== 'pending') throw new RuntimeException(t('nl.ap_not_pending'));
+    $reply = mb_substr(trim($reply), 0, 500); if (!$ok && $reply === '') throw new RuntimeException(t('nl.ap_reply_req')); $u = current_user(); $n = count(nl_audience($I['audience'], nl_site_of($I)));
+    q("UPDATE nl_issues SET appr_state = ?, appr_by = ?, appr_name = ?, appr_at = NOW(), appr_reply = ?, appr_hash = ?, appr_n = ? WHERE id = ? AND appr_state = 'pending'", [$ok ? 'approved' : 'returned', (int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? ''), $reply ?: null, $ok ? nl_hash($I) : null, $n, $id]);
+    try { $to = array_values(array_unique(array_filter([(int)($I['appr_req_by'] ?? 0), (int)($I['created_by'] ?? 0)]))); if (function_exists('nf_push') && $to) nf_push($to, 'nl:appr', 'nl:' . $id, t($ok ? 'nl.ap_nf_ok' : 'nl.ap_nf_back', ['t' => (string)$I['title']]), mb_substr((string)($u['full_name'] ?? '') . ($reply !== '' ? ' — ' . $reply : ''), 0, 300), url('newsletter', ['id' => $id]) . '#approval', (int)($u['id'] ?? 0), (string)($u['full_name'] ?? '')); } catch (Throwable $e) {}
+}
 /** Save head, blocks and audience of a draft from the editor form. */
 function nl_save_from_post(int $id): void {
     $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); nl_editable($I);
@@ -197,7 +226,8 @@ function nl_send_test(int $id): string {
 }
 /** Queue a draft: resolve the audience, register the links, create one row per recipient. From here the issue is locked. */
 function nl_queue(int $id): int {
-    if (!nl_can_send()) throw new RuntimeException(t('err.noaccess')); $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); nl_editable($I);
+    $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); if (!nl_may_send($I)) throw new RuntimeException(t(nl_can() && nl_appr_on() ? 'nl.ap_needed' : 'err.noaccess')); if ($I['status'] !== 'draft') throw new RuntimeException(t('nl.locked'));
+    if (!nl_appr_ok($I)) throw new RuntimeException(t('nl.ap_needed'));   /* R97-051 */
     $site = nl_site_of($I); if (!nl_ready($site)) throw new RuntimeException(t($site === 'kyma' ? 'nl.no_mailer_kyma' : 'nl.no_mailer')); if (!$I['blocks']) throw new RuntimeException(t('nl.empty'));
     $rc = nl_audience($I['audience'], $site); if (!$rc) throw new RuntimeException(t('nl.no_rcpt')); $u = current_user();
     db()->beginTransaction();
@@ -408,14 +438,21 @@ function nl_ai_draft(int $id, string $brief, bool $news, bool $replace): int {
 function nl_handle_action(string $action): bool {
     if (!str_starts_with($action, 'nl_')) return false; require_staff(); if (!nl_can()) throw new RuntimeException(t('err.noaccess'));
     $id = (int)($_POST['id'] ?? 0); $back = fn(string $a = '') => redirect('newsletter', ['id' => $id, '_r' => uniqid()], $a);
+    /* R97-051: an issue waiting for approval is locked — its form is not saved again; a change to an approved issue cancels the approval. */
+    $sv = function () use ($id): void { $I = nl_issue($id); if ($I && ($I['appr_state'] ?? '') === 'pending') return; nl_save_from_post($id); if (nl_appr_recheck($id)) flash('info', t('nl.ap_reset')); };
     switch ($action) {
+        case 'nl_appr_request': $sv(); nl_appr_request($id, (string)($_POST['appr_note'] ?? '')); flash('good', t('nl.ap_requested')); $back('#approval');
+        case 'nl_appr_withdraw': nl_appr_withdraw($id); flash('good', t('nl.ap_withdrawn')); $back('#approval');
+        case 'nl_appr_approve': nl_appr_decide($id, true, (string)($_POST['appr_reply'] ?? '')); flash('good', t('nl.ap_approved')); $back('#approval');
+        case 'nl_appr_approve_send': nl_appr_decide($id, true, (string)($_POST['appr_reply'] ?? '')); $n = nl_queue($id); flash('good', t('nl.queued', ['n' => $n])); $back('#stats');
+        case 'nl_appr_return': nl_appr_decide($id, false, (string)($_POST['appr_reply'] ?? '')); flash('good', t('nl.ap_returned')); $back('#approval');
         case 'nl_create': $id = nl_create((string)($_POST['title'] ?? ''), (string)($_POST['site'] ?? 'golden')); flash('good', t('nl.created')); redirect('newsletter', ['id' => $id]);
-        case 'nl_save': nl_save_from_post($id); flash('good', t('nl.saved')); $back(!empty($_POST['add']) ? '#blocks' : '');
+        case 'nl_save': nl_save_from_post($id); if (nl_appr_recheck($id)) flash('info', t('nl.ap_reset')); flash('good', t('nl.saved')); $back(!empty($_POST['add']) ? '#blocks' : '');
         case 'nl_copy': $id = nl_copy($id); flash('good', t('nl.copied')); redirect('newsletter', ['id' => $id]);
         case 'nl_delete': nl_delete($id); flash('good', t('nl.deleted')); redirect('newsletters', ['_r' => uniqid()]);
-        case 'nl_ai': nl_save_from_post($id); $n = nl_ai_draft($id, (string)($_POST['brief'] ?? ''), !empty($_POST['news']), !empty($_POST['replace'])); flash('good', t('nl.ai_done', ['n' => $n])); $back('#blocks');
-        case 'nl_test': nl_save_from_post($id); $to = nl_send_test($id); flash('good', t('nl.test_sent', ['e' => $to])); $back();
-        case 'nl_queue': nl_save_from_post($id); $n = nl_queue($id); flash('good', t('nl.queued', ['n' => $n])); $back('#stats');
+        case 'nl_ai': $sv(); $n = nl_ai_draft($id, (string)($_POST['brief'] ?? ''), !empty($_POST['news']), !empty($_POST['replace'])); flash('good', t('nl.ai_done', ['n' => $n])); $back('#blocks');
+        case 'nl_test': $sv(); $to = nl_send_test($id); flash('good', t('nl.test_sent', ['e' => $to])); $back();
+        case 'nl_queue': $sv(); $n = nl_queue($id); flash('good', t('nl.queued', ['n' => $n])); $back('#stats');
         case 'nl_batch': if (!nl_can_send()) throw new RuntimeException(t('err.noaccess')); $n = nl_send_batch(min(30, nl_batch() * 2)); flash('good', t('nl.batch_sent', ['n' => $n])); $back('#stats');
         case 'nl_cancel': $n = nl_cancel($id); flash('good', t('nl.cancelled', ['n' => $n])); $back('#stats');
         case 'nl_retry': $n = nl_retry_failed($id); flash('good', t('nl.retried', ['n' => $n])); $back('#stats');
@@ -425,7 +462,7 @@ function nl_handle_action(string $action): bool {
         case 'nl_list_delete': q('DELETE FROM nl_lists WHERE id = ?', [(int)($_POST['list_id'] ?? 0)]); flash('good', t('nl.l_deleted')); redirect('newsletters', ['tab' => 'lists', '_r' => uniqid()]);
         case 'nl_suball': if (!nl_can_send()) throw new RuntimeException(t('err.noaccess')); $n = ct_subscribe_all(); flash('good', t('nl.suball_done', ['n' => $n])); redirect('newsletters', ['tab' => 'lists', '_r' => uniqid()]);
         case 'nl_autocat': if (!nl_can_send()) throw new RuntimeException(t('err.noaccess')); $n = ct_autocat(); flash('good', t('nl.autocat_done', ['n' => $n])); redirect('newsletters', ['tab' => 'lists', '_r' => uniqid()]);
-        case 'nl_settings': if (!nl_can_send()) throw new RuntimeException(t('err.noaccess')); $m = trim((string)($_POST['nl_from'] ?? '')); cp_setting_set('nl_from', $m !== '' && filter_var($m, FILTER_VALIDATE_EMAIL) ? $m : ''); cp_setting_set('nl_batch', (string) max(1, min(50, (int)($_POST['nl_batch'] ?? 15)))); cp_setting_set('nl_daily', (string) max(10, min(5000, (int)($_POST['nl_daily'] ?? 400))));
+        case 'nl_settings': if (!nl_can_send()) throw new RuntimeException(t('err.noaccess')); $m = trim((string)($_POST['nl_from'] ?? '')); cp_setting_set('nl_from', $m !== '' && filter_var($m, FILTER_VALIDATE_EMAIL) ? $m : ''); cp_setting_set('nl_batch', (string) max(1, min(50, (int)($_POST['nl_batch'] ?? 15)))); cp_setting_set('nl_daily', (string) max(10, min(5000, (int)($_POST['nl_daily'] ?? 400)))); if (nl_appr_has() && nl_approver()) cp_setting_set('nl_approval', !empty($_POST['nl_approval']) ? '1' : '0');
             if (kym_has()) { $mk = trim((string)($_POST['nl_from_kyma'] ?? '')); cp_setting_set('nl_from_kyma', $mk !== '' && filter_var($mk, FILTER_VALIDATE_EMAIL) ? $mk : ''); cp_setting_set('nl_list_headers_kyma', !empty($_POST['nl_list_headers_kyma']) ? '1' : '0'); cp_setting_set('nl_list_headers', !empty($_POST['nl_list_headers']) ? '1' : '0'); cp_setting_set('nl_mime_bad_until', '0'); }   // R97-050
             flash('good', t('nl.settings_saved')); redirect('newsletters', ['tab' => 'settings', '_r' => uniqid()]);
     }

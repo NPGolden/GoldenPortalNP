@@ -9,7 +9,7 @@ $S = $draft ? null : nl_stats($id); $ro = $draft ? '' : ' readonly'; $dis = $dra
 layout_head($I['title'] . ' · ' . t('nl.title'), 'web_sales');
 ?>
 <p class="eyebrow"><a href="<?= url('newsletters') ?>"><?= tt('nl.title') ?></a> › <?= e($I['title']) ?></p>
-<div class="page-head"><div><h1>✉ <?= e($I['title']) ?> <?= nl_pill((string)$I['status']) ?><?= $ks ? ' ' . kym_pill($site) : '' ?></h1><p class="lede" style="margin-bottom:0;"><?= e((string)$I['created_name']) ?> · <?= e(fmt_date(substr((string)$I['created_at'], 0, 10))) ?><?= $I['queued_at'] ? ' · ' . e(t('nl.queued_by', ['n' => (string)$I['queued_name'], 'd' => fmt_datetime($I['queued_at'])])) : '' ?></p></div>
+<div class="page-head"><div><h1>✉ <?= e($I['title']) ?> <?= nl_pill((string)$I['status']) ?><?= nl_appr_pill($I) ?><?= $ks ? ' ' . kym_pill($site) : '' ?></h1><p class="lede" style="margin-bottom:0;"><?= e((string)$I['created_name']) ?> · <?= e(fmt_date(substr((string)$I['created_at'], 0, 10))) ?><?= $I['queued_at'] ? ' · ' . e(t('nl.queued_by', ['n' => (string)$I['queued_name'], 'd' => fmt_datetime($I['queued_at'])])) : '' ?></p></div>
   <div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('newsletter', ['id' => $id, 'preview' => 1]) ?>" target="_blank" rel="noopener">👁 <?= tt('nl.preview') ?></a>
     <form method="post" action="<?= $self ?>" class="inline"><?= csrf_field() ?><input type="hidden" name="action" value="nl_copy"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost btn--sm" type="submit">⧉ <?= tt('nl.copy') ?></button></form>
     <?php if ($draft): ?><form method="post" action="<?= $self ?>" class="inline" data-confirm="<?= tt('nl.delete_q') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="nl_delete"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost btn--sm" type="submit">🗑 <?= tt('btn.delete') ?></button></form><?php endif; ?></div></div>
@@ -82,11 +82,30 @@ layout_head($I['title'] . ' · ' . t('nl.title'), 'web_sales');
   </div>
   <?php if ($draft && $rc): ?><details><summary class="hint" style="cursor:pointer;"><?= e(t('nl.aud_list', ['n' => count($rc)])) ?></summary><div class="table-scroll" style="max-height:260px;"><table class="tbl"><tbody><?php foreach (array_slice($rc, 0, 400) as $r): ?><tr><td><?= e($r['name'] ?: '—') ?></td><td class="hint"><?= e($r['email']) ?></td><td><?= e($r['company']) ?></td><td class="hint"><?= e(nl_group_label($r['grp'])) ?></td></tr><?php endforeach; ?></tbody></table></div></details><?php endif; ?>
 </div>
-<?php if ($draft): ?>
+<?php if ($draft && nl_appr_has() && nl_appr_on()): $as = nl_appr_state($I); $apv = nl_approver(); ?>
+<div class="card" id="approval"><div class="card-head"><h2>✔ <?= tt('nl.ap_title') ?><?= nl_appr_pill(['status' => 'draft', 'appr_state' => $as]) ?></h2><span class="hint"><?= tt($apv ? 'nl.ap_hint_apv' : 'nl.ap_hint') ?></span></div>
+  <?php if ($as === 'pending'): ?>
+    <p><?= e(t('nl.ap_asked', ['u' => (string)$I['appr_req_name'], 'd' => fmt_datetime((string)$I['appr_req_at']), 'n' => (int)$I['appr_n']])) ?><?= !empty($I['appr_note']) ? ' — <i>' . e((string)$I['appr_note']) . '</i>' : '' ?></p>
+    <?php if ($apv): ?>
+      <div class="field"><label><?= tt('nl.ap_reply') ?></label><textarea name="appr_reply" rows="2" maxlength="500"></textarea><p class="hint"><?= tt('nl.ap_reply_hint') ?></p></div>
+      <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit" name="action" value="nl_appr_approve">✔ <?= tt('nl.ap_approve') ?></button>
+        <button class="btn btn--sm" type="submit" name="action" value="nl_appr_approve_send" data-confirm="<?= e(t('nl.queue_q', ['n' => count($rc)])) ?>">▶ <?= e(t('nl.ap_approve_send', ['n' => count($rc)])) ?></button>
+        <button class="btn btn--ghost btn--sm" type="submit" name="action" value="nl_appr_return">↩ <?= tt('nl.ap_return') ?></button></div>
+    <?php else: ?><div class="btn-row"><span class="hint"><?= tt('nl.ap_locked') ?></span><?php if ($send || (int)($u['id'] ?? 0) === (int)$I['appr_req_by']): ?><button class="btn btn--ghost btn--sm" type="submit" name="action" value="nl_appr_withdraw" style="margin-left:auto;">↩ <?= tt('nl.ap_withdraw') ?></button><?php endif; ?></div><?php endif; ?>
+  <?php elseif ($as === 'approved'): ?>
+    <p><?= pill('green', t('nl.ap_s_approved')) ?> <?= e(t('nl.ap_by', ['u' => (string)$I['appr_name'], 'd' => fmt_datetime((string)$I['appr_at']), 'n' => (int)$I['appr_n']])) ?><?= !empty($I['appr_reply']) ? ' — <i>' . e((string)$I['appr_reply']) . '</i>' : '' ?></p><p class="hint"><?= tt('nl.ap_change_hint') ?></p>
+  <?php elseif (!$apv): ?>
+    <?php if ($as === 'returned'): ?><p class="flash flash--bad"><?= e(t('nl.ap_back', ['u' => (string)$I['appr_name'], 'd' => fmt_datetime((string)$I['appr_at'])])) ?> — <?= e((string)$I['appr_reply']) ?></p><?php endif; ?>
+    <div class="field"><label><?= tt('nl.ap_note') ?></label><input name="appr_note" maxlength="300"></div>
+    <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit" name="action" value="nl_appr_request" data-confirm="<?= e(t('nl.ap_request_q', ['n' => count($rc)])) ?>">✔ <?= tt('nl.ap_request') ?></button></div>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+<?php if ($draft): $lk = nl_appr_has() && ($I['appr_state'] ?? '') === 'pending'; $ms = nl_may_send($I) && nl_appr_ok($I); ?>
 <div class="card"><div class="btn-row">
-  <button class="btn btn--gold btn--sm" type="submit" name="action" value="nl_save">✓ <?= tt('nl.save') ?></button>
+  <?php if (!$lk): ?><button class="btn btn--gold btn--sm" type="submit" name="action" value="nl_save">✓ <?= tt('nl.save') ?></button><?php endif; ?>
   <button class="btn btn--sm" type="submit" name="action" value="nl_test" data-busy="…">✉ <?= tt('nl.test') ?></button><span class="hint"><?= e(t('nl.test_hint', ['e' => (string)($u['email'] ?? '')])) ?></span>
-  <?php if ($send): ?><button class="btn btn--sm" type="submit" name="action" value="nl_queue" data-confirm="<?= e(t('nl.queue_q', ['n' => count($rc)])) ?>" style="margin-left:auto;">▶ <?= e(t('nl.queue', ['n' => count($rc)])) ?></button><?php else: ?><span class="hint" style="margin-left:auto;"><?= tt('nl.queue_who') ?></span><?php endif; ?>
+  <?php if ($ms): ?><button class="btn btn--sm" type="submit" name="action" value="nl_queue" data-confirm="<?= e(t('nl.queue_q', ['n' => count($rc)])) ?>" style="margin-left:auto;">▶ <?= e(t('nl.queue', ['n' => count($rc)])) ?></button><?php else: ?><span class="hint" style="margin-left:auto;"><?= tt(nl_appr_has() && nl_appr_on() ? 'nl.ap_needed' : 'nl.queue_who') ?></span><?php endif; ?>
 </div></div>
 <?php endif; ?>
 </form>

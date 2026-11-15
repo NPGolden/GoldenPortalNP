@@ -2080,3 +2080,26 @@ Language keys 10 071 each.
 **Security review**: site taken from the key, never from the request; constant-time comparison, keys never logged, shown once, one per site so one can be rotated without the other; KYMA key cannot reach tickets, access requests or counts; career data limited to administrators and management and removable by age; unsubscribe gives no hint whether an address is known; no cross-site sending; all new actions POST + CSRF with role checks; new columns read through placeholders; no inline script. Proposed next (no cost in speed): rotate the Golden site key too so both keys date from this release; an expiry reminder for site keys older than 12 months in the daily health report; SPF / DKIM / DMARC records for the KYMA sender domain before the first issue.
 
 Language keys 10 135 each.
+
+## §337 v1.146.0 (R97-051) — Newsletters: approval by the CEO / General Manager
+
+**Request**: "do we have an approval process for the Newsletters from the CEO or General Manager before launched?" → "do as you say and CEO and General Manager dont need approval".
+
+**Migration** `install/migrate_cp_r97_051_nl_approval.sql` (key `r97t`): `nl_issues.appr_state` (NULL · pending · approved · returned), `appr_req_by/name/at`, `appr_note`, `appr_by/name/at`, `appr_reply`, `appr_hash`, `appr_n`. Guarded by `nl_appr_has()`.
+
+**Logic** (`app/nl.php`):
+
+- `nl_approver()` = Owner scope, CEO, General Manager / Managing Director (`mgmt_can()` or role name `ceo`). They approve and need no approval.
+- `nl_appr_on()` = setting `nl_approval` (default 1) and at least one active approver account (`nl_appr_ids()`), so sending can never be locked out.
+- `nl_hash()` = SHA-1 over subject, preheader, language, blocks, audience, site. `nl_appr_state()` treats an approval whose hash no longer matches as absent; `nl_appr_recheck()` clears it after a save.
+- `nl_appr_request()` (author; content and recipients required; notification `nl:appr` to the approvers), `nl_appr_withdraw()` (author or sender), `nl_appr_decide()` (approver only; comment required on return; notification to the author).
+- `nl_editable()` refuses while `pending`. `nl_queue()`: `nl_may_send()` (administrators and management as before, plus the author once approved) and `nl_appr_ok()`.
+- Actions `nl_appr_request`, `nl_appr_withdraw`, `nl_appr_approve`, `nl_appr_approve_send`, `nl_appr_return`; `nl_settings` stores the switch only for an approver.
+
+**Pages**: card `#approval` on the issue, state pill on the issue and in the list, switch on Newsletters › Settings.
+
+**Tests (sandbox)**: page before the migration unchanged; author without approval cannot send (message names the rule); author cannot approve; submit → pending, approvers notified, save refused, Save button gone; return without comment refused, with comment → author sees it; resubmit → approve → author may send with the form unchanged; change of subject after approval → approval cancelled and send refused; approved state with a foreign fingerprint written straight into the database → refused; CEO sends directly; withdraw; switch not changeable by a non-approver, off → card gone, on again. Page sweep unchanged. Real sending is not possible in the sandbox (no mail connection).
+
+**Security review**: the gate is enforced in `nl_queue()` on the server, not by the buttons; approval is bound to the content and audience by fingerprint and compared in constant time; approver identity from the staff role, never from the request; all actions POST + CSRF; comments trimmed and length-capped, shown escaped; the switch is limited to the approvers. Proposed next (no cost in speed): list approvals and sends in the daily health report; a second approver for audiences above a set size.
+
+Language keys 10 173 each.
