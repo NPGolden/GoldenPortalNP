@@ -304,6 +304,7 @@ function sb_finish_blockers(array $B): array {
     if (!(int)$B['project_id'] || !(int)$B['subproject_id']) $x[] = t('sb.blk_sub');
     if (!$B['labour'] && !$B['parts']) $x[] = t('sb.blk_lines');
     if ($T['unpriced'] > 0) $x[] = t('sb.blk_unpriced', ['n' => $T['unpriced']]);
+    if (function_exists('sbc_blocking')) foreach (sbc_blocking($B) as $m) $x[] = $m;   // R97-048: arithmetic and below-cost findings, unless management accepted them
     return $x;
 }
 function sb_set_status(int $id, string $to): void {
@@ -801,6 +802,7 @@ function sb_convert(int $id, array $opt): int {
     if (!sb_can_convert()) throw new RuntimeException(t('sb.cv_no_right'));
     $B = sb_get($id); if (!$B) throw new RuntimeException(t('err.notfound'));
     if ($B['status'] !== 'finished' || !empty($B['is_template'])) throw new RuntimeException(t('sb.cv_need_finished'));
+    if (function_exists('sbc_blocking') && ($blkC = sbc_blocking($B))) throw new RuntimeException(t('sbc.cv_blocked') . ' ' . implode(' ', array_slice($blkC, 0, 3)));   // R97-048
     if (!empty($opt['assign']) && sb_assign_lines($B, (array)$opt['assign'])) $B = sb_get($id);   // R97-007: section / discipline chosen on the preview for lines that had none
     $pid = (int)$B['project_id']; $sid = (int)$B['subproject_id']; $sp = $sid ? one('SELECT s.*, p.vessel_id FROM subprojects s JOIN projects p ON p.id = s.project_id WHERE s.id = ? AND s.project_id = ?', [$sid, $pid]) : null; if (!$sp) throw new RuntimeException(t('sb.blk_sub'));
     $P = sb_offer_lines($B, $opt); if (!$P['lines']) throw new RuntimeException(t('sb.cv_no_lines'));

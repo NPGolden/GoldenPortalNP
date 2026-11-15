@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.142.1** (build 2026-11-15). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.143.0** (build 2026-11-15). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.143.0 | GAS-CP-R97-048 | 2026-11-15 | System Budgets: consistency check — ten checks on every budget (arithmetic, completeness, rates and prices against the masters, profit rules, internal ratios, similar budgets, revision to revision, budget to offer, budget to actuals, AI review of the scope), a company overview, limits set by management; “must fix” findings stop Finish and Convert until solved or accepted by management with a reason. | — |
 | 1.142.1 | GAS-CP-R97-047 | 2026-11-15 | Exports of contacts, organisations, customers and accounts are allowed only to the staff roles CEO, General Manager and Developer (no longer to every administrator); each export and each refused attempt is recorded and listed in the daily health report. | — |
 | 1.142.0 | GAS-CP-R97-046 | 2026-11-14 | System health (Settings › System): 30-day trend of page times, where slow pages spent their time, calls to other servers, background jobs, slow database statements with examination, PHP errors grouped with page and version and “new since this release”; the daily health report carries the same findings. | — |
 | 1.141.0 | GAS-CP-R97-045 | 2026-11-14 | Daily health report by e-mail to the portal administrators (default 07:00, schedule and recipients in Settings › About / Versions › Diagnostics): failed checks and warnings, slow pages and PHP log of the last 24 hours grouped, background work, full diagnostics; timesheet PDF footer shows the branch line again. | — |

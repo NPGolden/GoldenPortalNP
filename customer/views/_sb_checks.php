@@ -1,0 +1,36 @@
+<?php
+/** Consistency check panel of a system budget — included by system_budget.php ($B, $id, $self, $isRev, $tpl, $CUR).   GAS-CP-R97-048 */
+$sbcOnly = $isRev ? [1, 2, 4, 7] : ($tpl ? [1, 2, 3, 4, 5] : null); $SR = sbc_run($B, $sbcOnly); $sbcN = $SR['n']; $sbcOv = $isRev || $tpl ? null : sbc_overridden($CUR);
+$sbcBy = []; foreach ($SR['findings'] as $f) $sbcBy[$f['c']][] = $f; ksort($sbcBy); $sbcStored = (bool) array_filter($SR['findings'], fn($f) => $f['code'] === 'stored');
+$sbcHard = count(array_filter($SR['findings'], fn($f) => $f['sev'] === 'block' && in_array($f['c'], [1, 2, 4], true)));
+?>
+<div class="card" id="checks">
+  <div class="card-head"><h2>🔍 <?= tt('sbc.title') ?>
+    <?= $sbcN['block'] ? ' ' . pill('bad', $sbcN['block'] . ' ' . t('sbc.sev_block')) : '' ?><?= $sbcN['warn'] ? ' ' . pill('gold', $sbcN['warn'] . ' ' . t('sbc.sev_warn')) : '' ?><?= $sbcN['info'] ? ' ' . pill('mute', $sbcN['info'] . ' ' . t('sbc.sev_info')) : '' ?><?= !$sbcN['block'] && !$sbcN['warn'] ? ' ' . pill('green', t('sbc.ok_all')) : '' ?></h2>
+    <div class="btn-row">
+      <?php if ($sbcStored && !$isRev): ?><form method="post" action="<?= $self ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sbc_recalc"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--gold btn--sm" type="submit">Σ <?= tt('sbc.recalc_btn') ?></button></form><?php endif; ?>
+      <?php if (!$isRev && !$tpl && function_exists('sb_ai_on') && sb_ai_on()): ?><form method="post" action="<?= $self ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sbc_ai"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost btn--sm" type="submit">✨ <?= tt('sbc.ai_btn') ?></button></form><?php endif; ?>
+      <a class="btn btn--ghost btn--sm" href="<?= url('system_budget_checks') ?>">☰ <?= tt('sbc.ov_title') ?></a>
+    </div></div>
+  <p class="hint" style="margin:0 0 8px;"><?= tt('sbc.hint') ?></p>
+  <?php if ($sbcOv): ?><p class="flash flash--warn" style="margin:0 0 8px;"><?= e(t('sbc.ov_by', ['n' => (string)$sbcOv['full_name'], 'd' => fmt_datetime((string)$sbcOv['created_at']), 'r' => (string)$sbcOv['note']])) ?></p>
+  <?php elseif ($sbcHard && !$isRev && !$tpl): ?><p class="flash flash--bad" style="margin:0 0 8px;"><?= tt('sbc.blocked_note') ?></p>
+    <?php if (sb_can_reopen()): ?><form method="post" action="<?= $self ?>" class="filters" style="margin:0 0 10px;" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sbc_override"><input type="hidden" name="id" value="<?= $id ?>"><div class="field" style="flex:1;min-width:260px;"><label><?= tt('sbc.ov_reason') ?></label><input name="reason" maxlength="270" required minlength="10"></div><button class="btn btn--sm" type="submit">⚑ <?= tt('sbc.ov_btn') ?></button></form><?php endif; ?>
+  <?php endif; ?>
+  <?php if (!$SR['findings']): ?><p class="hint"><?= tt('sbc.none') ?></p><?php endif; ?>
+  <?php foreach ($sbcBy as $cNo => $list): $worst = in_array('block', array_column($list, 'sev'), true) ? 'block' : (in_array('warn', array_column($list, 'sev'), true) ? 'warn' : 'info'); ?>
+  <details<?= $worst !== 'info' ? ' open' : '' ?> style="border-top:1px solid var(--line);padding:6px 0;">
+    <summary style="cursor:pointer;"><b><?= $cNo ?>. <?= tt('sbc.c' . $cNo) ?></b> <?= pill(SBC_SEV[$worst], (string) count($list)) ?></summary>
+    <ul style="margin:6px 0 4px;padding-left:4px;list-style:none;"><?php foreach ($list as $f): ?><li style="margin:3px 0;display:flex;gap:8px;align-items:baseline;"><span style="flex:none;"><?= pill(SBC_SEV[$f['sev']], t('sbc.sev1_' . $f['sev'])) ?></span><span><?= e($f['msg']) ?><?php if ($f['at'] !== '' && !$isRev): ?> <a class="hint" href="#<?= e($f['at']) ?>">↓</a><?php endif; ?></span></li><?php endforeach; ?></ul>
+    <?php if ($cNo === 6 && !empty($SR['extra']['peer']['rows'])): $PE = $SR['extra']['peer']; ?><div class="table-scroll"><table class="tbl tbl--compact"><thead><tr><th><?= tt('sbc.p_measure') ?></th><th class="num"><?= tt('sbc.p_this') ?></th><th class="num"><?= tt('sbc.p_typical') ?></th><th class="num"><?= tt('sbc.p_range') ?></th><th></th></tr></thead><tbody>
+      <?php foreach ($PE['rows'] as $r): ?><tr><td><?= tt('sbc.k_' . $r['k']) ?></td><td class="num"><b><?= e($r['v']) ?></b></td><td class="num"><?= e($r['md']) ?></td><td class="num"><?= e($r['lo'] . ' – ' . $r['hi']) ?></td><td><?= $r['out'] === '' ? pill('green', 'OK') : pill('gold', t('sbc.p_' . $r['out'])) ?></td></tr><?php endforeach; ?></tbody></table></div><p class="hint"><?= e(t('sbc.p_scope_' . $PE['scope'], ['n' => $PE['n']])) ?></p><?php endif; ?>
+    <?php if ($cNo === 7 && !empty($SR['extra']['diff']['rows'])): $DF = $SR['extra']['diff']; ?><div class="table-scroll"><table class="tbl tbl--compact"><thead><tr><th><?= tt('sbc.d_part') ?></th><th><?= tt('sbc.d_line') ?></th><th><?= tt('sbc.d_change') ?></th><th><?= tt('sbc.d_what') ?></th><th class="num">Δ <?= tt('sbc.w_cost') ?></th><th class="num">Δ <?= tt('sbc.w_sale') ?></th></tr></thead><tbody>
+      <?php foreach (array_slice($DF['rows'], 0, 80) as $r): ?><tr><td><?= tt('sbc.t_' . $r['t']) ?></td><td><?= e($r['l']) ?></td><td><?= pill($r['ch'] === 'added' ? 'green' : ($r['ch'] === 'removed' ? 'bad' : 'gold'), t('sbc.ch_' . $r['ch'])) ?></td><td class="hint"><?= e($r['what']) ?></td><td class="num"><?= ($r['dc'] >= 0 ? '+' : '') . sbc_m($r['dc']) ?></td><td class="num"><?= ($r['ds'] >= 0 ? '+' : '') . sbc_m($r['ds']) ?></td></tr><?php endforeach; ?>
+      <tr><td colspan="4"><b><?= e('R' . $DF['prev'] . ' → R' . $DF['cur']) ?></b> · <?= e(t('sbc.d_profit', ['a' => sbc_p($DF['pp']), 'b' => sbc_p($DF['pn'])])) ?></td><td class="num"><b><?= ($DF['dc'] >= 0 ? '+' : '') . sbc_m($DF['dc']) ?></b></td><td class="num"><b><?= ($DF['ds'] >= 0 ? '+' : '') . sbc_m($DF['ds']) ?></b></td></tr></tbody></table></div><?php endif; ?>
+    <?php if ($cNo === 9 && !empty($SR['extra']['actual']['rows'])): $AC = $SR['extra']['actual']; ?><div class="table-scroll"><table class="tbl tbl--compact"><thead><tr><th><?= tt('sbc.a_disc') ?></th><th class="num"><?= tt('sbc.a_bh') ?></th><th class="num"><?= tt('sbc.a_ah') ?></th><th class="num">%</th></tr></thead><tbody>
+      <?php foreach ($AC['rows'] as $r): ?><tr><td><?= e($r['name']) ?></td><td class="num"><?= sb_h($r['budget_h']) ?></td><td class="num"><?= sb_h($r['actual_h']) ?></td><td class="num"><?= pill($r['tone'] === 'red' ? 'bad' : ($r['tone'] === 'amber' ? 'gold' : 'green'), $r['pct'] . ' %') ?></td></tr><?php endforeach; ?>
+      <tr><td><b><?= tt('sbc.a_parts') ?></b></td><td class="num"><?= sbc_m($AC['parts_budget']) ?></td><td class="num"><?= sbc_m($AC['parts_committed']) ?></td><td></td></tr><tr><td><b><?= tt('sbc.a_forecast') ?></b></td><td class="num"><?= sbc_m($AC['budget_cost']) ?></td><td class="num"><?= sbc_m($AC['forecast']) ?></td><td class="num"><?= (int)$AC['progress'] ?> % <?= tt('sbc.a_progress') ?></td></tr></tbody></table></div>
+      <p class="hint"><?= tt('sbc.a_note') ?> <a href="<?= url('subproject', ['id' => (int)$AC['sid']]) ?>#budget"><?= tt('sbc.a_open') ?></a></p><?php endif; ?>
+  </details>
+  <?php endforeach; ?>
+</div>

@@ -9,7 +9,7 @@ layout_head(t('sb.title'), 'system_budgets');
 ?>
 <div class="page-head">
   <div><h1>🧮 <?= tt('sb.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('sb.lede') ?></p></div>
-  <?php if (sb_can_reopen() && function_exists('sb_audit_xlsx')): ?><div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('system_budget_audit') ?>" title="<?= tt('sb.aud_hint') ?>">🛡 <?= tt('sb.aud_btn') ?></a></div><?php endif; ?>
+  <div class="btn-row"><?php if (function_exists('sbc_run')): ?><a class="btn btn--ghost btn--sm" href="<?= url('system_budget_checks') ?>">🔍 <?= tt('sbc.ov_title') ?></a><?php endif; ?><?php if (sb_can_reopen() && function_exists('sb_audit_xlsx')): ?><a class="btn btn--ghost btn--sm" href="<?= url('system_budget_audit') ?>" title="<?= tt('sb.aud_hint') ?>">🛡 <?= tt('sb.aud_btn') ?></a><?php endif; ?></div>
 </div>
 
 <div class="kpi kpi--4">

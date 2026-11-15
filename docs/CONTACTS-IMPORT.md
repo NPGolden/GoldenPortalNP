@@ -2001,3 +2001,32 @@ Language keys 9 812 each.
 **Security review**: this closes the bulk-extraction path for the customer and contact base for every account except three roles; the server refuses the request itself, not only the button; attempts are logged, so a try by a compromised administrator account becomes visible the next morning. Not covered by this rule and worth knowing: a person who may open the Contacts list can still read it on screen page by page, and the mobile app service returns contacts to staff — a per-day view limit or an alert on unusual reading volume can be added if wanted.
 
 Language keys 9 813 each.
+
+## §334 v1.143.0 (R97-048) — System Budgets: consistency checks 1–10
+
+**Request**: "propose ways to check budget consistency" → "Add all 1-10".
+
+**New module** `app/sbc.php` (loaded after `sb.php`), no database step. `sbc_run($B, $only)` returns findings `['c','sev','code','msg','at']`, counts and extra tables.
+
+| # | Check | Function | Severity |
+|---|---|---|---|
+| 1 | Arithmetic: stored totals ≠ lines, negatives, discount range, hours without rate, flat / cost rate zero, expense mark-up drift, commission range | `sbc_c1` | block |
+| 2 | Completeness: no sub-project, empty / zero lines, no section / discipline, unpriced, duplicates, description empty or naming work with no hours | `sbc_c2` | warn (unpriced = block) |
+| 3 | Masters: labour rate vs rate card of the zone, part cost vs inventory (lowest price → last price → average), price age, inactive items, free parts that match an inventory code | `sbc_c3` | warn |
+| 4 | Profit: line / section / group / total vs `sb_min_profit()`; below cost | `sbc_c4` | block below cost, warn below minimum |
+| 5 | Ratios (from 40 h): PM share, commissioning, engineering, overtime, travel and allowance outside Attica, FAT, documentation, logistics | `sbc_c5` | warn / info |
+| 6 | Similar budgets: sale per hour, material / labour cost, profit, engineering share, other costs share against the 10th–90th percentile of finished / converted budgets (same template when five exist) | `sbc_c6`, `sbc_population()` (4 statements, cached 15 min) | info |
+| 7 | Revision diff by code + description, each side priced with its own header | `sbc_c7`, `sbc_diff()` | info; warn on profit drop |
+| 8 | Offer: exists, total equals budget sale (with or without commission), edited / revised after conversion, sub-project budget revision, hours not fed | `sbc_c8` | warn |
+| 9 | Actuals of the sub-project (`bg_calc()`): discipline over budget, unbudgeted hours, parts over, forecast overrun | `sbc_c9` | warn |
+| 10 | AI review of scope against lines, on request, stored in `storage/sbc/ai-<id>.json` | `sbc_ai_review()`, `sbc_c10` | info |
+
+- Gate: `sb_finish_blockers()` and `sb_convert()` include `sbc_blocking()` (blocking findings of checks 1, 2, 4). `sbc_override()` — management (`sb_can_reopen()`), reason ≥ 10 characters, `sb_events` kind `override` for the current revision.
+- Pages: card on the budget (`views/_sb_checks.php`), `?p=system_budget_checks` overview (`sbc_overview()`, summary per budget cached 10 min) with the limits form.
+- Actions: `sbc_recalc`, `sbc_override`, `sbc_ai`, `sbc_settings`. Settings `sbc_price_tol` 5, `sbc_price_age` 6, `sbc_profit_drop` 5, `sbc_pm_share` 3, `sbc_ot_share` 25, `sbc_overrun` 10.
+
+**Tests (sandbox)**: nine budgets opened — findings match the data (rate drift listed per line, below-cost line blocks, revision table R1 → R2); Finish refused with the finding text; reason of 5 characters refused; management acceptance recorded; project manager cannot accept; stored total altered by hand → button appears, recalculation clears it; overview 191 statements cold, 45 cached; no PHP warnings. AI review not exercised (no key in the sandbox).
+
+**Security review**: read-only module; actions POST + CSRF behind `sb_guard()`; acceptance management only and recorded with name, time, address; AI review sends titles, descriptions, codes, quantities and hours — no prices, no customer or personal data — and follows the existing AI limits and log; the stored answer is stripped of markup. Statement placeholders throughout; IN-lists built from integers or bound values.
+
+Language keys 9 997 each.
