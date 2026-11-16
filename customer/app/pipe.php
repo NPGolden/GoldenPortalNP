@@ -79,8 +79,10 @@ function pp_open(array $f = []): array {
     [$scope, $args] = scope_sql('p'); $w = ["o.status IN ('" . implode("','", array_map(fn($s) => str_replace("'", '', $s), pp_open_statuses())) . "')", $scope];
     if (!empty($f['owner'])) { $w[] = 'COALESCE(o.next_action_user_id, o.created_by) = ?'; $args[] = (int)$f['owner']; }
     if (!empty($f['vessel'])) { $w[] = 'o.vessel_id = ?'; $args[] = (int)$f['vessel']; }
-    $rows = all("SELECT o.*, p.project_code, p.name AS project_name, v.name AS vessel, c.name AS customer_name, cu.full_name AS owner_name, cr.full_name AS creator_name
-                 FROM offers o JOIN projects p ON p.id = o.project_id LEFT JOIN vessels v ON v.id = o.vessel_id LEFT JOIN customers c ON c.id = p.customer_id
+    // R97-055: branch of an offer = its sub-project's branch, else the project's, else the default branch (as the offers list)
+    if (!empty($f['branch']) && function_exists('br_has') && br_has()) { $w[] = 'COALESCE(s.branch_id, p.branch_id, ?) = ?'; array_push($args, (int)br_default()['id'], (int)$f['branch']); }
+    $rows = all("SELECT o.*, p.project_code, p.name AS project_name, v.name AS vessel, c.name AS customer_name, cu.full_name AS owner_name, cr.full_name AS creator_name, COALESCE(s.branch_id, p.branch_id) AS branch_id
+                 FROM offers o JOIN projects p ON p.id = o.project_id LEFT JOIN subprojects s ON s.id = o.subproject_id LEFT JOIN vessels v ON v.id = o.vessel_id LEFT JOIN customers c ON c.id = p.customer_id
                  LEFT JOIN customer_users cu ON cu.id = o.next_action_user_id LEFT JOIN customer_users cr ON cr.id = o.created_by WHERE " . implode(' AND ', $w) . ' ORDER BY o.next_action_at IS NULL, o.next_action_at, o.sent_at', $args);
     $sig = pp_signals_bulk(array_column($rows, 'id')); $today = date('Y-m-d');
     foreach ($rows as &$o) { $o['signals'] = $sig[(int)$o['id']] ?? []; $o['prob'] = pp_prob($o, $o['signals']); $o['weighted'] = round((float)$o['amount'] * $o['prob'] / 100, 2);
@@ -89,9 +91,10 @@ function pp_open(array $f = []): array {
     unset($o); return $rows;
 }
 /** Stage-to-stage funnel for a year: how many offers (and value) reached each stage at least once (events status_<stage>, sent_at, decisions). */
-function pp_funnel(int $year): array {
-    $stages = pp_open_statuses(); $out = []; [$scope, $args] = scope_sql('p');
-    $ids = all("SELECT o.id, o.amount, o.status FROM offers o JOIN projects p ON p.id = o.project_id WHERE YEAR(COALESCE(o.sent_at, o.created_at)) = ? AND o.status <> 'draft' AND {$scope}", array_merge([$year], $args));
+function pp_funnel(int $year, int $branch = 0): array {
+    $stages = pp_open_statuses(); $out = []; [$scope, $args] = scope_sql('p'); $bw = '';
+    if ($branch && function_exists('br_has') && br_has()) { $bw = ' AND COALESCE(s.branch_id, p.branch_id, ?) = ?'; array_push($args, (int)br_default()['id'], $branch); }   // R97-055
+    $ids = all("SELECT o.id, o.amount, o.status FROM offers o JOIN projects p ON p.id = o.project_id LEFT JOIN subprojects s ON s.id = o.subproject_id WHERE YEAR(COALESCE(o.sent_at, o.created_at)) = ? AND o.status <> 'draft' AND {$scope}{$bw}", array_merge([$year], $args));
     $byId = []; foreach ($ids as $r) $byId[(int)$r['id']] = $r; if (!$byId) return ['stages' => [], 'won' => ['n' => 0, 'amount' => 0], 'lost' => ['n' => 0, 'amount' => 0]];
     $reached = []; foreach ($stages as $s) $reached[$s] = [];
     foreach (all('SELECT offer_id, event FROM offer_events WHERE offer_id IN (' . implode(',', array_keys($byId)) . ") AND event LIKE 'status_%'") as $e) { $s = substr($e['event'], 7); if (isset($reached[$s])) $reached[$s][(int)$e['offer_id']] = true; }

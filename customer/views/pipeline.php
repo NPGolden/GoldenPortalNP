@@ -4,22 +4,23 @@
 require __DIR__ . '/_layout.php';
 $u = require_login(); $staff = is_staff();
 if (!$staff || !function_exists('pp_can') || !pp_can()) { http_response_code(403); layout_head(t('err.noaccess'), 'pipeline'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
-$f = ['owner' => (int)($_GET['owner'] ?? 0), 'vessel' => (int)($_GET['vessel'] ?? 0)]; $view = ($_GET['view'] ?? 'board') === 'list' ? 'list' : 'board'; $year = (int)($_GET['year'] ?? date('Y'));
+$brOn = function_exists('br_has') && br_has() && br_multi();   // R97-055: branch filter, when more than one branch is active
+$f = ['owner' => (int)($_GET['owner'] ?? 0), 'vessel' => (int)($_GET['vessel'] ?? 0), 'branch' => $brOn ? (int)($_GET['branch'] ?? 0) : 0]; if ($f['branch'] && !isset(br_all(true)[$f['branch']])) $f['branch'] = 0; $view = ($_GET['view'] ?? 'board') === 'list' ? 'list' : 'board'; $year = (int)($_GET['year'] ?? date('Y'));
 $rows = pp_open($f); $stages = pp_open_statuses(); $today = date('Y-m-d');
 $byStage = []; foreach ($stages as $s) $byStage[$s] = []; foreach ($rows as $o) $byStage[$o['status']][] = $o;
 $tot = ['n' => count($rows), 'amount' => 0.0, 'weighted' => 0.0, 'overdue' => 0, 'none' => 0, 'expiring' => 0, 'late' => 0];
 foreach ($rows as $o) { $tot['amount'] += (float)$o['amount']; $tot['weighted'] += $o['weighted']; if ($o['overdue'] !== null && $o['overdue'] > 0) $tot['overdue']++; if (empty($o['next_action_at'])) $tot['none']++; if ($o['expiring']) $tot['expiring']++; if ($o['stage_late']) $tot['late']++; }
 $due = array_values(array_filter($rows, fn($o) => !empty($o['next_action_at']) && $o['next_action_at'] <= $today)); usort($due, fn($a, $b) => $a['next_action_at'] <=> $b['next_action_at']);
 $none = array_values(array_filter($rows, fn($o) => empty($o['next_action_at'])));
-$funnel = pp_funnel($year);
+$funnel = pp_funnel($year, $f['branch']);
 $byOwner = []; foreach ($rows as $o) { $k = $o['owner_label'] ?: '—'; $byOwner[$k] = $byOwner[$k] ?? ['n' => 0, 'amount' => 0.0, 'weighted' => 0.0, 'overdue' => 0, 'none' => 0]; $byOwner[$k]['n']++; $byOwner[$k]['amount'] += (float)$o['amount']; $byOwner[$k]['weighted'] += $o['weighted']; if ($o['overdue'] > 0) $byOwner[$k]['overdue']++; if (empty($o['next_action_at'])) $byOwner[$k]['none']++; }
 ksort($byOwner);
 $staffList = function_exists('mt_staff') ? mt_staff() : []; [$vs, $va] = tk_scope(); $vessels = all("SELECT v.id, v.name FROM vessels v WHERE {$vs} ORDER BY v.name", $va);
 $keep = array_filter($f + ['view' => $view, 'year' => $year]);
-$card = function (array $o) use ($today): string {
+$card = function (array $o) use ($today, $brOn): string {
     $cls = $o['overdue'] > 0 || $o['stage_late'] ? 'is-late' : ($o['expiring'] ? 'is-warn' : '');
     $h = '<div class="pp-card ' . $cls . '"><div class="pp-top"><a href="' . url('offer', ['id' => (int)$o['id']]) . '#followup"><b>' . e($o['offer_no']) . '</b> <span class="hint">' . e($o['revision']) . '</span></a>' . pp_prob_pill((int)$o['prob']) . '</div>';
-    $h .= '<div class="pp-title">' . e($o['title']) . '</div><div class="hint">' . e($o['vessel'] ?: $o['project_code']) . ($o['customer_name'] ? ' · ' . e($o['customer_name']) : '') . '</div>';
+    $h .= '<div class="pp-title">' . e($o['title']) . '</div><div class="hint">' . e($o['vessel'] ?: $o['project_code']) . ($o['customer_name'] ? ' · ' . e($o['customer_name']) : '') . ($brOn ? ' · <span title="' . tt('br.one') . '">' . e((string)br_get((int)($o['branch_id'] ?? 0) ?: null)['code']) . '</span>' : '') . '</div>';
     $h .= '<div class="pp-row"><b>' . e(of_money((float)$o['amount'], $o['currency'])) . '</b><span class="hint">' . e(t('pp.weighted_short', ['v' => of_money($o['weighted'])])) . '</span></div>';
     $h .= '<div class="pp-row"><span class="hint">' . e(t('pp.in_stage', ['n' => $o['days_in_stage']])) . ($o['stage_late'] ? ' ' . pill('bad', t('pp.stage_late')) : '') . '</span>' . ($o['expiring'] ? pill('gold', t('pp.expiring_short', ['d' => fmt_date($o['valid_until'])])) : '') . '</div>';
     $h .= '<div class="pp-row">' . ($o['next_action_type'] ? '<span>' . e(pp_action_label($o['next_action_type'])) . ' · ' . ($o['overdue'] > 0 ? pill('bad', fmt_date($o['next_action_at']) . ' · ' . t('pp.overdue_d', ['d' => $o['overdue']])) : ($o['overdue'] === 0 ? pill('gold', t('pp.today')) : e(fmt_date($o['next_action_at'])))) . '</span>' : pill('bad', t('pp.none_short'))) . '<span class="hint">' . e($o['owner_label']) . '</span></div>';
@@ -43,10 +44,11 @@ layout_head(t('pp.title'), 'pipeline');
 </div>
 
 <div class="card card--tight">
-  <form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1fr 1fr auto;">
+  <form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1fr 1fr<?= $brOn ? ' 1fr' : '' ?> auto;">
     <input type="hidden" name="p" value="pipeline"><input type="hidden" name="view" value="<?= $view ?>">
     <div class="field"><label><?= tt('pp.owner') ?></label><select name="owner"><option value=""><?= tt('flt.any') ?></option><?php foreach ($staffList as $x): ?><option value="<?= (int)$x['id'] ?>"<?= (int)$x['id'] === $f['owner'] ? ' selected' : '' ?>><?= e($x['name']) ?></option><?php endforeach; ?></select></div>
     <div class="field"><label><?= tt('v.one') ?></label><select name="vessel"><option value=""><?= tt('flt.any') ?></option><?php foreach ($vessels as $v): ?><option value="<?= (int)$v['id'] ?>"<?= (int)$v['id'] === $f['vessel'] ? ' selected' : '' ?>><?= e($v['name']) ?></option><?php endforeach; ?></select></div>
+    <?php if ($brOn): ?><div class="field"><label for="branch"><?= tt('br.one') ?></label><select id="branch" name="branch" data-nosearch><option value=""><?= tt('flt.any') ?></option><?= br_options($f['branch'] ?: null) ?></select></div><?php endif; ?>
     <div class="fltbar-actions"><button class="btn btn--sm" type="submit"><?= tt('btn.apply') ?></button><a class="btn btn--ghost btn--sm" href="<?= url('pipeline', ['view' => $view]) ?>"><?= tt('btn.clear') ?></a></div>
   </form>
 </div>

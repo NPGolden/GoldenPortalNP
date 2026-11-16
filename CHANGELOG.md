@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.149.0** (build 2026-11-15). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.150.0** (build 2026-11-15). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.150.0 | GAS-CP-R97-055 | 2026-11-16 | Sales pipeline: branch filter — board, list, totals, follow-ups, per sales person and the funnel can be limited to one branch; each card shows the branch code. | — |
 | 1.149.0 | GAS-CP-R97-054 | 2026-11-16 | KYMA mark by role: contacts and organisations with an e-mail that are customers, yards, owners or engineering offices get the KYMA mark next to Golden A/S automatically (hourly check, switch and “mark now” in Settings › Website › KYMA website); only the mark is added. | — |
 | 1.148.0 | GAS-CP-R97-053 | 2026-11-16 | Sub-projects: the order is numbered automatically, like the code — a new sub-project gets the next number, typing a position moves it there and the others are renumbered 1…N without gaps or doubles; existing projects were renumbered once in their present order. | — |
 | 1.147.0 | GAS-CP-R97-052 | 2026-11-15 | Organisations: “Known shipyards” — proposes the Yard tick for organisations whose name carries a shipyard word (any language) or the name of a known yard in Europe, the US and worldwide; nothing changes until the proposed rows are approved; only the Yard role is added, the other roles stay. The role “Other” now stays on an organisation only when no other role is ticked. | — |

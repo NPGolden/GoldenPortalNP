@@ -2165,3 +2165,17 @@ Language keys 10 197 each.
 **Security and data protection review**: administrators only, POST + CSRF; fixed role and category lists compiled into the SQL (no request data in it); only one column touched; logged. Data protection: the mark makes people reachable by a second sender (KYMA) who gave their address to Golden A/S — the KYMA issues must carry the KYMA identity, a working unsubscribe (in place since v1.145.0) and be relevant to their business role; the approval step of v1.146.0 applies. Proposed (no cost in speed): state in the privacy notice of both sites that Golden A/S and KYMA Marine Power share business contacts for their newsletters.
 
 Language keys 10 205 each.
+
+## §341 v1.150.0 (R97-055) — Sales pipeline: branch filter
+
+**Request**: "Create Branch filter to Sales Pipeline".
+
+- `app/pipe.php`: `pp_open($f)` accepts `branch` — `COALESCE(s.branch_id, p.branch_id, <default branch>) = ?` with a join to the sub-project (same rule as `of_list()`, R96-002) and returns `branch_id`; `pp_funnel($year, $branch = 0)` filters the same way.
+- `views/pipeline.php`: `$brOn` (more than one active branch), select `branch` (`br_options()`), unknown ids fall back to all, branch code on each card, the value travels with the board / list buttons and the year form.
+- No new language keys (`br.one`, `flt.any` exist), no migration.
+
+**Tests (sandbox)**: page with branch 0 / head office / second branch / unknown id in board and list view — no errors, the select keeps the choice; three sent offers in a project moved to the second branch → 3 with that branch, 0 with the head office, 3 without filter; year form keeps the branch.
+
+**Security review**: the branch id is cast to an integer, checked against the active branches and bound as a parameter; the existing project scope (`scope_sql`) still applies before the filter, so the filter can only narrow what the account may already see. Nothing to propose for this change.
+
+Language keys 10 205 each (unchanged).
