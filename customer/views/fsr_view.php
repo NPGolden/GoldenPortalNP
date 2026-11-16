@@ -26,6 +26,7 @@ layout_head(t('fsr.title') . ' ' . $r['report_no'], $staff ? 'projects' : 'repor
     <?php if (is_staff() && array_key_exists('invoicing', $r) && ($r['invoicing'] ?? 'none') !== 'none' && function_exists('acc_has') && acc_has()): $ar = $r['acc_report_id'] ? one('SELECT id, report_no, revision FROM acc_reports WHERE id = ?', [(int)$r['acc_report_id']]) : null; ?><p class="hint" style="margin:4px 0 0;">🧾 <?= e(t('acc.inv_line', ['s' => t('acc.inv_' . $r['invoicing'])])) ?><?= $ar ? ' — <a href="' . url('acc_report', ['id' => $ar['id']]) . '">' . e($ar['report_no'] . ' ' . $ar['revision']) . '</a>' : '' ?></p><?php endif; ?>
   </div>
   <div class="actions">
+    <?= function_exists('sgn_button') && ($r['kind'] ?? 'internal') !== 'external' ? sgn_button('fsr', $id, (string)$r['status']) : '' ?>
     <?php if ($r['pdf_file_id']): ?><a class="btn btn--gold" href="<?= url('file', ['id' => $r['pdf_file_id']]) ?>" target="_blank">⤓ PDF</a><?php endif; ?>
     <?php if ($staff && function_exists('em_card_html') && $r['status'] !== 'draft'): ?><button class="btn" type="button" data-open-email>✉ <?= tt('em.send') ?></button><?php endif; ?>
     <?php if ($r['docx_file_id']): ?><a class="btn" href="<?= url('file', ['id' => $r['docx_file_id']]) ?>">⤓ Word</a><?php endif; ?>

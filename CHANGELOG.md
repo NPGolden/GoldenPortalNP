@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.150.1** (build 2026-11-15). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.151.0** (build 2026-11-15). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.151.0 | GAS-CP-R97-057 | 2026-11-16 | Customer signs on the engineer’s device: a submitted service report or function check opens in a signing view without the portal menu — summary, full PDF, name, capacity, remark and signature pad; accepted or sent back on the spot. In the documents the name, capacity and date are kept inside the signature box on their own lines. | `install/migrate_cp_r97_057_sign_on_site.sql` |
 | 1.150.1 | GAS-CP-R97-056 | 2026-11-16 | Dashboard speed: the KPI block (thousands of statements) is no longer computed while the page is drawn — the page shows the kept value and the background sweep renews it every 10 minutes, one value per branch scope; diagnostics judge refused database connections per hour instead of as a total. | — |
 | 1.150.0 | GAS-CP-R97-055 | 2026-11-16 | Sales pipeline: branch filter — board, list, totals, follow-ups, per sales person and the funnel can be limited to one branch; each card shows the branch code. | — |
 | 1.149.0 | GAS-CP-R97-054 | 2026-11-16 | KYMA mark by role: contacts and organisations with an e-mail that are customers, yards, owners or engineering offices get the KYMA mark next to Golden A/S automatically (hourly check, switch and “mark now” in Settings › Website › KYMA website); only the mark is added. | — |

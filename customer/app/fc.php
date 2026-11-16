@@ -211,9 +211,9 @@ function fc_render_pdf(array $r): string {
     $sig = function (float $x, string $title, string $who, string $when, ?int $fileId) use ($pdf, $navy, $ink, $line, $mute, $y, $bw, $bh) {
         $pdf->setColor($line); $pdf->rect($x, $y, $bw, $bh); $pdf->setColor($navy); $pdf->setFont('B', 8); $pdf->text($x + 2, $y + 4.5, $title);
         if ($fileId && ($b = cp_file_bytes($fileId))) $pdf->image($b, $x + 2, $y + 6, 48, 14.4);
-        $pdf->setColor($ink); $pdf->setFont('R', 7.5); $pdf->text($x + 2, $y + $bh - 6.5, $who); $pdf->setColor($mute); $pdf->setFont('R', 7); $pdf->text($x + 2, $y + $bh - 2.5, $when);
+        $pdf->setColor($ink); $pdf->fitText($x + 2, $y + $bh - 6.5, $who, $bw - 4, 'L', 'R', 7.5); $pdf->setColor($mute); $pdf->fitText($x + 2, $y + $bh - 2.5, $when, $bw - 4, 'L', 'R', 7);   // R97-057: kept inside the box
     };
-    $sig($L, 'Signature customer', (string)($r['accepted_name'] ?: ($r['customer_name'] ?: '')), $r['accepted_at'] ? fmt_dt_doc($r['accepted_at']) . ($r['accepted_ip'] ? ' · ' . $r['accepted_ip'] : '') : ($r['status'] === 'disputed' ? 'Disputed — see remark' : 'Not yet signed'), $r['customer_sign_id'] ? (int)$r['customer_sign_id'] : null);
+    $sig($L, 'Signature customer', (string)($r['accepted_name'] ?: ($r['customer_name'] ?: '')) . (!empty($r['accepted_role']) ? ' — ' . $r['accepted_role'] : '') . (($r['accepted_via'] ?? '') === 'on_site' ? ' (signed on site)' : ''), $r['accepted_at'] ? fmt_dt_doc($r['accepted_at']) . ($r['accepted_ip'] ? ' · ' . $r['accepted_ip'] : '') : ($r['status'] === 'disputed' ? 'Disputed — see remark' : 'Not yet signed'), $r['customer_sign_id'] ? (int)$r['customer_sign_id'] : null);
     $sig($L + $half + 4, 'Signature service technician', (string)($r['submitted_name'] ?: $r['engineer_name'] ?: ''), $r['submitted_at'] ? fmt_dt_doc($r['submitted_at']) : '', $r['golden_sign_id'] ? (int)$r['golden_sign_id'] : null);
     $pdf->setColor($mute); $pdf->setFont('R', 6.5); $pdf->text($L, $y + $bh + 3.5, 'Filled and signed electronically on the Golden A/S customer portal; every step is logged with user, date, time and address.', 'C', $W);
     return $pdf->bytes($tpl['title'] . ' ' . $r['report_no']);

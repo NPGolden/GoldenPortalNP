@@ -1961,3 +1961,30 @@ html[data-theme="dark"] .sb-low, html[data-theme="dark"] .sb-low-cell, html[data
 .nl-block { border: 1px solid var(--line, #E3E7EC); border-left: 3px solid var(--cp-gold); border-radius: 8px; padding: 10px 12px; margin: 0 0 10px; }
 .nl-block input:not([type=checkbox]):not([type=number]):not([type=file]), .nl-block textarea { width: 100%; }
 .nl-bhead { display: flex; gap: 14px; align-items: center; margin-bottom: 6px; } .nl-bhead b { margin-right: auto; }
+
+/* ---- R97-057: customer signs on the engineer's device (?p=sign_onsite) — no portal menu, phone first ---- */
+body.sgn { background: #F3F5F8; margin: 0; }
+.sgn-bar { display: flex; align-items: center; gap: 14px; background: #0A1B2E; color: #fff; padding: 12px 16px; padding-top: calc(12px + env(safe-area-inset-top)); position: sticky; top: 0; z-index: 5; }
+.sgn-bar img { height: 30px; width: auto; }
+.sgn-bar div { display: flex; flex-direction: column; line-height: 1.25; min-width: 0; }
+.sgn-bar b { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sgn-bar span { font-family: var(--mono); font-size: 13px; color: #E0B94F; }
+.sgn-main { max-width: 760px; margin: 0 auto; padding: 14px 12px calc(28px + env(safe-area-inset-bottom)); }
+.sgn-main .card { margin-bottom: 12px; }
+.sgn-main h2 { font-size: 17px; margin: 0 0 8px; }
+.sgn-main h3 { font-size: 13px; margin: 12px 0 4px; color: #14285A; text-transform: uppercase; letter-spacing: .04em; }
+.sgn-staff { font-size: 12.5px; color: #5B6675; margin: 0 2px 10px; }
+.sgn-dl { display: grid; grid-template-columns: minmax(96px, 34%) 1fr; gap: 6px 12px; margin: 0 0 10px; font-size: 15px; }
+.sgn-dl dt { color: #5B6675; } .sgn-dl dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+.sgn-text { font-size: 15px; line-height: 1.5; text-align: justify; overflow-wrap: anywhere; margin: 0 0 6px; }
+.sgn-list { margin: 0 0 6px; padding-left: 18px; font-size: 15px; }
+.sgn-tbl td, .sgn-tbl th { font-size: 13.5px; padding: 6px 8px; }
+.sgn-main input, .sgn-main textarea { font-size: 16px; }   /* 16 px: iOS does not zoom the page on focus */
+.sgn-main canvas.sigpad { max-width: 100%; aspect-ratio: 600 / 220; border: 2px dashed #9AA5B1; }
+.sgn-actions { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 6px; }
+.sgn-actions .btn { width: 100%; justify-content: center; padding: 14px 16px; font-size: 16px; }
+.sgn-done { text-align: center; padding: 28px 18px; }
+.sgn-tick { width: 72px; height: 72px; border-radius: 50%; background: #2F7D5C; color: #fff; font-size: 40px; line-height: 72px; margin: 0 auto 12px; }
+.sgn-tick.is-bad { background: #C89B3C; }
+@media (min-width: 620px) { .sgn-actions { grid-template-columns: 2fr 1fr; } }
+.sgn-dl--num { grid-template-columns: 1fr auto; }

@@ -137,6 +137,13 @@ final class PdfWriter {
         $this->cur .= sprintf("BT /F%s %.2F Tf %.2F %.2F Td %s Tj ET\n", $this->curFont, $this->curSize, $this->x($x), $this->y($y), $this->esc($s));
     }
     /** Word-wrap into lines no wider than $w mm. */
+    /** One line that must stay inside a width: the size is reduced step by step (down to $min) and, if it still does not fit, the text is cut with an ellipsis.   R97-057 */
+    public function fitText(float $x, float $y, string $s, float $w, string $align = 'C', string $style = 'R', float $size = 8.5, float $min = 5.5): void {
+        $s = trim($s); if ($s === '' || $w <= 0) return;
+        while ($size > $min && $this->width($s, $style, $size) > $w) $size -= 0.25;
+        if ($this->width($s, $style, $size) > $w) { while (mb_strlen($s) > 4 && $this->width($s . '…', $style, $size) > $w) $s = mb_substr($s, 0, -1); $s .= '…'; }
+        $this->setFont($style, $size); $this->text($x, $y, $s, $align, $w);
+    }
     public function wrap(string $s, float $w): array {
         $out = []; if (function_exists('rt_plain')) $s = rt_plain($s);
         foreach (preg_split('/\r\n|\r|\n/', $s) as $para) {

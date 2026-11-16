@@ -338,6 +338,16 @@ function fsr_generate_documents(int $id): void {
 
 function fsr_legend(): array { return ['TT: Travelling Time | WT: Working Time', 'W: Warranty | G: Goodwill | I: Invoice']; }
 
+/** The acceptance boxes as separate lines, so each one can be kept inside its box (R97-057): ['g' => [name, capacity, detail], 'c' => [name, capacity, detail], 'sub' => text]. */
+function fsr_sign_parts(array $r): array {
+    $g = $r['submitted_at'] ? [(string)($r['submitted_name'] ?: ''), '', fmt_dt_doc($r['submitted_at'])] : ['', '', ''];
+    $c = ['', '', '']; $sub = 'Pending acceptance / Εκκρεμεί αποδοχή';
+    if ($r['status'] === 'accepted' && $r['accepted_at']) {
+        $c = [(string)($r['accepted_name'] ?: ''), (string)($r['accepted_role'] ?? ''), fmt_dt_doc($r['accepted_at']) . ($r['accepted_ip'] ? ' · IP ' . $r['accepted_ip'] : '')];
+        $sub = function_exists('sgn_via_label') ? sgn_via_label($r['accepted_via'] ?? null) : 'Accepted electronically / Αποδοχή ηλεκτρονικά';
+    } elseif ($r['status'] === 'disputed') { $c = ['NOT ACCEPTED — see notes', '', '']; $sub = 'Not accepted / Δεν έγινε αποδοχή'; }
+    return ['g' => $g, 'c' => $c, 'sub' => $sub];
+}
 /** Texts for the two acceptance boxes: [golden, customer, customerSub]. */
 function fsr_sign_texts(array $r): array {
     $g = $r['submitted_at'] ? sprintf('%s · %s', $r['submitted_name'] ?: '', fmt_dt_doc($r['submitted_at'])) : '';
@@ -345,7 +355,8 @@ function fsr_sign_texts(array $r): array {
     if ($r['status'] === 'accepted' && $r['accepted_at']) {
         $c = sprintf('%s · %s', $r['accepted_name'] ?: '', fmt_dt_doc($r['accepted_at']));
         if ($r['accepted_ip']) $c .= ' · IP ' . $r['accepted_ip'];
-        $sub = 'Accepted electronically / Αποδοχή ηλεκτρονικά';
+        if (!empty($r['accepted_role'])) $c = sprintf('%s — %s · %s', $r['accepted_name'] ?: '', $r['accepted_role'], fmt_dt_doc($r['accepted_at'])) . ($r['accepted_ip'] ? ' · IP ' . $r['accepted_ip'] : '');
+        $sub = function_exists('sgn_via_label') ? sgn_via_label($r['accepted_via'] ?? null) : 'Accepted electronically / Αποδοχή ηλεκτρονικά';
     } elseif ($r['status'] === 'disputed') { $c = 'NOT ACCEPTED — see notes'; $sub = 'Not accepted / Δεν έγινε αποδοχή'; }
     return [$g, $c, $sub];
 }
@@ -476,7 +487,7 @@ function fsr_render_pdf(array $r): string {
 
     /* ---- acceptance boxes */
     $need(48);
-    [$gTxt, $cTxt, $cSub] = fsr_sign_texts($r);
+    $SP = fsr_sign_parts($r); $gTxt = $SP['g']; $cTxt = $SP['c']; $cSub = $SP['sub'];   // R97-057: name and details on their own lines, each kept inside the box
     $half = $W / 2; $bx = 42.0;
     // R68-001: the drawn signatures (sp_files fsr_sign, stored by the engineer's app and by the customer's app / web page) are printed inside the boxes
     $gSig = !empty($r['golden_sign_id']) ? cp_file_bytes((int)$r['golden_sign_id']) : null;
@@ -486,17 +497,22 @@ function fsr_render_pdf(array $r): string {
               [$L + $half, 'CUSTOMER ACCEPTANCE', $cSub, $cTxt, $cSig]] as [$sx, $lab, $sub, $txt, $sig]) {
         $pdf->setColor($line); $pdf->setLineWidth(0.3); $pdf->rect($sx + 2, $y + 2, $half - 4, $bx);
         $pdf->setColor($navy); $pdf->setFont('B', 8.5); $pdf->text($sx, $y + 10, $lab, 'C', $half);
-        $pdf->setColor($ink); $pdf->setFont('R', 7.5); $pdf->text($sx, $y + 18, $sub, 'C', $half);
-        $drawn = $sig ? $pdf->image($sig, $sx + $half / 2 - 24, $y + 19.5, 48, 13) : false;     // 48 × 13 mm, centred above the name line
-        if ($drawn) { $sigShown = $sigShown || $sx > $L; $pdf->setColor($line); $pdf->setLineWidth(0.2); $pdf->line($sx + $half / 2 - 26, $y + 33.5, $sx + $half / 2 + 26, $y + 33.5); $pdf->setColor($ink); }
-        $pdf->setFont('B', 8.5); $pdf->text($sx, $y + ($drawn ? 38 : 26), $txt, 'C', $half);
-        if ($sx > $L && $r['customer_remark'] && !$drawn) {
-            $pdf->setFont('B', 7.5); $pdf->text($sx + 5, $y + 33, 'Customer notes / Σημειώσεις πελάτη:');
-            $pdf->setFont('R', 7.5); $pdf->paragraph($sx + 5, $y + 34, $half - 10, (string)$r['customer_remark'], 3.6, 2);
+        $pdf->setColor($ink); $pdf->fitText($sx + 4, $y + 18, $sub, $half - 8, 'C', 'R', 7.5);
+        $three = trim((string)$txt[1]) !== '';                                                   // name, capacity and date on three lines
+        $drawn = $sig ? $pdf->image($sig, $sx + $half / 2 - 24, $y + 19.3, 48, $three ? 11.5 : 13) : false;     // centred above the name line
+        $ly = $three ? 31.6 : 33.5;
+        if ($drawn) { $sigShown = $sigShown || $sx > $L; $pdf->setColor($line); $pdf->setLineWidth(0.2); $pdf->line($sx + $half / 2 - 26, $y + $ly, $sx + $half / 2 + 26, $y + $ly); $pdf->setColor($ink); }
+        $ty = $drawn ? ($three ? 35.0 : 37.2) : 25.0;
+        $pdf->fitText($sx + 4, $y + $ty, (string)$txt[0], $half - 8, 'C', 'B', 8.5);
+        if ($three) { $ty += 3.4; $pdf->fitText($sx + 4, $y + $ty, (string)$txt[1], $half - 8, 'C', 'R', 7); }
+        $pdf->fitText($sx + 4, $y + $ty + ($three ? 3.3 : ($drawn ? 3.6 : 4.5)), (string)$txt[2], $half - 8, 'C', 'R', 7);
+        if ($sx > $L && $r['customer_remark'] && !$drawn && !$three) {
+            $pdf->setFont('B', 7.5); $pdf->text($sx + 5, $y + 34.5, 'Customer notes / Σημειώσεις πελάτη:');
+            $pdf->setFont('R', 7.5); $pdf->paragraph($sx + 5, $y + 35.5, $half - 10, (string)$r['customer_remark'], 3.6, 2);
         }
     }
     $y += $bx + 6;
-    if ($r['customer_remark'] && (mb_strlen((string)$r['customer_remark']) > 120 || $sigShown)) {       // long notes (or notes next to a drawn signature) get their own block
+    if ($r['customer_remark'] && (mb_strlen((string)$r['customer_remark']) > 120 || $sigShown || trim((string)$cTxt[1]) !== '')) {       // long notes (or notes next to a drawn signature) get their own block
         $pdf->setFont('R', 8); $h = $pdf->paragraphHeight($W - 4, (string)$r['customer_remark'], 4.0) + 8; $need($h);
         $pdf->setColor($head); $pdf->rect($L, $y, $W, 5, 'F'); $pdf->setColor($line); $pdf->rect($L, $y, $W, $h);
         $pdf->setColor($navy); $pdf->setFont('B', 7.5); $pdf->text($L + 1.8, $y + 3.6, 'Customer notes / Σημειώσεις πελάτη');

@@ -2201,3 +2201,27 @@ Language keys 10 205 each (unchanged).
 **Security review**: the per-scope key closes a small information leak between branch scopes on the dashboard block. No new entry point. Proposed next (speed, no security cost): load the budget figures of all sub-projects of the KPI page in a few grouped statements instead of per sub-project, so the KPI page and the sweep become light as well.
 
 Language keys 10 206 each.
+
+## §343 v1.151.0 (R97-057) — Customer signs on the engineer's device; signature boxes
+
+**Request**: "In the Service reports and wherever a signature needs to be placed by the customer we need a process to prepare a preview for the customer to sign on the mobile. Also the signature name etc. keep justified in the box. Also can you propose an email approval process for the customer if they dont want to connect to the portal?"
+
+**Before**: a service report (`fsr`) could be accepted only by a signed-in customer account (portal page or customer app) or by an administrator "on behalf"; a function check (`fc`) could carry the customer's signature only at the moment the engineer submitted it. In the PDF the name, date and address were one centred line that could run over the box.
+
+**Migration** `install/migrate_cp_r97_057_sign_on_site.sql` (key `r97u`): `accepted_via`, `accepted_role` on `fsr_reports` and `fc_reports`. Guard `sgn_has()`.
+
+**Module** `app/sgn.php`: `sgn_load($doc, $id)` (staff, document in scope, not an external report), `sgn_can()` (status `submitted`), `sgn_button()`, `sgn_via_label()`, `sgn_decide()` — name (3+ characters), capacity, remark; accept needs the "read" tick and a valid drawn PNG (stored with the document's own `*_store_signature`); writes `accepted_by` = the member of staff, `accepted_name` = the signer, `accepted_role`, `accepted_via = 'on_site'`, time and address, an event "signed on site by …, on the device of …", and regenerates the documents; "Do not accept" needs a remark and sets `disputed`. The update carries `AND status = 'submitted'`.
+
+**Page** `views/sign_onsite.php` (`?p=sign_onsite&doc=fsr|fc&id=`): its own page without the portal menu (the customer holding the device has nothing to navigate to), phone first (16 px inputs, large buttons, sticky header), own small script with nonce for the pad and the checks, result screen with the signed PDF. Styles `.sgn-*` in `assets/portal.css`. Buttons on `fsr_view.php` and `fc_view.php`.
+
+**Documents**: `PdfWriter::fitText()` (size reduced step by step, then ellipsis); `fsr_sign_parts()` gives name / capacity / date as separate lines; the boxes of the service report and of the function check use it; sub-line "Signed on site / Υπογραφή επί τόπου" (`sgn_via_label`, also prepared for "Accepted by e-mail").
+
+**Tests (sandbox)**: page before the migration (no button, notice); empty name, missing tick, missing or invalid signature refused on the server; accept with a 55-character name and a 62-character capacity → accepted, signature stored, event, PDF rendered and inspected (everything inside the box, three lines); second attempt refused; "Do not accept" without / with remark; signed-out and customer sessions cannot use the action; phone emulation (iPhone 13): messages, drawing, accept, no sideways scroll, no script errors. Page sweep and app API test unchanged.
+
+**Not covered**: the three native apps keep their own signing screens — the new view runs in the phone's browser inside the portal; inspection reports (SF-GLD-020) have no electronic acceptance at all (printed signature lines).
+
+**Security review**: staff only, POST + CSRF, document must be in the account's project scope; the signature is validated as a PNG of limited size; the signer's identity is a typed name — the record therefore keeps the member of staff who presented the device, time and address, so the acceptance is attributable; no portal navigation in the signing view while the device is in the customer's hands (the session is still the engineer's: the engineer should stay present — stated in the manual). Proposed: an optional one-time code sent to the customer's e-mail or phone and typed on the device, for customers who want stronger proof than a drawn signature.
+
+**Proposal made in the reply (not built)**: acceptance by e-mail link for customers without a portal account.
+
+Language keys 10 249 each.
