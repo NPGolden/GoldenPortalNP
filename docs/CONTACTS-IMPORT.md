@@ -2272,3 +2272,29 @@ Language keys 10 338 each.
 **Security review**: the inbox is read with `$select` of subject, preview and sender only, nothing is stored except the matched preview (250 characters) on the link; only messages from mail systems are considered, so a customer's reply cannot mark a link as returned; reasons are shown escaped. Proposed: the same returned-message check for newsletters, to fill the unsubscribe list automatically.
 
 Language keys 10 355 each.
+
+## §346 v1.154.0 (R97-061) — Service Engineer app 0.7.0: customer acceptance
+
+**Request**: "is this also integrated in the mobile versions?" → "I want it in the engineer app".
+
+**How the app is delivered**: `customer/mobile/` is a web application; the store shells (Capacitor) load it from the portal (`server.url`) and the service worker replaces the shell when `VERSION` in `sw.js` changes. A portal release therefore updates the app — no store build. Version 0.6.21 → **0.7.0** (`sw.js`, `index.html`, `js/api.js`).
+
+**API** (`api/v1`, engineer app; `sgn` and `dl` added to the module list in `bootstrap.php`):
+
+- `GET /fsr/{id}/acceptance` → status, what is possible (`onsite`, `email`), the links with state and problem, the customer's contacts, the report in the app's shape.
+- `POST /fsr/{id}/accept-link` {email, name} → `dl_create()`; `POST /fsr/{id}/accept-link/{link}/cancel` → `dl_cancel()`; `POST /fsr/{id}/sign-onsite` {decision, name, role, remark, signature, read} → `sgn_decide()`.
+- `Portal::fsrMine()`: the report must be the engineer's own (author, submitter or on a time line), as in the report list; errors of the portal functions come back as 422 with their text.
+- `shapeFsr()` adds `accepted_via`, `accepted_role`.
+- Shared functions no longer redirect when there is no page session (`dl_staff()`, check in `sgn_decide()`); `dl_base()` gives the address of `customer/` also when called from `…/api/v1` (the link in the e-mail would otherwise have pointed into the API folder).
+
+**App** (`mobile/js/reports.js`, `api.js`, `i18n.js` en / el / it, `css/app.css`): `acceptanceBox()` under a submitted report; `signScreen()` (`#/fsr/{id}?sign=1`, app chrome hidden, customer view = `view()` up to a cut mark, signature pad of the app); `previewScreen()` (`#/fsr/{id}?preview=1`) for a draft with on-site signing. Online only — these calls are never queued.
+
+**Also**: a link is no longer shown as a problem when a newer link went to the same address; the warning banner appears only while the document still waits.
+
+**Tests (sandbox)**: API — state, no token 401, another engineer 403, unknown report 404, bad address and missing mail 422, signing without signature / name 422, sign → accepted `on_site`, second signature 422, cancel. App on an emulated phone — sign-in, report list, acceptance box, send (refused here: no mail), signing screen with chrome hidden, three validation messages, drawing, "Signed — thank you", back to the report showing the signer; draft: preview and back to the form with "on site" still chosen; no script errors, no sideways scroll. **Not tested**: inside the installed iOS / Android shells, and with real outgoing mail.
+
+**Security review**: same rules as the portal functions (they are the same functions); the app can act only on the engineer's own reports; API calls rate-limited (20 a minute for sending and signing); the token of a link never reaches the app; the customer screen hides the app's navigation, the session remains the engineer's. Proposed: require the phone's unlock (Face ID / fingerprint) again before the engineer's menu returns after the customer has held the phone.
+
+**Numbering**: another session released GAS-CP-R97-060 / v1.153.0 (website inbox: Integrated Bridge questionnaire) while this work was being finished; this release was put on top of it and renumbered R97-061 / v1.154.0. That release has no § in this guide.
+
+Language keys 10 358 each (portal; +3 from R97-060, none from this release); app keys +41 in three languages.

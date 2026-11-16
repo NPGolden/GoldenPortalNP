@@ -24,7 +24,16 @@ function dl_hash(string $s): string { return hash('sha256', $s); }
 function dl_token(): string { $a = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'; $s = ''; foreach (str_split(random_bytes(40)) as $c) $s .= $a[ord($c) % 62]; return $s; }
 function dl_ip(): string { return function_exists('sgn_ip') ? sgn_ip() : ''; }
 function dl_mask(string $email): string { [$l, $d] = array_pad(explode('@', $email, 2), 2, ''); return mb_substr($l, 0, 1) . str_repeat('•', max(2, min(6, mb_strlen($l) - 1))) . '@' . $d; }
-function dl_url(string $token): string { return (function_exists('nl_base') ? nl_base() : '') . '/sign.php?t=' . $token; }
+/** Address of the customer/ folder — also when the call comes from the mobile API (…/customer/api/v1).   R97-060 */
+function dl_base(): string {
+    $b = trim((string) cfg('app.base_url', ''));
+    if ($b === '' || str_contains($b, '127.0.0.1') || str_contains($b, 'localhost')) { $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'); $host = preg_replace('/[^A-Za-z0-9.\-:]/', '', (string)($_SERVER['HTTP_HOST'] ?? 'goldensas.com'));
+        $dir = preg_replace('#/api/v1$#', '', rtrim(dirname((string)($_SERVER['SCRIPT_NAME'] ?? '/customer/index.php')), '/')); $b = ($https ? 'https' : 'http') . '://' . $host . $dir; }
+    return rtrim($b, '/');
+}
+function dl_url(string $token): string { return dl_base() . '/sign.php?t=' . $token; }
+/** A signed-in member of staff — without the redirect of require_staff(), so the mobile API can call the same functions. */
+function dl_staff(): array { $u = current_user(); if (!$u || !is_staff()) throw new RuntimeException(t('err.noaccess')); return $u; }
 
 /** The document as the current account sees it (staff, or the sender the public page runs as), in one shape for every kind. */
 function dl_info(string $doc, int $id): ?array {
@@ -79,6 +88,7 @@ function dl_tell(array $L, string $title, string $body): void {
 /** What staff should know about a link: ['tone', 'label', 'detail', 'do'] or null when all is well. */
 function dl_problem(array $L): ?array {
     if (!dl_err_has() || $L['used_at']) { return dl_err_has() && $L['used_at'] && str_starts_with((string)($L['mail_error'] ?? ''), 'confirmation:') ? ['tone' => 'gold', 'label' => t('dl.pr_mail'), 'detail' => t('dl.st_confirmation') . ' — ' . substr((string)$L['mail_error'], 14), 'do' => t('dl.do_confirm')] : null; }
+    if (!empty($L['superseded'])) return null;   // a newer link went to the same address — the old trouble is dealt with
     if ($L['cancelled_at'] && ($L['cancel_note'] ?? '') !== 'locked') return null;   // replaced, cancelled by staff, decided another way: nothing to do
     if (!empty($L['bounced_at'])) return ['tone' => 'bad', 'label' => t('dl.pr_bounced'), 'detail' => (string)$L['bounce_reason'], 'do' => t('dl.do_address')];
     if (!empty($L['mail_error'])) { [$step, $why] = array_pad(explode(': ', (string)$L['mail_error'], 2), 2, ''); return ['tone' => 'bad', 'label' => t('dl.pr_mail'), 'detail' => t('dl.st_' . $step) . ' — ' . $why . ' · ' . fmt_datetime((string)$L['mail_error_at']), 'do' => t($step === 'confirmation' ? 'dl.do_confirm' : 'dl.do_resend')]; }
@@ -121,7 +131,7 @@ function dl_expiry_tell(): int {
 
 /** Send a document for acceptance. Returns [link id, token] — the token is never stored and is not shown to staff. */
 function dl_create(string $doc, int $id, string $email, string $name, bool $send = true): array {
-    $u = require_staff(); if (!dl_has()) throw new RuntimeException(t('dl.not_ready'));
+    $u = dl_staff(); if (!dl_has()) throw new RuntimeException(t('dl.not_ready'));
     $I = dl_info($doc, $id); if (!$I) throw new RuntimeException(t('err.notfound')); if (!$I['open']) throw new RuntimeException(t('dl.not_open'));
     $email = strtolower(trim($email)); if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 190) throw new RuntimeException(t('dl.bad_email'));
     if ($send && !(function_exists('cp_mail_configured') && cp_mail_configured())) throw new RuntimeException(t('dl.no_mail'));
@@ -136,10 +146,10 @@ function dl_create(string $doc, int $id, string $email, string $name, bool $send
     if ($send && !dl_mail_link($L, $token, false, dl_att($I['file'], $I['no'] . '.pdf'))) { q('DELETE FROM doc_links WHERE id = ?', [$lid]); throw new RuntimeException(t('dl.mail_failed') . ' (' . dl_mail_reason() . ')'); }
     return [$lid, $token];
 }
-function dl_list(string $doc, int $id): array { return dl_has() ? all("SELECT l.*, (l.expires_at < NOW()) AS is_expired FROM doc_links l WHERE l.doc = ? AND l.doc_id = ? ORDER BY l.id DESC LIMIT 20", [$doc, $id]) : []; }
+function dl_list(string $doc, int $id): array { return dl_has() ? all("SELECT l.*, (l.expires_at < NOW()) AS is_expired, EXISTS (SELECT 1 FROM doc_links n WHERE n.doc = l.doc AND n.doc_id = l.doc_id AND n.email = l.email AND n.id > l.id) AS superseded FROM doc_links l WHERE l.doc = ? AND l.doc_id = ? ORDER BY l.id DESC LIMIT 20", [$doc, $id]) : []; }
 /** R97-059: 'problem' when the confirmation could not be sent is a note, not a state — see dl_problem(). */
 function dl_state_of(array $L): string { return $L['used_at'] ? 'used' : ($L['cancelled_at'] ? 'cancelled' : ((int)($L['is_expired'] ?? 0) ? 'expired' : ($L['verified_at'] ? 'verified' : ($L['opened_at'] ? 'opened' : 'sent')))); }
-function dl_cancel(int $lid): void { require_staff(); $L = one('SELECT * FROM doc_links WHERE id = ?', [$lid]); if (!$L || !dl_info((string)$L['doc'], (int)$L['doc_id'])) throw new RuntimeException(t('err.notfound')); q("UPDATE doc_links SET cancelled_at = NOW(), cancel_note = 'staff' WHERE id = ? AND used_at IS NULL AND cancelled_at IS NULL", [$lid]); }
+function dl_cancel(int $lid): void { dl_staff(); $L = one('SELECT * FROM doc_links WHERE id = ?', [$lid]); if (!$L || !dl_info((string)$L['doc'], (int)$L['doc_id'])) throw new RuntimeException(t('err.notfound')); q("UPDATE doc_links SET cancelled_at = NOW(), cancel_note = 'staff' WHERE id = ? AND used_at IS NULL AND cancelled_at IS NULL", [$lid]); }
 
 /* ---------------------------------------------------------------- public side (customer/sign.php) */
 
@@ -219,7 +229,7 @@ function dl_after(array $L, string $decision, string $who, string $remark): void
     $ttl = t($ok ? 'dl.nf_ok' : 'dl.nf_back', ['t' => (string)$L['doc_title'], 'no' => (string)$L['doc_no']]); $body = $who . ' · ' . $L['email'] . ($remark !== '' ? ' — ' . $remark : '');
     if (function_exists('nf_push') && (int)$L['created_by']) nf_push([(int)$L['created_by']], 'dl:done', 'dl:' . $doc . ':' . $id, $ttl, $body, $I ? $I['back'] : url('dashboard'), null, mb_substr($who, 0, 120));
     $staffMail = (string) scalar('SELECT email FROM customer_users WHERE id = ?', [(int)$L['created_by']]);
-    if ($staffMail !== '') dl_mail($staffMail, $ttl, $body . "\n\n" . (function_exists('nl_base') ? nl_base() . '/' : '') . ($I ? $I['back'] : ''));
+    if ($staffMail !== '') dl_mail($staffMail, $ttl, $body . "\n\n" . dl_base() . '/' . ($I ? $I['back'] : ''));
     $lg = (string)$L['lang']; $v = ['t' => (string)$L['doc_title'], 'no' => (string)$L['doc_no']];
     $sent = dl_mail((string)$L['email'], t_in($ok ? 'dl.m_done_s' : 'dl.m_back_s', $lg, $v), t_in($ok ? 'dl.m_done_b' : 'dl.m_back_b', $lg, $v) . "\n\n" . t_in('dl.m_sign', $lg, $v), $staffMail ?: null, $ok && $I && in_array($doc, ['fsr', 'fc'], true) ? dl_att($I['file'], $I['no'] . '.pdf') : []);
     if (!$sent && dl_err_has()) { q('UPDATE doc_links SET mail_error = ?, mail_error_at = NOW() WHERE id = ?', [mb_substr('confirmation: ' . dl_mail_reason(), 0, 255), (int)$L['id']]); dl_tell($L, t('dl.nf_mail', $v), t('dl.st_confirmation') . ' → ' . $L['email'] . ' — ' . dl_mail_reason()); }

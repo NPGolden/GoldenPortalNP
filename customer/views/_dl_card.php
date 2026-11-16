@@ -5,7 +5,7 @@ if (function_exists('dl_has') && dl_has() && is_staff() && ($dlI = dl_info($dlDo
     if ($dlI['open'] || $dlRows):
         $dlPeople = $dlI['customer_id'] ? all("SELECT full_name AS n, email AS e FROM contacts WHERE customer_id = ? AND email LIKE '%_@_%._%' UNION SELECT full_name, email FROM customer_users WHERE customer_id = ? AND is_active = 1 AND email LIKE '%_@_%._%' ORDER BY n LIMIT 60", [$dlI['customer_id'], $dlI['customer_id']]) : [];
         $dlTone = ['sent' => 'gold', 'opened' => 'blue', 'verified' => 'blue', 'used' => 'green', 'cancelled' => 'mute', 'expired' => 'bad']; ?>
-<?php $dlBad = 0; foreach ($dlRows as $l) { $p0 = dl_problem($l); if ($p0 && $p0['tone'] === 'bad') $dlBad++; } ?>
+<?php $dlBad = 0; foreach ($dlRows as $l) { $p0 = dl_problem($l); if ($dlI['open'] && $p0 && $p0['tone'] === 'bad') $dlBad++; } ?>
 <div class="card" id="dl"><?php if ($dlBad): ?><div class="flash flash--bad" style="margin-bottom:10px;">⚠ <?= e(t('dl.attention', ['n' => $dlBad])) ?></div><?php endif; ?><div class="card-head"><h2>✉ <?= tt('dl.title') ?></h2><span class="hint"><?= tt('dl.hint_' . ($dlDoc === 'fsr' ? 'fsr' : ($dlDoc === 'offer' ? 'offer' : 'other'))) ?></span></div>
   <?php if ($dlI['open']): ?>
   <form method="post" action="<?= e($dlI['back']) ?>#dl" class="form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="dl_send"><input type="hidden" name="doc" value="<?= e($dlDoc) ?>"><input type="hidden" name="id" value="<?= (int)$dlId ?>">

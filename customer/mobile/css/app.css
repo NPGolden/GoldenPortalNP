@@ -122,3 +122,13 @@ table.week { width: 100%; border-collapse: collapse; } .week tr { border-bottom:
 .pk-it { display: block; width: 100%; text-align: left; background: none; border: 0; border-bottom: 1px solid var(--light); padding: 12px; font: inherit; color: var(--text); }
 .pk-it.on { color: var(--navy); font-weight: 700; box-shadow: inset 4px 0 0 var(--gold); }
 .pk-it:active { background: var(--light); }
+
+/* ---- R97-060: customer acceptance — what the customer sees on the engineer's phone ---- */
+.cust { padding-bottom: 24px; }
+.custbar { display: flex; flex-direction: column; background: var(--navy); color: #fff; margin: -12px -16px 12px; padding: calc(14px + env(safe-area-inset-top)) 16px 12px; }
+.custbar b { font-size: 17px; letter-spacing: .02em; } .custbar span { font-size: 13px; color: #E0B94F; }
+.cust input, .cust textarea { font-size: 16px; }
+.custchk { display: flex; gap: 10px; align-items: flex-start; margin: 12px 0; font-size: 14px; } .custchk input { width: 22px; height: 22px; flex: none; margin: 0; }
+.cust .sigbox canvas { height: 180px; }
+.custdone { text-align: center; padding: 30px 10px; } .custdone .tick { width: 72px; height: 72px; line-height: 72px; border-radius: 50%; background: var(--green); color: #fff; font-size: 40px; margin: 0 auto 12px; } .custdone .tick.amber { background: var(--amber); }
+#accbox .card .t { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; word-break: break-all; }

@@ -88,6 +88,11 @@ try {
         case $method === 'GET' && $path === '/documents': Response::json(['items' => Portal::documents()]);
         case $method === 'GET' && $path === '/accounting/status': Response::json(['items' => Response::noMoney(Portal::accountingStatus($u))]);   // CS-02
         case $method === 'GET' && $path === '/fsr': Response::json(['items' => Response::noMoney(Portal::reports($u))]);
+        /* R97-060: customer acceptance of a service report from the app */
+        case $method === 'GET' && preg_match('#^/fsr/(\d+)/acceptance$#', $path, $m): Response::json(Portal::acceptance($u, (int)$m[1]));
+        case $method === 'POST' && preg_match('#^/fsr/(\d+)/accept-link$#', $path, $m): RateLimit::check('api', 'dl' . $u['id'], 20); Response::json(Portal::acceptLink($u, (int)$m[1], $body), 201);
+        case $method === 'POST' && preg_match('#^/fsr/(\d+)/accept-link/(\d+)/cancel$#', $path, $m): Response::json(Portal::acceptCancel($u, (int)$m[1], (int)$m[2]));
+        case $method === 'POST' && preg_match('#^/fsr/(\d+)/sign-onsite$#', $path, $m): RateLimit::check('api', 'sgn' . $u['id'], 20); Response::json(Portal::signOnsite($u, (int)$m[1], $body));
         case $method === 'GET' && $path === '/timesheets': Response::json(['items' => Response::noMoney(Portal::timesheets($u))]);
         case $method === 'GET' && $path === '/notes': Response::json(['items' => Portal::notes($u)]);
         case $method === 'POST' && $path === '/sync': RateLimit::check('sync', 'u' . $u['id'], 60); require __DIR__ . '/endpoints/sync.php'; sync_ops($u, $body);

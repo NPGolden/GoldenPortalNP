@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.153.0';
+const CP_VERSION = '1.154.0';
 const CP_BUILD   = '2026-11-16';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-061', 'version' => '1.154.0', 'date' => '2026-11-16', 'title' => 'Service Engineer app 0.7.0: customer acceptance in the app — “Customer signs on this phone” with a preview of the report, name, capacity and finger signature; “Send for acceptance by e-mail” with the state of every link, its problems, send again and cancel; and a customer preview before signing a draft on site. The app updates itself from the portal.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-060', 'version' => '1.153.0', 'date' => '2026-11-16', 'title' => 'Website inbox: the Integrated Bridge captain’s questionnaire (goldenas.com.gr/bridge-questionnaire) arrives as a Bridge enquiry with the vessel, the internal project class A / B / C with its score and budget fit, and the full specification table; the free-text copy stays under “Message”.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-059', 'version' => '1.152.1', 'date' => '2026-11-16', 'title' => 'Acceptance by e-mail: delivery problems are shown — a message that could not be sent or was returned by the recipient’s mail server, a link closed after wrong codes or expired without an answer is marked on the link with the reason and what to do, the card carries a warning, “Send again” is one click, and the sender gets a notification.', 'db' => 'install/migrate_cp_r97_059_doc_links_errors.sql', 'check' => 'r97w'],
         ['ref' => 'GAS-CP-R97-058', 'version' => '1.152.0', 'date' => '2026-11-16', 'title' => 'Acceptance by e-mail link for customers without a portal account: service reports, function checks, offers and owner approvals (drawings) are sent to one address with a personal link, confirmed with a 6-digit code, then accepted or sent back with name and capacity (reports with a drawn signature). Service reports 24 hours, offers until their validity date or 14 days, others 14 days; reminders, cancel and replace.', 'db' => 'install/migrate_cp_r97_058_doc_links.sql', 'check' => 'r97v'],

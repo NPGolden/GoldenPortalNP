@@ -78,7 +78,7 @@ window.REPORTS = (() => {
         ${(tk.parts || []).length ? `<div class="s muted" style="margin-top:6px"><b>${t("rep.parts")}:</b> ${tk.parts.map((p) => `${esc(p.name)} <span class="chip">${esc(p.type)}</span>`).join(", ")}</div>` : ""}
         ${(tk.issues || []).length ? `<div class="s" style="margin-top:6px;color:var(--amber)"><b>${t("rep.issues")}:</b> ${tk.issues.map(esc).join("; ")}</div>` : ""}
         ${(tk.times || []).map((l) => `<div class="kv"><span>${esc(l.engineer || engName(l.engineer_id))} • ${esc(l.specialty)}</span><span class="v">${esc(l.start)}–${esc(l.end)} ${esc(l.type)} • ${hm(dur(l))}</span></div>`).join("")}</div>`).join("")}
-      <h2>${t("rep.submitted")}</h2><p class="muted">${esc(f.submitted_by || me().name)} · ${f.submitted_at ? esc(String(f.submitted_at).replace("T", " ").slice(0, 16)) : "—"}</p>
+      <!--cut--><h2>${t("rep.submitted")}</h2><p class="muted">${esc(f.submitted_by || me().name)} · ${f.submitted_at ? esc(String(f.submitted_at).replace("T", " ").slice(0, 16)) : "—"}</p>
       <h2>${t("fsr.sign")}</h2>${f.acceptance === "onsite" && f.signature ? `<img src="${f.signature}" style="max-width:260px;display:block;margin:8px auto">` : ""}${f.accepted_by ? `<p class="muted">${esc(f.accepted_by)} · ${esc(String(f.accepted_at || "").slice(0, 16))}${f.accepted_ip ? " · IP " + esc(f.accepted_ip) : ""}</p>` : f.acceptance === "onsite" && f.signer ? `<p class="muted" style="text-align:center">${esc(f.signer)}${f.signer_role ? ", " + esc(f.signer_role) : ""} · ${t("rep.signedphone")}</p>` : `<p class="muted">${t("rep.awaiting")}</p>`}
       ${f.invoicing && f.invoicing !== "none" ? kv(t("rep.invoicing"), S().stChip(f.invoicing)) : ""}
       <p class="muted">${f.status === "queued" ? t("rep.queued") : `PDF ${esc(f.number)} ${esc(f.rev || "")} — ${t("rep.archived")}`}</p>${pdfLink(f)}<p class="muted">WT: Working Time | TT: Travelling Time | NC: Not Chargeable · W: Warranty | G: Goodwill | I: Invoice</p>`;
@@ -95,13 +95,91 @@ window.REPORTS = (() => {
       ${f.checked_by ? kv(t("ins.checked"), esc(f.checked_by)) : ""}${f.issued_at ? kv(t("ins.issued"), esc(String(f.issued_at).slice(0, 16))) : `<p class="muted">${f.status === "queued" ? t("rep.queued") : t("ins.awaitingpm")}</p>`}${pdfLink(f)}`;
   }
 
+
+  // ---------------------------------------------------------------- customer acceptance (R97-060)
+  /** What the customer is shown: the report without the engineer's own blocks. */
+  const custView = (f) => view(f).split("<!--cut-->")[0];
+  const custBar = (f) => `<div class="custbar"><b>Golden A/S</b><span>${t("fsr.title")} ${esc(f.number || "")}</span></div>`;
+  /** Draft, not yet submitted: the report as the customer will see it, before signing on the phone. */
+  function previewScreen(f) {
+    UI.chrome(false);
+    return { html: `<div class="cust">${custBar(f)}${custView(f)}<button class="btn gold" id="c-back">${t("acc.backsign")}</button></div>`,
+      bind(root) { root.querySelector("#c-back").onclick = () => { location.hash = `#/fsr/${f.id}`; }; } };
+  }
+  /** Submitted report: the customer reads and signs on this phone; the portal accepts it at once. */
+  function signScreen(f) {
+    UI.chrome(false);
+    return { html: `<div class="cust">${custBar(f)}<p class="muted">${t("acc.c_staff")} <a id="c-cancel">${t("acc.c_back")}</a></p>${custView(f)}${pdfLink(f)}
+      <h2>${t("acc.c_sign")}</h2><p class="muted">${t("acc.c_lede")}</p>
+      <label>${t("acc.c_name")} *</label><input id="c-name" maxlength="90" autocomplete="name">
+      <label>${t("acc.c_role")}</label><input id="c-role" maxlength="80" placeholder="${t("acc.c_role_ph")}">
+      <label>${t("acc.c_remark")}</label><textarea id="c-remark" maxlength="2000"></textarea>
+      <label class="custchk"><input type="checkbox" id="c-read"> <span>${t("acc.c_read")}</span></label>
+      <div class="sigbox"><canvas id="sig"></canvas><button class="clr" id="clr">${t("acc.c_clear")}</button><span class="lbl">${t("acc.c_here")}</span></div>
+      <p class="note red hidden" id="c-err"></p>
+      <button class="btn gold" id="c-ok">${t("acc.c_accept")}</button><button class="btn line" id="c-no">${t("acc.c_refuse")}</button>
+      <p class="muted">${t("acc.c_legal")}</p></div>`,
+      bind(root) {
+        const $ = (s) => root.querySelector(s); UI.sig.init(root, null); setTimeout(() => UI.sig.fit(root), 50);
+        const fail = (m) => { const e = $("#c-err"); e.textContent = m; e.classList.remove("hidden"); e.scrollIntoView({ block: "center" }); };
+        $("#c-cancel").onclick = () => { location.hash = `#/fsr/${f.id}`; };
+        const send = async (decision) => {
+          $("#c-err").classList.add("hidden"); const name = $("#c-name").value.trim(), remark = $("#c-remark").value.trim(); let signature = "";
+          if (name.length < 3) return fail(t("acc.e_name"));
+          if (decision === "disputed") { if (!remark) return fail(t("acc.e_remark")); }
+          else { if (!$("#c-read").checked) return fail(t("acc.e_read")); signature = UI.sig.data(root); if (!signature) return fail(t("acc.e_sign")); }
+          $("#c-ok").disabled = true; $("#c-no").disabled = true;
+          try {
+            const r = await API.signOnsite(f.portal_id, { decision, name, role: $("#c-role").value.trim(), remark, signature, read: true });
+            if (r.report) await DB.put("fsr", { ...f, ...r.report });
+            const ok = r.decision === "accepted";
+            root.innerHTML = `<div class="cust">${custBar(f)}<div class="custdone"><div class="tick ${ok ? "" : "amber"}">${ok ? "✓" : "↩"}</div><h2>${t(ok ? "acc.d_ok" : "acc.d_back")}</h2><p>${t(ok ? "acc.d_ok_p" : "acc.d_back_p")}</p><p class="muted">${t("acc.d_hand")}</p><button class="btn navy" id="c-done">${t("acc.c_back")}</button></div></div>`;
+            root.querySelector("#c-done").onclick = () => { location.hash = `#/fsr/${f.id}`; }; window.scrollTo(0, 0);
+          } catch (e) { $("#c-ok").disabled = false; $("#c-no").disabled = false; fail(e.status === 422 || e.status === 403 || e.status === 409 ? String(e.message || "").replace(/\s*\((GET|POST) [^)]*\)$/, "") : t("acc.offline")); }
+        };
+        $("#c-ok").onclick = () => send("accepted"); $("#c-no").onclick = () => send("disputed");
+      } };
+  }
+  /** Under a submitted report: sign on this device, send for acceptance by e-mail, and the links with their state and problems. */
+  async function acceptanceBox(root, f) {
+    const box = root.querySelector("#accbox"); if (!box || API.mock) return;
+    const msg = (e) => String(e.message || "").replace(/\s*\((GET|POST) [^)]*\)$/, "");
+    const draw = (A) => {
+      if (A.report && A.report.status !== f.status) { DB.put("fsr", { ...f, ...A.report }).then(() => UI.render()); return; }
+      if (!A.open && !A.links.length) { box.innerHTML = ""; return; }
+      const chip = { sent: "amber", opened: "", verified: "", used: "green", cancelled: "grey", expired: "red" };
+      const bad = A.open ? A.links.filter((l) => l.problem && l.problem.tone === "bad").length : 0;
+      box.innerHTML = `<h2>${t("acc.title")}</h2>${bad ? `<p class="note red">⚠ ${t("acc.attention").replace("{n}", bad)}</p>` : ""}
+        ${A.onsite ? `<button class="btn gold" id="acc-sign">✍ ${t("acc.onsite")}</button><p class="muted">${t("acc.onsite_hint")}</p>` : ""}
+        ${A.email ? `<label>${t("acc.email")}</label><input id="acc-email" type="email" list="acc-people" autocomplete="off" inputmode="email"><datalist id="acc-people">${A.people.map((p) => `<option value="${esc(p.e)}">${esc(p.n)}</option>`).join("")}</datalist>
+          <label>${t("acc.name")}</label><input id="acc-name" maxlength="120"><button class="btn navy" id="acc-send">✉ ${t("acc.send")}</button><p class="muted">${t("acc.email_hint")}</p>` : (A.open ? `<p class="muted">${t("acc.nopdf")}</p>` : "")}
+        ${A.links.map((l) => `<div class="card ${l.problem && l.problem.tone === "bad" ? "c-red" : l.state === "used" ? "c-green" : "c-grey"}"><div class="t">${esc(l.email)} <span class="chip ${chip[l.state] || ""}">${esc(l.state_label)}</span></div>
+          <div class="s muted">${esc(l.name || "")}${l.name ? " • " : ""}${t("acc.until")} ${esc(l.until)}${l.signer ? " • " + esc(l.signer) : ""}</div>
+          ${l.problem ? `<div class="note ${l.problem.tone === "bad" ? "red" : ""}" style="margin-top:6px">⚠ <b>${esc(l.problem.label)}</b>${l.problem.detail ? " — " + esc(l.problem.detail) : ""}<br>${esc(l.problem.do)}</div>` : ""}
+          <div class="row2">${l.problem && A.email ? `<button class="btn gold sm" data-again="${esc(l.email)}" data-name="${esc(l.name || "")}">↻ ${t("acc.again")}</button>` : ""}${l.active ? `<button class="btn line sm" data-cancel="${l.id}">${t("acc.cancel")}</button>` : ""}</div></div>`).join("")}`;
+      const $ = (s) => box.querySelector(s);
+      const run = async (fn, okMsg) => { try { const r = await fn(); if (okMsg) UI.toast(okMsg); draw(r); } catch (e) { UI.toast(e.status === 422 || e.status === 403 ? msg(e) : t("acc.offline"), 4000); } };
+      if ($("#acc-sign")) $("#acc-sign").onclick = () => { location.hash = `#/fsr/${f.id}?sign=1`; };
+      if ($("#acc-send")) $("#acc-send").onclick = () => { const email = $("#acc-email").value.trim(); if (!/^\S+@\S+\.\S+$/.test(email)) return UI.toast(t("acc.e_email")); $("#acc-send").disabled = true; run(() => API.acceptLink(f.portal_id, { email, name: $("#acc-name").value.trim() }), t("acc.sent")).finally(() => { const b = $("#acc-send"); if (b) b.disabled = false; }); };
+      box.querySelectorAll("[data-cancel]").forEach((b) => b.onclick = () => { if (confirm(t("acc.cancel_q"))) run(() => API.acceptCancel(f.portal_id, +b.dataset.cancel), t("acc.cancelled")); });
+      box.querySelectorAll("[data-again]").forEach((b) => b.onclick = () => { b.disabled = true; run(() => API.acceptLink(f.portal_id, { email: b.dataset.again, name: b.dataset.name }), t("acc.sent")); });
+    };
+    box.innerHTML = f.status === "submitted" ? `<h2>${t("acc.title")}</h2><p class="muted">…</p>` : "";
+    try { draw(await API.acceptance(f.portal_id)); } catch (e) { box.innerHTML = f.status === "submitted" ? `<h2>${t("acc.title")}</h2><p class="muted">${t("acc.offline")}</p>` : ""; }
+  }
+
   // ---------------------------------------------------------------- editor
   async function edit(id, q) {
     const ctx = S().ctx; let f = id === "new" ? null : await DB.get("fsr", id);
     if (!f) { const tk = q.ticket ? await DB.get("tickets", +q.ticket) : null; f = blank(q.kind === "inspection" ? "inspection" : "service", tk, q); }
     const kind = f.kind || "service"; const L = lim();
     UI.chrome(true, f.number || (kind === "inspection" ? t("rep.newins") : t("rep.newsr")), "fsr", true); UI.badge(kind === "inspection" ? "SF-GLD-020" : f.type === "external" ? "EXT" : "SF-GLD-014");
-    if (f.status !== "draft") return { html: kind === "inspection" ? viewIsr(f) : view(f) };
+    if (f.status !== "draft") {
+      if (kind === "service" && q.sign && f.portal_id && f.status === "submitted") return signScreen(f);                       // R97-060
+      if (kind === "service" && f.portal_id && f.type !== "external") return { html: view(f) + `<div id="accbox"></div>`, bind(root) { acceptanceBox(root, f); } };
+      return { html: kind === "inspection" ? viewIsr(f) : view(f) };
+    }
+    if (kind === "service" && q.preview && id !== "new") return previewScreen(f);
     const myTickets = (await DB.all("tickets")).filter((x) => x.status !== "closed" && x.status !== "resolved");
     const engs = engineers(); const vEq = ctx.equipment.filter((e) => e.vessel_id === f.vessel_id);
     const eqOptions = (sel) => `<option value="">—</option>` + vEq.map((e) => `<option value="${e.id}" ${e.id === sel ? "selected" : ""}>${esc(e.tag)} — ${esc(e.system)}</option>`).join("");
@@ -123,7 +201,7 @@ window.REPORTS = (() => {
       <h2>${t("fsr.sign")}</h2>
       <div class="seg" data-k="acc"><button data-v="portal" class="${f.acceptance !== "onsite" ? "on" : ""}">${t("rep.accportal")}</button><button data-v="onsite" class="${f.acceptance === "onsite" ? "on" : ""}">${t("rep.acconsite")}</button></div>
       <p class="muted" id="acchint">${t(f.acceptance === "onsite" ? "rep.acconsitehint" : "rep.accportalhint")}</p>
-      <div id="sigblock" class="${f.acceptance === "onsite" ? "" : "hidden"}"><p class="muted">${t("fsr.consent")}</p><div class="sigbox"><canvas id="sig"></canvas><button class="clr" id="clr">${t("fsr.clear")}</button><span class="lbl">${t("fsr.signlbl")}</span></div>
+      <div id="sigblock" class="${f.acceptance === "onsite" ? "" : "hidden"}"><button class="btn line sm" id="custprev">👁 ${t("acc.preview")}</button><p class="muted">${t("fsr.consent")}</p><div class="sigbox"><canvas id="sig"></canvas><button class="clr" id="clr">${t("fsr.clear")}</button><span class="lbl">${t("fsr.signlbl")}</span></div>
       <div class="row2"><div><label>${t("fsr.signer")}</label><input id="signer" value="${esc(f.signer)}"></div><div><label>${t("fsr.role")}</label><input id="role" value="${esc(f.signer_role)}"></div></div></div>
       <button class="btn gold" id="submit">${t("fsr.submit")}</button><button class="btn line" id="save">${t("fsr.save")}</button>`
     : `${header}
@@ -194,6 +272,7 @@ window.REPORTS = (() => {
       const storePhotos = async () => { const boxes = root.querySelectorAll(".task .bph, .item .bph"); for (let i = 0; i < boxes.length; i++) await UI.photos.store(boxes[i], f.id, i + 1); };   // the box position is the task / system number the portal files the photo under
       const save = async () => { f = { ...f, ...read(root) }; await DB.put("fsr", f); await storePhotos(); };
       $("#save").onclick = async () => { await save(); UI.toast(t("fsr.save")); location.hash = "#/fsr"; };
+      if ($("#custprev")) $("#custprev").onclick = async () => { await save(); location.hash = `#/fsr/${f.id}?preview=1`; };   // R97-060: the customer reads the report before signing
       $("#submit").onclick = async () => {
         const v = read(root);
         if (!v.vessel_id || !v.customer) return UI.toast(t("rep.needheader"));

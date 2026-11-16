@@ -142,12 +142,47 @@ final class Portal {
         usort($out, fn($a, $b) => strcmp($b['date'], $a['date']));
         return $out;
     }
+
+    /* ---- R97-060: customer acceptance from the Service Engineer app — signing on this device (with a preview) and acceptance by e-mail link ---- */
+    /** A service report the engineer works on (author, submitter or on a time line) — the same rule as the report list. */
+    public static function fsrMine(array $u, int $id): array {
+        $r = fsr_load($id); if (!$r || ($r['kind'] ?? 'internal') === 'external') throw new ApiException(404, 'Not found');
+        $mine = (int)$r['created_by'] === (int)$u['id'] || (int)$r['submitted_by'] === (int)$u['id'] || array_filter($r['lines'], fn($l) => mb_strtolower(trim((string)$l['engineer'])) === mb_strtolower((string)$u['full_name'])) || is_cp_admin();
+        if (!$mine) throw new ApiException(403, 'Not your report'); return $r;
+    }
+    /** State of the customer acceptance of a report: what is possible now and the e-mail links with their problems. */
+    public static function acceptance(array $u, int $id): array {
+        $r = self::fsrMine($u, $id); $open = $r['status'] === 'submitted'; $ready = function_exists('dl_has') && dl_has(); $links = [];
+        if ($ready) foreach (dl_list('fsr', $id) as $l) { $p = function_exists('dl_problem') ? dl_problem($l) : null; $st = dl_state_of($l);
+            $links[] = ['id' => (int)$l['id'], 'email' => (string)$l['email'], 'name' => (string)($l['name'] ?? ''), 'state' => $st, 'state_label' => t('dl.s_' . $st), 'sent_at' => (string)$l['created_at'], 'sent_by' => (string)$l['created_name'], 'until' => fmt_datetime((string)$l['expires_at']),
+                'signer' => trim((string)($l['signer_name'] ?? '') . ((string)($l['signer_role'] ?? '') !== '' ? ', ' . $l['signer_role'] : '')), 'active' => in_array($st, ['sent', 'opened', 'verified'], true),
+                'problem' => $p ? ['tone' => $p['tone'], 'label' => $p['label'], 'detail' => $p['detail'], 'do' => $p['do']] : null]; }
+        $people = $open && $ready && (int)$r['customer_id'] ? array_map(fn($p) => ['n' => (string)$p['n'], 'e' => (string)$p['e']], all("SELECT full_name AS n, email AS e FROM contacts WHERE customer_id = ? AND email LIKE '%_@_%._%' ORDER BY full_name LIMIT 40", [(int)$r['customer_id']])) : [];
+        return ['status' => (string)$r['status'], 'open' => $open, 'onsite' => $open && function_exists('sgn_has') && sgn_has(), 'email' => $open && $ready && (int)($r['pdf_file_id'] ?? 0) > 0, 'links' => $links, 'people' => $people, 'report' => self::shapeFsr($r)];
+    }
+    public static function acceptLink(array $u, int $id, array $b): array {
+        self::fsrMine($u, $id); if (!function_exists('dl_create')) throw new ApiException(409, 'Not available');
+        try { dl_create('fsr', $id, (string)($b['email'] ?? ''), (string)($b['name'] ?? '')); } catch (RuntimeException $e) { throw new ApiException(422, $e->getMessage()); }
+        return self::acceptance($u, $id);
+    }
+    public static function acceptCancel(array $u, int $id, int $lid): array {
+        self::fsrMine($u, $id); if (!(int) scalar("SELECT COUNT(*) FROM doc_links WHERE id = ? AND doc = 'fsr' AND doc_id = ?", [$lid, $id])) throw new ApiException(404, 'Not found');
+        try { dl_cancel($lid); } catch (RuntimeException $e) { throw new ApiException(422, $e->getMessage()); }
+        return self::acceptance($u, $id);
+    }
+    /** The customer signs (or does not accept) on the engineer's phone — the portal's own sgn_decide(). */
+    public static function signOnsite(array $u, int $id, array $b): array {
+        self::fsrMine($u, $id); if (!function_exists('sgn_decide')) throw new ApiException(409, 'Not available');
+        try { $st = sgn_decide('fsr', $id, ($b['decision'] ?? '') === 'disputed' ? 'disputed' : 'accepted', (string)($b['name'] ?? ''), (string)($b['role'] ?? ''), (string)($b['remark'] ?? ''), (string)($b['signature'] ?? ''), !empty($b['read'])); }
+        catch (RuntimeException $e) { throw new ApiException(422, $e->getMessage()); }
+        return ['decision' => $st] + self::acceptance($u, $id);
+    }
     public static function shapeFsr(array $r): array {
         return ['id' => 'F' . $r['id'], 'portal_id' => (int)$r['id'], 'kind' => 'service', 'number' => $r['report_no'], 'rev' => 'R' . (int)$r['version'], 'form' => $r['form_code'], 'type' => $r['kind'], 'status' => $r['status'], 'date' => $r['report_date'], 'project_id' => (int)$r['project_id'], 'subproject_id' => (int)($r['subproject_id'] ?? 0) ?: null, 'ticket_id' => (int)($r['ticket_id'] ?? 0) ?: null,
             'vessel' => (string)$r['vessel_name'], 'customer' => (string)$r['customer_name'], 'location' => (string)$r['location'], 'pic' => (string)$r['pic_name'], 'pic_position' => (string)$r['pic_position'], 'pic_mobile' => (string)$r['pic_mobile'], 'pic_email' => (string)$r['pic_email'],
             'tasks' => array_map(fn($w) => ['seq' => (int)$w['seq'], 'description' => (string)$w['description'], 'parts' => array_map(fn($p) => ['name' => $p['d'], 'type' => $p['t'], 'code' => $p['c'] ?? null, 'qty' => isset($p['q']) ? (float)$p['q'] : null, 'move_id' => $p['m'] ?? null], $w['parts']), 'issues' => array_values(array_filter(array_map('trim', explode("\n", (string)$w['open_issues'])))),
                 'times' => array_map(fn($l) => ['engineer' => (string)$l['engineer'], 'specialty' => (string)$l['specialty'], 'start' => substr((string)$l['start_time'], 0, 5), 'end' => substr((string)$l['end_time'], 0, 5), 'type' => $l['time_type'], 'hours' => (float)$l['hours'], 'nc_reason' => $l['nc_reason'] ?? null], $w['lines'])], $r['works']),
-            'summary' => $r['summary'], 'submitted_by' => (string)$r['submitted_name'], 'submitted_at' => (string)$r['submitted_at'], 'accepted_by' => (string)$r['accepted_name'], 'accepted_at' => (string)$r['accepted_at'], 'accepted_ip' => (string)$r['accepted_ip'], 'acceptance' => $r['customer_sign_id'] ? 'onsite' : 'portal',
+            'summary' => $r['summary'], 'submitted_by' => (string)$r['submitted_name'], 'submitted_at' => (string)$r['submitted_at'], 'accepted_by' => (string)$r['accepted_name'], 'accepted_at' => (string)$r['accepted_at'], 'accepted_ip' => (string)$r['accepted_ip'], 'acceptance' => $r['customer_sign_id'] ? 'onsite' : 'portal', 'accepted_via' => (string)($r['accepted_via'] ?? ''), 'accepted_role' => (string)($r['accepted_role'] ?? ''),
             'invoicing' => $r['invoicing'], 'pdf_file_id' => (int)($r['pdf_file_id'] ?? 0) ?: null, 'photos' => count($r['photos'])];
     }
     public static function shapeIsr(array $r): array {

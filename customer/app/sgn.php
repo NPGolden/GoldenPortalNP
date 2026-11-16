@@ -26,7 +26,7 @@ function sgn_via_label(?string $via): string { return $via === 'on_site' ? 'Sign
 
 /** The signer's decision, given on the device of a member of staff. Returns 'accepted' or 'disputed'. */
 function sgn_decide(string $doc, int $id, string $decision, string $name, string $role, string $remark, string $sig, bool $read): string {
-    $u = require_staff(); $D = sgn_load($doc, $id); if (!$D) throw new RuntimeException(t('err.notfound'));
+    $u = current_user(); if (!$u || !is_staff()) throw new RuntimeException(t('err.noaccess')); $D = sgn_load($doc, $id); if (!$D) throw new RuntimeException(t('err.notfound'));
     if (!sgn_can($D)) throw new RuntimeException(t('fsr.not_pending'));
     $r = $D['r']; $name = mb_substr(trim(preg_replace('/\s+/u', ' ', $name)), 0, 90); $role = mb_substr(trim(preg_replace('/\s+/u', ' ', $role)), 0, 80); $remark = mb_substr(trim($remark), 0, 2000);
     if (mb_strlen($name) < 3) throw new RuntimeException(t('sgn.name_needed'));
