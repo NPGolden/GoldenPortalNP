@@ -35,7 +35,15 @@ layout_head(t('web.inbox'), 'web_sales');
       <tr><th>IP</th><td class="hint"><?= e($cur['ip']) ?></td></tr>
       <?php if ($cur['handled_name']): ?><tr><th><?= tt('web.handled') ?></th><td><?= e($cur['handled_name']) ?> · <?= e(fmt_datetime($cur['handled_at'])) ?><?= $cur['note'] ? '<br><span class="hint">' . e($cur['note']) . '</span>' : '' ?></td></tr><?php endif; ?>
     </table></div>
+    <?php $bs = function_exists('web_bridge_spec') ? web_bridge_spec($cur) : null; if ($bs): $bc = (string)($bs['class'] ?? ''); $bcol = ['A' => '#0A1B2E', 'B' => '#B8902E', 'C' => '#6B7280'][$bc] ?? '#6B7280'; ?>
+    <div><h3 style="margin-top:0;"><?= tt('web.bridge_spec') ?></h3>
+      <div class="card" style="padding:12px 14px;margin-bottom:12px;border-left:5px solid <?= $bcol ?>;"><b style="font-size:1.05rem;"><?= tt('web.bridge_class') ?> <?= e($bc) ?></b> · <?= tt('web.bridge_score') ?> <?= (int)($bs['score'] ?? 0) ?>/27<br><span class="hint"><?= e((string)($bs['fit'] ?? '')) ?><?php if (!empty($bs['points'])): ?> · <?= e(implode(', ', array_map(fn($k, $p) => $k . ' +' . $p, array_keys($bs['points']), $bs['points']))) ?><?php endif; ?></span></div>
+      <div class="table-scroll" style="max-height:520px;overflow:auto;"><table class="tbl tbl--compact"><tbody><?php $tt_ = $bs['titles'] ?? []; foreach (($bs['labels'] ?? []) as $k => $val): if ($val === '' || $val === '—' || in_array($k, ['name', 'email', 'phone', 'company'], true)) continue; ?><tr><th style="width:42%;font-weight:600;"><?= e((string)($tt_[$k] ?? $k)) ?></th><td><?= e((string)$val) ?></td></tr><?php endforeach; ?></tbody></table></div>
+      <details style="margin-top:10px;"><summary class="hint" style="cursor:pointer;"><?= tt('web.message') ?></summary><div class="prose" style="white-space:pre-wrap;font-size:.85rem;"><?= e((string)$cur['message']) ?></div></details>
+    </div>
+    <?php else: ?>
     <div><h3 style="margin-top:0;"><?= tt('web.message') ?></h3><div class="prose" style="white-space:pre-wrap;"><?= e((string)$cur['message']) ?></div></div>
+    <?php endif; ?>
   </div>
   <div class="btn-row" style="margin-top:14px;flex-wrap:wrap;gap:10px;">
     <?php if (!$cur['ticket_id'] && function_exists('web_can_convert') && web_can_convert()): $hint = trim((string)($cur['vessel'] ?: $cur['vessels'] ?: '')); $vs = all('SELECT id, name FROM vessels WHERE is_active = 1 ORDER BY (name LIKE ?) DESC, name', ['%' . ($hint !== '' ? mb_substr($hint, 0, 40) : '§none§') . '%']);
@@ -68,7 +76,7 @@ layout_head(t('web.inbox'), 'web_sales');
   <td><a href="<?= url('web_inbox', ['id' => (int)$r['id']] + $keep) ?>#inq"><b><?= e($r['ref']) ?></b></a><?= $ks ? ' ' . kym_pill($site) : '' ?></td>
   <td><?= $r['kind'] === 'ticket' ? '🎫 ' . tt('web.kind_ticket') : ($r['kind'] === 'contact' ? '✉ ' . tt('web.kind_contact') : '🔑 ' . tt('web.kind_access')) ?></td>
   <td><?= e($r['name']) ?></td><td><?= e($r['company']) ?></td>
-  <td><?= $r['kind'] === 'ticket' ? e($r['vessel']) . ' — ' . e($r['subject']) : ($r['kind'] === 'contact' ? e(mb_substr((string)$r['subject'], 0, 90)) : e(mb_substr((string)$r['vessels'], 0, 80))) ?><?= $r['ticket_no'] ? ' · <a href="' . url('ticket', ['id' => (int)$r['ticket_id']]) . '">' . e($r['ticket_no']) . '</a>' : '' ?></td>
+  <td><?= $r['kind'] === 'ticket' ? e($r['vessel']) . ' — ' . e($r['subject']) : ($r['kind'] === 'contact' ? ((string)$r['system_kind'] === 'bridge' ? '🧭 ' : '') . e(mb_substr((string)$r['subject'], 0, 90)) : e(mb_substr((string)$r['vessels'], 0, 80))) ?><?= $r['ticket_no'] ? ' · <a href="' . url('ticket', ['id' => (int)$r['ticket_id']]) . '">' . e($r['ticket_no']) . '</a>' : '' ?></td>
   <td><?= $prio((string)$r['priority']) ?></td><td><?= $tone($r['status']) ?></td><td class="hint"><?= e(fmt_datetime($r['created_at'])) ?></td></tr><?php endforeach; ?>
 </tbody></table></div></div>
 <?php if ($ks && is_cp_admin()): ?><div class="card"><h2 style="margin-top:0;">🗑 <?= tt('web.purge_title') ?></h2><p class="hint"><?= e(t($site === 'kyma' ? 'web.purge_hint_kyma' : 'web.purge_hint', ['b' => $brandName])) ?></p>

@@ -52,8 +52,10 @@ function web_pub_contact(array $b, string $ip, string $site = 'golden'): array {
     $db = [$email, $msg]; $dup = one('SELECT ref FROM web_inquiries WHERE kind = "contact" AND email = ? AND message = ?' . kym_w('site', $site, $db) . ' AND created_at > DATE_SUB(NOW(), INTERVAL 1 HOUR)', $db); if ($dup) return ['ref' => $dup['ref'], 'duplicate' => true];
     $ref = web_ref($site); $topics = WEB_TOPICS;
     $subject = ($topic !== '' ? ($topics[$topic] ?? ucfirst($topic)) . ' — ' : '') . $name . ($company !== '' ? ' (' . $company . ')' : '');
-    q('INSERT INTO web_inquiries (ref, kind, name, company, email, phone, system_kind, subject, message, ip) VALUES (?,?,?,?,?,?,?,?,?,?)',
-      [$ref, 'contact', $name, $company, $email, $f('phone', 40), $topic, mb_substr($subject, 0, 190), $msg, mb_substr($ip, 0, 64)]);
+    // R97-060: the Integrated Bridge questionnaire hands over its structured answers and internal class (JSON, kept in `vessels`)
+    $spec = ''; if ($topic === 'bridge' && is_string($b['spec'] ?? null) && strlen($b['spec']) <= 120000) { $sj = json_decode($b['spec'], true); if (is_array($sj) && isset($sj['answers'])) { $spec = $b['spec']; $cls = preg_replace('/[^A-C]/', '', (string) ($sj['class'] ?? '')); $vsl = trim((string) ($sj['answers']['vessel'] ?? '')); $loa = (string) ($sj['answers']['loa'] ?? ''); $subject = 'Bridge' . ($cls !== '' ? ' · Class ' . $cls : '') . ' — ' . ($vsl !== '' ? $vsl : $name) . ($loa !== '' ? ' · ' . $loa . ' m' : '') . ($vsl !== '' ? ' · ' . $name : '') . ($company !== '' ? ' (' . $company . ')' : ''); } }
+    q('INSERT INTO web_inquiries (ref, kind, name, company, email, phone, system_kind, subject, message, vessels, ip) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+      [$ref, 'contact', $name, $company, $email, $f('phone', 40), $topic, mb_substr($subject, 0, 190), $msg, $spec !== '' ? $spec : null, mb_substr($ip, 0, 64)]);
     $id = (int) db()->lastInsertId(); if ($ks) q('UPDATE web_inquiries SET site = ? WHERE id = ?', [$site, $id]);
     $careers = $topic === 'careers';
     if (function_exists('nf_push')) try { nf_push($careers ? web_mgmt_ids() : web_notify_ids('contact'), 'tk', 'web:' . $id, ($site === 'kyma' ? 'KYMA · ' : '') . t($careers ? 'web.nf_careers' : 'web.nf_contact', ['name' => $name]), $careers ? null : mb_substr($msg, 0, 140), url('web_inbox', ['site' => $site, 'id' => $id]), null, $site === 'kyma' ? 'KYMA website' : 'Website'); } catch (Throwable $e) {}
@@ -220,3 +222,6 @@ function web_handle_action(string $action): bool {
     flash('good', t('sys.saved')); redirect('settings', ['tab' => 'website', '_r' => uniqid()]);
     return true;
 }
+/** R97-060: the Integrated Bridge questionnaire kept with a contact enquiry (web_inquiries.vessels) — decoded, or null. */
+function web_bridge_spec(array $row): ?array { if (($row['kind'] ?? '') !== 'contact' || ($row['system_kind'] ?? '') !== 'bridge' || empty($row['vessels'])) return null; $s = json_decode((string) $row['vessels'], true); return is_array($s) && isset($s['answers']) ? $s : null; }
+

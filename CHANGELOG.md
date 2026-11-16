@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.152.1** (build 2026-11-15). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.153.0** (build 2026-11-16). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.153.0 | GAS-CP-R97-060 | 2026-11-16 | Website inbox: the Integrated Bridge captain’s questionnaire (goldenas.com.gr/bridge-questionnaire) arrives as a Bridge enquiry with the vessel, the internal project class A / B / C with its score and budget fit, and the full specification table; the free-text copy stays under “Message”. | — |
 | 1.152.1 | GAS-CP-R97-059 | 2026-11-16 | Acceptance by e-mail: delivery problems are shown — a message that could not be sent or was returned by the recipient’s mail server, a link closed after wrong codes or expired without an answer is marked on the link with the reason and what to do, the card carries a warning, “Send again” is one click, and the sender gets a notification. | `install/migrate_cp_r97_059_doc_links_errors.sql` |
 | 1.152.0 | GAS-CP-R97-058 | 2026-11-16 | Acceptance by e-mail link for customers without a portal account: service reports, function checks, offers and owner approvals (drawings) are sent to one address with a personal link, confirmed with a 6-digit code, then accepted or sent back with name and capacity (reports with a drawn signature). Service reports 24 hours, offers until their validity date or 14 days, others 14 days; reminders, cancel and replace. | `install/migrate_cp_r97_058_doc_links.sql` |
 | 1.151.0 | GAS-CP-R97-057 | 2026-11-16 | Customer signs on the engineer’s device: a submitted service report or function check opens in a signing view without the portal menu — summary, full PDF, name, capacity, remark and signature pad; accepted or sent back on the spot. In the documents the name, capacity and date are kept inside the signature box on their own lines. | `install/migrate_cp_r97_057_sign_on_site.sql` |
