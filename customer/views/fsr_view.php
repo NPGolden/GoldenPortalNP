@@ -36,6 +36,7 @@ layout_head(t('fsr.title') . ' ' . $r['report_no'], $staff ? 'projects' : 'repor
   </div>
 </div>
 
+<?php $dlDoc = 'fsr'; $dlId = $id; require __DIR__ . '/_dl_card.php'; ?>
 <?php if ($canAccept): ?>
 <div class="card fsr-accept">
   <h2><?= tt('fsr.accept_title') ?></h2>

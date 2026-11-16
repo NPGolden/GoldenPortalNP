@@ -1988,3 +1988,8 @@ body.sgn { background: #F3F5F8; margin: 0; }
 .sgn-tick.is-bad { background: #C89B3C; }
 @media (min-width: 620px) { .sgn-actions { grid-template-columns: 2fr 1fr; } }
 .sgn-dl--num { grid-template-columns: 1fr auto; }
+/* ---- R97-058: acceptance by e-mail link (customer/sign.php) ---- */
+.sgn-tick.is-mute { background: #8A94A6; }
+.sgn-foot { text-align: center; font-size: 12px; color: #5B6675; margin-top: 18px; }
+.sgn-code input { font-size: 28px; letter-spacing: .35em; text-align: center; font-family: var(--mono); max-width: 260px; }
+@media (min-width: 620px) { .sgn-actions--3 { grid-template-columns: 2fr 1.4fr 1fr; } .sgn-actions--1 { grid-template-columns: 1fr; } }

@@ -106,6 +106,7 @@ require __DIR__ . '/app/sbc.php';     // R97-048 System Budgets consistency chec
 require __DIR__ . '/app/sbp.php';     // R97-049 System Budgets procurement step
 require __DIR__ . '/app/yards.php';   // R97-052 known shipyards → Yard role, on approval
 require __DIR__ . '/app/sgn.php';     // R97-057 customer signs on the engineer's device
+require __DIR__ . '/app/dl.php';      // R97-058 acceptance by e-mail link
 require __DIR__ . '/app/ar.php';
 require __DIR__ . '/app/rp.php';
 require __DIR__ . '/app/kb.php';
@@ -166,6 +167,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (function_exists('nl_handle_action') && nl_handle_action($action)) exit;   // R97-039
         if (function_exists('yd_handle_action') && yd_handle_action($action)) exit;   // R97-052
         if (function_exists('sgn_handle_action') && sgn_handle_action($action)) exit;   // R97-057
+        if (function_exists('dl_handle_action') && dl_handle_action($action)) exit;   // R97-058
         if (function_exists('ws_handle_action') && ws_handle_action($action)) exit;   // R95-001
         if (function_exists('web_handle_action') && web_handle_action($action)) exit;   // R90-001   // R89-001 recruiting actions (always redirect)
         if (pm_handle_action($action, $page)) exit;     // PM-tool actions (always redirect)

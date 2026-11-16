@@ -2225,3 +2225,27 @@ Language keys 10 206 each.
 **Proposal made in the reply (not built)**: acceptance by e-mail link for customers without a portal account.
 
 Language keys 10 249 each.
+
+## §344 v1.152.0 (R97-058) — Acceptance by e-mail link
+
+**Decision of the owner (16/11/2026)**: proposal accepted. Documents: service reports and offers, and whatever needs an owner approval, such as drawings. Keep the 6-digit code. Validity: service reports 24 h; the others 14 days or the validity of the offer.
+
+**Migration** `install/migrate_cp_r97_058_doc_links.sql` (key `r97v`): table `doc_links` — document kind and id, number and title at the time of sending, `token_hash` (SHA-256, unique), recipient, language, sender, `expires_at`, code (`code_hash`, expiry, sends, tries), `fails`, `verified_at`, `pass_hash`, answer (`used_at`, `used_ip`, `decision`, signer), cancellation, reminders.
+
+**Module** `app/dl.php`:
+
+- `DL_DOCS` = fsr, fc, offer, oa. `dl_info()` gives every kind one shape (number, title, open?, file, customer, validity, back link).
+- `dl_ttl()`: fsr 24 h; offer until `valid_until` 23:59 when that is more than an hour away, else 14 days; others 14 days.
+- `dl_create()` (staff, document in scope and open, file present, mail configured, at most 10 links per document per hour): cancels an open link to the same address, stores only the hash of a 40-character token, mails the link with the file attached (plain text, portal mailbox, Reply-To the sender); if the mail fails nothing is kept.
+- Public side: `dl_find()` (state on the database clock), `dl_run_as()` (the page reads and regenerates the document as the sender, in memory only — no session, no cookie of the portal), `dl_code_issue()` (6 digits, 15 minutes, one per 45 s, 6 per link), `dl_code_check()` (5 tries per code, 15 failures close the link, constant-time compare; success gives a random pass kept as an HttpOnly, SameSite=Strict cookie scoped to `sign.php`, valid 60 minutes), `dl_decide()` (own guarded updates: fsr / fc → `accepted_via = 'email'` with the drawn signature, or disputed; offer → approved / rejected; owner approval → approved / approved with comments / rejected; events in the document's own log with the signer's name and the address), `dl_after()` (notification and mail to the sender, confirmation to the recipient with the signed report).
+- `dl_sweep()` in the background sweep: reminders (fsr once after 8 h; others after 3 and 7 days) — each with a new token, the old one dies.
+
+**Public page** `customer/sign.php?t=`: loads the portal's modules (list read from `index.php`), strict headers (CSP with nonce, no framing, no referrer, no store, noindex), 60 requests per address per minute, generic answers for unknown / dead links, file only after the code (`&f=1`, sandboxed). Preview shared with the on-site view (`views/_sgn_preview.php`).
+
+**Staff card** `views/_dl_card.php` on `fsr_view`, `fc_view`, `offer`, `approval`; actions `dl_send`, `dl_cancel`.
+
+**Tests (sandbox, no outgoing mail there — links and codes were issued from the command line)**: pages before / after the migration; sending without mail set up refused and nothing stored; step 1 shows no document; file and decision refused without the code; wrong code, code reuse, five wrong codes, lock after 15; code confirmed in another browser not valid; accept a service report with signature → status, event, notification, PDF sub-line "Accepted by e-mail"; second decision impossible; offer with validity date (link 5.3 days) approved, offer without (14 days) rejected with reason; drawing approved with comments; link replaced, cancelled, expired; confirmation older than 60 minutes; reminder issues a new token; document decided in the portal closes the link; rate limit; junk tokens; phone emulation of the whole flow. **Not tested**: real delivery of the four kinds of mail and their attachments (Microsoft 365).
+
+**Security review**: the link alone shows nothing — the document appears only after a code delivered to the mailbox; token never stored or logged, 40 random characters, in the address only (never in a form body); codes and passes stored as hashes, limited in time, tries and number; answers do not reveal whether a token ever existed; every decision is a guarded update on the pending status, so a link cannot change a decided document; staff cannot read the token (not even the sender); mails are plain text; the public page runs with the sender's reading rights only inside the functions it calls and has no portal session. Residual risk, by design: whoever controls the mailbox can accept — the same assurance as a signed e-mail reply, with a better record. Proposed (no cost in speed): SPF, DKIM and DMARC alignment check of the sending mailbox so the acceptance mails are not marked as spam; list of open acceptance links on System health.
+
+Language keys 10 338 each.

@@ -122,7 +122,7 @@ function hr_gate(string $page): void { if (hr_only() && !in_array($page, HR_PAGE
  *  open in a browser and drops out ~PRESENCE_MINUTES after closing it; signing out or the idle time-out
  *  clears the stamp at once (R24-002). Silent before the R6 migration. */
 function presence_touch(array $u): void {
-    if (!array_key_exists('last_seen_at', $u)) return;
+    if (!array_key_exists('last_seen_at', $u) || !empty($GLOBALS['cp_no_presence'])) return;   // R97-058: the public acceptance page reads as the sender without marking them online
     if ($u['last_seen_at'] && tz_age((string)$u['last_seen_at']) < 60) return;   // R97-044: zone-safe
     try { q('UPDATE customer_users SET last_seen_at = NOW() WHERE id = ?', [$u['id']]); } catch (Throwable $e) {}
 }

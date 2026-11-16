@@ -56,6 +56,7 @@ layout_head($r['report_no'] . ' · ' . $tpl['short'], 'reports');
   <div class="card"><h2><?= tt('fc.sign_engineer') ?></h2><?php if ($r['golden_sign_id']): ?><img src="<?= url('file', ['id' => $r['golden_sign_id']]) ?>" alt="" style="max-width:320px;max-height:110px;display:block;"><?php endif; ?><p><b><?= e($r['submitted_name'] ?: ($r['engineer_name'] ?: '—')) ?></b><?= $r['submitted_at'] ? '<br><span class="hint">' . e(fmt_datetime($r['submitted_at'])) . '</span>' : '' ?></p></div>
 </div>
 
+<?php $dlDoc = 'fc'; $dlId = $id; require __DIR__ . '/_dl_card.php'; ?>
 <?php if ($canAccept): ?>
 <div class="card fsr-accept">
   <h2><?= tt('fc.accept_title') ?></h2><p><?= tt('fc.accept_lede') ?></p>

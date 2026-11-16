@@ -114,4 +114,5 @@ layout_head($r['doc_no'] . ' · ' . $r['title'], 'approvals');
     <?php endif; ?>
   </div>
 </div>
+<?php $dlDoc = 'oa'; $dlId = $id; require __DIR__ . '/_dl_card.php'; ?>
 <?php layout_foot(); ?>

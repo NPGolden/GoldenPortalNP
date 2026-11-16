@@ -156,4 +156,5 @@ layout_head($o['offer_no'] . ' · ' . $o['title'], 'offers');
   echo em_card_html(['kind' => 'offer', 'ctx' => ['no' => $o['offer_no'] . ' ' . $o['revision'], 'title' => (string)$o['title'], 'vessel' => (string)($o['vessel'] ?? ''), 'customer' => (string)($o['customer_name'] ?? ''), 'project' => (string)($o['project_code'] ?? ''), 'doc' => t('em.w_offer', ['no' => $o['offer_no'] . ' ' . $o['revision']]), 'project_id' => (int)$o['project_id'], 'customer_id' => (int)($o['customer_id'] ?? 0)],
     'people' => em_people((int)($o['vessel_id'] ?? 0) ?: null, (int)($o['customer_id'] ?? 0) ?: null), 'atts' => $emAtts, 'back' => url('offer', ['id' => $id])]); endif; ?>
 <?php $adAction = 'of_delete'; $adId = $id; $adBack = 'offers'; $adConfirm = t('of.delete_confirm', ['no' => $o['offer_no'] . ' ' . $o['revision']]); $adNote = t('of.delete_note'); require __DIR__ . '/_admin_delete.php'; ?>
+<?php $dlDoc = 'offer'; $dlId = $id; require __DIR__ . '/_dl_card.php'; ?>
 <?php layout_foot(); ?>
