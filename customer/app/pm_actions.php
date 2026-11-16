@@ -78,6 +78,7 @@ function pm_handle_action(string $action, string $page): bool {
             q('UPDATE subprojects SET code = ?, name = ?, system_id = ?, description = ?, sort_order = ?, status = ? WHERE id = ?',
               [$code, $str('name', 120), (int)($_POST['system_id'] ?? 0) ?: null, $str('description', 4000), (int)($_POST['sort_order'] ?? 0),
                in_array($_POST['status'] ?? '', pm_statuses(), true) ? $_POST['status'] : $s['status'], $id]);
+            sp_reorder((int)$s['project_id'], $id, (int)($_POST['sort_order'] ?? 0));   // R97-053
             if (br_has() && isset($_POST['branch_id'])) q('UPDATE subprojects SET branch_id = ? WHERE id = ?', [br_from_post(), $id]);   // R24-001
             pm_save_invoicing($id); pm_save_deadline('subprojects', $id); pm_track_completed($id); if (function_exists('iv_sub_save')) iv_sub_save($id); if (function_exists('pty_sub_save')) pty_sub_save($id);
             flash('good', t('sp.updated'));
@@ -93,6 +94,7 @@ function pm_handle_action(string $action, string $page): bool {
             $newId = (int) db()->lastInsertId();
             if (function_exists('of_sync_project')) of_sync_project($pid);                                           // R57-001: follows an approved project-level offer
             if (br_has()) q('UPDATE subprojects SET branch_id = ? WHERE id = ?', [br_from_post(), $newId]);                // R24-001
+            sp_reorder($pid, $newId, (int)($_POST['sort_order'] ?? 0));                                                   // R97-053: automatic order — placed where asked, the rest renumbered
             pm_save_invoicing($newId); pm_save_deadline('subprojects', $newId); if (function_exists('iv_sub_save')) iv_sub_save($newId); if (function_exists('pty_sub_save')) pty_sub_save($newId);
             flash('good', t('pr.saved'));
             redirect('subproject', ['id' => $newId]);
@@ -1686,6 +1688,20 @@ function pm_import_systems(string $path, bool $dry): array {
 /** Project / sub-project statuses in display order (R57-001 adds "quoted" = offer stage when the migration has run). */
 function pm_statuses(): array { return function_exists('of_quoted_has') && of_quoted_has() ? ['quoted', 'active', 'onhold', 'completed'] : ['active', 'onhold', 'completed']; }
 /** Status of a project / sub-project created without an approved offer. */
+/* ---- R97-053: the order of the sub-projects of a project is numbered by the portal: 1…N, no gaps, no doubles ---- */
+/** Renumber the sub-projects of a project 1…N in their present order (numbered first, then the unnumbered by code).
+ *  With $movedId the sub-project is placed at position $pos (0 or beyond the end = last) and the others shift. */
+function sp_reorder(int $pid, int $movedId = 0, int $pos = 0): int {
+    if ($pid <= 0) return 0; $rows = all('SELECT id, sort_order FROM subprojects WHERE project_id = ? ORDER BY (sort_order <= 0), sort_order, code, id', [$pid]);
+    $cur = []; $ids = []; foreach ($rows as $r) { $cur[(int)$r['id']] = (int)$r['sort_order']; $ids[] = (int)$r['id']; }
+    if ($movedId && isset($cur[$movedId])) { $ids = array_values(array_diff($ids, [$movedId])); $at = $pos <= 0 ? count($ids) : min($pos - 1, count($ids)); array_splice($ids, $at, 0, [$movedId]); }
+    $n = 0; foreach ($ids as $i => $id) if ($cur[$id] !== $i + 1) { q('UPDATE subprojects SET sort_order = ? WHERE id = ?', [$i + 1, $id]); $n++; }
+    return $n;
+}
+/** The number the next new sub-project of this project gets. */
+function sp_next_order(int $pid): int { return (int) scalar('SELECT COUNT(*) FROM subprojects WHERE project_id = ?', [$pid]) + 1; }
+/** Once, after the release: every project whose order has gaps, doubles or zeros is renumbered in its present order. */
+function sp_reorder_all(): int { $n = 0; foreach (all('SELECT project_id FROM subprojects GROUP BY project_id HAVING MIN(sort_order) <> 1 OR MAX(sort_order) <> COUNT(*) OR COUNT(DISTINCT sort_order) <> COUNT(*)') as $r) { sp_reorder((int)$r['project_id']); $n++; } return $n; }
 function pm_default_status(): string { return function_exists('of_quoted_has') && of_quoted_has() ? 'quoted' : 'active'; }
 function pm_status_tone(string $s): string { return ['quoted' => 'navy', 'active' => 'green', 'onhold' => 'gold', 'completed' => 'mute'][$s] ?? 'mute'; }
 function pm_norm_status(string $s): ?string {
@@ -1848,14 +1864,16 @@ function pm_import_projects(string $path, bool $dry): array {
                 foreach ($pcts as $col => $v) { $sets[] = "{$col} = ?"; $vals[] = $v; }
                 $vals[] = $s['id'];
                 q('UPDATE subprojects SET ' . implode(', ', $sets) . ' WHERE id = ?', $vals);
+                if ($order !== null) sp_reorder((int)$p['id'], (int)$s['id'], (int)$order);   // R97-053
                 $res['subs_upd']++;
             } else {
-                if ($order === null) $order = (int) scalar('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM subprojects WHERE project_id = ?', [$p['id']]);
+                $ordGiven = $order !== null; if ($order === null) $order = (int) scalar('SELECT COALESCE(MAX(sort_order), 0) + 1 FROM subprojects WHERE project_id = ?', [$p['id']]);
                 $cols = ['project_id', 'code', 'erp_code', 'name', 'system_id', 'status', 'sort_order', 'description'];
                 $vals = [$p['id'], $subCode !== '' ? mb_substr($subCode, 0, 40) : null, mb_substr($code, 0, 40),
                          mb_substr($subName ?: $subCode, 0, 120), $sysId, $sstatus ?? pm_default_status(), $order, $desc ?: null];
                 foreach ($pcts as $col => $v) { $cols[] = $col; $vals[] = $v; }
                 q('INSERT INTO subprojects (' . implode(', ', $cols) . ') VALUES (' . rtrim(str_repeat('?,', count($cols)), ',') . ')', $vals);
+                sp_reorder((int)$p['id'], (int) db()->lastInsertId(), $ordGiven ? (int)$order : 0);   // R97-053
                 $res['subs_new']++;
             }
         }
@@ -1891,7 +1909,9 @@ function pm_delete_subproject(int $id): void {
     $files = all('SELECT stored_name FROM sp_files WHERE subproject_id = ?', [$id]);
     db()->beginTransaction();
     q('DELETE FROM sp_files WHERE subproject_id = ?', [$id]);
+    $spPid = (int) scalar('SELECT project_id FROM subprojects WHERE id = ?', [$id]);
     q('DELETE FROM subprojects WHERE id = ?', [$id]);         // cascades: comments, notes, snapshots, tests
+    if ($spPid) sp_reorder($spPid);   // R97-053: close the gap in the order
     db()->commit();
     pm_unlink_files($files);
 }

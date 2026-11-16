@@ -2125,3 +2125,23 @@ Language keys 10 173 each.
 **Security review**: read-only scan; the change is POST + CSRF, administrators only, and limited on the server to rows the scan proposes at that moment, so a forged id cannot mark an arbitrary organisation; one column pair written through placeholders; every run logged; no personal data leaves the portal — the yard names are a fixed list in the code. Proposed next (no cost in speed): show the runs of `yards.log` and `exports.log` on System health.
 
 Language keys 10 195 each.
+
+## §339 v1.148.0 (R97-053) — Sub-projects: automatic order
+
+**Request**: "in the sub projects provide me the same automatic numbering for the order also since it makes a mess and every time i have to check the correct order manually".
+
+**Before**: `subprojects.sort_order` was typed by hand (default 0) — doubles, gaps and zeros; lists sort by `sort_order, code`.
+
+**Now** (`app/pm_actions.php`):
+
+- `sp_reorder($pid, $movedId = 0, $pos = 0)`: reads the sub-projects in their present order (numbered first, then the unnumbered by code), places `$movedId` at `$pos` (0 or beyond the end = last) and writes 1…N; only changed rows are updated.
+- `sp_next_order($pid)` = count + 1, shown in the form.
+- Called from `subproject_save`, `subproject_update`, the Excel import (insert and update with an order), and after a delete.
+- `sp_reorder_all()`: one pass over the projects whose order is not exactly 1…N, run once from the background sweep (`sp_order_v1`).
+- Form (`views/project_new.php`): the field shows the next number / the present position, `min 1`, `max N`, with a hint. Keys `sp.order_hint_new`, `sp.order_hint`.
+
+**Tests (sandbox)**: project with five sub-projects all on 0 → new one gets 6 and the five become 1–5 by code; new at position 2 → the rest shift; move to 1; move beyond the end → last; one-off pass → no project out of order, display order unchanged.
+
+**Security review**: no new entry point; the position is cast to an integer and clamped by the routine, updates use placeholders and are limited to the sub-projects of the one project; the existing staff check and CSRF of the actions apply. Nothing to propose for this change.
+
+Language keys 10 197 each.
