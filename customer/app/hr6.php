@@ -111,7 +111,9 @@ function hr_evaluation_save_from_post(int $pid): void {
     $cur = hr_evaluation($pid, $year); if ($cur && $cur['status'] !== 'draft' && !hr_can()) throw new RuntimeException(t('hr.ev_locked'));
     $sc = []; foreach (HR_EVAL_CRITERIA as $c) { $v = (int)($_POST['sc'][$c] ?? 0); if ($v >= 1 && $v <= 5) $sc[$c] = $v; }
     if ($sc && function_exists('hr_eval_auto')) foreach (hr_eval_auto($pid, $year) as $k => $a) $sc[$k] = (int)$a['score'];   // R64-001: training participation and attendance consistency, computed
-    $overall = $sc ? round(array_sum($sc) / count($sc), 1) : null; $status = in_array($_POST['status'] ?? '', ['draft', 'final'], true) ? $_POST['status'] : 'draft';
+    $overall = $sc ? round(array_sum($sc) / count($sc), 1) : null;
+    if ($sc && function_exists('hrs_eval_scores')) $sc += hrs_eval_scores($pid, $year);   // R97-063: assessment results of the year are recorded with the evaluation — after the overall mark, they do not change it
+    $status = in_array($_POST['status'] ?? '', ['draft', 'final'], true) ? $_POST['status'] : 'draft';
     $t = fn(string $k) => mb_substr(trim((string)($_POST[$k] ?? '')), 0, 8000) ?: null; $d = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['eval_date'] ?? '')) ? $_POST['eval_date'] : date('Y-m-d');
     $v = [$d, (int)(current_user()['id'] ?? 0) ?: null, json_encode($sc), $overall, $t('strengths'), $t('improvements'), $t('goals'), $t('training_needs'), $t('comments'), $status];
     if ($cur) q('UPDATE hr_evaluations SET eval_date = ?, evaluator_id = ?, scores = ?, overall = ?, strengths = ?, improvements = ?, goals = ?, training_needs = ?, comments = ?, status = IF(status = "acknowledged", status, ?) WHERE id = ?', [...$v, (int)$cur['id']]);

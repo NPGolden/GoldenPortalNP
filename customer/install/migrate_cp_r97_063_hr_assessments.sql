@@ -1,0 +1,67 @@
+-- GAS-CP-R97-063 (v1.155.0) — HR › Assessments: campaigns of questionnaires imported from the Excel template, self and manager forms, results kept per year
+CREATE TABLE IF NOT EXISTS hrs_campaigns (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  family_code VARCHAR(40) NOT NULL,
+  family_version SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+  title VARCHAR(200) NOT NULL,
+  form MEDIUMTEXT NOT NULL,
+  status VARCHAR(12) NOT NULL DEFAULT 'draft',
+  starts_on DATE NULL,
+  ends_on DATE NULL,
+  year SMALLINT UNSIGNED NULL,
+  reminded TINYINT UNSIGNED NOT NULL DEFAULT 0,
+  file_name VARCHAR(190) NULL,
+  created_by INT UNSIGNED NULL,
+  created_name VARCHAR(120) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  started_at DATETIME NULL,
+  closed_at DATETIME NULL,
+  closed_by INT UNSIGNED NULL,
+  KEY k_family (family_code, year),
+  KEY k_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hrs_targets (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  campaign_id INT UNSIGNED NOT NULL,
+  person_id INT UNSIGNED NOT NULL,
+  user_id INT UNSIGNED NULL,
+  rater_user_id INT UNSIGNED NULL,
+  department_id INT UNSIGNED NULL,
+  self_status VARCHAR(10) NOT NULL DEFAULT 'pending',
+  self_started_at DATETIME NULL,
+  self_submitted_at DATETIME NULL,
+  self_seconds INT UNSIGNED NOT NULL DEFAULT 0,
+  mgr_status VARCHAR(10) NOT NULL DEFAULT 'pending',
+  mgr_submitted_at DATETIME NULL,
+  answers MEDIUMTEXT NULL,
+  mgr_answers TEXT NULL,
+  scores TEXT NULL,
+  flags TEXT NULL,
+  valid TINYINT(1) NOT NULL DEFAULT 1,
+  overall DECIMAL(5,1) NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY u_cp (campaign_id, person_id),
+  KEY k_user (user_id),
+  KEY k_rater (rater_user_id),
+  KEY k_person (person_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS hrs_scores (
+  id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  campaign_id INT UNSIGNED NOT NULL,
+  person_id INT UNSIGNED NOT NULL,
+  family_code VARCHAR(40) NOT NULL,
+  family_version SMALLINT UNSIGNED NOT NULL DEFAULT 1,
+  year SMALLINT UNSIGNED NOT NULL,
+  dim VARCHAR(12) NOT NULL,
+  self_score TINYINT UNSIGNED NULL,
+  mgr_score TINYINT UNSIGNED NULL,
+  combined TINYINT UNSIGNED NULL,
+  valid TINYINT(1) NOT NULL DEFAULT 1,
+  department_id INT UNSIGNED NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY u_cpd (campaign_id, person_id, dim),
+  KEY k_person (person_id, year),
+  KEY k_family (family_code, dim, year)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

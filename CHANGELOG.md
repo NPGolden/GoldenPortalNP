@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.154.1** (build 2026-11-16). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.155.0** (build 2026-11-16). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.155.0 | GAS-CP-R97-063 | 2026-11-16 | HR › Assessments: questionnaire campaigns imported from an Excel template measure qualities (reliability, consistency, willingness to learn and to evolve, interest in innovation) for chosen people over a period; own answers plus the rating of the department head; scores 0–100 per quality kept per year and shown in the annual evaluation. | `install/migrate_cp_r97_063_hr_assessments.sql` |
 | 1.154.1 | GAS-CP-R97-062 | 2026-11-16 | Website inbox: a Bridge enquiry lists the drawings and documents the captain attached (up to 10 files), opened with signed links from the website host. | — |
 | 1.154.0 | GAS-CP-R97-061 | 2026-11-16 | Service Engineer app 0.7.0: customer acceptance in the app — “Customer signs on this phone” with a preview of the report, name, capacity and finger signature; “Send for acceptance by e-mail” with the state of every link, its problems, send again and cancel; and a customer preview before signing a draft on site. The app updates itself from the portal. | — |
 | 1.153.0 | GAS-CP-R97-060 | 2026-11-16 | Website inbox: the Integrated Bridge captain’s questionnaire (goldenas.com.gr/bridge-questionnaire) arrives as a Bridge enquiry with the vessel, the internal project class A / B / C with its score and budget fit, and the full specification table; the free-text copy stays under “Message”. | — |
