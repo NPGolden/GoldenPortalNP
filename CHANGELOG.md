@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.150.0** (build 2026-11-15). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.150.1** (build 2026-11-15). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.150.1 | GAS-CP-R97-056 | 2026-11-16 | Dashboard speed: the KPI block (thousands of statements) is no longer computed while the page is drawn — the page shows the kept value and the background sweep renews it every 10 minutes, one value per branch scope; diagnostics judge refused database connections per hour instead of as a total. | — |
 | 1.150.0 | GAS-CP-R97-055 | 2026-11-16 | Sales pipeline: branch filter — board, list, totals, follow-ups, per sales person and the funnel can be limited to one branch; each card shows the branch code. | — |
 | 1.149.0 | GAS-CP-R97-054 | 2026-11-16 | KYMA mark by role: contacts and organisations with an e-mail that are customers, yards, owners or engineering offices get the KYMA mark next to Golden A/S automatically (hourly check, switch and “mark now” in Settings › Website › KYMA website); only the mark is added. | — |
 | 1.148.0 | GAS-CP-R97-053 | 2026-11-16 | Sub-projects: the order is numbered automatically, like the code — a new sub-project gets the next number, typing a position moves it there and the others are renumbered 1…N without gaps or doubles; existing projects were renumbered once in their present order. | — |

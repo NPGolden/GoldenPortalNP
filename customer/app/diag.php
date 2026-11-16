@@ -24,7 +24,9 @@ function diag_run(): array {
         if ($pct >= 80) $R[] = diag_row('db', t('dg.connections'), 'fail', $conn . ' / ' . $max . ' (' . $pct . ' %)', t('dg.fix_connections'));
         if ((int)($vars['max_allowed_packet'] ?? 0) < 16 * 1048576) $R[] = diag_row('db', 'max_allowed_packet', 'warn', diag_fmt_bytes((int)$vars['max_allowed_packet']), t('dg.fix_packet'));
         if ((int)($st['Innodb_row_lock_waits'] ?? 0) > 0) $R[] = diag_row('db', t('dg.lock_waits'), (int)($st['Innodb_row_lock_time_max'] ?? 0) > 10000 ? 'warn' : 'ok', t('dg.lock_waits_detail', ['n' => (int)$st['Innodb_row_lock_waits'], 'ms' => (int)($st['Innodb_row_lock_time_max'] ?? 0)]));
-        if ((int)($st['Aborted_connects'] ?? 0) > 100) $R[] = diag_row('db', t('dg.aborted'), 'warn', (string)$st['Aborted_connects'], t('dg.fix_aborted'));
+        // R97-056: the counter belongs to the whole database server (shared hosting: every account on it) and counts refused sign-ins since its restart — judged per hour, not as a total
+        $ab = (int)($st['Aborted_connects'] ?? 0); $abH = $ab / max(1, (int)($st['Uptime'] ?? 0) / 3600);
+        $R[] = diag_row('db', t('dg.aborted'), $abH > 300 ? 'warn' : 'ok', t('dg.aborted_v', ['n' => $ab, 'h' => (int) round($abH)]), $abH > 300 ? t('dg.fix_aborted') : '');
         if (str_contains((string)($vars['sql_mode'] ?? ''), 'ONLY_FULL_GROUP_BY')) $R[] = diag_row('db', 'sql_mode', 'ok', 'ONLY_FULL_GROUP_BY ' . t('dg.on'));
     }, 'db', t('dg.db_server'));
 

@@ -2179,3 +2179,25 @@ Language keys 10 205 each.
 **Security review**: the branch id is cast to an integer, checked against the active branches and bound as a parameter; the existing project scope (`scope_sql`) still applies before the filter, so the filter can only narrow what the account may already see. Nothing to propose for this change.
 
 Language keys 10 205 each (unchanged).
+
+## §342 v1.150.1 (R97-056) — Dashboard speed; refused connections per hour
+
+**Trigger**: daily health report of 16/11/2026 (v1.147.0): dashboard 4 slow loads in 24 h, 2.4–2.9 s, 4 200–4 400 statements, almost all in "draw"; warning "Aborted connections: 833"; News feed marinelog.com HTTP 403.
+
+**Finding 1 — dashboard**: `kpi_cockpit()` → `kpi_projects()` → `kpi_project()` → `kpi_sub()` → `bg_calc()` costs about 11 statements per active sub-project (sandbox: 13 sub-projects = 165 statements; live ≈ 380 sub-projects ≈ 4 200). It was cached for 10 minutes, so the first visitor after every expiry paid the full cost — exactly the 4–6 slow loads a day.
+
+**Change** (`app/kpi.php`, `app/nf.php`):
+
+- `kpi_cockpit()` returns the kept value whenever one exists (kept for a day, with its time); only when there is none at all (after a release or a cache restart) it computes once.
+- `kpi_cockpit_refresh()` in the background sweep (job `kpi-cockpit`) renews the value when it is older than 10 minutes.
+- `kpi_cockpit_key()`: one value per branch scope (`br_scope_sql`) — before, the key was shared, so a member of staff limited to a branch could be shown the list computed for an unrestricted account, and the reverse.
+
+**Measured (sandbox)**: dashboard cold 334 statements (165 KPI), with a kept value 106 (0 KPI), also with a value one hour old; the sweep then spends the 178 KPI statements and the value is fresh.
+
+**Finding 2 — "Aborted connections 833"**: `Aborted_connects` is a counter of the whole database server (shared hosting) since its restart: refused sign-ins of every account. 833 in 28 h is about 30 an hour, with no PHP error on our side. `app/diag.php` now shows total and rate and warns only above 300 per hour (`dg.aborted`, `dg.aborted_v`, `dg.fix_aborted` reworded).
+
+**Finding 3 — News feed 403**: marinelog.com refuses the portal's news reader, which identifies itself honestly. Not changed — the reader does not pretend to be a browser. The feed can be switched off in Marine intelligence › News sources; the other feeds are unaffected.
+
+**Security review**: the per-scope key closes a small information leak between branch scopes on the dashboard block. No new entry point. Proposed next (speed, no security cost): load the budget figures of all sub-projects of the KPI page in a few grouped statements instead of per sub-project, so the KPI page and the sweep become light as well.
+
+Language keys 10 206 each.

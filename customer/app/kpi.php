@@ -196,7 +196,20 @@ function kpi_spark(array $trend, string $k): string {
 /** Worst projects for the dashboard cockpit (red first, then amber), by the number of red KPIs. */
 function kpi_cockpit(int $limit = 5): array {
     if (!kpi_can()) return [];
-    return function_exists('cache_remember') ? cache_remember('kpi_cockpit:' . $limit, 600, fn() => kpi_cockpit_compute($limit)) : kpi_cockpit_compute($limit);   // R69-002: ~15 queries per active sub-project
+    if (!function_exists('cache_get')) return kpi_cockpit_compute($limit);
+    // R97-056: the block costs ~11 statements per active sub-project (thousands on the live data). A page never waits for it once a
+    // value exists: it shows the kept value (up to a day old) and the background sweep renews it every 10 minutes (kpi_cockpit_refresh()).
+    $c = cache_get(kpi_cockpit_key($limit)); if (is_array($c) && isset($c['rows'])) return $c['rows'];
+    return kpi_cockpit_store($limit);
+}
+/** One kept value per project scope: staff limited to a branch never share the list of the others (R97-056). */
+function kpi_cockpit_key(int $limit): string { $s = 'all'; if (function_exists('br_scope_sql')) { [$w, $a] = br_scope_sql('p'); if ($a) $s = 'b' . implode('-', array_map('intval', $a)) . (str_contains($w, 'IS NULL') ? 'd' : ''); } return 'kpi_cockpit:' . $limit . ':' . $s; }
+function kpi_cockpit_store(int $limit): array { $rows = kpi_cockpit_compute($limit); cache_set(kpi_cockpit_key($limit), ['at' => time(), 'rows' => $rows], 86400); return $rows; }
+/** Background sweep: renew the kept value of the signed-in account's scope when it is older than 10 minutes. Returns 1 when renewed. */
+function kpi_cockpit_refresh(int $limit = 5): int {
+    if (!function_exists('cache_get') || !kpi_can()) return 0;
+    $c = cache_get(kpi_cockpit_key($limit)); if (is_array($c) && time() - (int)($c['at'] ?? 0) < 600) return 0;
+    kpi_cockpit_store($limit); return 1;
 }
 function kpi_cockpit_compute(int $limit): array {
     [$from, $to] = kpi_period('m'); $rows = [];

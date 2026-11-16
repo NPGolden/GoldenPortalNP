@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.150.0';
+const CP_VERSION = '1.150.1';
 const CP_BUILD   = '2026-11-15';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-056', 'version' => '1.150.1', 'date' => '2026-11-16', 'title' => 'Dashboard speed: the KPI block (thousands of statements) is no longer computed while the page is drawn — the page shows the kept value and the background sweep renews it every 10 minutes, one value per branch scope; diagnostics judge refused database connections per hour instead of as a total.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-055', 'version' => '1.150.0', 'date' => '2026-11-16', 'title' => 'Sales pipeline: branch filter — board, list, totals, follow-ups, per sales person and the funnel can be limited to one branch; each card shows the branch code.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-054', 'version' => '1.149.0', 'date' => '2026-11-16', 'title' => 'KYMA mark by role: contacts and organisations with an e-mail that are customers, yards, owners or engineering offices get the KYMA mark next to Golden A/S automatically (hourly check, switch and “mark now” in Settings › Website › KYMA website); only the mark is added.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-053', 'version' => '1.148.0', 'date' => '2026-11-16', 'title' => 'Sub-projects: the order is numbered automatically, like the code — a new sub-project gets the next number, typing a position moves it there and the others are renumbered 1…N without gaps or doubles; existing projects were renumbered once in their present order.', 'db' => null, 'check' => null],
