@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.148.0';
+const CP_VERSION = '1.149.0';
 const CP_BUILD   = '2026-11-15';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-054', 'version' => '1.149.0', 'date' => '2026-11-16', 'title' => 'KYMA mark by role: contacts and organisations with an e-mail that are customers, yards, owners or engineering offices get the KYMA mark next to Golden A/S automatically (hourly check, switch and “mark now” in Settings › Website › KYMA website); only the mark is added.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-053', 'version' => '1.148.0', 'date' => '2026-11-16', 'title' => 'Sub-projects: the order is numbered automatically, like the code — a new sub-project gets the next number, typing a position moves it there and the others are renumbered 1…N without gaps or doubles; existing projects were renumbered once in their present order.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-052', 'version' => '1.147.0', 'date' => '2026-11-15', 'title' => 'Organisations: “Known shipyards” — proposes the Yard tick for organisations whose name carries a shipyard word (any language) or the name of a known yard in Europe, the US and worldwide; nothing changes until the proposed rows are approved; only the Yard role is added, the other roles stay. The role “Other” now stays on an organisation only when no other role is ticked.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-051', 'version' => '1.146.0', 'date' => '2026-11-15', 'title' => 'Newsletters: approval before sending — an issue written by anyone other than the CEO or the General Manager is submitted for approval, locked while it waits, approved or returned with a comment, and can be sent only once approved; any later change cancels the approval; the CEO and the General Manager send without approval.', 'db' => 'install/migrate_cp_r97_051_nl_approval.sql', 'check' => 'r97t'],

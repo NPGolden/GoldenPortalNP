@@ -2145,3 +2145,23 @@ Language keys 10 195 each.
 **Security review**: no new entry point; the position is cast to an integer and clamped by the routine, updates use placeholders and are limited to the sub-projects of the one project; the existing staff check and CSRF of the actions apply. Nothing to propose for this change.
 
 Language keys 10 197 each.
+
+## §340 v1.149.0 (R97-054) — KYMA mark by role
+
+**Request**: "All contacts, companies organizations with email marked as customers and yards, owners, engineering office please tick KYMA contact as well automatically".
+
+**Rule** (`app/helpers.php`): `KYM_AUTO_ROLES` = customer, yard, owner, consultant (organisation roles; consultant / designer stands for the engineering office, there is no separate organisation role); `KYM_AUTO_CATS` = owner, owner_rep, yard, yard_mgr, technical, designer (contact categories; `technical` = "Engineering / technical office").
+
+- Organisation: `customer_id` set or one of the roles (in `roles` or as `kind`), and an e-mail on the organisation or on one of its contacts.
+- Contact: valid-looking e-mail, and `customer_id` set, or one of the categories, or its organisation carries one of the roles.
+- `kym_auto_where()` builds both conditions once; `kym_auto_count()` (read-only) and `kym_auto_mark()` (adds `kyma` to `brands` with `CONCAT_WS`, never removes anything; line in `storage/kyma-mark.log`).
+- `kym_auto_on()` = setting `kym_auto` (default 1). Background job `kyma-mark` at most once an hour (`kym_auto_at`); the first run after the release marks the existing records.
+- Settings › Website › KYMA website: card with the count waiting, the switch and "Save and mark now" — action `kym_auto_save` (administrators).
+
+**Effect on newsletters**: a KYMA issue with "contacts" in its audience now also reaches these contacts, subject to their subscriptions and the KYMA opt-out list as before.
+
+**Tests (sandbox)**: count before = rows changed; contacts of an owner / customer organisation marked whatever their category; supplier-only contact with e-mail not marked; nobody without e-mail marked; Golden mark kept on every row; project manager cannot run it; switch off and on; second run changes nothing.
+
+**Security and data protection review**: administrators only, POST + CSRF; fixed role and category lists compiled into the SQL (no request data in it); only one column touched; logged. Data protection: the mark makes people reachable by a second sender (KYMA) who gave their address to Golden A/S — the KYMA issues must carry the KYMA identity, a working unsubscribe (in place since v1.145.0) and be relevant to their business role; the approval step of v1.146.0 applies. Proposed (no cost in speed): state in the privacy notice of both sites that Golden A/S and KYMA Marine Power share business contacts for their newsletters.
+
+Language keys 10 205 each.

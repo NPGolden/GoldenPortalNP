@@ -159,6 +159,28 @@ function kym_brand_pills(array $row): string { return in_array('kyma', kym_brand
 /** Add a brand to a contact or an organisation (table name is fixed here, never taken from input). */
 function kym_brand_add(string $what, int $id, string $brand): void { if (!kym_has() || $id <= 0) return; $tb = $what === 'company' ? 'companies' : 'contacts'; $brand = kym_site($brand); q("UPDATE $tb SET brands = CONCAT_WS(',', NULLIF(brands, ''), ?) WHERE id = ? AND NOT FIND_IN_SET(?, brands)", [$brand, $id, $brand]); }
 function kym_brand_set(string $what, int $id, array $brands): void { if (!kym_has() || $id <= 0) return; $tb = $what === 'company' ? 'companies' : 'contacts'; $set = array_values(array_intersect(array_keys(KYM_SITES), array_map('strval', $brands))) ?: ['golden']; q("UPDATE $tb SET brands = ? WHERE id = ?", [implode(',', $set), $id]); }
+/* ---- R97-054: the KYMA mark follows the role — customers, yards, owners and engineering offices with an e-mail ---- */
+const KYM_AUTO_ROLES = ['customer', 'yard', 'owner', 'consultant'];                       // organisation roles (consultant = consultant / designer / engineering office)
+const KYM_AUTO_CATS  = ['owner', 'owner_rep', 'yard', 'yard_mgr', 'technical', 'designer'];   // contact categories (technical = engineering / technical office)
+function kym_auto_on(): bool { return kym_has() && (string) cp_setting('kym_auto', '1') === '1'; }
+/** SQL condition: the organisation (alias) carries one of the roles. */
+function kym_auto_co_sql(string $a = 'co'): string { $p = ["$a.customer_id IS NOT NULL"]; foreach (KYM_AUTO_ROLES as $r) { $p[] = "FIND_IN_SET('$r', $a.roles)"; if ($r !== 'customer') $p[] = "$a.kind = '$r'"; } return '(' . implode(' OR ', $p) . ')'; }
+/** The two conditions that pick who gets the mark; shared by the count and the update. */
+function kym_auto_where(): array {
+    $mail = "LIKE '%_@_%._%'";
+    $co = "NOT FIND_IN_SET('kyma', co.brands) AND " . kym_auto_co_sql('co') . " AND (co.email $mail OR EXISTS (SELECT 1 FROM contacts x WHERE x.company_id = co.id AND x.email $mail))";
+    $ct = "NOT FIND_IN_SET('kyma', ct.brands) AND ct.email $mail AND (ct.customer_id IS NOT NULL OR ct.category IN ('" . implode("','", KYM_AUTO_CATS) . "') OR (co.id IS NOT NULL AND " . kym_auto_co_sql('co') . "))";
+    return ['co' => $co, 'ct' => $ct];
+}
+/** How many organisations and contacts the rule would mark now. Read-only. */
+function kym_auto_count(): array { if (!kym_has()) return ['co' => 0, 'ct' => 0]; $w = kym_auto_where();
+    return ['co' => (int) scalar("SELECT COUNT(*) FROM companies co WHERE {$w['co']}"), 'ct' => (int) scalar("SELECT COUNT(*) FROM contacts ct LEFT JOIN companies co ON co.id = ct.company_id WHERE {$w['ct']}")]; }
+/** Add the KYMA mark where the rule applies. The Golden mark and everything else stay. Returns the rows changed. */
+function kym_auto_mark(): array { if (!kym_has()) return ['co' => 0, 'ct' => 0]; $w = kym_auto_where();
+    $ct = q("UPDATE contacts ct LEFT JOIN companies co ON co.id = ct.company_id SET ct.brands = CONCAT_WS(',', NULLIF(ct.brands, ''), 'kyma') WHERE {$w['ct']}")->rowCount();
+    $co = q("UPDATE companies co SET co.brands = CONCAT_WS(',', NULLIF(co.brands, ''), 'kyma') WHERE {$w['co']}")->rowCount();
+    if ($co || $ct) @file_put_contents(dirname(__DIR__) . '/storage/kyma-mark.log', date('Y-m-d H:i:s') . "\t" . (int)(current_user()['id'] ?? 0) . "\t$co organisations\t$ct contacts\n", FILE_APPEND | LOCK_EX);
+    return ['co' => $co, 'ct' => $ct]; }
 /** Administrators and management — the only ones who see career applications from the KYMA site. */
 function kym_careers_can(): bool { return function_exists('is_staff') && is_staff() && (is_cp_admin() || (function_exists('mgmt_can') && mgmt_can())); }
 

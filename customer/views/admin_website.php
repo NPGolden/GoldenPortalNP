@@ -48,6 +48,16 @@ layout_head(t('web.title'), 'admin_website');
 </div>
 <?php if (function_exists('kym_has') && kym_has()): $kk = (string)cp_setting('web_site_key_kyma', ''); $konce = (string)($_SESSION['web_key_once_kyma'] ?? ''); unset($_SESSION['web_key_once_kyma']); ?>
 <h2 class="settings-h" id="kyma"><?= tt('kym.set_title') ?></h2>
+<?php if (kym_has()): $kac = kym_auto_count(); ?>
+<div class="card"><h2>🏷 <?= tt('kym.auto_title') ?> <?= pill(kym_auto_on() ? 'green' : 'mute', t(kym_auto_on() ? 'kym.auto_s_on' : 'kym.auto_s_off')) ?></h2>
+  <p class="hint"><?= tt('kym.auto_hint') ?></p>
+  <form method="post" action="<?= url('admin_website') ?>#kyma" class="form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="kym_auto_save">
+    <label class="check span2"><input type="checkbox" name="kym_auto" value="1"<?= kym_auto_on() ? ' checked' : '' ?>> <?= tt('kym.auto_on') ?></label>
+    <p class="span2"><?= e(t('kym.auto_wait', ['o' => $kac['co'], 'c' => $kac['ct']])) ?></p>
+    <div class="span2 btn-row"><button class="btn btn--gold btn--sm" type="submit">✓ <?= tt('btn.save') ?></button><button class="btn btn--sm" type="submit" name="run" value="1">▶ <?= tt('kym.auto_run') ?></button></div>
+  </form>
+</div>
+<?php endif; ?>
 <div class="card"><h2>🔑 <?= tt('kym.key_title') ?> <?= pill($kk !== '' ? 'green' : 'mute', t($kk !== '' ? 'kym.connected' : 'kym.not_connected')) ?></h2>
   <p class="hint"><?= tt('kym.key_hint') ?></p>
   <form method="post" action="<?= url('admin_website') ?>#kyma" class="form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="web_kyma_key">

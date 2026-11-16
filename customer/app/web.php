@@ -194,6 +194,10 @@ function web_handle_action(string $action): bool {
     }
     if ($action === 'web_inq_contact') { require_staff(); $id = (int)($_POST['id'] ?? 0); $cid = web_inquiry_to_contact($id, (string)($_POST['role'] ?? ''), !empty($_POST['make_org'])); flash('good', t('web.ct_done')); redirect('contact', ['id' => $cid, '_r' => uniqid()]); }   // R97-050
     if ($action === 'web_purge') { require_cp_admin(); $st = kym_site($_POST['site'] ?? 'golden'); $n = web_purge($st, (int)($_POST['months'] ?? 24), !empty($_POST['careers'])); flash('good', t('web.purged', ['n' => $n])); redirect('web_inbox', ['site' => $st, '_r' => uniqid()]); }
+    if ($action === 'kym_auto_save') {   // R97-054: the KYMA mark follows the role
+        require_cp_admin(); if (!kym_has()) throw new RuntimeException(t('err.noaccess')); cp_setting_set('kym_auto', !empty($_POST['kym_auto']) ? '1' : '0');
+        if (!empty($_POST['run'])) { $r = kym_auto_mark(); cp_setting_set('kym_auto_at', (string) time()); flash('good', t('kym.auto_done', ['o' => $r['co'], 'c' => $r['ct']])); } else flash('good', t('sys.saved'));
+        redirect('admin_website', ['_r' => uniqid()], '#kyma'); }
     if ($action === 'web_kyma_key') {   // R97-050: the key the KYMA website sends — shown in full once
         require_cp_admin(); if (!kym_has()) throw new RuntimeException(t('err.noaccess'));
         if (!empty($_POST['rotate'])) { $nk = bin2hex(random_bytes(24)); cp_setting_set('web_site_key_kyma', $nk); $_SESSION['web_key_once_kyma'] = $nk; } if (!empty($_POST['disable'])) cp_setting_set('web_site_key_kyma', '');
