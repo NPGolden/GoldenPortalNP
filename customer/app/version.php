@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.152.0';
+const CP_VERSION = '1.152.1';
 const CP_BUILD   = '2026-11-15';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-059', 'version' => '1.152.1', 'date' => '2026-11-16', 'title' => 'Acceptance by e-mail: delivery problems are shown — a message that could not be sent or was returned by the recipient’s mail server, a link closed after wrong codes or expired without an answer is marked on the link with the reason and what to do, the card carries a warning, “Send again” is one click, and the sender gets a notification.', 'db' => 'install/migrate_cp_r97_059_doc_links_errors.sql', 'check' => 'r97w'],
         ['ref' => 'GAS-CP-R97-058', 'version' => '1.152.0', 'date' => '2026-11-16', 'title' => 'Acceptance by e-mail link for customers without a portal account: service reports, function checks, offers and owner approvals (drawings) are sent to one address with a personal link, confirmed with a 6-digit code, then accepted or sent back with name and capacity (reports with a drawn signature). Service reports 24 hours, offers until their validity date or 14 days, others 14 days; reminders, cancel and replace.', 'db' => 'install/migrate_cp_r97_058_doc_links.sql', 'check' => 'r97v'],
         ['ref' => 'GAS-CP-R97-057', 'version' => '1.151.0', 'date' => '2026-11-16', 'title' => 'Customer signs on the engineer’s device: a submitted service report or function check opens in a signing view without the portal menu — summary, full PDF, name, capacity, remark and signature pad; accepted or sent back on the spot. In the documents the name, capacity and date are kept inside the signature box on their own lines.', 'db' => 'install/migrate_cp_r97_057_sign_on_site.sql', 'check' => 'r97u'],
         ['ref' => 'GAS-CP-R97-056', 'version' => '1.150.1', 'date' => '2026-11-16', 'title' => 'Dashboard speed: the KPI block (thousands of statements) is no longer computed while the page is drawn — the page shows the kept value and the background sweep renews it every 10 minutes, one value per branch scope; diagnostics judge refused database connections per hour instead of as a total.', 'db' => null, 'check' => null],
@@ -503,6 +504,7 @@ function cp_migration_state(): array {
         'r97p' => $has("SHOW TABLES LIKE 'nl_issues'"),
         'r97q' => $has("SHOW TABLES LIKE 'nl_lists'"),
         'r97r' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'proc_state'") && $has("SHOW COLUMNS FROM sb_parts LIKE 'proc_at'"),
+        'r97w' => $has("SHOW COLUMNS FROM doc_links LIKE 'mail_error'"),
         'r97v' => $has("SHOW TABLES LIKE 'doc_links'"),
         'r97u' => $has("SHOW COLUMNS FROM fsr_reports LIKE 'accepted_via'"),
         'r97t' => $has("SHOW COLUMNS FROM nl_issues LIKE 'appr_state'"),

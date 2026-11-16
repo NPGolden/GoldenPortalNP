@@ -31,7 +31,8 @@ function cp_graph_token(bool $fresh = false): ?string {
 }
 /** Send through Graph: POST /users/{from}/sendMail. Plain text; optional Reply-To; saved to the mailbox's Sent Items. */
 function cp_graph_send(string $from, string $fromName, string $to, string $subject, string $body, ?string $replyTo = null, array $attachments = []): bool {
-    $tok = cp_graph_token(); if (!$tok) return false;
+    $GLOBALS['cp_graph_last_error'] = '';   // R97-059: why the last message was refused, for the screens that show it
+    $tok = cp_graph_token(); if (!$tok) { $GLOBALS['cp_graph_last_error'] = 'no access to Microsoft 365 (token)'; return false; }
     $msg = ['subject' => preg_replace('/[\r\n]/', ' ', $subject), 'body' => ['contentType' => 'Text', 'content' => $body],
             'toRecipients' => [['emailAddress' => ['address' => $to]]], 'from' => ['emailAddress' => ['address' => $from, 'name' => preg_replace('/[\r\n"]/', '', $fromName)]]];
     if ($replyTo && filter_var($replyTo, FILTER_VALIDATE_EMAIL)) $msg['replyTo'] = [['emailAddress' => ['address' => $replyTo]]];
@@ -45,7 +46,8 @@ function cp_graph_send(string $from, string $fromName, string $to, string $subje
     [$code, $res] = $post($tok);
     if ($code === 401) { $tok = cp_graph_token(true); if ($tok) [$code, $res] = $post($tok); }   // expired / revoked token → one retry
     if ($code === 202) return true;
-    $j = json_decode($res, true); error_log('[cp_mail] Graph sendMail → ' . $code . ' ' . preg_replace('/\s+/', ' ', mb_substr((string) ($j['error']['code'] ?? '') . ' ' . (string) ($j['error']['message'] ?? ''), 0, 200)));
+    $j = json_decode($res, true); $GLOBALS['cp_graph_last_error'] = trim('HTTP ' . $code . ' ' . mb_substr((string) ($j['error']['code'] ?? '') . ' ' . (string) ($j['error']['message'] ?? ''), 0, 160));
+    error_log('[cp_mail] Graph sendMail → ' . $code . ' ' . preg_replace('/\s+/', ' ', mb_substr((string) ($j['error']['code'] ?? '') . ' ' . (string) ($j['error']['message'] ?? ''), 0, 200)));
     return false;
 }
 

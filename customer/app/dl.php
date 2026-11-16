@@ -60,6 +60,65 @@ function dl_mail_link(array $L, string $token, bool $reminder = false, array $at
     return dl_mail((string)$L['email'], t_in($reminder ? 'dl.m_remind_s' : 'dl.m_link_s', $lg, $v), t_in($v['n'] !== '' ? 'dl.m_hello' : 'dl.m_hello0', $lg, $v) . "\n\n" . t_in($reminder ? 'dl.m_remind_b' : 'dl.m_link_b', $lg, $v) . "\n\n" . $v['url'] . "\n\n" . t_in('dl.m_link_f', $lg, $v) . "\n\n" . t_in('dl.m_sign', $lg, $v), $reply ?: null, $atts);
 }
 
+/* ---- R97-059: delivery problems are kept on the link, shown in the card and told to the sender ---- */
+function dl_err_has(): bool { static $h = null; if ($h === null) { try { $h = dl_has() && (bool) one("SHOW COLUMNS FROM doc_links LIKE 'mail_error'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function dl_mail_reason(): string { $r = trim((string)($GLOBALS['cp_graph_last_error'] ?? '')); return $r !== '' ? $r : 'the mail server did not accept the message'; }
+/** A mail of this link went out ($ok) or not: the problem is stored with its step (link, code, reminder, confirmation) and the sender is told once. */
+function dl_mail_result(array $L, string $step, bool $ok): void {
+    if (!dl_err_has()) return;
+    if ($ok) { if ($step !== 'confirmation') q('UPDATE doc_links SET mail_error = NULL, mail_error_at = NULL WHERE id = ? AND mail_error LIKE ?', [(int)$L['id'], $step . ':%']); return; }
+    $first = !scalar('SELECT COUNT(*) FROM doc_links WHERE id = ? AND mail_error LIKE ?', [(int)$L['id'], $step . ':%']);
+    q('UPDATE doc_links SET mail_error = ?, mail_error_at = NOW() WHERE id = ?', [mb_substr($step . ': ' . dl_mail_reason(), 0, 255), (int)$L['id']]);
+    if ($first) dl_tell($L, t('dl.nf_mail', ['t' => (string)$L['doc_title'], 'no' => (string)$L['doc_no']]), t('dl.st_' . $step) . ' → ' . $L['email'] . ' — ' . dl_mail_reason());
+}
+/** Notification to the member of staff who sent the link. */
+function dl_tell(array $L, string $title, string $body): void {
+    if (!function_exists('nf_push') || !(int)$L['created_by']) return; $page = ['fsr' => 'fsr', 'fc' => 'fc', 'offer' => 'offer', 'oa' => 'approval'][(string)$L['doc']] ?? 'dashboard';
+    try { nf_push([(int)$L['created_by']], 'dl:problem', 'dl:' . $L['doc'] . ':' . $L['doc_id'] . ':' . $L['id'], $title, $body, url($page, ['id' => (int)$L['doc_id']]) . '#dl', null, 'Golden A/S'); } catch (Throwable $e) {}
+}
+/** What staff should know about a link: ['tone', 'label', 'detail', 'do'] or null when all is well. */
+function dl_problem(array $L): ?array {
+    if (!dl_err_has() || $L['used_at']) { return dl_err_has() && $L['used_at'] && str_starts_with((string)($L['mail_error'] ?? ''), 'confirmation:') ? ['tone' => 'gold', 'label' => t('dl.pr_mail'), 'detail' => t('dl.st_confirmation') . ' — ' . substr((string)$L['mail_error'], 14), 'do' => t('dl.do_confirm')] : null; }
+    if ($L['cancelled_at'] && ($L['cancel_note'] ?? '') !== 'locked') return null;   // replaced, cancelled by staff, decided another way: nothing to do
+    if (!empty($L['bounced_at'])) return ['tone' => 'bad', 'label' => t('dl.pr_bounced'), 'detail' => (string)$L['bounce_reason'], 'do' => t('dl.do_address')];
+    if (!empty($L['mail_error'])) { [$step, $why] = array_pad(explode(': ', (string)$L['mail_error'], 2), 2, ''); return ['tone' => 'bad', 'label' => t('dl.pr_mail'), 'detail' => t('dl.st_' . $step) . ' — ' . $why . ' · ' . fmt_datetime((string)$L['mail_error_at']), 'do' => t($step === 'confirmation' ? 'dl.do_confirm' : 'dl.do_resend')]; }
+    if (($L['cancel_note'] ?? '') === 'locked') return ['tone' => 'bad', 'label' => t('dl.pr_locked'), 'detail' => t('dl.cn_locked'), 'do' => t('dl.do_resend')];
+    if ((int)($L['is_expired'] ?? 0) && !$L['cancelled_at']) return ['tone' => 'gold', 'label' => t('dl.pr_expired'), 'detail' => '', 'do' => t('dl.do_resend')];
+    return null;
+}
+/** Messages returned by the recipient's mail server (wrong address, full mailbox, refused): read from the inbox of the portal's mailbox.
+ *  Needs the Microsoft 365 permission the portal already uses for drafts; without it the check is skipped silently. */
+function dl_bounce_check(): int {
+    if (!dl_err_has() || !function_exists('cp_graph_configured') || !cp_graph_configured() || !function_exists('cp_graph_call')) return 0;
+    $open = all("SELECT * FROM doc_links WHERE bounced_at IS NULL AND used_at IS NULL AND cancelled_at IS NULL AND created_at > NOW() - INTERVAL 3 DAY ORDER BY id DESC LIMIT 40"); if (!$open) return 0;
+    $since = gmdate('Y-m-d\TH:i:s\Z', time() - 3 * 86400);
+    try { [$code, $j] = cp_graph_call('GET', '/users/' . rawurlencode((string) cfg('graph.from')) . '/mailFolders/inbox/messages?$top=50&$orderby=' . rawurlencode('receivedDateTime desc') . '&$filter=' . rawurlencode('receivedDateTime ge ' . $since) . '&$select=subject,bodyPreview,from,receivedDateTime', null, 20); } catch (Throwable $e) { return 0; }
+    if ($code !== 200 || empty($j['value'])) return 0; $n = 0;
+    foreach (dl_bounce_match((array)$j['value'], $open) as $lid => $why) { $L = null; foreach ($open as $x) if ((int)$x['id'] === $lid) $L = $x; if (!$L) continue;
+        q('UPDATE doc_links SET bounced_at = NOW(), bounce_reason = ? WHERE id = ? AND bounced_at IS NULL', [$why, $lid]);
+        dl_tell($L, t('dl.nf_bounce', ['t' => (string)$L['doc_title'], 'no' => (string)$L['doc_no']]), $L['email'] . ' — ' . $why); $n++; }
+    return $n;
+}
+/** Which open links do these inbox messages speak of? Only messages from a mail system count (postmaster, mailer-daemon, Microsoft Exchange),
+ *  and the message must name the recipient's address. Returns [link id => reason]. */
+function dl_bounce_match(array $messages, array $open): array {
+    $out = [];
+    foreach ($messages as $m) {
+        $from = strtolower((string)($m['from']['emailAddress']['address'] ?? '') . ' ' . (string)($m['from']['emailAddress']['name'] ?? '')); $subj = (string)($m['subject'] ?? ''); $text = strtolower($subj . ' ' . (string)($m['bodyPreview'] ?? ''));
+        if (!preg_match('/postmaster|mailer-daemon|microsoftexchange|microsoft outlook|mail delivery/', $from)) continue;
+        foreach ($open as $L) { $lid = (int)$L['id']; if (isset($out[$lid]) || !str_contains($text, strtolower((string)$L['email']))) continue;
+            $out[$lid] = mb_substr(trim(preg_replace('/\s+/u', ' ', (string)($m['bodyPreview'] ?? '') ?: $subj)), 0, 250); break; }
+    }
+    return $out;
+}
+/** Links that ran out without an answer: the sender is told once. */
+function dl_expiry_tell(): int {
+    if (!dl_err_has()) return 0; $n = 0;
+    foreach (all("SELECT * FROM doc_links WHERE used_at IS NULL AND cancelled_at IS NULL AND expiry_told = 0 AND expires_at < NOW() AND expires_at > NOW() - INTERVAL 7 DAY ORDER BY id LIMIT 20") as $L) {
+        q('UPDATE doc_links SET expiry_told = 1 WHERE id = ?', [(int)$L['id']]); dl_tell($L, t('dl.nf_expired', ['t' => (string)$L['doc_title'], 'no' => (string)$L['doc_no']]), $L['email'] . ' — ' . t('dl.do_resend')); $n++; }
+    return $n;
+}
+
 /** Send a document for acceptance. Returns [link id, token] — the token is never stored and is not shown to staff. */
 function dl_create(string $doc, int $id, string $email, string $name, bool $send = true): array {
     $u = require_staff(); if (!dl_has()) throw new RuntimeException(t('dl.not_ready'));
@@ -74,10 +133,11 @@ function dl_create(string $doc, int $id, string $email, string $name, bool $send
     q('INSERT INTO doc_links (doc, doc_id, doc_no, doc_title, token_hash, email, name, lang, created_by, created_name, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?, NOW() + INTERVAL ? SECOND)',
       [$doc, $id, mb_substr($I['no'], 0, 80), mb_substr($I['title'], 0, 160), dl_hash($token), $email, $name ?: null, in_array(locale(), ['en', 'el', 'it'], true) ? locale() : 'en', (int)$u['id'], (string)$u['full_name'], dl_ttl($I)]);
     $lid = (int) db()->lastInsertId(); $L = one('SELECT * FROM doc_links WHERE id = ?', [$lid]);
-    if ($send && !dl_mail_link($L, $token, false, dl_att($I['file'], $I['no'] . '.pdf'))) { q('DELETE FROM doc_links WHERE id = ?', [$lid]); throw new RuntimeException(t('dl.mail_failed')); }
+    if ($send && !dl_mail_link($L, $token, false, dl_att($I['file'], $I['no'] . '.pdf'))) { q('DELETE FROM doc_links WHERE id = ?', [$lid]); throw new RuntimeException(t('dl.mail_failed') . ' (' . dl_mail_reason() . ')'); }
     return [$lid, $token];
 }
 function dl_list(string $doc, int $id): array { return dl_has() ? all("SELECT l.*, (l.expires_at < NOW()) AS is_expired FROM doc_links l WHERE l.doc = ? AND l.doc_id = ? ORDER BY l.id DESC LIMIT 20", [$doc, $id]) : []; }
+/** R97-059: 'problem' when the confirmation could not be sent is a note, not a state — see dl_problem(). */
 function dl_state_of(array $L): string { return $L['used_at'] ? 'used' : ($L['cancelled_at'] ? 'cancelled' : ((int)($L['is_expired'] ?? 0) ? 'expired' : ($L['verified_at'] ? 'verified' : ($L['opened_at'] ? 'opened' : 'sent')))); }
 function dl_cancel(int $lid): void { require_staff(); $L = one('SELECT * FROM doc_links WHERE id = ?', [$lid]); if (!$L || !dl_info((string)$L['doc'], (int)$L['doc_id'])) throw new RuntimeException(t('err.notfound')); q("UPDATE doc_links SET cancelled_at = NOW(), cancel_note = 'staff' WHERE id = ? AND used_at IS NULL AND cancelled_at IS NULL", [$lid]); }
 
@@ -99,7 +159,7 @@ function dl_code_issue(array $L): ?string {
     return $code;
 }
 function dl_code_mail(array $L, string $code): bool { $lg = (string)$L['lang']; $v = ['c' => $code, 't' => (string)$L['doc_title'], 'no' => (string)$L['doc_no'], 'm' => DL_CODE_MIN];
-    return dl_mail((string)$L['email'], t_in('dl.m_code_s', $lg, $v), t_in('dl.m_code_b', $lg, $v) . "\n\n" . t_in('dl.m_sign', $lg, $v)); }
+    $ok = dl_mail((string)$L['email'], t_in('dl.m_code_s', $lg, $v), t_in('dl.m_code_b', $lg, $v) . "\n\n" . t_in('dl.m_sign', $lg, $v)); dl_mail_result($L, 'code', $ok); return $ok; }
 /** Check a typed code. On success the mailbox counts as confirmed and a pass for the browser is returned. */
 function dl_code_check(array $L, string $code): ?string {
     if (!(int)$L['code_live'] || (int)$L['code_tries'] >= DL_CODE_TRIES || !preg_match('/^\d{6}$/', $code)) { if (preg_match('/^\d{6}$/', $code)) dl_fail($L); return null; }
@@ -108,7 +168,7 @@ function dl_code_check(array $L, string $code): ?string {
     q('UPDATE doc_links SET verified_at = NOW(), pass_hash = ?, code_hash = NULL, code_expires = NULL WHERE id = ?', [dl_hash($pass), (int)$L['id']]);
     return $pass;
 }
-function dl_fail(array $L): void { q('UPDATE doc_links SET fails = fails + 1 WHERE id = ?', [(int)$L['id']]); q("UPDATE doc_links SET cancelled_at = NOW(), cancel_note = 'locked' WHERE id = ? AND fails >= " . DL_FAILS . " AND cancelled_at IS NULL AND used_at IS NULL", [(int)$L['id']]); }
+function dl_fail(array $L): void { q('UPDATE doc_links SET fails = fails + 1 WHERE id = ?', [(int)$L['id']]); $n = q("UPDATE doc_links SET cancelled_at = NOW(), cancel_note = 'locked' WHERE id = ? AND fails >= " . DL_FAILS . " AND cancelled_at IS NULL AND used_at IS NULL", [(int)$L['id']])->rowCount(); if ($n && function_exists('dl_tell')) dl_tell($L, t('dl.nf_locked', ['t' => (string)$L['doc_title'], 'no' => (string)$L['doc_no']]), $L['email'] . ' — ' . t('dl.cn_locked')); }
 function dl_pass_ok(array $L, string $pass): bool { return (int)$L['is_fresh'] === 1 && $pass !== '' && !empty($L['pass_hash']) && hash_equals((string)$L['pass_hash'], dl_hash($pass)); }
 
 /** The recipient's decision. $I = dl_info() read as the sender. Returns the decision stored. */
@@ -161,7 +221,8 @@ function dl_after(array $L, string $decision, string $who, string $remark): void
     $staffMail = (string) scalar('SELECT email FROM customer_users WHERE id = ?', [(int)$L['created_by']]);
     if ($staffMail !== '') dl_mail($staffMail, $ttl, $body . "\n\n" . (function_exists('nl_base') ? nl_base() . '/' : '') . ($I ? $I['back'] : ''));
     $lg = (string)$L['lang']; $v = ['t' => (string)$L['doc_title'], 'no' => (string)$L['doc_no']];
-    dl_mail((string)$L['email'], t_in($ok ? 'dl.m_done_s' : 'dl.m_back_s', $lg, $v), t_in($ok ? 'dl.m_done_b' : 'dl.m_back_b', $lg, $v) . "\n\n" . t_in('dl.m_sign', $lg, $v), $staffMail ?: null, $ok && $I && in_array($doc, ['fsr', 'fc'], true) ? dl_att($I['file'], $I['no'] . '.pdf') : []);
+    $sent = dl_mail((string)$L['email'], t_in($ok ? 'dl.m_done_s' : 'dl.m_back_s', $lg, $v), t_in($ok ? 'dl.m_done_b' : 'dl.m_back_b', $lg, $v) . "\n\n" . t_in('dl.m_sign', $lg, $v), $staffMail ?: null, $ok && $I && in_array($doc, ['fsr', 'fc'], true) ? dl_att($I['file'], $I['no'] . '.pdf') : []);
+    if (!$sent && dl_err_has()) { q('UPDATE doc_links SET mail_error = ?, mail_error_at = NOW() WHERE id = ?', [mb_substr('confirmation: ' . dl_mail_reason(), 0, 255), (int)$L['id']]); dl_tell($L, t('dl.nf_mail', $v), t('dl.st_confirmation') . ' → ' . $L['email'] . ' — ' . dl_mail_reason()); }
 }
 
 /** Reminders (background sweep, every 10 minutes at most): a service report once after 8 hours; other documents after 3 and 7 days.
@@ -172,7 +233,8 @@ function dl_sweep(): int {
                   OR (doc <> 'fsr' AND expires_at > NOW() + INTERVAL 12 HOUR AND ((remind_n = 0 AND created_at < NOW() - INTERVAL 3 DAY) OR (remind_n = 1 AND created_at < NOW() - INTERVAL 7 DAY)))) ORDER BY id LIMIT 10");
     foreach ($rows as $L) { $token = dl_token();
         q('UPDATE doc_links SET token_hash = ?, remind_n = remind_n + 1, last_remind_at = NOW(), code_hash = NULL, pass_hash = NULL, verified_at = NULL WHERE id = ?', [dl_hash($token), (int)$L['id']]);
-        if (dl_mail_link($L, $token, true)) $n++; }
+        $ok = dl_mail_link($L, $token, true); dl_mail_result($L, 'reminder', $ok); if ($ok) $n++; }
+    try { $n += dl_bounce_check(); $n += dl_expiry_tell(); } catch (Throwable $e) { error_log('[dl] checks: ' . $e->getMessage()); }
     return $n;
 }
 

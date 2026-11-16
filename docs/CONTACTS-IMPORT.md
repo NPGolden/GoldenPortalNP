@@ -2249,3 +2249,26 @@ Language keys 10 249 each.
 **Security review**: the link alone shows nothing — the document appears only after a code delivered to the mailbox; token never stored or logged, 40 random characters, in the address only (never in a form body); codes and passes stored as hashes, limited in time, tries and number; answers do not reveal whether a token ever existed; every decision is a guarded update on the pending status, so a link cannot change a decided document; staff cannot read the token (not even the sender); mails are plain text; the public page runs with the sender's reading rights only inside the functions it calls and has no portal session. Residual risk, by design: whoever controls the mailbox can accept — the same assurance as a signed e-mail reply, with a better record. Proposed (no cost in speed): SPF, DKIM and DMARC alignment check of the sending mailbox so the acceptance mails are not marked as spam; list of open acceptance links on System health.
 
 Language keys 10 338 each.
+
+## §345 v1.152.1 (R97-059) — Acceptance by e-mail: problems shown
+
+**Request** (after a first live send that showed "Sent" but did not arrive): "if there is an error in the acceptance by email log it should be shown for the user to take action".
+
+**What "Sent" means**: Microsoft 365 accepted the message (HTTP 202). What happens after that — wrong address, refusal, spam — was invisible in the portal.
+
+**Migration** `install/migrate_cp_r97_059_doc_links_errors.sql` (key `r97w`): `doc_links.mail_error`, `mail_error_at`, `bounced_at`, `bounce_reason`, `expiry_told`. Guard `dl_err_has()`.
+
+**Changes**:
+
+- `cp_graph_send()` keeps the reason of a refusal in `$GLOBALS['cp_graph_last_error']`; `dl_mail_reason()` reads it.
+- `dl_mail_result($L, $step, $ok)`: step `link` / `code` / `reminder` / `confirmation`; a failure is stored as "step: reason" and the sender is notified once per step; a later success of the same step clears it.
+- `dl_bounce_check()` (in `dl_sweep`, every 10 minutes): reads the last 50 messages of three days from the inbox of the portal's mailbox (Graph, the permission already used for drafts; skipped silently when not allowed) and `dl_bounce_match()` picks those from a mail system (postmaster, mailer-daemon, Microsoft Exchange / Outlook) that name the address of an open link → `bounced_at`, `bounce_reason`, notification.
+- `dl_expiry_tell()`: a link that ran out without an answer → one notification. `dl_fail()`: notification when a link is closed after wrong codes.
+- `dl_problem($L)` → tone, label, detail, action; the card shows a banner with the number of links needing attention, the warning and text on the row, and "Send again" (posts `dl_send` with the same address).
+- First message refused → nothing stored, the flash carries the reason.
+
+**Tests (sandbox)**: card before the migration; refused first send; failing code mail → stored, notified, shown with "Send again"; `dl_bounce_match()` with three made-up inbox messages (a return naming the address → matched; an ordinary reply from the recipient → ignored; a return for another address → ignored); returned state shown with the text; expiry → notification and "No answer". **Not tested**: reading the real inbox through Microsoft 365.
+
+**Security review**: the inbox is read with `$select` of subject, preview and sender only, nothing is stored except the matched preview (250 characters) on the link; only messages from mail systems are considered, so a customer's reply cannot mark a link as returned; reasons are shown escaped. Proposed: the same returned-message check for newsletters, to fill the unsubscribe list automatically.
+
+Language keys 10 355 each.
