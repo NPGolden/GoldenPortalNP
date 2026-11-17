@@ -2366,3 +2366,17 @@ Language keys 10 358 each (portal; +3 from R97-060, none from this release); app
 
 **Security review**: display only, no new entry point, no new proposals.
 
+## §351 v1.155.4 (R97-067) — Payables: the reason behind "Quantity mismatch"
+
+**Report** (screenshot, supplier invoice GAS-SI-26-0001, two lines equal to the purchase order in quantity and price, PO open qty 0, both "Quantity mismatch"): "it gives qty mismatch which is not true".
+
+**Finding**: the rule works as written — `si_match()` compares the invoiced quantity with `po_lines.qty_accepted − qty_invoiced` (received and not yet invoiced), not with the ordered quantity. PO open qty 0 means no goods receipt is recorded for the line, or the quantity was invoiced before. The label did not say which, so the result looked wrong.
+
+**Change** (display only, `views/payable.php`): on an editable invoice, under the label of a line with a quantity mismatch: `si.why_nums` (ordered · received · invoiced before) and the reason `si.why_recv` (goods receipt missing, with a link to the purchase order), `si.why_inv` (already invoiced) or `si.why_over`. 10 554 keys per file. The rule is unchanged.
+
+**Tests (sandbox)**: a test order with one line not received, one already invoiced and one received; the two explanations shown, none on the received line; test data removed.
+
+**Not done**: the live order GAS-PO-26-0003 was not looked at — the new text on the invoice shows its received and invoiced quantities.
+
+**Security review**: display only, no new entry point, no new proposals.
+

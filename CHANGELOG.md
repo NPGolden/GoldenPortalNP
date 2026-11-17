@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.155.3** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.155.4** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.155.4 | GAS-CP-R97-067 | 2026-11-17 | Payables: under Quantity mismatch each line shows ordered, received and already invoiced, and says what is missing — the goods receipt of the purchase order, or a quantity invoiced before. | — |
 | 1.155.3 | GAS-CP-R97-066 | 2026-11-17 | Payables: a Draft or Disputed supplier invoice shows the button Check first where the tick box would be, and the list says that only Checked invoices can go into a payment request. | — |
 | 1.155.2 | GAS-CP-R97-065 | 2026-11-17 | Sub-project with a doubled code can be saved again: the code is checked only when it is changed (a sub-project could not be set to Completed); the form warns about the double and new doubles are refused. | — |
 | 1.155.1 | GAS-CP-R97-064 | 2026-11-17 | BOM template: the same Excel template now downloads from System Budgets (list and Parts › Import BOM parts) and from the Procurement tab of a sub-project; it gains the optional column Unit price and a sheet with the rules. | — |
