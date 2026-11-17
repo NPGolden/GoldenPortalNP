@@ -32,7 +32,7 @@ function nf_groups(): array {
     return ['fleet' => t('nav.g_fleet'), 'work' => t('nav.g_work'), 'commercial' => t('nav.g_commercial'), 'hr' => t('nav.g_hr'), 'library' => t('nav.g_library')];   // R92-005: HR group
 }
 const NF_GROUP_OF = ['rc' => 'hr', 'wkp' => 'work', 'tk' => 'work', 'wf' => 'work', 'jo' => 'work', 'fsr' => 'work', 'isr' => 'work', 'ts' => 'work', 'of' => 'commercial', 'oa' => 'commercial', 'ctn' => 'commercial',
-                     'cls' => 'fleet', 'drw' => 'fleet', 'spn' => 'fleet', 'spc' => 'fleet', 'doc' => 'library', 'td' => 'work', 'lic' => 'library', 'mt' => 'work', 'bg' => 'fleet', 'wp' => 'work', 'sec' => 'library', 'acc' => 'commercial', 'pd' => 'work', 'pi' => 'commercial', 'eng' => 'work', 'hrq' => 'hr', 'hrm' => 'hr', 'crq' => 'library', 'soc' => 'work', 'hrt' => 'hr', 'hrev' => 'hr', 'hra' => 'hr', 'hrs' => 'hr'];
+                     'cls' => 'fleet', 'drw' => 'fleet', 'spn' => 'fleet', 'spc' => 'fleet', 'doc' => 'library', 'td' => 'work', 'lic' => 'library', 'mt' => 'work', 'bg' => 'fleet', 'wp' => 'work', 'sec' => 'library', 'acc' => 'commercial', 'pd' => 'work', 'pi' => 'commercial', 'eng' => 'work', 'hrq' => 'hr', 'hrm' => 'hr', 'crq' => 'library', 'soc' => 'work', 'hrt' => 'hr', 'hrev' => 'hr', 'hra' => 'hr', 'hrs' => 'hr', 'ism' => 'work'];
 
 /* ------------------------------------------------------------ sweep */
 
@@ -81,6 +81,7 @@ function nf_sweep(int $every = 60, bool $force = false): int {
             nf_job('contacts_once', function () { if (function_exists('ct_autocat') && function_exists('cp_setting') && cp_setting('ct_autocat_done', '') !== '1') { cp_setting_set('ct_autocat_done', '1'); cp_setting_set('ct_autocat_n', (string) ct_autocat()); } if (function_exists('ct_subscribe_all') && function_exists('cp_setting') && cp_setting('ct_suball_done', '') !== '1') { cp_setting_set('ct_suball_done', '1'); cp_setting_set('ct_suball_n', (string) ct_subscribe_all()); } });   // R97-040 / R97-042: one-time jobs
             nf_job('doc-links', fn() => function_exists('dl_sweep') ? dl_sweep() : 0);                                // R97-058: reminders for acceptance links
             nf_job('hr-assessments', fn() => function_exists('hrs_sweep') ? hrs_sweep() : 0);                       // R97-063: campaigns start, remind and close on their dates
+            nf_job('isms', fn() => function_exists('ism_sweep') ? ism_sweep() : 0);                                  // R97-080: due and review dates of the ISMS registers
             nf_job('kpi-cockpit', fn() => function_exists('kpi_cockpit_refresh') ? kpi_cockpit_refresh() : 0);       // R97-056: dashboard KPI block renewed here, not while a page is drawn
             nf_job('sub-order', function () { if (function_exists('sp_reorder_all') && (string) cp_setting('sp_order_v1', '') === '') { cp_setting_set('sp_order_v1', date('Y-m-d H:i')); sp_reorder_all(); } });   // R97-053: once
             nf_job('kyma-mark', function () { if (function_exists('kym_auto_on') && kym_auto_on() && time() - (int) cp_setting('kym_auto_at', '0') >= 3600) { cp_setting_set('kym_auto_at', (string) time()); kym_auto_mark(); } });   // R97-054: once an hour

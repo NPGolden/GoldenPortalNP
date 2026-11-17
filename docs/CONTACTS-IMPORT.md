@@ -2582,3 +2582,48 @@ The preview (`?p=data_doubles&keep=&drop=`) runs the same function with `$dry = 
 
 **Security review**: the kept schema holds table and column names only, in the portal's cache (APCu or `storage/cache`, closed to the web); the statements answered from it are matched by a strict pattern with literal names; nothing from user input reaches it. No new proposals.
 
+## §364 v1.159.0 (R97-080) — IT & Cybersecurity menu group and the ISO 27001 module
+
+**Request**: "IT and Cybersecurity should be disengaged from the Library menu and create a new module containing the Remote Support Contracts as one of the submenu and then all the reporting and filing required for ISO 27001".
+
+**Menu**: new group **IT & Cybersecurity** (before Library): Remote support contracts (page `cyber`, unchanged, also for customers), ISO 27001 — ISMS (`isms`, for those with access), Report a security event (`isms_report`, all staff). The entry is removed from Library.
+
+**Access**: `ism_can()` = administrators, management (`mgmt_can()`) and the ISMS team (setting `ism_team`, chosen on the overview by management / administrators). Deleting a record and choosing the team: management / administrators only (`ism_manage()`). Reporting an event: every staff account, including the restricted HR / planning / employee accounts (page and action added to their lists). Customers: none of it.
+
+**Registers** (`ism_regs()` in `app/ism.php` — one definition per register: clause, code prefix, statuses, which of them are closed, fields):
+
+| Register | Clause | Code | What it files |
+|---|---|---|---|
+| Documents | 7.5 | ISMS- | policies, procedures, records: version, approval, next review |
+| Risks | 6.1.2 · 8.2 · 8.3 | RSK- | asset, threat, vulnerability, likelihood × impact, treatment, plan, residual score |
+| Statement of Applicability | 6.1.3 d | A x.y | the 93 Annex A controls: applicable or not, justification, state, how / evidence |
+| Assets | A 5.9 | AST- | type, classification, location, criticality |
+| Incidents | A 5.24 – 5.28 | INC- | what happened, severity, containment, cause, lessons, who was notified |
+| Audits & reviews | 9.2 · 9.3 | AUD- | internal audit, management review, access review, restore test, continuity exercise |
+| Nonconformities | 10.2 | NC- | source, cause, correction, corrective action, check of effectiveness |
+| Objectives | 6.2 | OBJ- | measure, target, result |
+| Suppliers | A 5.19 – 5.22 | SUP- | service, access to our information, agreement, last review |
+| Training & awareness | 7.2 · 7.3 | TRN- | audience, attendees, trainer |
+| Legal requirements | A 5.31 | LEG- | obligation and how it is met |
+
+Every record: code (proposed, unique per register), title, status, owner, due date, next review, reference, the fields of its register, files, history (`ism_events`: created, changed fields, status from → to, file attached / removed, with name and time).
+
+**Pre-filled once** (`ism_seed()`, setting `ism_seeded`): 32 items of documented information of ISO/IEC 27001:2022 as drafts and the 93 controls of Annex A (5.1–5.37, 6.1–6.8, 7.1–7.14, 8.1–8.34) as "Planned". Titles only — the content of the policies is written by the company and attached.
+
+**Files**: `storage/isms`, random stored name, original name kept in the database, SHA-256 and size recorded, 25 MB, extensions from a fixed list (pdf, Office, images, txt, csv, eml, msg, zip); served only through `?p=isms_rec&id=…&file=…` to those with access, as attachment with `nosniff`.
+
+**Overview**: documents approved, controls implemented (of the applicable), open risks by level, open incidents, open nonconformities; table of registers (records, open, overdue); Needs attention (due date passed or review date reached); planned audits and reviews; the ISMS team.
+
+**Report a security event**: title, when, what is affected, what happened → an incident with status Reported; the team and the administrators are notified (`ism:incident`).
+
+**Reminders**: `ism_sweep()` hourly in the background sweep — due date or review date within 14 days: one notification per record and date to the owner, or to the team when there is no owner (`ism:due`).
+
+**Export**: All registers (Excel) — a Summary sheet and one sheet per register with every field and the number of files.
+
+**Database**: `install/migrate_cp_r97_080_isms.sql` — `ism_records`, `ism_files`, `ism_events` (step `r97z`).
+
+**Tests (sandbox)**: menu for CEO / PM / restricted account; 32 + 93 records seeded; create, edit (history with changed fields and status), doubled code refused; PM outside the team refused on pages (403), on save and on file download; PM in the team sees and edits, cannot delete, does not see the team form; upload of pdf accepted, `.php` and `.pdf.php` refused; download headers; file and record delete remove the stored files; event report by a PM filed as INC-001 and notified; empty report refused; reminder sent by the sweep; workbook opened (12 sheets); page sweeps for three roles, API test, browser pages without console errors; no new lines in `storage/php-errors.log`.
+
+**Not tested / not done**: e-mail of notifications (the sandbox sends no mail); no PDF report — the workbook is the report; no link yet between a risk and the controls that treat it other than the reference text; the contents of the policies are not written by the portal.
+
+**Security review**: the module holds the company's most sensitive security information — pages, actions and downloads all check `ism_can()` on the server, not only the menu; nothing of it is in the assistant's context; all posts carry the CSRF token, no inline scripts; uploads are never executed (random name, fixed extension list, folder closed to the web by `storage/.htaccess`). Proposals, no cost in speed: (1) include `storage/isms` in the off-hosting backup; (2) keep the ISMS team small and review it at every access review (register Audits & reviews); (3) the four secrets shown in the earlier screenshot of `config.php` should be rotated and the rotation filed as an incident record with its closing date.

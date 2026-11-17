@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.158.0';
+const CP_VERSION = '1.159.0';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-080', 'version' => '1.159.0', 'date' => '2026-11-17', 'title' => 'IT & Cybersecurity is a menu group of its own (out of Library) with Remote support contracts, the new ISO 27001 — ISMS module (eleven registers with owners, dates, files and history; the documented-information list and the 93 Annex A controls pre-filled; overview, reminders, Excel export) and Report a security event for all staff.', 'db' => 'install/migrate_cp_r97_080_isms.sql', 'check' => 'r97z'],
         ['ref' => 'GAS-CP-R97-079', 'version' => '1.158.0', 'date' => '2026-11-17', 'title' => 'Speed: the checks whether a table or column exists are answered from a kept copy of the schema (about 38 database statements fewer on every page); leave totals use the date index; presence and device stamps are written less often.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-078', 'version' => '1.157.2', 'date' => '2026-11-17', 'title' => 'Service reports: the list Older documents is back on the first tab and the warning logged on every opening of the page is gone (a query dropped by mistake in v1.157.1).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-077', 'version' => '1.157.1', 'date' => '2026-11-17', 'title' => 'Service reports page in three tabs — Field service reports, Inspection reports, Function checks / commissioning — each with filters (word, vessel, project, status, order) and a Needs action view that says what each report still needs.', 'db' => null, 'check' => null],
@@ -524,6 +525,7 @@ function cp_migration_state(): array {
         'r97p' => $has("SHOW TABLES LIKE 'nl_issues'"),
         'r97q' => $has("SHOW TABLES LIKE 'nl_lists'"),
         'r97r' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'proc_state'") && $has("SHOW COLUMNS FROM sb_parts LIKE 'proc_at'"),
+        'r97z' => $has("SHOW TABLES LIKE 'ism_records'"),
         'r97y' => $has("SHOW COLUMNS FROM si_lines LIKE 'po_cost_id'"),
         'r97x' => $has("SHOW TABLES LIKE 'hrs_campaigns'") && $has("SHOW TABLES LIKE 'hrs_scores'"),
         'r97w' => $has("SHOW COLUMNS FROM doc_links LIKE 'mail_error'"),
