@@ -1047,6 +1047,11 @@ function pm_handle_action(string $action, string $page): bool {
         case 'dn_cancel': { require_pr_wh(); $did = (int)($_POST['id'] ?? 0); dn_cancel($did, trim((string)($_POST['note'] ?? ''))); flash('good', t('dn.cancelled')); redirect('delivery_note', ['id' => $did, '_r' => uniqid()]); }
         case 'po_ncr_close': { require_po_admin(); $oid = (int)($_POST['id'] ?? 0); po_ncr_close($oid, (int)($_POST['rl_id'] ?? 0), trim((string)($_POST['note'] ?? ''))); flash('good', t('po.ncr_closed_ok')); redirect('purchase_order', ['id' => $oid, '_r' => uniqid()]); }
         case 'si_save': { require_si(); $iid = si_save_from_post(); flash('good', t('si.saved')); redirect('payable', ['id' => $iid, '_r' => uniqid()]); }   // R81-001
+        case 'si_lc_add': {   // R97-072: one logistic cost of the order onto this invoice, also when its provider is not the supplier (the supplier re-invoices the carrier)
+            require_si(); $iid = (int)($_POST['id'] ?? 0); $i = si_load($iid); if (!$i || !si_editable($i) || !$i['order_id']) throw new RuntimeException(t('err.noaccess'));
+            $lc = si_costs_from_po($iid, (int)$i['order_id'], (int)($_POST['cost_id'] ?? 0)); si_recalc($iid);
+            if ($lc['n']) flash('good', t('si.lc_pulled', ['n' => $lc['n']])); else flash('warn', $lc['cur'] ? t('si.lc_cur', ['n' => $lc['cur']]) : t('err.notfound'));
+            redirect('payable', ['id' => $iid, '_r' => uniqid()]); }
         case 'si_pull': { require_si(); $iid = (int)($_POST['id'] ?? 0); $i = si_load($iid); if (!$i || !si_editable($i) || !$i['order_id']) throw new RuntimeException(t('err.noaccess')); $n = si_lines_from_po($iid, (int)$i['order_id']); $lc = si_costs_from_po($iid, (int)$i['order_id']); si_recalc($iid);
             $extra = ($lc['other'] ? ' ' . t('si.lc_other', ['p' => implode(', ', array_slice($lc['other'], 0, 4))]) : '') . ($lc['cur'] ? ' ' . t('si.lc_cur', ['n' => $lc['cur']]) : '');
             if ($n || $lc['n']) flash('good', t('si.pulled_n', ['n' => $n]) . ($lc['n'] ? ' ' . t('si.lc_pulled', ['n' => $lc['n']]) : '') . $extra);

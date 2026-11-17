@@ -2444,3 +2444,15 @@ Language keys 10 358 each (portal; +3 from R97-060, none from this release); app
 
 **Security review**: same action and checks as before (`require_si`, CSRF, the invoice must be editable and belong to the order); the new column is filled only from costs of the invoice's own order. No new proposals.
 
+## §356 v1.156.1 (R97-072) — Payables: a logistic cost of another provider added by choice
+
+**Report** (screenshot, GAS-SI-26-0002, DEIF A/S, PO GAS-PO-26-0004): "i have 2 logisitc costs it brought only 1 of them" — the second had Provider DHL and was left out by the rule of §355.
+
+**Finding**: the Provider field of a logistic cost is used for the carrier also when the supplier re-invoices the freight. The automatic rule (provider empty or = supplier) is right as a default — it keeps a carrier's own invoice from being paid to the supplier — but the user must be able to overrule it.
+
+**Change**: `views/payable.php` lists, on an editable invoice of an order, the logistic costs of the order that are on no invoice (`si_lc_open()`), with "Add to this invoice"; action `si_lc_add` → `si_costs_from_po($iid, $oid, $costId)` adds that one cost whatever its provider (the provider is written in the line text). The message of the pull points to the list. Keys `si.lc_open_title`, `si.lc_open_hint`, `si.lc_add`, `si.lc_other_cur`; `si.lc_other` reworded (10 569 per file).
+
+**Tests (sandbox)**: order with a cost without provider and a cost of DHL: pull adds the first and lists the second; "Add to this invoice" adds it; adding it twice or a cost of another order is refused; test data removed.
+
+**Security review**: the new action has the same checks as the pull (`require_si`, CSRF, editable invoice) and takes only a cost of the invoice's own order that is on no other invoice. No new proposals.
+

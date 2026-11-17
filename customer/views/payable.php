@@ -112,6 +112,15 @@ layout_head(($i ? $i['si_no'] : ($isCredit ? t('si.new_credit') : t('si.new'))) 
   </table>
   <?php if ($edit): ?>
   <div class="btn-row" style="margin-top:8px;"><?php if ($i['order_id']): ?><form method="post" action="<?= $self ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="si_pull"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost btn--sm" type="submit">⤵ <?= tt('si.pull_lines_btn') ?></button></form><?php endif; ?></div>
+  <?php if ($edit && $i['order_id'] && $i['kind'] !== 'credit' && function_exists('si_lc_open') && ($lcOpen = si_lc_open((int)$i['order_id']))): /* R97-072: logistic costs of the order still without an invoice — add any of them by choice */ ?>
+  <div style="margin-top:10px;border:1px dashed rgba(31,58,95,.25);border-radius:8px;padding:8px 12px;">
+    <b>🚚 <?= tt('si.lc_open_title') ?></b> <span class="hint" style="display:inline;"><?= tt('si.lc_open_hint') ?></span>
+    <table class="tbl" style="margin-top:6px;"><tbody><?php foreach ($lcOpen as $c): $sameCur = (string)$c['currency'] === (string)$i['currency']; ?><tr>
+      <td><?= tt('po.c_' . $c['kind']) ?><?= $c['ref'] ? ' <span class="hint">' . e($c['ref']) . '</span>' : '' ?></td><td><?= e($c['provider'] ?: $i['supplier']) ?></td><td class="num"><?= e(po_money((float)$c['amount'], $c['currency'])) ?></td>
+      <td class="num"><?php if ($sameCur): ?><form method="post" action="<?= $self ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="si_lc_add"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="cost_id" value="<?= (int)$c['id'] ?>"><button class="btn btn--ghost btn--sm" type="submit">+ <?= tt('si.lc_add') ?></button></form><?php else: ?><span class="hint"><?= tt('si.lc_other_cur') ?></span><?php endif; ?></td>
+    </tr><?php endforeach; ?></tbody></table>
+  </div>
+  <?php endif; ?>
   <h3 id="line-form-title" style="margin-top:10px;"><?= tt('prq.add_line') ?></h3>
   <form method="post" action="<?= $self ?>" id="line-form" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="si_line_save"><input type="hidden" name="invoice_id" value="<?= $id ?>"><input type="hidden" name="line_id" id="lf-id" value="0">
     <div class="form-grid">

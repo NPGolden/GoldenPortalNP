@@ -120,13 +120,14 @@ function si_lc_open(int $oid): array {
 }
 /** Pull the open logistic costs charged by the supplier of the invoice, one line each. Costs of another provider or in another currency stay out and are reported.
  *  Returns ['n' => pulled, 'other' => [provider names], 'cur' => n in another currency]. */
-function si_costs_from_po(int $iid, int $oid): array {
+function si_costs_from_po(int $iid, int $oid, ?int $onlyCost = null): array {   // $onlyCost (R97-072): that one cost, whoever its provider is — the user chose it
     $out = ['n' => 0, 'other' => [], 'cur' => 0]; $i = si_load($iid); if (!$i || !si_lc_has() || $i['kind'] === 'credit') return $out;
     $po = (string) scalar('SELECT po_no FROM po_orders WHERE id = ?', [$oid]); $seq = (int) scalar('SELECT COALESCE(MAX(seq),0) FROM si_lines WHERE invoice_id = ?', [$iid]);
     foreach (si_lc_open($oid) as $c) {
-        if (!si_lc_same($c['provider'], (string)$i['supplier'])) { $out['other'][(string)$c['provider']] = 1; continue; }
+        if ($onlyCost !== null && (int)$c['id'] !== $onlyCost) continue;
+        if ($onlyCost === null && !si_lc_same($c['provider'], (string)$i['supplier'])) { $out['other'][(string)$c['provider']] = 1; continue; }
         if ((string)$c['currency'] !== (string)$i['currency']) { $out['cur']++; continue; }
-        $amt = round((float)$c['amount'], 2); $desc = mb_substr(t('po.c_' . $c['kind']) . ' · ' . $po . ($c['ref'] ? ' · ' . $c['ref'] : '') . ($c['note'] ? ' · ' . $c['note'] : ''), 0, 255);
+        $amt = round((float)$c['amount'], 2); $desc = mb_substr(t('po.c_' . $c['kind']) . ($onlyCost !== null && $c['provider'] ? ' · ' . $c['provider'] : '') . ' · ' . $po . ($c['ref'] ? ' · ' . $c['ref'] : '') . ($c['note'] ? ' · ' . $c['note'] : ''), 0, 255);
         q('INSERT INTO si_lines (invoice_id, seq, po_line_id, po_cost_id, description, qty, unit_price, line_total) VALUES (?,?,NULL,?,?,1,?,?)', [$iid, ++$seq, (int)$c['id'], $desc, $amt, $amt]); $out['n']++;
     }
     $out['other'] = array_keys($out['other']); return $out;
