@@ -17,6 +17,7 @@ layout_head(t('hr.training'), 'hr_training');
   <div><h1>🎓 <?= e($tr['title']) ?></h1><p class="lede" style="margin-bottom:0;"><?= hr_tr_kind_pill($tr['kind']) ?> <?= hr_tr_status_pill($tr['status']) ?><?= $tr['certificate'] ? ' ' . pill('gold', '🏅 ' . t('hr.tr_cert')) : '' ?> · <?= $tr['date_from'] ? e(fmt_date($tr['date_from'])) . ($tr['date_to'] && $tr['date_to'] !== $tr['date_from'] ? ' – ' . e(fmt_date($tr['date_to'])) : '') : tt('hr.tr_tba') ?><?= $tr['hours'] !== null ? ' · ' . e($fh($tr['hours'])) . ' h' : '' ?><?= $tr['provider'] ? ' · ' . e($tr['provider']) : '' ?><?= $tr['location'] ? ' · ' . e($tr['location']) : '' ?></p></div>
   <div class="btn-row"><a class="btn btn--ghost" href="<?= url('hr_training', ['id' => $id, 'edit' => 1]) ?>"><?= tt('btn.edit') ?></a><a class="btn btn--ghost" href="<?= url('hr_training') ?>">‹ <?= tt('hr.tr_list') ?></a></div>
 </div>
+<?php if (function_exists('ism_tr_badge')) echo ism_tr_badge($id);   // R97-083 ?>
 <div class="cols" style="grid-template-columns: 2fr 1fr;">
 <div>
 <div class="card">

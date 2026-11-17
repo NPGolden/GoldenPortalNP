@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.160.1';
+const CP_VERSION = '1.161.0';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-083', 'version' => '1.161.0', 'date' => '2026-11-17', 'title' => 'ISO 27001: the supplier register takes its suppliers from the supplier list and each is evaluated (six criteria, rating, result, next evaluation date; shown on the supplier page); a training is created in or linked to HR › Training and attendance is kept in the personnel records; Access by position is set by the CEO and the General Manager only.', 'db' => 'install/migrate_cp_r97_083_isms_suppliers_training.sql', 'check' => 'r98b'],
         ['ref' => 'GAS-CP-R97-082', 'version' => '1.160.1', 'date' => '2026-11-17', 'title' => 'IT & Cybersecurity: access by position — the staff roles and disciplines ticked on the ISO 27001 overview have the whole group (top management and QHSE, project managers, IT, automation and electrical engineers by default until saved).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-081', 'version' => '1.160.0', 'date' => '2026-11-17', 'title' => 'IT & Cybersecurity › Marine cyber safety (IACS UR E26 / E27): the products we supply, linked to vessel, project and sub-project; the ten UR E27 documents of each with their approval by class; every software release of the programming team from development to installation on board, approved by a second person; shown on the vessel and sub-project pages.', 'db' => 'install/migrate_cp_r97_081_marine_cyber.sql', 'check' => 'r98a'],
         ['ref' => 'GAS-CP-R97-080', 'version' => '1.159.0', 'date' => '2026-11-17', 'title' => 'IT & Cybersecurity is a menu group of its own (out of Library) with Remote support contracts, the new ISO 27001 — ISMS module (eleven registers with owners, dates, files and history; the documented-information list and the 93 Annex A controls pre-filled; overview, reminders, Excel export) and Report a security event for all staff.', 'db' => 'install/migrate_cp_r97_080_isms.sql', 'check' => 'r97z'],
@@ -527,6 +528,7 @@ function cp_migration_state(): array {
         'r97p' => $has("SHOW TABLES LIKE 'nl_issues'"),
         'r97q' => $has("SHOW TABLES LIKE 'nl_lists'"),
         'r97r' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'proc_state'") && $has("SHOW COLUMNS FROM sb_parts LIKE 'proc_at'"),
+        'r98b' => $has("SHOW COLUMNS FROM ism_records LIKE 'supplier_id'"),
         'r98a' => $has("SHOW COLUMNS FROM ism_records LIKE 'parent_id'"),
         'r97z' => $has("SHOW TABLES LIKE 'ism_records'"),
         'r97y' => $has("SHOW COLUMNS FROM si_lines LIKE 'po_cost_id'"),

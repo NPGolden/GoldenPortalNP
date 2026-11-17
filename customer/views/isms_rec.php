@@ -7,7 +7,7 @@ if (!empty($_GET['file'])) { ism_file_send((int)$_GET['file']); exit; }
 $id = (int)($_GET['id'] ?? 0); $r = $id ? ism_get($id) : null; $reg = $r ? (string)$r['reg'] : (string)($_GET['reg'] ?? ''); $R = ism_reg($reg);
 if ($R && !ism_can_reg($reg)) { http_response_code(403); layout_head(t('ism.title'), 'isms'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
 $PG = $R ? ism_page($reg) : 'isms'; $marine = $PG === 'mcs';
-$par = null; if ($R && !empty($R['parent'])) { $par = ism_get((int)($r['parent_id'] ?? ($_GET['parent'] ?? 0))); if ($par && $par['reg'] !== 'mprod') $par = null; }
+$par = null; if ($R && !empty($R['parent'])) { $par = ism_get((int)($r['parent_id'] ?? ($_GET['parent'] ?? 0))); if ($par && $par['reg'] !== $R['parent']) $par = null; }
 if (!$R || ($id && !$r)) { http_response_code(404); layout_head(t('ism.title'), 'isms'); echo '<h1>' . tt('err.notfound') . '</h1>'; layout_foot(); return; }
 $d = $r ? ism_data($r) : []; $users = ism_users(); $self = url('isms_rec', $id ? ['id' => $id] : ['reg' => $reg]); $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : '';
 $files = $id ? ism_files($id) : []; $events = $id ? ism_events($id) : []; $why = $r ? ism_due($r) : null;
@@ -23,15 +23,19 @@ layout_head(($r ? $r['code'] . ' · ' : '') . ism_reg_title($reg), $PG);
   <form method="post" action="<?= $self ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="ism_save"><input type="hidden" name="reg" value="<?= e($reg) ?>"><input type="hidden" name="id" value="<?= $id ?>">
     <div class="grid grid-3">
       <div class="field"><label><?= tt('ism.code') ?></label><input name="code" maxlength="40" value="<?= e((string)($r['code'] ?? '')) ?>" placeholder="<?= e(ism_next_code($reg)) ?>"></div>
-      <div class="field" style="grid-column: span 2;"><label><?= tt('ism.title_f') ?> *</label><input name="title" maxlength="255" required value="<?= e((string)($r['title'] ?? '')) ?>"></div>
+      <div class="field" style="grid-column: span 2;"><label><?= tt('ism.title_f') ?><?= in_array($reg, ['supplier', 'supeval'], true) ? '' : ' *' ?></label><input name="title" maxlength="255"<?= in_array($reg, ['supplier', 'supeval'], true) ? ' placeholder="' . tt('ism.title_auto') . '"' : ' required' ?> value="<?= e((string)($r['title'] ?? '')) ?>"></div>
       <div class="field"><label><?= tt('th.status') ?></label><select name="status" data-nosearch><?php foreach ($R['st'] as $sk => $_): ?><option value="<?= $sk ?>"<?= $sel($sk, $r['status'] ?? array_key_first($R['st'])) ?>><?= tt('ism.s_' . $sk) ?></option><?php endforeach; ?></select></div>
       <div class="field"><label><?= tt($reg === 'msw' ? 'ism.own_msw' : 'ism.owner') ?></label><select name="owner_user_id"><option value="">—</option><?php foreach ($users as $x): ?><option value="<?= (int)$x['id'] ?>"<?= $sel($x['id'], $r['owner_user_id'] ?? '') ?>><?= e($x['full_name']) ?></option><?php endforeach; ?></select></div>
       <?php if (!empty($R['ref']) || $reg === 'soa'): ?><div class="field"><label><?= tt($reg === 'soa' ? 'ism.theme' : 'ism.ref') ?></label><input name="ref" maxlength="60" value="<?= e((string)($r['ref'] ?? '')) ?>" placeholder="<?= $reg === 'soa' ? '' : tt('ism.ref_ph') ?>"></div><?php endif; ?>
       <?php if (!empty($R['due'])): ?><div class="field"><label><?= tt('ism.due_' . $reg) === 'ism.due_' . $reg ? tt('ism.due_date') : tt('ism.due_' . $reg) ?></label><input type="date" name="due_date" value="<?= e((string)($r['due_date'] ?? '')) ?>"></div><?php endif; ?>
       <?php if (!empty($R['review'])): ?><div class="field"><label><?= tt('ism.review_date') ?></label><input type="date" name="review_date" value="<?= e((string)($r['review_date'] ?? '')) ?>"></div><?php endif; ?>
     </div>
-    <?php if (!empty($R['parent'])): $prods = ism_list('mprod'); ?>
-    <div class="grid grid-2" style="margin-top:6px;"><div class="field" style="grid-column: 1 / -1;"><label><?= tt('ism.product') ?> *</label><select name="parent_id" required><option value="">—</option><?php foreach ($prods as $x): ?><option value="<?= (int)$x['id'] ?>"<?= $sel($x['id'], $par['id'] ?? '') ?>><?= e($x['code'] . ' — ' . $x['title'] . ($x['vessel_name'] ? ' · ' . $x['vessel_name'] : '')) ?></option><?php endforeach; ?></select>
+    <?php if ($reg === 'supplier' && ism_has_ext()): $supSel = (int)($r['supplier_id'] ?? ($_GET['supplier'] ?? 0)); $supOpt = ism_supplier_options(); ?>
+    <div class="grid grid-2" style="margin-top:6px;"><div class="field" style="grid-column: 1 / -1;"><label><?= tt('ism.sup_pick') ?></label><select name="supplier_id"><option value="">—</option><?php foreach ($supOpt as $x): ?><option value="<?= (int)$x['id'] ?>"<?= $sel($x['id'], $supSel) ?>><?= e($x['name'] . ($x['city'] || $x['country'] ? ' · ' . trim($x['city'] . ' ' . $x['country']) : '') . ($x['is_active'] ? '' : ' (' . t('v.inactive') . ')')) ?></option><?php endforeach; ?></select>
+      <span class="hint"><?= tt('ism.sup_pick_hint') ?><?= $supSel && function_exists('pr_can') && pr_can() ? ' · <a href="' . url('suppliers', ['id' => $supSel]) . '">' . tt('ism.sup_open') . ' ↗</a>' : '' ?></span></div></div>
+    <?php endif; ?>
+    <?php if (!empty($R['parent'])): $prods = ism_list($R['parent']); ?>
+    <div class="grid grid-2" style="margin-top:6px;"><div class="field" style="grid-column: 1 / -1;"><label><?= tt($R['parent'] === 'mprod' ? 'ism.product' : 'ism.supplier') ?> *</label><select name="parent_id" required><option value="">—</option><?php foreach ($prods as $x): ?><option value="<?= (int)$x['id'] ?>"<?= $sel($x['id'], $par['id'] ?? '') ?>><?= e($x['code'] . ' — ' . $x['title'] . (!empty($x['vessel_name']) ? ' · ' . $x['vessel_name'] : '')) ?></option><?php endforeach; ?></select>
       <?php if ($par): ?><span class="hint"><?= $par['x_vessel'] ? '⚓ <a href="' . url('vessel', ['id' => (int)$par['x_vessel']]) . '">' . e((string)$par['vessel_name']) . '</a>' : '' ?><?= $par['x_sub'] ? ' · <a href="' . url('subproject', ['id' => (int)$par['x_sub']]) . '">' . e(trim((string)$par['sub_code'] . ' ' . (string)$par['sub_name'])) . '</a>' : '' ?><?= $par['x_project'] ? ' · ' . e(trim((string)$par['project_code'] . ' ' . (string)$par['project_name'])) : '' ?></span><?php endif; ?></div></div>
     <?php endif; ?>
     <?php if (!empty($R['links'])): $lp = (int)($r['project_id'] ?? ($_GET['project'] ?? 0)); $ls = (int)($r['subproject_id'] ?? ($_GET['sub'] ?? 0)); $lv = (int)($r['vessel_id'] ?? ($_GET['vessel'] ?? 0));
@@ -57,6 +61,8 @@ layout_head(($r ? $r['code'] . ' · ' : '') . ism_reg_title($reg), $PG);
       <?php endforeach; ?>
     </div>
     <?php if ($reg === 'risk'): $s1 = ism_score($d); $s2 = ism_score($d, 'res_'); [$t1, $l1] = ism_level($s1); [$t2, $l2] = ism_level($s2); ?><p class="hint"><?= tt('ism.score') ?>: <?= $s1 ? pill($t1, $s1 . ' · ' . $l1) : '—' ?> · <?= tt('ism.res_score') ?>: <?= $s2 ? pill($t2, $s2 . ' · ' . $l2) : '—' ?> — <?= tt('ism.score_hint') ?></p><?php endif; ?>
+    <?php if ($reg === 'supeval'): ?><p class="hint"><?= isset($d['rating']) ? tt('ism.f_rating') . ': ' . pill((int)$d['rating'] >= 70 ? 'green' : ((int)$d['rating'] >= 50 ? 'gold' : 'bad'), (int)$d['rating'] . ' %') . ' — ' : '' ?><?= tt('ism.eval_rule') ?></p><?php endif; ?>
+    <?php if ($reg === 'supplier' && isset($d['rating'])): ?><p class="hint"><?= tt('ism.f_rating') ?>: <?= pill((int)$d['rating'] >= 70 ? 'green' : ((int)$d['rating'] >= 50 ? 'gold' : 'bad'), (int)$d['rating'] . ' %') ?><?= !empty($d['rating_result']) ? ' ' . tt('ism.o_' . $d['rating_result']) : '' ?></p><?php endif; ?>
     <?php if ($reg === 'msw'): ?><p class="hint"><?= !empty($d['approved_by']) ? '✅ ' . e(t('ism.sw_approved', ['n' => $d['approved_by'], 'd' => fmt_date($d['approved_on'] ?? '')])) . ' — ' : '' ?><?= tt('ism.sw_rule') ?></p><?php endif; ?>
     <div class="btn-row" style="margin-top:8px;"><button class="btn btn--gold" type="submit"><?= tt('btn.save') ?></button><a class="btn btn--ghost" href="<?= $par ? url('isms_rec', ['id' => (int)$par['id']]) : url($PG, ['reg' => $reg]) ?>"><?= tt('btn.cancel') ?></a></div>
   </form>
@@ -70,6 +76,33 @@ layout_head(($r ? $r['code'] . ' · ' : '') . ism_reg_title($reg), $PG);
 <div class="card" id="sw">
   <div class="card-head"><h2>💾 <?= tt('ism.r_msw') ?> <span class="count"><?= count($cs) ?></span></h2><div class="btn-row"><a class="btn btn--gold btn--sm" href="<?= url('isms_rec', ['reg' => 'msw', 'parent' => $id]) ?>">+ <?= tt('ism.sw_new') ?></a></div></div>
   <?php if (!$cs): ?><p class="hint"><?= tt('ism.sw_none') ?></p><?php else: ?><table class="tbl tbl--wrap"><tbody><?php foreach ($cs as $x): $xd = ism_data($x); ?><tr><td><a href="<?= url('isms_rec', ['id' => (int)$x['id']]) ?>"><b class="mono"><?= e((string)($xd['version'] ?? $x['code'])) ?></b> <?= e($x['title']) ?></a><br><span class="hint"><?= !empty($xd['component']) ? tt('ism.o_' . $xd['component']) . ' · ' : '' ?><?= !empty($xd['change_type']) ? tt('ism.o_' . $xd['change_type']) . ' · ' : '' ?><?= e((string)($x['owner_name'] ?: '—')) ?><?= !empty($xd['approved_by']) ? ' · ✅ ' . e($xd['approved_by']) : '' ?><?= !empty($xd['installed_on']) ? ' · ⤓ ' . e(fmt_date($xd['installed_on'])) : '' ?></span></td><td style="white-space:nowrap;"><?= ism_status_pill('msw', (string)$x['status']) ?></td></tr><?php endforeach; ?></tbody></table><?php endif; ?>
+</div>
+<?php endif; ?>
+<?php if ($r && $reg === 'supplier'): $ce = array_reverse(ism_children($id, 'supeval')); ?>
+<div class="card" id="evals">
+  <div class="card-head"><h2>📝 <?= tt('ism.r_supeval') ?> <span class="count"><?= count($ce) ?></span></h2><div class="btn-row"><a class="btn btn--gold btn--sm" href="<?= url('isms_rec', ['reg' => 'supeval', 'parent' => $id]) ?>">+ <?= tt('ism.eval_new') ?></a></div></div>
+  <?php if (!$ce): ?><p class="hint"><?= tt('ism.eval_none') ?></p><?php else: ?><table class="tbl tbl--wrap"><tbody><?php foreach ($ce as $x): $xd = ism_data($x); ?><tr><td><a href="<?= url('isms_rec', ['id' => (int)$x['id']]) ?>"><b class="mono"><?= e($x['code']) ?></b></a> <?= !empty($xd['eval_kind']) ? tt('ism.o_' . $xd['eval_kind']) : '' ?><br><span class="hint"><?= !empty($xd['evaluated_on']) ? e(fmt_date($xd['evaluated_on'])) : ($x['due_date'] ? e(fmt_date($x['due_date'])) : '') ?><?= !empty($xd['evaluator']) ? ' · ' . e($xd['evaluator']) : '' ?><?= !empty($xd['eval_result']) ? ' · ' . tt('ism.o_' . $xd['eval_result']) : '' ?></span></td><td style="white-space:nowrap;"><?= isset($xd['rating']) && $x['status'] === 'done' ? pill((int)$xd['rating'] >= 70 ? 'green' : ((int)$xd['rating'] >= 50 ? 'gold' : 'bad'), (int)$xd['rating'] . ' %') : ism_status_pill('supeval', (string)$x['status']) ?></td></tr><?php endforeach; ?></tbody></table><?php endif; ?>
+  <p class="hint" style="margin-bottom:0;"><?= tt('ism.eval_hint') ?></p>
+</div>
+<?php endif; ?>
+<?php if ($r && $reg === 'training' && ism_has_ext() && function_exists('hr_tr_has') && hr_tr_has()): $HT = ism_tr($r); ?>
+<div class="card" id="hrtr">
+  <h2>🎓 <?= tt('ism.tr_h') ?></h2>
+  <?php if (!$HT): $hrAll = all("SELECT id, title, date_from FROM hr_trainings WHERE status <> 'cancelled' ORDER BY COALESCE(date_from, created_at) DESC LIMIT 200"); ?>
+  <p class="hint"><?= tt('ism.tr_none') ?></p>
+  <form method="post" action="<?= $self ?>#hrtr" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="ism_tr_create"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--gold btn--sm" type="submit">+ <?= tt('ism.tr_create') ?></button></form>
+  <?php if ($hrAll): ?><form method="post" action="<?= $self ?>#hrtr" data-lock style="margin-top:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="ism_tr_link"><input type="hidden" name="id" value="<?= $id ?>">
+    <div class="field"><label><?= tt('ism.tr_link') ?></label><select name="hr_training_id" required><option value="">—</option><?php foreach ($hrAll as $x): ?><option value="<?= (int)$x['id'] ?>"><?= e($x['title'] . ($x['date_from'] ? ' · ' . fmt_date($x['date_from']) : '')) ?></option><?php endforeach; ?></select></div><button class="btn btn--ghost btn--sm" type="submit"><?= tt('ism.tr_link_btn') ?></button></form><?php endif; ?>
+  <?php else: $st = []; foreach ($HT['members'] as $m) $st[(int)$m['person_id']] = (string)$m['status']; $ppl = all('SELECT id, name_en FROM hr_people WHERE is_active = 1 ORDER BY name_en'); $nAtt = count(array_filter($st, fn($s) => $s === 'attended')); ?>
+  <p><b><?= e($HT['title']) ?></b> <?= function_exists('hr_tr_status_pill') ? hr_tr_status_pill((string)$HT['status']) : '' ?><?= function_exists('hr_can') && hr_can() ? ' <a class="hint" href="' . url('hr_training', ['id' => (int)$HT['id']]) . '">HR › ' . tt('hr.training') . ' ↗</a>' : '' ?><br><span class="hint"><?= $HT['date_from'] ? e(fmt_date($HT['date_from'])) . ' · ' : '' ?><?= e(t('ism.tr_n', ['n' => $nAtt, 'a' => count($ppl)])) ?></span></p>
+  <form method="post" action="<?= $self ?>#hrtr" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="ism_tr_attend"><input type="hidden" name="id" value="<?= $id ?>">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:4px 12px;max-height:300px;overflow:auto;"><?php foreach ($ppl as $x): $ms = $st[(int)$x['id']] ?? ''; ?><label style="display:flex;gap:6px;align-items:center;font-weight:400;"><input type="checkbox" name="pid[]" value="<?= (int)$x['id'] ?>"<?= $ms === 'attended' ? ' checked' : '' ?> style="width:16px;height:16px;"> <?= e($x['name_en']) ?><?= $ms !== '' && $ms !== 'attended' ? ' <span class="hint">(' . tt('hr.tm_' . $ms) . ')</span>' : '' ?></label><?php endforeach; ?></div>
+    <label style="display:flex;gap:6px;align-items:center;font-weight:400;margin-top:8px;"><input type="checkbox" name="close" value="1" style="width:16px;height:16px;"> <?= tt('ism.tr_close') ?></label>
+    <div class="btn-row" style="margin-top:8px;"><button class="btn btn--sm" type="submit"><?= tt('ism.tr_save') ?></button></div>
+  </form>
+  <p class="hint" style="margin-bottom:0;"><?= tt('ism.tr_hint') ?></p>
+  <form method="post" action="<?= $self ?>#hrtr" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="ism_tr_link"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="hr_training_id" value="0"><button class="btn btn--ghost btn--sm" type="submit"><?= tt('ism.tr_unlink') ?></button></form>
+  <?php endif; ?>
 </div>
 <?php endif; ?>
 <?php if ($r): ?>

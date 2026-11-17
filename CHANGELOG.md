@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.160.1** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.161.0** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.161.0 | GAS-CP-R97-083 | 2026-11-17 | ISO 27001: the supplier register takes its suppliers from the supplier list and each is evaluated (six criteria, rating, result, next evaluation date; shown on the supplier page); a training is created in or linked to HR › Training and attendance is kept in the personnel records; Access by position is set by the CEO and the General Manager only. | `install/migrate_cp_r97_083_isms_suppliers_training.sql` |
 | 1.160.1 | GAS-CP-R97-082 | 2026-11-17 | IT & Cybersecurity: access by position — the staff roles and disciplines ticked on the ISO 27001 overview have the whole group (top management and QHSE, project managers, IT, automation and electrical engineers by default until saved). | — |
 | 1.160.0 | GAS-CP-R97-081 | 2026-11-17 | IT & Cybersecurity › Marine cyber safety (IACS UR E26 / E27): the products we supply, linked to vessel, project and sub-project; the ten UR E27 documents of each with their approval by class; every software release of the programming team from development to installation on board, approved by a second person; shown on the vessel and sub-project pages. | `install/migrate_cp_r97_081_marine_cyber.sql` |
 | 1.159.0 | GAS-CP-R97-080 | 2026-11-17 | IT & Cybersecurity is a menu group of its own (out of Library) with Remote support contracts, the new ISO 27001 — ISMS module (eleven registers with owners, dates, files and history; the documented-information list and the 93 Annex A controls pre-filled; overview, reminders, Excel export) and Report a security event for all staff. | `install/migrate_cp_r97_080_isms.sql` |
