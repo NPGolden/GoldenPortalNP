@@ -184,3 +184,19 @@ function hr_off_pending(): array {
     if (!hr_off_has()) return [];
     return all("SELECT p.id, p.name_en, e.id AS employment_id, e.date_from AS end_date, e.reason, SUM(o.done) AS done, COUNT(*) AS total FROM hr_offboarding o JOIN hr_employments e ON e.id = o.employment_id JOIN hr_people p ON p.id = o.person_id GROUP BY p.id, p.name_en, e.id, e.date_from, e.reason HAVING done < total ORDER BY e.date_from DESC");
 }
+
+/* ------------------------------------------------------------ R97-093 — people who are no longer in the company do not stand in the lists of personnel */
+/** Portal accounts that are still open although the HR card of the person is not active (left, or Active unticked). */
+function hr_gone_accounts(): array {
+    static $c = null; if ($c !== null) return $c; if (!hr2_has()) return $c = [];
+    try { $c = all("SELECT cu.id, cu.full_name, cu.role, p.id AS person_id, " . (hr3_has() ? 'p.left_date' : 'NULL AS left_date') . " FROM hr_people p JOIN customer_users cu ON cu.id = p.user_id WHERE p.is_active = 0 AND cu.is_active = 1 AND cu.role IN ('staff','admin') ORDER BY cu.full_name"); } catch (Throwable $e) { error_log('[hr_gone] ' . $e->getMessage()); $c = []; }
+    return $c;
+}
+function hr_gone_ids(): array { return array_map(fn($r) => (int)$r['id'], hr_gone_accounts()); }
+/** Take the people who left out of a list of accounts (rows with an id). */
+function hr_here(array $rows, string $key = 'id'): array { $g = hr_gone_ids(); return $g ? array_values(array_filter($rows, fn($r) => !in_array((int)$r[$key], $g, true))) : $rows; }
+/** Close the staff accounts of people who are not active (administrator accounts are never closed by the portal — they are listed for a decision). Returns how many were closed. */
+function hr_gone_close(?int $personId = null): int {
+    if (!$personId && !(is_cp_admin() || (function_exists('hr_can') && hr_can()))) throw new RuntimeException(t('err.noaccess')); if (!hr2_has()) return 0;
+    return q("UPDATE customer_users cu JOIN hr_people p ON p.user_id = cu.id SET cu.is_active = 0 WHERE p.is_active = 0 AND cu.is_active = 1 AND cu.role = 'staff'" . ($personId ? ' AND p.id = ' . (int)$personId : ''))->rowCount();
+}

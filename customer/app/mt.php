@@ -14,7 +14,8 @@ function mt_staff(): array {
     if ($c !== null) return $c;
     $c = [];
     try {
-        foreach (all("SELECT id, full_name, email FROM customer_users WHERE role IN ('staff','admin') AND is_active = 1 ORDER BY full_name") as $u) {
+        $gone = function_exists('hr_gone_ids') ? hr_gone_ids() : [];   // R97-093
+        foreach (all("SELECT id, full_name, email FROM customer_users WHERE role IN ('staff','admin') AND is_active = 1 ORDER BY full_name") as $u) { if (in_array((int)$u['id'], $gone, true)) continue;
             $h = strtolower(trim((string) strstr((string)$u['email'], '@', true)));
             $h = preg_replace('/[^a-z0-9._-]/', '', $h);
             if ($h === '') continue;

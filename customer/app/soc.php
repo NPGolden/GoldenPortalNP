@@ -20,7 +20,7 @@ const SOC_BADGES = [   // code => [icon, metric key, threshold]
 
 function soc_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'soc_kudos'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function soc_me(): int { return (int)(current_user()['id'] ?? 0); }
-function soc_staff(): array { static $c = null; if ($c === null) { $c = []; foreach (all("SELECT id, full_name, email, created_at FROM customer_users WHERE role IN ('staff','admin') AND is_active = 1 ORDER BY full_name") as $u) $c[(int)$u['id']] = $u; } return $c; }
+function soc_staff(): array { static $c = null; if ($c === null) { $c = []; foreach (all("SELECT id, full_name, email, created_at FROM customer_users WHERE role IN ('staff','admin') AND is_active = 1 ORDER BY full_name") as $u) $c[(int)$u['id']] = $u; if (function_exists('hr_gone_ids')) foreach (hr_gone_ids() as $g) unset($c[$g]); } return $c; }
 function soc_can_post(): bool { return is_cp_admin() || (function_exists('hr_can') && hr_can()) || (function_exists('hr_is_manager') && hr_is_manager()) || (function_exists('pm_is_pm') && pm_is_pm()); }
 function soc_name(int $uid): string { return (string)(soc_staff()[$uid]['full_name'] ?? scalar('SELECT full_name FROM customer_users WHERE id = ?', [$uid]) ?? '—'); }
 function soc_notify(array $to, string $kind, string $ref, string $title, ?string $body, string $url): void { $to = array_values(array_unique(array_filter(array_map('intval', $to), fn($i) => $i > 0 && $i !== soc_me()))); if ($to && function_exists('nf_push')) nf_push($to, $kind, $ref, $title, $body, $url, soc_me() ?: null, (string)(current_user()['full_name'] ?? '')); }

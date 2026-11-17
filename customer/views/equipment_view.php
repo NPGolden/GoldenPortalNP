@@ -107,6 +107,7 @@ layout_head(t('eq.sn') . ' ' . $e['serial_no'], 'equipment');
   </div>
 </div>
 
+<?php if ($staff && function_exists('ism_eq_card')) ism_eq_card($e);   /* R97-093 */ ?>
 <?php if ($staff && function_exists('pd_card') && ($pc = pd_card($id))): $pu = $pc['unit']; $pG = pd_files_by_phase($pc['unit_files']); $pms = pd_milestones($pc); ?>
 <div class="card" id="production">
   <div class="page-head" style="margin-bottom:6px;"><h2 style="margin:0;">🏭 <?= tt('pd.card') ?></h2>

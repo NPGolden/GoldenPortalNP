@@ -21,6 +21,13 @@ layout_head(t('hr.settings'), 'admin_hr');
 
 <?php if ($tab === 'people'): $pid = (int)($_GET['pid'] ?? 0); $cur = $pid ? hr_person($pid) : null; ?>
 <?php if (function_exists('hr3_has') && hr3_has() && ($al = hr_contract_alerts())): ?><div class="flash flash--warn"><b><?= tt('hr.contract_alerts') ?>:</b> <?php foreach ($al as $i => $a): ?><?= $i ? ' · ' : '' ?><a href="<?= url('hr_person', ['id' => (int)$a['id']]) ?>"><?= e($a['name_en']) ?></a> <?= e(fmt_date($a['contract_end'])) ?><?= (int)$a['left_days'] < 0 ? ' ⚠' : '' ?><?php endforeach; ?></div><?php endif; ?>
+<?php $gone = function_exists('hr_gone_accounts') ? hr_gone_accounts() : []; if ($gone): /* R97-093 */ ?>
+<div class="card" id="hr-gone" style="border-left:4px solid var(--red, #b3261e);">
+  <div class="card-head"><h2>⚠ <?= tt('hr.gone_h') ?> <span class="count"><?= count($gone) ?></span></h2><?php if (array_filter($gone, fn($g) => $g['role'] === 'staff')): ?><form method="post" action="<?= url('admin_hr') ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hr_gone_close"><button class="btn btn--sm" type="submit" data-js-confirm="<?= e(t('hr.gone_confirm')) ?>"><?= tt('hr.gone_btn') ?></button></form><?php endif; ?></div>
+  <p class="hint"><?= tt('hr.gone_hint') ?></p>
+  <table class="tbl"><thead><tr><th><?= tt('hr.people') ?></th><th><?= tt('hr.f_left') ?></th><th><?= tt('hr.gone_account') ?></th></tr></thead><tbody><?php foreach ($gone as $g): ?><tr><td><a href="<?= url('hr_person', ['id' => (int)$g['person_id']]) ?>"><?= e($g['full_name']) ?></a></td><td><?= $g['left_date'] ? e(fmt_date($g['left_date'])) : '—' ?></td><td><?= $g['role'] === 'admin' ? pill('bad', t('hr.gone_admin')) : pill('gold', t('hr.gone_staff')) ?></td></tr><?php endforeach; ?></tbody></table>
+</div>
+<?php endif; ?>
 <div class="cols">
 <div class="card" id="hr-people">
   <h2><?= tt('hr.people') ?> <span class="hint">(<?= count(array_filter($peopleAll ?? $people, fn($p) => $p['is_active'])) ?>)</span></h2>

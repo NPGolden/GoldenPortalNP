@@ -21,7 +21,7 @@ $vess = []; foreach (ism_marine_products() as $p) if ($p['x_vessel']) $vess[(int
   <div class="table-scroll"><table class="tbl tbl--wrap">
     <thead><tr><th><?= tt('ism.product') ?></th><th><?= tt('ism.vessel') ?></th><th><?= tt('ism.project') ?></th><th><?= tt('ism.f_class_society') ?></th><th><?= tt('th.status') ?></th><th><?= tt('ism.m_docs') ?></th><th><?= tt('ism.m_sw') ?></th><th><?= tt('ism.owner') ?></th></tr></thead>
     <tbody><?php foreach ($P as $p): $d = ism_data($p); $m = $p['_m']; $why = ism_due($p); ?><tr>
-      <td><a href="<?= url('isms_rec', ['id' => (int)$p['id']]) ?>"><b class="mono"><?= e($p['code']) ?></b> <?= e($p['title']) ?></a><?= !empty($d['system']) ? '<br><span class="hint">' . e($d['system']) . (!empty($d['cbs_cat']) ? ' · ' . tt('ism.o_' . $d['cbs_cat']) : '') . '</span>' : '' ?></td>
+      <td><a href="<?= url('isms_rec', ['id' => (int)$p['id']]) ?>"><b class="mono"><?= e($p['code']) ?></b> <?= e($p['title']) ?></a><?= $p['_sn'] !== '' ? '<br><span class="hint">' . tt('eq.sn') . ' <a class="mono" href="' . url('equipment_view', ['id' => (int)$p['equipment_id']]) . '">' . e($p['_sn']) . '</a></span>' : '' ?><?= !empty($d['system']) ? '<br><span class="hint">' . e($d['system']) . (!empty($d['cbs_cat']) ? ' · ' . tt('ism.o_' . $d['cbs_cat']) : '') . '</span>' : '' ?></td>
       <td><?= $p['x_vessel'] ? '<a href="' . url('vessel', ['id' => (int)$p['x_vessel']]) . '">' . e((string)$p['vessel_name']) . '</a>' : '<span class="hint">—</span>' ?></td>
       <td><?= $p['x_sub'] ? '<a href="' . url('subproject', ['id' => (int)$p['x_sub']]) . '">' . e(trim((string)$p['sub_code'] . ' ' . (string)$p['sub_name'])) . '</a><br>' : '' ?><span class="hint"><?= e(trim((string)$p['project_code'] . ' ' . (string)$p['project_name'])) ?: '—' ?></span></td>
       <td><?= !empty($d['class_society']) ? tt('ism.o_' . $d['class_society']) : '<span class="hint">—</span>' ?><?= !empty($d['route']) ? '<br><span class="hint">' . tt('ism.o_' . $d['route']) . '</span>' : '' ?></td>
@@ -33,6 +33,16 @@ $vess = []; foreach (ism_marine_products() as $p) if ($p['x_vessel']) $vess[(int
   </table></div>
   <?php endif; ?>
 </div>
+<?php $eqU = ism_eq_unlinked(40); if ($eqU): /* R97-093: produced, not yet in cyber safety */ ?>
+<div class="card" id="mcs-eq">
+  <div class="card-head"><h2>🏭 <?= tt('ism.eq_unl_h') ?> <span class="count"><?= count($eqU) ?></span></h2></div>
+  <p class="hint"><?= tt('ism.eq_unl_hint') ?></p>
+  <div class="table-scroll"><table class="tbl tbl--wrap"><thead><tr><th><?= tt('eq.sn') ?></th><th><?= tt('ism.product') ?></th><th><?= tt('ism.vessel') ?></th><th><?= tt('pd.order') ?></th><th></th></tr></thead><tbody>
+    <?php foreach ($eqU as $x): ?><tr><td><a class="mono" href="<?= url('equipment_view', ['id' => (int)$x['id']]) ?>"><?= e($x['serial_no']) ?></a></td><td><?= e(trim($x['maker'] . ' ' . ($x['model'] ?: $x['family']))) ?></td><td><?= e((string)$x['vessel']) ?: '<span class="hint">—</span>' ?></td><td><a href="<?= url('production_order', ['id' => (int)$x['order_id']]) ?>"><?= e($x['po_no']) ?></a></td>
+      <td style="text-align:right;"><form method="post" action="<?= url('mcs') ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="ism_eq_add"><input type="hidden" name="equipment_id" value="<?= (int)$x['id'] ?>"><button class="btn btn--ghost btn--sm" type="submit">+ <?= tt('ism.eq_add') ?></button></form></td></tr><?php endforeach; ?>
+  </tbody></table></div>
+</div>
+<?php endif; ?>
 <div class="cols" style="grid-template-columns: 1fr 1fr;">
 <div class="card">
   <h2>✍ <?= tt('ism.m_wait_h') ?> <span class="count"><?= count($wait) ?></span></h2>

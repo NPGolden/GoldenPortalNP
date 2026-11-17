@@ -29,7 +29,7 @@ function hr_type(?int $id): ?array { return $id ? (hr_types(false)[$id] ?? null)
 function hr_types_for_kind(string $kind): array { return array_filter(hr_types(), fn($t) => $t['kind'] === $kind); }
 /** Default type of a kind: the built-in one, else the first active. */
 function hr_default_type(string $kind): ?int { $b = null; foreach (hr_types() as $id => $t) if ($t['kind'] === $kind) { if ($t['builtin']) return $id; $b ??= $id; } return $b; }
-function hr_staff(): array { return all("SELECT cu.id, cu.full_name, d.name AS discipline FROM customer_users cu LEFT JOIN disciplines d ON d.id = cu.discipline_id WHERE cu.role IN ('staff','admin') AND cu.is_active = 1 ORDER BY d.sort_order, d.name, cu.full_name"); }
+function hr_staff(): array { $r = all("SELECT cu.id, cu.full_name, d.name AS discipline FROM customer_users cu LEFT JOIN disciplines d ON d.id = cu.discipline_id WHERE cu.role IN ('staff','admin') AND cu.is_active = 1 ORDER BY d.sort_order, d.name, cu.full_name"); return function_exists('hr_here') ? hr_here($r) : $r; }
 function hr_years(): array { $y = (int) date('Y'); $min = (int) (scalar('SELECT MIN(year) FROM hr_entitlements') ?: $y); $min = min($min, (int) (scalar('SELECT YEAR(MIN(plan_date)) FROM plan_entries') ?: $y)); $out = []; for ($i = max($min, $y - 5); $i <= $y + 1; $i++) $out[] = $i; return $out; }
 
 /* ------------------------------------------------------------ entitlements */

@@ -227,7 +227,7 @@ function ism_next_code(string $reg, int $parentId = 0): string {
 function ism_event(int $rid, string $ev, ?string $note = null): void { $u = current_user(); q('INSERT INTO ism_events (record_id, event, user_id, user_name, note) VALUES (?,?,?,?,?)', [$rid, mb_substr($ev, 0, 24), (int)($u['id'] ?? 0) ?: null, mb_substr((string)($u['full_name'] ?? ''), 0, 120), $note !== null ? mb_substr($note, 0, 600) : null]); }
 function ism_events(int $rid): array { return all('SELECT * FROM ism_events WHERE record_id = ? ORDER BY id DESC LIMIT 200', [$rid]); }
 function ism_files(int $rid): array { return all('SELECT * FROM ism_files WHERE record_id = ? ORDER BY id DESC', [$rid]); }
-function ism_users(): array { return all("SELECT id, full_name FROM customer_users WHERE is_active = 1 AND role <> 'customer' ORDER BY full_name"); }
+function ism_users(): array { $r = all("SELECT id, full_name FROM customer_users WHERE is_active = 1 AND role <> 'customer' ORDER BY full_name"); return function_exists('hr_here') ? hr_here($r) : $r; }   // R97-093: without the people who left
 
 /** Save a record from the form. Returns its id. */
 function ism_save_from_post(): int {
@@ -236,6 +236,7 @@ function ism_save_from_post(): int {
     $id = (int)($_POST['id'] ?? 0); $old = $id ? ism_get($id) : null; if ($id && (!$old || $old['reg'] !== $reg)) throw new RuntimeException(t('err.notfound'));
     $S = fn(string $k, int $max) => mb_substr(trim((string)($_POST[$k] ?? '')), 0, $max);
     $D = function (string $k): ?string { $v = trim((string)($_POST[$k] ?? '')); return preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) && checkdate((int)substr($v, 5, 2), (int)substr($v, 8, 2), (int)substr($v, 0, 4)) ? $v : null; };
+    if ($reg === 'mprod' && ism_has_eq() && ($eqp = (int)($_POST['equipment_id'] ?? 0)) && scalar("SELECT COUNT(*) FROM ism_records WHERE reg = 'mprod' AND equipment_id = ? AND id <> ?", [$eqp, $id])) throw new RuntimeException(t('ism.e_eq_twice'));   // R97-093: before anything is written
     $title = $S('title', 255);
     /* R97-083: a supplier of the register is a company of the supplier list — once only; its name is the title when none is typed */
     $supId = null; if (isset(ISM_SUP[$reg]) && ism_has_ext()) { $supId = (int)($_POST['supplier_id'] ?? 0) ?: null;
@@ -301,14 +302,14 @@ function ism_save_from_post(): int {
         foreach (['title', 'code', 'ref', 'due_date', 'review_date'] as $k) if ((string)($old[$k] ?? '') !== (string)(['title' => $title, 'code' => $code, 'ref' => $row[7], 'due_date' => $row[5], 'review_date' => $row[6]][$k] ?? '')) $ch[] = $k;
         if ((int)$old['owner_user_id'] !== $owner) $ch[] = 'owner';
         $od = ism_data($old); foreach ($R['f'] as $k => $_) if ((string)($od[$k] ?? '') !== (string)($data[$k] ?? '')) $ch[] = $k;
-        if (ism_has_links()) { q('UPDATE ism_records SET parent_id = ?, project_id = ?, subproject_id = ?, vessel_id = ? WHERE id = ?', array_merge(array_values($L), [$id])); foreach (['project_id' => 'project', 'subproject_id' => 'sub-project', 'vessel_id' => 'vessel'] as $k => $lab) if (!empty($R['links']) && (int)($old[$k] ?? 0) !== (int)$L[$k]) $ch[] = $lab; }
+        if (ism_has_links()) { q('UPDATE ism_records SET parent_id = ?, project_id = ?, subproject_id = ?, vessel_id = ? WHERE id = ?', array_merge(array_values($L), [$id])); foreach (['project_id' => 'project', 'subproject_id' => 'sub-project', 'vessel_id' => 'vessel'] as $k => $lab) if (!empty($R['links']) && (int)($old[$k] ?? 0) !== (int)$L[$k]) $ch[] = $lab; if ($reg === 'mprod' && ism_eq_apply($id, (int)($old['equipment_id'] ?? 0))) $ch[] = 'serial number'; }
         if ($ch) ism_event($id, $old['status'] !== $status ? 'status' : 'update', implode(' · ', $ch));
         if ($supId !== null || isset(ISM_SUP[$reg])) { if (ism_has_ext()) q('UPDATE ism_records SET supplier_id = ? WHERE id = ?', [$supId, $id]); }
         if ($reg === 'msw' && $old['status'] !== $status) ism_release_notify($id, $code, $title, (string)($data['version'] ?? ''), $status, $owner);
     } else {
         q('INSERT INTO ism_records (reg, code, title, status, owner_user_id, owner_name, due_date, review_date, ref, data, updated_name, created_by, created_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)', array_merge([$reg], $row, [(int)($u['id'] ?? 0) ?: null, $row[9]]));
         $id = (int) db()->lastInsertId(); ism_event($id, 'create', $code);
-        if (ism_has_links()) q('UPDATE ism_records SET parent_id = ?, project_id = ?, subproject_id = ?, vessel_id = ? WHERE id = ?', array_merge(array_values($L), [$id]));
+        if (ism_has_links()) { q('UPDATE ism_records SET parent_id = ?, project_id = ?, subproject_id = ?, vessel_id = ? WHERE id = ?', array_merge(array_values($L), [$id])); if ($reg === 'mprod') ism_eq_apply($id, 0); }
         if ($supId !== null && ism_has_ext()) q('UPDATE ism_records SET supplier_id = ? WHERE id = ?', [$supId, $id]);
         if ($reg === 'mprod') foreach (ISM_E27_DOCS as $i => [$ref, $tt]) q("INSERT INTO ism_records (reg, code, title, status, ref, sort, data, parent_id, created_name) VALUES ('mdoc', ?, ?, 'missing', ?, ?, '{}', ?, 'IACS UR E27')", [$code . '-D' . str_pad((string)($i + 1), 2, '0', STR_PAD_LEFT), $tt, 'UR E27 ' . $ref, $i + 1, $id]);
         if ($reg === 'msw' && $status !== 'development') ism_release_notify($id, $code, $title, (string)($data['version'] ?? ''), $status, $owner);
@@ -413,6 +414,7 @@ function ism_handle_action(string $action): bool {
     }
     if (!ism_can() && !ism_can_marine() && !qh_can()) throw new RuntimeException(t('err.noaccess'));
     switch ($action) {
+        case 'ism_eq_add': $rid = ism_eq_add((int)($_POST['equipment_id'] ?? 0)); flash('good', t('ism.eq_added')); redirect('isms_rec', ['id' => $rid]);   // R97-093
         case 'qh_access_save': if (!ism_top()) throw new RuntimeException(t('err.noaccess'));
             $rs = array_map('intval', array_column(all('SELECT id FROM staff_roles'), 'id')); $ds = array_map('intval', array_column(all('SELECT id FROM disciplines'), 'id'));
             cp_setting_set('qh_access', json_encode(['roles' => array_values(array_intersect(array_map('intval', (array)($_POST['roles'] ?? [])), $rs)), 'disc' => array_values(array_intersect(array_map('intval', (array)($_POST['disc'] ?? [])), $ds))])); flash('good', t('ism.saved')); redirect('qhse', [], '#access');
@@ -446,7 +448,8 @@ function ism_marine_products(array $f = []): array {
         else { $x['n_sw']++; $d = ism_data($c); if (in_array($c['status'], ['released', 'installed'], true)) $x['sw'] = ['v' => (string)($d['version'] ?? ''), 'status' => (string)$c['status'], 'id' => (int)$c['id']]; elseif (in_array($c['status'], ['development', 'testing', 'review', 'approved'], true)) $x['pending']++; }
         unset($x);
     }
-    foreach ($P as &$p) $p['_m'] = $by[(int)$p['id']]; unset($p);
+    $sn = []; if (ism_has_eq() && ($eq = array_filter(array_map(fn($p) => (int)($p['equipment_id'] ?? 0), $P)))) foreach (all('SELECT id, serial_no FROM equipment WHERE id IN (' . implode(',', $eq) . ')') as $e) $sn[(int)$e['id']] = (string)$e['serial_no'];   // R97-093
+    foreach ($P as &$p) { $p['_m'] = $by[(int)$p['id']]; $p['_sn'] = $sn[(int)($p['equipment_id'] ?? 0)] ?? ''; } unset($p);
     return $P;
 }
 function ism_marine_export(): void {
@@ -468,7 +471,7 @@ function ism_marine_card(array $f): void {
     echo '<div class="card" id="mcs"><div class="card-head"><h2>🚢 ' . tt('ism.m_card') . ' <span class="count">' . count($P) . '</span></h2><div class="btn-row"><a class="btn btn--ghost btn--sm" href="' . url('isms_rec', $new) . '">+ ' . tt('ism.m_new') . '</a></div></div>';
     if (!$P) echo '<p class="hint">' . tt('ism.m_card_none') . '</p>';
     else { echo '<div class="table-scroll"><table class="tbl tbl--wrap"><thead><tr><th>' . tt('ism.product') . '</th>' . (empty($f['sub']) ? '<th>' . tt('ism.project') . '</th>' : '') . '<th>' . tt('th.status') . '</th><th>' . tt('ism.m_docs') . '</th><th>' . tt('ism.m_sw') . '</th></tr></thead><tbody>';
-        foreach ($P as $p) { $m = $p['_m']; echo '<tr><td><a href="' . url('isms_rec', ['id' => (int)$p['id']]) . '"><b class="mono">' . e($p['code']) . '</b> ' . e($p['title']) . '</a></td>' . (empty($f['sub']) ? '<td>' . ($p['x_sub'] ? '<a href="' . url('subproject', ['id' => (int)$p['x_sub']]) . '">' . e(trim((string)$p['sub_code'] . ' ' . (string)$p['sub_name'])) . '</a>' : e((string)$p['project_name'])) . '</td>' : '') . '<td>' . ism_status_pill('mprod', (string)$p['status']) . '</td><td>' . pill($m['docs'] && $m['docs_ok'] === $m['docs'] ? 'green' : 'gold', $m['docs_ok'] . ' / ' . $m['docs']) . '</td><td>' . ($m['sw'] ? '<span class="mono">' . e($m['sw']['v']) . '</span>' : '<span class="hint">—</span>') . ($m['pending'] ? ' ' . pill('gold', '+' . $m['pending']) : '') . '</td></tr>'; }
+        foreach ($P as $p) { $m = $p['_m']; echo '<tr><td><a href="' . url('isms_rec', ['id' => (int)$p['id']]) . '"><b class="mono">' . e($p['code']) . '</b> ' . e($p['title']) . '</a>' . ($p['_sn'] !== '' ? '<br><span class="hint">' . tt('eq.sn') . ' <a class="mono" href="' . url('equipment_view', ['id' => (int)$p['equipment_id']]) . '">' . e($p['_sn']) . '</a></span>' : '') . '</td>' . (empty($f['sub']) ? '<td>' . ($p['x_sub'] ? '<a href="' . url('subproject', ['id' => (int)$p['x_sub']]) . '">' . e(trim((string)$p['sub_code'] . ' ' . (string)$p['sub_name'])) . '</a>' : e((string)$p['project_name'])) . '</td>' : '') . '<td>' . ism_status_pill('mprod', (string)$p['status']) . '</td><td>' . pill($m['docs'] && $m['docs_ok'] === $m['docs'] ? 'green' : 'gold', $m['docs_ok'] . ' / ' . $m['docs']) . '</td><td>' . ($m['sw'] ? '<span class="mono">' . e($m['sw']['v']) . '</span>' : '<span class="hint">—</span>') . ($m['pending'] ? ' ' . pill('gold', '+' . $m['pending']) : '') . '</td></tr>'; }
         echo '</tbody></table></div>'; }
     echo '</div>';
 }
@@ -678,4 +681,52 @@ function ism_docs_align(): int {
     }
     if (!scalar("SELECT COUNT(*) FROM ism_records WHERE reg = 'doc' AND code = 'ISMS-MAN-001'")) { q("INSERT INTO ism_records (reg, code, title, status, ref, sort, review_date, data, created_name) VALUES ('doc', 'ISMS-MAN-001', 'ISMS Manual — Εγχειρίδιο ΣΔΑΠ', 'approved', '4 – 10', 0, '2027-08-01', ?, 'ISMS documents v1.0')", [$data('How the company meets clauses 4 to 10 of ISO/IEC 27001:2022: context and scope, leadership, planning, support, operation, performance evaluation and improvement. The top document of the ISMS.')]); q("INSERT INTO ism_events (record_id, event, user_name, note) VALUES (?, 'create', 'ISMS documents v1.0', 'ISMS-MAN-001 · v1.0 · 01/08/2026')", [(int) db()->lastInsertId()]); $n++; }
     cp_setting_set('ism_docs_gas1', '1'); return $n;
+}
+
+/* ------------------------------------------------------------ R97-093 — marine cyber safety speaks of equipment: a record is a serial number of the Equipment register */
+function ism_has_eq(): bool { static $h = null; if ($h === null) { try { $h = ism_has_links() && function_exists('eq_has') && eq_has() && (bool) scalar("SHOW COLUMNS FROM ism_records LIKE 'equipment_id'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** Store the serial number chosen on the form (once per serial); the vessel of the equipment is taken when the record has none. True when it changed. */
+function ism_eq_apply(int $id, int $was): bool {
+    if (!ism_has_eq() || !array_key_exists('equipment_id', $_POST)) return false; $eq = (int)$_POST['equipment_id'] ?: null; $e = null;
+    if ($eq) { $e = one('SELECT id, vessel_id FROM equipment WHERE id = ?', [$eq]); if (!$e) $eq = null; elseif (scalar("SELECT COUNT(*) FROM ism_records WHERE reg = 'mprod' AND equipment_id = ? AND id <> ?", [$eq, $id])) throw new RuntimeException(t('ism.e_eq_twice')); }
+    q('UPDATE ism_records SET equipment_id = ?' . ($e && $e['vessel_id'] ? ', vessel_id = COALESCE(vessel_id, ' . (int)$e['vessel_id'] . ')' : '') . ' WHERE id = ?', [$eq, $id]);
+    return (int)$eq !== $was;
+}
+/** The cyber safety record of a serial number, with its documents and software, or null. */
+function ism_eq_of(int $eqId): ?array { if (!ism_has_eq() || !$eqId) return null; $id = (int) scalar("SELECT id FROM ism_records WHERE reg = 'mprod' AND equipment_id = ? LIMIT 1", [$eqId]); if (!$id) return null; foreach (ism_marine_products() as $p) if ((int)$p['id'] === $id) return $p; return null; }
+/** Serial numbers to choose on the form: what we produced or sold, not yet in cyber safety, plus the one of the record. */
+function ism_eq_options(int $cur = 0): array {
+    if (!ism_has_eq()) return [];
+    return all("SELECT e.id, e.serial_no, e.maker, e.family, e.model, v.name AS vessel FROM equipment e LEFT JOIN vessels v ON v.id = e.vessel_id
+                WHERE e.id = ? OR (e.retired = 0 AND (e.sold_by_us = 1 OR EXISTS (SELECT 1 FROM production_units u WHERE u.equipment_id = e.id)) AND NOT EXISTS (SELECT 1 FROM ism_records r WHERE r.reg = 'mprod' AND r.equipment_id = e.id)) ORDER BY e.id = ? DESC, e.id DESC LIMIT 400", [$cur, $cur]);
+}
+/** Equipment we produced (a production order) that has no cyber safety record yet — shown on the overview. */
+function ism_eq_unlinked(int $limit = 40): array {
+    if (!ism_has_eq() || !function_exists('pd_has') || !pd_has()) return [];
+    return all("SELECT e.id, e.serial_no, e.maker, e.family, e.model, e.kind, v.name AS vessel, e.vessel_id, o.po_no, o.id AS order_id FROM equipment e JOIN production_units u ON u.equipment_id = e.id JOIN production_orders o ON o.id = u.order_id LEFT JOIN vessels v ON v.id = e.vessel_id
+                WHERE e.retired = 0 AND o.status <> 'cancelled' AND NOT EXISTS (SELECT 1 FROM ism_records r WHERE r.reg = 'mprod' AND r.equipment_id = e.id) GROUP BY e.id ORDER BY e.id DESC LIMIT " . max(1, min(200, $limit)));
+}
+/** Take a serial number into marine cyber safety: a record with its ten UR E27 documents, linked to the vessel and — when it came from production — to the project and sub-project of its order. */
+function ism_eq_add(int $eqId): int {
+    if (!ism_has_eq() || !ism_can_marine()) throw new RuntimeException(t('err.noaccess'));
+    $e = one('SELECT * FROM equipment WHERE id = ?', [$eqId]); if (!$e) throw new RuntimeException(t('err.notfound'));
+    if ($x = scalar("SELECT id FROM ism_records WHERE reg = 'mprod' AND equipment_id = ? LIMIT 1", [$eqId])) return (int)$x;
+    $o = function_exists('pd_has') && pd_has() ? one('SELECT o.project_id, o.subproject_id, o.title FROM production_units u JOIN production_orders o ON o.id = u.order_id WHERE u.equipment_id = ? ORDER BY o.id DESC LIMIT 1', [$eqId]) : null;
+    $mm = trim((string)$e['maker'] . ' ' . (string)($e['model'] ?: $e['family'])); $title = mb_substr(($o['title'] ?? '') ?: ($mm ?: (string)$e['serial_no']), 0, 255);
+    $keep = $_POST; $_POST = ['reg' => 'mprod', 'title' => $title, 'status' => 'preparing', 'vessel_id' => (int)$e['vessel_id'], 'project_id' => (int)($o['project_id'] ?? 0), 'subproject_id' => (int)($o['subproject_id'] ?? 0), 'equipment_id' => $eqId,
+        'd' => ['maker_model' => $mm, 'system' => (string)($e['family'] ?: (function_exists('eq_kinds') ? (eq_kinds()[$e['kind']] ?? '') : ''))]];
+    try { $id = ism_save_from_post(); } finally { $_POST = $keep; }
+    return $id;
+}
+/** The card on the page of a serial number. */
+function ism_eq_card(array $e): void {
+    if (!function_exists('ism_can_marine') || !ism_can_marine() || !ism_has_eq()) return; $p = ism_eq_of((int)$e['id']);
+    echo '<div class="card" id="mcs"><div class="card-head"><h2>🚢 ' . tt('ism.m_card') . '</h2>';
+    if (!$p) { echo '<form method="post" action="' . url('equipment_view', ['id' => (int)$e['id']]) . '" class="inline" data-lock>' . csrf_field() . '<input type="hidden" name="action" value="ism_eq_add"><input type="hidden" name="equipment_id" value="' . (int)$e['id'] . '"><button class="btn btn--ghost btn--sm" type="submit">+ ' . tt('ism.eq_add') . '</button></form></div><p class="hint">' . tt('ism.eq_card_none') . '</p></div>'; return; }
+    $m = $p['_m']; $d = ism_data($p);
+    echo '<a class="btn btn--ghost btn--sm" href="' . url('isms_rec', ['id' => (int)$p['id']]) . '">' . e($p['code']) . ' ›</a></div><table class="kv"><tbody>'
+       . '<tr><th>' . tt('th.status') . '</th><td>' . ism_status_pill('mprod', (string)$p['status']) . (!empty($d['class_society']) ? ' · ' . tt('ism.o_' . $d['class_society']) : '') . (!empty($d['cbs_cat']) ? ' · ' . tt('ism.o_' . $d['cbs_cat']) : '') . '</td></tr>'
+       . '<tr><th>' . tt('ism.m_docs') . '</th><td><a href="' . url('mcs', ['reg' => 'mdoc', 'parent' => (int)$p['id']]) . '">' . pill($m['docs'] && $m['docs_ok'] === $m['docs'] ? 'green' : ($m['docs_ok'] ? 'gold' : 'bad'), $m['docs_ok'] . ' / ' . $m['docs']) . '</a></td></tr>'
+       . '<tr><th>' . tt('ism.m_sw') . '</th><td>' . ($m['sw'] ? '<a class="mono" href="' . url('isms_rec', ['id' => $m['sw']['id']]) . '">' . e($m['sw']['v']) . '</a> <span class="hint">' . tt('ism.s_' . $m['sw']['status']) . '</span>' : '<span class="hint">—</span>') . ($m['pending'] ? ' ' . pill('gold', t('ism.m_pending_n', ['n' => $m['pending']])) : '') . '</td></tr>'
+       . (!empty($d['cert_no']) ? '<tr><th>' . tt('ism.f_cert_no') . '</th><td>' . e((string)$d['cert_no']) . (!empty($d['cert_valid']) ? ' · ' . e(fmt_date((string)$d['cert_valid'])) : '') . '</td></tr>' : '') . '</tbody></table></div>';
 }
