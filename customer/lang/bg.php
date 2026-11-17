@@ -473,6 +473,7 @@ return [
 'sp.edit' => 'Редактиране на подпроект',
 'sp.updated' => 'Данните на подпроекта са запазени.',
 'sp.dup_code' => 'Този код на подпроект вече съществува в този проект.',
+'sp.dup_warn' => 'Another sub-project of this project has the same code: {n}. You can save this one as it is; give one of the two another code when you can.',
 'btn.cancel' => 'Отказ',
 'v.lede_staff' => 'Целият флот — {n} плавателен/ни съд(а) при всички клиенти. Тук на неразпределените плавателни съдове може да бъде зададен клиент.',
 'v.customer' => 'Клиент',

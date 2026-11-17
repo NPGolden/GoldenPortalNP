@@ -473,6 +473,7 @@ return [
 'sp.edit' => 'Редагувати підпроєкт',
 'sp.updated' => 'Дані підпроєкту збережено.',
 'sp.dup_code' => 'Цей код підпроєкту вже існує в цьому проєкті.',
+'sp.dup_warn' => 'Another sub-project of this project has the same code: {n}. You can save this one as it is; give one of the two another code when you can.',
 'btn.cancel' => 'Скасувати',
 'v.lede_staff' => 'Увесь флот — {n} суден усіх замовників. Непризначеним суднам тут можна призначити замовника.',
 'v.customer' => 'Замовник',

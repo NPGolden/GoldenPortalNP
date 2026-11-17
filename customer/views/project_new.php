@@ -107,7 +107,7 @@ layout_head($title, 'projects');
     <?php if ($edit): ?><input type="hidden" name="id" value="<?= $id ?>"><?php else: ?><input type="hidden" name="project_id" value="<?= $pid ?>"><?php endif; ?>
     <div class="grid grid-2">
       <?php $numAuto = !$edit && function_exists('num_has') && num_has() && num_cfg()['auto']; ?>
-      <div class="field"><label><?= tt('sp.code') ?></label><input name="code" <?= $numAuto ? '' : 'required ' ?>maxlength="40" placeholder="<?= $numAuto ? e(num_next_sub($pid)) : 'Y.01' ?>" value="<?= e($v['code'] ?? ($numAuto ? num_next_sub($pid) : '')) ?>"><p class="hint"><?= $numAuto ? '🔢 ' . e(t('num.s_hint', ['n' => num_next_sub($pid)])) : tt('sp.code_hint') ?></p></div>
+      <div class="field"><label><?= tt('sp.code') ?></label><input name="code" <?= $numAuto ? '' : 'required ' ?>maxlength="40" placeholder="<?= $numAuto ? e(num_next_sub($pid)) : 'Y.01' ?>" value="<?= e($v['code'] ?? ($numAuto ? num_next_sub($pid) : '')) ?>"><p class="hint"><?= $numAuto ? '🔢 ' . e(t('num.s_hint', ['n' => num_next_sub($pid)])) : tt('sp.code_hint') ?></p><?php if ($edit && ($dupSp = one('SELECT name FROM subprojects WHERE project_id = ? AND code = ? AND id <> ? LIMIT 1', [(int)($v['project_id'] ?? 0), (string)($v['code'] ?? ''), $id]))): /* R97-065 */ ?><p class="hint" style="color:#b3261e;">⚠ <?= e(t('sp.dup_warn', ['n' => $dupSp['name']])) ?></p><?php endif; ?></div>
       <div class="field"><label><?= tt('sp.name') ?></label><input name="name" required maxlength="120" placeholder="Main Switchboard" value="<?= e($v['name'] ?? '') ?>"></div>
       <div class="field"><label><?= tt('sys.one') ?></label>
         <select name="system_id"><option value=""><?= tt('sys.none') ?></option>

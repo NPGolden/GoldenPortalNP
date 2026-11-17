@@ -481,6 +481,7 @@ return [
 'sp.edit' => 'Modifica sottoprogetto',
 'sp.updated' => 'Dati del sottoprogetto salvati.',
 'sp.dup_code' => 'Questo codice sottoprogetto esiste già nel progetto.',
+'sp.dup_warn' => 'Un altro sottoprogetto di questo progetto ha lo stesso codice: {n}. Può salvare questo così com’è; assegni a uno dei due un altro codice quando possibile.',
 'btn.cancel' => 'Annulla',
 'v.lede_staff' => 'L\'intera flotta — {n} nave/i di tutti i clienti. Le navi non assegnate possono ricevere un cliente qui.',
 'v.customer' => 'Cliente',

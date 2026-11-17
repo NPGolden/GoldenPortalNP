@@ -481,6 +481,7 @@ return [
 'sp.edit' => 'Edit sub-project',
 'sp.updated' => 'Sub-project details saved.',
 'sp.dup_code' => 'That sub-project code already exists in this project.',
+'sp.dup_warn' => 'Another sub-project of this project has the same code: {n}. You can save this one as it is; give one of the two another code when you can.',
 'btn.cancel' => 'Cancel',
 'v.lede_staff' => 'The whole fleet — {n} vessel(s) across every customer. Unassigned vessels can be given a customer here.',
 'v.customer' => 'Customer',

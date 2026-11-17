@@ -2336,3 +2336,21 @@ Language keys 10 358 each (portal; +3 from R97-060, none from this release); app
 
 **Security review**: no new entry point — the template page already required a signed-in staff account; the file is generated on request and contains only example lines, no data of the portal. No proposals from this change; the open ones of §347 stand.
 
+## §349 v1.155.2 (R97-065) — a sub-project with a doubled code could not be saved
+
+**Report** (screenshot, PRJ.000550 › Y.006, Edit sub-project): "he is trying to set the subproject complete but cannot" — the save answered "That sub-project code already exists in this project."
+
+**Cause**: `subproject_update` (`app/pm_actions.php`) refused every save when another sub-project of the project had the same code, also when the code was not being changed. Two sub-projects that already share a code (ERP import, older entry — `subproject_save` had no such check) could therefore never be edited: no status, no order, no invoicing.
+
+**Change**:
+
+- `subproject_update`: the check runs only when the posted code differs from the stored one. The message names the sub-project that has the code.
+- `subproject_save`: a new sub-project with a code already used in the project is refused (no new doubles through the form).
+- `views/project_new.php` (Edit sub-project): a red note under Code when another sub-project of the project has the same code (`sp.dup_warn`, 10 547 keys per file).
+
+**Tests (sandbox)**: a double made in the database; the sub-project saved as Completed with the code unchanged (refused before); the note shown; change to a used code refused with the name; new sub-project with a used code refused; double removed, note gone.
+
+**Not done**: the live data was not looked at — which other sub-project of PRJ.000550 carries Y.006 is shown by the red note on the form.
+
+**Security review**: no new entry point; the two actions keep their staff check and CSRF token; the name in the message is of a sub-project of the same project, which the user already sees. No new proposals.
+
