@@ -493,6 +493,7 @@ return [
 'dd.subs_h' => 'Sottoprogetti con lo stesso codice in un progetto',
 'dd.prj_h' => 'Progetti con lo stesso codice',
 'dd.none' => 'Nessuno.',
+'dd.greek' => 'contiene una lettera greca o un carattere insolito',
 'dd.project' => 'Progetto',
 'dd.record' => 'Record',
 'dd.linked' => 'Record collegati',

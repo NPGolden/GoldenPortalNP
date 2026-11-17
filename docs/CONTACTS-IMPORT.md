@@ -2487,3 +2487,19 @@ Language keys 10 358 each (portal; +3 from R97-060, none from this release); app
 
 **Security review**: `fv` is accepted only when it equals a vessel name already present in the user's own lists and is printed escaped; `fo` is one of three fixed values. No new proposals.
 
+## §359 v1.156.4 (R97-075) — sub-project codes compared loosely
+
+**Request**: "Step 1 do it" — after the question "is it possible to pass the same sub project in the system?" (answer: through the Excel import when the code is typed another way; no lock in the database).
+
+**Change** (`app/pm.php`): `sp_code_norm()` — capitals, spaces removed, the Greek capitals Α Β Ε Ζ Η Ι Κ Μ Ν Ο Ρ Τ Υ Χ written as their Latin look-alikes; `sp_find_by_code($pid, $code, $exceptId)`; `sp_doubles()`.
+
+- `subproject_save`: refused when another sub-project of the project has the code (loosely).
+- `subproject_update`: checked when the code changes in the loose sense; correcting only the spelling of the own code (Υ.01 → Y.01) is allowed.
+- Excel import (`proj_import`): exact match first, then the loose one — the existing sub-project is updated, no second record.
+- `views/project_new.php` (red note), `views/projects.php` (button count), `views/data_doubles.php` (list, and a mark on a code with a non-ASCII character; `dd.greek`) use the loose comparison. 10 588 keys per file.
+- Not included: leading zeros (Y.28 ≠ Y.028), and the lock in the database (step 2, after the existing doubles are merged or renamed).
+
+**Tests (sandbox)**: `sp_code_norm` on seven spellings; new sub-project with Greek Υ and with small letter and spaces refused; edit to a used code in Greek refused; spelling change of the own code allowed; import of a file with `y.01` and `Υ.010` updated the two existing sub-projects and created none; a Greek-letter double listed and marked on the Doubled codes page and named in the red note; test data removed.
+
+**Security review**: no new entry point; comparison in PHP on the sub-projects of one project. No new proposals.
+

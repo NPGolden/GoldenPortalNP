@@ -485,6 +485,7 @@ return [
 'dd.subs_h' => 'Sub-projects with the same code in one project',
 'dd.prj_h' => 'Projects with the same project code',
 'dd.none' => 'None.',
+'dd.greek' => 'has a Greek letter or an unusual character',
 'dd.project' => 'Project',
 'dd.record' => 'Record',
 'dd.linked' => 'Linked records',

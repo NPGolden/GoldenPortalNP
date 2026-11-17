@@ -76,7 +76,7 @@ function pm_handle_action(string $action, string $page): bool {
             $code = (string)$str('code', 40);
             // R97-065: the code is checked only when it is changed. Two sub-projects that already share a code (ERP import, older entry) must still be editable —
             // before, neither could be saved at all, so a status could not be set to Completed.
-            if ($code !== (string)$s['code'] && ($dup = one('SELECT name FROM subprojects WHERE project_id = ? AND code = ? AND id <> ? LIMIT 1', [$s['project_id'], $code, $id]))) throw new RuntimeException(t('sp.dup_code') . ' (' . $dup['name'] . ')');
+            if (sp_code_norm($code) !== sp_code_norm($s['code']) && ($dup = sp_find_by_code((int)$s['project_id'], $code, $id))) throw new RuntimeException(t('sp.dup_code') . ' (' . $dup['code'] . ' · ' . $dup['name'] . ')');   // R97-075: compared loosely
             q('UPDATE subprojects SET code = ?, name = ?, system_id = ?, description = ?, sort_order = ?, status = ? WHERE id = ?',
               [$code, $str('name', 120), (int)($_POST['system_id'] ?? 0) ?: null, $str('description', 4000), (int)($_POST['sort_order'] ?? 0),
                in_array($_POST['status'] ?? '', pm_statuses(), true) ? $_POST['status'] : $s['status'], $id]);
@@ -90,7 +90,7 @@ function pm_handle_action(string $action, string $page): bool {
             require_staff();
             $pid = (int)$_POST['project_id'];
             if (function_exists('num_has') && num_has() && trim((string)($_POST['code'] ?? '')) === '') $_POST['code'] = num_next_sub($pid);   // R43-001: automatic sub-project code
-            if (($nc = (string)$str('code', 40)) !== '' && ($dup = one('SELECT name FROM subprojects WHERE project_id = ? AND code = ? LIMIT 1', [$pid, $nc]))) throw new RuntimeException(t('sp.dup_code') . ' (' . $dup['name'] . ')');   // R97-065: no new doubles
+            if (($nc = (string)$str('code', 40)) !== '' && ($dup = sp_find_by_code($pid, $nc))) throw new RuntimeException(t('sp.dup_code') . ' (' . $dup['code'] . ' · ' . $dup['name'] . ')');   // R97-065: no new doubles · R97-075: compared loosely
             q('INSERT INTO subprojects (project_id, code, name, system_id, description, sort_order, status)
                VALUES (?, ?, ?, ?, ?, ?, ?)',
               [$pid, $str('code', 40), $str('name', 120), (int)($_POST['system_id'] ?? 0) ?: null, $str('description', 4000), (int)($_POST['sort_order'] ?? 0), pm_default_status()]);
@@ -1852,7 +1852,7 @@ function pm_import_projects(string $path, bool $dry): array {
 
             /* -- sub-project: find or create -------------------------- */
             $s = $subCode !== ''
-               ? one('SELECT * FROM subprojects WHERE project_id = ? AND code = ?', [$p['id'], $subCode])
+               ? (one('SELECT * FROM subprojects WHERE project_id = ? AND code = ?', [$p['id'], $subCode]) ?: sp_find_by_code((int)$p['id'], $subCode))   // R97-075: the same code typed another way (Greek Υ, spaces, small letters) is the same sub-project
                : one('SELECT * FROM subprojects WHERE project_id = ? AND LOWER(name) = LOWER(?)', [$p['id'], $subName]);
             if (!$s && $subName === '') { $res['skipped'][] = [$line, t('im.r_nosubname')]; continue; }   // a new sub-project needs a name; updates don't
             $sysId = pm_find_system($g($r, 'system'), $res);

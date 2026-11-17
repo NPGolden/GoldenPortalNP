@@ -55,6 +55,23 @@ function pr_link(int $pid, ?string $code, ?string $name = null): string {
 const PROJECT_SUB_DELIM = 'Y.';
 
 /** Split an ERP project code into [mainCode, subCode|null]. */
+/* ---- R97-075: sub-project codes are compared loosely, so the same code typed another way is not a second sub-project */
+/** A code as it is compared: capitals, no spaces, Greek capitals that look like Latin ones written as Latin (Υ.028 = Y.028 = y.028 = "Y. 028"). */
+function sp_code_norm(?string $c): string {
+    $c = mb_strtoupper(preg_replace('/\s+/u', '', (string)$c));
+    return strtr($c, ['Α' => 'A', 'Β' => 'B', 'Ε' => 'E', 'Ζ' => 'Z', 'Η' => 'H', 'Ι' => 'I', 'Κ' => 'K', 'Μ' => 'M', 'Ν' => 'N', 'Ο' => 'O', 'Ρ' => 'P', 'Τ' => 'T', 'Υ' => 'Y', 'Χ' => 'X']);
+}
+/** Another sub-project of the project with the same code (loosely): its row, or null. */
+function sp_find_by_code(int $pid, string $code, int $exceptId = 0): ?array {
+    $n = sp_code_norm($code); if ($n === '') return null;
+    foreach (all('SELECT * FROM subprojects WHERE project_id = ? AND id <> ? ORDER BY id', [$pid, $exceptId]) as $r) if (sp_code_norm($r['code']) === $n) return $r;
+    return null;
+}
+/** Every group of sub-projects that share a code in one project: ['<project>|<code>' => [ids]]. */
+function sp_doubles(): array {
+    $g = []; foreach (all("SELECT id, project_id, code FROM subprojects WHERE code IS NOT NULL AND code <> ''") as $r) $g[(int)$r['project_id'] . '|' . sp_code_norm($r['code'])][] = (int)$r['id'];
+    return array_filter($g, fn($ids) => count($ids) > 1);
+}
 function split_project_code(string $code): array {
     $code = trim($code);
     $pos  = strpos($code, PROJECT_SUB_DELIM);

@@ -8,10 +8,11 @@ $refTables = function (string $col): array { try { return array_column(all("SELE
 $linked = function (array $tables, string $col, int $id): array { $o = []; foreach ($tables as $tb) { if (!preg_match('/^[a-z0-9_]+$/', $tb)) continue; try { $n = (int) scalar("SELECT COUNT(*) FROM `{$tb}` WHERE `{$col}` = ?", [$id]); if ($n) $o[$tb] = $n; } catch (Throwable $e) {} } arsort($o); return $o; };
 $show = function (array $o): string { if (!$o) return '<span class="hint">—</span>'; $p = []; foreach (array_slice($o, 0, 6, true) as $k => $n) $p[] = e($k) . ' ' . (int)$n; return '<b>' . array_sum($o) . '</b> <span class="hint">' . implode(' · ', $p) . (count($o) > 6 ? ' …' : '') . '</span>'; };
 $tS = $refTables('subproject_id'); $tP = $refTables('project_id');
-$subs = all("SELECT s.id, s.project_id, s.code, s.erp_code, s.name, s.status, s.invoicing, s.system_id, LEFT(s.description, 120) AS descr, p.project_code, p.name AS project_name, v.name AS vessel, sy.name AS system
+$ddIds = []; foreach (sp_doubles() as $ids) foreach ($ids as $x) $ddIds[] = (int)$x; $ddIds = array_slice($ddIds, 0, 400);   // R97-075: compared loosely (capitals, spaces, Greek / Latin look-alike letters)
+$subs = $ddIds ? all("SELECT s.id, s.project_id, s.code, s.erp_code, s.name, s.status, s.invoicing, s.system_id, LEFT(s.description, 120) AS descr, p.project_code, p.name AS project_name, v.name AS vessel, sy.name AS system
              FROM subprojects s JOIN projects p ON p.id = s.project_id LEFT JOIN vessels v ON v.id = p.vessel_id LEFT JOIN vessel_systems sy ON sy.id = s.system_id
-             JOIN (SELECT project_id, code FROM subprojects WHERE code IS NOT NULL AND code <> '' GROUP BY project_id, code HAVING COUNT(*) > 1) d ON d.project_id = s.project_id AND d.code = s.code
-             ORDER BY p.project_code, s.code, s.id LIMIT 400");
+             WHERE s.id IN (" . implode(',', $ddIds) . ") ORDER BY p.project_code, s.project_id, s.code, s.id") : [];
+usort($subs, fn($a, $b) => [$a['project_code'], (int)$a['project_id'], sp_code_norm($a['code']), (int)$a['id']] <=> [$b['project_code'], (int)$b['project_id'], sp_code_norm($b['code']), (int)$b['id']]);
 $prj = all("SELECT p.id, p.project_code, p.erp_code, p.name, p.status, v.name AS vessel, c.name AS customer, (SELECT COUNT(*) FROM subprojects s WHERE s.project_id = p.id) AS n_subs
             FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id LEFT JOIN customers c ON c.id = p.customer_id
             JOIN (SELECT project_code FROM projects WHERE project_code IS NOT NULL AND project_code <> '' GROUP BY project_code HAVING COUNT(*) > 1) d ON d.project_code = p.project_code
@@ -26,9 +27,9 @@ layout_head(t('dd.title'), 'projects');
   <?php if (!$subs): ?><div class="empty"><?= tt('dd.none') ?></div><?php else: ?>
   <div class="table-scroll"><table class="tbl tbl--wrap">
     <thead><tr><th><?= tt('dd.project') ?></th><th><?= tt('sp.code') ?></th><th><?= tt('dd.record') ?></th><th><?= tt('prq.status') ?></th><th><?= tt('dd.linked') ?></th><th></th></tr></thead>
-    <tbody><?php $last = ''; foreach ($subs as $s): $k = $s['project_id'] . '|' . $s['code']; $first = $k !== $last; $last = $k; ?><tr<?= $first ? ' style="border-top:2px solid rgba(31,58,95,.35);"' : '' ?>>
+    <tbody><?php $last = ''; foreach ($subs as $s): $k = $s['project_id'] . '|' . sp_code_norm($s['code']); $first = $k !== $last; $last = $k; ?><tr<?= $first ? ' style="border-top:2px solid rgba(31,58,95,.35);"' : '' ?>>
       <td><?= $first ? '<b>' . e($s['project_code']) . '</b><br><span class="hint">' . e((string)$s['vessel']) . '</span>' : '' ?></td>
-      <td class="mono"><?= e($s['code']) ?></td>
+      <td class="mono"><?= e($s['code']) ?><?= preg_match('/[^\x20-\x7E]/', (string)$s['code']) ? '<br><span class="hint">⚠ ' . tt('dd.greek') . '</span>' : '' ?></td>
       <td>#<?= (int)$s['id'] ?> · <b><?= e($s['name']) ?></b><?= $s['system'] ? '<br><span class="hint">' . e($s['system']) . '</span>' : '' ?><?= trim((string)$s['descr']) !== '' ? '<br><span class="hint">' . e((string)$s['descr']) . '</span>' : '' ?></td>
       <td><?= e((string)$s['status']) ?><br><span class="hint"><?= e((string)$s['invoicing']) ?></span></td>
       <td><?= $show($linked($tS, 'subproject_id', (int)$s['id'])) ?></td>
