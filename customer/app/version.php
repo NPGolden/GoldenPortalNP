@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.155.4';
+const CP_VERSION = '1.155.5';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-068', 'version' => '1.155.5', 'date' => '2026-11-17', 'title' => 'Purchase order and requisition: the Category drop-down of a new inventory item can be searched by typing.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-067', 'version' => '1.155.4', 'date' => '2026-11-17', 'title' => 'Payables: under Quantity mismatch each line shows ordered, received and already invoiced, and says what is missing — the goods receipt of the purchase order, or a quantity invoiced before.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-066', 'version' => '1.155.3', 'date' => '2026-11-17', 'title' => 'Payables: a Draft or Disputed supplier invoice shows the button Check first where the tick box would be, and the list says that only Checked invoices can go into a payment request.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-065', 'version' => '1.155.2', 'date' => '2026-11-17', 'title' => 'Sub-project with a doubled code can be saved again: the code is checked only when it is changed (a sub-project could not be set to Completed); the form warns about the double and new doubles are refused.', 'db' => null, 'check' => null],

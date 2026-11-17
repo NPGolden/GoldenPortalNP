@@ -2380,3 +2380,15 @@ Language keys 10 358 each (portal; +3 from R97-060, none from this release); app
 
 **Security review**: display only, no new entry point, no new proposals.
 
+## §352 v1.155.5 (R97-068) — PO / requisition: Category searchable by typing
+
+**Report**: "in the PO in the categories he cannot search by name as typing".
+
+**Cause**: the Category drop-down of a new inventory item in the line form (`views/purchase_order.php`, `views/requisition.php`) carried `data-nosearch`, which switches off the type-to-filter list of `assets/portal.js` (R30-007). It was set with the item picker of R86-002; no script depends on it.
+
+**Change**: the mark is removed in both views. No other change.
+
+**Tests (sandbox)**: a test order with twelve test categories, in a browser: the list opens with the search box, typing "rel" leaves "Relays", Enter selects it, no script errors; test data removed.
+
+**Security review**: display only; no new proposals.
+
