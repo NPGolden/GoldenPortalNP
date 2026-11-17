@@ -29,6 +29,26 @@ layout_head($b['sub_code'] . ' · BOM ' . $rev, 'projects');
   </div>
 </div>
 
+<?php $bPos = function_exists('bom_pos') ? bom_pos($id) : []; $bCan = function_exists('bom_po_can') && bom_po_can($b); if ($bPos || $bCan): $bPlan = $bCan ? bom_po_plan($id) : null; $bOpen = $bPlan ? array_sum(array_map(fn($g) => count($g['lines']), $bPlan['groups'])) + count($bPlan['none']) : 0; /* R97-097 */ ?>
+<div class="card" id="bom-po">
+  <div class="card-head"><h2>🛒 <?= tt('bom.po_h') ?> <span class="count"><?= count($bPos) ?></span></h2></div>
+  <?php if ($bPos): ?><table class="tbl"><thead><tr><th><?= tt('po.no') ?></th><th><?= tt('po.supplier') ?></th><th><?= tt('bom.lines') ?></th><th><?= tt('th.status') ?></th></tr></thead><tbody>
+    <?php foreach ($bPos as $o): ?><tr><td><a class="mono" href="<?= url('purchase_order', ['id' => (int)$o['id']]) ?>"><?= e($o['po_no']) ?></a></td><td><?= e((string)$o['supplier']) ?></td><td><?= (int)$o['n_lines'] ?></td><td><?= po_pill((string)$o['status']) ?></td></tr><?php endforeach; ?>
+  </tbody></table><?php endif; ?>
+  <?php if ($bCan && $bPlan['pr']): ?><p class="hint"><?= e(t('bom.po_has_pr', ['n' => $bPlan['pr']])) ?></p>
+  <?php elseif ($bCan && !$bOpen): ?><p class="hint"><?= tt($bPos ? 'bom.po_all' : 'bom.nothing_to_buy') ?></p>
+  <?php elseif ($bCan): ?>
+  <p class="hint"><?= tt('bom.po_hint') ?></p>
+  <form method="post" action="<?= url('bom', ['id' => $id]) ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="bom_to_po"><input type="hidden" name="id" value="<?= $id ?>">
+    <table class="tbl"><thead><tr><th><?= tt('po.supplier') ?></th><th><?= tt('bom.lines') ?></th><th><?= tt('bom.po_what') ?></th></tr></thead><tbody>
+      <?php foreach ($bPlan['groups'] as $g): ?><tr><td><b><?= e($g['name']) ?></b></td><td><?= count($g['lines']) ?></td><td class="hint"><?= e(mb_strimwidth(implode(' · ', array_map(fn($l) => (string)($l['item_code'] ?: $l['part_no'] ?: $l['description']), $g['lines'])), 0, 160, '…')) ?></td></tr><?php endforeach; ?>
+      <?php if ($bPlan['none']): ?><tr><td><select name="supplier_id" style="max-width:260px;"><option value=""><?= tt('bom.po_later') ?></option><?php foreach (sup_list() as $sx): ?><option value="<?= (int)$sx['id'] ?>"><?= e($sx['name']) ?></option><?php endforeach; ?></select><p class="hint" style="margin:2px 0 0;"><?= tt('bom.po_nosup') ?></p></td><td><?= count($bPlan['none']) ?></td><td class="hint"><?= e(mb_strimwidth(implode(' · ', array_map(fn($l) => (string)($l['item_code'] ?: $l['part_no'] ?: $l['description']), $bPlan['none'])), 0, 160, '…')) ?></td></tr><?php endif; ?>
+    </tbody></table>
+    <div class="btn-row" style="margin-top:8px;"><button class="btn btn--gold btn--sm" type="submit" data-confirm="<?= e(t('bom.po_q')) ?>">🛒 <?= tt('bom.po_btn') ?></button></div>
+  </form>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
 <div class="kpi kpi--4" style="margin-bottom:10px;">
   <div class="stat"><b><?= $cov['lines'] ?></b><?= tt('bom.lines') ?><span class="s"><?= e(t('bom.lines_hint', ['n' => $cov['none']])) ?></span></div>
   <div class="stat<?= $cov['full'] === $cov['lines'] && $cov['lines'] ? ' ok' : '' ?>"><b><?= $cov['full'] ?></b><?= tt('bom.cv_full') ?><span class="s"><?= e(t('bom.cv_partial_n', ['n' => $cov['partial']])) ?></span></div>

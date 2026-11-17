@@ -382,3 +382,57 @@ function bom_import_apply(int $bid): array {
     return $n;
 }
 function bom_import_discard(int $bid): void { $b = bom_load($bid); if (!$b || !bom_editable($b)) throw new RuntimeException(t('err.noaccess')); q('DELETE FROM bom_import_rows WHERE bom_rev_id = ?', [$bid]); }
+
+
+/* ======================================================================================================================
+ * GAS-CP-R97-097 — purchase orders straight from an approved BOM: one draft order per supplier, for Procurement to follow
+ * ==================================================================================================================== */
+function bom_po_can(array $b): bool { return $b['status'] === 'approved' && function_exists('po_admin') && po_admin() && !(function_exists('po_it') && po_it() && !it_sub_ok((int)$b['subproject_id'])); }
+/** The purchase orders that carry lines of this BOM. */
+function bom_pos(int $bid): array {
+    try { return all("SELECT o.id, o.po_no, o.status, o.kind, co.name AS supplier, COUNT(*) AS n_lines FROM po_lines pl JOIN bom_lines bl ON bl.id = pl.bom_line_id JOIN po_orders o ON o.id = pl.order_id LEFT JOIN companies co ON co.id = o.supplier_id WHERE bl.bom_rev_id = ? AND pl.status <> 'cancelled' GROUP BY o.id ORDER BY o.id", [$bid]); } catch (Throwable $e) { return []; }
+}
+/** What is still to buy of the BOM, split by the supplier each line would go to: the preferred supplier of the item, else the one it was last bought from, else the supplier of the maker.
+ *  Returns ['groups' => [supplierId => ['name' =>, 'lines' => [...]]], 'none' => [lines without a known supplier], 'ordered' => lines already on an order, 'pr' => number of a live requisition of this BOM or null]. */
+function bom_po_plan(int $bid): array {
+    $P = ['groups' => [], 'none' => [], 'ordered' => 0, 'pr' => null];
+    $P['pr'] = (string) scalar("SELECT pr_no FROM pr_requests WHERE bom_rev_id = ? AND status NOT IN ('rejected','cancelled') ORDER BY id DESC LIMIT 1", [$bid]) ?: null;
+    $done = []; foreach (all("SELECT pl.bom_line_id, SUM(pl.qty) AS q FROM po_lines pl JOIN bom_lines bl ON bl.id = pl.bom_line_id JOIN po_orders o ON o.id = pl.order_id WHERE bl.bom_rev_id = ? AND pl.status <> 'cancelled' AND o.status <> 'cancelled' GROUP BY pl.bom_line_id", [$bid]) as $r) $done[(int)$r['bom_line_id']] = (float)$r['q'];
+    $names = [];
+    foreach (bom_lines($bid) as $l) {
+        if ($l['status'] === 'removed') continue; $open = round((float)$l['to_buy'] - ($done[(int)$l['id']] ?? 0.0), 3);
+        if (isset($done[(int)$l['id']])) $P['ordered']++; if ($open <= 0.0005) continue; $l['open'] = $open; $sup = 0;
+        if ($l['item_id']) { $it = one('SELECT preferred_supplier_id, last_supplier_id, maker FROM inv_items WHERE id = ?', [(int)$l['item_id']]); $sup = (int)($it['preferred_supplier_id'] ?? 0) ?: (int)($it['last_supplier_id'] ?? 0); if (!$sup && function_exists('sup_for_maker') && ($mk = sup_for_maker(($it['maker'] ?? '') ?: $l['maker']))) $sup = (int)$mk[0]['id']; }
+        elseif (function_exists('sup_for_maker') && ($mk = sup_for_maker($l['maker']))) $sup = (int)$mk[0]['id'];
+        if ($sup && !isset($names[$sup])) { $names[$sup] = (string) scalar('SELECT co.name FROM companies co WHERE co.id = ? AND co.is_active = 1 AND ' . sup_where(), [$sup]); }
+        if ($sup && $names[$sup] !== '') { $P['groups'][$sup] = $P['groups'][$sup] ?? ['name' => $names[$sup], 'lines' => []]; $P['groups'][$sup]['lines'][] = $l; } else $P['none'][] = $l;
+    }
+    return $P;
+}
+/** Draft purchase orders from the BOM — one per supplier. Lines without a known supplier go to $fallback when one is chosen, otherwise they stay to be ordered later.
+ *  Returns ['orders' => [[id, po_no, supplier, lines]], 'left' => lines not ordered, 'refused' => [supplier names the order was refused for]]. */
+function bom_to_po(int $bid, int $fallback = 0): array {
+    $b = bom_load($bid); if (!$b || !bom_po_can($b)) throw new RuntimeException(t('err.noaccess')); $u = current_user();
+    $P = bom_po_plan($bid); if ($P['pr']) throw new RuntimeException(t('bom.po_has_pr', ['n' => $P['pr']]));
+    if ($fallback && $P['none']) { $S = sup_load($fallback); if ($S && ($S['kind'] === 'supplier' || !empty($S['is_supplier']))) { $P['groups'][$fallback] = $P['groups'][$fallback] ?? ['name' => (string)$S['name'], 'lines' => []]; foreach ($P['none'] as $l) $P['groups'][$fallback]['lines'][] = $l; $P['none'] = []; } }
+    if (!$P['groups']) throw new RuntimeException(t($P['none'] ? 'bom.po_need_sup' : ($P['ordered'] ? 'bom.po_all' : 'bom.nothing_to_buy')));
+    $br = null; try { $br = (int) scalar('SELECT branch_id FROM projects WHERE id = ?', [(int)$b['project_id']]) ?: null; } catch (Throwable $e) {}
+    $out = ['orders' => [], 'left' => count($P['none']), 'refused' => []]; $rev = 'R' . $b['revision'];
+    foreach ($P['groups'] as $sup => $g) {
+        $S = sup_load((int)$sup); if (!$S) { $out['left'] += count($g['lines']); continue; }
+        try { if (function_exists('sup_po_check')) sup_po_check((int)$sup); } catch (Throwable $e) { $out['refused'][] = $g['name']; $out['left'] += count($g['lines']); continue; }   // not an approved supplier
+        $no = po_number('po', $br);
+        q('INSERT INTO po_orders (kind, po_no, branch_id, supplier_id, project_id, subproject_id, title, currency, incoterms, terms_days, advance_pct, warehouse_id, vat_pct, supplier_email, internal_note, created_by, created_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+          ['po', $no, $br, (int)$sup, (int)$b['project_id'], (int)$b['subproject_id'], mb_substr(t('bom.po_title', ['r' => $rev, 't' => $b['title'] ?: $b['sub_name']]), 0, 160), (string)(($S['sup_currency'] ?? '') ?: 'EUR'), $S['incoterms'] ?? null, $S['terms_days'] ?? null, $S['advance_pct'] ?? null, stk_default_wh(), 0, $S['email'] ?? null, t('bom.from_bom', ['r' => $rev]), (int)$u['id'], $u['full_name']]);
+        $oid = (int) db()->lastInsertId(); $seq = 0;
+        foreach ($g['lines'] as $l) {
+            $price = null; $origin = null; $it = $l['item_id'] ? stk_item((int)$l['item_id']) : null;
+            if ($it) { $pp = stk_price_proposal($it, (int)$sup); if ($pp['price'] !== null) { $price = $pp['price']; $origin = mb_substr((string)$pp['origin'], 0, 160); } }
+            elseif ($l['est_price'] !== null) { $price = (float)$l['est_price']; $origin = t('prq.est_typed'); }
+            q('INSERT INTO po_lines (order_id, seq, item_id, description, maker, part_no, unit, qty, unit_price, price_origin, bom_line_id, note) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', [$oid, ++$seq, $l['item_id'], $l['description'], $l['maker'], $l['part_no'], $l['unit'], $l['open'], $price, $origin, (int)$l['id'], $l['section'] ? mb_substr((string)$l['section'], 0, 255) : null]);
+        }
+        po_recalc($oid); po_event($oid, 'create', $no . ' · BOM ' . $rev); $out['orders'][] = ['id' => $oid, 'po_no' => $no, 'supplier' => $g['name'], 'lines' => $seq];
+    }
+    if ($out['orders']) bom_event($bid, 'to_po', implode(', ', array_column($out['orders'], 'po_no')));
+    return $out;
+}

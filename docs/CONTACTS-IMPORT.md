@@ -2921,3 +2921,17 @@ The common registers carry the field Standard (All four / one of them) and the l
 **Tests (sandbox)**: draft → not fed; submitted → 0 %; approved → 0 %; one of two lines ordered (half of the value) → 25 %; half received → 38 %; received and the other reserved from stock → 100 %; a line without price → equal weights 50 %; page hint with counts; submitting a requisition through its action rewrote a stale 77 % to 0 %; Unlock hides the feed and keeps the PM value, Lock returns it; a sub-project without procurement unchanged; no new lines in `storage/php-errors.log`. Not tested: lines of purchase orders without a requisition (calculation read through), the one-off run on live data. 3 language keys, 11 432 per file.
 
 **Security review**: only a percentage is derived and shown — no amounts, so accounts without financial data see nothing new. No proposal in this release.
+
+## §381 v1.172.0 (R97-097) — An approved BOM becomes draft purchase orders
+
+**Request**: "when a bom is imported in the procurement of the sub project then i need to be able to convert it also to PO to go to the procurement to follow the process".
+
+**Before**: an approved BOM could become a requisition (uncovered lines) or a production kit; purchase orders were raised from approved requisition lines (To buy).
+
+**Now** (`bom_po_plan()`, `bom_to_po()`, `bom_pos()`, `bom_po_can()` in `app/bom.php`; action `bom_to_po`; card `#bom-po` in `views/bom.php`): for an approved BOM and a user who may raise purchase orders (`po_admin()`; the IT buyer only for sub-projects open to IT), the lines still to buy — `to_buy` of `bom_lines()` minus the quantity already on live order lines with the same `bom_line_id` — are grouped by supplier: preferred supplier of the item, last supplier, supplier of the maker (`sup_for_maker()`); lines without one go to the supplier chosen on the card or stay. One draft `po_orders` row of kind po per supplier with the supplier's currency, incoterms, terms and e-mail, project, sub-project, default warehouse; lines carry `bom_line_id`, the price of `stk_price_proposal()` or the estimate typed on the BOM line. `sup_po_check()` is applied — a supplier that is Not approved gets no order and is reported. Refused when the BOM has a live requisition (so that nothing is bought twice). Events: `po_event create`, `bom_event to_po`.
+
+**Tests (sandbox) — form posted**: BOM with an item of a preferred supplier, an item whose maker has a supplier and a free-text line: without a chosen supplier the free-text line is refused with the message; with one → order with the estimate as price; items covered by stock are not ordered; with quantities above stock → two drafts, one per supplier; repeat → "everything is on a purchase order"; the card lists the orders; the order page opens; live requisition → refused with its number; an account without procurement rights → 403; no new lines in `storage/php-errors.log`. Not tested: a Not approved supplier in the plan (code path read). 16 language keys, 11 448 per file.
+
+**Note**: the BOM must be Approved — an imported BOM is a draft until it is issued and approved by Procurement, as before.
+
+**Security review**: creation is checked on the server with the same right as a manual purchase order and respects the approved-supplier rule; nothing is sent to a supplier — the orders are drafts. No proposal in this release.
