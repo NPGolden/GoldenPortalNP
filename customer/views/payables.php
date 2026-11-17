@@ -36,7 +36,7 @@ layout_head(t('si.title'), 'payables');
   <?php if (!$rows): ?><tr><td colspan="11" class="hint"><?= tt('si.none') ?></td></tr><?php endif; ?>
   <?php foreach ($rows as $r): $od = $r['due_date'] && in_array($r['status'], ['checked', 'disputed', 'requested', 'approved'], true) && $r['due_date'] < date('Y-m-d'); ?>
     <tr<?= $r['kind'] === 'credit' ? ' style="background:rgba(201,162,39,.06)"' : '' ?>>
-      <td><?php if ($r['status'] === 'checked'): ?><input type="checkbox" name="inv[]" value="<?= (int)$r['id'] ?>" data-sup="<?= (int)$r['supplier_id'] ?>"><?php endif; ?></td>
+      <td><?php if ($r['status'] === 'checked'): ?><input type="checkbox" name="inv[]" value="<?= (int)$r['id'] ?>" data-sup="<?= (int)$r['supplier_id'] ?>"><?php elseif (in_array($r['status'], ['draft', 'disputed'], true)): /* R97-066: say why there is no tick box */ ?><a class="btn btn--ghost btn--sm" href="<?= url('payable', ['id' => (int)$r['id']]) ?>" title="<?= tt('si.tick_why') ?>" style="white-space:nowrap;">☑ <?= tt('si.tick_check') ?></a><?php endif; ?></td>
       <td><a href="<?= url('payable', ['id' => (int)$r['id']]) ?>" style="font-family:var(--mono);"><?= e($r['si_no']) ?></a><?= $r['kind'] === 'credit' ? ' ' . pill('gold', t('si.credit')) : '' ?></td>
       <td><?= e($r['supplier']) ?></td><td><?= e($r['inv_no']) ?></td>
       <td><?= $r['order_id'] ? '<a href="' . url('purchase_order', ['id' => (int)$r['order_id']]) . '" style="font-family:var(--mono);">' . e($r['po_no']) . '</a>' : '—' ?><?= $r['sub_code'] ? '<br><small class="hint">' . e($r['project_code'] . ' · ' . $r['sub_code']) . '</small>' : '' ?></td>
@@ -48,7 +48,7 @@ layout_head(t('si.title'), 'payables');
   </tbody>
 </table>
 <?= $pg ?>
-<div class="btn-row" style="margin-top:10px;"><button class="btn btn--gold btn--sm" type="submit" id="req-btn" disabled>✅ <?= tt('si.make_request') ?></button><input name="pay_by" type="date" title="<?= tt('si.pay_by') ?>"><input name="note" maxlength="600" placeholder="<?= tt('prq.note') ?>" style="min-width:16em;"><span class="hint"><?= e(t('si.request_hint', ['v' => si_money(si_threshold())])) ?></span></div>
+<div class="btn-row" style="margin-top:10px;"><button class="btn btn--gold btn--sm" type="submit" id="req-btn" disabled>✅ <?= tt('si.make_request') ?></button><input name="pay_by" type="date" title="<?= tt('si.pay_by') ?>"><input name="note" maxlength="600" placeholder="<?= tt('prq.note') ?>" style="min-width:16em;"><span class="hint"><?= e(t('si.request_hint', ['v' => si_money(si_threshold())])) ?> <?= tt('si.tick_why') ?></span></div>
 </form>
 <script nonce="<?= csp_nonce() ?>">(function(){var cbs=document.querySelectorAll('input[name="inv[]"]'),btn=document.getElementById('req-btn');function upd(){var on=[].filter.call(cbs,function(c){return c.checked;});var sups={};on.forEach(function(c){sups[c.dataset.sup]=1;});btn.disabled=!on.length||Object.keys(sups).length>1;}cbs.forEach(function(c){c.addEventListener('change',upd);});})();</script>
 </div>

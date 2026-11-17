@@ -2354,3 +2354,15 @@ Language keys 10 358 each (portal; +3 from R97-060, none from this release); app
 
 **Security review**: no new entry point; the two actions keep their staff check and CSRF token; the name in the message is of a sub-project of the same project, which the user already sees. No new proposals.
 
+## §350 v1.155.3 (R97-066) — Payables: why an invoice has no tick box
+
+**Report** (screenshot, Payables › Supplier invoices, GAS-SI-26-0001, DEIF A/S, Draft, gross 0,00 EUR): "i cannot select the payable".
+
+**Cause**: by design — `views/payables.php` prints the tick box only for status `checked` (`si_request` refuses anything else, `si.need_checked`). The invoice was a Draft without lines (gross 0,00); `si_check()` needs at least one line. The list gave no reason for the empty cell.
+
+**Change** (display only): Draft and Disputed rows show the button "Check first" (`si.tick_check`) linking to the invoice; the hint under the list adds `si.tick_why`. 10 549 keys per file. No change to the rules.
+
+**Tests (sandbox)**: a Draft and a Checked test invoice — button on the Draft, tick box on the Checked, hint shown; test rows removed.
+
+**Security review**: display only, no new entry point, no new proposals.
+

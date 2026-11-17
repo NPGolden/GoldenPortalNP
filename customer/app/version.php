@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.155.2';
+const CP_VERSION = '1.155.3';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-066', 'version' => '1.155.3', 'date' => '2026-11-17', 'title' => 'Payables: a Draft or Disputed supplier invoice shows the button Check first where the tick box would be, and the list says that only Checked invoices can go into a payment request.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-065', 'version' => '1.155.2', 'date' => '2026-11-17', 'title' => 'Sub-project with a doubled code can be saved again: the code is checked only when it is changed (a sub-project could not be set to Completed); the form warns about the double and new doubles are refused.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-064', 'version' => '1.155.1', 'date' => '2026-11-17', 'title' => 'BOM template: the same Excel template now downloads from System Budgets (list and Parts › Import BOM parts) and from the Procurement tab of a sub-project; it gains the optional column Unit price and a sheet with the rules.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-063', 'version' => '1.155.0', 'date' => '2026-11-16', 'title' => 'HR › Assessments: questionnaire campaigns imported from an Excel template measure qualities (reliability, consistency, willingness to learn and to evolve, interest in innovation) for chosen people over a period; own answers plus the rating of the department head; scores 0–100 per quality kept per year and shown in the annual evaluation.', 'db' => 'install/migrate_cp_r97_063_hr_assessments.sql', 'check' => 'r97x'],
