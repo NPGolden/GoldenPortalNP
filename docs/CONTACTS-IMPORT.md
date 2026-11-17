@@ -2503,3 +2503,27 @@ Language keys 10 358 each (portal; +3 from R97-060, none from this release); app
 
 **Security review**: no new entry point; comparison in PHP on the sub-projects of one project. No new proposals.
 
+## §360 v1.157.0 (R97-076) — merge of doubled sub-projects
+
+**Request**: "Mergo tool yes do it" (after §357: Y.028 in PRJ.000418 exists twice; §349: Y.006 in PRJ.000550).
+
+**Code**: `customer/app/spm.php`, preview and buttons in `views/data_doubles.php`, action `spm_merge`.
+
+`spm_run($keep, $drop, $opt, $dry)`:
+
+1. Allowed for management / administrators (`spm_can()`); the two records must be of the same project and have the same code in the loose sense (`sp_code_norm`).
+2. Tables = every base table with a column `subproject_id` (`spm_tables()`, from `information_schema`); refused when one of them is not InnoDB (no all-or-nothing).
+3. One transaction. Per table: `UPDATE IGNORE … SET subproject_id = keep WHERE subproject_id = drop`. Rows left behind collide with a unique key: in the link tables `SPM_DROP_DUP` (sp_team, sp_contacts, wf_item_subs, kpi_snapshots, sp_progress_snapshots, pm_milestones) they are deleted and kept in the restore file; in any other table the merge is **blocked**. `SPM_SINGLE` (sp_budgets): blocked when both records have a row.
+4. Kept record: each `pct_*` = the higher of the two; the fields of `SPM_FILL` filled when empty; status of the removed record when chosen. Then the removed record is deleted.
+5. Blocked or preview → rollback. Otherwise the restore file `storage/merge/sp_<drop>_into_<keep>_<time>.json` (both records, ids of every moved row per table, full rows of dropped duplicates) is written **before** the commit; when it cannot be written nothing is merged. `storage/merge/merge.log` gets one line. After the commit: `sp_reorder()`, caches reset.
+
+The preview (`?p=data_doubles&keep=&drop=`) runs the same function with `$dry = true`, so its figures are those of the real merge.
+
+**Not covered**: two *projects* with the same project code; references to a sub-project inside free text or stored settings; files stay in their folder on disk (they are found by their stored name, so they open normally).
+
+**Tests (sandbox, database backed up and restored)**: a Greek-letter double of a sub-project with 16 files, proformas, service reports: preview leaves the database unchanged; merge moves the rows, deletes the double, renumbers; with a team member and two progress snapshots on both → dropped and listed in the file; with a BOM revision of the same number and a budget on both → blocked, nothing changed; after clearing → merged, progress 10 → 80, system filled, status of the removed record taken when chosen; without the tick refused; two sub-projects with different codes refused; project manager refused (action and preview).
+
+**Not tested**: the live data; a table of the live database that the sandbox does not have (it is handled by the same generic rule: moved, or blocked when it collides).
+
+**Security review**: action and preview only for management / administrators, CSRF token, confirmation tick checked on the server; table names from `information_schema` checked against `[a-z0-9_]`; column names of the kept record come from its own row and are checked the same way; the restore file is under `storage/`, closed to the web by its `.htaccess` (R97-005) and not in the repository. Proposal: include `storage/merge` in the server backup you keep outside the hosting.
+

@@ -17,10 +17,44 @@ $prj = all("SELECT p.id, p.project_code, p.erp_code, p.name, p.status, v.name AS
             FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id LEFT JOIN customers c ON c.id = p.customer_id
             JOIN (SELECT project_code FROM projects WHERE project_code IS NOT NULL AND project_code <> '' GROUP BY project_code HAVING COUNT(*) > 1) d ON d.project_code = p.project_code
             ORDER BY p.project_code, p.id LIMIT 200");
+$grp = []; foreach ($subs as $x) $grp[$x['project_id'] . '|' . sp_code_norm($x['code'])][] = $x;
+// R97-076: preview of a merge — done for real inside a transaction and rolled back, so the figures are what will happen
+$pv = null; $pvErr = null; $mKeep = (int)($_GET['keep'] ?? 0); $mDrop = (int)($_GET['drop'] ?? 0);
+if ($mKeep && $mDrop && function_exists('spm_run')) { try { $pv = spm_run($mKeep, $mDrop, ['status' => ($_GET['status'] ?? '') === 'drop' ? 'drop' : 'keep'], true); } catch (Throwable $e) { $pvErr = $e->getMessage(); } }
 layout_head(t('dd.title'), 'projects');
 ?>
 <p class="eyebrow"><a href="<?= url('projects') ?>"><?= tt('pr.title') ?></a> › <?= tt('dd.title') ?></p>
 <div class="page-head"><div><h1>👥 <?= tt('dd.title') ?></h1><p class="lede"><?= tt('dd.lede') ?></p></div></div>
+
+<?php if ($pvErr): ?><div class="flash flash--bad"><?= e($pvErr) ?></div><?php endif; ?>
+<?php if ($pv): $pk = $pv['keep']; $pd = $pv['drop']; $blocked = (bool)$pv['blocked']; ?>
+<div class="card" id="merge" style="border-left:4px solid <?= $blocked ? '#b3261e' : '#C9A227' ?>;">
+  <h2>🔀 <?= e(t('spm.pv_title', ['c' => $pk['code']])) ?></h2>
+  <div class="grid grid-2">
+    <div><p style="margin:0 0 4px;"><?= pill('green', t('spm.kept')) ?> #<?= (int)$pk['id'] ?> · <b><?= e($pk['name']) ?></b></p><p class="hint" style="margin:0;"><?= e((string)$pk['status']) ?><?= trim((string)$pk['description']) !== '' ? ' · ' . e(mb_substr((string)$pk['description'], 0, 120)) : '' ?></p></div>
+    <div><p style="margin:0 0 4px;"><?= pill('bad', t('spm.removed')) ?> #<?= (int)$pd['id'] ?> · <b><?= e($pd['name']) ?></b></p><p class="hint" style="margin:0;"><?= e((string)$pd['status']) ?><?= trim((string)$pd['description']) !== '' ? ' · ' . e(mb_substr((string)$pd['description'], 0, 120)) : '' ?></p></div>
+  </div>
+  <table class="tbl" style="margin-top:10px;"><thead><tr><th><?= tt('spm.what') ?></th><th class="num"><?= tt('spm.rows') ?></th><th><?= tt('spm.result') ?></th></tr></thead><tbody>
+    <?php foreach ($pv['moved'] as $tb => $n): ?><tr><td class="mono"><?= e($tb) ?></td><td class="num"><?= (int)$n ?></td><td><?= tt('spm.r_moved') ?></td></tr><?php endforeach; ?>
+    <?php foreach ($pv['dups'] as $tb => $n): ?><tr><td class="mono"><?= e($tb) ?></td><td class="num"><?= (int)$n ?></td><td><span class="hint"><?= tt('spm.r_dup') ?></span></td></tr><?php endforeach; ?>
+    <?php foreach ($pv['blocked'] as $tb => $why): ?><tr><td class="mono"><?= e($tb) ?></td><td class="num">—</td><td style="color:#b3261e;"><b>⛔ <?= e($why) ?></b></td></tr><?php endforeach; ?>
+    <?php if (!$pv['moved'] && !$pv['dups'] && !$pv['blocked']): ?><tr><td colspan="3" class="hint"><?= tt('spm.nothing') ?></td></tr><?php endif; ?>
+    <?php foreach ($pv['fields'] as $col => [$old, $new]): ?><tr><td class="mono"><?= e($col) ?></td><td class="num">—</td><td><?= e(t('spm.r_field', ['a' => ($old === null || $old === '') ? '—' : mb_substr((string)$old, 0, 40), 'b' => mb_substr((string)$new, 0, 40)])) ?></td></tr><?php endforeach; ?>
+  </tbody></table>
+  <?php if ($blocked): ?>
+    <p style="color:#b3261e;margin:10px 0 0;"><b><?= tt('spm.blocked') ?></b> <?= tt('spm.blocked_hint') ?></p>
+    <div class="btn-row" style="margin-top:8px;"><a class="btn btn--ghost" href="<?= url('subproject', ['id' => (int)$pd['id']]) ?>"><?= e(t('spm.open_n', ['n' => (int)$pd['id']])) ?></a><a class="btn btn--ghost" href="<?= url('subproject', ['id' => (int)$pk['id']]) ?>"><?= e(t('spm.open_n', ['n' => (int)$pk['id']])) ?></a><a class="btn btn--ghost" href="<?= url('data_doubles') ?>"><?= tt('btn.cancel') ?></a></div>
+  <?php else: ?>
+    <form method="post" action="<?= url('data_doubles') ?>" data-lock data-confirm="<?= e(t('spm.confirm', ['n' => (int)$pd['id']])) ?>" style="margin-top:10px;"><?= csrf_field() ?>
+      <input type="hidden" name="action" value="spm_merge"><input type="hidden" name="keep" value="<?= (int)$pk['id'] ?>"><input type="hidden" name="drop" value="<?= (int)$pd['id'] ?>">
+      <?php if ((string)$pk['status'] !== (string)$pd['status']): ?><div class="field" style="max-width:420px;"><label><?= tt('spm.status_lbl') ?></label><select name="status" data-nosearch><option value="keep"><?= e((string)$pk['status']) ?> — #<?= (int)$pk['id'] ?></option><option value="drop"<?= ($_GET['status'] ?? '') === 'drop' ? ' selected' : '' ?>><?= e((string)$pd['status']) ?> — #<?= (int)$pd['id'] ?></option></select></div><?php endif; ?>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-weight:400;margin:8px 0;"><input type="checkbox" name="sure" value="1" required style="width:17px;height:17px;margin-top:2px;"> <span><?= e(t('spm.sure', ['n' => (int)$pd['id']])) ?></span></label>
+      <div class="btn-row"><button class="btn btn--gold" type="submit">🔀 <?= tt('spm.merge_now') ?></button><a class="btn btn--ghost" href="<?= url('data_doubles', ['keep' => (int)$pd['id'], 'drop' => (int)$pk['id']]) ?>#merge">⇄ <?= tt('spm.swap') ?></a><a class="btn btn--ghost" href="<?= url('data_doubles') ?>"><?= tt('btn.cancel') ?></a></div>
+    </form>
+    <p class="hint" style="margin-top:8px;"><?= tt('spm.pv_hint') ?></p>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
 
 <div class="card">
   <h2><?= tt('dd.subs_h') ?> <span class="count"><?= count($subs) ?></span></h2>
@@ -33,7 +67,8 @@ layout_head(t('dd.title'), 'projects');
       <td>#<?= (int)$s['id'] ?> · <b><?= e($s['name']) ?></b><?= $s['system'] ? '<br><span class="hint">' . e($s['system']) . '</span>' : '' ?><?= trim((string)$s['descr']) !== '' ? '<br><span class="hint">' . e((string)$s['descr']) . '</span>' : '' ?></td>
       <td><?= e((string)$s['status']) ?><br><span class="hint"><?= e((string)$s['invoicing']) ?></span></td>
       <td><?= $show($linked($tS, 'subproject_id', (int)$s['id'])) ?></td>
-      <td><a class="btn btn--ghost btn--sm" href="<?= url('subproject', ['id' => (int)$s['id']]) ?>"><?= tt('dd.open') ?></a></td>
+      <td style="white-space:nowrap;"><a class="btn btn--ghost btn--sm" href="<?= url('subproject', ['id' => (int)$s['id']]) ?>"><?= tt('dd.open') ?></a>
+        <?php if (function_exists('spm_can') && spm_can()): foreach ($grp[$k] ?? [] as $o): if ((int)$o['id'] === (int)$s['id']) continue; /* R97-076 */ ?><br><a class="btn btn--sm" style="margin-top:4px;" href="<?= url('data_doubles', ['keep' => (int)$s['id'], 'drop' => (int)$o['id']]) ?>#merge" title="<?= tt('spm.btn_hint') ?>">🔀 <?= e(t('spm.btn', ['n' => (int)$o['id']])) ?></a><?php endforeach; endif; ?></td>
     </tr><?php endforeach; ?></tbody>
   </table></div>
   <p class="hint"><?= tt('dd.subs_hint') ?></p>

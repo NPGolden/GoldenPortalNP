@@ -63,6 +63,7 @@ require __DIR__ . '/app/hr5.php';   // R61-001
 require __DIR__ . '/app/hr6.php';   // R62-001
 require __DIR__ . '/app/hr7.php';   // R64-001 targets, auto-metrics, personal gate
 require __DIR__ . '/app/hrs.php';   // R97-063 HR assessments
+require __DIR__ . '/app/spm.php';   // R97-076 merge of doubled sub-projects
 require __DIR__ . '/app/diag.php';  // R69-001 diagnostics
 require __DIR__ . '/app/rcr.php';    // R89-001 recruiting
 require __DIR__ . '/app/pmt.php';    // R93-001 work permits
@@ -170,6 +171,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (function_exists('sgn_handle_action') && sgn_handle_action($action)) exit;   // R97-057
         if (function_exists('dl_handle_action') && dl_handle_action($action)) exit;   // R97-058
         if (function_exists('hrs_handle_action') && hrs_handle_action($action)) exit;   // R97-063
+        if (function_exists('spm_handle_action') && spm_handle_action($action)) exit;   // R97-076
         if (function_exists('ws_handle_action') && ws_handle_action($action)) exit;   // R95-001
         if (function_exists('web_handle_action') && web_handle_action($action)) exit;   // R90-001   // R89-001 recruiting actions (always redirect)
         if (pm_handle_action($action, $page)) exit;     // PM-tool actions (always redirect)
