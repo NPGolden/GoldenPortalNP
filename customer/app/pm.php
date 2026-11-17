@@ -205,10 +205,11 @@ function per_page(): int {
 /** Golden A/S staff accounts (active staff + admins) with their Golden
  *  role, Project Managers first — the pick-list for project managers. */
 function staff_users(): array {
-    return all("SELECT cu.id, cu.full_name, cu.email, cu.role, r.name AS role_name
+    $r = all("SELECT cu.id, cu.full_name, cu.email, cu.role, r.name AS role_name
                 FROM customer_users cu LEFT JOIN staff_roles r ON r.id = cu.staff_role_id
                 WHERE cu.role IN ('staff','admin') AND cu.is_active = 1
                 ORDER BY (r.name = 'Project Manager') DESC, r.sort_order, cu.full_name");
+    return function_exists('hr_here') ? hr_here($r) : $r;   // R97-094: without the people who are not active in HR
 }
 
 /** Resolve the PM fields for a project from the posted pm_user_id:

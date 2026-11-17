@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.169.0';
+const CP_VERSION = '1.169.1';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-094', 'version' => '1.169.1', 'date' => '2026-11-18', 'title' => 'Leavers: the daily health report counts the accounts still open for people who are not active in HR; Settings › Users lists them at the top; the general staff lists of the portal leave these people out.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-093', 'version' => '1.169.0', 'date' => '2026-11-18', 'title' => 'Marine cyber safety speaks of Equipment instead of Products and links each record to its serial number of the Equipment register (card on the serial number, Add to Marine cyber safety, list of produced equipment not yet included). People who are not active in HR no longer stand in the lists of personnel; unticking Active closes the staff account; HR settings lists accounts still open for people who left.', 'db' => 'install/migrate_cp_r97_093_marine_equipment.sql', 'check' => 'r98e'],
         ['ref' => 'GAS-CP-R97-092', 'version' => '1.168.0', 'date' => '2026-11-18', 'title' => 'Customer subscriptions: weekly e-mail and notification to Sales and management with the subscriptions to renew and the licences running out within 90 days (Send now and on / off on the page); device serial numbers are no longer shown to customer accounts.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-091', 'version' => '1.167.0', 'date' => '2026-11-18', 'title' => 'Customer subscriptions: remote support contracts carry product and serial number, payment status, renewal period, installation date and licence expiry; the list shows what runs out (renewal within 30 / 90 days, licences, expired) and imports the list of Sales; a renewal offer is raised from the subscription into Commercial › Offers and the sales pipeline lists the subscriptions to renew. The quality / QHSE manager has access to ISO 27001 and marine cyber safety.', 'db' => 'install/migrate_cp_r97_091_subscriptions.sql', 'check' => 'r98d'],

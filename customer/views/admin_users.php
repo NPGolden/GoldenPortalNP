@@ -40,6 +40,13 @@ layout_head(t('au.title'), 'admin_users');
 <h2 class="settings-h"><?= tt('au.title') ?></h2>
 <p class="lede"><?= tt('au.lede') ?> <?= tt('au.mgmt_only') ?></p>
 <div class="btn-row" style="margin:-6px 0 14px;"><?php if (export_people_can()): ?><a class="btn btn--ghost btn--sm" href="<?= url('users_export', array_filter(['q' => $f['q'], 'role' => $f['access']])) ?>">⤓ <?= tt('au.export') ?></a><?php endif; ?><a class="btn btn--ghost btn--sm" href="<?= url('settings', ['tab' => 'import']) ?>#users">⤒ <?= tt('im.title') ?></a><span class="hint"><?= tt('au.export_hint') ?></span></div>
+<?php $gone = function_exists('hr_gone_accounts') ? hr_gone_accounts() : []; if ($gone): /* R97-094 */ ?>
+<div class="card" id="users-gone" style="border-left:4px solid var(--red, #b3261e);">
+  <div class="card-head"><h2>⚠ <?= tt('hr.gone_h') ?> <span class="count"><?= count($gone) ?></span></h2><?php if (function_exists('hr_can') && (hr_can() || is_cp_admin())): ?><a class="btn btn--ghost btn--sm" href="<?= url('admin_hr', ['tab' => 'people']) ?>#hr-gone"><?= tt('hr.settings') ?> ›</a><?php endif; ?></div>
+  <p class="hint"><?= tt('hr.gone_users_hint') ?></p>
+  <p><?php foreach ($gone as $g): ?><a class="pill pill--<?= $g['role'] === 'admin' ? 'bad' : 'gold' ?>" href="<?= url('admin_users', ['q' => $g['full_name']]) ?>" style="margin:0 6px 6px 0;"><?= e($g['full_name']) ?> · <?= e(t('role.' . $g['role'])) ?><?= $g['left_date'] ? ' · ' . e(fmt_date($g['left_date'])) : '' ?></a><?php endforeach; ?></p>
+</div>
+<?php endif; ?>
 <?php if (function_exists('cr_has') && cr_has()): ?><form method="post" action="<?= url('admin_users') ?>" class="card" style="padding:12px 16px;margin-bottom:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="cr_dev">
   <b>💡 <?= tt('cr.dev_setting') ?></b><select name="user_id" data-nosearch style="min-width:220px;"><?php foreach (all("SELECT id, full_name FROM customer_users WHERE role IN ('staff','admin') AND is_active = 1 ORDER BY full_name") as $dvu): ?><option value="<?= (int)$dvu['id'] ?>"<?= (int)$dvu['id'] === cr_dev_id() ? ' selected' : '' ?>><?= e($dvu['full_name']) ?></option><?php endforeach; ?></select><span class="hint" style="flex:1;min-width:240px;"><?= tt('cr.dev_setting_hint') ?></span><button class="btn btn--ghost btn--sm" type="submit"><?= tt('btn.save') ?></button></form><?php endif; ?>
 <?php if (tm_has()): ?><form method="post" action="<?= url('admin_users') ?>" class="card" style="padding:12px 16px;margin-bottom:14px;display:flex;gap:14px;align-items:center;flex-wrap:wrap;" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="tm_strict">

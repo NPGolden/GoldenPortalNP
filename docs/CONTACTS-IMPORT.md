@@ -2881,3 +2881,17 @@ The common registers carry the field Standard (All four / one of them) and the l
 **Tests (sandbox) — every form posted**: serial added from the equipment page → CBS-001 with ten documents, vessel and fields; second click returns the same record; form select, clearing and re-choosing the serial; a second record on the same serial refused with nothing written; card, overview and vessel card wording; person made inactive → gone from the owner list, listed in HR settings, closed by an administrator, refused for an account without HR rights; sweeps admin 9 / hr 2 / pm 0; no new lines in `storage/php-errors.log`. Not tested: project / sub-project taken from a production order (no production order in the sandbox — code read); unticking Active through the card form. 18 language keys, 11 422 per file.
 
 **Security review**: closing the accounts of leavers is control A 5.18 / A 6.5 — the new list shows the gap instead of hiding it. Proposals without cost in speed: (1) a line in the daily health report when accounts are open for people who left; (2) the same warning for administrator accounts in Settings › Users.
+
+## §378 v1.169.1 (R97-094) — Leavers: health report line, warning in Settings › Users, general staff list
+
+**Request**: the two cybersecurity proposals of §377, accepted.
+
+**Daily health report** (`dh_build()` in `app/diag.php`): one line in the summary — accounts still open for people who are not active in HR, with the number of administrators and where to close them. Numbers only; no names leave the portal by e-mail.
+
+**Settings › Users** (`views/admin_users.php`): a card at the top with the same accounts by name, role and leaving date; each opens the user list filtered on the person; link to HR settings › People for the staff accounts. Administrator accounts are closed here by hand, as before.
+
+**General staff list** (`staff_users()` in `app/pm.php`, used in 18 places — project managers, teams, assignees): passes through `hr_here()`, so people who are not active in HR are left out there too.
+
+**Tests (sandbox)**: two people made inactive (one staff, one administrator) → card with both names and roles, health report line "2 (administrators: 1)", `staff_users()` without them; made active again → card gone, line 0, list complete; no new lines in `storage/php-errors.log`.
+
+**Security review**: nothing new is exposed — the card is on a page for administrators only, the e-mail carries counts. No further proposal in this release.

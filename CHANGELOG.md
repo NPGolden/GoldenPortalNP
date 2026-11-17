@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.169.0** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.169.1** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.169.1 | GAS-CP-R97-094 | 2026-11-18 | Leavers: the daily health report counts the accounts still open for people who are not active in HR; Settings › Users lists them at the top; the general staff lists of the portal leave these people out. | — |
 | 1.169.0 | GAS-CP-R97-093 | 2026-11-18 | Marine cyber safety speaks of Equipment instead of Products and links each record to its serial number of the Equipment register (card on the serial number, Add to Marine cyber safety, list of produced equipment not yet included). People who are not active in HR no longer stand in the lists of personnel; unticking Active closes the staff account; HR settings lists accounts still open for people who left. | `install/migrate_cp_r97_093_marine_equipment.sql` |
 | 1.168.0 | GAS-CP-R97-092 | 2026-11-18 | Customer subscriptions: weekly e-mail and notification to Sales and management with the subscriptions to renew and the licences running out within 90 days (Send now and on / off on the page); device serial numbers are no longer shown to customer accounts. | — |
 | 1.167.0 | GAS-CP-R97-091 | 2026-11-18 | Customer subscriptions: remote support contracts carry product and serial number, payment status, renewal period, installation date and licence expiry; the list shows what runs out (renewal within 30 / 90 days, licences, expired) and imports the list of Sales; a renewal offer is raised from the subscription into Commercial › Offers and the sales pipeline lists the subscriptions to renew. The quality / QHSE manager has access to ISO 27001 and marine cyber safety. | `install/migrate_cp_r97_091_subscriptions.sql` |
