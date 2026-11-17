@@ -23,7 +23,7 @@ const OF_KINDS = ['firm', 'budgetary'];
 
 function pi_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'proformas'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Sales permission: issue / edit proformas and payment terms (administrators always). Accounting users may link invoices. */
-function pi_is_sales(): bool { static $v = null; if ($v === null) { $u = current_user(); $v = is_cp_admin() || (is_staff() && pi_has() && (bool) scalar('SELECT can_sales FROM customer_users WHERE id = ?', [(int)($u['id'] ?? 0)])); } return $v; }
+function pi_is_sales(): bool { static $v = null; if ($v === null) { $u = current_user(); $v = !(function_exists('fin_blocked') && fin_blocked()) && (is_cp_admin() || (is_staff() && pi_has() && (bool) scalar('SELECT can_sales FROM customer_users WHERE id = ?', [(int)($u['id'] ?? 0)]))); } return $v; }
 function pi_can_view(): bool { return is_staff() && pi_has() && fin_visible(); }
 function pi_can_invoices(): bool { return pi_is_sales() || (function_exists('acc_is_accounting') && acc_is_accounting()); }
 function pi_money(float $v, string $cur = 'EUR'): string { if (!fin_visible()) return fin_masked(); return number_format($v, 2, ',', '.') . ' ' . $cur; }

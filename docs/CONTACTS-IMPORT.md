@@ -2728,3 +2728,48 @@ Every record: code (proposed, unique per register), title, status, owner, due da
 **Tests (sandbox)**: number shown on new forms of six registers; two products saved from forms opened with the same proposed number → CBS-003 and CBS-004; release opened under one product and saved under another → number of the second; typed number kept; the same typed number twice refused; evaluation SUP-001-E01; handbook page, Support card and search; Staff and PM handbooks without the old entries; page sweeps for three roles; no new lines in `storage/php-errors.log`.
 
 **Security review**: the handbook describes procedures only and holds no record data; it is open to all staff because everybody must know how to report an event. Numbers are checked for uniqueness on the server. No new proposals in this revision.
+
+## §370 v1.163.0 (R97-086) — QHSE: ISO 9001 · 14001 · 45001 · 22301, calibration, no financial data for the QHSE role
+
+**Request**: "Also we need to integrate QHSE module for our quality department ISO 9001, ISO 14001, ISO 45001, ISO 22301 which our company is certified for. In the quality ISO9001 system we need also to add equipment calibrations and the process of calibrations and validity of the certificates. QHSE Manager should not have access to Financial Data of the company".
+
+**Menu**: group **QHSE** › Management systems (ISO) — page `qhse` (`views/qhse.php` sets the area and uses `views/isms.php`; overview `views/_qhse_overview.php`; a record is the page `isms_rec`). Five tabs: Integrated system, ISO 9001, ISO 14001, ISO 45001, ISO 22301 (`QH_STD`). No database step — the registers use the tables of the ISMS module (`ism_records`, `ism_files`, `ism_events`).
+
+**Registers** (`'grp' => 'qhse'`, `'std'` = the tab):
+
+| Tab | Register | Clause | Code |
+|---|---|---|---|
+| Integrated system | Documents | 7.5 | QD- |
+| | Risks & opportunities | 6.1 | QR- |
+| | Objectives | 6.2 | QO- |
+| | Audits & reviews | 9.2 · 9.3 | QA- |
+| | Nonconformities | 10.2 | QN- |
+| | Legal & other requirements | 6.1.3 · 9.1.2 | QL- |
+| | Training & competence (HR link) | 7.2 · 7.3 | QT- |
+| | Interested parties | 4.1 · 4.2 | QP- |
+| ISO 9001 | Customer complaints & feedback | 9.1.2 · 8.2.1 | QC- |
+| | Measuring equipment | 7.1.5 | EQ- |
+| | Calibrations | 7.1.5.2 | EQ-nnn-Cnn |
+| ISO 14001 | Environmental aspects | 6.1.2 | EA- |
+| | Waste records | 8.1 · 9.1 | WR- |
+| ISO 45001 | Hazards & risk assessment | 6.1.2 | HZ- |
+| | Incidents & near misses | 10.2 | HS- |
+| ISO 22301 | Business impact analysis | 8.2.2 | BI- |
+| | Continuity plans | 8.3 · 8.4 | BC- |
+| | Exercises & tests | 8.5 | BX- |
+
+The common registers carry the field Standard (All four / one of them) and the list filters by it. Nonconformities, complaints, waste, hazards and incidents can be linked to vessel, project and sub-project. Registers with likelihood and impact show the score (flag `score`). Training uses the HR link of §367 (flag `hrtr`).
+
+**Calibration**: an instrument (`qequip`) has kind, maker and model, serial number, range, location, holder, calibration required, interval in months. Its calibrations (`qcal`) go Planned → At the laboratory → Done / Failed. Done needs date, certificate number and result; the result Out of tolerance makes it Failed. `ism_cal_apply()`: the latest finished calibration writes last calibration, certificate, laboratory and result to the instrument and sets the date the certificate is valid until (`review_date`) — the date on the certificate, else calibration date + interval; Failed → instrument Out of service, the next good one → In use. `ism_cal_state()`: valid · due soon (30 days) · expired · never calibrated · out of service · not required — on the list, the record and the ISO 9001 overview (instruments calibrated, due in 30 days, Calibration to arrange). Reminder to the holder 30 days before expiry (`'remind' => 30`).
+
+**Access**: `qh_can()` — management, administrators, the QHSE team (`qh_team`, set by management) and the staff roles / disciplines of `qh_access` (card Access by position on the first tab, CEO and General Manager only; by the names QHSE / HSE / Quality until saved). Delete: management / administrators. Export: per tab and All standards (`qh_export()`).
+
+**No financial data for the QHSE role**: `fin_blocked()` (app/pm.php) is true for a staff role named QHSE, HSE, EHS or Quality. Then: `fin_visible()` is false (amounts masked everywhere it is used) — before the administrator shortcut; the rights `is_accounting`, `can_accounting`, `can_sales`, `can_cashflow` count as not ticked (`col_flag()`, `acc_user_flag()`, `pi_is_sales()`); `col_can()`, `sb_can()`, `acc_can_prepare()` and `stk_price_visible()` are false; and the router closes the pages of `FIN_PAGES` (pipeline, sales reports, offers, System Budgets, collections, statement, accounting, proforma invoices, direct invoice, payables, cash flow, cost control, financial report) with the message "Financial pages are not available for your role".
+
+**Help**: new edition `views/_manual_qhse.php` — QHSE Handbook (card on Support, in the help search). From now on changes of the group QHSE are written there. One pointer line in the Staff and PM handbooks.
+
+**Tests (sandbox)**: five tabs and eighteen registers open, new-record forms of all registers; an engineer and a restricted account refused; instrument and three calibrations — Done without certificate refused; first calibration → valid until date + 12 months; a newer one Out of tolerance → Failed and the instrument Out of service; a newer good one with a date on the certificate → In use and that date; history lines; numbers EQ-001-C01…; standard filter; hazard linked through a sub-project to project and vessel; training created in HR; workbook of all standards (19 sheets); a test account with every financial right ticked: before — collections, cash flow, payables, System Budgets, offers open; with the role QHSE Manager — all redirected, no amounts on dashboard, projects, sub-project; the CEO unchanged; page sweeps for three roles (one of them as QHSE Manager), API test, browser pages without console errors; no new lines in `storage/php-errors.log`.
+
+**Not done / to check**: the registers start empty — existing documents, instruments and certificates are entered or imported by the quality department (an Excel import of the instrument list can be added); supplier evaluation for ISO 9001 (8.4) is not a separate register — the evaluation of §367 covers information security only; the certificates of the company itself (four certificates with their surveillance dates) are kept as documents; the phone apps were not checked for amounts shown to the QHSE role; staff outside QHSE cannot read the documents here (a read-only library of approved documents can be added).
+
+**Security review**: the financial block is by role name and is enforced in the functions and in the router, so it does not depend on ticks; incident records can hold names of injured people — the handbook asks for the minimum and they are not sent to the assistant; access is checked on the server per register. Proposals, no cost in speed: (1) check on the live portal that the role of the QHSE Manager is named QHSE / HSE / Quality — otherwise the block and the default access do not apply (the role switch "Financial data visible" remains as a second lock); (2) if the QHSE Manager uses the phone apps, confirm that no amounts appear there; (3) file the six-monthly access review for this group together with those of §366 and §368.

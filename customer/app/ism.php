@@ -32,9 +32,27 @@ function ism_mteam(): array { $v = json_decode((string) cp_setting('ism_mteam', 
 /** Marine cyber safety area: the ISMS people and the programming team. */
 function ism_can_marine(): bool { static $v = null; if ($v === null) $v = ism_has_links() && is_staff() && (ism_can() || in_array((int)(current_user()['id'] ?? 0), ism_mteam(), true)); return $v; }
 function ism_grp(string $reg): string { return (string)(ism_regs()[$reg]['grp'] ?? 'iso'); }
-function ism_can_reg(string $reg): bool { return ism_grp($reg) === 'marine' ? ism_can_marine() : ism_can(); }
+function ism_can_reg(string $reg): bool { $g = ism_grp($reg); return $g === 'marine' ? ism_can_marine() : ($g === 'qhse' ? qh_can() : ism_can()); }
+/* ---- R97-086 — QHSE area: management, administrators, the QHSE team, and the staff roles / disciplines ticked by the CEO or the General Manager (by name until saved: QHSE, HSE, Quality). */
+const QH_RX = '/\b(qhse|hse|ehs|quality|qa|qc)\b|ποιότητ|ασφάλεια[ςσ]? και υγε/u';
+const QH_STD = ['ims' => 'IMS', '9001' => 'ISO 9001', '14001' => 'ISO 14001', '45001' => 'ISO 45001', '22301' => 'ISO 22301'];
+function qh_team(): array { $v = json_decode((string) cp_setting('qh_team', '[]'), true); return is_array($v) ? array_values(array_unique(array_map('intval', $v))) : []; }
+function qh_access(): array {
+    static $A = null; if ($A !== null) return $A; $s = json_decode((string) cp_setting('qh_access', ''), true);
+    if (is_array($s) && isset($s['roles'], $s['disc'])) return $A = ['roles' => array_map('intval', (array)$s['roles']), 'disc' => array_map('intval', (array)$s['disc']), 'saved' => true];
+    $A = ['roles' => [], 'disc' => [], 'saved' => false];
+    try { foreach (all('SELECT id, name FROM staff_roles WHERE is_active = 1') as $r) if (preg_match(QH_RX, mb_strtolower((string)$r['name']))) $A['roles'][] = (int)$r['id'];
+          foreach (all('SELECT id, name FROM disciplines WHERE is_active = 1') as $r) if (preg_match(QH_RX, mb_strtolower((string)$r['name']))) $A['disc'][] = (int)$r['id']; } catch (Throwable $e) {}
+    return $A;
+}
+function qh_can(): bool {
+    static $v = null; if ($v !== null) return $v; $u = current_user(); if (!$u || !is_staff() || !ism_has_ext()) return $v = false;
+    if (ism_manage() || in_array((int)$u['id'], qh_team(), true)) return $v = true; $A = qh_access();
+    return $v = (!empty($u['staff_role_id']) && in_array((int)$u['staff_role_id'], $A['roles'], true)) || (!empty($u['discipline_id']) && in_array((int)$u['discipline_id'], $A['disc'], true));
+}
+function qh_regs(string $std): array { return array_filter(ism_regs('qhse'), fn($R) => $R['std'] === $std); }
 /** The page of an area: 'isms' (ISO 27001) or 'mcs' (marine cyber safety). */
-function ism_page(string $reg): string { return ism_grp($reg) === 'marine' ? 'mcs' : 'isms'; }
+function ism_page(string $reg): string { $g = ism_grp($reg); return $g === 'marine' ? 'mcs' : ($g === 'qhse' ? 'qhse' : 'isms'); }
 /**
  * R97-082 — access by position: the staff roles and the disciplines whose people have the whole of IT & Cybersecurity.
  * Until management saves a choice, the names decide: top management and QHSE, project managers, IT, automation and electrical engineers.
@@ -63,7 +81,7 @@ function ism_regs(?string $grp = null): array {
     $all = [
         'doc'       => ['icon' => '📄', 'clause' => '7.5',           'prefix' => 'ISMS', 'st' => ['draft' => 'mute', 'review' => 'gold', 'approved' => 'green', 'obsolete' => 'mute'], 'closed' => ['approved', 'obsolete'],
                         'f' => ['version' => 'text', 'approved_by' => 'text', 'approved_on' => 'date', 'summary' => 'area'], 'ref' => true, 'due' => false, 'review' => true],
-        'risk'      => ['icon' => '⚠', 'clause' => '6.1.2 · 8.2 · 8.3', 'prefix' => 'RSK', 'st' => ['open' => 'bad', 'treating' => 'gold', 'accepted' => 'navy', 'closed' => 'green'], 'closed' => ['accepted', 'closed'],
+        'risk'      => ['icon' => '⚠', 'clause' => '6.1.2 · 8.2 · 8.3', 'prefix' => 'RSK', 'score' => true, 'st' => ['open' => 'bad', 'treating' => 'gold', 'accepted' => 'navy', 'closed' => 'green'], 'closed' => ['accepted', 'closed'],
                         'f' => ['asset' => 'text', 'threat' => 'area', 'vulnerability' => 'area', 'likelihood' => 'score', 'impact' => 'score', 'treatment' => 'sel:mitigate,accept,transfer,avoid', 'plan' => 'area', 'res_likelihood' => 'score', 'res_impact' => 'score'], 'ref' => true, 'due' => true, 'review' => true],
         'soa'       => ['icon' => '☑', 'clause' => '6.1.3 d',        'prefix' => 'A',   'st' => ['planned' => 'bad', 'partial' => 'gold', 'done' => 'green', 'na' => 'mute'], 'closed' => ['done', 'na'],
                         'f' => ['justification' => 'area', 'how' => 'area'], 'ref' => false, 'due' => true, 'review' => true],
@@ -82,7 +100,7 @@ function ism_regs(?string $grp = null): array {
         /* R97-083 — evaluation of a supplier of the register (A 5.19 – 5.22): six criteria 1–5, a result; the last one sets the state of the supplier and its next evaluation */
         'supeval'   => ['icon' => '📝', 'clause' => 'A 5.19 – 5.22',  'prefix' => 'SEV', 'st' => ['planned' => 'gold', 'done' => 'green', 'cancelled' => 'mute'], 'closed' => ['done', 'cancelled'],
                         'f' => ['eval_kind' => 'sel:initial,periodic,after_incident', 'evaluated_on' => 'date', 'evaluator' => 'text', 'c_agreement' => 'score', 'c_certification' => 'score', 'c_access' => 'score', 'c_incidents' => 'score', 'c_continuity' => 'score', 'c_quality' => 'score', 'eval_result' => 'sel:res_approved,res_conditional,res_rejected', 'conditions' => 'area', 'notes' => 'area'], 'ref' => false, 'due' => true, 'review' => false, 'parent' => 'supplier', 'auto' => ['rating']],
-        'training'  => ['icon' => '🎓', 'clause' => '7.2 · 7.3 · A 6.3', 'prefix' => 'TRN', 'st' => ['planned' => 'gold', 'done' => 'green'], 'closed' => ['done'],
+        'training'  => ['hrtr' => true, 'icon' => '🎓', 'clause' => '7.2 · 7.3 · A 6.3', 'prefix' => 'TRN', 'st' => ['planned' => 'gold', 'done' => 'green'], 'closed' => ['done'],
                         'f' => ['audience' => 'text', 'attendees' => 'num', 'trainer' => 'text', 'notes' => 'area'], 'ref' => false, 'due' => true, 'review' => false],
         'legal'     => ['icon' => '⚖', 'clause' => 'A 5.31',         'prefix' => 'LEG', 'st' => ['applicable' => 'green', 'not_applicable' => 'mute'], 'closed' => ['applicable', 'not_applicable'],
                         'f' => ['source' => 'text', 'obligation' => 'area', 'how' => 'area'], 'ref' => false, 'due' => false, 'review' => true],
@@ -93,6 +111,43 @@ function ism_regs(?string $grp = null): array {
                         'f' => ['doc_no' => 'text', 'revision' => 'text', 'submitted_on' => 'date', 'approved_on' => 'date', 'class_comments' => 'area', 'notes' => 'area'], 'ref' => true, 'due' => true, 'review' => false, 'parent' => 'mprod'],
         'msw'       => ['grp' => 'marine', 'icon' => '💾', 'clause' => 'UR E27 5 · 3.1.9 · UR E22', 'prefix' => 'SW', 'st' => ['development' => 'mute', 'testing' => 'gold', 'review' => 'gold', 'approved' => 'navy', 'released' => 'green', 'installed' => 'green', 'superseded' => 'mute', 'withdrawn' => 'bad'], 'closed' => ['installed', 'superseded', 'withdrawn'],
                         'f' => ['version' => 'text', 'component' => 'sel:plc,hmi,scada,firmware,network,os,other', 'change_type' => 'sel:first_issue,feature,bugfix,security_update,config', 'change' => 'area', 'moc_ref' => 'text', 'repo_ref' => 'text', 'checksum' => 'text', 'tested_by' => 'text', 'test_ref' => 'text', 'class_notify' => 'sel:not_needed,needed,notified,accepted', 'installed_on' => 'date', 'installed_by' => 'text', 'rollback' => 'area', 'notes' => 'area'], 'ref' => false, 'due' => true, 'review' => false, 'parent' => 'mprod', 'auto' => ['approved_by', 'approved_on']],
+        /* R97-086 — QHSE: ISO 9001, ISO 14001, ISO 45001, ISO 22301. 'std' = the tab of the QHSE page the register stands under ('ims' = common to all four). */
+        'qdoc'      => ['grp' => 'qhse', 'std' => 'ims', 'icon' => '📄', 'clause' => '7.5', 'prefix' => 'QD', 'st' => ['draft' => 'mute', 'review' => 'gold', 'approved' => 'green', 'obsolete' => 'mute'], 'closed' => ['approved', 'obsolete'],
+                        'f' => ['std' => 'sel:all_std,s9001,s14001,s45001,s22301', 'doc_type' => 'sel:manual,policy_d,procedure,instruction,form,record_t,plan_t', 'version' => 'text', 'approved_by' => 'text', 'approved_on' => 'date', 'summary' => 'area'], 'ref' => true, 'due' => false, 'review' => true],
+        'qrisk'     => ['grp' => 'qhse', 'std' => 'ims', 'icon' => '⚠', 'clause' => '6.1', 'prefix' => 'QR', 'st' => ['open' => 'bad', 'treating' => 'gold', 'accepted' => 'navy', 'closed' => 'green'], 'closed' => ['accepted', 'closed'], 'score' => true,
+                        'f' => ['std' => 'sel:all_std,s9001,s14001,s45001,s22301', 'ro_kind' => 'sel:risk_k,opportunity', 'process' => 'text', 'description' => 'area', 'likelihood' => 'score', 'impact' => 'score', 'treatment' => 'sel:mitigate,accept,transfer,avoid', 'plan' => 'area', 'res_likelihood' => 'score', 'res_impact' => 'score'], 'ref' => false, 'due' => true, 'review' => true],
+        'qobj'      => ['grp' => 'qhse', 'std' => 'ims', 'icon' => '🎯', 'clause' => '6.2', 'prefix' => 'QO', 'st' => ['active' => 'gold', 'met' => 'green', 'missed' => 'bad', 'dropped' => 'mute'], 'closed' => ['met', 'missed', 'dropped'],
+                        'f' => ['std' => 'sel:all_std,s9001,s14001,s45001,s22301', 'measure' => 'text', 'target' => 'text', 'result' => 'area'], 'ref' => false, 'due' => true, 'review' => false],
+        'qaudit'    => ['grp' => 'qhse', 'std' => 'ims', 'icon' => '🔍', 'clause' => '9.2 · 9.3', 'prefix' => 'QA', 'st' => ['planned' => 'gold', 'done' => 'green', 'cancelled' => 'mute'], 'closed' => ['done', 'cancelled'],
+                        'f' => ['std' => 'sel:all_std,s9001,s14001,s45001,s22301', 'kind' => 'sel:internal_audit,management_review,external_audit,supplier_audit,inspection,drill', 'done_on' => 'date', 'scope' => 'text', 'auditor' => 'text', 'result' => 'area', 'findings' => 'num'], 'ref' => false, 'due' => true, 'review' => false],
+        'qnc'       => ['grp' => 'qhse', 'std' => 'ims', 'icon' => '🛠', 'clause' => '10.2', 'prefix' => 'QN', 'st' => ['open' => 'bad', 'action' => 'gold', 'verify' => 'navy', 'closed' => 'green'], 'closed' => ['closed'],
+                        'f' => ['std' => 'sel:all_std,s9001,s14001,s45001,s22301', 'source' => 'text', 'description' => 'area', 'root_cause' => 'area', 'correction' => 'area', 'action' => 'area', 'effectiveness' => 'area', 'closed_on' => 'date'], 'ref' => false, 'due' => true, 'review' => false, 'links' => true],
+        'qlegal'    => ['grp' => 'qhse', 'std' => 'ims', 'icon' => '⚖', 'clause' => '6.1.3 · 9.1.2', 'prefix' => 'QL', 'st' => ['applicable' => 'green', 'not_applicable' => 'mute'], 'closed' => ['applicable', 'not_applicable'],
+                        'f' => ['std' => 'sel:all_std,s9001,s14001,s45001,s22301', 'source' => 'text', 'obligation' => 'area', 'how' => 'area'], 'ref' => false, 'due' => false, 'review' => true],
+        'qtrain'    => ['grp' => 'qhse', 'std' => 'ims', 'icon' => '🎓', 'clause' => '7.2 · 7.3', 'prefix' => 'QT', 'st' => ['planned' => 'gold', 'done' => 'green', 'cancelled' => 'mute'], 'closed' => ['done', 'cancelled'], 'hrtr' => true,
+                        'f' => ['std' => 'sel:all_std,s9001,s14001,s45001,s22301', 'audience' => 'text', 'attendees' => 'num', 'trainer' => 'text', 'notes' => 'area'], 'ref' => false, 'due' => true, 'review' => false],
+        'qparty'    => ['grp' => 'qhse', 'std' => 'ims', 'icon' => '👥', 'clause' => '4.1 · 4.2', 'prefix' => 'QP', 'st' => ['active' => 'green', 'ended' => 'mute'], 'closed' => ['active', 'ended'],
+                        'f' => ['party_type' => 'sel:customer_p,authority,class_soc,supplier_p,employee_p,owner_p,community', 'needs' => 'area', 'how' => 'area'], 'ref' => false, 'due' => false, 'review' => true],
+        'qcomplaint' => ['grp' => 'qhse', 'std' => '9001', 'icon' => '💬', 'clause' => '9.1.2 · 8.2.1', 'prefix' => 'QC', 'st' => ['open' => 'bad', 'action' => 'gold', 'verify' => 'navy', 'closed' => 'green'], 'closed' => ['closed'],
+                        'f' => ['fb_kind' => 'sel:complaint,feedback,praise', 'customer' => 'text', 'received_on' => 'date', 'description' => 'area', 'root_cause' => 'area', 'correction' => 'area', 'action' => 'area', 'closed_on' => 'date'], 'ref' => false, 'due' => true, 'review' => false, 'links' => true],
+        'qequip'    => ['grp' => 'qhse', 'std' => '9001', 'icon' => '📏', 'clause' => '7.1.5', 'prefix' => 'EQ', 'st' => ['in_use' => 'green', 'out_of_service' => 'bad', 'retired' => 'mute'], 'closed' => ['in_use', 'retired'], 'remind' => 30,
+                        'f' => ['eq_type' => 'text', 'maker_model' => 'text', 'serial' => 'text', 'range' => 'text', 'location' => 'text', 'cal_needed' => 'sel:yes,no', 'cal_interval' => 'num', 'notes' => 'area'], 'ref' => false, 'due' => false, 'review' => true, 'auto' => ['last_cal', 'cert_no', 'cal_result', 'lab']],
+        'qcal'      => ['grp' => 'qhse', 'std' => '9001', 'icon' => '🧪', 'clause' => '7.1.5.2', 'prefix' => 'CAL', 'st' => ['planned' => 'gold', 'at_lab' => 'navy', 'done' => 'green', 'failed' => 'bad', 'cancelled' => 'mute'], 'closed' => ['done', 'failed', 'cancelled'],
+                        'f' => ['cal_date' => 'date', 'lab' => 'text', 'accredited' => 'sel:yes,no', 'cert_no' => 'text', 'cal_result' => 'sel:cal_pass,cal_adjusted,cal_limited,cal_fail', 'valid_until' => 'date', 'standard_used' => 'text', 'uncertainty' => 'text', 'notes' => 'area'], 'ref' => false, 'due' => true, 'review' => false, 'parent' => 'qequip'],
+        'qaspect'   => ['grp' => 'qhse', 'std' => '14001', 'icon' => '🌍', 'clause' => '6.1.2', 'prefix' => 'EA', 'st' => ['open' => 'bad', 'treating' => 'gold', 'accepted' => 'navy', 'closed' => 'green'], 'closed' => ['accepted', 'closed'], 'score' => true,
+                        'f' => ['activity' => 'text', 'aspect' => 'text', 'env_impact' => 'text', 'condition' => 'sel:normal,abnormal,emergency', 'likelihood' => 'score', 'impact' => 'score', 'controls' => 'area', 'res_likelihood' => 'score', 'res_impact' => 'score'], 'ref' => false, 'due' => false, 'review' => true],
+        'qwaste'    => ['grp' => 'qhse', 'std' => '14001', 'icon' => '♻', 'clause' => '8.1 · 9.1', 'prefix' => 'WR', 'st' => ['open' => 'gold', 'closed' => 'green'], 'closed' => ['closed'],
+                        'f' => ['waste_type' => 'text', 'ewc' => 'text', 'quantity' => 'num', 'unit_w' => 'sel:kg,litre,pcs_w,m3', 'handed_on' => 'date', 'carrier' => 'text', 'doc_ref' => 'text', 'notes' => 'area'], 'ref' => false, 'due' => false, 'review' => false, 'links' => true],
+        'qhazard'   => ['grp' => 'qhse', 'std' => '45001', 'icon' => '⛑', 'clause' => '6.1.2', 'prefix' => 'HZ', 'st' => ['open' => 'bad', 'treating' => 'gold', 'accepted' => 'navy', 'closed' => 'green'], 'closed' => ['accepted', 'closed'], 'score' => true,
+                        'f' => ['activity' => 'text', 'hazard' => 'text', 'who_exposed' => 'text', 'likelihood' => 'score', 'impact' => 'score', 'controls' => 'area', 'ppe' => 'text', 'res_likelihood' => 'score', 'res_impact' => 'score'], 'ref' => false, 'due' => false, 'review' => true, 'links' => true],
+        'qhsinc'    => ['grp' => 'qhse', 'std' => '45001', 'icon' => '🚑', 'clause' => '10.2', 'prefix' => 'HS', 'st' => ['reported' => 'bad', 'assessing' => 'gold', 'action' => 'gold', 'closed' => 'green'], 'closed' => ['closed'],
+                        'f' => ['hs_kind' => 'sel:near_miss,unsafe_condition,first_aid,medical,lost_time,property,environmental', 'occurred_on' => 'date', 'location' => 'text', 'involved' => 'text', 'description' => 'area', 'containment' => 'area', 'root_cause' => 'area', 'action' => 'area', 'lost_days' => 'num', 'notified' => 'text', 'closed_on' => 'date'], 'ref' => false, 'due' => true, 'review' => false, 'links' => true],
+        'qbia'      => ['grp' => 'qhse', 'std' => '22301', 'icon' => '📉', 'clause' => '8.2.2', 'prefix' => 'BI', 'st' => ['draft' => 'mute', 'approved' => 'green', 'obsolete' => 'mute'], 'closed' => ['approved', 'obsolete'],
+                        'f' => ['process' => 'text', 'impact_desc' => 'area', 'mtpd' => 'text', 'rto' => 'text', 'rpo' => 'text', 'dependencies' => 'area', 'criticality' => 'score'], 'ref' => false, 'due' => false, 'review' => true],
+        'qbcp'      => ['grp' => 'qhse', 'std' => '22301', 'icon' => '🧭', 'clause' => '8.3 · 8.4', 'prefix' => 'BC', 'st' => ['draft' => 'mute', 'review' => 'gold', 'approved' => 'green', 'obsolete' => 'mute'], 'closed' => ['approved', 'obsolete'],
+                        'f' => ['scenario' => 'text', 'strategy' => 'area', 'version' => 'text', 'approved_by' => 'text', 'approved_on' => 'date', 'last_tested' => 'date'], 'ref' => false, 'due' => false, 'review' => true],
+        'qexercise' => ['grp' => 'qhse', 'std' => '22301', 'icon' => '🏋', 'clause' => '8.5', 'prefix' => 'BX', 'st' => ['planned' => 'gold', 'done' => 'green', 'cancelled' => 'mute'], 'closed' => ['done', 'cancelled'],
+                        'f' => ['scenario' => 'text', 'done_on' => 'date', 'scope' => 'text', 'result' => 'area', 'lessons' => 'area', 'findings' => 'num'], 'ref' => false, 'due' => true, 'review' => false],
     ];
     return $grp === null ? $all : array_filter($all, fn($R) => ($R['grp'] ?? 'iso') === $grp);
 }
@@ -137,7 +192,7 @@ function ism_list(string $reg, array $f = []): array {
     return $rows;
 }
 /** R97-085: the number a new record gets by default. A record that belongs to a product or a supplier is numbered under it: CBS-001-D11, CBS-001-SW02, SUP-003-E01. */
-const ISM_CHILD_SFX = ['mdoc' => 'D', 'msw' => 'SW', 'supeval' => 'E'];
+const ISM_CHILD_SFX = ['mdoc' => 'D', 'msw' => 'SW', 'supeval' => 'E', 'qcal' => 'C'];
 function ism_next_code(string $reg, int $parentId = 0): string {
     $R = ism_reg($reg); $max = 0;
     if ($parentId && isset(ISM_CHILD_SFX[$reg]) && ($pc = (string) scalar('SELECT code FROM ism_records WHERE id = ?', [$parentId])) !== '') {
@@ -163,6 +218,7 @@ function ism_save_from_post(): int {
     /* R97-083: a supplier of the register is a company of the supplier list — once only; its name is the title when none is typed */
     $supId = null; if ($reg === 'supplier' && ism_has_ext()) { $supId = (int)($_POST['supplier_id'] ?? 0) ?: null;
         if ($supId) { $co = one('SELECT co.id, co.name FROM companies co WHERE co.id = ? AND ' . sup_where(), [$supId]); if (!$co) $supId = null; else { if ($title === '') $title = mb_substr((string)$co['name'], 0, 255); if (scalar("SELECT COUNT(*) FROM ism_records WHERE reg = 'supplier' AND supplier_id = ? AND id <> ?", [$supId, $id])) throw new RuntimeException(t('ism.e_sup_twice')); } } }
+    if ($reg === 'qcal' && $title === '') { $pp = ism_get((int)($_POST['parent_id'] ?? ($old['parent_id'] ?? 0))); if ($pp) $title = mb_substr((string)$pp['title'], 0, 255); }
     if ($reg === 'supeval' && $title === '') { $pp = ism_get((int)($_POST['parent_id'] ?? ($old['parent_id'] ?? 0))); if ($pp) $title = mb_substr((string)$pp['title'], 0, 255); }
     if ($title === '') throw new RuntimeException(t('ism.e_title'));
     $status = (string)($_POST['status'] ?? ''); if (!isset($R['st'][$status])) $status = (string) array_key_first($R['st']);
@@ -202,6 +258,11 @@ function ism_save_from_post(): int {
         if ($status === 'installed' && empty($data['installed_on'])) $data['installed_on'] = date('Y-m-d');
     }
     if ($reg === 'supplier') foreach (['rating', 'rating_result'] as $k) if (isset($od0[$k])) $data[$k] = $od0[$k];
+    if ($reg === 'qequip') foreach (['last_cal', 'cert_no', 'cal_result', 'lab'] as $k) if (isset($od0[$k])) $data[$k] = $od0[$k];
+    if ($reg === 'qcal' && in_array($status, ['done', 'failed'], true)) {   // R97-086: a finished calibration needs its date, certificate and result; a failed result is a failed calibration
+        if (empty($data['cal_date']) || empty($data['cert_no']) || empty($data['cal_result'])) throw new RuntimeException(t('ism.e_cal_done'));
+        $status = $data['cal_result'] === 'cal_fail' ? 'failed' : 'done';
+    }
     if ($reg === 'supeval') {
         $cr = array_filter(array_map(fn($k) => (int)($data[$k] ?? 0), ISM_EVAL_CRIT)); if ($cr) $data['rating'] = (int) round(100 * array_sum($cr) / (5 * count($cr)));
         if ($status === 'done') { if (count($cr) < count(ISM_EVAL_CRIT)) throw new RuntimeException(t('ism.e_eval_scores')); if (empty($data['evaluated_on'])) $data['evaluated_on'] = date('Y-m-d'); if (empty($data['evaluator'])) $data['evaluator'] = (string)($u0['full_name'] ?? '');
@@ -231,6 +292,7 @@ function ism_save_from_post(): int {
         if ($reg === 'msw' && $status !== 'development') ism_release_notify($id, $code, $title, (string)($data['version'] ?? ''), $status, $owner);
     }
     if ($reg === 'supeval' && $status === 'done') ism_eval_apply((int)$L['parent_id']);
+    if ($reg === 'qcal' && in_array($status, ['done', 'failed'], true)) ism_cal_apply((int)$L['parent_id']);
     return $id;
 }
 /** A release that waits for review goes to the programming team and the ISMS people; an approved, released or installed one to its developer. */
@@ -301,11 +363,12 @@ function ism_export(): void {
 }
 /** Hourly: tell the owner (or the ISMS team) once about a record whose due or review date is within 14 days or has passed. */
 function ism_sweep(): int {
-    if (!ism_has() || time() - (int) cp_setting('ism_sweep_at', '0') < 3600 || !function_exists('nf_push')) return 0; cp_setting_set('ism_sweep_at', (string) time()); $n = 0; $lim = date('Y-m-d', strtotime('+14 days')); $team = array_values(array_unique(array_merge(ism_team(), array_map('intval', array_column(all("SELECT cu.id FROM customer_users cu WHERE cu.is_active = 1 AND cu.role = 'admin' LIMIT 5"), 'id')))));
+    if (!ism_has() || time() - (int) cp_setting('ism_sweep_at', '0') < 3600 || !function_exists('nf_push')) return 0; cp_setting_set('ism_sweep_at', (string) time()); $n = 0; $lim = date('Y-m-d', strtotime('+30 days')); $lim14 = date('Y-m-d', strtotime('+14 days')); $team = array_values(array_unique(array_merge(ism_team(), array_map('intval', array_column(all("SELECT cu.id FROM customer_users cu WHERE cu.is_active = 1 AND cu.role = 'admin' LIMIT 5"), 'id')))));
     foreach (all("SELECT * FROM ism_records WHERE (due_date IS NOT NULL AND due_date <= ?) OR (review_date IS NOT NULL AND review_date <= ?)", [$lim, $lim]) as $r) {
         $R = ism_reg((string)$r['reg']); if (!$R) continue; $open = !in_array($r['status'], $R['closed'], true);
         foreach ([['due_date', $open, 'ism.nf_due'], ['review_date', !in_array($r['status'], ['obsolete', 'retired', 'ended', 'dropped', 'na', 'not_applicable', 'cancelled'], true), 'ism.nf_review']] as [$col, $want, $key]) {
-            if (!$want || !$r[$col] || $r[$col] > $lim) continue; $to = $r['owner_user_id'] ? [(int)$r['owner_user_id']] : (($R['grp'] ?? '') === 'marine' ? array_values(array_unique(array_merge(ism_mteam(), $team))) : $team); if (!$to) continue;
+            if (!$want || !$r[$col] || $r[$col] > (isset($R['remind']) ? $lim : $lim14)) continue; if ($r['reg'] === 'qequip' && (ism_data($r)['cal_needed'] ?? 'yes') === 'no') continue;
+            $to = $r['owner_user_id'] ? [(int)$r['owner_user_id']] : (($R['grp'] ?? '') === 'qhse' ? array_values(array_unique(array_merge(qh_team(), $team))) : (($R['grp'] ?? '') === 'marine' ? array_values(array_unique(array_merge(ism_mteam(), $team))) : $team)); if (!$to) continue;
             if ($r['reg'] === 'mdoc' && $r['status'] === 'missing' && !$r['due_date']) continue;
             $n += (int) nf_push($to, 'ism:due', 'ism:' . $r['id'] . ':' . $col . ':' . $r[$col], t($key, ['c' => $r['code'], 't' => mb_substr((string)$r['title'], 0, 80), 'd' => fmt_date($r[$col])]), null, url('isms_rec', ['id' => (int)$r['id']]), null, null);
         }
@@ -326,8 +389,12 @@ function ism_handle_action(string $action): bool {
         if ($to && function_exists('nf_push')) nf_push($to, 'ism:incident', 'ism:' . $rid, t('ism.nf_incident', ['c' => $code, 't' => $title]), null, url('isms_rec', ['id' => $rid]), (int)$u['id'], (string)$u['full_name']);
         flash('good', t('ism.report_ok', ['c' => $code])); redirect('isms_report', ['sent' => 1]);
     }
-    if (!ism_can() && !ism_can_marine()) throw new RuntimeException(t('err.noaccess'));
+    if (!ism_can() && !ism_can_marine() && !qh_can()) throw new RuntimeException(t('err.noaccess'));
     switch ($action) {
+        case 'qh_access_save': if (!ism_top()) throw new RuntimeException(t('err.noaccess'));
+            $rs = array_map('intval', array_column(all('SELECT id FROM staff_roles'), 'id')); $ds = array_map('intval', array_column(all('SELECT id FROM disciplines'), 'id'));
+            cp_setting_set('qh_access', json_encode(['roles' => array_values(array_intersect(array_map('intval', (array)($_POST['roles'] ?? [])), $rs)), 'disc' => array_values(array_intersect(array_map('intval', (array)($_POST['disc'] ?? [])), $ds))])); flash('good', t('ism.saved')); redirect('qhse', [], '#access');
+        case 'qh_team_save': if (!ism_manage()) throw new RuntimeException(t('err.noaccess')); $ok = array_map('intval', array_column(ism_users(), 'id')); cp_setting_set('qh_team', json_encode(array_values(array_intersect(array_map('intval', (array)($_POST['team'] ?? [])), $ok)))); flash('good', t('ism.saved')); redirect('qhse', [], '#team');
         case 'ism_save': $id = ism_save_from_post(); flash('good', t('ism.saved')); redirect('isms_rec', ['id' => $id]);
         case 'ism_delete': $x = ism_get((int)($_POST['id'] ?? 0)); $reg = ism_delete((int)($_POST['id'] ?? 0)); flash('good', t('ism.deleted')); if ($x && $x['parent_id']) redirect('isms_rec', ['id' => (int)$x['parent_id']]); redirect(ism_page($reg), ['reg' => $reg]);
         case 'ism_tr_create': $rid = ism_tr_create((int)($_POST['id'] ?? 0)); flash('good', t('ism.tr_created')); redirect('isms_rec', ['id' => $rid], '#hrtr');
@@ -408,11 +475,11 @@ function ism_supplier_card(int $companyId): void {
 }
 /** HR training behind an ISO training record, with its members. */
 function ism_tr(array $r): ?array { if (!ism_has_ext() || empty($r['hr_training_id']) || !function_exists('hr_tr_has') || !hr_tr_has()) return null; $t = one('SELECT * FROM hr_trainings WHERE id = ?', [(int)$r['hr_training_id']]); if (!$t) return null; $t['members'] = all('SELECT m.person_id, m.status, p.name_en FROM hr_training_members m JOIN hr_people p ON p.id = m.person_id WHERE m.training_id = ? ORDER BY p.name_en', [(int)$t['id']]); return $t; }
-function ism_tr_rec(int $rid): array { $r = ism_get($rid); if (!$r || $r['reg'] !== 'training' || !ism_can() || !ism_has_ext() || !function_exists('hr_tr_has') || !hr_tr_has()) throw new RuntimeException(t('err.noaccess')); return $r; }
+function ism_tr_rec(int $rid): array { $r = ism_get($rid); if (!$r || empty(ism_reg((string)$r['reg'])['hrtr']) || !ism_can_reg((string)$r['reg']) || !ism_has_ext() || !function_exists('hr_tr_has') || !hr_tr_has()) throw new RuntimeException(t('err.noaccess')); return $r; }
 /** Create the training in HR › Training from the ISO record (internal, offered to everybody) and link the two. */
 function ism_tr_create(int $rid): int {
     $r = ism_tr_rec($rid); if (!empty($r['hr_training_id']) && scalar('SELECT id FROM hr_trainings WHERE id = ?', [(int)$r['hr_training_id']])) return $rid; $d = ism_data($r); $u = current_user();
-    q("INSERT INTO hr_trainings (kind, title, provider, trainer, date_from, date_to, description, target, status, created_by) VALUES ('internal', ?, 'Golden A/S — ISO 27001', ?, ?, ?, ?, 'all', ?, ?)", [mb_substr((string)$r['title'], 0, 160), mb_substr((string)($d['trainer'] ?? ''), 0, 120) ?: null, $r['due_date'], $r['due_date'], mb_substr(trim('ISO/IEC 27001 — ' . $r['code'] . "\n" . (string)($d['audience'] ?? '') . "\n" . (string)($d['notes'] ?? '')), 0, 8000), $r['status'] === 'done' ? 'done' : 'closed', (int)($u['id'] ?? 0) ?: null]);
+    q("INSERT INTO hr_trainings (kind, title, provider, trainer, date_from, date_to, description, target, status, created_by) VALUES ('internal', ?, ?, ?, ?, ?, ?, 'all', ?, ?)", [mb_substr((string)$r['title'], 0, 160), $r['reg'] === 'qtrain' ? 'Golden A/S — QHSE' : 'Golden A/S — ISO 27001', mb_substr((string)($d['trainer'] ?? ''), 0, 120) ?: null, $r['due_date'], $r['due_date'], mb_substr(trim(($r['reg'] === 'qtrain' ? 'QHSE — ' : 'ISO/IEC 27001 — ') . $r['code'] . "\n" . (string)($d['audience'] ?? '') . "\n" . (string)($d['notes'] ?? '')), 0, 8000), $r['status'] === 'done' ? 'done' : 'closed', (int)($u['id'] ?? 0) ?: null]);
     $tid = (int) db()->lastInsertId(); q('UPDATE ism_records SET hr_training_id = ? WHERE id = ?', [$tid, $rid]); ism_event($rid, 'update', 'HR › Training #' . $tid); return $rid;
 }
 function ism_tr_link(int $rid, int $tid): int { $r = ism_tr_rec($rid); if ($tid && !scalar('SELECT id FROM hr_trainings WHERE id = ?', [$tid])) throw new RuntimeException(t('err.notfound')); q('UPDATE ism_records SET hr_training_id = ? WHERE id = ?', [$tid ?: null, $rid]); ism_event($rid, 'update', 'HR › Training ' . ($tid ? '#' . $tid : '—')); return $rid; }
@@ -427,4 +494,47 @@ function ism_tr_attend(int $rid, array $pids, bool $close): int {
     ism_event($rid, $close && $r['status'] !== 'done' ? 'status' : 'update', t('ism.f_attendees') . ': ' . $n . ($close && $r['status'] !== 'done' ? ' · ' . t('ism.s_' . $r['status']) . ' → ' . t('ism.s_done') : '')); return $n;
 }
 /** Line on the HR training page: the ISO 27001 record it belongs to. */
-function ism_tr_badge(int $hrTrainingId): string { if (!function_exists('ism_has_ext') || !ism_has_ext()) return ''; $r = one("SELECT id, code, title FROM ism_records WHERE reg = 'training' AND hr_training_id = ?", [$hrTrainingId]); if (!$r) return ''; return '<p class="hint">🛡 ' . tt('ism.tr_badge') . ' ' . (ism_can() ? '<a href="' . url('isms_rec', ['id' => (int)$r['id']]) . '">' . e($r['code']) . '</a>' : e($r['code'])) . '</p>'; }
+function ism_tr_badge(int $hrTrainingId): string { if (!function_exists('ism_has_ext') || !ism_has_ext()) return ''; $r = one("SELECT id, code, title, reg FROM ism_records WHERE reg IN ('training','qtrain') AND hr_training_id = ?", [$hrTrainingId]); if (!$r) return ''; return '<p class="hint">🛡 ' . tt($r['reg'] === 'qtrain' ? 'ism.tr_badge_q' : 'ism.tr_badge') . ' ' . (ism_can_reg((string)$r['reg']) ? '<a href="' . url('isms_rec', ['id' => (int)$r['id']]) . '">' . e($r['code']) . '</a>' : e($r['code'])) . '</p>'; }
+
+/* ------------------------------------------------------------ R97-086 — QHSE: calibration of measuring equipment, statistics, export */
+/** The latest finished calibration of an instrument sets its last calibration, certificate, result and the date its certificate is valid until
+ *  (the date on the certificate, else calibration date + the interval of the instrument); a failed one takes the instrument out of service. */
+function ism_cal_apply(int $eqId): void {
+    $E = ism_get($eqId); if (!$E || $E['reg'] !== 'qequip') return; $last = null;
+    foreach (ism_children($eqId, 'qcal') as $c) { if (!in_array($c['status'], ['done', 'failed'], true)) continue; if (!$last || (string)(ism_data($c)['cal_date'] ?? '') >= (string)(ism_data($last)['cal_date'] ?? '')) $last = $c; }
+    if (!$last) return; $d = ism_data($last); $ed = ism_data($E); $on = (string)$d['cal_date'];
+    $ed['last_cal'] = $on; $ed['cert_no'] = (string)($d['cert_no'] ?? ''); $ed['cal_result'] = (string)($d['cal_result'] ?? ''); $ed['lab'] = (string)($d['lab'] ?? '');
+    $until = !empty($d['valid_until']) ? (string)$d['valid_until'] : ((int)($ed['cal_interval'] ?? 0) > 0 ? date('Y-m-d', strtotime($on . ' +' . (int)$ed['cal_interval'] . ' months')) : null);
+    $st = $E['status'] === 'retired' ? 'retired' : ($last['status'] === 'failed' ? 'out_of_service' : 'in_use');
+    q('UPDATE ism_records SET data = ?, status = ?, review_date = ?, updated_at = NOW() WHERE id = ?', [json_encode($ed, JSON_UNESCAPED_UNICODE), $st, $last['status'] === 'failed' ? $E['review_date'] : $until, $eqId]);
+    ism_event($eqId, $st !== $E['status'] ? 'status' : 'update', $last['code'] . ' · ' . $ed['cert_no'] . ' · ' . t('ism.o_' . $ed['cal_result']) . ($until && $last['status'] !== 'failed' ? ' · → ' . fmt_date($until) : '') . ($st !== $E['status'] ? ' · ' . t('ism.s_' . $E['status']) . ' → ' . t('ism.s_' . $st) : ''));
+}
+/** State of the calibration of an instrument: ['none'|'na'|'valid'|'soon'|'expired'|'out', tone]. */
+function ism_cal_state(array $r): array {
+    $d = ism_data($r); if ($r['status'] === 'retired') return ['na', 'mute']; if ($r['status'] === 'out_of_service') return ['out', 'bad']; if (($d['cal_needed'] ?? 'yes') === 'no') return ['na', 'mute'];
+    if (!$r['review_date']) return ['none', 'bad']; $t = date('Y-m-d'); if ($r['review_date'] < $t) return ['expired', 'bad']; return $r['review_date'] <= date('Y-m-d', strtotime('+30 days')) ? ['soon', 'gold'] : ['valid', 'green'];
+}
+/** Per register of a QHSE tab: records, open, overdue; and the list of what needs attention. */
+function qh_stats(string $std): array {
+    $regs = qh_regs($std); $O = ['regs' => [], 'due' => []]; foreach ($regs as $k => $R) $O['regs'][$k] = ['n' => 0, 'open' => 0, 'due' => 0]; if (!$regs) return $O;
+    foreach (all("SELECT * FROM ism_records WHERE reg IN ('" . implode("','", array_keys($regs)) . "') ORDER BY COALESCE(due_date, review_date), id") as $r) {
+        $k = (string)$r['reg']; $O['regs'][$k]['n']++; if (!in_array($r['status'], $regs[$k]['closed'], true)) $O['regs'][$k]['open']++;
+        if ($k === 'qequip') { $cs = ism_cal_state($r)[0]; $why = in_array($cs, ['expired', 'none'], true) ? 'review' : null; } else $why = ism_due($r);
+        if ($why) { $O['regs'][$k]['due']++; if (count($O['due']) < 40) $O['due'][] = $r + ['_why' => $why]; }
+    }
+    return $O;
+}
+function qh_export(string $std): void {
+    if (!qh_can()) throw new RuntimeException(t('err.noaccess')); require_once __DIR__ . '/xlsxw.php'; $sheets = []; $all = $std === 'all' ? ism_regs('qhse') : qh_regs($std); $sum = []; $cnt = [];
+    foreach (QH_STD as $sk => $_) { $S = qh_stats($sk); foreach ($S['regs'] as $k => $x) $cnt[$k] = $x; }
+    foreach ($all as $k => $R) $sum[] = [QH_STD[$R['std']], ism_reg_title($k), $R['clause'], $cnt[$k]['n'], $cnt[$k]['open'], $cnt[$k]['due']];
+    $sheets[] = ['name' => 'Summary', 'first' => true, 'header' => [t('qh.std'), t('ism.register'), t('ism.clause'), t('ism.n_records'), t('ism.n_open'), t('ism.n_due')], 'rows' => $sum, 'widths' => [14, 38, 16, 12, 12, 12]];
+    foreach ($all as $k => $R) {
+        $h = [t('ism.code'), t('ism.title_f')]; if (!empty($R['parent'])) $h[] = t('ism.par_' . $R['parent']); if (!empty($R['links'])) { $h[] = t('ism.vessel'); $h[] = t('ism.project'); }
+        array_push($h, t('th.status'), t('ism.owner'), t('ism.due_date'), t('ism.review_date')); $F = array_merge($R['f'], array_fill_keys($R['auto'] ?? [], 'text')); foreach ($F as $fk => $_) $h[] = t('ism.f_' . $fk); $h[] = t('ism.files'); $rows = [];
+        foreach (ism_list($k) as $r) { $d = ism_data($r); $row = [$r['code'], $r['title']]; if (!empty($R['parent'])) $row[] = trim((string)$r['parent_code'] . ' ' . (string)$r['parent_title']); if (!empty($R['links'])) { $row[] = (string)$r['vessel_name']; $row[] = trim((string)$r['project_code'] . ' ' . (string)$r['project_name']); }
+            array_push($row, t('ism.s_' . $r['status']), (string)$r['owner_name'], (string)$r['due_date'], (string)$r['review_date']); foreach ($F as $fk => $type) { $v = $d[$fk] ?? ''; $row[] = (str_starts_with($type, 'sel:') || $fk === 'cal_result') && $v !== '' ? t('ism.o_' . $v) : $v; } $row[] = (int)$r['n_files']; $rows[] = $row; }
+        $sheets[] = ['name' => mb_substr(preg_replace('/[\\\\\/\?\*\[\]:]/', ' ', ism_reg_title($k)), 0, 31), 'header' => $h, 'rows' => $rows, 'widths' => array_merge([14, 40], array_fill(0, count($h) - 2, 20))];
+    }
+    xlsx_download('GAS-QHSE_' . ($std === 'all' ? 'all' : $std) . '_' . date('Y-m-d') . '.xlsx', $sheets);
+}

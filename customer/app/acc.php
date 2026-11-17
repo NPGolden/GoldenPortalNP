@@ -18,10 +18,10 @@
 const ACC_TYPES = ['normal', 'overtime', 'holiday', 'travel'];
 
 function acc_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'acc_reports'"); } catch (Throwable $e) { $h = false; } } return $h; }
-function acc_user_flag(string $col): bool { $u = current_user(); if (!$u || !acc_has()) return false; static $c = []; $k = $col . (int)$u['id']; if (!isset($c[$k])) $c[$k] = (bool) scalar("SELECT {$col} FROM customer_users WHERE id = ?", [(int)$u['id']]); return $c[$k]; }
+function acc_user_flag(string $col): bool { $u = current_user(); if (!$u || !acc_has()) return false; if (function_exists('fin_blocked') && fin_blocked()) return false;   /* R97-086 */ static $c = []; $k = $col . (int)$u['id']; if (!isset($c[$k])) $c[$k] = (bool) scalar("SELECT {$col} FROM customer_users WHERE id = ?", [(int)$u['id']]); return $c[$k]; }
 /** May prepare accounting reports: administrators, accounts ticked "May prepare accounting reports", the PM of the project. */
 function acc_can_prepare(?int $pid = null): bool {
-    if (!acc_has() || !is_staff()) return false;
+    if (!acc_has() || !is_staff() || (function_exists('fin_blocked') && fin_blocked())) return false;
     if (is_cp_admin() || acc_user_flag('can_accounting')) return true;
     if ($pid) { $u = current_user(); return (int) scalar('SELECT pm_user_id FROM projects WHERE id = ?', [$pid]) === (int)$u['id']; }
     return (bool) scalar("SELECT COUNT(*) FROM projects WHERE pm_user_id = ? AND status <> 'completed'", [(int)current_user()['id']]);

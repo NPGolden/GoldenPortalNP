@@ -26,7 +26,7 @@ function pr_admin(): bool { static $v = null; if ($v === null) $v = is_staff() &
 /** Warehouse moves (receipts / issues / adjustments / transfers). */
 function pr_wh(): bool { static $v = null; if ($v === null) $v = pr_admin() || (is_staff() && stk_has() && stk_flag('can_warehouse')); return $v; }
 /** Prices visible: procurement, management, accounting, financial right. */
-function stk_price_visible(): bool { static $v = null; if ($v === null) $v = pr_admin() || (function_exists('it_buyer') && it_buyer()) || stk_flag('is_accounting') || (function_exists('fin_visible') && fin_visible()); return $v; }
+function stk_price_visible(): bool { static $v = null; if ($v === null) $v = !(function_exists('fin_blocked') && fin_blocked()) && (pr_admin() || (function_exists('it_buyer') && it_buyer()) || stk_flag('is_accounting') || (function_exists('fin_visible') && fin_visible())); return $v; }
 function require_pr(): array { $u = require_staff(); if (!pr_can()) { http_response_code(403); exit(t('err.noaccess')); } return $u; }
 function require_pr_admin(): array { $u = require_staff(); if (!pr_admin()) { http_response_code(403); exit(t('err.noaccess')); } return $u; }
 function require_pr_wh(): array { $u = require_staff(); if (!pr_wh()) { http_response_code(403); exit(t('err.noaccess')); } return $u; }

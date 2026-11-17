@@ -502,11 +502,21 @@ function sys_select_options($selected): string {
 /** True once migrate_cp_r10_approvals_invoicing.sql has run. */
 /** R18: may the signed-in person see money (offer amounts, invoicing)? Owners always (it is their money), administrators always,
  *  Golden A/S staff according to the "Financial data visible" switch of their Golden A/S role (roles default to visible). */
+/** R97-086: the QHSE Manager (a staff role named QHSE / HSE / Quality) has no access to the financial data of the company — whatever the
+ *  switch of the role, the rights ticked on the account or an administrator account say. Checked by fin_visible(), col_can(), cf_can(),
+ *  stk_price_visible() and the accounting rights. */
+/** Pages that show financial data: closed to an account that is fin_blocked(), in the router, before any page code runs. */
+const FIN_PAGES = ['pipeline', 'report_fin', 'report_sales', 'sales', 'admin_sales', 'collections', 'statement', 'cashflow', 'cost_control', 'acc_register', 'acc_report', 'acc_reports', 'acc_vessel', 'dn_invoicing', 'invoice_new', 'proforma', 'proformas', 'payable', 'payables', 'offer', 'offer_edit', 'offers', 'admin_offer_classes', 'admin_offer_statuses', 'admin_offer_texts', 'system_budget', 'system_budget_bom', 'system_budget_checks', 'system_budget_convert', 'system_budget_feed', 'system_budget_import', 'system_budget_proc', 'system_budgets', 'system_budgets_proc'];
+function fin_blocked(): bool {
+    static $v = null; if ($v !== null) return $v; $u = current_user(); if (!$u || !is_staff() || empty($u['staff_role_id'])) return $v = false;
+    try { $n = mb_strtolower(trim((string) scalar('SELECT name FROM staff_roles WHERE id = ?', [(int)$u['staff_role_id']]))); return $v = (bool) preg_match('/\b(qhse|hse|ehs|quality)\b|ποιότητ/u', $n); } catch (Throwable $e) { return $v = false; }
+}
 function fin_visible(): bool {
     static $v = null;
     if ($v !== null) return $v;
     $u = current_user();
     if (!$u) return $v = false;
+    if (fin_blocked()) return $v = false;
     if (!is_staff() || is_cp_admin()) return $v = true;
     try {
         if (!(bool) scalar("SHOW COLUMNS FROM staff_roles LIKE 'see_financials'")) return $v = true;

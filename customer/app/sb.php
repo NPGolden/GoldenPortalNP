@@ -24,7 +24,7 @@ const SB_MAX_REVISIONS = 50;     // R97-005: stored revisions per budget
 
 function sb_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'sb_budgets'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Sales, project managers, management (CEO / GM / owner scope) and administrators. */
-function sb_can(): bool { static $v = null; if ($v === null) $v = function_exists('is_staff') && is_staff() && sb_has() && (is_cp_admin() || (function_exists('mgmt_can') && mgmt_can()) || (function_exists('pm_is_pm') && pm_is_pm()) || (function_exists('pi_is_sales') && pi_is_sales())); return $v; }
+function sb_can(): bool { static $v = null; if ($v === null) $v = function_exists('is_staff') && is_staff() && sb_has() && !(function_exists('fin_blocked') && fin_blocked()) && (is_cp_admin() || (function_exists('mgmt_can') && mgmt_can()) || (function_exists('pm_is_pm') && pm_is_pm()) || (function_exists('pi_is_sales') && pi_is_sales())); return $v; }
 function sb_can_reopen(): bool { return sb_can() && (is_cp_admin() || (function_exists('mgmt_can') && mgmt_can())); }
 function sb_require(): array { $u = require_staff(); if (!sb_can()) { http_response_code(403); exit(t('err.noaccess')); } return $u; }
 function sb_guard(): void { if (!sb_can()) throw new RuntimeException(t('err.noaccess')); }
