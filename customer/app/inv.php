@@ -237,6 +237,7 @@ function stk_settings_save_from_post(): void {
     require_pr_admin(); $rule = in_array($_POST['rule'] ?? '', STK_RULES, true) ? $_POST['rule'] : 'last';
     cp_setting_set('proc_price_rule', $rule); cp_setting_set('proc_price_n', (string) max(2, min(10, (int)($_POST['n'] ?? 3)))); cp_setting_set('proc_price_pct', (string) round((float) str_replace(',', '.', (string)($_POST['pct'] ?? '0')), 2));
     $disc = array_values(array_unique(array_map('intval', (array)($_POST['disciplines'] ?? [])))); cp_setting_set('proc_disciplines', json_encode($disc));
+    if (isset($_POST['it_buy_form'])) cp_setting_set('po_approved_only', empty($_POST['po_approved_only']) ? '0' : '1');   // R97-087
     if (isset($_POST['it_buy_form'])) cp_setting_set('it_buy_pos', json_encode(['roles' => array_values(array_unique(array_map('intval', (array)($_POST['it_roles'] ?? [])))), 'disc' => array_values(array_unique(array_map('intval', (array)($_POST['it_disc'] ?? []))))]));   // R97-084
     cp_setting_set('proc_pay_threshold', (string) round((float) str_replace(',', '.', (string)($_POST['pay_threshold'] ?? '0')), 2));
     cp_setting_set('proc_offer_margin', (string) round(max(-100.0, min(1000.0, (float) str_replace(',', '.', (string)($_POST['offer_margin'] ?? '25')))), 2));   // R82-001

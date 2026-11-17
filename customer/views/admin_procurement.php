@@ -21,6 +21,9 @@ layout_head(t('stk.settings'), 'admin_procurement');
       </div>
       <h3 style="margin-top:12px;"><?= tt('stk.disciplines') ?></h3><p class="hint"><?= tt('stk.disciplines_hint') ?></p>
       <div class="pr-disc"><?php foreach ($disc as $d): ?><label><input type="checkbox" name="disciplines[]" value="<?= (int)$d['id'] ?>"<?= in_array((int)$d['id'], $on, true) ? ' checked' : '' ?>> <?= e($d['name']) ?></label><?php endforeach; ?></div>
+      <?php if (function_exists('sup_po_strict')): $nAp = (int) scalar("SELECT COUNT(*) FROM ism_records WHERE reg = 'qsup' AND status IN ('active','conditional')"); ?>
+      <h3 style="margin-top:12px;" id="approved">✅ <?= tt('qh.set_h') ?></h3><label class="chk"><input type="checkbox" name="po_approved_only" value="1"<?= sup_po_strict() ? ' checked' : '' ?>> <?= tt('qh.set_chk') ?></label><p class="hint"><?= e(t('qh.set_hint', ['n' => $nAp])) ?> <a href="<?= url('qhse', ['reg' => 'qsup', 'format' => 'asl']) ?>">⤓ <?= tt('qh.asl') ?></a></p>
+      <?php endif; ?>
       <?php if (function_exists('it_buy_has') && it_buy_has()): $ITP = it_buy_positions(); $itRoles = all('SELECT id, name FROM staff_roles WHERE is_active = 1 ORDER BY sort_order, name'); ?>
       <h3 style="margin-top:12px;" id="it">💻 <?= tt('it.set_h') ?></h3><p class="hint"><?= tt('it.set_hint') ?><?= $ITP['saved'] ? '' : ' <b>' . tt('it.set_default') . '</b>' ?></p><input type="hidden" name="it_buy_form" value="1">
       <p style="margin:6px 0 2px;"><b><?= tt('ism.acc_roles') ?></b></p><div class="pr-disc"><?php foreach ($itRoles as $d): ?><label><input type="checkbox" name="it_roles[]" value="<?= (int)$d['id'] ?>"<?= in_array((int)$d['id'], $ITP['roles'], true) ? ' checked' : '' ?>> <?= e($d['name']) ?></label><?php endforeach; ?></div>

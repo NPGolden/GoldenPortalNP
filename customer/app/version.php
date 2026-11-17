@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.163.1';
+const CP_VERSION = '1.164.0';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-088', 'version' => '1.164.0', 'date' => '2026-11-17', 'title' => 'QHSE: approved suppliers (ISO 9001 8.4) evaluated on the supplier list and shown to procurement, with purchase orders refused to suppliers that are Not approved and an optional rule approved-only; Excel import of register records (instruments with their last calibration); Documents library for all staff; the PM app no longer shows offer amounts to accounts without financial data.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-087', 'version' => '1.163.1', 'date' => '2026-11-17', 'title' => 'QHSE: saving the QHSE team and Access by position did nothing — fixed.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-086', 'version' => '1.163.0', 'date' => '2026-11-17', 'title' => 'QHSE: new menu group for the quality department — the registers of ISO 9001, ISO 14001, ISO 45001 and ISO 22301, with measuring equipment, its calibrations and the validity of the certificates; its own handbook in Support; a staff role named QHSE, HSE or Quality has no access to financial data.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-085', 'version' => '1.162.1', 'date' => '2026-11-17', 'title' => 'Support: IT & Cybersecurity has its own handbook (its entries leave the Staff and Project Manager handbooks); every record of IT & Cybersecurity opens with its automatic number filled in, which can be changed — documents and releases of a product and evaluations of a supplier are numbered under it.', 'db' => null, 'check' => null],

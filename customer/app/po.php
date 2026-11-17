@@ -86,6 +86,7 @@ function po_save_from_post(): int {
     $pid = (int)($_POST['project_id'] ?? 0) ?: null; $sid = (int)($_POST['subproject_id'] ?? 0) ?: null;
     if ($sid) { $pp = (int) scalar('SELECT project_id FROM subprojects WHERE id = ?', [$sid]); if (!$pp) $sid = null; elseif (!$pid) $pid = $pp; elseif ($pp !== $pid) $sid = null; }
     if (po_it() && !it_sub_ok($sid)) throw new RuntimeException(t('it.e_sub'));
+    if (function_exists('sup_po_check') && (($id ? (string) scalar('SELECT kind FROM po_orders WHERE id = ?', [$id]) : (($_POST['kind'] ?? 'po') === 'rfq' ? 'rfq' : 'po')) === 'po') && (!$id || (int) scalar("SELECT supplier_id FROM po_orders WHERE id = ? AND status = 'draft'", [$id]) !== $sup && (string) scalar('SELECT status FROM po_orders WHERE id = ?', [$id]) === 'draft')) sup_po_check($sup);   // R97-087: purchase orders go to approved suppliers
     $v = ['supplier_id' => $sup, 'project_id' => $pid, 'subproject_id' => $sid, 'title' => mb_substr(trim((string)($_POST['title'] ?? '')), 0, 160) ?: null,
           'currency' => preg_match('/^[A-Z]{3}$/', (string)($_POST['currency'] ?? '')) ? $_POST['currency'] : (string)(($S['sup_currency'] ?? '') ?: 'EUR'),
           'incoterms' => in_array($_POST['incoterms'] ?? '', PO_INCOTERMS, true) ? $_POST['incoterms'] : ($S['incoterms'] ?? null),
@@ -169,6 +170,7 @@ function po_mark_sent(int $oid, array $to = []): void {
     $o = po_load($oid); if (!$o || !po_admin() || !in_array($o['status'], ['draft', 'sent', 'quoted'], true)) throw new RuntimeException(t('err.noaccess'));
     if (!(int) scalar("SELECT COUNT(*) FROM po_lines WHERE order_id = ? AND status <> 'cancelled'", [$oid])) throw new RuntimeException(t('prq.need_lines'));
     if ($o['kind'] === 'po' && (int) scalar("SELECT COUNT(*) FROM po_lines WHERE order_id = ? AND status <> 'cancelled' AND unit_price IS NULL", [$oid])) throw new RuntimeException(t('po.need_prices'));
+    if ($o['kind'] === 'po' && $o['status'] === 'draft' && function_exists('sup_po_check')) sup_po_check((int)$o['supplier_id']);   // R97-087: also for a PO made by awarding an RFQ
     $first = $o['status'] === 'draft';
     if ($first && $o['kind'] === 'po') {
         foreach (all('SELECT * FROM po_lines WHERE order_id = ? AND pr_line_id IS NOT NULL', [$oid]) as $l) { q('UPDATE pr_lines SET qty_ordered = qty_ordered + ?, status = ? WHERE id = ?', [(float)$l['qty'], 'ordered', (int)$l['pr_line_id']]); }

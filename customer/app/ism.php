@@ -134,6 +134,11 @@ function ism_regs(?string $grp = null): array {
                         'f' => ['eq_type' => 'text', 'maker_model' => 'text', 'serial' => 'text', 'range' => 'text', 'location' => 'text', 'cal_needed' => 'sel:yes,no', 'cal_interval' => 'num', 'notes' => 'area'], 'ref' => false, 'due' => false, 'review' => true, 'auto' => ['last_cal', 'cert_no', 'cal_result', 'lab']],
         'qcal'      => ['grp' => 'qhse', 'std' => '9001', 'icon' => '🧪', 'clause' => '7.1.5.2', 'prefix' => 'CAL', 'st' => ['planned' => 'gold', 'at_lab' => 'navy', 'done' => 'green', 'failed' => 'bad', 'cancelled' => 'mute'], 'closed' => ['done', 'failed', 'cancelled'],
                         'f' => ['cal_date' => 'date', 'lab' => 'text', 'accredited' => 'sel:yes,no', 'cert_no' => 'text', 'cal_result' => 'sel:cal_pass,cal_adjusted,cal_limited,cal_fail', 'valid_until' => 'date', 'standard_used' => 'text', 'uncertainty' => 'text', 'notes' => 'area'], 'ref' => false, 'due' => true, 'review' => false, 'parent' => 'qequip'],
+        /* R97-087 — approved suppliers (ISO 9001 8.4): a supplier of the supplier list, evaluated; procurement orders from this list */
+        'qsup'      => ['grp' => 'qhse', 'std' => '9001', 'icon' => '🤝', 'clause' => '8.4', 'prefix' => 'AS', 'st' => ['candidate' => 'gold', 'active' => 'green', 'conditional' => 'gold', 'blocked' => 'bad', 'ended' => 'mute'], 'closed' => ['active', 'conditional', 'blocked', 'ended'],
+                        'f' => ['sup_category' => 'sel:material,equipment_s,subcontractor,service_s,calibration_lab,logistics_s', 'supplies' => 'text', 'critical' => 'sel:yes,no', 'agreement' => 'text', 'last_review' => 'date', 'notes' => 'area'], 'ref' => false, 'due' => false, 'review' => true, 'auto' => ['rating', 'rating_result']],
+        'qsupeval'  => ['grp' => 'qhse', 'std' => '9001', 'icon' => '📝', 'clause' => '8.4.1', 'prefix' => 'SE', 'st' => ['planned' => 'gold', 'done' => 'green', 'cancelled' => 'mute'], 'closed' => ['done', 'cancelled'],
+                        'f' => ['eval_kind' => 'sel:initial,periodic,after_incident', 'evaluated_on' => 'date', 'evaluator' => 'text', 'c_q_quality' => 'score', 'c_q_delivery' => 'score', 'c_q_docs' => 'score', 'c_q_response' => 'score', 'c_q_terms' => 'score', 'c_q_hse' => 'score', 'eval_result' => 'sel:res_approved,res_conditional,res_rejected', 'conditions' => 'area', 'notes' => 'area'], 'ref' => false, 'due' => true, 'review' => false, 'parent' => 'qsup', 'auto' => ['rating']],
         'qaspect'   => ['grp' => 'qhse', 'std' => '14001', 'icon' => '🌍', 'clause' => '6.1.2', 'prefix' => 'EA', 'st' => ['open' => 'bad', 'treating' => 'gold', 'accepted' => 'navy', 'closed' => 'green'], 'closed' => ['accepted', 'closed'], 'score' => true,
                         'f' => ['activity' => 'text', 'aspect' => 'text', 'env_impact' => 'text', 'condition' => 'sel:normal,abnormal,emergency', 'likelihood' => 'score', 'impact' => 'score', 'controls' => 'area', 'res_likelihood' => 'score', 'res_impact' => 'score'], 'ref' => false, 'due' => false, 'review' => true],
         'qwaste'    => ['grp' => 'qhse', 'std' => '14001', 'icon' => '♻', 'clause' => '8.1 · 9.1', 'prefix' => 'WR', 'st' => ['open' => 'gold', 'closed' => 'green'], 'closed' => ['closed'],
@@ -152,6 +157,9 @@ function ism_regs(?string $grp = null): array {
     return $grp === null ? $all : array_filter($all, fn($R) => ($R['grp'] ?? 'iso') === $grp);
 }
 const ISM_EVAL_CRIT = ['c_agreement', 'c_certification', 'c_access', 'c_incidents', 'c_continuity', 'c_quality'];
+/** R97-087: supplier registers and their evaluation registers; the criteria of each evaluation. */
+const ISM_SUP = ['supplier' => 'supeval', 'qsup' => 'qsupeval'];
+const ISM_EVAL = ['supeval' => ISM_EVAL_CRIT, 'qsupeval' => ['c_q_quality', 'c_q_delivery', 'c_q_docs', 'c_q_response', 'c_q_terms', 'c_q_hse']];
 /** The ten documents UR E27 (Rev.1) 3.1 asks for a computer-based system. */
 const ISM_E27_DOCS = [['3.1.1', 'CBS asset inventory'], ['3.1.2', 'Topology diagrams'], ['3.1.3', 'Description of security capabilities'], ['3.1.4', 'Test procedure of security capabilities'], ['3.1.5', 'Security configuration guidelines'], ['3.1.6', 'Secure development lifecycle documents'], ['3.1.7', 'Plans for maintenance and verification of the CBS'], ['3.1.8', 'Information supporting the owner\'s incident response and recovery plan'], ['3.1.9', 'Management of change plan'], ['3.1.10', 'Test reports']];
 function ism_reg(string $k): ?array { $r = ism_regs()[$k] ?? null; if ($r) $r['key'] = $k; return $r; }
@@ -192,7 +200,7 @@ function ism_list(string $reg, array $f = []): array {
     return $rows;
 }
 /** R97-085: the number a new record gets by default. A record that belongs to a product or a supplier is numbered under it: CBS-001-D11, CBS-001-SW02, SUP-003-E01. */
-const ISM_CHILD_SFX = ['mdoc' => 'D', 'msw' => 'SW', 'supeval' => 'E', 'qcal' => 'C'];
+const ISM_CHILD_SFX = ['mdoc' => 'D', 'msw' => 'SW', 'supeval' => 'E', 'qcal' => 'C', 'qsupeval' => 'E'];
 function ism_next_code(string $reg, int $parentId = 0): string {
     $R = ism_reg($reg); $max = 0;
     if ($parentId && isset(ISM_CHILD_SFX[$reg]) && ($pc = (string) scalar('SELECT code FROM ism_records WHERE id = ?', [$parentId])) !== '') {
@@ -216,10 +224,10 @@ function ism_save_from_post(): int {
     $D = function (string $k): ?string { $v = trim((string)($_POST[$k] ?? '')); return preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) && checkdate((int)substr($v, 5, 2), (int)substr($v, 8, 2), (int)substr($v, 0, 4)) ? $v : null; };
     $title = $S('title', 255);
     /* R97-083: a supplier of the register is a company of the supplier list — once only; its name is the title when none is typed */
-    $supId = null; if ($reg === 'supplier' && ism_has_ext()) { $supId = (int)($_POST['supplier_id'] ?? 0) ?: null;
-        if ($supId) { $co = one('SELECT co.id, co.name FROM companies co WHERE co.id = ? AND ' . sup_where(), [$supId]); if (!$co) $supId = null; else { if ($title === '') $title = mb_substr((string)$co['name'], 0, 255); if (scalar("SELECT COUNT(*) FROM ism_records WHERE reg = 'supplier' AND supplier_id = ? AND id <> ?", [$supId, $id])) throw new RuntimeException(t('ism.e_sup_twice')); } } }
+    $supId = null; if (isset(ISM_SUP[$reg]) && ism_has_ext()) { $supId = (int)($_POST['supplier_id'] ?? 0) ?: null;
+        if ($supId) { $co = one('SELECT co.id, co.name FROM companies co WHERE co.id = ? AND ' . sup_where(), [$supId]); if (!$co) $supId = null; else { if ($title === '') $title = mb_substr((string)$co['name'], 0, 255); if (scalar('SELECT COUNT(*) FROM ism_records WHERE reg = ? AND supplier_id = ? AND id <> ?', [$reg, $supId, $id])) throw new RuntimeException(t('ism.e_sup_twice')); } } }
     if ($reg === 'qcal' && $title === '') { $pp = ism_get((int)($_POST['parent_id'] ?? ($old['parent_id'] ?? 0))); if ($pp) $title = mb_substr((string)$pp['title'], 0, 255); }
-    if ($reg === 'supeval' && $title === '') { $pp = ism_get((int)($_POST['parent_id'] ?? ($old['parent_id'] ?? 0))); if ($pp) $title = mb_substr((string)$pp['title'], 0, 255); }
+    if (isset(ISM_EVAL[$reg]) && $title === '') { $pp = ism_get((int)($_POST['parent_id'] ?? ($old['parent_id'] ?? 0))); if ($pp) $title = mb_substr((string)$pp['title'], 0, 255); }
     if ($title === '') throw new RuntimeException(t('ism.e_title'));
     $status = (string)($_POST['status'] ?? ''); if (!isset($R['st'][$status])) $status = (string) array_key_first($R['st']);
     $owner = (int)($_POST['owner_user_id'] ?? 0); $ownerName = $owner ? (string) scalar("SELECT full_name FROM customer_users WHERE id = ? AND role <> 'customer'", [$owner]) : ''; if ($ownerName === '') $owner = 0;
@@ -257,15 +265,15 @@ function ism_save_from_post(): int {
         if ($ix($status) < $ix('approved')) unset($data['approved_by'], $data['approved_on']);   // back to development or test: the approval no longer stands
         if ($status === 'installed' && empty($data['installed_on'])) $data['installed_on'] = date('Y-m-d');
     }
-    if ($reg === 'supplier') foreach (['rating', 'rating_result'] as $k) if (isset($od0[$k])) $data[$k] = $od0[$k];
+    if (isset(ISM_SUP[$reg])) foreach (['rating', 'rating_result'] as $k) if (isset($od0[$k])) $data[$k] = $od0[$k];
     if ($reg === 'qequip') foreach (['last_cal', 'cert_no', 'cal_result', 'lab'] as $k) if (isset($od0[$k])) $data[$k] = $od0[$k];
     if ($reg === 'qcal' && in_array($status, ['done', 'failed'], true)) {   // R97-086: a finished calibration needs its date, certificate and result; a failed result is a failed calibration
         if (empty($data['cal_date']) || empty($data['cert_no']) || empty($data['cal_result'])) throw new RuntimeException(t('ism.e_cal_done'));
         $status = $data['cal_result'] === 'cal_fail' ? 'failed' : 'done';
     }
-    if ($reg === 'supeval') {
-        $cr = array_filter(array_map(fn($k) => (int)($data[$k] ?? 0), ISM_EVAL_CRIT)); if ($cr) $data['rating'] = (int) round(100 * array_sum($cr) / (5 * count($cr)));
-        if ($status === 'done') { if (count($cr) < count(ISM_EVAL_CRIT)) throw new RuntimeException(t('ism.e_eval_scores')); if (empty($data['evaluated_on'])) $data['evaluated_on'] = date('Y-m-d'); if (empty($data['evaluator'])) $data['evaluator'] = (string)($u0['full_name'] ?? '');
+    if (isset(ISM_EVAL[$reg])) {
+        $cr = array_filter(array_map(fn($k) => (int)($data[$k] ?? 0), ISM_EVAL[$reg])); if ($cr) $data['rating'] = (int) round(100 * array_sum($cr) / (5 * count($cr)));
+        if ($status === 'done') { if (count($cr) < count(ISM_EVAL[$reg])) throw new RuntimeException(t('ism.e_eval_scores')); if (empty($data['evaluated_on'])) $data['evaluated_on'] = date('Y-m-d'); if (empty($data['evaluator'])) $data['evaluator'] = (string)($u0['full_name'] ?? '');
             if (empty($data['eval_result'])) $data['eval_result'] = $data['rating'] >= 70 ? 'res_approved' : ($data['rating'] >= 50 ? 'res_conditional' : 'res_rejected'); }
     }
     $code = $S('code', 40);
@@ -281,7 +289,7 @@ function ism_save_from_post(): int {
         $od = ism_data($old); foreach ($R['f'] as $k => $_) if ((string)($od[$k] ?? '') !== (string)($data[$k] ?? '')) $ch[] = $k;
         if (ism_has_links()) { q('UPDATE ism_records SET parent_id = ?, project_id = ?, subproject_id = ?, vessel_id = ? WHERE id = ?', array_merge(array_values($L), [$id])); foreach (['project_id' => 'project', 'subproject_id' => 'sub-project', 'vessel_id' => 'vessel'] as $k => $lab) if (!empty($R['links']) && (int)($old[$k] ?? 0) !== (int)$L[$k]) $ch[] = $lab; }
         if ($ch) ism_event($id, $old['status'] !== $status ? 'status' : 'update', implode(' · ', $ch));
-        if ($supId !== null || $reg === 'supplier') { if (ism_has_ext()) q('UPDATE ism_records SET supplier_id = ? WHERE id = ?', [$supId, $id]); }
+        if ($supId !== null || isset(ISM_SUP[$reg])) { if (ism_has_ext()) q('UPDATE ism_records SET supplier_id = ? WHERE id = ?', [$supId, $id]); }
         if ($reg === 'msw' && $old['status'] !== $status) ism_release_notify($id, $code, $title, (string)($data['version'] ?? ''), $status, $owner);
     } else {
         q('INSERT INTO ism_records (reg, code, title, status, owner_user_id, owner_name, due_date, review_date, ref, data, updated_name, created_by, created_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)', array_merge([$reg], $row, [(int)($u['id'] ?? 0) ?: null, $row[9]]));
@@ -291,7 +299,7 @@ function ism_save_from_post(): int {
         if ($reg === 'mprod') foreach (ISM_E27_DOCS as $i => [$ref, $tt]) q("INSERT INTO ism_records (reg, code, title, status, ref, sort, data, parent_id, created_name) VALUES ('mdoc', ?, ?, 'missing', ?, ?, '{}', ?, 'IACS UR E27')", [$code . '-D' . str_pad((string)($i + 1), 2, '0', STR_PAD_LEFT), $tt, 'UR E27 ' . $ref, $i + 1, $id]);
         if ($reg === 'msw' && $status !== 'development') ism_release_notify($id, $code, $title, (string)($data['version'] ?? ''), $status, $owner);
     }
-    if ($reg === 'supeval' && $status === 'done') ism_eval_apply((int)$L['parent_id']);
+    if (isset(ISM_EVAL[$reg]) && $status === 'done') ism_eval_apply((int)$L['parent_id']);
     if ($reg === 'qcal' && in_array($status, ['done', 'failed'], true)) ism_cal_apply((int)$L['parent_id']);
     return $id;
 }
@@ -397,6 +405,7 @@ function ism_handle_action(string $action): bool {
         case 'qh_team_save': if (!ism_manage()) throw new RuntimeException(t('err.noaccess')); $ok = array_map('intval', array_column(ism_users(), 'id')); cp_setting_set('qh_team', json_encode(array_values(array_intersect(array_map('intval', (array)($_POST['team'] ?? [])), $ok)))); flash('good', t('ism.saved')); redirect('qhse', [], '#team');
         case 'ism_save': $id = ism_save_from_post(); flash('good', t('ism.saved')); redirect('isms_rec', ['id' => $id]);
         case 'ism_delete': $x = ism_get((int)($_POST['id'] ?? 0)); $reg = ism_delete((int)($_POST['id'] ?? 0)); flash('good', t('ism.deleted')); if ($x && $x['parent_id']) redirect('isms_rec', ['id' => (int)$x['parent_id']]); redirect(ism_page($reg), ['reg' => $reg]);
+        case 'ism_import': $reg = (string)($_POST['reg'] ?? ''); [$n, $skip, $errs] = ism_import($reg, $_FILES['file'] ?? []); flash($errs ? 'warn' : 'good', t('ism.imp_done', ['n' => $n, 's' => $skip]) . ($errs ? ' — ' . implode(' · ', array_slice($errs, 0, 5)) : '')); redirect(ism_page($reg), ['reg' => $reg]);
         case 'ism_tr_create': $rid = ism_tr_create((int)($_POST['id'] ?? 0)); flash('good', t('ism.tr_created')); redirect('isms_rec', ['id' => $rid], '#hrtr');
         case 'ism_tr_link': $rid = ism_tr_link((int)($_POST['id'] ?? 0), (int)($_POST['hr_training_id'] ?? 0)); flash('good', t('ism.saved')); redirect('isms_rec', ['id' => $rid], '#hrtr');
         case 'ism_tr_attend': $rid = (int)($_POST['id'] ?? 0); $n = ism_tr_attend($rid, (array)($_POST['pid'] ?? []), !empty($_POST['close'])); flash('good', t('ism.tr_attended', ['n' => $n])); redirect('isms_rec', ['id' => $rid], '#hrtr');
@@ -453,11 +462,11 @@ function ism_marine_card(array $f): void {
 /* ------------------------------------------------------------ R97-083 — suppliers of the supplier list and their evaluation; training kept in HR › Training */
 /** The last finished evaluation of a supplier sets its rating, its state and the date of the next evaluation (12 months when critical or with access to confidential / personal information, else 24). */
 function ism_eval_apply(int $supRecId): void {
-    $S = ism_get($supRecId); if (!$S || $S['reg'] !== 'supplier') return; $last = null;
-    foreach (ism_children($supRecId, 'supeval') as $e) { if ($e['status'] !== 'done') continue; $d = ism_data($e); if (!$last || (string)($d['evaluated_on'] ?? '') >= (string)(ism_data($last)['evaluated_on'] ?? '')) $last = $e; }
+    $S = ism_get($supRecId); if (!$S || !isset(ISM_SUP[$S['reg']])) return; $last = null;
+    foreach (ism_children($supRecId, ISM_SUP[$S['reg']]) as $e) { if ($e['status'] !== 'done') continue; $d = ism_data($e); if (!$last || (string)($d['evaluated_on'] ?? '') >= (string)(ism_data($last)['evaluated_on'] ?? '')) $last = $e; }
     if (!$last) return; $d = ism_data($last); $sd = ism_data($S); $on = (string)($d['evaluated_on'] ?? date('Y-m-d'));
     $sd['rating'] = (int)($d['rating'] ?? 0); $sd['rating_result'] = (string)($d['eval_result'] ?? ''); $sd['last_review'] = $on;
-    $months = ((int)($sd['criticality'] ?? 0) >= 4 || in_array($sd['data_access'] ?? '', ['confidential', 'personal'], true)) ? 12 : 24;
+    $months = ((int)($sd['criticality'] ?? 0) >= 4 || in_array($sd['data_access'] ?? '', ['confidential', 'personal'], true) || ($sd['critical'] ?? '') === 'yes') ? 12 : 24;
     $st = $S['status'] === 'ended' ? 'ended' : (['res_approved' => 'active', 'res_conditional' => 'conditional', 'res_rejected' => 'blocked'][$sd['rating_result']] ?? $S['status']);
     q('UPDATE ism_records SET data = ?, status = ?, review_date = ?, updated_at = NOW() WHERE id = ?', [json_encode($sd, JSON_UNESCAPED_UNICODE), $st, date('Y-m-d', strtotime($on . ' +' . $months . ' months')), $supRecId]);
     ism_event($supRecId, $st !== $S['status'] ? 'status' : 'update', $last['code'] . ' · ' . $sd['rating'] . ' % · ' . ($sd['rating_result'] ? t('ism.o_' . $sd['rating_result']) : '') . ($st !== $S['status'] ? ' · ' . t('ism.s_' . $S['status']) . ' → ' . t('ism.s_' . $st) : ''));
@@ -466,6 +475,13 @@ function ism_eval_apply(int $supRecId): void {
 function ism_supplier_options(): array { try { return function_exists('sup_where') ? all('SELECT co.id, co.name, co.city, co.country, co.is_active FROM companies co WHERE ' . sup_where() . ' ORDER BY co.name') : []; } catch (Throwable $e) { return []; } }
 /** Card on Procurement › Suppliers for those of the ISMS: the state of the supplier in the ISO 27001 register. */
 function ism_supplier_card(int $companyId): void {
+    if (function_exists('qh_has_sup') && ism_has_ext() && $companyId && ((function_exists('pr_can') && pr_can()) || qh_can())) {   // R97-087: approval of the supplier (ISO 9001) — shown to procurement, edited by QHSE
+        $q = one("SELECT * FROM ism_records WHERE reg = 'qsup' AND supplier_id = ?", [$companyId]); [$st, $tone] = sup_approval($companyId);
+        echo '<div class="card" id="approval"><h2>✅ ' . tt('qh.sup_card') . '</h2><p>' . pill($tone, t('qh.ap_' . $st));
+        if ($q) { $d = ism_data($q); echo (isset($d['rating']) ? ' ' . pill((int)$d['rating'] >= 70 ? 'green' : ((int)$d['rating'] >= 50 ? 'gold' : 'bad'), (int)$d['rating'] . ' %') : '') . (ism_due($q) ? ' ' . pill('bad', t('ism.sup_eval_due')) : '') . (qh_can() ? ' <a href="' . url('isms_rec', ['id' => (int)$q['id']]) . '"><b class="mono">' . e($q['code']) . '</b></a>' : ' <span class="mono">' . e($q['code']) . '</span>') . '</p><p class="hint">' . (!empty($d['last_review']) ? tt('ism.f_last_review') . ': ' . e(fmt_date($d['last_review'])) . ' · ' : '') . ($q['review_date'] ? tt('ism.sup_next') . ': ' . e(fmt_date($q['review_date'])) : tt('ism.sup_never')) . '</p>'; }
+        else echo '</p><p class="hint">' . tt('qh.sup_card_none') . '</p>' . (qh_can() ? '<a class="btn btn--ghost btn--sm" href="' . url('isms_rec', ['reg' => 'qsup', 'supplier' => $companyId]) . '">+ ' . tt('qh.sup_card_add') . '</a>' : '');
+        echo '</div>';
+    }
     if (!function_exists('ism_can') || !ism_can() || !ism_has_ext() || !$companyId) return;
     $r = one("SELECT * FROM ism_records WHERE reg = 'supplier' AND supplier_id = ?", [$companyId]);
     echo '<div class="card" id="isms"><h2>🛡 ' . tt('ism.sup_card') . '</h2>';
@@ -537,4 +553,80 @@ function qh_export(string $std): void {
         $sheets[] = ['name' => mb_substr(preg_replace('/[\\\\\/\?\*\[\]:]/', ' ', ism_reg_title($k)), 0, 31), 'header' => $h, 'rows' => $rows, 'widths' => array_merge([14, 40], array_fill(0, count($h) - 2, 20))];
     }
     xlsx_download('GAS-QHSE_' . ($std === 'all' ? 'all' : $std) . '_' . date('Y-m-d') . '.xlsx', $sheets);
+}
+
+/* ------------------------------------------------------------ R97-087 — approved suppliers for procurement, Excel import, read-only library */
+function qh_has_sup(): bool { return ism_has_ext(); }
+/** Approval of a supplier of the supplier list (ISO 9001 8.4): ['approved'|'conditional'|'blocked'|'candidate'|'ended'|'none', tone]. */
+function sup_approval(int $companyId): array {
+    static $M = null; if ($M === null) { $M = []; try { if (function_exists('ism_has_ext') && ism_has_ext()) foreach (all("SELECT supplier_id, status FROM ism_records WHERE reg = 'qsup' AND supplier_id IS NOT NULL") as $r) $M[(int)$r['supplier_id']] = (string)$r['status']; } catch (Throwable $e) {} }
+    $s = $M[$companyId] ?? ''; return ['active' => ['approved', 'green'], 'conditional' => ['conditional', 'gold'], 'blocked' => ['blocked', 'bad'], 'candidate' => ['candidate', 'gold'], 'ended' => ['ended', 'mute']][$s] ?? ['none', 'mute'];
+}
+/** Purchase orders only to approved suppliers? (Settings › Procurement) */
+function sup_po_strict(): bool { return (string) cp_setting('po_approved_only', '0') === '1'; }
+/** May a purchase order go to this supplier? A supplier that is Not approved never; with the rule switched on only an approved one (or approved with conditions). */
+function sup_po_check(int $companyId): void {
+    [$st] = sup_approval($companyId); if ($st === 'blocked') throw new RuntimeException(t('qh.e_po_blocked'));
+    if (sup_po_strict() && !in_array($st, ['approved', 'conditional'], true)) throw new RuntimeException(t('qh.e_po_not_approved'));
+}
+/** The approved supplier list as a workbook — for procurement and for the auditor. */
+function qh_asl_export(): void {
+    if (!((function_exists('pr_can') && pr_can()) || qh_can())) throw new RuntimeException(t('err.noaccess')); require_once __DIR__ . '/xlsxw.php'; $rows = [];
+    foreach (ism_list('qsup') as $r) { $d = ism_data($r); $rows[] = [$r['code'], (string)($r['supplier_name'] ?: $r['title']), !empty($d['sup_category']) ? t('ism.o_' . $d['sup_category']) : '', (string)($d['supplies'] ?? ''), t('ism.s_' . $r['status']), isset($d['rating']) ? (int)$d['rating'] : '', (string)($d['last_review'] ?? ''), (string)$r['review_date'], !empty($d['critical']) ? t('ism.o_' . $d['critical']) : '']; }
+    xlsx_download('GAS-approved-suppliers_' . date('Y-m-d') . '.xlsx', [['name' => 'Approved suppliers', 'first' => true, 'header' => [t('ism.code'), t('ism.supplier'), t('ism.f_sup_category'), t('ism.f_supplies'), t('th.status'), t('ism.f_rating') . ' %', t('ism.f_last_review'), t('ism.sup_next'), t('ism.f_critical')], 'rows' => $rows, 'widths' => [10, 40, 20, 34, 24, 10, 14, 14, 10]]]);
+}
+
+/** Columns of the import of a register: [key, label, type]. Core columns first, then the fields; for instruments the last calibration too. */
+function ism_import_cols(string $reg): array {
+    $R = ism_reg($reg); $C = [['code', t('ism.code'), 'text'], ['title', t('ism.title_f'), 'text'], ['status', t('th.status'), 'status'], ['owner', t('ism.owner'), 'owner']];
+    if (!empty($R['ref'])) $C[] = ['ref', t('ism.ref'), 'text']; if (!empty($R['due'])) $C[] = ['due_date', t('ism.due_date'), 'date']; if (!empty($R['review']) && $reg !== 'qequip') $C[] = ['review_date', t('ism.review_date'), 'date'];
+    foreach ($R['f'] as $k => $type) $C[] = ['d:' . $k, t('ism.f_' . $k), $type];
+    if ($reg === 'qequip') foreach ([['c:cal_date', t('ism.f_last_cal'), 'date'], ['c:cert_no', t('ism.f_cert_no'), 'text'], ['c:lab', t('ism.f_lab'), 'text'], ['c:valid_until', t('ism.f_valid_until'), 'date']] as $x) $C[] = $x;
+    return $C;
+}
+function ism_importable(string $reg): bool { $R = ism_reg($reg); return $R && empty($R['parent']) && $reg !== 'soa' && !isset(ISM_SUP[$reg]) && ism_can_reg($reg); }
+function ism_template(string $reg): void {
+    if (!ism_importable($reg)) throw new RuntimeException(t('err.noaccess')); require_once __DIR__ . '/xlsxw.php'; $R = ism_reg($reg); $C = ism_import_cols($reg); $lists = [[t('th.status'), implode(' · ', array_map(fn($s) => t('ism.s_' . $s), array_keys($R['st'])))]];
+    foreach ($R['f'] as $k => $type) { if (str_starts_with($type, 'sel:')) $lists[] = [t('ism.f_' . $k), implode(' · ', array_map(fn($o) => t('ism.o_' . $o), ism_opts($type)))]; elseif ($type === 'score') $lists[] = [t('ism.f_' . $k), '1 – 5']; }
+    foreach ([t('ism.imp_n1'), t('ism.imp_n2'), t('ism.imp_n3'), t('ism.imp_n4')] as $n) $lists[] = ['', $n]; if ($reg === 'qequip') $lists[] = ['', t('ism.imp_n_eq')];
+    xlsx_download('GAS-import-' . $reg . '.xlsx', [['name' => 'Records', 'first' => true, 'header' => array_column($C, 1), 'rows' => [], 'widths' => array_map(fn($c) => in_array($c[0], ['title'], true) ? 40 : 20, $C)], ['name' => 'Lists and rules', 'header' => [t('ism.imp_col'), t('ism.imp_vals')], 'rows' => $lists, 'widths' => [34, 110]]]);
+}
+/** Import records of one register from the template. Returns [imported, skipped, errors]. A code already in the register is skipped — nothing is overwritten. */
+function ism_import(string $reg, array $file): array {
+    if (!ism_importable($reg)) throw new RuntimeException(t('err.noaccess')); if (($file['error'] ?? 1) !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'] ?? '') || strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION)) !== 'xlsx' || (int)$file['size'] > 8 * 1048576) throw new RuntimeException(t('ism.imp_e_file'));
+    require_once __DIR__ . '/xlsx.php'; $rows = xlsx_rows($file['tmp_name']); if (count($rows) < 2) throw new RuntimeException(t('ism.imp_e_file')); $R = ism_reg($reg); $C = ism_import_cols($reg);
+    $norm = fn($s) => mb_strtolower(trim(preg_replace('/\s+/u', ' ', (string)$s))); $head = array_map($norm, $rows[0]); $col = [];   // rows come keyed by column — empty cells are simply absent
+    foreach ($C as $i => [$k, $lab]) { $p = array_search($norm($lab), $head, true); $col[$k] = $p !== false ? $p : (count($head) === count($C) ? $i : null); }
+    if ($col['title'] === null) throw new RuntimeException(t('ism.imp_e_head'));
+    $users = []; foreach (ism_users() as $x) $users[$norm($x['full_name'])] = (int)$x['id']; $stMap = []; foreach ($R['st'] as $s => $_) { $stMap[$norm(t('ism.s_' . $s))] = $s; $stMap[$s] = $s; }
+    $date = function ($v) { $v = trim((string)$v); if ($v === '') return ''; if (preg_match('/^\d{4}-\d{2}-\d{2}/', $v)) return substr($v, 0, 10); if (preg_match('#^(\d{1,2})[/.\-](\d{1,2})[/.\-](\d{4})$#', $v, $m)) return sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]); if (is_numeric($v) && function_exists('xlsx_date')) return (string)(xlsx_date($v) ?? ''); return ''; };
+    $n = 0; $skip = 0; $errs = []; $keep = $_POST;
+    foreach (array_slice($rows, 1, 2000) as $ri => $row) {
+        $get = fn($k) => isset($col[$k]) && $col[$k] !== null ? trim((string)($row[$col[$k]] ?? '')) : ''; $title = $get('title'); if ($title === '') continue;
+        $code = $get('code'); if ($code !== '' && scalar('SELECT COUNT(*) FROM ism_records WHERE reg = ? AND code = ?', [$reg, $code])) { $skip++; continue; }
+        if (scalar('SELECT COUNT(*) FROM ism_records WHERE reg = ? AND LOWER(title) = LOWER(?)', [$reg, $title])) { $skip++; continue; }   // the same title is already in the register — the file was probably imported before
+        $P = ['reg' => $reg, 'title' => $title, 'code' => $code, 'status' => $stMap[$norm($get('status'))] ?? array_key_first($R['st']), 'owner_user_id' => $users[$norm($get('owner'))] ?? 0, 'ref' => $get('ref'), 'due_date' => $date($get('due_date')), 'review_date' => $date($get('review_date')), 'd' => []];
+        foreach ($R['f'] as $k => $type) { $v = $get('d:' . $k); if ($v === '') continue;
+            if (str_starts_with($type, 'sel:')) { $hit = ''; foreach (ism_opts($type) as $o) if ($norm(t('ism.o_' . $o)) === $norm($v) || $o === $norm($v)) { $hit = $o; break; } $v = $hit; } elseif ($type === 'date') $v = $date($v); elseif ($type === 'num' || $type === 'score') $v = str_replace(',', '.', $v);
+            if ($v !== '') $P['d'][$k] = $v; }
+        try { $_POST = $P; $id = ism_save_from_post(); $n++;
+            if ($reg === 'qequip' && ($cd = $date($get('c:cal_date'))) !== '' && $get('c:cert_no') !== '') { $_POST = ['reg' => 'qcal', 'parent_id' => $id, 'title' => '', 'code' => '', 'status' => 'done', 'd' => array_filter(['cal_date' => $cd, 'cert_no' => $get('c:cert_no'), 'lab' => $get('c:lab'), 'valid_until' => $date($get('c:valid_until')), 'cal_result' => 'cal_pass', 'notes' => t('ism.imp_cal_note')])]; ism_save_from_post(); }
+        } catch (Throwable $e) { $skip++; if (count($errs) < 8) $errs[] = t('ism.imp_row', ['n' => $ri + 2]) . ': ' . $e->getMessage(); }
+    }
+    $_POST = $keep; return [$n, $skip, $errs];
+}
+
+/** Read-only library for all staff: the approved documents of the QHSE systems with their files. */
+function qh_library(array $f = []): array {
+    if (!is_staff() || !ism_has_ext()) return []; $rows = [];
+    foreach (all("SELECT r.* FROM ism_records r WHERE r.reg = 'qdoc' AND r.status = 'approved' ORDER BY r.code") as $r) { $d = ism_data($r);
+        if (!empty($f['std']) && !in_array($d['std'] ?? 'all_std', [$f['std'], 'all_std', ''], true)) continue; if (!empty($f['type']) && ($d['doc_type'] ?? '') !== $f['type']) continue;
+        if (!empty($f['q']) && mb_stripos($r['code'] . ' ' . $r['title'] . ' ' . ($d['summary'] ?? '') . ' ' . $r['ref'], (string)$f['q']) === false) continue; $rows[] = $r + ['_d' => $d]; }
+    if ($rows) { $by = []; foreach (all('SELECT id, record_id, original_name, size_bytes, note, created_at FROM ism_files WHERE record_id IN (' . implode(',', array_map(fn($r) => (int)$r['id'], $rows)) . ') ORDER BY id DESC') as $x) $by[(int)$x['record_id']][] = $x; foreach ($rows as &$r) $r['_files'] = $by[(int)$r['id']] ?? []; unset($r); }
+    return $rows;
+}
+/** A file of an approved QHSE document, for any member of staff. */
+function qh_library_send(int $fid): void {
+    $f = is_staff() ? one("SELECT f.* FROM ism_files f JOIN ism_records r ON r.id = f.record_id WHERE f.id = ? AND r.reg = 'qdoc' AND r.status = 'approved'", [$fid]) : null; if (!$f) { http_response_code(403); exit; } $p = ism_dir() . '/' . $f['stored_name']; if (!is_file($p)) { http_response_code(404); exit; }
+    header('Content-Type: application/octet-stream'); header('Content-Disposition: attachment; filename="' . str_replace(['"', "\r", "\n"], '', (string)$f['original_name']) . '"'); header('Content-Length: ' . filesize($p)); header('X-Content-Type-Options: nosniff'); header('Cache-Control: private, no-store'); readfile($p); exit;
 }
