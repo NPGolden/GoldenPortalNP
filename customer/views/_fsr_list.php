@@ -23,7 +23,7 @@ function fsr_table(array $rows, bool $showProject = true, string $slug = 'report
           <td><?= e($r['vessel_name'] ?: ($r['vessel'] ?? '')) ?></td>
           <td><?= e($r['submitted_name'] ?: '—') ?></td>
           <td class="num"><?= e(fsr_fmt_hours((float) scalar('SELECT COALESCE(SUM(hours),0) FROM fsr_lines WHERE report_id = ?', [$r['id']]))) ?></td>
-          <td><?= fsr_status_pill($r['status']) ?></td>
+          <td><?= fsr_status_pill($r['status']) ?><?= !empty($r['_action']) ? '<br><span class="hint" style="color:#8a6d00;">⚑ ' . e($r['_action']) . '</span>' : '' ?></td>
           <td class="date"><?= $r['accepted_at'] ? e($r['accepted_name'] . ' · ' . fmt_datetime($r['accepted_at'])) : ($r['status'] === 'submitted' ? '<span class="hint">' . tt('fsr.pending') . '</span>' : '—') ?></td>
           <td class="row-actions" style="white-space:nowrap;">
             <?php if ($r['pdf_file_id']): ?><a class="btn btn--ghost btn--sm" href="<?= url('file', ['id' => $r['pdf_file_id']]) ?>" target="_blank">PDF</a><?php elseif (!empty($r['ext_file_id'])): ?><a class="btn btn--ghost btn--sm" href="<?= url('file', ['id' => $r['ext_file_id']]) ?>" target="_blank">⤓</a><?php endif; ?>

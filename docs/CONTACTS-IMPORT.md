@@ -2527,3 +2527,18 @@ The preview (`?p=data_doubles&keep=&drop=`) runs the same function with `$dry = 
 
 **Security review**: action and preview only for management / administrators, CSRF token, confirmation tick checked on the server; table names from `information_schema` checked against `[a-z0-9_]`; column names of the kept record come from its own row and are checked the same way; the restore file is under `storage/`, closed to the web by its `.htaccess` (R97-005) and not in the repository. Proposal: include `storage/merge` in the server backup you keep outside the hosting.
 
+## §361 v1.157.1 (R97-077) — Service reports: three tabs, filters, needs action
+
+**Request**: "In Service Reports page please separate the page in 3 tabs Field Service Reports, Inspection reports and Function Check / Commissioning as the 3 blocks on the page with filters also for vessel, project, word, Status so they can find easier" and "They need to be able to see what needs processing also as action".
+
+**Change** (`views/reports.php`; no change to the data):
+
+- Tabs `?p=reports[&tab=isr|fc]` with the number of reports and a flag with the number that need action. Only the list of the open tab is drawn.
+- Filter bar on the open tab: `q` (report no, project code / name, sub-project, vessel, subject, engineer, form), `fv` vessel, `fp` project, `fs` status, `fa` needs action, `fo` order. Options come from the rows of the tab; a value that is not among them is ignored. Filters are kept in the pager (`$keep`).
+- Needs action (closure `$act`): staff — field service report / function check: draft → finish and submit, submitted → customer acceptance, disputed → correct and resubmit, external report not processed → process; inspection report: draft → finish, checking → check and issue. Customer — submitted → own acceptance. The text is put on the row as `_action` and printed under the status by `_fsr_list.php`, `_isr_list.php`, `_fc_list.php` (other pages that use these tables pass no `_action` and are unchanged).
+- Older documents stay at the bottom of the first tab. Keys `r.word`, `r.show*`, `r.act_*`, `r.a_*` (10 630 per file).
+
+**Tests (sandbox)**: the three tabs, an unknown tab (falls back to the first), search with and without hits, status, needs action alone and combined; counts on the tabs; screenshot read; no script errors. The sandbox has no inspection or commissioning reports, so those two lists were tested empty.
+
+**Security review**: filters are compared in PHP against the user's own rows (the lists are already limited by the scope of the account); every value is printed escaped; no new query from user input. No new proposals.
+

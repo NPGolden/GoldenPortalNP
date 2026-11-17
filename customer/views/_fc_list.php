@@ -15,7 +15,7 @@ function fc_table(array $rows, bool $showProject = true, string $slug = 'reports
           <?php if ($showProject): ?><td><?= e($r['project_code'] ?: $r['project_name']) ?><?= $r['sub_code'] ? ' <span class="hint">' . e($r['sub_code'] . ' ' . $r['sub_name']) . '</span>' : '' ?></td><?php endif; ?>
           <td><?= e($r['vessel'] ?? '') ?></td>
           <td><?= e($r['engineer_name'] ?? '') ?></td>
-          <td><?= fc_status_pill($r['status']) ?></td>
+          <td><?= fc_status_pill($r['status']) ?><?= !empty($r['_action']) ? '<br><span class="hint" style="color:#8a6d00;">⚑ ' . e($r['_action']) . '</span>' : '' ?></td>
           <td class="row-actions" style="white-space:nowrap;"><?php if ($r['pdf_file_id']): ?><a class="btn btn--ghost btn--sm" href="<?= url('file', ['id' => $r['pdf_file_id']]) ?>" target="_blank">PDF</a> <?php endif; ?><a class="btn btn--ghost btn--sm" href="<?= url('fc', ['id' => $r['id']]) ?>"><?= tt('fsr.open') ?></a></td>
         </tr>
       <?php endforeach; ?></tbody>

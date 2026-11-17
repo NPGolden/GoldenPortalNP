@@ -21,7 +21,7 @@ function isr_table(array $rows, bool $showProject = true, string $slug = 'report
           <td><?= e(mb_substr((string)($r['subject'] ?? ''), 0, 60)) ?></td>
           <td class="num"><?= (int)$r['n_items'] ?></td>
           <td><?= $r['max_risk'] ? isr_risk_pill($lv[(int)$r['max_risk'] - 1] ?? 'none') : '—' ?></td>
-          <td><?= isr_status_pill($r['status']) ?></td>
+          <td><?= isr_status_pill($r['status']) ?><?= !empty($r['_action']) ? '<br><span class="hint" style="color:#8a6d00;">⚑ ' . e($r['_action']) . '</span>' : '' ?></td>
           <td class="row-actions" style="white-space:nowrap;">
             <?php if ($r['pdf_file_id']): ?><a class="btn btn--ghost btn--sm" href="<?= url('file', ['id' => $r['pdf_file_id']]) ?>" target="_blank">PDF</a><?php endif; ?>
             <?php if ($r['docx_file_id']): ?><a class="btn btn--ghost btn--sm" href="<?= url('file', ['id' => $r['docx_file_id']]) ?>">Word</a><?php endif; ?>
