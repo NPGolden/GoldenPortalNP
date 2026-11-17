@@ -164,6 +164,7 @@ function pd_sub_stages(int $sid): array {
         foreach ($st as $k => $v) { if ($v['value'] === null) continue; $sum[$k] += $v['value'] * $n; $w[$k] += $n; $out[$k]['orders'][] = ['id' => $oid, 'po_no' => $o['po_no'], 'value' => (int)$v['value'], 'override' => $v['override'] !== null]; } }
     foreach (PD_STAGE_SLUGS as $k) if ($w[$k] > 0) $out[$k]['value'] = (int) round($sum[$k] / $w[$k]);
     if (function_exists('eng_has') && eng_has()) foreach (eng_stage_pcts($sid) as $st => $ep) if (isset($out[$st])) $out[$st] = ['value' => $ep, 'orders' => $out[$st]['orders'], 'eng' => true];   // R47-001 / R48-001: earned value of the hour-budgeted sections replaces the order evidence for that stage
+    if (function_exists('proc_sub_pct') && ($pp = proc_sub_pct($sid))) $out['procurement'] = ['value' => $pp['pct'], 'orders' => [], 'proc' => $pp];   // R97-096: requisitions and purchase orders of the sub-project replace the order evidence for Procurement
     return $c[$sid] = $out;
 }
 /** Stages the PM has unlocked on a sub-project (his value stands). */
@@ -172,7 +173,8 @@ function pd_sub_manual(int $sid): array { try { return pd_stages_has() ? array_v
 function pd_sub_fed(int $sid): array {
     static $with = null; if ($with === null) { $with = []; if (pd_has()) foreach (all("SELECT DISTINCT subproject_id FROM production_orders WHERE subproject_id IS NOT NULL AND status <> 'cancelled'") as $r) $with[(int)$r['subproject_id']] = true; }
     $engAny = function_exists('eng_has') && eng_has() ? eng_stage_pcts($sid) : [];   // R47-001 / R48-001: budgeted sections feed their stages even without production orders
-    if (empty($with[$sid]) && !$engAny) return [];
+    $procAny = function_exists('proc_sub_pct') && proc_sub_pct($sid);   // R97-096
+    if (empty($with[$sid]) && !$engAny && !$procAny) return [];
     $man = pd_sub_manual($sid); $fed = []; foreach (pd_sub_stages($sid) as $k => $v) if ($v['value'] !== null && !in_array($k, $man, true)) $fed[] = $k;
     return $fed;
 }

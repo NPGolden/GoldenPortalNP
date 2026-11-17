@@ -84,7 +84,7 @@ function prq_list(array $f = []): array {
 }
 function prq_lines(int $rid): array { return all('SELECT l.*, i.code AS item_code, i.description AS item_desc, i.unit AS item_unit, i.last_price, i.currency AS item_cur, (SELECT COALESCE(SUM(s.qty_on_hand),0) FROM inv_stock s WHERE s.item_id = l.item_id) AS on_hand, (SELECT COALESCE(SUM(s.qty_reserved),0) FROM inv_stock s WHERE s.item_id = l.item_id) AS reserved_all FROM pr_lines l LEFT JOIN inv_items i ON i.id = l.item_id WHERE l.request_id = ? ORDER BY l.seq, l.id', [$rid]); }
 function prq_events(int $rid): array { return all('SELECT * FROM pr_events WHERE request_id = ? ORDER BY id DESC', [$rid]); }
-function prq_event(int $rid, string $ev, ?string $note = null): void { $u = current_user(); q('INSERT INTO pr_events (request_id, event, user_id, user_name, ip, note) VALUES (?,?,?,?,?,?)', [$rid, $ev, $u['id'] ?? null, $u['full_name'] ?? null, substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 64), $note !== null ? mb_substr($note, 0, 600) : null]); }
+function prq_event(int $rid, string $ev, ?string $note = null): void { $u = current_user(); q('INSERT INTO pr_events (request_id, event, user_id, user_name, ip, note) VALUES (?,?,?,?,?,?)', [$rid, $ev, $u['id'] ?? null, $u['full_name'] ?? null, substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 64), $note !== null ? mb_substr($note, 0, 600) : null]);  if (function_exists('proc_feed_later')) { try { proc_feed_later((int) scalar('SELECT subproject_id FROM pr_requests WHERE id = ?', [$rid]) ?: null); } catch (Throwable $e) {} } }
 function prq_counts(): array {
     if (!prq_has() || !prq_can()) return ['pending' => 0, 'mgmt' => 0, 'approved' => 0, 'mine' => 0];
     $u = current_user(); $c = ['pending' => 0, 'mgmt' => 0, 'approved' => 0, 'mine' => 0];
@@ -292,4 +292,45 @@ function prq_item_search(string $q, int $limit = 15, int $supplier = 0, bool $re
         $codes = array_values(array_filter([['k' => 'pn', 'v' => (string)($r['factory_code'] ?? '')], ['k' => 'barcode', 'v' => (string)($r['barcode'] ?? '')], ['k' => 'code', 'v' => (string)$r['code']]], fn($c) => $c['v'] !== ''));
         $out[] = ['codes' => $codes, 'alts' => $alts, 'id' => (int)$r['id'], 'code' => $r['code'], 'desc' => $r['description'], 'maker' => $r['maker'], 'pn' => $r['factory_code'], 'unit' => $r['unit'], 'on_hand' => (float)$r['on_hand'], 'free' => (float)$r['on_hand'] - (float)$r['reserved'], 'price' => stk_price_visible() && $r['last_price'] !== null ? (float)$r['last_price'] : null, 'cur' => $r['currency']]; }
     return $out;
+}
+
+/* ------------------------------------------------------------ R97-096 — the Procurement stage of a sub-project is fed from the procurement process */
+/** Earned progress of the procurement of a sub-project, or null when it has no requisition and no purchase order (then the value of the PM stands).
+ *  A requisition line counts 50 % when it is covered (ordered from a supplier or reserved from stock) and 100 % when it is in the warehouse (received, reserved from stock or issued).
+ *  Lines of purchase orders raised without a requisition count the same way. Lines weigh by their value; when a value is missing, every line weighs the same.
+ *  Requisitions still waiting for approval count with 0 %; drafts, rejected and cancelled ones do not count. */
+function proc_sub_pct(int $sid): ?array {
+    static $c = []; if (array_key_exists($sid, $c)) return $c[$sid]; if (!$sid) return $c[$sid] = null;
+    $L = []; $nPr = 0; $nPo = 0;
+    try {
+        if (function_exists('pr_has') ? pr_has() : true) foreach (all("SELECT l.qty, l.qty_reserved, l.qty_ordered, l.qty_received, l.qty_issued, l.est_price, l.status, r.status AS rst, r.id AS rid FROM pr_lines l JOIN pr_requests r ON r.id = l.request_id
+                      WHERE r.subproject_id = ? AND r.status IN ('submitted','mgmt','approved','closed') AND l.status <> 'cancelled' AND l.qty > 0", [$sid]) as $l) {
+            $q = (float)$l['qty']; $prs[(int)$l['rid']] = 1;
+            if (in_array($l['rst'], ['submitted', 'mgmt'], true)) { $d = 0.0; $cov = 0.0; }
+            else { $d = in_array($l['status'], ['received', 'issued'], true) ? 1.0 : min(1.0, max((float)$l['qty_received'] + (float)$l['qty_reserved'], (float)$l['qty_issued']) / $q);
+                   $cov = $l['status'] === 'ordered' && (float)$l['qty_ordered'] <= 0 ? 1.0 : min(1.0, ((float)$l['qty_ordered'] + (float)$l['qty_reserved']) / $q); }
+            $L[] = [$d + 0.5 * max(0.0, $cov - $d), $q * (float)$l['est_price']];
+        }
+        $nPr = isset($prs) ? count($prs) : 0;
+        foreach (all("SELECT l.qty, l.qty_received, l.qty_accepted, l.line_total, l.status, o.id AS oid FROM po_lines l JOIN po_orders o ON o.id = l.order_id
+                      WHERE o.kind = 'po' AND o.subproject_id = ? AND o.status NOT IN ('draft','cancelled') AND l.pr_line_id IS NULL AND l.status <> 'cancelled' AND l.qty > 0", [$sid]) as $l) {
+            $q = (float)$l['qty']; $pos[(int)$l['oid']] = 1; $d = $l['status'] === 'received' ? 1.0 : min(1.0, max((float)$l['qty_received'], (float)$l['qty_accepted']) / $q);
+            $L[] = [$d + 0.5 * (1.0 - $d), (float)$l['line_total']];
+        }
+        $nPo = isset($pos) ? count($pos) : 0;
+    } catch (Throwable $e) { return $c[$sid] = null; }
+    if (!$L) return $c[$sid] = null;
+    $byValue = !array_filter($L, fn($x) => $x[1] <= 0); $sum = 0.0; $w = 0.0; foreach ($L as [$p, $v]) { $k = $byValue ? $v : 1.0; $sum += $p * $k; $w += $k; }
+    return $c[$sid] = ['pct' => (int) round($sum / $w * 100), 'lines' => count($L), 'pr' => $nPr, 'po' => $nPo];
+}
+/** After a requisition or a purchase order changed: write the stage of its sub-project at the end of the request, when all quantities are in. */
+function proc_feed_later(?int $sid): void {
+    static $set = null; if (!$sid || !function_exists('pd_feed_subproject')) return;
+    if ($set === null) { $set = []; register_shutdown_function(function () use (&$set) { foreach (array_keys($set) as $s) { try { pd_feed_subproject((int)$s); } catch (Throwable $e) {} } }); }
+    $set[$sid] = 1;
+}
+/** Once after the update: the stage of every sub-project that already has requisitions or purchase orders. */
+function proc_feed_all(): int {
+    $n = 0; try { foreach (all("SELECT DISTINCT subproject_id FROM pr_requests WHERE subproject_id IS NOT NULL UNION SELECT DISTINCT subproject_id FROM po_orders WHERE subproject_id IS NOT NULL AND kind = 'po'") as $r) { pd_feed_subproject((int)$r['subproject_id']); $n++; } } catch (Throwable $e) {}
+    return $n;
 }

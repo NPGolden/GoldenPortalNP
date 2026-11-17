@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.170.0';
+const CP_VERSION = '1.171.0';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-096', 'version' => '1.171.0', 'date' => '2026-11-18', 'title' => 'Sub-project process: the stage Procurement is fed from the requisitions and purchase orders of the sub-project (ordered or reserved 50 %, in the warehouse 100 %, weighed by value), with Unlock for the project manager.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-095', 'version' => '1.170.0', 'date' => '2026-11-18', 'title' => 'Production orders carry the mark Cyber safety approval (IACS UR E26 / E27); Marine cyber safety lists only the serial numbers of marked orders, and its team is told when an order is marked.', 'db' => 'install/migrate_cp_r97_095_production_cyber.sql', 'check' => 'r98f'],
         ['ref' => 'GAS-CP-R97-094', 'version' => '1.169.1', 'date' => '2026-11-18', 'title' => 'Leavers: the daily health report counts the accounts still open for people who are not active in HR; Settings › Users lists them at the top; the general staff lists of the portal leave these people out.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-093', 'version' => '1.169.0', 'date' => '2026-11-18', 'title' => 'Marine cyber safety speaks of Equipment instead of Products and links each record to its serial number of the Equipment register (card on the serial number, Add to Marine cyber safety, list of produced equipment not yet included). People who are not active in HR no longer stand in the lists of personnel; unticking Active closes the staff account; HR settings lists accounts still open for people who left.', 'db' => 'install/migrate_cp_r97_093_marine_equipment.sql', 'check' => 'r98e'],

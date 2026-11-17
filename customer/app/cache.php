@@ -65,6 +65,7 @@ function hk_tick(): void {
         $log[] = 'cache ' . cache_sweep();
         try { $log[] = 'perf ' . perf_rollup(); } catch (Throwable $e) {}   // R97-046: yesterday's page timings into the trend
         try { if (function_exists('pp_daily')) $log[] = pp_daily(); } catch (Throwable $e) { $log[] = 'pipeline err'; }   // R75-001
+        try { if (function_exists('proc_feed_all') && cp_setting('proc_feed_v1', '') !== '1') { cp_setting_set('proc_feed_v1', '1'); $log[] = 'procurement stage ' . proc_feed_all(); } } catch (Throwable $e) { $log[] = 'procurement stage err'; }   // R97-096: once
         try { if (function_exists('rs_weekly')) $log[] = rs_weekly(); } catch (Throwable $e) { $log[] = 'subscriptions err'; }   // R97-092
         try { if (function_exists('hr_doc_daily')) $log[] = hr_doc_daily(); } catch (Throwable $e) { $log[] = 'hr-doc err'; }   // R77-007
         $dirs = (array) @glob($storage . '/backups/*', GLOB_ONLYDIR); rsort($dirs); $n = 0; foreach (array_slice($dirs, 3) as $d) { foreach ((array) @glob($d . '/*') as $f) @unlink($f); if (@rmdir($d)) $n++; } $log[] = 'backups ' . $n;
