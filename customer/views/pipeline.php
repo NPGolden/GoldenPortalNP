@@ -54,6 +54,21 @@ layout_head(t('pp.title'), 'pipeline');
 </div>
 
 <?php if ($due || $none): ?>
+<?php $rsDue = function_exists('rs_renewals_due') ? array_values(array_filter(rs_renewals_due(90), fn($r) => !$f['vessel'] || (int)$r['vessel_id'] === $f['vessel'])) : []; if ($rsDue): /* R97-091: subscriptions to renew */ ?>
+<div class="card" id="pp-subs">
+  <div class="card-head"><h2>🛡 <?= tt('rs.pp_title') ?> <span class="count"><?= count($rsDue) ?></span></h2><a class="btn btn--ghost btn--sm" href="<?= url('cyber', ['status' => 'due90']) ?>"><?= tt('rs.title') ?> →</a></div>
+  <p class="hint"><?= tt('rs.pp_hint') ?></p>
+  <table class="tbl"><thead><tr><th><?= tt('v.one') ?></th><th><?= tt('rs.title_f') ?></th><th><?= tt('rs.end') ?></th><th><?= tt('rs.pay') ?></th><th><?= tt('rs.ren_offer') ?></th></tr></thead><tbody>
+    <?php foreach ($rsDue as $r): ?><tr>
+      <td><a href="<?= url('rs', ['id' => (int)$r['id']]) ?>#renew"><b><?= e($r['vessel']) ?></b></a><?= $r['customer_name'] ? '<div class="hint">' . e($r['customer_name']) . '</div>' : '' ?></td>
+      <td><?= e($r['title']) ?><div class="hint"><?= e(trim(($r['product'] ?: '') . ' ' . rs_period_label((int)$r['period_months']))) ?> · <?= e($r['contract_no']) ?></div></td>
+      <td data-sort="<?= e((string)$r['end_date']) ?>"><?= rs_date_pill($r['end_date']) ?></td>
+      <td><?= rs_pay_pill($r['pay_status']) ?: '—' ?></td>
+      <td><?= $r['ren_no'] ? '<a href="' . url('offer', ['id' => (int)$r['renewal_offer_id']]) . '">' . e($r['ren_no']) . '</a> ' . of_status_pill((string)$r['ren_status']) . ' · ' . e(of_money((float)$r['ren_amount'], (string)$r['ren_currency'])) : '<a class="btn btn--ghost btn--sm" href="' . url('rs', ['id' => (int)$r['id']]) . '#renew">+ ' . tt('rs.ren_create') . '</a>' ?></td>
+    </tr><?php endforeach; ?>
+  </tbody></table>
+</div>
+<?php endif; ?>
 <div class="card" id="pp-due">
   <h2>⏰ <?= tt('pp.due_title') ?> <span class="count"><?= count($due) + count($none) ?></span></h2>
   <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('of.no') ?></th><th><?= tt('of.title_f') ?></th><th><?= tt('v.one') ?></th><th><?= tt('pp.next_action') ?></th><th><?= tt('pp.owner') ?></th><th class="num"><?= tt('of.amount') ?></th><th></th></tr></thead><tbody>

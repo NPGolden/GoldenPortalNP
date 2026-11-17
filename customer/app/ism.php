@@ -70,7 +70,9 @@ function ism_access(): array {
     return $A;
 }
 function ism_by_position(): bool { $u = current_user(); if (!$u) return false; $A = ism_access(); return (!empty($u['staff_role_id']) && in_array((int)$u['staff_role_id'], $A['roles'], true)) || (!empty($u['discipline_id']) && in_array((int)$u['discipline_id'], $A['disc'], true)); }
-function ism_can(): bool { static $v = null; if ($v === null) $v = ism_has() && is_staff() && (ism_manage() || in_array((int)(current_user()['id'] ?? 0), ism_team(), true) || ism_by_position()); return $v; }
+function ism_can(): bool { static $v = null; if ($v === null) $v = ism_has() && is_staff() && (ism_manage() || in_array((int)(current_user()['id'] ?? 0), ism_team(), true) || ism_by_position() || qh_role()); return $v; }
+/** R97-091: the quality / QHSE manager (a staff role named QHSE, HSE or Quality — the same test that closes the financial data) works in ISO 27001 and marine cyber safety without being ticked. */
+function qh_role(): bool { return is_staff() && function_exists('fin_blocked') && fin_blocked(); }
 
 /**
  * The registers. 'st' statuses [key => tone], 'closed' the statuses that need no further action, 'f' the own fields

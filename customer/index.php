@@ -246,6 +246,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             case 'wf_comment_add': { $wid = (int)$_POST['id']; wf_comment_add($wid); flash('good', t('wf.reply_sent')); redirect('wf', ['id' => $wid, '_r' => uniqid()], '#wf-replies'); }
             case 'wf_comment_delete': { $wid = wf_comment_delete((int)$_POST['id']); flash('good', t('wf.deleted')); redirect('wf', ['id' => $wid, '_r' => uniqid()], '#wf-replies'); }
             case 'rs_save': { $rid = rs_save_from_post(); flash('good', t('rs.saved')); redirect('rs', ['id' => $rid, '_r' => uniqid()]); }
+            case 'rs_import': { [$n, $sk, $nt] = rs_import($_FILES['file'] ?? [], !empty($_POST['mk_vessels'])); flash($nt ? 'warn' : 'good', t('rs.imp_done', ['n' => $n, 's' => $sk]) . ($nt ? ' — ' . implode(' · ', $nt) : '')); redirect('cyber', ['status' => '', '_r' => uniqid()]); }   // R97-091
+            case 'rs_renewal_offer': { $rid = (int)($_POST['id'] ?? 0); $oid = rs_renewal_offer($rid, (int)($_POST['project_id'] ?? 0)); flash('good', t('rs.ren_created')); redirect('offer', ['id' => $oid, '_r' => uniqid()]); }
+            case 'rs_renew': { $rid = (int)($_POST['id'] ?? 0); rs_renew($rid); flash('good', t('rs.renewed')); redirect('rs', ['id' => $rid, '_r' => uniqid()]); }
             case 'rs_delete': { rs_delete((int)$_POST['id']); flash('good', t('rs.deleted')); redirect('cyber', ['_r' => uniqid()]); }
             case 'rs_session_add': case 'rs_session_delete': {
                 if ($action === 'rs_session_add') rs_session_add((int)$_POST['contract_id'], (int)($_POST['ticket_id'] ?? 0) ?: null, (string)($_POST['date'] ?? ''), (float) str_replace(',', '.', (string)($_POST['hours'] ?? '0')), trim((string)($_POST['note'] ?? '')) ?: null);

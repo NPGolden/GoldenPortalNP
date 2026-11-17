@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.166.0';
+const CP_VERSION = '1.167.0';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-091', 'version' => '1.167.0', 'date' => '2026-11-18', 'title' => 'Customer subscriptions: remote support contracts carry product and serial number, payment status, renewal period, installation date and licence expiry; the list shows what runs out (renewal within 30 / 90 days, licences, expired) and imports the list of Sales; a renewal offer is raised from the subscription into Commercial › Offers and the sales pipeline lists the subscriptions to renew. The quality / QHSE manager has access to ISO 27001 and marine cyber safety.', 'db' => 'install/migrate_cp_r97_091_subscriptions.sql', 'check' => 'r98d'],
         ['ref' => 'GAS-CP-R97-090', 'version' => '1.166.0', 'date' => '2026-11-17', 'title' => 'ISO 27001: the Statement of Applicability can be filled from Excel — the template lists the 93 controls as they stand and a row fills its control by number, without overwriting a control already worked on.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-089', 'version' => '1.165.0', 'date' => '2026-11-17', 'title' => 'ISO 27001 filled from the company\'s ISMS manuals: the five governance documents carry their numbers, English and Greek titles, version, approval and next review; the risk register follows the risk matrix of ISMS-TIER1-004 (Low, Medium, High, Critical) with its named scales and acceptance criteria; new register Interested parties (4.2); suppliers of ISO 27001 can be imported from Excel.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-088', 'version' => '1.164.0', 'date' => '2026-11-17', 'title' => 'QHSE: approved suppliers (ISO 9001 8.4) evaluated on the supplier list and shown to procurement, with purchase orders refused to suppliers that are Not approved and an optional rule approved-only; Excel import of register records (instruments with their last calibration); Documents library for all staff; the PM app no longer shows offer amounts to accounts without financial data.', 'db' => null, 'check' => null],
@@ -535,6 +536,7 @@ function cp_migration_state(): array {
         'r97p' => $has("SHOW TABLES LIKE 'nl_issues'"),
         'r97q' => $has("SHOW TABLES LIKE 'nl_lists'"),
         'r97r' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'proc_state'") && $has("SHOW COLUMNS FROM sb_parts LIKE 'proc_at'"),
+        'r98d' => $has("SHOW COLUMNS FROM rs_contracts LIKE 'renewal_offer_id'"),
         'r98c' => $has("SHOW COLUMNS FROM subprojects LIKE 'it_purchase'"),
         'r98b' => $has("SHOW COLUMNS FROM ism_records LIKE 'supplier_id'"),
         'r98a' => $has("SHOW COLUMNS FROM ism_records LIKE 'parent_id'"),

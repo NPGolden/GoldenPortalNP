@@ -25,6 +25,13 @@ layout_head($c['contract_no'] . ' — ' . $c['vessel'], 'cyber');
   <div class="card">
     <h2><?= tt('rs.details') ?></h2>
     <div class="kv-grid">
+      <?php if (rs_sub_has()): ?>
+      <?php if ($c['product']): ?><div class="kv"><span><?= tt('rs.product') ?></span><b><?= e($c['product']) ?><?= $c['serial_no'] ? ' · <span class="mono">' . e(trim((string)$c['serial_no'])) . '</span>' : '' ?></b></div><?php endif; ?>
+      <?php if ($c['license_expiry']): ?><div class="kv"><span><?= tt('rs.lic') ?></span><b><?= rs_date_pill($c['license_expiry']) ?></b></div><?php endif; ?>
+      <?php if ($c['period_months']): ?><div class="kv"><span><?= tt('rs.period_m') ?></span><b><?= e(rs_period_label((int)$c['period_months'])) ?></b></div><?php endif; ?>
+      <?php if ($c['installed_on']): ?><div class="kv"><span><?= tt('rs.installed') ?></span><b><?= e(fmt_date($c['installed_on'])) ?></b></div><?php endif; ?>
+      <?php if ($staff && $c['pay_status']): ?><div class="kv"><span><?= tt('rs.pay') ?></span><b><?= rs_pay_pill($c['pay_status']) ?></b></div><?php endif; ?>
+      <?php endif; ?>
       <div class="kv"><span><?= tt('rs.hours_included') ?></span><b><?= $c['hours_included'] !== null ? $h($c['hours_included']) . ' h' : tt('rs.unlimited') ?></b></div>
       <div class="kv"><span><?= tt('rs.hours_used_l') ?></span><b><?= $h($c['hours_used']) ?> h<?= $pct !== null ? ' (' . $pct . ' %)' : '' ?></b></div>
       <div class="kv"><span><?= tt('rs.sla') ?></span><b><?= $c['response_hours'] !== null ? e(t('rs.sla_short', ['h' => (int)$c['response_hours']])) : '—' ?></b></div>
@@ -36,6 +43,17 @@ layout_head($c['contract_no'] . ' — ' . $c['vessel'], 'cyber');
     <?php if ($pct !== null): ?><div class="rs-bar"><span style="width:<?= $pct ?>%;" class="rs-bar-fill rs-<?= $pct >= 100 ? 'red' : ($pct >= 80 ? 'amber' : 'green') ?>"></span></div><?php endif; ?>
     <?php if ($c['scope']): ?><h3 class="ed-h" style="margin-top:14px;"><?= tt('rs.scope') ?></h3><?= rt_html($c['scope']) ?><?php endif; ?>
     <?php if ($staff && $c['notes']): ?><h3 class="ed-h" style="margin-top:14px;"><?= tt('rs.notes_int') ?></h3><div class="hint"><?= rt_html($c['notes']) ?></div><?php endif; ?>
+    <?php if ($staff && rs_sub_has() && function_exists('of_visible') && of_visible()): $rsCan = rs_sales_can(); $rsPj = $rsCan ? rs_projects((int)$c['vessel_id']) : []; /* R97-091: Sales */ ?>
+    <h3 class="ed-h" style="margin-top:14px;" id="renew">€ <?= tt('rs.sales') ?></h3>
+    <div class="kv-grid">
+      <div class="kv"><span><?= tt('rs.sold_offer') ?></span><b><?= $c['sold'] ? '<a href="' . url('offer', ['id' => (int)$c['sold']['id']]) . '">' . e($c['sold']['offer_no'] . ' ' . $c['sold']['revision']) . '</a> ' . of_status_pill((string)$c['sold']['status']) : ($c['sq_ref'] ? '<span class="mono">' . e($c['sq_ref']) . '</span> <span class="hint">' . tt('rs.sq_nolink') . '</span>' : '—') ?></b></div>
+      <div class="kv"><span><?= tt('rs.ren_offer') ?></span><b><?= $c['ren'] ? '<a href="' . url('offer', ['id' => (int)$c['ren']['id']]) . '">' . e($c['ren']['offer_no'] . ' ' . $c['ren']['revision']) . '</a> ' . of_status_pill((string)$c['ren']['status']) . ' · ' . e(of_money((float)$c['ren']['amount'], (string)$c['ren']['currency'])) : '—' ?></b></div>
+    </div>
+    <?php if ($rsCan): ?><div class="btn-row" style="margin-top:8px;">
+      <?php if (!$c['ren']): ?><?php if ($rsPj): ?><form method="post" action="<?= url('rs', ['id' => $id]) ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="rs_renewal_offer"><input type="hidden" name="id" value="<?= $id ?>"><select name="project_id" style="max-width:260px;"><?php foreach ($rsPj as $pj): ?><option value="<?= (int)$pj['id'] ?>"><?= e($pj['project_code'] . ' ' . $pj['name']) ?></option><?php endforeach; ?></select> <button class="btn btn--sm" type="submit">+ <?= tt('rs.ren_create') ?></button></form><?php else: ?><span class="hint"><?= tt('rs.ren_noproject') ?></span><?php endif; ?><?php endif; ?>
+      <form method="post" action="<?= url('rs', ['id' => $id]) ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="rs_renew"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost btn--sm" type="submit" data-js-confirm="<?= e(t('rs.renew_confirm', ['p' => rs_period_label((int)($c['period_months'] ?: 12))])) ?>">↻ <?= tt('rs.renew_btn') ?></button></form>
+    </div><p class="hint"><?= tt('rs.sales_hint') ?></p><?php endif; ?>
+    <?php endif; ?>
   </div>
   <div class="card">
     <div class="card-head"><h2><?= tt('rs.sessions') ?> <span class="count"><?= count($c['sessions']) ?></span></h2></div>

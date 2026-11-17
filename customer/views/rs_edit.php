@@ -28,6 +28,15 @@ layout_head($c ? t('rs.edit') : t('rs.new'), 'cyber');
       <div class="field"><label><?= tt('rs.start') ?> *</label><input type="date" name="start_date" required value="<?= $v('start_date', date('Y-m-d')) ?>"></div>
       <div class="field"><label><?= tt('rs.end') ?></label><input type="date" name="end_date" value="<?= $v('end_date') ?>"><p class="hint"><?= tt('rs.end_hint') ?></p></div>
       <div class="field"><label><?= tt('rs.notice') ?></label><input type="number" name="renew_notice_days" min="0" max="365" value="<?= (int)($c['renew_notice_days'] ?? 60) ?>"><p class="hint"><?= tt('rs.notice_hint') ?></p></div>
+      <?php if (rs_sub_has()): /* R97-091 */ ?>
+      <div class="field"><label><?= tt('rs.product') ?></label><input name="product" maxlength="60" list="rs-products" value="<?= $v('product') ?>" placeholder="Mb Connect, FortiGate …"><datalist id="rs-products"><?php foreach (all("SELECT DISTINCT product FROM rs_contracts WHERE product IS NOT NULL AND product <> '' ORDER BY product") as $pp): ?><option value="<?= e($pp['product']) ?>"></option><?php endforeach; ?></datalist></div>
+      <div class="field"><label><?= tt('rs.serial') ?></label><input name="serial_no" maxlength="60" value="<?= $v('serial_no') ?>"></div>
+      <div class="field"><label><?= tt('rs.lic') ?></label><input type="date" name="license_expiry" value="<?= $v('license_expiry') ?>"><p class="hint"><?= tt('rs.lic_hint') ?></p></div>
+      <div class="field"><label><?= tt('rs.period_m') ?></label><select name="period_months"><option value="">—</option><?php foreach ([1, 3, 6, 12, 24, 36, 48, 60] as $pm): ?><option value="<?= $pm ?>"<?= $sel($pm, $c['period_months'] ?? '') ?>><?= e(rs_period_label($pm)) ?></option><?php endforeach; ?></select></div>
+      <div class="field"><label><?= tt('rs.installed') ?></label><input type="date" name="installed_on" value="<?= $v('installed_on') ?>"></div>
+      <div class="field"><label><?= tt('rs.pay') ?></label><select name="pay_status"><option value="">—</option><?php foreach (rs_pay_statuses() as $k => $l): ?><option value="<?= $k ?>"<?= $sel($k, $c['pay_status'] ?? '') ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
+      <div class="field"><label><?= tt('rs.sq') ?></label><input name="sq_ref" maxlength="60" value="<?= $v('sq_ref') ?>"><p class="hint"><?= tt('rs.sq_hint') ?></p></div>
+      <?php endif; ?>
       <div class="field"><label><?= tt('rs.hours_included') ?></label><input type="number" step="0.5" min="0" name="hours_included" value="<?= $num($c['hours_included'] ?? null) ?>" placeholder="<?= tt('rs.unlimited') ?>"></div>
       <div class="field"><label><?= tt('rs.sla') ?></label><input type="number" min="0" name="response_hours" value="<?= $v('response_hours') ?>" placeholder="4"><p class="hint"><?= tt('rs.sla_hint') ?></p></div>
       <div class="field"><label><?= tt('rs.coverage') ?></label><select name="coverage"><?php foreach (rs_coverages() as $k => $l): ?><option value="<?= $k ?>"<?= $sel($k, $c['coverage'] ?? 'office') ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
