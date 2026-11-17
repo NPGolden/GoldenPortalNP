@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.172.0';
+const CP_VERSION = '1.173.0';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-098', 'version' => '1.173.0', 'date' => '2026-11-18', 'title' => 'Risk log: a risk is internal unless it is ticked Show in the weekly report; the weekly vessel report prints the ticked risks with mitigation, score, owner, due date, status and the counts of the week.', 'db' => 'install/migrate_cp_r97_098_risk_visibility.sql', 'check' => 'r98g'],
         ['ref' => 'GAS-CP-R97-097', 'version' => '1.172.0', 'date' => '2026-11-18', 'title' => 'Procurement: an approved BOM of a sub-project is converted into draft purchase orders, one per supplier, with what is still to buy; the BOM lists its orders and no line is ordered twice.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-096', 'version' => '1.171.0', 'date' => '2026-11-18', 'title' => 'Sub-project process: the stage Procurement is fed from the requisitions and purchase orders of the sub-project (ordered or reserved 50 %, in the warehouse 100 %, weighed by value), with Unlock for the project manager.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-095', 'version' => '1.170.0', 'date' => '2026-11-18', 'title' => 'Production orders carry the mark Cyber safety approval (IACS UR E26 / E27); Marine cyber safety lists only the serial numbers of marked orders, and its team is told when an order is marked.', 'db' => 'install/migrate_cp_r97_095_production_cyber.sql', 'check' => 'r98f'],
@@ -542,6 +543,7 @@ function cp_migration_state(): array {
         'r97p' => $has("SHOW TABLES LIKE 'nl_issues'"),
         'r97q' => $has("SHOW TABLES LIKE 'nl_lists'"),
         'r97r' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'proc_state'") && $has("SHOW COLUMNS FROM sb_parts LIKE 'proc_at'"),
+        'r98g' => $has("SHOW COLUMNS FROM sp_risks LIKE 'visibility'"),
         'r98f' => $has("SHOW COLUMNS FROM production_orders LIKE 'cyber_e27'"),
         'r98e' => $has("SHOW COLUMNS FROM ism_records LIKE 'equipment_id'"),
         'r98d' => $has("SHOW COLUMNS FROM rs_contracts LIKE 'renewal_offer_id'"),

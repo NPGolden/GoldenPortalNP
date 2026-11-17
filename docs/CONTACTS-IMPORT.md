@@ -2935,3 +2935,19 @@ The common registers carry the field Standard (All four / one of them) and the l
 **Note**: the BOM must be Approved — an imported BOM is a draft until it is issued and approved by Procurement, as before.
 
 **Security review**: creation is checked on the server with the same right as a manual purchase order and respects the approved-supplier rule; nothing is sent to a supplier — the orders are drafts. No proposal in this release.
+
+## §382 v1.173.0 (R97-098) — Risk log: internal by default, the ticked risks in the weekly report
+
+**Request**: "Should we include the risk logs and status to the Weekly report?" — agreed: yes, "by default internal and only if selected to be external to the report".
+
+**Database** (`install/migrate_cp_r97_098_risk_visibility.sql`, state `r98g`): `sp_risks.visibility` enum internal / external, default internal — every existing risk is internal after the update. Behind `rk_vis_has()`.
+
+**Risk log** (`rk_save_from_post()`, `views/_risks.php`): tick Show in the weekly report on the form; pill In weekly report in the list.
+
+**Weekly vessel report** (`rk_report_rows()`, `weekly_data()`, `wk_sections()` section 4): table Risk log per project with the ticked risks that are open, accepted or occurred, and those mitigated or closed in the week; columns number, title + mitigation (mark "new" when identified in the week), sub-project, score, owner, due date, status; row tone red for occurred or score from 15, amber from 8, green when mitigated; one line with the counts. PDF and Word use the same sections. The rule is the same for staff and owners: a risk that is not ticked is not in the report at all, because the copy a member of staff sends or files is produced under the staff account.
+
+**Executive summary** (`app/xs.php`): for an owner the tile Open risks counts only the ticked risks; the facts handed to the assistant for the summary text list only the ticked risks (the released text is shown to the owner).
+
+**Tests (sandbox) — form posted**: a ticked and an unticked risk saved; pill in the log; PDF of the week shows the ticked one with [new], mitigation and the count line, and not the unticked one; set to mitigated → still listed for the week; unticked on edit → gone from the report; Word file produced; no new lines in `storage/php-errors.log`. Not tested: the report opened by a customer account (the same query; the sandbox customer session had expired).
+
+**Security review — observation**: the weekly report a member of staff downloads, files or e-mails is the internal version: it contains the weekly notes marked Internal and internal ticket comments. Risks are safe by the rule above, but the notes are not. Proposal (no cost in speed): a choice Owner's copy when a member of staff sends or files the weekly report, which builds it exactly as the owner sees it.

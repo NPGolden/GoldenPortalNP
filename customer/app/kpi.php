@@ -259,7 +259,16 @@ function rk_save_from_post(): int {
           [$pid, $sid, rk_next_no($pid), $title, $desc, $cat, $l, $i, $st, $owner, $due, $mit, $ident, in_array($st, ['mitigated', 'closed'], true) ? date('Y-m-d') : null, (int)$u['id'], (string)$u['full_name']]);
         $id = (int) db()->lastInsertId();
     }
+    if (rk_vis_has() && isset($_POST['vis_form'])) q('UPDATE sp_risks SET visibility = ? WHERE id = ?', [!empty($_POST['in_report']) ? 'external' : 'internal', $id]);   // R97-098: internal unless ticked for the weekly report
     return $id;
+}
+function rk_vis_has(): bool { static $h = null; if ($h === null) { try { $h = rk_has() && (bool) scalar("SHOW COLUMNS FROM sp_risks LIKE 'visibility'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** The risks the weekly report prints for a project: only those marked for the report — open, accepted or occurred, and those mitigated or closed in the week. */
+function rk_report_rows(int $pid, string $ws, string $we): array {
+    if (!rk_vis_has()) return [];
+    return all("SELECT r.*, u.full_name AS owner_name, s.code AS sub_code, s.name AS sub_name FROM sp_risks r LEFT JOIN customer_users u ON u.id = r.owner_user_id LEFT JOIN subprojects s ON s.id = r.subproject_id
+                WHERE r.project_id = ? AND r.visibility = 'external' AND (r.status IN ('open','occurred','accepted') OR (r.status IN ('mitigated','closed') AND r.mitigated_at BETWEEN ? AND ?))
+                ORDER BY FIELD(r.status,'occurred','open','accepted','mitigated','closed'), (r.likelihood * r.impact) DESC, r.id", [$pid, $ws, $we]);
 }
 function rk_delete(int $id): void { require_staff(); if (rk_has()) q('DELETE FROM sp_risks WHERE id = ?', [$id]); }
 /** Seed the log from issued inspection reports: every item with a risk level becomes a risk once (source inspection). Returns how many were added. */

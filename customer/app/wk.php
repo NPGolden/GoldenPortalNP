@@ -83,6 +83,7 @@ function weekly_data(int $vid, ?int $onlyProject, string $weekStart): ?array {
         }
         foreach ($subs as $s) if ($s['status'] === 'onhold') $flags[] = t('wv.flag_onhold', ['s' => $s['code'] . ' ' . $s['name']]);
         $P['flags'] = $flags;
+        $P['risks'] = function_exists('rk_report_rows') ? rk_report_rows($pid, $ws, $we) : [];   // R97-098: only the risks marked for the report
         $P['notes'] = $r15 ? one('SELECT * FROM weekly_notes WHERE project_id = ? AND week_start = ?', [$pid, $ws]) : null;
         /* 4. open items: parts + offers */
         $fsrAll = all("SELECT f.id, f.report_no, f.report_date, f.status, f.submitted_at, f.accepted_at, f.submitted_name, f.accepted_name, f.customer_remark, f.ticket_id, f.created_by, s.code AS sub_code, s.name AS sub_name
@@ -185,6 +186,12 @@ function wk_sections(array $W): array {
     foreach ($W['projects'] as $P) {
         $lines = $P['flags']; if (!empty($P['notes']['delays'])) $lines[] = t('wv.pm_says') . ': ' . $P['notes']['delays'];
         $tbl(4, $pfx($P) . t('wv.t_delays'), [[t('wv.item'), 180, 'L']], $lines ? array_map(fn($l) => ['v' => [$l], 'tone' => 'red'], $lines) : [['v' => [t('wv.no_delays')], 'tone' => 'green']]);
+        if (!empty($P['risks'])) { $rr = $P['risks']; $nOpen = count(array_filter($rr, fn($r) => in_array($r['status'], ['open', 'occurred'], true))); $nHigh = count(array_filter($rr, fn($r) => in_array($r['status'], ['open', 'occurred'], true) && (int)$r['likelihood'] * (int)$r['impact'] >= 15)); $nNew = count(array_filter($rr, fn($r) => $r['identified_at'] >= $W['week_start'] && $r['identified_at'] <= $W['week_end'])); $nMit = count(array_filter($rr, fn($r) => in_array($r['status'], ['mitigated', 'closed'], true)));   // R97-098
+            $tbl(4, $pfx($P) . t('wv.t_risks'), [[t('rk.no'), 16, 'L'], [t('rk.risk'), 74, 'L'], [t('sp.one'), 30, 'L'], ['L × I', 14, 'R'], [t('rk.owner'), 26, 'L'], [t('rk.due'), 20, 'L'], [t('th.status'), 20, 'L']],
+                 array_map(function ($r) use ($W) { $sc = (int)$r['likelihood'] * (int)$r['impact']; $new = $r['identified_at'] >= $W['week_start'] && $r['identified_at'] <= $W['week_end'];
+                     return ['v' => [$r['risk_no'], $r['title'] . ($new ? ' [' . t('wv.risk_new') . ']' : '') . ($r['mitigation'] ? ' — ' . t('rk.mitigation') . ': ' . mb_substr((string)$r['mitigation'], 0, 200) : ''), $r['sub_code'] ? trim($r['sub_code'] . ' ' . $r['sub_name']) : t('wv.whole_project'), $sc . ' (' . (int)$r['likelihood'] . '×' . (int)$r['impact'] . ')', $r['owner_name'] ?: '—', $r['due_date'] ? fmt_date($r['due_date']) : '—', t('rk.st_' . $r['status']) . (in_array($r['status'], ['mitigated', 'closed'], true) && $r['mitigated_at'] ? ' ' . fmt_date($r['mitigated_at']) : '')],
+                             'tone' => in_array($r['status'], ['mitigated', 'closed'], true) ? 'green' : ($r['status'] === 'occurred' || $sc >= 15 ? 'red' : ($sc >= 8 ? 'amber' : null))]; }, $rr));
+            $txt(4, $pfx($P) . t('wv.risk_sum', ['o' => $nOpen, 'h' => $nHigh, 'n' => $nNew, 'm' => $nMit])); }
         if (!empty($P['notes']['remarks'])) $txt(4, $pfx($P) . t('wv.remarks') . ': ' . $P['notes']['remarks']);
     }
     // 4
