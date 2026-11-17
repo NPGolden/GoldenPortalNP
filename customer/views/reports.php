@@ -6,6 +6,9 @@ require __DIR__ . '/_fc_list.php';   // R77-001
 $u = require_login(); $cid = (int)$u['customer_id'];
 $fsrs = fsr_list(null, null, is_staff() ? null : $cid);
 $pending = array_values(array_filter($fsrs, fn($r) => $r['status'] === 'submitted'));
+$docs = all("SELECT d.*, v.name AS vessel FROM documents d LEFT JOIN vessels v ON v.id=d.vessel_id
+             WHERE d.customer_id=? AND d.category IN ('fsr','workorder')
+             ORDER BY d.updated_at DESC LIMIT 200", [$cid]);   // older documents — the query was dropped by mistake in v1.157.1 (R97-078)
 // R97-074 filter by vessel and order · R97-077 three tabs, each with its own filters (word, vessel, project, status, order) and what needs action
 $isrOn = isr_has(); $fcOn = function_exists('fc_has') && fc_has(); $staffV = is_staff();
 $tab = (string)($_GET['tab'] ?? 'fsr'); if (!in_array($tab, ['fsr', 'isr', 'fc'], true) || ($tab === 'isr' && !$isrOn) || ($tab === 'fc' && !$fcOn)) $tab = 'fsr';

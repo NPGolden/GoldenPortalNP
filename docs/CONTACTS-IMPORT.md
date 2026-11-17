@@ -2542,3 +2542,17 @@ The preview (`?p=data_doubles&keep=&drop=`) runs the same function with `$dry = 
 
 **Security review**: filters are compared in PHP against the user's own rows (the lists are already limited by the scope of the account); every value is printed escaped; no new query from user input. No new proposals.
 
+## §362 v1.157.2 (R97-078) — Service reports: the dropped query of "Older documents"
+
+**Report** (screenshot, System health › PHP errors): `PHP Warning: Undefined variable $docs in /views/reports.php on line 84`, new since 1.157.1, 28 times in a quarter of an hour.
+
+**Cause**: in §361 the block of `views/reports.php` that prepares the lists was replaced as a whole and the query of the older documents (`$docs`), which stood inside that block, went with it. Effect: a warning on every opening of the page and the list "Older documents" not shown. No data affected.
+
+**Change**: the query is back.
+
+**Why the tests of §361 missed it**: the sandbox does not print warnings on the page, it writes them to `storage/php-errors.log` — and the log was not read. It had the warning eighteen times. **Rule from now on**: after the page tests of a release the lines added to `storage/php-errors.log` are read; a release goes out only when there are none.
+
+**Tests (sandbox)**: the pages changed today opened as CEO, project manager and HR; no line added to the log.
+
+**Security review**: none of it touches access or data; no new proposals.
+
