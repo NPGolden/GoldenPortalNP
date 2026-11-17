@@ -100,7 +100,7 @@ layout_head(($i ? $i['si_no'] : ($isCredit ? t('si.new_credit') : t('si.new'))) 
     <tbody>
     <?php if (!$lines): ?><tr><td colspan="10" class="hint"><?= tt('si.no_lines') ?></td></tr><?php endif; ?>
     <?php foreach ($lines as $l): ?>
-      <tr><td><?= (int)$l['seq'] ?></td><td><?= e($l['description']) ?></td><td><?= $l['po_line_id'] ? '#' . (int)$l['po_seq'] . ' <small class="hint">' . e(mb_substr((string)$l['po_desc'], 0, 40)) . '</small>' : '<span class="hint">—</span>' ?></td>
+      <tr><td><?= (int)$l['seq'] ?></td><td><?= e($l['description']) ?></td><td><?= $l['po_line_id'] ? '#' . (int)$l['po_seq'] . ' <small class="hint">' . e(mb_substr((string)$l['po_desc'], 0, 40)) . '</small>' : (!empty($l['po_cost_id']) ? pill('navy', '🚚 ' . t('si.lc_tag')) : '<span class="hint">—</span>') ?></td>
         <td class="num"><?= stk_qty((float)$l['qty']) ?></td><td class="num"><?= e(number_format((float)$l['unit_price'], 4, ',', '.')) ?></td><td class="num"><?= e($m((float)$l['line_total'])) ?></td>
         <td class="num"><?= $l['po_qty_open'] !== null ? stk_qty((float)$l['po_qty_open']) : ($l['po_line_id'] ? stk_qty((float)$l['qty_accepted'] - (float)$l['qty_invoiced']) : '—') ?></td><td class="num"><?= $l['po_price'] !== null ? e(number_format((float)$l['po_price'], 4, ',', '.')) : ($l['po_line_id'] && $l['po_unit_price'] !== null ? e(number_format((float)$l['po_unit_price'] * (1 - (float)$l['discount_pct'] / 100), 4, ',', '.')) : '—') ?></td>
         <td><?= si_m_pill($l['match_status']) ?><?php if ($edit && $l['po_line_id'] && in_array($l['match_status'], ['qty', 'both'], true)): /* R97-067: say which quantity is short and what to do */

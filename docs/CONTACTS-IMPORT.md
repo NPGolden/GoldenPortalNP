@@ -2423,3 +2423,24 @@ Language keys 10 358 each (portal; +3 from R97-060, none from this release); app
 
 **Security review**: no new entry point (same action, same checks); no new proposals.
 
+## §355 v1.156.0 (R97-071) — Payables: logistic costs of the order on the supplier invoice
+
+**Request**: "also in the Supplier invoice it does not bring the logisitc costs" (after "In POs the logistic costs should be added in the total … so we can pay all").
+
+**Before**: a supplier invoice was built from the order lines only; freight charged by the supplier had to be typed as a free line.
+
+**Change**:
+
+- Migration `r97y`: `si_lines.po_cost_id` (the logistic cost of the order the line carries).
+- `app/si.php`: `si_lc_has()`, `si_lc_open($oid)` (costs not on a non-cancelled invoice), `si_lc_same()` (provider empty, or the supplier of the invoice — compared without spaces and punctuation), `si_costs_from_po()` (one line per cost: kind · PO no · ref · note, quantity 1, the amount), `si_lc_net()`, `si_lc_invoice()`.
+- `si_pull` (and the tick at registration) pulls lines and costs; the message reports costs of another provider and costs in another currency, which are left out.
+- `si_sp_cost_sync()`: the cost of the invoice on the sub-project is its net **without** the logistic lines (they are already there as kind Logistics from the order), and the reduction of the order commitment uses the same figure — no double counting.
+- `po_cost_delete()` refuses while the cost is on an invoice. `views/purchase_order.php` shows the invoice next to the cost; `views/payable.php` marks the line "logistics".
+- Keys `si.lc_*`, labels `si.pull_lines`, `si.pull_lines_btn` reworded (10 565 per file).
+
+**Tests (sandbox)**: order with two received lines and four costs (no provider, provider DSV, provider = supplier, one in USD): pulled 2 lines + 2 costs, DSV named, USD reported; net 17.385,50; check → Matched; sub-project cost of the invoice 16.950,00 with the logistics rows unchanged; invoice shown on the two costs of the order; delete of a cost on the invoice refused; test data removed.
+
+**Not tested**: an invoice with VAT (the VAT rate of the invoice applies to the logistic lines as to every line — import VAT typed as a logistic cost would get VAT on top; such a cost should be left for the broker's invoice or its line removed); the live data.
+
+**Security review**: same action and checks as before (`require_si`, CSRF, the invoice must be editable and belong to the order); the new column is filled only from costs of the invoice's own order. No new proposals.
+

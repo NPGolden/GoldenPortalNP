@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.155.7** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.156.0** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.156.0 | GAS-CP-R97-071 | 2026-11-17 | Payables: Pull received PO lines also brings the logistic costs of the purchase order charged by the same supplier, one invoice line each, so parts and logistics are paid together; costs of another provider are named, not pulled. | `install/migrate_cp_r97_071_si_logistic_costs.sql` |
 | 1.155.7 | GAS-CP-R97-070 | 2026-11-17 | Payables: when Pull received PO lines brings nothing, the message says why — how many lines of the order are already on the invoice, have no goods receipt, or are fully invoiced. | — |
 | 1.155.6 | GAS-CP-R97-069 | 2026-11-17 | Purchase orders show the total with logistics: gross of the parts plus the logistic costs, as a tile on the order, in the logistic costs table and in the list of orders. | — |
 | 1.155.5 | GAS-CP-R97-068 | 2026-11-17 | Purchase order and requisition: the Category drop-down of a new inventory item can be searched by typing. | — |

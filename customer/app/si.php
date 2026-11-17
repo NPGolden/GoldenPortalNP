@@ -93,7 +93,7 @@ function si_save_from_post(): int {
         $v = ['kind' => $kind, 'si_no' => si_number($kind === 'credit' ? 'SCN' : 'SI', $br), 'branch_id' => $br] + $v + ['created_by' => (int)$u['id'], 'created_name' => $u['full_name']];
         q('INSERT INTO si_invoices (' . implode(', ', array_keys($v)) . ') VALUES (' . implode(', ', array_fill(0, count($v), '?')) . ')', array_values($v));
         $id = (int) db()->lastInsertId(); si_event($id, null, 'create', $v['si_no']);
-        if ($O && !empty($_POST['pull_lines'])) si_lines_from_po($id, (int)$O['id']);
+        if ($O && !empty($_POST['pull_lines'])) { si_lines_from_po($id, (int)$O['id']); si_costs_from_po($id, (int)$O['id']); }   // R97-071: and the logistic costs of the supplier
         si_recalc($id);
     }
     return $id;
@@ -109,6 +109,33 @@ function si_lines_from_po(int $iid, int $oid): int {
     }
     return $n;
 }
+/* ---- R97-071: logistic costs of the purchase order on the supplier invoice */
+function si_lc_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM si_lines LIKE 'po_cost_id'") && (bool) scalar("SHOW TABLES LIKE 'po_costs'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function si_lc_norm(string $s): string { return preg_replace('/[^a-z0-9α-ω]/u', '', mb_strtolower($s)); }
+/** Is the provider typed on a logistic cost the supplier of the invoice? Empty provider = the supplier of the order. */
+function si_lc_same(?string $provider, string $supplier): bool { $p = si_lc_norm((string)$provider); $s = si_lc_norm($supplier); return $p === '' || ($s !== '' && mb_strlen($p) >= 3 && (str_contains($s, $p) || str_contains($p, $s))); }
+/** Logistic costs of the order that are not yet on a supplier invoice (cancelled invoices do not count). */
+function si_lc_open(int $oid): array {
+    return si_lc_has() ? all("SELECT c.* FROM po_costs c WHERE c.order_id = ? AND NOT EXISTS (SELECT 1 FROM si_lines sl JOIN si_invoices x ON x.id = sl.invoice_id WHERE sl.po_cost_id = c.id AND x.status <> 'cancelled') ORDER BY c.cost_date, c.id", [$oid]) : [];
+}
+/** Pull the open logistic costs charged by the supplier of the invoice, one line each. Costs of another provider or in another currency stay out and are reported.
+ *  Returns ['n' => pulled, 'other' => [provider names], 'cur' => n in another currency]. */
+function si_costs_from_po(int $iid, int $oid): array {
+    $out = ['n' => 0, 'other' => [], 'cur' => 0]; $i = si_load($iid); if (!$i || !si_lc_has() || $i['kind'] === 'credit') return $out;
+    $po = (string) scalar('SELECT po_no FROM po_orders WHERE id = ?', [$oid]); $seq = (int) scalar('SELECT COALESCE(MAX(seq),0) FROM si_lines WHERE invoice_id = ?', [$iid]);
+    foreach (si_lc_open($oid) as $c) {
+        if (!si_lc_same($c['provider'], (string)$i['supplier'])) { $out['other'][(string)$c['provider']] = 1; continue; }
+        if ((string)$c['currency'] !== (string)$i['currency']) { $out['cur']++; continue; }
+        $amt = round((float)$c['amount'], 2); $desc = mb_substr(t('po.c_' . $c['kind']) . ' · ' . $po . ($c['ref'] ? ' · ' . $c['ref'] : '') . ($c['note'] ? ' · ' . $c['note'] : ''), 0, 255);
+        q('INSERT INTO si_lines (invoice_id, seq, po_line_id, po_cost_id, description, qty, unit_price, line_total) VALUES (?,?,NULL,?,?,1,?,?)', [$iid, ++$seq, (int)$c['id'], $desc, $amt, $amt]); $out['n']++;
+    }
+    $out['other'] = array_keys($out['other']); return $out;
+}
+/** Net of the logistic-cost lines of an invoice — already on the sub-project as cost of kind Logistics, so it is left out of the invoice cost. */
+function si_lc_net(int $iid): float { return si_lc_has() ? (float) scalar('SELECT COALESCE(SUM(line_total),0) FROM si_lines WHERE invoice_id = ? AND po_cost_id IS NOT NULL', [$iid]) : 0.0; }
+/** The supplier invoice that carries a logistic cost: [id, si_no] or null. */
+function si_lc_invoice(int $costId): ?array { return si_lc_has() ? (one("SELECT x.id, x.si_no FROM si_lines sl JOIN si_invoices x ON x.id = sl.invoice_id WHERE sl.po_cost_id = ? AND x.status <> 'cancelled' LIMIT 1", [$costId]) ?: null) : null; }
+
 /** R97-070: why "Pull received PO lines" brought nothing — the lines of the order by reason. ['total','on_invoice','not_received','invoiced'] */
 function si_pull_why(int $iid, int $oid): array {
     $w = ['total' => 0, 'on_invoice' => 0, 'not_received' => 0, 'invoiced' => 0];
@@ -161,12 +188,12 @@ function si_check(int $iid, bool $force, string $note): void {
 /** The invoice on the sub-project costs (kind invoice, negative for a credit note) — the cash flow treats it as an actual outflow; the PO "order" row stays as the commitment. */
 function si_sp_cost_sync(int $iid): void {
     $i = si_load($iid); if (!$i || !function_exists('bg_has') || !bg_has()) return; $u = current_user();
-    $want = $i['subproject_id'] && in_array($i['status'], ['checked', 'requested', 'approved', 'paid'], true); $amt = ($i['kind'] === 'credit' ? -1 : 1) * (float)$i['net'];
+    $want = $i['subproject_id'] && in_array($i['status'], ['checked', 'requested', 'approved', 'paid'], true); $amt = ($i['kind'] === 'credit' ? -1 : 1) * ((float)$i['net'] - si_lc_net($iid));   /* R97-071: logistic-cost lines are already a cost of kind Logistics — not twice */
     if (!$want) { if ($i['sp_cost_id']) { q('DELETE FROM sp_costs WHERE id = ?', [(int)$i['sp_cost_id']]); q('UPDATE si_invoices SET sp_cost_id = NULL WHERE id = ?', [$iid]); } }
     elseif ($i['sp_cost_id'] && scalar('SELECT 1 FROM sp_costs WHERE id = ?', [(int)$i['sp_cost_id']])) q('UPDATE sp_costs SET cost_date = ?, supplier = ?, description = ?, ref_no = ?, amount = ?, currency = ? WHERE id = ?', [$i['issue_date'], $i['supplier'], mb_substr(t($i['kind'] === 'credit' ? 'si.sp_cost_credit' : 'si.sp_cost_desc', ['n' => $i['inv_no'], 'po' => $i['po_no'] ?: '']), 0, 255), mb_substr($i['inv_no'], 0, 60), $amt, $i['currency'], (int)$i['sp_cost_id']]);
     else { q('INSERT INTO sp_costs (subproject_id, cost_date, kind, supplier, description, ref_no, amount, currency, file_id, created_by, created_name) VALUES (?,?,?,?,?,?,?,?,?,?,?)', [(int)$i['subproject_id'], $i['issue_date'], 'invoice', $i['supplier'], mb_substr(t($i['kind'] === 'credit' ? 'si.sp_cost_credit' : 'si.sp_cost_desc', ['n' => $i['inv_no'], 'po' => $i['po_no'] ?: '']), 0, 255), mb_substr($i['inv_no'], 0, 60), $amt, $i['currency'], $i['file_id'], (int)($u['id'] ?? 0) ?: null, $u['full_name'] ?? null]); q('UPDATE si_invoices SET sp_cost_id = ? WHERE id = ?', [(int) db()->lastInsertId(), $iid]); }
     // the PO commitment is reduced by what is invoiced, so Budget & actual does not count the order twice
-    if ($i['order_id'] && function_exists('po_load')) { $o = po_load((int)$i['order_id']); if ($o && $o['cost_id']) { $inv = (float) scalar("SELECT COALESCE(SUM(IF(kind = 'credit', -net, net)),0) FROM si_invoices WHERE order_id = ? AND status IN ('checked','requested','approved','paid')", [(int)$o['id']]); q('UPDATE sp_costs SET amount = ? WHERE id = ?', [max(0.0, (float)$o['subtotal'] - $inv), (int)$o['cost_id']]); } }
+    if ($i['order_id'] && function_exists('po_load')) { $o = po_load((int)$i['order_id']); if ($o && $o['cost_id']) { $inv = (float) scalar("SELECT COALESCE(SUM(IF(kind = 'credit', -net, net)),0) FROM si_invoices WHERE order_id = ? AND status IN ('checked','requested','approved','paid')", [(int)$o['id']]); if (si_lc_has()) $inv -= (float) scalar("SELECT COALESCE(SUM(sl.line_total),0) FROM si_lines sl JOIN si_invoices x ON x.id = sl.invoice_id WHERE x.order_id = ? AND x.kind <> 'credit' AND x.status IN ('checked','requested','approved','paid') AND sl.po_cost_id IS NOT NULL", [(int)$o['id']]);   /* the commitment is for the parts only */ q('UPDATE sp_costs SET amount = ? WHERE id = ?', [max(0.0, (float)$o['subtotal'] - $inv), (int)$o['cost_id']]); } }
     if (function_exists('eng_rows_reset')) eng_rows_reset();
 }
 function si_cancel(int $iid, string $note): void {

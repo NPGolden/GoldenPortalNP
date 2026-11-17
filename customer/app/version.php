@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.155.7';
+const CP_VERSION = '1.156.0';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-071', 'version' => '1.156.0', 'date' => '2026-11-17', 'title' => 'Payables: Pull received PO lines also brings the logistic costs of the purchase order charged by the same supplier, one invoice line each, so parts and logistics are paid together; costs of another provider are named, not pulled.', 'db' => 'install/migrate_cp_r97_071_si_logistic_costs.sql', 'check' => 'r97y'],
         ['ref' => 'GAS-CP-R97-070', 'version' => '1.155.7', 'date' => '2026-11-17', 'title' => 'Payables: when Pull received PO lines brings nothing, the message says why — how many lines of the order are already on the invoice, have no goods receipt, or are fully invoiced.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-069', 'version' => '1.155.6', 'date' => '2026-11-17', 'title' => 'Purchase orders show the total with logistics: gross of the parts plus the logistic costs, as a tile on the order, in the logistic costs table and in the list of orders.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-068', 'version' => '1.155.5', 'date' => '2026-11-17', 'title' => 'Purchase order and requisition: the Category drop-down of a new inventory item can be searched by typing.', 'db' => null, 'check' => null],
@@ -515,6 +516,7 @@ function cp_migration_state(): array {
         'r97p' => $has("SHOW TABLES LIKE 'nl_issues'"),
         'r97q' => $has("SHOW TABLES LIKE 'nl_lists'"),
         'r97r' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'proc_state'") && $has("SHOW COLUMNS FROM sb_parts LIKE 'proc_at'"),
+        'r97y' => $has("SHOW COLUMNS FROM si_lines LIKE 'po_cost_id'"),
         'r97x' => $has("SHOW TABLES LIKE 'hrs_campaigns'") && $has("SHOW TABLES LIKE 'hrs_scores'"),
         'r97w' => $has("SHOW COLUMNS FROM doc_links LIKE 'mail_error'"),
         'r97v' => $has("SHOW TABLES LIKE 'doc_links'"),
