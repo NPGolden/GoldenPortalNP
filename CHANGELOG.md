@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.160.0** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.160.1** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.160.1 | GAS-CP-R97-082 | 2026-11-17 | IT & Cybersecurity: access by position — the staff roles and disciplines ticked on the ISO 27001 overview have the whole group (top management and QHSE, project managers, IT, automation and electrical engineers by default until saved). | — |
 | 1.160.0 | GAS-CP-R97-081 | 2026-11-17 | IT & Cybersecurity › Marine cyber safety (IACS UR E26 / E27): the products we supply, linked to vessel, project and sub-project; the ten UR E27 documents of each with their approval by class; every software release of the programming team from development to installation on board, approved by a second person; shown on the vessel and sub-project pages. | `install/migrate_cp_r97_081_marine_cyber.sql` |
 | 1.159.0 | GAS-CP-R97-080 | 2026-11-17 | IT & Cybersecurity is a menu group of its own (out of Library) with Remote support contracts, the new ISO 27001 — ISMS module (eleven registers with owners, dates, files and history; the documented-information list and the 93 Annex A controls pre-filled; overview, reminders, Excel export) and Report a security event for all staff. | `install/migrate_cp_r97_080_isms.sql` |
 | 1.158.0 | GAS-CP-R97-079 | 2026-11-17 | Speed: the checks whether a table or column exists are answered from a kept copy of the schema (about 38 database statements fewer on every page); leave totals use the date index; presence and device stamps are written less often. | — |

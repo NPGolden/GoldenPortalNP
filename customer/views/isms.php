@@ -39,6 +39,16 @@ layout_head($TT . ($reg ? ' · ' . ism_reg_title($reg) : ''), $PG);
   <?php endif; ?>
 </div>
 <?php if ($O['next']): ?><div class="card"><h2>🔍 <?= tt('ism.next_h') ?></h2><table class="tbl"><tbody><?php foreach ($O['next'] as $r): $d = ism_data($r); ?><tr><td><a href="<?= url('isms_rec', ['id' => (int)$r['id']]) ?>"><b><?= e($r['code']) ?></b></a> <?= e($r['title']) ?><br><span class="hint"><?= !empty($d['kind']) ? tt('ism.o_' . $d['kind']) : '' ?></span></td><td style="white-space:nowrap;"><?= e(fmt_date($r['due_date'])) ?></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
+<?php if (ism_manage()): $AC = ism_access(); $acR = all('SELECT r.id, r.name, (SELECT COUNT(*) FROM customer_users cu WHERE cu.staff_role_id = r.id AND cu.is_active = 1) AS n FROM staff_roles r WHERE r.is_active = 1 ORDER BY r.sort_order, r.name'); $acD = all('SELECT d.id, d.name, (SELECT COUNT(*) FROM customer_users cu WHERE cu.discipline_id = d.id AND cu.is_active = 1) AS n FROM disciplines d WHERE d.is_active = 1 ORDER BY d.sort_order, d.name'); ?>
+<div class="card" id="access">
+  <h2>🔑 <?= tt('ism.acc_h') ?></h2><p class="hint"><?= tt('ism.acc_hint') ?><?= $AC['saved'] ? '' : ' <b>' . tt('ism.acc_default') . '</b>' ?></p>
+  <form method="post" action="<?= url('isms') ?>#access" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="ism_access_save">
+    <?php foreach ([['roles', $acR, 'ism.acc_roles'], ['disc', $acD, 'ism.acc_disc']] as [$nm, $list, $lab]): ?><p style="margin:8px 0 4px;"><b><?= tt($lab) ?></b></p>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px 12px;"><?php foreach ($list as $x): ?><label style="display:flex;gap:6px;align-items:center;font-weight:400;"><input type="checkbox" name="<?= $nm ?>[]" value="<?= (int)$x['id'] ?>"<?= in_array((int)$x['id'], $AC[$nm], true) ? ' checked' : '' ?> style="width:16px;height:16px;"> <?= e($x['name']) ?> <span class="hint">(<?= (int)$x['n'] ?>)</span></label><?php endforeach; ?></div><?php endforeach; ?>
+    <div class="btn-row" style="margin-top:8px;"><button class="btn btn--sm" type="submit"><?= tt('btn.save') ?></button></div>
+  </form>
+</div>
+<?php endif; ?>
 <div class="card">
   <h2>👥 <?= tt('ism.team_h') ?></h2><p class="hint"><?= tt('ism.team_hint') ?></p>
   <?php $team = ism_team(); $users = ism_users(); if (ism_manage()): ?>

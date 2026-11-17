@@ -32,7 +32,24 @@ function ism_grp(string $reg): string { return (string)(ism_regs()[$reg]['grp'] 
 function ism_can_reg(string $reg): bool { return ism_grp($reg) === 'marine' ? ism_can_marine() : ism_can(); }
 /** The page of an area: 'isms' (ISO 27001) or 'mcs' (marine cyber safety). */
 function ism_page(string $reg): string { return ism_grp($reg) === 'marine' ? 'mcs' : 'isms'; }
-function ism_can(): bool { static $v = null; if ($v === null) $v = ism_has() && is_staff() && (ism_manage() || in_array((int)(current_user()['id'] ?? 0), ism_team(), true)); return $v; }
+/**
+ * R97-082 — access by position: the staff roles and the disciplines whose people have the whole of IT & Cybersecurity.
+ * Until management saves a choice, the names decide: top management and QHSE, project managers, IT, automation and electrical engineers.
+ * Returns ['roles' => [ids], 'disc' => [ids], 'saved' => bool].
+ */
+const ISM_ROLE_RX = '/\b(ceo|owner|general manager|managing director|director|technical manager|cto|coo|qhse|hse|quality|project manager|pm|it|ict|cyber|automation|electrical|programmer|software)\b|διευθ|ποιότητ|αυτοματ|ηλεκτρολ|πληροφορ|έργου/u';
+const ISM_DISC_RX = '/\b(automation|electrical|it|ict|information technology|software|programming|cyber|project management|qhse|quality|management)\b|αυτοματ|ηλεκτρολ|πληροφορ|ποιότητ|διαχείριση έργ/u';
+function ism_access(): array {
+    static $A = null; if ($A !== null) return $A;
+    $s = json_decode((string) cp_setting('ism_access', ''), true);
+    if (is_array($s) && isset($s['roles'], $s['disc'])) return $A = ['roles' => array_map('intval', (array)$s['roles']), 'disc' => array_map('intval', (array)$s['disc']), 'saved' => true];
+    $A = ['roles' => [], 'disc' => [], 'saved' => false];
+    try { foreach (all('SELECT id, name FROM staff_roles WHERE is_active = 1') as $r) if (preg_match(ISM_ROLE_RX, mb_strtolower((string)$r['name']))) $A['roles'][] = (int)$r['id'];
+          foreach (all('SELECT id, name FROM disciplines WHERE is_active = 1') as $r) if (preg_match(ISM_DISC_RX, mb_strtolower((string)$r['name']))) $A['disc'][] = (int)$r['id']; } catch (Throwable $e) {}
+    return $A;
+}
+function ism_by_position(): bool { $u = current_user(); if (!$u) return false; $A = ism_access(); return (!empty($u['staff_role_id']) && in_array((int)$u['staff_role_id'], $A['roles'], true)) || (!empty($u['discipline_id']) && in_array((int)$u['discipline_id'], $A['disc'], true)); }
+function ism_can(): bool { static $v = null; if ($v === null) $v = ism_has() && is_staff() && (ism_manage() || in_array((int)(current_user()['id'] ?? 0), ism_team(), true) || ism_by_position()); return $v; }
 
 /**
  * The registers. 'st' statuses [key => tone], 'closed' the statuses that need no further action, 'f' the own fields
@@ -285,6 +302,9 @@ function ism_handle_action(string $action): bool {
         case 'ism_mteam_save': if (!ism_manage()) throw new RuntimeException(t('err.noaccess')); $ok = array_map('intval', array_column(ism_users(), 'id')); cp_setting_set('ism_mteam', json_encode(array_values(array_intersect(array_map('intval', (array)($_POST['team'] ?? [])), $ok)))); flash('good', t('ism.saved')); redirect('mcs');
         case 'ism_file_add': $rid = (int)($_POST['id'] ?? 0); ism_file_add($rid, $_FILES['file'] ?? null, (string)($_POST['note'] ?? '')); flash('good', t('ism.file_ok')); redirect('isms_rec', ['id' => $rid], '#files');
         case 'ism_file_del': $rid = ism_file_delete((int)($_POST['file_id'] ?? 0)); flash('good', t('ism.file_deleted')); redirect('isms_rec', ['id' => $rid], '#files');
+        case 'ism_access_save': if (!ism_manage()) throw new RuntimeException(t('err.noaccess'));
+            $rs = array_map('intval', array_column(all('SELECT id FROM staff_roles'), 'id')); $ds = array_map('intval', array_column(all('SELECT id FROM disciplines'), 'id'));
+            cp_setting_set('ism_access', json_encode(['roles' => array_values(array_intersect(array_map('intval', (array)($_POST['roles'] ?? [])), $rs)), 'disc' => array_values(array_intersect(array_map('intval', (array)($_POST['disc'] ?? [])), $ds))])); flash('good', t('ism.saved')); redirect('isms', [], '#access');
         case 'ism_team_save': if (!ism_can()) throw new RuntimeException(t('err.noaccess')); if (!ism_manage()) throw new RuntimeException(t('err.noaccess')); $ok = array_map('intval', array_column(ism_users(), 'id')); cp_setting_set('ism_team', json_encode(array_values(array_intersect(array_map('intval', (array)($_POST['team'] ?? [])), $ok)))); flash('good', t('ism.saved')); redirect('isms');
         default: throw new RuntimeException(t('err.notfound'));
     }
