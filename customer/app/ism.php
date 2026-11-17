@@ -136,8 +136,15 @@ function ism_list(string $reg, array $f = []): array {
     if ($show === 'due') $rows = array_values(array_filter($rows, fn($r) => ism_due($r) !== null));
     return $rows;
 }
-function ism_next_code(string $reg): string {
-    $R = ism_reg($reg); $max = 0; foreach (all('SELECT code FROM ism_records WHERE reg = ?', [$reg]) as $x) if (preg_match('/-(\d+)$/', (string)$x['code'], $m)) $max = max($max, (int)$m[1]);
+/** R97-085: the number a new record gets by default. A record that belongs to a product or a supplier is numbered under it: CBS-001-D11, CBS-001-SW02, SUP-003-E01. */
+const ISM_CHILD_SFX = ['mdoc' => 'D', 'msw' => 'SW', 'supeval' => 'E'];
+function ism_next_code(string $reg, int $parentId = 0): string {
+    $R = ism_reg($reg); $max = 0;
+    if ($parentId && isset(ISM_CHILD_SFX[$reg]) && ($pc = (string) scalar('SELECT code FROM ism_records WHERE id = ?', [$parentId])) !== '') {
+        $stem = $pc . '-' . ISM_CHILD_SFX[$reg]; foreach (all('SELECT code FROM ism_records WHERE reg = ? AND parent_id = ?', [$reg, $parentId]) as $x) if (preg_match('/^' . preg_quote($stem, '/') . '(\d+)$/', (string)$x['code'], $m)) $max = max($max, (int)$m[1]);
+        do { $c = $stem . str_pad((string)(++$max), 2, '0', STR_PAD_LEFT); } while (scalar('SELECT COUNT(*) FROM ism_records WHERE reg = ? AND code = ?', [$reg, $c])); return $c;
+    }
+    foreach (all('SELECT code FROM ism_records WHERE reg = ?', [$reg]) as $x) if (preg_match('/^' . preg_quote($R['prefix'], '/') . '-(\d+)$/', (string)$x['code'], $m)) $max = max($max, (int)$m[1]);
     return $R['prefix'] . '-' . str_pad((string)($max + 1), 3, '0', STR_PAD_LEFT);
 }
 function ism_event(int $rid, string $ev, ?string $note = null): void { $u = current_user(); q('INSERT INTO ism_events (record_id, event, user_id, user_name, note) VALUES (?,?,?,?,?)', [$rid, mb_substr($ev, 0, 24), (int)($u['id'] ?? 0) ?: null, mb_substr((string)($u['full_name'] ?? ''), 0, 120), $note !== null ? mb_substr($note, 0, 600) : null]); }
@@ -200,7 +207,9 @@ function ism_save_from_post(): int {
         if ($status === 'done') { if (count($cr) < count(ISM_EVAL_CRIT)) throw new RuntimeException(t('ism.e_eval_scores')); if (empty($data['evaluated_on'])) $data['evaluated_on'] = date('Y-m-d'); if (empty($data['evaluator'])) $data['evaluator'] = (string)($u0['full_name'] ?? '');
             if (empty($data['eval_result'])) $data['eval_result'] = $data['rating'] >= 70 ? 'res_approved' : ($data['rating'] >= 50 ? 'res_conditional' : 'res_rejected'); }
     }
-    $code = $S('code', 40); if ($code === '') $code = $old ? (string)$old['code'] : ism_next_code($reg);
+    $code = $S('code', 40);
+    if (!$old && ($code === '' || $code === $S('code_auto', 40))) $code = ism_next_code($reg, (int)($L['parent_id'] ?? 0));   // R97-085: the number was not changed by hand — it is taken again now, for the product or supplier actually chosen
+    elseif ($code === '') $code = (string)$old['code'];
     if (scalar('SELECT COUNT(*) FROM ism_records WHERE reg = ? AND code = ? AND id <> ?', [$reg, $code, $id])) throw new RuntimeException(t('ism.e_code', ['c' => $code]));
     $u = current_user(); $row = [$code, $title, $status, $owner ?: null, $ownerName ?: null, !empty($R['due']) ? $D('due_date') : null, !empty($R['review']) ? $D('review_date') : null, $S('ref', 60) ?: null, json_encode($data, JSON_UNESCAPED_UNICODE), mb_substr((string)($u['full_name'] ?? ''), 0, 120)];
     if ($old) {

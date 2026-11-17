@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.162.0';
+const CP_VERSION = '1.162.1';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-085', 'version' => '1.162.1', 'date' => '2026-11-17', 'title' => 'Support: IT & Cybersecurity has its own handbook (its entries leave the Staff and Project Manager handbooks); every record of IT & Cybersecurity opens with its automatic number filled in, which can be changed — documents and releases of a product and evaluations of a supplier are numbered under it.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-084', 'version' => '1.162.0', 'date' => '2026-11-17', 'title' => 'Procurement: the IT department raises requisitions, RFQs and POs for the sub-projects marked Open for IT purchases (Edit sub-project) — only those are listed to them; who is IT is ticked in Settings › Procurement; requisitions are approved by procurement as any other and IT orders take their lines from approved requisitions.', 'db' => 'install/migrate_cp_r97_084_it_purchases.sql', 'check' => 'r98c'],
         ['ref' => 'GAS-CP-R97-083', 'version' => '1.161.0', 'date' => '2026-11-17', 'title' => 'ISO 27001: the supplier register takes its suppliers from the supplier list and each is evaluated (six criteria, rating, result, next evaluation date; shown on the supplier page); a training is created in or linked to HR › Training and attendance is kept in the personnel records; Access by position is set by the CEO and the General Manager only.', 'db' => 'install/migrate_cp_r97_083_isms_suppliers_training.sql', 'check' => 'r98b'],
         ['ref' => 'GAS-CP-R97-082', 'version' => '1.160.1', 'date' => '2026-11-17', 'title' => 'IT & Cybersecurity: access by position — the staff roles and disciplines ticked on the ISO 27001 overview have the whole group (top management and QHSE, project managers, IT, automation and electrical engineers by default until saved).', 'db' => null, 'check' => null],

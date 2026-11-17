@@ -1,0 +1,130 @@
+<?php
+/** User manual — IT & Cybersecurity edition: remote support contracts, reporting a security event, the ISO 27001 registers, marine cyber safety (IACS UR E26 / E27) and the purchases of the IT department.   GAS-CP-R97-085
+ *  Every change to the menu group IT & Cybersecurity is described here, not in the Staff or Project Manager handbooks. */
+return [
+  'title' => 'Customer Portal — IT & Cybersecurity Handbook',
+  'lede'  => 'How the menu group IT & Cybersecurity is used: remote support contracts, reporting a security event, the filing and reporting of ISO/IEC 27001 with its supplier evaluations and training, marine cyber safety for the products we supply (IACS UR E26 / E27) with the life cycle of their software, and the purchases of the IT department.',
+  'sections' => [
+    ['id' => 'where', 'title' => 'Where things are and who sees them', 'body' => [
+      'The menu group IT & Cybersecurity stands on its own in the left menu, above Library. What you see in it depends on your account.',
+      ['ul' => [
+        'Remote support contracts — staff and customers; a customer sees the contracts of their own vessels.',
+        'ISO 27001 — ISMS — management, administrators, the ISMS team, and everybody whose staff role or discipline is ticked under Access by position.',
+        'Marine cyber safety (E26 / E27) — the same people, plus the programming team, who see this area only.',
+        'Report a security event — every member of staff, including the accounts limited to HR or planning.',
+      ]],
+      'Access by position is a card on ISO 27001 — ISMS › Overview that only the CEO and the General Manager see and save. It lists every staff role and discipline with the number of active accounts; a tick gives all those people the ISO 27001 registers and Marine cyber safety. Until it is saved for the first time the portal ticks by name — top management and QHSE, project managers, IT, automation and electrical engineers — and the card says so.',
+      'Two teams add single people who are not covered by their position: the ISMS team (ISO 27001 overview) has everything; the programming team (Marine cyber safety overview) has the marine area only. Management and administrators choose both teams and are the only ones who delete records.',
+      ['tip' => 'Nothing that is filed in this group is sent to the assistant of the portal.'],
+    ]],
+    ['id' => 'remote', 'title' => 'Remote support contracts', 'body' => [
+      'One contract per vessel and period: the hours included, the response time, the coverage hours and how we connect. Tickets raised on the vessel are covered by the live contract and every remote session is logged against it.',
+      'An end date creates the renewal task, due the agreed number of days before the end; a contract without an end date is open-ended and has no renewal reminder.',
+      'The page moved here from Library in v1.159.0; the page itself and the contracts did not change.',
+    ]],
+    ['id' => 'report', 'title' => 'Reporting a security event', 'body' => [
+      'Anything that looks wrong for the security of information is reported at once: a suspicious e-mail that was opened, a lost laptop or phone, a password that may have been given away, an unknown USB stick, a door left open, data sent to the wrong person. It is better to report something harmless than to miss something serious.',
+      ['ol' => [
+        'Open IT & Cybersecurity › Report a security event.',
+        'Write what it is in a few words, when it happened, what is affected and what happened — what you saw and what you did. Never write a password.',
+        'Send the report. It is filed as an incident with status Reported and the ISMS team and the administrators are notified at once.',
+      ]],
+      ['tip' => 'Do not delete the e-mail or the file concerned and do not switch the device off unless you are told to.'],
+    ]],
+    ['id' => 'isms', 'title' => 'ISO 27001 — the overview and the registers', 'body' => [
+      'ISO 27001 — ISMS opens on the overview: documents approved, controls implemented out of those that apply, open risks by level, open incidents and open nonconformities; the table of registers with records, open and overdue; Needs attention (a due date passed or a review date reached); the planned audits and reviews; the ISMS team.',
+      'Each tab is a register, tied to its clause of ISO/IEC 27001:2022:',
+      ['ul' => [
+        'Documents (7.5) — policies, procedures and records with version, approval and next review. It starts with the 32 items of documented information the standard asks for, as drafts; attach the approved file to each.',
+        'Risks (6.1.2 · 8.2 · 8.3) — asset, threat, vulnerability, likelihood and impact from 1 to 5, the treatment and its plan, and the residual likelihood and impact. The score is likelihood × impact: 15 and more is high, 8 to 14 medium, below 8 low.',
+        'Statement of Applicability (6.1.3 d) — the 93 controls of Annex A. For each: applicable or not with the justification, how far it is implemented, how it is met, and the evidence attached.',
+        'Assets (A 5.9) — type, classification, location and criticality.',
+        'Incidents (A 5.24 – 5.28) — what happened, severity, containment, root cause, lessons learned and who was notified. Reports from staff arrive here.',
+        'Audits & reviews (9.2 · 9.3) — internal audits, management reviews, reviews of access rights, backup restore tests and continuity exercises, with result and report.',
+        'Nonconformities (10.2) — source, cause, correction, corrective action and the check of its effectiveness.',
+        'Objectives (6.2) — measure, target and result.',
+        'Suppliers and Supplier evaluations (A 5.19 – 5.22) — see the next section.',
+        'Training & awareness (7.2 · 7.3) — see the section on training.',
+        'Legal requirements (A 5.31) — the obligation and how it is met.',
+      ]],
+      'A record: every record is numbered automatically — a new record opens with its number already filled in (ISMS-033, RSK-001, INC-001 …; a document or a software release of a product and an evaluation of a supplier are numbered under it: CBS-001-D11, CBS-001-SW01, SUP-003-E01) and you may type another number as long as it is not used in the register; remote support contracts are numbered GAS-RS-year-number in the same way. Besides the number a record has a title, a status, an owner, a due date and a next review, the fields of its register, files and a history. Save the record first; then attach the evidence (PDF, Office, images, e-mail, zip, up to 25 MB each) with a note of what it is. The history keeps who created it, which fields changed, every status step and every file attached or removed.',
+      'Lists are filtered by word, status and owner, and by Open or Overdue. Open means that the record still needs work; overdue that its due date has passed or its review date has come.',
+      'Reminders: the owner of a record is notified 14 days before a due date or a review date; a record without an owner goes to the ISMS team.',
+      'All registers (Excel) at the top gives one workbook with a summary and a sheet per register — the file for the auditor.',
+    ]],
+    ['id' => 'suppliers', 'title' => 'Suppliers and their evaluation', 'body' => [
+      'A record of the supplier register is a supplier of Procurement › Suppliers. Choose it from the list — a supplier is in the register once and its name becomes the title — and state the service, the access it has to our information, how critical it is and the agreement (contract, NDA, DPA). A new supplier starts as To evaluate.',
+      ['ol' => [
+        'On the supplier record press + New evaluation and choose the kind: initial (before first use), periodic, or after an incident.',
+        'Score the six criteria from 1 (very weak) to 5 (very good): agreement in place; certification and evidence (ISO 27001 or equivalent); control of access to our information and systems; incidents and how they are reported to us; continuity and reliability of the service; quality and response.',
+        'Write any conditions asked from the supplier and attach the questionnaire or the certificate received.',
+        'Set the evaluation to Done. All six scores are needed; the date and the evaluator are filled in when empty.',
+      ]],
+      'The rating is the sum of the scores in percent. The result is proposed from it — 70 % and more Approved, 50 to 69 % Approved with conditions, below 50 % Not approved — and another result can be chosen.',
+      'The latest finished evaluation gives the supplier its rating and its state (Active, Approved with conditions, Not approved) and dates the next evaluation: 12 months later when the supplier is critical (4 or 5) or reaches confidential or personal information, otherwise 24 months. The owner is reminded 14 days before.',
+      'People of the ISMS also see the card Information security (ISO 27001) on the page of the supplier in Procurement: the state, the rating and the next evaluation, or a button that adds the supplier to the register.',
+      ['tip' => 'The register is for the suppliers that handle our information or our systems — not for the whole supplier list.'],
+    ]],
+    ['id' => 'training', 'title' => 'Training and awareness, kept in the personnel records', 'body' => [
+      'An ISO 27001 training is recorded once and kept in HR, so that it appears in the personnel record of everybody who attended.',
+      ['ol' => [
+        'Create the record in Training & awareness: title, planned date, audience and trainer.',
+        'On the record, in the card HR › Training and personnel records, press Create in HR › Training — or link a training that HR has already published.',
+        'After the session tick who attended and press Save attendance. Tick Set the training to Done to close the record here and the training in HR together.',
+      ]],
+      'The attendance is written to HR › Training and shows on the Training tab of each personnel record; somebody who was marked as attended and is un-ticked becomes absent. HR adds certificates and scores there. The number of attendees of the ISO record follows the ticks.',
+    ]],
+    ['id' => 'marine', 'title' => 'Marine cyber safety — IACS UR E26 / E27', 'body' => [
+      'Marine cyber safety (E26 / E27) holds the computer-based systems we supply in our projects, the documents IACS UR E27 asks for each of them, their approval by the classification society and every release of their software.',
+      'Products: add the product and choose its vessel, project and sub-project (a sub-project fills in its project, a project its vessel), the classification society, the approval route (plan approval per vessel or type approval), the system category of UR E22 and whether it has an interface to an untrusted network; record the class reference and the certificate with its validity. The status follows the approval: In preparation → Submitted to class → Class comments → Approved → In service → Retired.',
+      'UR E27 documentation: every new product receives the ten documents of UR E27 section 3.1 as Missing —',
+      ['ol' => [
+        'CBS asset inventory',
+        'Topology diagrams',
+        'Description of security capabilities',
+        'Test procedure of security capabilities',
+        'Security configuration guidelines',
+        'Secure development lifecycle documents',
+        'Plans for maintenance and verification of the CBS',
+        'Information supporting the owner\'s incident response and recovery plan',
+        'Management of change plan',
+        'Test reports',
+      ]],
+      'Give each its document number and revision, attach every issued revision and move it: Draft → Internal review → Submitted to class → Approved, or Class comments with the comments written in. A document that does not apply is set to Not applicable. Further documents are added with + on the product.',
+      'Software releases: every version of the software of a product is a record — version, component (PLC program, HMI, SCADA, firmware, network configuration, operating system), kind of change, what changed and why, change request, repository tag or archive location, SHA-256 of the released package, who tested it and the test report, whether the classification society must be notified, the rollback plan. It moves Development → Test → Review → Approved → Released → Installed on board, and later Superseded or Withdrawn.',
+      ['ul' => [
+        'A release is approved by somebody other than its developer (management and administrators excepted). The approver and the date are recorded automatically.',
+        'A release cannot be set to Released or Installed before it is approved.',
+        'Going back to Development or Test withdraws the approval.',
+        'A release sent to Review notifies the programming team, the ISMS team and the administrators; the developer is told when it is approved, released, installed or withdrawn.',
+      ]],
+      'The overview shows per product the approval, the documents approved out of those that apply and the software version on board; the releases waiting for approval; those approved but not yet installed; and the certificates that expire within 90 days.',
+      'The product also appears on the page of its vessel and on the first tab of its sub-project, where + New product starts one that is already linked. Lists are filtered by product, vessel and project. Products, documents, releases (Excel) gives the workbook for the surveyor or the customer.',
+      ['tip' => 'Source code and packages are not stored in the portal — only their reference and checksum, so that the copy installed on board can be verified.'],
+    ]],
+    ['id' => 'purchases', 'title' => 'Purchases of the IT department', 'body' => [
+      'People of IT raise requisitions, requests for quotation and purchase orders through Procurement — for the sub-projects that are opened for it, of any vessel project.',
+      ['ul' => [
+        'To open a sub-project: Edit sub-project › IT purchases › tick Open for IT purchases.',
+        'Who counts as IT: Settings › Procurement › IT department purchases — the staff roles and disciplines ticked there (by the names IT / ICT until it is saved). The same card lists the sub-projects that are open.',
+      ]],
+      ['ol' => [
+        'Procurement › Requisitions › new requisition: only the opened sub-projects are offered. Add the lines and submit.',
+        'Procurement approves the requisition against the parts budget of the sub-project; over budget it goes to management. IT cannot approve.',
+        'Procurement › Purchase orders: make the RFQ or the PO from the approved lines (To buy, or Pull lines on the order), choose the supplier from the supplier list of the company, set the prices, send it and record the confirmation.',
+      ]],
+      'An order of IT takes its lines from approved requisitions only; a free line is refused. In the lists of RFQs, POs and To buy IT sees what belongs to the opened sub-projects; an order of another sub-project cannot be opened. Removing the tick closes the access at once.',
+      'Receiving the goods stays with the warehouse; suppliers, inventory, payables and the procurement settings stay with procurement — a supplier that is not in the list yet is added by procurement. Somebody of IT who already has the procurement or warehouse right keeps that right unchanged.',
+    ]],
+    ['id' => 'routine', 'title' => 'The routine through the year', 'body' => [
+      ['ul' => [
+        'Every week — look at Needs attention on the ISO 27001 overview and at the releases waiting for approval on the marine overview.',
+        'When something happens — a reported event is assessed, contained and closed in Incidents with its cause and lessons; a finding becomes a nonconformity with its corrective action.',
+        'Every six months — review the access rights: Access by position, the two teams and the ticks of the IT department in Settings › Procurement; file it in Audits & reviews as Review of access rights.',
+        'Every year — internal audit and management review (Audits & reviews), the awareness training (Training & awareness), the review of the risks and of the Statement of Applicability, the backup restore test and the continuity exercise.',
+        'Per supplier — the evaluation on the date the register shows.',
+        'Per product — the certificate before it expires, and a release record for every version that goes on board.',
+      ]],
+    ]],
+  ],
+];
