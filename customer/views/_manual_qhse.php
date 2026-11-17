@@ -10,7 +10,7 @@ return [
       ['ul' => [
         'Who works in it: management and administrators always; everybody whose staff role or discipline is ticked under Access by position; and the single people ticked in the QHSE team.',
         'Access by position is a card on the first tab that only the CEO and the General Manager see and save. Until it is saved the portal ticks the roles and disciplines named QHSE, HSE or Quality, and the card says so.',
-        'The QHSE team is chosen by management and administrators on the same tab. Only management and administrators delete records.',
+        'The QHSE team is chosen by management and administrators on the same tab (in v1.163.0 the Save buttons of the team and of Access by position did nothing; corrected in v1.163.1). Only management and administrators delete records.',
       ]],
       'No financial data for the QHSE role: an account whose staff role is named QHSE, HSE or Quality has no access to the financial data of the company. Amounts are hidden wherever the portal shows them, and the pages Sales pipeline, Offers, System Budgets, Collections, Accounting, Proforma invoices, Payables, Cash flow, Cost control and the financial reports are closed — whatever is ticked on the account, and for an administrator account too.',
       ['tip' => 'Nothing that is filed in this group is sent to the assistant of the portal.'],

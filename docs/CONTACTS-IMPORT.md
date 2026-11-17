@@ -2773,3 +2773,15 @@ The common registers carry the field Standard (All four / one of them) and the l
 **Not done / to check**: the registers start empty — existing documents, instruments and certificates are entered or imported by the quality department (an Excel import of the instrument list can be added); supplier evaluation for ISO 9001 (8.4) is not a separate register — the evaluation of §367 covers information security only; the certificates of the company itself (four certificates with their surveillance dates) are kept as documents; the phone apps were not checked for amounts shown to the QHSE role; staff outside QHSE cannot read the documents here (a read-only library of approved documents can be added).
 
 **Security review**: the financial block is by role name and is enforced in the functions and in the router, so it does not depend on ticks; incident records can hold names of injured people — the handbook asks for the minimum and they are not sent to the assistant; access is checked on the server per register. Proposals, no cost in speed: (1) check on the live portal that the role of the QHSE Manager is named QHSE / HSE / Quality — otherwise the block and the default access do not apply (the role switch "Financial data visible" remains as a second lock); (2) if the QHSE Manager uses the phone apps, confirm that no amounts appear there; (3) file the six-monthly access review for this group together with those of §366 and §368.
+
+## §371 v1.163.1 (R97-087) — QHSE team and Access by position could not be saved
+
+**Report**: "I tried to save the QHSE team but it does nothing".
+
+**Cause**: the two QHSE actions are named `qh_team_save` and `qh_access_save`; `ism_handle_action()` took up only actions that start with `ism_`, so the portal reloaded the page without saving. They were not posted in the sandbox tests of v1.163.0 — only the pages were opened.
+
+**Fix**: `ism_handle_action()` also takes up actions that start with `qh_`.
+
+**Tests (sandbox)**: team saved by the CEO and the ticked person gets the QHSE page; Access by position saved by the CEO; both refused for somebody who is not management / CEO; no new lines in `storage/php-errors.log`.
+
+**Rule added to the release routine**: every form of a new page is posted in the sandbox before a release, not only opened.

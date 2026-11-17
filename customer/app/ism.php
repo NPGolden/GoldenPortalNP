@@ -378,7 +378,7 @@ function ism_sweep(): int {
 
 /* ------------------------------------------------------------ actions */
 function ism_handle_action(string $action): bool {
-    if (!str_starts_with($action, 'ism_')) return false;
+    if (!str_starts_with($action, 'ism_') && !str_starts_with($action, 'qh_')) return false;   // R97-087: the QHSE actions (team, access) were not taken up — fixed
     if (!ism_has() || !is_staff()) throw new RuntimeException(t('err.noaccess'));
     if ($action === 'ism_report') {   // any staff member reports a security event (A 6.8)
         $what = mb_substr(trim((string)($_POST['what'] ?? '')), 0, 6000); $title = mb_substr(trim((string)($_POST['title'] ?? '')), 0, 200); if ($title === '' || $what === '') throw new RuntimeException(t('ism.e_report'));
