@@ -26,7 +26,7 @@ layout_head($c['contract_no'] . ' — ' . $c['vessel'], 'cyber');
     <h2><?= tt('rs.details') ?></h2>
     <div class="kv-grid">
       <?php if (rs_sub_has()): ?>
-      <?php if ($c['product']): ?><div class="kv"><span><?= tt('rs.product') ?></span><b><?= e($c['product']) ?><?= $c['serial_no'] ? ' · <span class="mono">' . e(trim((string)$c['serial_no'])) . '</span>' : '' ?></b></div><?php endif; ?>
+      <?php if ($c['product']): ?><div class="kv"><span><?= tt('rs.product') ?></span><b><?= e($c['product']) ?><?= $staff && $c['serial_no'] ? ' · <span class="mono">' . e(trim((string)$c['serial_no'])) . '</span>' : '' ?></b></div><?php endif; ?>
       <?php if ($c['license_expiry']): ?><div class="kv"><span><?= tt('rs.lic') ?></span><b><?= rs_date_pill($c['license_expiry']) ?></b></div><?php endif; ?>
       <?php if ($c['period_months']): ?><div class="kv"><span><?= tt('rs.period_m') ?></span><b><?= e(rs_period_label((int)$c['period_months'])) ?></b></div><?php endif; ?>
       <?php if ($c['installed_on']): ?><div class="kv"><span><?= tt('rs.installed') ?></span><b><?= e(fmt_date($c['installed_on'])) ?></b></div><?php endif; ?>

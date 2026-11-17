@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.167.0';
+const CP_VERSION = '1.168.0';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-092', 'version' => '1.168.0', 'date' => '2026-11-18', 'title' => 'Customer subscriptions: weekly e-mail and notification to Sales and management with the subscriptions to renew and the licences running out within 90 days (Send now and on / off on the page); device serial numbers are no longer shown to customer accounts.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-091', 'version' => '1.167.0', 'date' => '2026-11-18', 'title' => 'Customer subscriptions: remote support contracts carry product and serial number, payment status, renewal period, installation date and licence expiry; the list shows what runs out (renewal within 30 / 90 days, licences, expired) and imports the list of Sales; a renewal offer is raised from the subscription into Commercial › Offers and the sales pipeline lists the subscriptions to renew. The quality / QHSE manager has access to ISO 27001 and marine cyber safety.', 'db' => 'install/migrate_cp_r97_091_subscriptions.sql', 'check' => 'r98d'],
         ['ref' => 'GAS-CP-R97-090', 'version' => '1.166.0', 'date' => '2026-11-17', 'title' => 'ISO 27001: the Statement of Applicability can be filled from Excel — the template lists the 93 controls as they stand and a row fills its control by number, without overwriting a control already worked on.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-089', 'version' => '1.165.0', 'date' => '2026-11-17', 'title' => 'ISO 27001 filled from the company\'s ISMS manuals: the five governance documents carry their numbers, English and Greek titles, version, approval and next review; the risk register follows the risk matrix of ISMS-TIER1-004 (Low, Medium, High, Critical) with its named scales and acceptance criteria; new register Interested parties (4.2); suppliers of ISO 27001 can be imported from Excel.', 'db' => null, 'check' => null],

@@ -123,7 +123,7 @@ return [
       ['ol' => ['Reply on the forecast page to ask for a change of the schedule, or to tell us about a delay foreseen, an obstacle in a space, or painting planned in an area — choose the kind, the area and the dates. Golden A/S is notified at once.', 'Your remarks are carried into the final weekly schedule (the next revision of the forecast), together with a line on how the schedule was adapted; the issued revisions are listed on the page with their PDF and Word.']],
     ]],
     ['id' => 'remote', 'title' => 'Remote support contracts', 'body' => [
-      'Library › IT & Cybersecurity lists the remote support contracts of your vessels — period, hours included and used, agreed response time, coverage hours — next to the cyber documents. A ticket you raise on a vessel with a live contract is covered by it; the ticket page shows the contract and the remote sessions Golden A/S logged against it. Where it applies, the list also shows the product with its serial number, the renewal period and the licence expiry of the device (v1.167.0).',
+      'Library › IT & Cybersecurity lists the remote support contracts of your vessels — period, hours included and used, agreed response time, coverage hours — next to the cyber documents. A ticket you raise on a vessel with a live contract is covered by it; the ticket page shows the contract and the remote sessions Golden A/S logged against it. Where it applies, the list also shows the product, the renewal period and the licence expiry of the device (v1.168.0).',
       ['fig' => 'g-rs-list.jpg', 'cap' => 'IT & Cybersecurity — your remote support contracts'],
     ]],
     ['id' => 'documents', 'title' => 'Documentation', 'body' => [

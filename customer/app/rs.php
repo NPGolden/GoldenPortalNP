@@ -37,7 +37,7 @@ function rs_list(array $f = []): array {
     if (!empty($f['customer'])) { $w[] = '(v.customer_id = ? OR r.customer_id = ?)'; $args[] = (int)$f['customer']; $args[] = (int)$f['customer']; }
     if (!empty($f['status'])) { if ($f['status'] === 'live') $w[] = "r.status IN ('active','suspended')"; elseif ($f['status'] === 'expiring') $w[] = "r.status = 'active' AND r.end_date IS NOT NULL AND r.end_date <= DATE_ADD(CURDATE(), INTERVAL r.renew_notice_days DAY)"; elseif ($f['status'] === 'due90') $w[] = "r.status = 'active' AND r.end_date IS NOT NULL AND r.end_date <= DATE_ADD(CURDATE(), INTERVAL 90 DAY)"; elseif ($f['status'] === 'lic' && rs_sub_has()) $w[] = "r.status IN ('active','suspended') AND r.license_expiry IS NOT NULL AND r.license_expiry <= DATE_ADD(CURDATE(), INTERVAL 90 DAY)"; elseif ($f['status'] === 'norenew' && rs_sub_has()) $w[] = "((r.status = 'active' AND r.end_date IS NOT NULL AND r.end_date <= DATE_ADD(CURDATE(), INTERVAL 90 DAY)) OR (r.status = 'expired' AND r.end_date >= DATE_SUB(CURDATE(), INTERVAL 180 DAY))) AND r.renewal_offer_id IS NULL AND COALESCE(r.pay_status, '') <> 'rejected'"; elseif (isset(rs_statuses()[$f['status']])) { $w[] = 'r.status = ?'; $args[] = $f['status']; } }
     if (!empty($f['pay']) && rs_sub_has() && isset(rs_pay_statuses()[$f['pay']])) { $w[] = 'r.pay_status = ?'; $args[] = $f['pay']; }
-    if (!empty($f['q'])) { $x = rs_sub_has(); $w[] = '(r.contract_no LIKE ? OR r.title LIKE ? OR v.name LIKE ? OR r.access_method LIKE ?' . ($x ? ' OR r.product LIKE ? OR r.serial_no LIKE ? OR r.sq_ref LIKE ?' : '') . ')'; array_push($args, ...array_fill(0, $x ? 7 : 4, '%' . $f['q'] . '%')); }
+    if (!empty($f['q'])) { $x = rs_sub_has() && is_staff();   /* R97-092: serial and SQ are searched by staff only */ $w[] = '(r.contract_no LIKE ? OR r.title LIKE ? OR v.name LIKE ? OR r.access_method LIKE ?' . ($x ? ' OR r.product LIKE ? OR r.serial_no LIKE ? OR r.sq_ref LIKE ?' : '') . ')'; array_push($args, ...array_fill(0, $x ? 7 : 4, '%' . $f['q'] . '%')); }
     $sx = rs_sub_has() ? "(SELECT o.offer_no FROM offers o WHERE o.id = r.offer_id) AS sold_no, (SELECT o.offer_no FROM offers o WHERE o.id = r.renewal_offer_id) AS ren_no, (SELECT o.status FROM offers o WHERE o.id = r.renewal_offer_id) AS ren_status," : '';
     return all("SELECT r.*, v.name AS vessel, COALESCE(c.name, cv.name) AS customer_name, {$sx}
                        (SELECT COALESCE(SUM(s.hours), 0) FROM rs_sessions s WHERE s.contract_id = r.id) AS hours_used,
@@ -262,4 +262,38 @@ function rs_import(array $file, bool $mkVessels): array {
         $id = (int) db()->lastInsertId(); $n++; rs_sync_renewal_task($id); rs_cover_tickets($id);
     }
     return [$n, $skip, $notes];
+}
+
+/* ------------------------------------------------------------ R97-092 — weekly e-mail to Sales: subscriptions and licences running out */
+/** Who receives it: active staff marked Sales, plus management (owner / full scope, CEO, administrators). Accounts without financial data are left out. */
+function rs_weekly_recipients(): array {
+    $ids = function_exists('pp_managers') ? pp_managers() : [];
+    try { $ids = array_merge($ids, array_map('intval', array_column(all("SELECT id FROM customer_users WHERE is_active = 1 AND role IN ('staff','admin') AND can_sales = 1"), 'id'))); } catch (Throwable $e) {}
+    $ids = array_values(array_unique(array_filter($ids))); if (!$ids) return [];
+    return all("SELECT cu.id, cu.email, cu.full_name FROM customer_users cu LEFT JOIN staff_roles r ON r.id = cu.staff_role_id WHERE cu.is_active = 1 AND cu.id IN (" . implode(',', $ids) . ") AND NOT (COALESCE(LOWER(r.name), '') REGEXP '(^|[^a-z])(qhse|hse|ehs|quality)([^a-z]|$)')");
+}
+/** Subject and text of the weekly list, or null when nothing runs out. */
+function rs_weekly_build(): ?array {
+    if (!rs_sub_has()) return null; rs_sweep();
+    $ren = all("SELECT r.*, v.name AS vessel, o.offer_no AS ren_no FROM rs_contracts r JOIN vessels v ON v.id = r.vessel_id LEFT JOIN offers o ON o.id = r.renewal_offer_id
+                WHERE ((r.status = 'active' AND r.end_date IS NOT NULL AND r.end_date <= DATE_ADD(CURDATE(), INTERVAL 90 DAY)) OR (r.status = 'expired' AND r.end_date >= DATE_SUB(CURDATE(), INTERVAL 180 DAY))) AND COALESCE(r.pay_status, '') <> 'rejected' ORDER BY r.end_date, v.name");
+    $lic = all("SELECT r.*, v.name AS vessel FROM rs_contracts r JOIN vessels v ON v.id = r.vessel_id WHERE r.status IN ('active','suspended') AND r.license_expiry IS NOT NULL AND r.license_expiry <= DATE_ADD(CURDATE(), INTERVAL 90 DAY) ORDER BY r.license_expiry, v.name");
+    if (!$ren && !$lic) return null;
+    $when = fn(?string $d) => $d ? fmt_date($d) . ' (' . (($n = rs_days_left($d)) < 0 ? t('rs.expired_ago', ['n' => -$n]) : t('rs.days_left', ['n' => $n])) . ')' : '—';
+    $base = function_exists('nl_base') ? nl_base() : ''; $link = fn(array $q) => ($base !== '' ? $base . '/' : '') . url('cyber', $q);
+    $L = [t('rs.wk_intro'), ''];
+    if ($ren) { $L[] = mb_strtoupper(t('rs.pp_title')) . ' — ' . count($ren); foreach ($ren as $r) $L[] = '  • ' . $r['vessel'] . ' — ' . $r['title'] . ($r['product'] ? ' (' . $r['product'] . ')' : '') . ' — ' . $when($r['end_date']) . ' — ' . ($r['ren_no'] ? t('rs.ren_offer') . ' ' . $r['ren_no'] : t('rs.wk_nooffer')) . ($r['pay_status'] === 'pending' ? ' — ' . t('rs.pay_pending') : '') . ' — ' . $r['contract_no']; $L[] = '  ' . $link(['status' => 'due90']); $L[] = ''; }
+    if ($lic) { $L[] = mb_strtoupper(t('rs.k_lic')) . ' — ' . count($lic); foreach ($lic as $r) $L[] = '  • ' . $r['vessel'] . ' — ' . ($r['product'] ?: $r['title']) . ($r['serial_no'] ? ' ' . trim((string)$r['serial_no']) : '') . ' — ' . $when($r['license_expiry']) . ' — ' . $r['contract_no']; $L[] = '  ' . $link(['status' => 'lic']); $L[] = ''; }
+    $L[] = t('rs.wk_foot');
+    return [t('rs.wk_subject', ['a' => count($ren), 'b' => count($lic)]), implode("\n", $L), count($ren), count($lic)];
+}
+/** Called by the daily house-keeping: sends the list once a week (first run on or after Monday). $force sends now. Returns a short log text. */
+function rs_weekly(bool $force = false): string {
+    if (!rs_sub_has()) return 'subscriptions off'; $wk = date('o-W'); if (!$force && cp_setting('rs_weekly', '') === $wk) return 'subscriptions mail done';
+    if (!$force && cp_setting('rs_weekly_on', '1') !== '1') return 'subscriptions mail off';
+    cp_setting_set('rs_weekly', $wk); $m = rs_weekly_build(); if (!$m) return 'subscriptions mail: nothing due';
+    $n = 0; $to = rs_weekly_recipients();
+    foreach ($to as $r) { try { if (function_exists('cp_mail') && cp_mail((string)$r['email'], $m[0], $m[1])) $n++; } catch (Throwable $e) { error_log('[rs_weekly] ' . $e->getMessage()); } }
+    if ($to && function_exists('nf_push')) { try { nf_push(array_map(fn($r) => (int)$r['id'], $to), 'of:followup', 'rsw:' . $wk, $m[0], t('rs.wk_nf'), url('cyber', ['status' => 'due90']), null, null); } catch (Throwable $e) {} }
+    return 'subscriptions mail ' . $n . '/' . count($to) . ' (' . $m[2] . ' renewals, ' . $m[3] . ' licences)';
 }
