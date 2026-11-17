@@ -2456,3 +2456,17 @@ Language keys 10 358 each (portal; +3 from R97-060, none from this release); app
 
 **Security review**: the new action has the same checks as the pull (`require_si`, CSRF, editable invoice) and takes only a cost of the invoice's own order that is on no other invoice. No new proposals.
 
+## §357 v1.156.2 (R97-073) — Projects › Doubled codes
+
+**Report** (two screenshots, PRJ.000418 › Y.028 Navigation Lights Upgrade, M/Y AMBROSIA): opened from Projects the sub-project shows offer SQ-E000006, system "NAVIGATION LIGHTING SYSTEM", 0 % progress, fully invoiced; opened from Vessels it shows no offer, 100 % progress, not invoiced and the description "SoftOne status: to be invoiced · Created 25.02.2026".
+
+**Reading**: the two screens are two different records with the same visible code — the second carries the description written by the SoftOne projects import, the first was worked on in the portal. Same family as §349 (Y.006 in PRJ.000550). Whether the double is at sub-project level (two Y.028 in one project) or at project level (two projects PRJ.000418) cannot be read from the screenshots; the live data was not inspected.
+
+**Change** (read only): `views/data_doubles.php` (`?p=data_doubles`, management and administrators): sub-projects sharing a code in one project and projects sharing a project code, each record with id, name, system, description start, status, and "Linked records" — a count per table of every row that points to it (tables found through `information_schema` by the column `subproject_id` / `project_id`). Button on Projects when doubles exist (count kept 10 minutes); link from the red note of Edit sub-project. Keys `dd.*` (10 582 per file).
+
+**Not done**: no merge. Merging moves the rows of about forty tables from one record to the other and cannot be undone by a button; it needs a decision per pair which record is kept.
+
+**Tests (sandbox)**: a doubled sub-project and a doubled project made in the database: both listed with their linked records; the button on Projects; project manager refused (403); doubles removed, lists empty.
+
+**Security review**: read only, management / administrators; table names for the counts come from `information_schema` of the portal's own database and are checked against `[a-z0-9_]` before use. No new proposals.
+

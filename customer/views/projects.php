@@ -51,6 +51,7 @@ layout_head(t('pr.title'), 'projects');
     <p class="lede" style="margin-bottom:0;"><?= e(t('pr.tree_lede', ['n' => $total, 'm' => $nSub])) ?></p>
   </div>
   <div class="btn-row">
+    <?php if (mgmt_can() || is_cp_admin()): $ddN = cache_get('dd_n'); if ($ddN === null || $ddN === false) { try { $ddN = (int) scalar("SELECT COUNT(*) FROM (SELECT 1 FROM subprojects WHERE code IS NOT NULL AND code <> '' GROUP BY project_id, code HAVING COUNT(*) > 1) x") + (int) scalar("SELECT COUNT(*) FROM (SELECT 1 FROM projects WHERE project_code IS NOT NULL AND project_code <> '' GROUP BY project_code HAVING COUNT(*) > 1) x"); } catch (Throwable $e) { $ddN = 0; } cache_set('dd_n', $ddN, 600); } if ($ddN): /* R97-073 */ ?><a class="btn btn--ghost" href="<?= url('data_doubles') ?>" title="<?= tt('dd.lede') ?>" style="color:#b3261e;">👥 <?= e(t('dd.btn', ['n' => (int)$ddN])) ?></a><?php endif; endif; ?>
     <?php if (is_cp_admin()): ?><a class="btn btn--ghost" href="<?= url('projects_export', $keep) ?>">⤓ <?= tt('ct.export') ?></a><?php endif; ?>
     <?php if ($staff): ?>
       <a class="btn btn--ghost" href="<?= url('import') ?>"><?= tt('nav.import') ?></a>
