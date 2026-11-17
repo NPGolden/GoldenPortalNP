@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.169.1';
+const CP_VERSION = '1.170.0';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-095', 'version' => '1.170.0', 'date' => '2026-11-18', 'title' => 'Production orders carry the mark Cyber safety approval (IACS UR E26 / E27); Marine cyber safety lists only the serial numbers of marked orders, and its team is told when an order is marked.', 'db' => 'install/migrate_cp_r97_095_production_cyber.sql', 'check' => 'r98f'],
         ['ref' => 'GAS-CP-R97-094', 'version' => '1.169.1', 'date' => '2026-11-18', 'title' => 'Leavers: the daily health report counts the accounts still open for people who are not active in HR; Settings › Users lists them at the top; the general staff lists of the portal leave these people out.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-093', 'version' => '1.169.0', 'date' => '2026-11-18', 'title' => 'Marine cyber safety speaks of Equipment instead of Products and links each record to its serial number of the Equipment register (card on the serial number, Add to Marine cyber safety, list of produced equipment not yet included). People who are not active in HR no longer stand in the lists of personnel; unticking Active closes the staff account; HR settings lists accounts still open for people who left.', 'db' => 'install/migrate_cp_r97_093_marine_equipment.sql', 'check' => 'r98e'],
         ['ref' => 'GAS-CP-R97-092', 'version' => '1.168.0', 'date' => '2026-11-18', 'title' => 'Customer subscriptions: weekly e-mail and notification to Sales and management with the subscriptions to renew and the licences running out within 90 days (Send now and on / off on the page); device serial numbers are no longer shown to customer accounts.', 'db' => null, 'check' => null],
@@ -539,6 +540,7 @@ function cp_migration_state(): array {
         'r97p' => $has("SHOW TABLES LIKE 'nl_issues'"),
         'r97q' => $has("SHOW TABLES LIKE 'nl_lists'"),
         'r97r' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'proc_state'") && $has("SHOW COLUMNS FROM sb_parts LIKE 'proc_at'"),
+        'r98f' => $has("SHOW COLUMNS FROM production_orders LIKE 'cyber_e27'"),
         'r98e' => $has("SHOW COLUMNS FROM ism_records LIKE 'equipment_id'"),
         'r98d' => $has("SHOW COLUMNS FROM rs_contracts LIKE 'renewal_offer_id'"),
         'r98c' => $has("SHOW COLUMNS FROM subprojects LIKE 'it_purchase'"),

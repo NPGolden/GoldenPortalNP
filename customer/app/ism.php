@@ -702,9 +702,9 @@ function ism_eq_options(int $cur = 0): array {
 }
 /** Equipment we produced (a production order) that has no cyber safety record yet — shown on the overview. */
 function ism_eq_unlinked(int $limit = 40): array {
-    if (!ism_has_eq() || !function_exists('pd_has') || !pd_has()) return [];
+    if (!ism_has_eq() || !function_exists('pd_cyber_has') || !pd_cyber_has()) return [];   // R97-095: only orders marked for the cyber safety approval
     return all("SELECT e.id, e.serial_no, e.maker, e.family, e.model, e.kind, v.name AS vessel, e.vessel_id, o.po_no, o.id AS order_id FROM equipment e JOIN production_units u ON u.equipment_id = e.id JOIN production_orders o ON o.id = u.order_id LEFT JOIN vessels v ON v.id = e.vessel_id
-                WHERE e.retired = 0 AND o.status <> 'cancelled' AND NOT EXISTS (SELECT 1 FROM ism_records r WHERE r.reg = 'mprod' AND r.equipment_id = e.id) GROUP BY e.id ORDER BY e.id DESC LIMIT " . max(1, min(200, $limit)));
+                WHERE e.retired = 0 AND o.status <> 'cancelled' AND o.cyber_e27 = 1 AND NOT EXISTS (SELECT 1 FROM ism_records r WHERE r.reg = 'mprod' AND r.equipment_id = e.id) GROUP BY e.id ORDER BY e.id DESC LIMIT " . max(1, min(200, $limit)));
 }
 /** Take a serial number into marine cyber safety: a record with its ten UR E27 documents, linked to the vessel and — when it came from production — to the project and sub-project of its order. */
 function ism_eq_add(int $eqId): int {

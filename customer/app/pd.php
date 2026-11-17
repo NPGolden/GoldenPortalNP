@@ -360,9 +360,15 @@ function pd_save_from_post(): int {
         pd_log($id, 'created', $w ? t('pd.from_work', ['no' => (string)$w['wp_no']]) : null);
         $o = pd_get($id); if ($o) pd_notify($o, 'created', $title, $o['vessel'] ? t('pd.nf_created_body', ['v' => (string)$o['vessel']]) : null);
     }
+    if (pd_cyber_has() && isset($_POST['cyber_form'])) {   // R97-095: the order is marked when its equipment needs the cyber safety approval; the marine team is told once
+        $on = (int)!empty($_POST['cyber_e27']); $was = (int)($old['cyber_e27'] ?? 0); q('UPDATE production_orders SET cyber_e27 = ? WHERE id = ?', [$on, $id]);
+        if ($on !== $was) { pd_log($id, 'edited', t($on ? 'pd.cyber_on' : 'pd.cyber_off'));
+            if ($on && function_exists('nf_push') && function_exists('ism_mteam')) { try { $to = array_values(array_diff(array_unique(array_merge(ism_mteam(), ism_team())), [(int)$u['id']])); if ($to) nf_push($to, 'ism:incident', 'pdcy:' . $id, t('pd.cyber_nf', ['n' => (string)(scalar('SELECT po_no FROM production_orders WHERE id = ?', [$id]))]), $title, url('mcs') . '#mcs-eq', (int)$u['id'], (string)$u['full_name']); } catch (Throwable $e) {} } }
+    }
     pd_units_add_from_post($id);
     return $id;
 }
+function pd_cyber_has(): bool { static $h = null; if ($h === null) { try { $h = pd_has() && (bool) scalar("SHOW COLUMNS FROM production_orders LIKE 'cyber_e27'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Add units to an order: existing equipment ids (eq_ids[]) and/or new serial numbers (one per line) created in the Equipment register. */
 function pd_units_add_from_post(int $oid): int {
     $o = pd_get($oid); if (!$o || !pd_can_edit($o)) throw new RuntimeException(t('err.noaccess'));

@@ -2895,3 +2895,17 @@ The common registers carry the field Standard (All four / one of them) and the l
 **Tests (sandbox)**: two people made inactive (one staff, one administrator) → card with both names and roles, health report line "2 (administrators: 1)", `staff_users()` without them; made active again → card gone, line 0, list complete; no new lines in `storage/php-errors.log`.
 
 **Security review**: nothing new is exposed — the card is on a page for administrators only, the e-mail carries counts. No further proposal in this release.
+
+## §379 v1.170.0 (R97-095) — Production orders marked for cyber safety approval; the marine list shows only those
+
+**Request** (with a screenshot of Marine cyber safety listing every produced serial): "in the list of UR E26/27 add only production orders that are defined to comply with the cybersecurity standards through the production order … otherwise the ITs will see so many production orders not related to Cybersafety approval".
+
+**Database** (`install/migrate_cp_r97_095_production_cyber.sql`, state `r98f`): `production_orders.cyber_e27` (0 / 1, default 0), behind `pd_cyber_has()`.
+
+**Production order** (`pd_save_from_post()`, `views/production_edit.php`, `views/production_order.php`): tick Cyber safety approval (IACS UR E26 / E27) with its explanation; the order page shows the mark (a link to Marine cyber safety for those with access); a change of the mark is written in the order log; when it is set, the programming team and the ISMS team get one notification.
+
+**Marine cyber safety** (`ism_eq_unlinked()`): the list is now To add — production orders under UR E26 / E27 and takes only serials of orders with the mark; without the column it is empty. Existing orders are unmarked after the update, so the list starts empty until the orders concerned are ticked. Choosing a serial by hand on a record and the button on the page of a serial number are unchanged.
+
+**Tests (sandbox) — every form posted**: order without the tick → its serial not listed; order with the tick → listed, tick shown on the form, mark on the order page, log line; ticking the first order afterwards → listed; serial added → record with the project of the production order (this path was not tested in §377); no new lines in `storage/php-errors.log`. Not tested: the notification to the team (the only member in the sandbox is the user who ticks). 6 language keys, 11 429 per file.
+
+**Security review**: no new page; the mark is saved with the rights of the production order. Proposal (no cost in speed): when a marked order reaches the stage Delivered while one of its serials has no cyber safety record or an unapproved one, warn the order manager and the IT Manager.

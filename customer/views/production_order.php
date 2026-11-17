@@ -12,7 +12,7 @@ layout_head($o['po_no'] . ' · ' . $o['title'], 'equipment');
 ?>
 <p class="eyebrow"><a href="<?= url('equipment') ?>"><?= tt('eq.title') ?></a> › <a href="<?= url('production') ?>"><?= tt('pd.title') ?></a> › <?= e($o['po_no']) ?></p>
 <div class="page-head">
-  <div><h1><span class="mono" style="color:var(--gold-text);"><?= e($o['po_no']) ?></span> <?= e($o['title']) ?> <?= pd_status_pill($o['status']) ?></h1>
+  <div><h1><span class="mono" style="color:var(--gold-text);"><?= e($o['po_no']) ?></span> <?= e($o['title']) ?> <?= pd_status_pill($o['status']) ?><?= !empty($o['cyber_e27']) ? ' ' . (function_exists('ism_can_marine') && ism_can_marine() ? '<a href="' . url('mcs') . '">' . pill('navy', '🚢 ' . t('pd.cyber_pill')) . '</a>' : pill('navy', '🚢 ' . t('pd.cyber_pill'))) : '' ?></h1>
     <p class="lede" style="margin-bottom:0;"><?= pr_link((int)$o['project_id'], $o['project_code'], $o['project_name']) ?><?= $o['sub_code'] ? ' › <a href="' . url('subproject', ['id' => (int)$o['subproject_id'], 'tab' => 'works']) . '">' . e($o['sub_code'] . ' ' . $o['sub_name']) . '</a>' : '' ?><?= $o['vessel'] ? ' · <a href="' . url('vessel', ['id' => (int)$o['vessel_id'], 'tab' => 'equipment']) . '">' . e($o['vessel']) . '</a>' : '' ?><?= $o['system_name'] ? ' · ' . e($o['system_name']) : '' ?><?= $o['wp_no'] ? ' · <a href="' . url('work', ['id' => (int)$o['work_id']]) . '">' . e($o['wp_no'] . ' ' . $o['work_title']) . '</a>' : '' ?></p></div>
   <div class="btn-row"><a class="btn btn--ghost" href="<?= url('production_pdf', ['id' => $id]) ?>" target="_blank">⤓ <?= tt('pd.card') ?> PDF</a><?php if ($can): ?><a class="btn btn--ghost" href="<?= url('production_edit', ['id' => $id]) ?>">✎ <?= tt('btn.edit') ?></a><?php endif; ?></div>
 </div>
