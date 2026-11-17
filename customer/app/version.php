@@ -14,7 +14,7 @@
 declare(strict_types=1);
 
 const CP_VERSION = '1.155.1';
-const CP_BUILD   = '2026-11-16';
+const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */

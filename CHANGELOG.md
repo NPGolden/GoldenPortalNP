@@ -1,6 +1,6 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.155.1** (build 2026-11-16). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.155.1** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
