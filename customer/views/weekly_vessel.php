@@ -20,8 +20,10 @@ layout_head(t('wv.title') . ' · ' . $v['name'], 'vessels');
 <div class="page-head">
   <div><h1><?= tt('wv.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= e($v['name']) ?> · <?= e($W['iso']) ?> · <?= e(fmt_date($ws)) ?> – <?= e(fmt_date($W['week_end'])) ?><?= $W['only_project'] ? ' · ' . e($W['only_project']['project_code'] ?: $W['only_project']['name']) : '' ?></p></div>
   <div class="btn-row">
-    <a class="btn btn--ghost btn--sm" href="<?= url('report_weekly', array_filter(['vessel' => $vid, 'project' => $pid, 'week' => $ws])) ?>" target="_blank">⤓ PDF</a>
-    <a class="btn btn--ghost btn--sm" href="<?= url('report_weekly', array_filter(['vessel' => $vid, 'project' => $pid, 'week' => $ws, 'format' => 'docx'])) ?>">⤓ Word</a>
+    <?php if (is_staff()): /* R97-099 */ ?><a class="btn btn--gold btn--sm" href="<?= url('report_weekly', array_filter(['vessel' => $vid, 'project' => $pid, 'week' => $ws, 'copy' => 'owner'])) ?>" target="_blank" title="<?= tt('wv.owner_copy_hint') ?>">⤓ <?= tt('wv.owner_copy') ?> PDF</a>
+    <a class="btn btn--gold btn--sm" href="<?= url('report_weekly', array_filter(['vessel' => $vid, 'project' => $pid, 'week' => $ws, 'format' => 'docx', 'copy' => 'owner'])) ?>" title="<?= tt('wv.owner_copy_hint') ?>">⤓ <?= tt('wv.owner_copy') ?> Word</a><?php endif; ?>
+    <a class="btn btn--ghost btn--sm" href="<?= url('report_weekly', array_filter(['vessel' => $vid, 'project' => $pid, 'week' => $ws])) ?>" target="_blank" title="<?= is_staff() ? tt('wv.int_copy_hint') : '' ?>">⤓ <?= is_staff() ? tt('wv.int_copy') . ' ' : '' ?>PDF</a>
+    <a class="btn btn--ghost btn--sm" href="<?= url('report_weekly', array_filter(['vessel' => $vid, 'project' => $pid, 'week' => $ws, 'format' => 'docx'])) ?>" title="<?= is_staff() ? tt('wv.int_copy_hint') : '' ?>">⤓ <?= is_staff() ? tt('wv.int_copy') . ' ' : '' ?>Word</a>
   </div>
 </div>
 <div class="card card--tight">
@@ -79,9 +81,10 @@ if (function_exists('xs_has') && xs_has()): $xsN = 0; foreach ($W['projects'] as
   <?php endif; endif; ?>
 </div>
 <?php endforeach; ?>
-<?php if (ar_has() && is_staff()) { $arPid = (int)($W['only_project']['id'] ?? 0) ?: ar_vessel_project($vid); if ($arPid) echo ar_issued_html(wk_doc_no($W['vessel'], $W['only_project'], $W['week_start']), $arPid, ['kind' => 'weekly', 'vessel' => $vid, 'project' => $pid, 'week' => $ws], url('weekly_vessel', array_filter(['vessel' => $vid, 'project' => $pid, 'week' => $ws]))); } ?>
+<?php if (ar_has() && is_staff()) { $arPid = (int)($W['only_project']['id'] ?? 0) ?: ar_vessel_project($vid); if ($arPid) echo ar_issued_html(wk_doc_no($W['vessel'], $W['only_project'], $W['week_start']), $arPid, ['kind' => 'weekly', 'vessel' => $vid, 'project' => $pid, 'week' => $ws], url('weekly_vessel', array_filter(['vessel' => $vid, 'project' => $pid, 'week' => $ws])), '<select name="copy" data-nosearch title="' . tt('wv.copy_hint') . '" style="max-width:230px;margin-right:6px;"><option value="owner">' . tt('wv.copy_owner_opt') . '</option><option value="internal">' . tt('wv.copy_int_opt') . '</option></select>');
+  $arInt = $arPid ? ar_issued(wk_doc_no($W['vessel'], $W['only_project'], $W['week_start']) . '-INT', $arPid) : []; if ($arInt) { echo '<p class="hint" style="margin:4px 0 10px;">' . tt('wv.int_filed') . ' '; foreach ($arInt as $r) foreach ($r['files'] as $ext => $fid) echo '<a class="btn btn--ghost btn--sm" href="' . url('file', ['id' => $fid]) . '">' . e($r['revision']) . ' ' . strtoupper($ext) . '</a> '; echo '</p>'; } } ?>
 <?php if (is_staff() && function_exists('em_card_html')): $emNo = wk_doc_no($W['vessel'], $W['only_project'], $W['week_start']); $emK = 'wk:' . $vid . ':' . (int)$pid . ':' . $ws;
-  $emAtts = [[$emK . ':pdf', $emNo . '.pdf'], [$emK . ':docx', $emNo . '.docx']];
+  $emAtts = [[$emK . ':pdf:o', $emNo . '.pdf — ' . t('wv.owner_copy')], [$emK . ':docx:o', $emNo . '.docx — ' . t('wv.owner_copy')], [$emK . ':pdf', $emNo . '-INT.pdf — ' . t('wv.int_copy')], [$emK . ':docx', $emNo . '-INT.docx — ' . t('wv.int_copy')]];   // R97-099: the owner's copy is the one ticked
   echo em_card_html(['kind' => 'weekly', 'ctx' => ['no' => $emNo, 'title' => (string)($W['only_project']['name'] ?? ''), 'vessel' => (string)$v['name'], 'customer' => (string)($v['customer_name'] ?? ''), 'project' => (string)($W['only_project']['project_code'] ?? ''), 'week' => (string)$W['iso'], 'doc' => t('em.w_wk', ['no' => $emNo, 'w' => (string)$W['iso']]), 'project_id' => (int)($W['only_project']['id'] ?? 0), 'customer_id' => (int)($v['customer_id'] ?? 0)],
     'people' => em_people($vid ?: null, (int)($v['customer_id'] ?? 0) ?: null), 'atts' => $emAtts, 'back' => $q()]); endif; ?>
 <?php layout_foot(); ?>

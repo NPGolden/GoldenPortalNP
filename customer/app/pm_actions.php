@@ -480,8 +480,9 @@ function pm_handle_action(string $action, string $page): bool {
             $docxMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
             if ($kind === 'weekly') {
                 $vid = (int)$_POST['vessel']; $pid0 = (int)($_POST['project'] ?? 0) ?: null; $ws = (string)($_POST['week'] ?? date('Y-m-d'));
-                $W = weekly_data($vid, $pid0, $ws); if (!$W) throw new RuntimeException(t('err.notfound'));
-                $docNo = wk_doc_no($W['vessel'], $W['only_project'], $W['week_start']);
+                $wkInt = ($_POST['copy'] ?? 'owner') === 'internal';   // R97-099: the filed report is the owner's copy unless Internal copy is chosen
+                $W = weekly_data($vid, $pid0, $ws, !$wkInt); if (!$W) throw new RuntimeException(t('err.notfound'));
+                $docNo = wk_doc_no($W['vessel'], $W['only_project'], $W['week_start']) . ($wkInt ? '-INT' : '');
                 $pid = (int)($W['only_project']['id'] ?? 0) ?: ar_vessel_project($vid);
                 $files = [[wk_render_pdf($W), 'pdf', 'application/pdf'], [wk_render_docx($W), 'docx', $docxMime]];
                 $backPage = 'weekly_vessel'; $backParams = array_filter(['vessel' => $vid, 'project' => $pid0, 'week' => $ws]);
@@ -507,7 +508,7 @@ function pm_handle_action(string $action, string $page): bool {
                 $backPage = 'manhours'; $backParams = array_filter(['project' => $pid, 'from' => $from, 'to' => $to]);
             } else throw new RuntimeException(t('err.notfound'));
             if (!$pid) throw new RuntimeException(t('ar.need_project'));
-            $r = ar_issue($docNo, $pid, $sid, $files, $kind === 'timesheet' ? 'internal' : 'external', $docNo);
+            $r = ar_issue($docNo, $pid, $sid, $files, $kind === 'timesheet' || !empty($wkInt) ? 'internal' : 'external', $docNo);
             flash('good', t('ar.issued_ok', ['doc' => $docNo, 'rev' => $r['revision']]));
             redirect($backPage, $backParams + ['_r' => uniqid()]);
         }

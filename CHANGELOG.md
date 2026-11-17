@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.173.0** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.174.0** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.174.0 | GAS-CP-R97-099 | 2026-11-18 | Weekly vessel report: Owner's copy for staff — download, e-mail attachment (ticked by default) and filing produce the report exactly as the owner sees it; the internal version is marked -INT and is filed for staff only. | — |
 | 1.173.0 | GAS-CP-R97-098 | 2026-11-18 | Risk log: a risk is internal unless it is ticked Show in the weekly report; the weekly vessel report prints the ticked risks with mitigation, score, owner, due date, status and the counts of the week. | `install/migrate_cp_r97_098_risk_visibility.sql` |
 | 1.172.0 | GAS-CP-R97-097 | 2026-11-18 | Procurement: an approved BOM of a sub-project is converted into draft purchase orders, one per supplier, with what is still to buy; the BOM lists its orders and no line is ordered twice. | — |
 | 1.171.0 | GAS-CP-R97-096 | 2026-11-18 | Sub-project process: the stage Procurement is fed from the requisitions and purchase orders of the sub-project (ordered or reserved 50 %, in the warehouse 100 %, weighed by value), with Unlock for the project manager. | — |

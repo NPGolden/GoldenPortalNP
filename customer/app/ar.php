@@ -354,11 +354,11 @@ function ar_issued(string $docNo, int $pid): array {
     return array_values($out);
 }
 /** Small card listing issued revisions with download links, and the Issue button for staff. */
-function ar_issued_html(string $docNo, int $pid, array $issueParams, string $back): string {
+function ar_issued_html(string $docNo, int $pid, array $issueParams, string $back, string $extra = ''): string {
     if (!ar_has()) return '';
     $rows = ar_issued($docNo, $pid);
     $h = '<div class="card card--flat ar-issued"><div class="page-head" style="margin-bottom:6px;"><h3 class="ed-h" style="margin:0;">' . tt('ar.issued') . ' <span class="hint" style="display:inline;margin-left:6px;">' . e($docNo) . '</span></h3>';
-    if (is_staff()) $h .= '<form method="post" action="' . e($back) . '" data-lock data-busy="' . tt('ar.issuing') . '">' . csrf_field() . '<input type="hidden" name="action" value="doc_issue">' . implode('', array_map(fn($k, $v) => '<input type="hidden" name="' . e((string)$k) . '" value="' . e((string)$v) . '">', array_keys($issueParams), $issueParams)) . '<button class="btn btn--gold btn--sm" type="submit">⎙ ' . tt('ar.issue') . ' ' . e('R' . count($rows)) . '</button></form>';
+    if (is_staff()) $h .= '<form method="post" action="' . e($back) . '" data-lock data-busy="' . tt('ar.issuing') . '">' . csrf_field() . '<input type="hidden" name="action" value="doc_issue">' . implode('', array_map(fn($k, $v) => '<input type="hidden" name="' . e((string)$k) . '" value="' . e((string)$v) . '">', array_keys($issueParams), $issueParams)) . $extra . '<button class="btn btn--gold btn--sm" type="submit">⎙ ' . tt('ar.issue') . ' ' . e('R' . count($rows)) . '</button></form>';
     $h .= '</div>';
     if (!$rows) $h .= '<p class="hint" style="margin:0;">' . tt('ar.none_issued') . '</p>';
     else { $h .= '<table class="ar-issued-t"><thead><tr><th>' . tt('sub.rev') . '</th><th>' . tt('th.date') . '</th><th>' . tt('ar.issued_by') . '</th><th></th></tr></thead><tbody>';

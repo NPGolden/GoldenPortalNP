@@ -40,7 +40,7 @@ function iss_sides(): array { return ['golden' => t('iss.side_golden'), 'custome
 function iss_status_pill(string $s): string { return pill(['open' => 'bad', 'in_progress' => 'gold', 'closed' => 'green'][$s] ?? 'mute', iss_statuses()[$s] ?? $s); }
 function iss_priority_pill(string $p): string { return pill(['high' => 'bad', 'normal' => 'mute', 'low' => 'blue'][$p] ?? 'mute', t('td.p_' . $p)); }
 function iss_overdue(array $i): bool { return $i['status'] !== 'closed' && !empty($i['due_on']) && $i['due_on'] < date('Y-m-d'); }
-function iss_vis_sql(string $a = 'i'): string { return is_staff() ? '1 = 1' : "{$a}.visibility = 'external'"; }
+function iss_vis_sql(string $a = 'i'): string { return is_staff() && !(function_exists('wk_as_owner') && wk_as_owner()) ? '1 = 1' : "{$a}.visibility = 'external'"; }   // R97-099: the owner's copy of a report hides internal issues also when staff build it
 
 /** Issues of a sub-project or a whole project. $f: status (open_all | open | in_progress | closed | ''), side, assignee, q, from/to (raised), closed_from/closed_to. */
 function iss_list(?int $projectId, ?int $subId, array $f = []): array {

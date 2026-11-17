@@ -2951,3 +2951,21 @@ The common registers carry the field Standard (All four / one of them) and the l
 **Tests (sandbox) — form posted**: a ticked and an unticked risk saved; pill in the log; PDF of the week shows the ticked one with [new], mitigation and the count line, and not the unticked one; set to mitigated → still listed for the week; unticked on edit → gone from the report; Word file produced; no new lines in `storage/php-errors.log`. Not tested: the report opened by a customer account (the same query; the sandbox customer session had expired).
 
 **Security review — observation**: the weekly report a member of staff downloads, files or e-mails is the internal version: it contains the weekly notes marked Internal and internal ticket comments. Risks are safe by the rule above, but the notes are not. Proposal (no cost in speed): a choice Owner's copy when a member of staff sends or files the weekly report, which builds it exactly as the owner sees it.
+
+## §383 v1.174.0 (R97-099) — Weekly vessel report: Owner's copy when staff download, send or file it
+
+**Request**: the proposal of §382, accepted — "add an 'Owner's copy' choice when staff send or file the weekly report".
+
+**Problem**: `weekly_data()` decides what is internal by the account that builds the report. A member of staff therefore always got the internal version — internal weekly notes, internal ticket comments, internal open issues, our drafts — also in the PDF attached to an e-mail and in the revision filed with visibility external, which the customer sees under Documents.
+
+**Change**: `weekly_data(..., bool $ownerCopy)` builds with `$staff = false` when asked; `wk_as_owner()` is switched on while `wk_sections()` runs so that `iss_vis_sql()` hides internal issues too; the header reads Owner's copy.
+- Download (`views/report_weekly.php`, `?copy=owner`; buttons on `views/weekly_vessel.php`): Owner's copy PDF / Word next to Internal PDF / Word. A file built by staff without the choice is named …-INT.
+- E-mail (`em.php` attachment key `wk:…:pdf:o`): four attachments offered — Owner's copy PDF (ticked), Owner's copy Word, Internal PDF, Internal Word.
+- Filing (`doc_issue`, kind weekly): select next to the button — Owner's copy (default; filed external under the report number) or Internal copy (filed internal under number-INT; listed for staff under Internal copies filed). `ar_issued_html()` takes extra form fields.
+The page on screen stays the internal version for staff.
+
+**Tests (sandbox) — forms posted**: with an internal and an external weekly note and open issue: internal PDF contains all four and the scope line Internal; Owner's copy PDF and Word contain only the two external ones and the line Owner's copy; file names with and without -INT; filing Owner's copy → revision R0 external; filing Internal copy → R0 internal under -INT, listed on the page; no new lines in `storage/php-errors.log`. Not tested: the attachment built at the moment an e-mail is sent (same function with the flag — needs the mail connection).
+
+**Not changed**: revisions of weekly reports filed before this release are the internal version and remain visible to customers — see the proposal.
+
+**Security review — proposals** (no cost in speed): (1) list the weekly-report revisions filed before v1.174.0 so that the ones containing internal notes can be withdrawn or re-filed as Owner's copy; (2) the same Owner's copy choice for the monthly sub-project report and the vessel technical history, which are built the same way.

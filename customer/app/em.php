@@ -95,8 +95,9 @@ function em_attachment(string $key): ?array {
             return [$b, function_exists('ar_download_name') ? ar_download_name($f) : (string)$f['original_name'], (string)$f['mime_type']];
         case 'wk':
             if (!function_exists('weekly_data')) return null;
-            $W = weekly_data((int)($p[1] ?? 0), (int)($p[2] ?? 0) ?: null, (string)($p[3] ?? date('Y-m-d'))); if (empty($W['vessel'])) return null;
-            $docx = ($p[4] ?? 'pdf') === 'docx'; $no = wk_doc_no($W['vessel'], $W['only_project'] ?? null, (string)$W['week_start']);
+            $own = ($p[5] ?? '') === 'o';   // R97-099: the owner's copy
+            $W = weekly_data((int)($p[1] ?? 0), (int)($p[2] ?? 0) ?: null, (string)($p[3] ?? date('Y-m-d')), $own); if (empty($W['vessel'])) return null;
+            $docx = ($p[4] ?? 'pdf') === 'docx'; $no = wk_doc_no($W['vessel'], $W['only_project'] ?? null, (string)$W['week_start']) . ($own ? '' : '-INT');
             return [$docx ? wk_render_docx($W) : wk_render_pdf($W), $no . ($docx ? '.docx' : '.pdf'), $docx ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' : 'application/pdf'];
         case 'wf':
             if (!function_exists('wf_get')) return null;

@@ -14,7 +14,10 @@ function wk_doc_no(array $v, ?array $p, string $ws): string {
 }
 function wk_days_left(?string $d, string $ref): ?int { return $d ? (int) floor((strtotime($d) - strtotime($ref)) / 86400) : null; }
 
-function weekly_data(int $vid, ?int $onlyProject, string $weekStart): ?array {
+/** R97-099: while the owner's copy of a report is built by a member of staff, the parts that hide internal content behave as for the owner. */
+function wk_as_owner(?bool $set = null): bool { static $on = false; if ($set !== null) $on = $set; return $on; }
+/** $ownerCopy: a member of staff asks for the report exactly as the owner sees it (no internal notes, comments, issues or drafts). */
+function weekly_data(int $vid, ?int $onlyProject, string $weekStart, bool $ownerCopy = false): ?array {
     if (!$vid && $onlyProject) {                       // project-level call (the project's own "Weekly report" button): same report, scoped to that project
         [$ps, $pa] = scope_sql('p'); array_unshift($pa, $onlyProject);
         $pp = one("SELECT p.*, c.name AS customer_name FROM projects p LEFT JOIN customers c ON c.id = p.customer_id WHERE p.id = ? AND {$ps}", $pa);
@@ -28,12 +31,12 @@ function weekly_data(int $vid, ?int $onlyProject, string $weekStart): ?array {
         if (!$v) return null;
     }
     if (empty($v)) return null;
-    $staff = is_staff(); $r15 = of_has();
+    $staff = is_staff() && !$ownerCopy; $r15 = of_has();
     $ws = wk_monday($weekStart); $we = date('Y-m-d', strtotime($ws) + 6 * 86400); $prev = date('Y-m-d', strtotime($ws) - 86400);
     $weEnd = $we . ' 23:59:59'; $wsStart = $ws . ' 00:00:00';
     $inWeek = fn(?string $dt) => $dt && substr($dt, 0, 10) >= $ws && substr($dt, 0, 10) <= $we;
     $stages = stage_defs();
-    $W = ['vessel' => $v, 'week_start' => $ws, 'week_end' => $we, 'prev' => $prev, 'iso' => date('o-\WW', strtotime($ws)), 'projects' => [], 'only_project' => null, 'staff' => $staff];
+    $W = ['vessel' => $v, 'week_start' => $ws, 'week_end' => $we, 'prev' => $prev, 'iso' => date('o-\WW', strtotime($ws)), 'projects' => [], 'only_project' => null, 'staff' => $staff, 'owner_copy' => $ownerCopy && is_staff()];
     [$ps, $pa] = scope_sql('p');
     $projects = $onlyProject ? all("SELECT p.* FROM projects p WHERE p.id = ? AND {$ps}", array_merge([$onlyProject], $pa))
                              : all("SELECT p.* FROM projects p WHERE p.vessel_id = ? AND {$ps} ORDER BY p.status = 'completed', p.project_code, p.name", array_merge([$vid], $pa));
@@ -150,7 +153,8 @@ function wk_pct_delta(int $now, int $base, bool $hasBase = true): string { if (p
 /* ================================================================ render */
 
 /** Every table of the report as rows, shared by PDF and Word. Returns sections => [['title','cols','rows','note'], …] */
-function wk_sections(array $W): array {
+function wk_sections(array $W): array { $was = wk_as_owner(); wk_as_owner(!empty($W['owner_copy'])); try { return wk_sections_do($W); } finally { wk_as_owner($was); } }
+function wk_sections_do(array $W): array {
     $staff = $W['staff']; $S = []; $ab = wk_stage_abbr(); $stages = array_keys(stage_defs());
     $pfx = fn(array $P) => count($W['projects']) > 1 ? ($P['p']['project_code'] ?: $P['p']['name']) . ' · ' : '';
     $sec = function (int $no, string $title) use (&$S) { $S[$no] = ['title' => $no . '. ' . $title, 'tables' => [], 'text' => []]; };
