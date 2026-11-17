@@ -596,12 +596,16 @@ function ism_import_cols(string $reg): array {
     if ($reg === 'qequip') foreach ([['c:cal_date', t('ism.f_last_cal'), 'date'], ['c:cert_no', t('ism.f_cert_no'), 'text'], ['c:lab', t('ism.f_lab'), 'text'], ['c:valid_until', t('ism.f_valid_until'), 'date']] as $x) $C[] = $x;
     return $C;
 }
-function ism_importable(string $reg): bool { $R = ism_reg($reg); return $R && empty($R['parent']) && $reg !== 'soa' && $reg !== 'qsup' && ism_can_reg($reg); }   // R97-089: the ISO 27001 supplier register can be imported (the link to the supplier list is chosen afterwards)
+function ism_importable(string $reg): bool { $R = ism_reg($reg); return $R && empty($R['parent']) && $reg !== 'qsup' && ism_can_reg($reg); }   // R97-090: the Statement of Applicability too — its rows fill the 93 controls instead of adding records
+/** The number of an Annex A control as written in the register: 'A.5.1', 'a 5.1' and '5.1' all become 'A 5.1'. */
+function ism_soa_code(string $c): string { return preg_match('/^\s*(?:A)?[\s.]*([5-8])\s*\.\s*(\d{1,2})\s*$/i', $c, $m) ? 'A ' . $m[1] . '.' . (int)$m[2] : trim($c); }   // R97-089: the ISO 27001 supplier register can be imported (the link to the supplier list is chosen afterwards)
 function ism_template(string $reg): void {
     if (!ism_importable($reg)) throw new RuntimeException(t('err.noaccess')); require_once __DIR__ . '/xlsxw.php'; $R = ism_reg($reg); $C = ism_import_cols($reg); $lists = [[t('th.status'), implode(' · ', array_map(fn($s) => t('ism.s_' . $s), array_keys($R['st'])))]];
     foreach ($R['f'] as $k => $type) { if (str_starts_with($type, 'sel:')) $lists[] = [t('ism.f_' . $k), implode(' · ', array_map(fn($o) => t('ism.o_' . $o), ism_opts($type)))]; elseif ($type === 'score') $lists[] = [t('ism.f_' . $k), '1 – 5']; }
-    foreach ([t('ism.imp_n1'), t('ism.imp_n2'), t('ism.imp_n3'), t('ism.imp_n4')] as $n) $lists[] = ['', $n]; if ($reg === 'qequip') $lists[] = ['', t('ism.imp_n_eq')];
-    xlsx_download('GAS-import-' . $reg . '.xlsx', [['name' => 'Records', 'first' => true, 'header' => array_column($C, 1), 'rows' => [], 'widths' => array_map(fn($c) => in_array($c[0], ['title'], true) ? 40 : 20, $C)], ['name' => 'Lists and rules', 'header' => [t('ism.imp_col'), t('ism.imp_vals')], 'rows' => $lists, 'widths' => [34, 110]]]);
+    foreach ([t('ism.imp_n1'), t('ism.imp_n2'), t('ism.imp_n3'), t('ism.imp_n4')] as $n) $lists[] = ['', $n]; if ($reg === 'qequip') $lists[] = ['', t('ism.imp_n_eq')]; if ($reg === 'soa') $lists[] = ['', t('ism.imp_n_soa')];
+    $rows = []; if ($reg === 'soa') { $un = []; foreach (ism_users() as $x) $un[(int)$x['id']] = (string)$x['full_name'];   // the template of the Statement of Applicability is the list of the controls as it stands
+        foreach (all("SELECT * FROM ism_records WHERE reg = 'soa' ORDER BY sort, id") as $r) { $d = ism_data($r); $row = []; foreach ($C as [$k]) $row[] = match (true) { $k === 'code' => $r['code'], $k === 'title' => $r['title'], $k === 'status' => t('ism.s_' . $r['status']), $k === 'owner' => $un[(int)$r['owner_user_id']] ?? '', $k === 'due_date' => (string)$r['due_date'], $k === 'review_date' => (string)$r['review_date'], str_starts_with($k, 'd:') => (string)($d[substr($k, 2)] ?? ''), default => '' }; $rows[] = $row; } }
+    xlsx_download('GAS-import-' . $reg . '.xlsx', [['name' => 'Records', 'first' => true, 'header' => array_column($C, 1), 'rows' => $rows, 'widths' => array_map(fn($c) => in_array($c[0], ['title'], true) ? 40 : 20, $C)], ['name' => 'Lists and rules', 'header' => [t('ism.imp_col'), t('ism.imp_vals')], 'rows' => $lists, 'widths' => [34, 110]]]);
 }
 /** Import records of one register from the template. Returns [imported, skipped, errors]. A code already in the register is skipped — nothing is overwritten. */
 function ism_import(string $reg, array $file): array {
@@ -615,7 +619,16 @@ function ism_import(string $reg, array $file): array {
     $n = 0; $skip = 0; $errs = []; $keep = $_POST;
     foreach (array_slice($rows, 1, 2000) as $ri => $row) {
         $get = fn($k) => isset($col[$k]) && $col[$k] !== null ? trim((string)($row[$col[$k]] ?? '')) : ''; $title = $get('title'); if ($title === '') continue;
-        $code = $get('code'); if ($code !== '' && scalar('SELECT COUNT(*) FROM ism_records WHERE reg = ? AND code = ?', [$reg, $code])) { $skip++; continue; }
+        $code = $get('code');
+        if ($reg === 'soa') {   // R97-090: a row fills its control (found by number); a control somebody already worked on is left as it is
+            $o = one("SELECT * FROM ism_records WHERE reg = 'soa' AND code = ?", [ism_soa_code($code)]); if (!$o) { $skip++; if (count($errs) < 8) $errs[] = t('ism.imp_row', ['n' => $ri + 2]) . ': ' . t('ism.imp_e_soa', ['c' => $code]); continue; }
+            $od = ism_data($o); $st = $stMap[$norm($get('status'))] ?? ''; $ju = $get('d:justification'); $hw = $get('d:how');
+            if ($o['status'] !== 'planned' || trim((string)($od['justification'] ?? '')) !== '' || trim((string)($od['how'] ?? '')) !== '' || ($st === '' && $ju === '' && $hw === '') || ($st === 'planned' && $ju === '' && $hw === '')) { $skip++; continue; }
+            try { $_POST = ['reg' => 'soa', 'id' => (int)$o['id'], 'title' => $o['title'], 'code' => $o['code'], 'ref' => (string)$o['ref'], 'status' => $st ?: 'planned', 'owner_user_id' => ($users[$norm($get('owner'))] ?? 0) ?: (int)$o['owner_user_id'], 'due_date' => $date($get('due_date')) ?: (string)$o['due_date'], 'review_date' => $date($get('review_date')) ?: (string)$o['review_date'], 'd' => array_filter(['justification' => $ju, 'how' => $hw], fn($v) => $v !== '')]; ism_save_from_post(); $n++; }
+            catch (Throwable $e) { $skip++; if (count($errs) < 8) $errs[] = t('ism.imp_row', ['n' => $ri + 2]) . ': ' . $e->getMessage(); }
+            continue;
+        }
+        if ($code !== '' && scalar('SELECT COUNT(*) FROM ism_records WHERE reg = ? AND code = ?', [$reg, $code])) { $skip++; continue; }
         if (scalar('SELECT COUNT(*) FROM ism_records WHERE reg = ? AND LOWER(title) = LOWER(?)', [$reg, $title])) { $skip++; continue; }   // the same title is already in the register — the file was probably imported before
         $P = ['reg' => $reg, 'title' => $title, 'code' => $code, 'status' => $stMap[$norm($get('status'))] ?? array_key_first($R['st']), 'owner_user_id' => $users[$norm($get('owner'))] ?? 0, 'ref' => $get('ref'), 'due_date' => $date($get('due_date')), 'review_date' => $date($get('review_date')), 'd' => []];
         foreach ($R['f'] as $k => $type) { $v = $get('d:' . $k); if ($v === '') continue;

@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.165.0** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.166.0** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.166.0 | GAS-CP-R97-090 | 2026-11-17 | ISO 27001: the Statement of Applicability can be filled from Excel — the template lists the 93 controls as they stand and a row fills its control by number, without overwriting a control already worked on. | — |
 | 1.165.0 | GAS-CP-R97-089 | 2026-11-17 | ISO 27001 filled from the company's ISMS manuals: the five governance documents carry their numbers, English and Greek titles, version, approval and next review; the risk register follows the risk matrix of ISMS-TIER1-004 (Low, Medium, High, Critical) with its named scales and acceptance criteria; new register Interested parties (4.2); suppliers of ISO 27001 can be imported from Excel. | — |
 | 1.164.0 | GAS-CP-R97-088 | 2026-11-17 | QHSE: approved suppliers (ISO 9001 8.4) evaluated on the supplier list and shown to procurement, with purchase orders refused to suppliers that are Not approved and an optional rule approved-only; Excel import of register records (instruments with their last calibration); Documents library for all staff; the PM app no longer shows offer amounts to accounts without financial data. | — |
 | 1.163.1 | GAS-CP-R97-087 | 2026-11-17 | QHSE: saving the QHSE team and Access by position did nothing — fixed. | — |

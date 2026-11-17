@@ -2825,3 +2825,15 @@ The common registers carry the field Standard (All four / one of them) and the l
 **Security review**: no confidential content of the manuals in code, commits or project documents; the import files and translations travel only through the portal's own upload (staff with access to ISO 27001, files outside the web root). Proposals without cost in speed: (1) when the documents are attached, limit the Documents register of ISO 27001 so that "Confidential" files are downloadable only by the ISMS team and management; (2) include `storage/isms` in the off-hosting backup (open since §364).
 
 **Found in the manuals**: blanks and a few points where the documents differ from each other were reported to the CEO in the delivery note; they are not repeated here because the documents are confidential.
+
+## §374 v1.166.0 (R97-090) — Statement of Applicability filled from Excel
+
+**Request**: "based on what you know for my company and the processes and the It department lets fill the Statement of applicability in the system".
+
+**Rule kept (§373)**: the content of the Statement of Applicability describes the security measures of the company and is confidential — it is not in the repository. The code only makes the register fillable from a file; the filled workbook (93 controls: status, justification, how it is met, next review) was handed to the CEO and is uploaded in the portal.
+
+**Code** (`app/ism.php`): `ism_importable()` no longer excludes `soa`; `ism_template('soa')` writes the 93 controls as they stand (number, title, status, owner, dates, justification, how it is met); `ism_import()` for `soa` finds the control by its number (`ism_soa_code()`: "A.5.1", "a 5.1" and "5.1" are read as "A 5.1") and saves it through `ism_save_from_post()` — history entry, validation and access as in the form. A control with a status other than Planned or with a text already entered is skipped, as is a row that brings nothing; an unknown number is reported with its row. The theme (Organizational, People, Physical, Technological) is kept.
+
+**Tests (sandbox) — form posted**: workbook of 93 rows → 92 filled and 1 skipped (a control changed by hand before the import kept its text); second upload → 0 filled, 93 skipped; unknown number reported; the template downloaded afterwards carries the filled values; restricted account gets no template; no new lines in `storage/php-errors.log`. 2 language keys, 11 334 per file.
+
+**Security review**: no new page and no new permission — the import needs the same access as editing a control and cannot overwrite work already done. Proposal (no cost in speed): the Excel exports of ISO 27001 (All registers, templates with content) carry the security measures of the company — limit them to the ISMS team and management, as proposed for Confidential files in §373.
