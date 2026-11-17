@@ -4,7 +4,7 @@ require __DIR__ . '/_layout.php';
 $u = require_staff();
 $marine = ($ISM_AREA ?? '') === 'marine'; $qhse = ($ISM_AREA ?? '') === 'qhse'; $PG = $marine ? 'mcs' : ($qhse ? 'qhse' : 'isms'); $TT = t($marine ? 'ism.m_title' : ($qhse ? 'qh.title' : 'ism.title'));   // R97-081 / R97-086: the same page serves marine cyber safety (views/mcs.php) and QHSE (views/qhse.php)
 if (!function_exists('ism_can') || !($marine ? ism_can_marine() : ($qhse ? qh_can() : ism_can()))) { http_response_code(403); layout_head($TT, $PG); echo '<h1>' . tt('err.noaccess') . '</h1><p class="hint">' . tt($marine ? 'ism.m_noaccess_hint' : ($qhse ? 'qh.noaccess_hint' : 'ism.noaccess_hint')) . '</p>'; layout_foot(); return; }
-if (!$marine && !$qhse) ism_seed();
+if (!$marine && !$qhse) { ism_seed(); ism_docs_align(); }
 $std = ''; $PA = [];   // QHSE: the standard whose registers are shown; kept in every link of the page
 if ($qhse) { $std = (string)($_GET['std'] ?? ''); if (isset(ism_regs('qhse')[$_GET['reg'] ?? ''])) $std = (string)ism_regs('qhse')[$_GET['reg']]['std']; if (!isset(QH_STD[$std])) $std = 'ims'; $PA = ['std' => $std]; }
 if (($_GET['format'] ?? '') === 'template' && ism_importable((string)($_GET['reg'] ?? ''))) { ism_template((string)$_GET['reg']); exit; }
@@ -25,7 +25,7 @@ layout_head($TT . ($reg ? ' · ' . ism_reg_title($reg) : ''), $PG);
 <div class="kpi kpi--5" style="margin-bottom:10px;">
   <div class="stat<?= $docs['n'] && $docs['st']['approved'] === $docs['n'] ? ' green' : ' gold' ?>"><b><?= (int)$docs['st']['approved'] ?> / <?= (int)$docs['n'] ?></b><?= tt('ism.k_docs') ?><span class="s"><?= tt('ism.k_docs_s') ?></span></div>
   <div class="stat<?= $pct >= 100 ? ' green' : '' ?>"><b><?= $pct ?> %</b><?= tt('ism.k_soa') ?><span class="s"><?= e(t('ism.k_soa_s', ['d' => $soa['done'], 'a' => $soa['applicable'], 'n' => $soa['na']])) ?></span></div>
-  <div class="stat<?= $O['risk']['high'] ? ' red' : '' ?>"><b><?= (int)$O['risk']['open'] ?></b><?= tt('ism.k_risks') ?><span class="s"><?= e(t('ism.k_risks_s', ['h' => $O['risk']['high'], 'm' => $O['risk']['medium'], 'l' => $O['risk']['low']])) ?></span></div>
+  <div class="stat<?= ($O['risk']['high'] ?? 0) + ($O['risk']['critical'] ?? 0) ? ' red' : '' ?>"><b><?= (int)$O['risk']['open'] ?></b><?= tt('ism.k_risks') ?><span class="s"><?= e(t('ism.k_risks_s4', ['c' => (int)($O['risk']['critical'] ?? 0), 'h' => (int)($O['risk']['high'] ?? 0), 'm' => (int)($O['risk']['medium'] ?? 0), 'l' => (int)($O['risk']['low'] ?? 0), 'u' => (int)($O['risk']['unscored'] ?? 0)])) ?></span></div>
   <div class="stat<?= $O['regs']['incident']['open'] ? ' red' : '' ?>"><b><?= (int)$O['regs']['incident']['open'] ?></b><?= tt('ism.k_inc') ?><span class="s"><?= e(t('ism.k_inc_s', ['n' => $O['regs']['incident']['n']])) ?></span></div>
   <div class="stat<?= $O['regs']['nc']['open'] ? ' gold' : '' ?>"><b><?= (int)$O['regs']['nc']['open'] ?></b><?= tt('ism.k_nc') ?><span class="s"><?= e(t('ism.k_nc_s', ['n' => $O['regs']['nc']['due']])) ?></span></div>
 </div>
@@ -97,7 +97,7 @@ layout_head($TT . ($reg ? ' · ' . ism_reg_title($reg) : ''), $PG);
       <?php if ($reg === 'qequip'): [$cs, $ct] = ism_cal_state($r); ?><td class="mono"><?= e((string)($d['serial'] ?? '')) ?></td><td><?= pill($ct, t('qh.cal_' . $cs)) ?><?= $r['review_date'] && $cs !== 'na' ? '<br><span class="hint">' . e(fmt_date($r['review_date'])) . '</span>' : '' ?></td>
       <?php elseif ($reg === 'qcal'): ?><td class="mono"><?= e((string)($d['cert_no'] ?? '')) ?></td><td><?= !empty($d['cal_result']) ? pill(['cal_pass' => 'green', 'cal_adjusted' => 'green', 'cal_limited' => 'gold', 'cal_fail' => 'bad'][$d['cal_result']] ?? 'mute', t('ism.o_' . $d['cal_result'])) : '<span class="hint">—</span>' ?><?= !empty($d['valid_until']) ? '<br><span class="hint">→ ' . e(fmt_date($d['valid_until'])) . '</span>' : '' ?></td>
       <?php elseif (in_array($reg, ['qhsinc', 'qcomplaint', 'qaudit', 'qdoc'], true)): $kf = ['qhsinc' => 'hs_kind', 'qcomplaint' => 'fb_kind', 'qaudit' => 'kind', 'qdoc' => 'doc_type'][$reg]; ?><td><?= !empty($d[$kf]) ? tt('ism.o_' . $d[$kf]) : '<span class="hint">—</span>' ?></td><?php endif; ?>
-      <?php if ($sc): $s1 = ism_score($d); $s2 = ism_score($d, 'res_'); [$t1, $l1] = ism_level($s1); [$t2, $l2] = ism_level($s2); ?><td class="num"><?= $s1 ? pill($t1, $s1 . ' · ' . $l1) : '<span class="hint">—</span>' ?></td><td class="num"><?= $s2 ? pill($t2, $s2 . ' · ' . $l2) : '<span class="hint">—</span>' ?></td>
+      <?php if ($sc): $p1 = ism_level_pill($reg, $d); $p2 = ism_level_pill($reg, $d, 'res_'); ?><td class="num"><?= $p1 ?: '<span class="hint">—</span>' ?></td><td class="num"><?= $p2 ?: '<span class="hint">—</span>' ?></td>
       <?php elseif ($reg === 'incident'): ?><td><?= !empty($d['severity']) ? pill(['low' => 'green', 'medium' => 'gold', 'high' => 'bad', 'critical' => 'bad'][$d['severity']] ?? 'mute', t('ism.o_' . $d['severity'])) : '<span class="hint">—</span>' ?></td>
       <?php elseif ($reg === 'audit'): ?><td><?= !empty($d['kind']) ? tt('ism.o_' . $d['kind']) : '<span class="hint">—</span>' ?></td>
       <?php elseif ($reg === 'asset'): ?><td><?= !empty($d['type']) ? tt('ism.o_' . $d['type']) : '<span class="hint">—</span>' ?></td>

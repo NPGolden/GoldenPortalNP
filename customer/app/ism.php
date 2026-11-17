@@ -102,6 +102,8 @@ function ism_regs(?string $grp = null): array {
                         'f' => ['eval_kind' => 'sel:initial,periodic,after_incident', 'evaluated_on' => 'date', 'evaluator' => 'text', 'c_agreement' => 'score', 'c_certification' => 'score', 'c_access' => 'score', 'c_incidents' => 'score', 'c_continuity' => 'score', 'c_quality' => 'score', 'eval_result' => 'sel:res_approved,res_conditional,res_rejected', 'conditions' => 'area', 'notes' => 'area'], 'ref' => false, 'due' => true, 'review' => false, 'parent' => 'supplier', 'auto' => ['rating']],
         'training'  => ['hrtr' => true, 'icon' => '🎓', 'clause' => '7.2 · 7.3 · A 6.3', 'prefix' => 'TRN', 'st' => ['planned' => 'gold', 'done' => 'green'], 'closed' => ['done'],
                         'f' => ['audience' => 'text', 'attendees' => 'num', 'trainer' => 'text', 'notes' => 'area'], 'ref' => false, 'due' => true, 'review' => false],
+        'party'     => ['icon' => '👥', 'clause' => '4.2', 'prefix' => 'IP', 'st' => ['active' => 'green', 'ended' => 'mute'], 'closed' => ['active', 'ended'],
+                        'f' => ['party_type' => 'sel:customer_p,authority,class_soc,supplier_p,employee_p,owner_p,community', 'needs' => 'area', 'how' => 'area'], 'ref' => false, 'due' => false, 'review' => true],   // R97-089: interested parties and their requirements
         'legal'     => ['icon' => '⚖', 'clause' => 'A 5.31',         'prefix' => 'LEG', 'st' => ['applicable' => 'green', 'not_applicable' => 'mute'], 'closed' => ['applicable', 'not_applicable'],
                         'f' => ['source' => 'text', 'obligation' => 'area', 'how' => 'area'], 'ref' => false, 'due' => false, 'review' => true],
         /* R97-081 — marine cyber safety (IACS UR E26 / E27) */
@@ -169,6 +171,16 @@ function ism_opts(string $type): array { return str_starts_with($type, 'sel:') ?
 function ism_data(array $r): array { $d = json_decode((string)($r['data'] ?? ''), true); return is_array($d) ? $d : []; }
 function ism_score(array $d, string $pre = ''): int { return (int)($d[$pre . 'likelihood'] ?? 0) * (int)($d[$pre . 'impact'] ?? 0); }
 function ism_level(int $score): array { return $score >= 15 ? ['bad', t('ism.lv_high')] : ($score >= 8 ? ['gold', t('ism.lv_medium')] : ($score > 0 ? ['green', t('ism.lv_low')] : ['mute', '—'])); }
+/** R97-089 — the risk matrix of the company's Risk Assessment & Treatment Methodology (ISMS-TIER1-004 §5), used by the ISO 27001 risk register:
+ *  rows = likelihood 1–5, columns = impact 1–5. An impact of 5 is at least High, and Critical from likelihood 3. */
+const ISM_MATRIX = [1 => ['low', 'low', 'low', 'medium', 'high'], 2 => ['low', 'low', 'medium', 'medium', 'high'], 3 => ['low', 'medium', 'medium', 'high', 'critical'], 4 => ['low', 'medium', 'high', 'critical', 'critical'], 5 => ['medium', 'high', 'critical', 'critical', 'critical']];
+const ISM_LV_TONE = ['low' => 'green', 'medium' => 'gold', 'high' => 'bad', 'critical' => 'bad'];
+function ism_matrix_level(array $d, string $pre = ''): string { $l = (int)($d[$pre . 'likelihood'] ?? 0); $i = (int)($d[$pre . 'impact'] ?? 0); return ($l >= 1 && $l <= 5 && $i >= 1 && $i <= 5) ? ISM_MATRIX[$l][$i - 1] : ''; }
+/** Pill of the risk level of a record: the matrix for the ISO 27001 risk register, likelihood × impact for the other scored registers. '' when not scored. */
+function ism_level_pill(string $reg, array $d, string $pre = ''): string {
+    if ($reg === 'risk') { $lv = ism_matrix_level($d, $pre); return $lv === '' ? '' : pill(ISM_LV_TONE[$lv], (int)$d[$pre . 'likelihood'] . ' × ' . (int)$d[$pre . 'impact'] . ' · ' . t('ism.lv_' . $lv)) . ($lv === 'critical' ? ' ⚠' : ''); }
+    $s = ism_score($d, $pre); if (!$s) return ''; [$tone, $lab] = ism_level($s); return pill($tone, $s . ' · ' . $lab);
+}
 /** Is something due on the record: its status still needs action and the due date has passed, or the review date has passed. */
 function ism_due(array $r): ?string {
     $R = ism_reg((string)$r['reg']); $today = date('Y-m-d'); if (!$R) return null;
@@ -352,7 +364,7 @@ function ism_overview(): array {
         $k = (string)$r['reg']; $R = ism_reg($k); if (!$R || !isset($O['regs'][$k])) continue; $x = &$O['regs'][$k]; $x['n']++; if (isset($x['st'][$r['status']])) $x['st'][$r['status']]++;
         $open = !in_array($r['status'], $R['closed'], true); if ($open) $x['open']++; $d = ism_due($r); if ($d) { $x['due']++; if (count($O['due']) < 40) $O['due'][] = $r + ['_why' => $d]; } unset($x);
         if ($k === 'soa') { if (isset($O['soa'][$r['status']])) $O['soa'][$r['status']]++; if ($r['status'] !== 'na') $O['soa']['applicable']++; }
-        if ($k === 'risk' && $open) { $O['risk']['open']++; $sc = ism_score(ism_data($r)); $O['risk'][$sc >= 15 ? 'high' : ($sc >= 8 ? 'medium' : 'low')]++; }
+        if ($k === 'risk' && $open) { $O['risk']['open']++; $lv = ism_matrix_level(ism_data($r)); if ($lv !== '') $O['risk'][$lv] = ($O['risk'][$lv] ?? 0) + 1; else $O['risk']['unscored'] = ($O['risk']['unscored'] ?? 0) + 1; }
         if ($k === 'audit' && $r['status'] === 'planned' && $r['due_date'] && count($O['next']) < 6) $O['next'][] = $r;
     }
     return $O;
@@ -584,7 +596,7 @@ function ism_import_cols(string $reg): array {
     if ($reg === 'qequip') foreach ([['c:cal_date', t('ism.f_last_cal'), 'date'], ['c:cert_no', t('ism.f_cert_no'), 'text'], ['c:lab', t('ism.f_lab'), 'text'], ['c:valid_until', t('ism.f_valid_until'), 'date']] as $x) $C[] = $x;
     return $C;
 }
-function ism_importable(string $reg): bool { $R = ism_reg($reg); return $R && empty($R['parent']) && $reg !== 'soa' && !isset(ISM_SUP[$reg]) && ism_can_reg($reg); }
+function ism_importable(string $reg): bool { $R = ism_reg($reg); return $R && empty($R['parent']) && $reg !== 'soa' && $reg !== 'qsup' && ism_can_reg($reg); }   // R97-089: the ISO 27001 supplier register can be imported (the link to the supplier list is chosen afterwards)
 function ism_template(string $reg): void {
     if (!ism_importable($reg)) throw new RuntimeException(t('err.noaccess')); require_once __DIR__ . '/xlsxw.php'; $R = ism_reg($reg); $C = ism_import_cols($reg); $lists = [[t('th.status'), implode(' · ', array_map(fn($s) => t('ism.s_' . $s), array_keys($R['st'])))]];
     foreach ($R['f'] as $k => $type) { if (str_starts_with($type, 'sel:')) $lists[] = [t('ism.f_' . $k), implode(' · ', array_map(fn($o) => t('ism.o_' . $o), ism_opts($type)))]; elseif ($type === 'score') $lists[] = [t('ism.f_' . $k), '1 – 5']; }
@@ -629,4 +641,26 @@ function qh_library(array $f = []): array {
 function qh_library_send(int $fid): void {
     $f = is_staff() ? one("SELECT f.* FROM ism_files f JOIN ism_records r ON r.id = f.record_id WHERE f.id = ? AND r.reg = 'qdoc' AND r.status = 'approved'", [$fid]) : null; if (!$f) { http_response_code(403); exit; } $p = ism_dir() . '/' . $f['stored_name']; if (!is_file($p)) { http_response_code(404); exit; }
     header('Content-Type: application/octet-stream'); header('Content-Disposition: attachment; filename="' . str_replace(['"', "\r", "\n"], '', (string)$f['original_name']) . '"'); header('Content-Length: ' . filesize($p)); header('X-Content-Type-Options: nosniff'); header('Cache-Control: private, no-store'); readfile($p); exit;
+}
+
+/* ------------------------------------------------------------ R97-089 — the company's own ISMS documents take the place of the generic entries */
+/** Once: the five documents issued by the IT department (ISMS Manual and the four Tier-1 documents, version 1.0, in force 01/08/2026) replace the generic
+ *  entries of the pre-filled list — number, title in English and Greek, version, approval and next review. Only entries nobody has worked on are touched
+ *  (still Draft, no file); the files themselves are attached in the portal — they are confidential and are not part of the program. */
+function ism_docs_align(): int {
+    if (!ism_has() || cp_setting('ism_docs_gas1', '') === '1') return 0; $n = 0;
+    $D = [['Scope of the ISMS', 'ISMS-TIER1-002', 'ISMS Scope Statement — Δήλωση Πεδίου Εφαρμογής ΣΔΑΠ', '4.3', 'Defines the boundaries of the ISMS: the organisational units, sites, systems and services that are in scope, what is excluded and why. Basis of the Statement of Applicability.'],
+          ['Information security policy', 'ISMS-TIER1-001', 'Information Security Policy — Πολιτική Ασφάλειας Πληροφοριών', '5.2 · A 5.1', 'The commitment of top management to information security and the framework for the objectives. The highest document of the ISMS; all policies, procedures and registers derive from it.'],
+          ['Roles, responsibilities and authorities', 'ISMS-TIER1-003', 'Information Security Roles & Responsibilities — Ρόλοι & Αρμοδιότητες Ασφάλειας Πληροφοριών', '5.3 · A 5.2', 'Roles, responsibilities and authorities for information security, segregation of duties and the compensating controls where full segregation is not possible.'],
+          ['Risk assessment and risk treatment methodology', 'ISMS-TIER1-004', 'Risk Assessment & Treatment Methodology — Μεθοδολογία Εκτίμησης & Αντιμετώπισης Κινδύνου', '6.1.2 · 6.1.3 · 8.2 · 8.3', 'How risks are identified, analysed, evaluated and treated: likelihood and impact scales, the risk matrix (Low, Medium, High, Critical), acceptance criteria, treatment options, residual risk, frequency.']];
+    $data = fn(string $sum) => json_encode(['version' => '1.0', 'approved_by' => 'CEO', 'approved_on' => '2026-08-01', 'summary' => $sum], JSON_UNESCAPED_UNICODE);
+    foreach ($D as [$old, $code, $title, $ref, $sum]) {
+        if (scalar("SELECT COUNT(*) FROM ism_records WHERE reg = 'doc' AND code = ?", [$code])) continue;
+        $r = one("SELECT r.id FROM ism_records r WHERE r.reg = 'doc' AND r.title = ? AND r.status = 'draft' AND r.updated_at IS NULL AND NOT EXISTS (SELECT 1 FROM ism_files f WHERE f.record_id = r.id) LIMIT 1", [$old]);
+        if ($r) { q("UPDATE ism_records SET code = ?, title = ?, ref = ?, status = 'approved', review_date = '2027-08-01', data = ?, updated_at = NOW(), updated_name = 'ISMS documents v1.0' WHERE id = ?", [$code, $title, $ref, $data($sum), (int)$r['id']]); $id = (int)$r['id']; }
+        else { q("INSERT INTO ism_records (reg, code, title, status, ref, sort, review_date, data, created_name) VALUES ('doc', ?, ?, 'approved', ?, 0, '2027-08-01', ?, 'ISMS documents v1.0')", [$code, $title, $ref, $data($sum)]); $id = (int) db()->lastInsertId(); }
+        q("INSERT INTO ism_events (record_id, event, user_name, note) VALUES (?, 'update', 'ISMS documents v1.0', ?)", [$id, $code . ' · v1.0 · 01/08/2026']); $n++;
+    }
+    if (!scalar("SELECT COUNT(*) FROM ism_records WHERE reg = 'doc' AND code = 'ISMS-MAN-001'")) { q("INSERT INTO ism_records (reg, code, title, status, ref, sort, review_date, data, created_name) VALUES ('doc', 'ISMS-MAN-001', 'ISMS Manual — Εγχειρίδιο ΣΔΑΠ', 'approved', '4 – 10', 0, '2027-08-01', ?, 'ISMS documents v1.0')", [$data('How the company meets clauses 4 to 10 of ISO/IEC 27001:2022: context and scope, leadership, planning, support, operation, performance evaluation and improvement. The top document of the ISMS.')]); q("INSERT INTO ism_events (record_id, event, user_name, note) VALUES (?, 'create', 'ISMS documents v1.0', 'ISMS-MAN-001 · v1.0 · 01/08/2026')", [(int) db()->lastInsertId()]); $n++; }
+    cp_setting_set('ism_docs_gas1', '1'); return $n;
 }
