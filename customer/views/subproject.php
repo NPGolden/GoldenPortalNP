@@ -541,6 +541,7 @@ layout_head($sp['code'] . ' · ' . $sp['name'], 'projects');
   <p class="hint" style="margin-top:12px;"><?= tt('rp.pdf_hint') ?></p>
 </div>
 <?php endif; ?>
+<?php if ($tab === 'process' && $staff && function_exists('ism_marine_card')) ism_marine_card(['sub' => (int)$sp['id'], 'project' => (int)$sp['project_id'], 'vessel' => (int)$sp['vessel_id']]);   // R97-081: marine cyber safety products of this sub-project ?>
 
 <script nonce="<?= csp_nonce() ?>">(function(){var ed=document.getElementById('stage-editor');if(!ed)return;ed.addEventListener('change',function(e){if(!e.target.classList.contains('js-na'))return;var inp=e.target.closest('.field').querySelector('.js-pct');inp.disabled=e.target.checked;if(e.target.checked)inp.value=0;});})();</script>
 <?php layout_foot(); ?>

@@ -275,4 +275,5 @@ layout_head($v['name'], 'vessels');
   <?php endforeach; endif; ?>
 </div>
 <?php endif; ?>
+<?php if ($staff && function_exists('ism_marine_card')) ism_marine_card(['vessel' => $id]);   // R97-081: marine cyber safety products on this vessel ?>
 <?php layout_foot(); ?>

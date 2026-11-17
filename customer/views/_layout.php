@@ -55,6 +55,7 @@ function nav_groups(): array {
     // R97-080: IT & Cybersecurity is a group of its own (was an entry of Library): remote support contracts for everybody, the ISMS for its team, the event report for staff
     $it = ['key' => 'it', 'label' => t('nav.g_it'), 'items' => [['cyber', t('rs.title'), '🛡']], 'folded' => true];
     if ($staff && function_exists('ism_can') && ism_can()) $it['items'][] = ['isms', t('ism.nav'), '📚'];
+    if ($staff && function_exists('ism_can_marine') && ism_can_marine()) $it['items'][] = ['mcs', t('ism.m_nav'), '🚢'];   // R97-081
     if ($staff && function_exists('ism_has') && ism_has()) $it['items'][] = ['isms_report', t('ism.report_btn'), '🚨'];
     array_splice($g, array_search('library', array_column($g, 'key'), true), 0, [$it]);
     if ($hr['items']) array_splice($g, array_search('library', array_column($g, 'key'), true), 0, [$hr]);   // R75-004: HR group after Commercial (and Accounting), before Library
