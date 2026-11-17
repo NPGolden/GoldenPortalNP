@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.155.6';
+const CP_VERSION = '1.155.7';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-070', 'version' => '1.155.7', 'date' => '2026-11-17', 'title' => 'Payables: when Pull received PO lines brings nothing, the message says why — how many lines of the order are already on the invoice, have no goods receipt, or are fully invoiced.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-069', 'version' => '1.155.6', 'date' => '2026-11-17', 'title' => 'Purchase orders show the total with logistics: gross of the parts plus the logistic costs, as a tile on the order, in the logistic costs table and in the list of orders.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-068', 'version' => '1.155.5', 'date' => '2026-11-17', 'title' => 'Purchase order and requisition: the Category drop-down of a new inventory item can be searched by typing.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-067', 'version' => '1.155.4', 'date' => '2026-11-17', 'title' => 'Payables: under Quantity mismatch each line shows ordered, received and already invoiced, and says what is missing — the goods receipt of the purchase order, or a quantity invoiced before.', 'db' => null, 'check' => null],

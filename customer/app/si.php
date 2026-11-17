@@ -109,6 +109,18 @@ function si_lines_from_po(int $iid, int $oid): int {
     }
     return $n;
 }
+/** R97-070: why "Pull received PO lines" brought nothing — the lines of the order by reason. ['total','on_invoice','not_received','invoiced'] */
+function si_pull_why(int $iid, int $oid): array {
+    $w = ['total' => 0, 'on_invoice' => 0, 'not_received' => 0, 'invoiced' => 0];
+    foreach (all("SELECT l.id, l.qty, l.qty_accepted, l.qty_invoiced, (SELECT COUNT(*) FROM si_lines s WHERE s.invoice_id = ? AND s.po_line_id = l.id) AS here FROM po_lines l WHERE l.order_id = ? AND l.status <> 'cancelled'", [$iid, $oid]) as $l) {
+        $w['total']++;
+        if ((int)$l['here']) $w['on_invoice']++;
+        elseif ((float)$l['qty_accepted'] - (float)$l['qty_invoiced'] > 0.0005) continue;
+        elseif ((float)$l['qty_accepted'] + 0.0005 < (float)$l['qty']) $w['not_received']++;
+        else $w['invoiced']++;
+    }
+    return $w;
+}
 function si_line_save_from_post(): int {
     require_si(); $iid = (int)($_POST['invoice_id'] ?? 0); $i = si_load($iid); if (!$i || !si_editable($i)) throw new RuntimeException(t('err.noaccess'));
     $lid = (int)($_POST['line_id'] ?? 0); $qty = (float) str_replace(',', '.', (string)($_POST['qty'] ?? '1')); if ($qty <= 0) throw new RuntimeException(t('prq.need_qty'));

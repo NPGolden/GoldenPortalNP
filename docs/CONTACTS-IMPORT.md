@@ -2411,3 +2411,15 @@ Language keys 10 358 each (portal; +3 from R97-060, none from this release); app
 
 **Security review**: display only; no new proposals.
 
+## §354 v1.155.7 (R97-070) — Payables: why "Pull received PO lines" brings 0 lines
+
+**Report**: "Pull PO lines is not working properly it brings 0 lines why".
+
+**Finding**: by design — `si_lines_from_po()` pulls, per order line, `qty_accepted − qty_invoiced` and skips a line when that is 0 (nothing received, or everything invoiced) or when the line is already on the invoice. The answer was "0 lines pulled" in green, without a reason. Same root as §351: the order has no goods receipt.
+
+**Change**: `si_pull_why()` (`app/si.php`) counts the order lines by reason; the action `si_pull` answers with a warning `si.pull_zero` (+ `si.pull_recv` when a receipt is missing) instead of the green message when nothing came. 10 560 keys per file. The rule is unchanged.
+
+**Tests (sandbox)**: test order with two lines — nothing received: warning "2 without goods receipt"; after receipt: "2 lines pulled"; pulled again: warning "2 already on this invoice"; test data removed.
+
+**Security review**: no new entry point (same action, same checks); no new proposals.
+
