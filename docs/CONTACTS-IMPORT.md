@@ -2470,3 +2470,20 @@ Language keys 10 358 each (portal; +3 from R97-060, none from this release); app
 
 **Security review**: read only, management / administrators; table names for the counts come from `information_schema` of the portal's own database and are checked against `[a-z0-9_]` before use. No new proposals.
 
+## §358 v1.156.3 (R97-074) — Service reports: filter by vessel, order; header sort in grouped tables
+
+**Report** (screenshot, Service reports grouped by vessel): "shorting is not working in service reports i need to filter per vessel or ascending descending of the vessels".
+
+**Cause**: `sortTable()` in `assets/portal.js` (R29) gives up when any row of the table has a cell with `colspan` — the group header rows of "Grouped by vessel" (`tr.vg-h`, R-vg) have one. So in every grouped table a click on a header did nothing. The page had no filter.
+
+**Change**:
+
+- `assets/portal.js`: in a table with group rows, the data rows are sorted inside each group and the groups are ordered by their first row; headers move with their rows. Tables without groups behave as before.
+- `views/reports.php`: filter bar — Vessel (`fv`, a name from the lists) and Order (`fo`: newest / `old` / `vaz` / `vza`), applied to the three lists and kept in their pagers.
+- `vg_order()` (`app/helpers.php`), used by `_fsr_list.php`, `_isr_list.php`, `_fc_list.php` instead of `vg_sort()`.
+- Keys `r.order`, `r.o_*` (10 587 per file).
+
+**Tests (sandbox, browser)**: reports on three vessels; header clicks Vessel ▲▼, Date ▲▼, Report no — groups reordered, each header followed by its rows, no script errors; Order Z → A; filter by one vessel; a vessel name that is not in the list is ignored.
+
+**Security review**: `fv` is accepted only when it equals a vessel name already present in the user's own lists and is printed escaped; `fo` is one of three fixed values. No new proposals.
+

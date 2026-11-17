@@ -6,7 +6,7 @@ function fsr_status_pill(string $s): string {
 }
 function fsr_table(array $rows, bool $showProject = true, string $slug = 'reports', array $keep = [], string $param = 'page'): void {
     if (!$rows) { echo '<div class="empty">' . tt('fsr.none') . '</div>'; return; }
-    $vg = $slug === 'reports' && vg_on('reports'); if ($vg) $rows = vg_sort($rows, 'vessel');
+    $vg = $slug === 'reports' && vg_on('reports'); $rows = vg_order($rows, 'vessel', $vg, (string)($keep['fo'] ?? ''));   // R97-074
     [$rows, $pager] = page_list($rows, $slug, $keep, $param); $vgCounts = []; foreach ($rows as $r) { $vgCounts[(string)($r['vessel'] ?? '')] = ($vgCounts[(string)($r['vessel'] ?? '')] ?? 0) + 1; } $vgLast = null;
     ?>
     <div class="table-scroll"><table>

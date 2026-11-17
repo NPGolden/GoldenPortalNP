@@ -2,7 +2,7 @@
 /** Shared table of function checks / commissioning sheets.            GAS-CP-R77-001 */
 function fc_table(array $rows, bool $showProject = true, string $slug = 'reports', array $keep = [], string $param = 'fpage'): void {
     if (!$rows) { echo '<div class="empty">' . tt('fc.none') . '</div>'; return; }
-    $vg = $slug === 'reports' && vg_on('reports'); if ($vg) $rows = vg_sort($rows, 'vessel');
+    $vg = $slug === 'reports' && vg_on('reports'); $rows = vg_order($rows, 'vessel', $vg, (string)($keep['fo'] ?? ''));   // R97-074
     [$rows, $pager] = page_list($rows, $slug, $keep, $param); $vgCounts = []; foreach ($rows as $r) { $vgCounts[(string)($r['vessel'] ?? '')] = ($vgCounts[(string)($r['vessel'] ?? '')] ?? 0) + 1; } $vgLast = null;
     ?>
     <div class="table-scroll"><table>

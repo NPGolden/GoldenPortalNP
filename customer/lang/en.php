@@ -115,6 +115,11 @@ return [
 'd.cat.other'     => 'Other',
 
 'r.title'         => 'Service reports',
+'r.order' => 'Order',
+'r.o_new' => 'Newest first',
+'r.o_old' => 'Oldest first',
+'r.o_vaz' => 'Vessels A → Z',
+'r.o_vza' => 'Vessels Z → A',
 'r.lede'          => 'Field service reports from our engineers, newest first.',
 'r.empty'         => 'No service reports yet.',
 

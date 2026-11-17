@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.156.2** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.156.3** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.156.3 | GAS-CP-R97-074 | 2026-11-17 | Service reports: filter by vessel and order (newest, oldest, vessels A→Z, Z→A); clicking a column header now sorts tables that are grouped by vessel, everywhere in the portal. | — |
 | 1.156.2 | GAS-CP-R97-073 | 2026-11-17 | Projects › Doubled codes: a read-only list of sub-projects that share a code inside one project and of projects that share a code, with what is linked to each record; a button on Projects when doubles exist. | — |
 | 1.156.1 | GAS-CP-R97-072 | 2026-11-17 | Payables: logistic costs of the order that carry another provider (a carrier re-invoiced by the supplier) are listed on the supplier invoice and added with one click. | — |
 | 1.156.0 | GAS-CP-R97-071 | 2026-11-17 | Payables: Pull received PO lines also brings the logistic costs of the purchase order charged by the same supplier, one invoice line each, so parts and logistics are paid together; costs of another provider are named, not pulled. | `install/migrate_cp_r97_071_si_logistic_costs.sql` |

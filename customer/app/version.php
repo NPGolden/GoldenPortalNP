@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.156.2';
+const CP_VERSION = '1.156.3';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-074', 'version' => '1.156.3', 'date' => '2026-11-17', 'title' => 'Service reports: filter by vessel and order (newest, oldest, vessels A→Z, Z→A); clicking a column header now sorts tables that are grouped by vessel, everywhere in the portal.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-073', 'version' => '1.156.2', 'date' => '2026-11-17', 'title' => 'Projects › Doubled codes: a read-only list of sub-projects that share a code inside one project and of projects that share a code, with what is linked to each record; a button on Projects when doubles exist.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-072', 'version' => '1.156.1', 'date' => '2026-11-17', 'title' => 'Payables: logistic costs of the order that carry another provider (a carrier re-invoiced by the supplier) are listed on the supplier invoice and added with one click.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-071', 'version' => '1.156.0', 'date' => '2026-11-17', 'title' => 'Payables: Pull received PO lines also brings the logistic costs of the purchase order charged by the same supplier, one invoice line each, so parts and logistics are paid together; costs of another provider are named, not pulled.', 'db' => 'install/migrate_cp_r97_071_si_logistic_costs.sql', 'check' => 'r97y'],

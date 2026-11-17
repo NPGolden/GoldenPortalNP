@@ -2,7 +2,7 @@
 /** Shared table of inspection reports (SF-GLD-020).            GAS-CP-R23-003 */
 function isr_table(array $rows, bool $showProject = true, string $slug = 'reports', array $keep = [], string $param = 'ipage'): void {
     if (!$rows) { echo '<div class="empty">' . tt('isr.none') . '</div>'; return; }
-    $vg = $slug === 'reports' && vg_on('reports'); if ($vg) $rows = vg_sort($rows, 'vessel');
+    $vg = $slug === 'reports' && vg_on('reports'); $rows = vg_order($rows, 'vessel', $vg, (string)($keep['fo'] ?? ''));   // R97-074
     [$rows, $pager] = page_list($rows, $slug, $keep, $param); $vgCounts = []; foreach ($rows as $r) { $vgCounts[(string)($r['vessel'] ?? '')] = ($vgCounts[(string)($r['vessel'] ?? '')] ?? 0) + 1; } $vgLast = null;
     $lv = array_keys(isr_risk_levels());
     ?>

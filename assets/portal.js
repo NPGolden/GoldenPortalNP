@@ -285,13 +285,20 @@
   }
   function sortTable(table, idx, dir) {
     var tbody = table.tBodies[0]; if (!tbody) return;
-    var rows = Array.prototype.slice.call(tbody.rows).filter(function (r) { return !r.classList.contains('pager-row'); });
+    var all = Array.prototype.slice.call(tbody.rows).filter(function (r) { return !r.classList.contains('pager-row'); });
+    var rows = all.filter(function (r) { return !r.classList.contains('vg-h'); });
     if (rows.some(function (r) { return r.cells.length <= idx || Array.prototype.some.call(r.cells, function (c) { return c.rowSpan > 1 || c.colSpan > 1; }); })) return;
     rows.forEach(function (r, i) { r._k = key(r.cells[idx]); r._i = i; });
-    rows.sort(function (a, b) { var x = a._k, y = b._k, c;
+    function cmp(a, b) { var x = a._k, y = b._k, c;
       if (x.n !== null && y.n !== null) c = x.n - y.n; else if (x.n !== null) c = -1; else if (y.n !== null) c = 1; else c = x.s.localeCompare(y.s, undefined, { numeric: true, sensitivity: 'base' });
-      if (c === 0) c = a._i - b._i; return dir === 'desc' ? -c : c; });
-    rows.forEach(function (r) { tbody.appendChild(r); });
+      if (c === 0) c = a._i - b._i; return dir === 'desc' ? -c : c; }
+    if (rows.length === all.length) { rows.sort(cmp); rows.forEach(function (r) { tbody.appendChild(r); }); return; }
+    /* R97-074 — table grouped by vessel: the rows are sorted inside each group and the groups follow their first row, so the group headers stay with their rows */
+    var groups = [], cur = null;
+    all.forEach(function (r) { if (r.classList.contains('vg-h')) { cur = { h: r, rows: [] }; groups.push(cur); } else { if (!cur) { cur = { h: null, rows: [] }; groups.push(cur); } cur.rows.push(r); } });
+    groups.forEach(function (g, i) { g.rows.sort(cmp); g._i = i; });
+    groups.sort(function (a, b) { if (!a.rows.length || !b.rows.length) return (a.rows.length ? -1 : 0) - (b.rows.length ? -1 : 0) || a._i - b._i; return cmp(a.rows[0], b.rows[0]); });
+    groups.forEach(function (g) { if (g.h) tbody.appendChild(g.h); g.rows.forEach(function (r) { tbody.appendChild(r); }); });
   }
   document.querySelectorAll('table').forEach(function (table) {
     if (table.hasAttribute('data-sorted') || table.hasAttribute('data-nosort') || !table.tHead || !table.tBodies[0] || table.tBodies[0].rows.length < 2) return;

@@ -115,6 +115,11 @@ return [
 'd.cat.other'     => 'Altro',
 
 'r.title'         => 'Rapporti di servizio',
+'r.order' => 'Ordine',
+'r.o_new' => 'Più recenti prima',
+'r.o_old' => 'Più vecchi prima',
+'r.o_vaz' => 'Imbarcazioni A → Z',
+'r.o_vza' => 'Imbarcazioni Z → A',
 'r.lede'          => 'I rapporti dei nostri tecnici dal campo, dai più recenti.',
 'r.empty'         => 'Ancora nessun rapporto.',
 

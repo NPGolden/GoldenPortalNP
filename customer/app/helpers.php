@@ -231,6 +231,15 @@ function doc_status_pill(string $s): string {
 function vg_on(string $page): bool { return (($_COOKIE['cp_vg_' . $page] ?? '1') !== '0'); }
 /** Sort rows by vessel name (empty last) keeping the original order inside a vessel; $key = column with the vessel name. */
 function vg_sort(array $rows, string $key = 'vessel'): array { $i = 0; foreach ($rows as &$r) $r['_vgi'] = $i++; unset($r); usort($rows, fn($a, $b) => [((string)($a[$key] ?? '')) === '' ? 1 : 0, mb_strtolower((string)($a[$key] ?? '')), $a['_vgi']] <=> [((string)($b[$key] ?? '')) === '' ? 1 : 0, mb_strtolower((string)($b[$key] ?? '')), $b['_vgi']]); return $rows; }
+/** R97-074: order of a report list. $ord: '' / 'new' as it comes (newest first) · 'old' oldest first · 'vaz' vessels A→Z · 'vza' vessels Z→A.
+ *  Grouped by vessel ($vg) the groups are always by vessel name (Z→A with 'vza', rows without a vessel last); inside a group the list order is kept. */
+function vg_order(array $rows, string $key, bool $vg, string $ord = ''): array {
+    if ($ord === 'old') $rows = array_reverse($rows);
+    if (!$vg && $ord !== 'vaz' && $ord !== 'vza') return $rows;
+    $rows = vg_sort($rows, $key); if ($ord !== 'vza') return $rows;
+    $g = []; foreach ($rows as $r) $g[(string)($r[$key] ?? '')][] = $r; $none = $g[''] ?? []; unset($g['']);
+    $out = []; foreach (array_reverse($g, true) as $rs) foreach ($rs as $r) $out[] = $r; return array_merge($out, $none);
+}
 /** Group header row for a table: ▸ vessel (n). Rows that follow must carry data-vg="<slug>". */
 function vg_row(string $vessel, int $n, int $cols): string { $slug = vg_slug($vessel); return '<tr class="vg-h" data-vg-h="' . e($slug) . '"><td colspan="' . $cols . '"><button type="button" class="vg-btn"><span class="vg-tw">▾</span> ' . ($vessel !== '' ? e($vessel) : tt('vg.no_vessel')) . ' <span class="hint">' . $n . '</span></button></td></tr>'; }
 function vg_slug(string $vessel): string { return $vessel === '' ? '_none' : substr(md5($vessel), 0, 10); }
