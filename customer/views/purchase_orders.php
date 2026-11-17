@@ -73,7 +73,7 @@ layout_head(t('po.title'), 'purchase_orders');
       <td><?= $r['project_id'] ? pr_link((int)$r['project_id'], $r['project_code'], $r['project_name']) : '—' ?><?= $r['subproject_id'] ? '<br><small><a href="' . url('subproject', ['id' => (int)$r['subproject_id'], 'tab' => 'procurement']) . '">' . e($r['sub_code'] . ' · ' . $r['sub_name']) . '</a></small>' : '' ?></td>
       <td<?= $late ? ' style="color:var(--red)"' : '' ?>><?= fmt_date($exp) ?></td>
       <td class="num"><?= (int)$r['n_lines'] ?><?= (int)$r['n_open'] && in_array($r['status'], ['partial'], true) ? ' <span class="pill pill--gold">' . (int)$r['n_open'] . '</span>' : '' ?></td>
-      <?php if ($priced): ?><td class="num"><?= e(po_money((float)$r['subtotal'], $r['currency'])) ?></td><?php endif; ?>
+      <?php if ($priced): ?><td class="num"><?= e(po_money((float)$r['subtotal'], $r['currency'])) ?><?php if ((float)($r['logistics_total'] ?? 0) != 0.0): /* R97-069 */ ?><br><small class="hint" title="<?= tt('po.pay_total_long') ?>">+ <?= e(po_money((float)$r['logistics_total'], $r['currency'])) ?> 🚚 · <?= e(po_money((float)$r['gross_total'] + (float)$r['logistics_total'], $r['currency'])) ?></small><?php endif; ?></td><?php endif; ?>
       <td><?= po_pill($r['status']) ?></td>
     </tr>
   <?php endforeach; ?>

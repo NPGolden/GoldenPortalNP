@@ -2392,3 +2392,22 @@ Language keys 10 358 each (portal; +3 from R97-060, none from this release); app
 
 **Security review**: display only; no new proposals.
 
+## §353 v1.155.6 (R97-069) — purchase order: total with logistics
+
+**Request**: "In POs the logistic costs should be added in the total so parts+logistics to be shown so we can pay all".
+
+**Before**: the order showed Net and Gross of the parts; the logistic costs (`po_costs`, `po_orders.logistics_total`, R80-004) appeared only in their own table with "Landed cost (net + logistics)" and as small text in the delivery tile.
+
+**Change** (display only):
+
+- `views/purchase_order.php`: a fifth tile "Total with logistics" = `gross_total + logistics_total` with the two parts under it (orders only, not requests for quotation); a row "Total to pay (gross + logistics)" at the end of the Logistic costs table.
+- `views/purchase_orders.php`: under the net of an order with logistic costs, "+ logistics · total".
+- Keys `po.pay_total`, `po.pay_total_s`, `po.pay_total_none`, `po.pay_total_long` (10 558 per file).
+- Not changed: the amounts stored, the PDF of the order (logistic costs are internal and often of another provider), Payables.
+
+**Known limit**: `logistics_total` adds the amounts as typed; a cost entered in another currency than the order is added without conversion (as before, also in the landed cost).
+
+**Tests (sandbox)**: a test order 16.950,00 net / 21.018,00 gross with freight 385,50: tile 21.403,50 with "gross 21.018,00 + logistics 385,50", landed cost 17.335,50, total to pay 21.403,50, list line shown; without costs the tile equals the gross and links to the costs table; test data removed.
+
+**Security review**: display only; no new proposals.
+

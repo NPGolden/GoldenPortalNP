@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.155.5';
+const CP_VERSION = '1.155.6';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-069', 'version' => '1.155.6', 'date' => '2026-11-17', 'title' => 'Purchase orders show the total with logistics: gross of the parts plus the logistic costs, as a tile on the order, in the logistic costs table and in the list of orders.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-068', 'version' => '1.155.5', 'date' => '2026-11-17', 'title' => 'Purchase order and requisition: the Category drop-down of a new inventory item can be searched by typing.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-067', 'version' => '1.155.4', 'date' => '2026-11-17', 'title' => 'Payables: under Quantity mismatch each line shows ordered, received and already invoiced, and says what is missing — the goods receipt of the purchase order, or a quantity invoiced before.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-066', 'version' => '1.155.3', 'date' => '2026-11-17', 'title' => 'Payables: a Draft or Disputed supplier invoice shows the button Check first where the tick box would be, and the list says that only Checked invoices can go into a payment request.', 'db' => null, 'check' => null],
