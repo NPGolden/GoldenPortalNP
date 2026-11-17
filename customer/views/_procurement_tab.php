@@ -13,7 +13,7 @@ $S = prq_sub_summary($id);
 <?php if (function_exists('bom_has') && bom_has()): $bomEng = bom_eng_can($id); $boms = bom_revisions($id); $bomCur = null; foreach ($boms as $bb) if ($bb['status'] === 'approved') { $bomCur = $bb; break; } ?>
 <div class="card">
   <div class="page-head" style="margin-bottom:6px;"><div><h2 style="margin:0;">📐 <?= tt('bom.title') ?> <span class="hint" style="font-weight:400;">(<?= count($boms) ?>)</span></h2><p class="hint"><?= tt('bom.tab_lede') ?></p></div>
-    <div class="btn-row"><?php if ($bomEng): ?><button class="btn btn--gold btn--sm" type="button" data-toggle="#bom-new">+ <?= tt('bom.new') ?></button><?php endif; ?></div></div>
+    <div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('bom_template') ?>" title="<?= tt('bom.tpl_hint') ?>">⤓ <?= tt('bom.tpl_btn') ?></a><?php if ($bomEng): ?><button class="btn btn--gold btn--sm" type="button" data-toggle="#bom-new">+ <?= tt('bom.new') ?></button><?php endif; ?></div></div>
   <?php if ($bomEng): ?>
   <form method="post" action="<?= url('subproject', ['id' => $id, 'tab' => 'procurement']) ?>" id="bom-new" class="is-hidden" enctype="multipart/form-data" data-lock style="margin-bottom:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="bom_create"><input type="hidden" name="subproject_id" value="<?= $id ?>">
     <div class="form-grid">
@@ -22,7 +22,7 @@ $S = prq_sub_summary($id);
       <div class="field"><label><?= tt('bom.import') ?></label><input type="file" name="file" accept=".xlsx,.xls,.csv"></div>
       <div class="field field--full"><label><?= tt('prq.note') ?></label><input name="note" maxlength="400"></div>
     </div>
-    <div class="btn-row"><button class="btn btn--sm" type="submit"><?= tt('bom.create') ?></button><span class="hint"><?= tt('bom.import_hint') ?></span></div>
+    <div class="btn-row"><button class="btn btn--sm" type="submit"><?= tt('bom.create') ?></button><a class="btn btn--ghost btn--sm" href="<?= url('bom_template') ?>">⤓ <?= tt('bom.imp_template') ?></a><span class="hint"><?= tt('bom.import_hint') ?></span></div>
   </form>
   <?php endif; ?>
   <table class="tbl tbl--wrap"><thead><tr><th><?= tt('bom.rev') ?></th><th><?= tt('prq.r_title') ?></th><th><?= tt('prq.who') ?></th><th><?= tt('bom.issued') ?></th><th class="num"><?= tt('prq.lines') ?></th><?php if ($priced): ?><th class="num"><?= tt('prq.estimate') ?></th><?php endif; ?><th><?= tt('prq.status') ?></th></tr></thead><tbody>

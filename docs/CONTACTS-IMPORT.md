@@ -2319,3 +2319,20 @@ Language keys 10 358 each (portal; +3 from R97-060, none from this release); app
 **Not tested**: real notifications by e-mail; a campaign with many people (group averages need five); the Greek / Italian screens were not read on screen; the HR mobile app does not show assessments.
 
 **Security review**: every action checks the role on the server and carries the CSRF token; a form can be saved only by its owner (`user_id`) or its rater (`rater_user_id`); results only for HR / CEO and the person after closing (`hrs_may_see()`), each view by HR written to the person's change log; the upload is limited to .xlsx of 3 MB, refused above 300 parts or 40 MB unpacked, read and discarded; no export; no inline script without nonce. Assistant: nothing in `hrs.php` calls it, and `hr_eval_ai_context()` now removes the `as_` values of last year's evaluation before sending. Proposals (no effect on speed): legal review of the profiling aspect (GDPR art. 22 / 35, Italian contracts) before the first real campaign; a written retention decision for "no expiry"; two-step sign-in obligatory for HR and CEO accounts.
+
+## §348 v1.155.1 (R97-064) — BOM template offered where a BOM is uploaded
+
+**Request**: "give me the template of the BOM and also added to System Budgets and procurement in projects so they know the template of the BOM to upload".
+
+**Before**: the template (`?p=bom_template`, `bom_import_template()`, R93-006) was offered only on a draft BOM revision (`views/bom.php`). The two other places where a BOM file is chosen had no link.
+
+**Change**:
+
+- `bom_template_sheets()` (new, `app/bom.php`) holds the sheets; `bom_import_template()` downloads them. Sheet BOM gains the column **Unit price** — the header `sb_bom_stage()` already reads as the cost; `bom_import_stage()` has no such column and ignores it. Sheet "How to" now states where to upload, what each column does, and the limit of 400 lines per file in a System Budget.
+- Download buttons: `views/system_budgets.php` (page head, when the BOM import of System Budgets is active), `views/system_budget.php` (next to Parts › Import BOM parts), `views/_procurement_tab.php` (head of the BOM card for everybody who sees it, and inside New BOM).
+- Language keys `bom.tpl_btn`, `bom.tpl_hint` (10 546 keys per file).
+
+**Tests (sandbox)**: download as CEO and as project manager; without sign-in the login page is returned, not the file; the downloaded file uploaded unchanged into a System Budget (2 lines staged, the price 412.50 read as cost on line 1, empty on line 2) and into a draft BOM revision (2 lines staged); buttons present on the three pages.
+
+**Security review**: no new entry point — the template page already required a signed-in staff account; the file is generated on request and contains only example lines, no data of the portal. No proposals from this change; the open ones of §347 stand.
+

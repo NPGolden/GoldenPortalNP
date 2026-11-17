@@ -175,7 +175,7 @@ layout_head(sb_label($B) . ' · ' . $B['title'], 'system_budgets');
     <form method="post" action="<?= $self ?>#parts" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_bom_upload"><input type="hidden" name="id" value="<?= $id ?>">
       <h3 style="margin:0 0 6px;">📑 <?= tt('sb.bom_title') ?></h3>
       <div class="field"><input type="file" name="file" accept=".xlsx" required><p class="hint" style="margin:4px 0 0;"><?= tt('sb.bom_hint') ?></p></div>
-      <div class="btn-row"><button class="btn btn--sm" type="submit"><?= tt('sb.bom_btn') ?></button></div>
+      <div class="btn-row"><button class="btn btn--sm" type="submit"><?= tt('sb.bom_btn') ?></button><a class="btn btn--ghost btn--sm" href="<?= url('bom_template') ?>">⤓ <?= tt('bom.imp_template') ?></a></div>
     </form>
     <form method="post" action="<?= $self ?>#parts" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_propose"><input type="hidden" name="id" value="<?= $id ?>">
       <h3 style="margin:0 0 6px;">🔎 <?= tt('sb.prop_title') ?></h3>

@@ -244,18 +244,27 @@ function bom_delete(int $bid): int {
     if (function_exists('sp_log')) try { sp_log((int)$b['subproject_id'], 'bom_deleted', 'R' . (int)$b['revision'] . ' ' . ($b['title'] ?? '')); } catch (Throwable $e) {}
     return (int)$b['subproject_id'];
 }
-/** The import template — one sheet, the columns the importer reads, two example lines, a Units sheet. */
-function bom_import_template(): void {
-    require_once __DIR__ . '/xlsxw.php';
-    xlsx_download('GAS-BOM-import-template.xlsx', [
-        ['name' => 'BOM', 'first' => true, 'header' => ['Section', 'Qty', 'Unit', 'Description', 'Maker', 'Maker part no', 'Golden code', 'Note'],
-         'rows' => [['MSB', 2, 'pcs', 'Circuit breaker 3P 250 A 36 kA, thermal-magnetic', 'Schneider Electric', 'LV431830', '', 'Feeder F12 / F13'],
-                    ['Bridge', 25, 'm', 'Cable 3x2.5 mm² 0.6/1 kV halogen-free, armoured', 'Prysmian', 'MPRX 3x2.5', '', '']],
-         'widths' => [14, 8, 8, 52, 22, 20, 14, 30]],
+/** The sheets of the BOM template — the columns both importers read (Engineering BOM of a sub-project, System Budget), two example lines, the units, the rules.   R93-006, R97-064 */
+function bom_template_sheets(): array {
+    return [
+        ['name' => 'BOM', 'first' => true, 'header' => ['Section', 'Qty', 'Unit', 'Description', 'Maker', 'Maker part no', 'Golden code', 'Unit price', 'Note'],
+         'rows' => [['MSB', 2, 'pcs', 'Circuit breaker 3P 250 A 36 kA, thermal-magnetic', 'Schneider Electric', 'LV431830', '', 412.50, 'Feeder F12 / F13'],
+                    ['Bridge', 25, 'm', 'Cable 3x2.5 mm² 0.6/1 kV halogen-free, armoured', 'Prysmian', 'MPRX 3x2.5', '', '', '']],
+         'widths' => [14, 8, 8, 52, 22, 20, 14, 12, 30]],
         ['name' => 'Units', 'header' => ['Unit', 'Meaning'], 'rows' => array_map(fn($u) => [$u, t('stk.u_' . $u) === 'stk.u_' . $u ? $u : t('stk.u_' . $u)], STK_UNITS), 'widths' => [10, 30]],
-        ['name' => 'How to', 'header' => ['Rule'], 'rows' => [['One line per part. Description is mandatory; Qty defaults to 1; Unit must be one of the Units sheet (default pcs).'], ['Golden code = our inventory code when you know it — the line is linked at once.'], ['Maker + Maker part no are what the importer uses to find the item in the inventory (exact, then without spaces / dashes, then the assistant proposes).'], ['After the upload nothing is written: you review every proposed match and Accept, Reject (free-text line) or Create a new inventory item, then Apply.']], 'widths' => [120]],
-    ]);
+        ['name' => 'How to', 'header' => ['Rule'], 'rows' => [
+            ['Replace the two example lines with your own. Keep the header row as it is; the order of the columns is free.'],
+            ['One line per part. Description is mandatory; Qty defaults to 1; Unit must be one of the Units sheet (default pcs).'],
+            ['Golden code = our inventory code when you know it — the line is linked at once.'],
+            ['Maker + Maker part no are what the importer uses to find the item in the inventory (exact, then without spaces / dashes, then the assistant proposes).'],
+            ['Unit price = cost per unit in EUR, without VAT. Optional. It is read by System Budgets as the cost of the line; the Engineering BOM of a sub-project ignores it.'],
+            ['Section = panel, area or system the part belongs to. Optional. Note is optional.'],
+            ['Where to upload: Projects › sub-project › Procurement › New BOM (or Import on a draft BOM revision), and System Budgets › a budget › Parts › Import BOM parts.'],
+            ['After the upload nothing is written: you review every proposed match and Accept, Reject (free-text line) or Create a new inventory item, then Apply.'],
+            ['File type .xlsx. A System Budget reads at most 400 lines per file.']], 'widths' => [140]],
+    ];
 }
+function bom_import_template(): void { require_once __DIR__ . '/xlsxw.php'; xlsx_download('GAS-BOM-import-template.xlsx', bom_template_sheets()); }
 function bom_imp_norm(string $s): string { return strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $s)); }
 /** Stage the file: parse with the template headers (old aliases tolerated), match deterministically, keep rows for review. Returns counts. */
 function bom_import_stage(int $bid, array $file): array {
