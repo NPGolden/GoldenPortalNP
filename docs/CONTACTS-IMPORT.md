@@ -2691,3 +2691,26 @@ Every record: code (proposed, unique per register), title, status, owner, due da
 **Not done**: no bulk adding of the whole supplier list — the register is for suppliers that handle our information or systems; the rating is not written to the procurement rating of the supplier; a supplier that is Not approved is not blocked in purchase orders (offered).
 
 **Security review**: the names of employees shown for attendance are names only — no other personnel data leaves HR; attendance writes are limited to active people and to trainings linked to the record; supplier ids are checked against the supplier list. Proposals, no cost in speed: (1) warn on a purchase order when its supplier is Not approved or its evaluation is overdue; (2) ask critical suppliers for their ISO 27001 certificate yearly and attach it to the evaluation; (3) make the yearly awareness training a standing record so the reminder comes by itself.
+
+## §368 v1.162.0 (R97-084) — purchases of the IT department
+
+**Request**: "IT departments should be able to place a requisition and a PO to the system through the procurement process. Projects available to place also IT POs should be defined in the corresponding Sub project and only those will be listed to ITs for RFQ and PO".
+
+**Database**: `install/migrate_cp_r97_084_it_purchases.sql` (step `r98c`) — `subprojects.it_purchase`.
+
+**Where it is set**: Edit sub-project › *Open for IT purchases* (`subproject_update`). Settings › Procurement › *IT department purchases*: the staff roles and disciplines that are IT (setting `it_buy_pos`; until saved, the names IT / ICT / Information Technology decide — `IT_BUY_RX`), and the list of the opened sub-projects.
+
+**Rules** (`app/prq.php`, `app/po.php`):
+
+- `it_buyer()` — a staff account in an IT role or discipline **without** the procurement or warehouse right (those keep what they have).
+- Requisition: `prq_can()` is true; `prq_save_from_post()` asks for a sub-project with `it_purchase = 1` (unless the person is the PM of the project). Approval is unchanged: procurement (`prq_decide`, not open to IT), over budget management.
+- RFQ / PO: `po_can()` and `po_admin()` are true for IT, inside the scope only — `po_load()` returns nothing for an order whose sub-project is not opened (so every action on it answers "not found / no access"); `po_list()` and `po_to_buy()` list the opened sub-projects only; `po_save_from_post()` asks for an opened sub-project; `po_line_from_pr()` takes lines of requisitions of opened sub-projects only; a new free line is refused (`it.e_free_line`) — lines of an IT order come from approved requisitions; existing lines can be priced and edited.
+- Forms: the project and sub-project lists of a new requisition, RFQ and PO show the opened sub-projects (and their projects) only. Menu: Procurement › Requisitions, Purchase orders.
+- Prices are visible to IT on what they can open (`stk_price_visible()`).
+- Not opened to IT: receiving goods (warehouse), suppliers, inventory, payables, procurement settings.
+
+**Tests (sandbox)**: flag saved from the edit form; IT sees only the opened sub-project in the lists; requisition on another sub-project and without sub-project refused, on the opened one saved, line added, submitted; IT approving it refused (403); approved by procurement and management; line appears in To buy for IT; RFQ created by IT on the opened sub-project, line pulled, price typed; PO on another sub-project and without sub-project refused; free line refused; an order of another sub-project: not in the IT lists, opening it "Not found", cancelling it has no effect; a to-buy line of another sub-project is not listed and cannot be pulled; after the flag is removed the IT order is no longer reachable by IT; suppliers, inventory, payables and settings 403; page sweeps for three roles, API test; no new lines in `storage/php-errors.log`.
+
+**Not done**: the numbers on the Purchase orders tabs count all orders, not only those of IT; no separate IT budget — the parts budget of the sub-project applies.
+
+**Security review**: the scope is enforced where an order is loaded, so it holds for every present and future action on orders; IT cannot approve its own requisition and cannot order what was not approved; removing the flag closes the access at once. Proposals, no cost in speed: (1) keep IT purchases in a dedicated sub-project per year with its own parts budget, so approvals compare against a real figure; (2) leave receiving with the warehouse — the person who orders should not be the one who confirms receipt; (3) review the ticks of the IT card together with the access review of §366.

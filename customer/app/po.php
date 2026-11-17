@@ -17,8 +17,10 @@ const PO_OPEN     = ['sent', 'confirmed', 'partial'];
 const PO_INCOTERMS = ['EXW', 'FCA', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP', 'FOB', 'CFR', 'CIF'];
 
 function po_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'po_orders'"); } catch (Throwable $e) { $h = false; } } return $h; }
-function po_can(): bool { return po_has() && function_exists('pr_can') && pr_can(); }
-function po_admin(): bool { return po_has() && function_exists('pr_admin') && pr_admin(); }
+function po_can(): bool { return po_has() && function_exists('pr_can') && (pr_can() || po_it()); }
+function po_admin(): bool { return po_has() && function_exists('pr_admin') && (pr_admin() || po_it()); }
+/** R97-084: a person of the IT department — sees and handles only the orders of the sub-projects opened for IT purchases. */
+function po_it(): bool { return function_exists('it_buyer') && it_buyer(); }
 function require_po_admin(): array { $u = require_staff(); if (!po_admin()) { http_response_code(403); exit(t('err.noaccess')); } return $u; }
 function po_pill(string $s): string { return pill(PO_TONE[$s] ?? 'mute', t('po.s_' . $s)); }
 function po_money(?float $v, string $cur = 'EUR'): string { return $v === null ? '—' : number_format($v, 2, ',', '.') . ' ' . $cur; }
@@ -28,10 +30,11 @@ const PO_SELECT = "SELECT o.*, co.name AS supplier, co.email AS supplier_co_emai
                    (SELECT COUNT(*) FROM po_lines l WHERE l.order_id = o.id AND l.status <> 'cancelled') AS n_lines,
                    (SELECT COUNT(*) FROM po_lines l WHERE l.order_id = o.id AND l.status IN ('open','partial')) AS n_open
                    FROM po_orders o JOIN companies co ON co.id = o.supplier_id LEFT JOIN projects p ON p.id = o.project_id LEFT JOIN subprojects s ON s.id = o.subproject_id LEFT JOIN inv_warehouses w ON w.id = o.warehouse_id";
-function po_load(int $id): ?array { return po_has() && $id ? one(PO_SELECT . ' WHERE o.id = ?', [$id]) ?: null : null; }
+function po_load(int $id): ?array { $o = po_has() && $id ? one(PO_SELECT . ' WHERE o.id = ?', [$id]) ?: null : null; if ($o && po_it() && !it_sub_ok((int)$o['subproject_id'] ?: null)) return null; return $o; }
 function po_list(array $f = []): array {
     if (!po_has()) return []; $w = []; $a = [];
     $w[] = 'o.kind = ?'; $a[] = ($f['kind'] ?? 'po') === 'rfq' ? 'rfq' : 'po';
+    if (po_it()) $w[] = 's.it_purchase = 1';
     if (!empty($f['status'])) { if ($f['status'] === 'open') $w[] = "o.status IN ('draft','sent','quoted','awarded','confirmed','partial')"; elseif (in_array($f['status'], PO_STATES, true)) { $w[] = 'o.status = ?'; $a[] = $f['status']; } }
     if (!empty($f['supplier_id'])) { $w[] = 'o.supplier_id = ?'; $a[] = (int)$f['supplier_id']; }
     if (!empty($f['subproject_id'])) { $w[] = 'o.subproject_id = ?'; $a[] = (int)$f['subproject_id']; }
@@ -51,6 +54,7 @@ function po_to_buy(array $f = []): array {
     $w = ["r.status = 'approved'", "l.status IN ('to_buy','ordered')", 'l.qty - l.qty_reserved - l.qty_ordered > 0.0005']; $a = [];
     if (!empty($f['subproject_id'])) { $w[] = 'r.subproject_id = ?'; $a[] = (int)$f['subproject_id']; }
     if (!empty($f['project_id'])) { $w[] = 'r.project_id = ?'; $a[] = (int)$f['project_id']; }
+    if (po_it()) $w[] = 's.it_purchase = 1';
     $rows = all('SELECT l.*, r.pr_no, r.project_id, r.subproject_id, r.need_date AS r_need, p.project_code, s.code AS sub_code, i.code AS item_code, i.maker AS item_maker, i.preferred_supplier_id, i.last_supplier_id, ps.name AS preferred_supplier, ls.name AS last_supplier, l.qty - l.qty_reserved - l.qty_ordered AS open_qty
                  FROM pr_lines l JOIN pr_requests r ON r.id = l.request_id JOIN projects p ON p.id = r.project_id LEFT JOIN subprojects s ON s.id = r.subproject_id LEFT JOIN inv_items i ON i.id = l.item_id LEFT JOIN companies ps ON ps.id = i.preferred_supplier_id LEFT JOIN companies ls ON ls.id = i.last_supplier_id
                  WHERE ' . implode(' AND ', $w) . ' ORDER BY COALESCE(i.preferred_supplier_id, i.last_supplier_id, 0), r.id, l.seq', $a);
@@ -81,6 +85,7 @@ function po_save_from_post(): int {
     $sup = (int)($_POST['supplier_id'] ?? 0); $S = $sup ? sup_load($sup) : null; if (!$S || !($S['kind'] === 'supplier' || !empty($S['is_supplier']))) throw new RuntimeException(t('po.need_supplier'));
     $pid = (int)($_POST['project_id'] ?? 0) ?: null; $sid = (int)($_POST['subproject_id'] ?? 0) ?: null;
     if ($sid) { $pp = (int) scalar('SELECT project_id FROM subprojects WHERE id = ?', [$sid]); if (!$pp) $sid = null; elseif (!$pid) $pid = $pp; elseif ($pp !== $pid) $sid = null; }
+    if (po_it() && !it_sub_ok($sid)) throw new RuntimeException(t('it.e_sub'));
     $v = ['supplier_id' => $sup, 'project_id' => $pid, 'subproject_id' => $sid, 'title' => mb_substr(trim((string)($_POST['title'] ?? '')), 0, 160) ?: null,
           'currency' => preg_match('/^[A-Z]{3}$/', (string)($_POST['currency'] ?? '')) ? $_POST['currency'] : (string)(($S['sup_currency'] ?? '') ?: 'EUR'),
           'incoterms' => in_array($_POST['incoterms'] ?? '', PO_INCOTERMS, true) ? $_POST['incoterms'] : ($S['incoterms'] ?? null),
@@ -109,8 +114,9 @@ function po_save_from_post(): int {
 }
 /** Add a line from a requisition line (open quantity), priced by the pricing rule for this supplier. */
 function po_line_from_pr(int $oid, int $plid): ?int {
-    $o = po_load($oid); $l = one("SELECT l.*, r.status AS r_status FROM pr_lines l JOIN pr_requests r ON r.id = l.request_id WHERE l.id = ?", [$plid]);
+    $o = po_load($oid); $l = one("SELECT l.*, r.status AS r_status, r.subproject_id AS r_sub FROM pr_lines l JOIN pr_requests r ON r.id = l.request_id WHERE l.id = ?", [$plid]);
     if (!$o || !$l || $l['r_status'] !== 'approved') return null;
+    if (po_it() && !it_sub_ok((int)$l['r_sub'] ?: null)) return null;
     $open = (float)$l['qty'] - (float)$l['qty_reserved'] - (float)$l['qty_ordered']; if ($open <= 0.0005) return null;
     if (scalar('SELECT 1 FROM po_lines WHERE order_id = ? AND pr_line_id = ?', [$oid, $plid])) return null;
     $it = $l['item_id'] ? stk_item((int)$l['item_id']) : null; $price = null; $origin = null;
@@ -123,6 +129,7 @@ function po_line_from_pr(int $oid, int $plid): ?int {
 function po_line_save_from_post(): int {
     $oid = (int)($_POST['order_id'] ?? 0); $o = po_load($oid); if (!$o || !po_editable($o)) throw new RuntimeException(t('err.noaccess'));
     $lid = (int)($_POST['line_id'] ?? 0); $qty = (float) str_replace(',', '.', (string)($_POST['qty'] ?? '0')); if ($qty <= 0) throw new RuntimeException(t('prq.need_qty'));
+    if (!$lid && po_it()) throw new RuntimeException(t('it.e_free_line'));   // R97-084: lines of the IT department come from approved requisitions
     if (!empty($_POST['new_item']) && function_exists('stk_item_quick_create')) $_POST['item_id'] = stk_item_quick_create(['code' => $_POST['new_code'] ?? '', 'description' => $_POST['description'] ?? '', 'maker' => $_POST['maker'] ?? '', 'part_no' => $_POST['part_no'] ?? '', 'unit' => $_POST['unit'] ?? 'pcs', 'category_id' => $_POST['new_category_id'] ?? 0, 'supplier_id' => $o['supplier_id']]);   // R86-002: "+ New item" from the line form
     $itemId = (int)($_POST['item_id'] ?? 0) ?: null; $it = $itemId ? stk_item($itemId) : null; if ($itemId && !$it) throw new RuntimeException(t('err.notfound'));
     $altOf = (int)($_POST['alt_of_item_id'] ?? 0) ?: null;

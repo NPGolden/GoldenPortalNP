@@ -82,6 +82,7 @@ function pm_handle_action(string $action, string $page): bool {
                in_array($_POST['status'] ?? '', pm_statuses(), true) ? $_POST['status'] : $s['status'], $id]);
             sp_reorder((int)$s['project_id'], $id, (int)($_POST['sort_order'] ?? 0));   // R97-053
             if (br_has() && isset($_POST['branch_id'])) q('UPDATE subprojects SET branch_id = ? WHERE id = ?', [br_from_post(), $id]);   // R24-001
+            if (function_exists('it_buy_has') && it_buy_has() && isset($_POST['it_purchase_form'])) q('UPDATE subprojects SET it_purchase = ? WHERE id = ?', [empty($_POST['it_purchase']) ? 0 : 1, $id]);   // R97-084
             pm_save_invoicing($id); pm_save_deadline('subprojects', $id); pm_track_completed($id); if (function_exists('iv_sub_save')) iv_sub_save($id); if (function_exists('pty_sub_save')) pty_sub_save($id);
             flash('good', t('sp.updated'));
             redirect('subproject', ['id' => $id, '_r' => uniqid()]);

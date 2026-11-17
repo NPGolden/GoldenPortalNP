@@ -17,6 +17,28 @@ const PRQ_PURPOSE = ['project', 'stock', 'service'];
 
 function prq_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'pr_requests'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Sub-project PM, project PM or the user's discipline manager scope: anyone who runs a project may raise a requisition for it. */
+/* ------------------------------------------------------------------ R97-084 — purchases of the IT department
+ * People of the IT department (the staff roles and disciplines ticked in Settings › Procurement; by name until saved) who have no procurement
+ * right raise requisitions, RFQs and POs — only for the sub-projects marked "Open for IT purchases" (subprojects.it_purchase). The requisition
+ * is approved by procurement / management as any other; an order of the IT department takes its lines from approved requisitions only. */
+const IT_BUY_RX = '/\b(it|ict|information technology|informatics)\b|πληροφορ/u';
+function it_buy_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM subprojects LIKE 'it_purchase'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** ['roles' => [ids], 'disc' => [ids], 'saved' => bool] */
+function it_buy_positions(): array {
+    static $A = null; if ($A !== null) return $A; $s = json_decode((string) cp_setting('it_buy_pos', ''), true);
+    if (is_array($s) && isset($s['roles'], $s['disc'])) return $A = ['roles' => array_map('intval', (array)$s['roles']), 'disc' => array_map('intval', (array)$s['disc']), 'saved' => true];
+    $A = ['roles' => [], 'disc' => [], 'saved' => false];
+    try { foreach (all('SELECT id, name FROM staff_roles WHERE is_active = 1') as $r) if (preg_match(IT_BUY_RX, mb_strtolower((string)$r['name']))) $A['roles'][] = (int)$r['id'];
+          foreach (all('SELECT id, name FROM disciplines WHERE is_active = 1') as $r) if (preg_match(IT_BUY_RX, mb_strtolower((string)$r['name']))) $A['disc'][] = (int)$r['id']; } catch (Throwable $e) {}
+    return $A;
+}
+/** A person of the IT department without a procurement or warehouse right: works inside the sub-projects opened for IT only. */
+function it_buyer(): bool {
+    static $v = null; if ($v !== null) return $v; $u = current_user();
+    if (!$u || !is_staff() || !it_buy_has() || !prq_has() || !stk_has() || pr_can()) return $v = false; $A = it_buy_positions();
+    return $v = (!empty($u['staff_role_id']) && in_array((int)$u['staff_role_id'], $A['roles'], true)) || (!empty($u['discipline_id']) && in_array((int)$u['discipline_id'], $A['disc'], true));
+}
+function it_sub_ok(?int $sid): bool { return $sid && it_buy_has() && (bool) scalar('SELECT 1 FROM subprojects WHERE id = ? AND it_purchase = 1', [$sid]); }
 function prq_is_pm(?int $pid = null): bool {
     $u = current_user(); if (!$u || !is_staff()) return false; static $c = [];
     $k = (int)$pid; if (!isset($c[$k])) { try { $c[$k] = $pid ? (bool) scalar('SELECT 1 FROM projects WHERE id = ? AND pm_user_id = ?', [$pid, (int)$u['id']]) : (bool) scalar('SELECT 1 FROM projects WHERE pm_user_id = ? LIMIT 1', [(int)$u['id']]); } catch (Throwable $e) { $c[$k] = false; } }
@@ -26,7 +48,7 @@ function prq_is_pm(?int $pid = null): bool {
 function prq_can(): bool {
     static $v = null; if ($v !== null) return $v;
     $u = current_user(); if (!$u || !is_staff() || !prq_has() || !stk_has()) return $v = false;
-    if (pr_can() || is_cp_admin() || prq_is_pm()) return $v = true;
+    if (pr_can() || is_cp_admin() || prq_is_pm() || it_buyer()) return $v = true;
     $d = (int)($u['discipline_id'] ?? 0); return $v = $d > 0 && in_array($d, stk_enabled_disciplines(), true);
 }
 function require_prq(): array { $u = require_staff(); if (!prq_can()) { http_response_code(403); exit(t('err.noaccess')); } return $u; }
@@ -114,6 +136,7 @@ function prq_save_from_post(): int {
     $pid = (int)($_POST['project_id'] ?? 0); $sid = (int)($_POST['subproject_id'] ?? 0) ?: null;
     if (!$pid) throw new RuntimeException(t('prq.need_project'));
     if ($sid && !scalar('SELECT 1 FROM subprojects WHERE id = ? AND project_id = ?', [$sid, $pid])) $sid = null;
+    if (it_buyer() && !is_cp_admin() && !prq_is_pm($pid) && !it_sub_ok($sid)) throw new RuntimeException(t('it.e_sub'));   // R97-084
     $purpose = in_array($_POST['purpose'] ?? '', PRQ_PURPOSE, true) ? $_POST['purpose'] : 'project';
     $title = mb_substr(trim((string)($_POST['title'] ?? '')), 0, 160) ?: null;
     $need = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['need_date'] ?? '')) ? $_POST['need_date'] : null;

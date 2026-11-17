@@ -26,7 +26,7 @@ function pr_admin(): bool { static $v = null; if ($v === null) $v = is_staff() &
 /** Warehouse moves (receipts / issues / adjustments / transfers). */
 function pr_wh(): bool { static $v = null; if ($v === null) $v = pr_admin() || (is_staff() && stk_has() && stk_flag('can_warehouse')); return $v; }
 /** Prices visible: procurement, management, accounting, financial right. */
-function stk_price_visible(): bool { static $v = null; if ($v === null) $v = pr_admin() || stk_flag('is_accounting') || (function_exists('fin_visible') && fin_visible()); return $v; }
+function stk_price_visible(): bool { static $v = null; if ($v === null) $v = pr_admin() || (function_exists('it_buyer') && it_buyer()) || stk_flag('is_accounting') || (function_exists('fin_visible') && fin_visible()); return $v; }
 function require_pr(): array { $u = require_staff(); if (!pr_can()) { http_response_code(403); exit(t('err.noaccess')); } return $u; }
 function require_pr_admin(): array { $u = require_staff(); if (!pr_admin()) { http_response_code(403); exit(t('err.noaccess')); } return $u; }
 function require_pr_wh(): array { $u = require_staff(); if (!pr_wh()) { http_response_code(403); exit(t('err.noaccess')); } return $u; }
@@ -237,6 +237,7 @@ function stk_settings_save_from_post(): void {
     require_pr_admin(); $rule = in_array($_POST['rule'] ?? '', STK_RULES, true) ? $_POST['rule'] : 'last';
     cp_setting_set('proc_price_rule', $rule); cp_setting_set('proc_price_n', (string) max(2, min(10, (int)($_POST['n'] ?? 3)))); cp_setting_set('proc_price_pct', (string) round((float) str_replace(',', '.', (string)($_POST['pct'] ?? '0')), 2));
     $disc = array_values(array_unique(array_map('intval', (array)($_POST['disciplines'] ?? [])))); cp_setting_set('proc_disciplines', json_encode($disc));
+    if (isset($_POST['it_buy_form'])) cp_setting_set('it_buy_pos', json_encode(['roles' => array_values(array_unique(array_map('intval', (array)($_POST['it_roles'] ?? [])))), 'disc' => array_values(array_unique(array_map('intval', (array)($_POST['it_disc'] ?? []))))]));   // R97-084
     cp_setting_set('proc_pay_threshold', (string) round((float) str_replace(',', '.', (string)($_POST['pay_threshold'] ?? '0')), 2));
     cp_setting_set('proc_offer_margin', (string) round(max(-100.0, min(1000.0, (float) str_replace(',', '.', (string)($_POST['offer_margin'] ?? '25')))), 2));   // R82-001
     if (isset($_POST['stock_subproject_id'])) { $ssid = (int)$_POST['stock_subproject_id']; $spid = $ssid ? (int) scalar('SELECT project_id FROM subprojects WHERE id = ?', [$ssid]) : 0; cp_setting_set('proc_stock_subproject_id', (string)($spid ? $ssid : 0)); cp_setting_set('proc_stock_project_id', (string)$spid); }   // R87-001

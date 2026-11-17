@@ -11,6 +11,8 @@ $lines = $o ? po_lines($id) : []; $events = $o ? po_events($id) : [];
 $sups = sup_list(['status' => 'active']); $whs = stk_warehouses(); $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : ''; $cur = $o['currency'] ?? 'EUR'; $m = fn(?float $v) => po_money($v, $cur);
 $projects = all("SELECT id, project_code, name FROM projects WHERE status IN ('active','quoted','onhold','planned') OR id = ? ORDER BY project_code DESC LIMIT 400", [(int)($o['project_id'] ?? 0)]);
 $subs = all("SELECT sp.id, sp.project_id, sp.code, sp.name FROM subprojects sp WHERE sp.status IN ('active','quoted','onhold') OR sp.id = ? ORDER BY sp.sort_order, sp.code LIMIT 1500", [(int)($o['subproject_id'] ?? 0)]);
+$itOnly = function_exists('it_buyer') && it_buyer();   // R97-084: the IT department sees only the sub-projects opened for IT purchases
+if ($itOnly) { $itS = array_map('intval', array_column(all('SELECT id FROM subprojects WHERE it_purchase = 1'), 'id')); $subs = array_values(array_filter($subs, fn($s) => in_array((int)$s['id'], $itS, true))); $itP = array_unique(array_map(fn($s) => (int)$s['project_id'], $subs)); $projects = array_values(array_filter($projects, fn($p) => in_array((int)$p['id'], $itP, true))); }
 $preP = (int)($_GET['project_id'] ?? ($o['project_id'] ?? 0)); $preS = (int)($_GET['subproject_id'] ?? ($o['subproject_id'] ?? 0)); $preSup = (int)($_GET['supplier_id'] ?? ($o['supplier_id'] ?? 0));
 $back = url('purchase_orders', ['tab' => $isRfq ? 'rfq' : 'po']); $self = url('purchase_order', ['id' => $id]);
 $r4 = function_exists('po_r4') && po_r4(); $expected = $o ? ($r4 ? ($o['expected_date'] ?: $o['delivery_date']) : $o['delivery_date']) : null;

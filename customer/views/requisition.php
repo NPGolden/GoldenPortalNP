@@ -8,6 +8,8 @@ if ($id && (!$r || !prq_can_view($r))) { http_response_code(404); layout_head(t(
 $edit = !$r || prq_can_edit($r); $admin = pr_admin(); $wh = pr_wh(); $mgmt = mgmt_can(); $priced = stk_price_visible();
 $projects = all("SELECT id, project_code, name FROM projects WHERE status IN ('active','quoted','onhold','planned') OR id = ? ORDER BY project_code DESC LIMIT 400", [(int)($r['project_id'] ?? 0)]);
 $subs = all("SELECT sp.id, sp.project_id, sp.code, sp.name FROM subprojects sp WHERE sp.status IN ('active','quoted','onhold') OR sp.id = ? ORDER BY sp.sort_order, sp.code LIMIT 1500", [(int)($r['subproject_id'] ?? 0)]);
+$itOnly = function_exists('it_buyer') && it_buyer() && !is_cp_admin() && !prq_is_pm();   // R97-084: the IT department sees only the sub-projects opened for IT purchases
+if ($itOnly) { $itS = array_map('intval', array_column(all('SELECT id FROM subprojects WHERE it_purchase = 1'), 'id')); $subs = array_values(array_filter($subs, fn($s) => in_array((int)$s['id'], $itS, true))); $itP = array_unique(array_map(fn($s) => (int)$s['project_id'], $subs)); $projects = array_values(array_filter($projects, fn($p) => in_array((int)$p['id'], $itP, true))); }
 $preP = (int)($_GET['project_id'] ?? ($r['project_id'] ?? 0)); $preS = (int)($_GET['subproject_id'] ?? ($r['subproject_id'] ?? 0));
 if (!$r && $preS && !$preP) $preP = (int) scalar('SELECT project_id FROM subprojects WHERE id = ?', [$preS]);
 $lines = $r ? prq_lines($id) : []; $events = $r ? prq_events($id) : []; $B = $r && $r['subproject_id'] ? prq_budget((int)$r['subproject_id'], $id) : null;
