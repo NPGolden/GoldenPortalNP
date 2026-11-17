@@ -473,7 +473,7 @@ function load_subproject(int $id): ?array {
 function sys_has_codes(): bool {
     static $has = null;
     if ($has === null) {
-        try { $has = (bool) db()->query("SHOW COLUMNS FROM vessel_systems LIKE 'abbr'")->fetch(); } catch (Throwable $e) { $has = false; }
+        try { $has = (bool) scalar("SHOW COLUMNS FROM vessel_systems LIKE 'abbr'"); } catch (Throwable $e) { $has = false; }
     }
     return $has;
 }
@@ -509,7 +509,7 @@ function fin_visible(): bool {
     if (!$u) return $v = false;
     if (!is_staff() || is_cp_admin()) return $v = true;
     try {
-        if (!(bool) db()->query("SHOW COLUMNS FROM staff_roles LIKE 'see_financials'")->fetch()) return $v = true;
+        if (!(bool) scalar("SHOW COLUMNS FROM staff_roles LIKE 'see_financials'")) return $v = true;
         if (empty($u['staff_role_id'])) return $v = true;
         $f = scalar('SELECT see_financials FROM staff_roles WHERE id = ?', [(int)$u['staff_role_id']]);
         return $v = ($f === null || (int)$f === 1);
@@ -520,7 +520,7 @@ function fin_masked(): string { return t('fin.hidden'); }
 function inv_has(): bool {
     static $has = null;
     if ($has === null) {
-        try { $has = (bool) db()->query("SHOW COLUMNS FROM subprojects LIKE 'invoicing'")->fetch(); } catch (Throwable $e) { $has = false; }
+        try { $has = (bool) scalar("SHOW COLUMNS FROM subprojects LIKE 'invoicing'"); } catch (Throwable $e) { $has = false; }
     }
     return $has && fin_visible();
 }

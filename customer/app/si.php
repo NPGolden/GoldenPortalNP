@@ -17,7 +17,7 @@ const SI_R_TONE = ['submitted' => 'gold', 'mgmt' => 'warn', 'approved' => 'ok', 
 const SI_METHODS = ['transfer', 'card', 'cash', 'cheque', 'other'];
 const SI_TOL_PCT = 2.0;   // price tolerance of the three-way check
 
-function si_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW TABLES LIKE 'si_invoices'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function si_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'si_invoices'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Accounting, Procurement and Management see and register; payments are recorded by Accounting / Management. */
 function si_can(): bool { static $v = null; if ($v === null) $v = is_staff() && si_has() && ((function_exists('mgmt_can') && mgmt_can()) || (function_exists('col_flag') && col_flag('is_accounting')) || (function_exists('pr_admin') && pr_admin())); return $v; }
 function si_pay_can(): bool { static $v = null; if ($v === null) $v = is_staff() && si_has() && ((function_exists('mgmt_can') && mgmt_can()) || (function_exists('col_flag') && col_flag('is_accounting'))); return $v; }

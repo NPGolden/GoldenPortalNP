@@ -2556,3 +2556,29 @@ The preview (`?p=data_doubles&keep=&drop=`) runs the same function with `$dry = 
 
 **Security review**: none of it touches access or data; no new proposals.
 
+## §363 v1.158.0 (R97-079) — speed: the schema kept between requests
+
+**Request** (screenshot, System health › Slow statements, last 7 days, 15 groups): "can you optimize the slowest statements".
+
+**Reading of the list**: the totals are small (the top line 8,2 s in a week). Most lines are simple statements by primary key that were slow once or twice (`SELECT * FROM subprojects WHERE id = ?` 190 ms, `SELECT k, v FROM cp_settings` 142 ms, the update of an offer by id) — that is waiting time of the shared database, not the statement. What can be improved is how many statements a page sends:
+
+- `SHOW TABLES LIKE '?'` (63 slow in a week) and `SHOW COLUMNS … LIKE '?'`: the `*_has()` checks of every module — about forty per page, each one prepare + execute.
+- the totals of leave requests with `YEAR(date_from) = ?` (718 ms): the function on the column keeps the index from being used.
+- writes on every request: `customer_users.last_seen_at`, `mob_devices.last_seen_at`.
+
+**Change**:
+
+- `app/db.php`: `db_schema()` — the list of tables (`SHOW TABLES`) and, per table on first use, of columns (`SHOW COLUMNS FROM t`), kept five minutes (`cache_set('db_schema')`, per release). `scalar()` and `one()` answer `SHOW TABLES LIKE 'x'` / `SHOW COLUMNS FROM t LIKE 'c'` from it through `db_schema_answer()` — **only a yes**; on a no the real statement runs, so a new table or column is seen at once. 52 checks written as `db()->query("SHOW …")->fetch()` were changed to `scalar("SHOW …")` so they pass through it. `install/update.php` drops the kept schema after the migrations (`db_schema_forget()`).
+- `db()`: the setting `tz_db` read at every connection is kept one minute (`cache 'tz_db'`, dropped when the setting is saved).
+- `app/hr2.php` `hr_req_sum()`: `date_from >= 'Y-01-01' AND date_from < 'Y+1-01-01'`.
+- `presence_touch()`: at most every 120 s (was 60; online = seen in the last five minutes). `api/v1/lib/jwt.php`: the device row is written at most every five minutes or when the app version changes.
+- `views/data_doubles.php`: the table list from `information_schema` kept ten minutes.
+
+**Measured (sandbox, statements per page, before → after)**: dashboard 107 → 69, projects 263 → 218, sub-project 122 → 73, service reports 55 → 17, tickets 50 → 14, payables 54 → 17, purchase orders 54 → 17, system budgets 56 → 17, collections 77 → 37, proformas 54 → 15, HR dashboard 79 → 33, person 72 → 26, timesheets 53 → 17, offers 56 → 18, vessels 50 → 13, my leave 82 → 37.
+
+**Tests (sandbox)**: yes / no answers for tables and columns; a column and a table added after the schema was kept are seen in the same request; page sweeps as CEO, project manager and HR; API test; a browser run; no line added to `storage/php-errors.log`.
+
+**Not done**: the Projects page still sends about 200 statements — eight budget-and-actual statements per sub-project of the page; a candidate for the next round. The slow lines that are single statements by key cannot be improved in the portal.
+
+**Security review**: the kept schema holds table and column names only, in the portal's cache (APCu or `storage/cache`, closed to the web); the statements answered from it are matched by a strict pattern with literal names; nothing from user input reaches it. No new proposals.
+

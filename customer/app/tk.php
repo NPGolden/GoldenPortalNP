@@ -12,7 +12,7 @@ function tk_ip(): string {
 }
 function tk_has(): bool {
     static $has = null;
-    if ($has === null) { try { $has = (bool) db()->query("SHOW TABLES LIKE 'tickets'")->fetch(); } catch (Throwable $e) { $has = false; } }
+    if ($has === null) { try { $has = (bool) scalar("SHOW TABLES LIKE 'tickets'"); } catch (Throwable $e) { $has = false; } }
     return $has;
 }
 function tk_categories(): array { return ['fault' => t('tk.c_fault'), 'service' => t('tk.c_service'), 'warranty' => t('tk.c_warranty'), 'spare_parts' => t('tk.c_spare_parts'), 'question' => t('tk.c_question'), 'complaint' => t('tk.c_complaint'), 'other' => t('tk.c_other')]; }

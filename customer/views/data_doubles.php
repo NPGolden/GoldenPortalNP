@@ -4,7 +4,7 @@ require __DIR__ . '/_layout.php';
 $u = require_staff();
 if (!(mgmt_can() || is_cp_admin())) { http_response_code(403); layout_head(t('err.noaccess'), 'projects'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
 // every table that points to a sub-project / a project — counted per record, so it is clear which of two doubles holds the work
-$refTables = function (string $col): array { try { return array_column(all("SELECT DISTINCT TABLE_NAME AS t FROM information_schema.columns WHERE table_schema = DATABASE() AND COLUMN_NAME = ? AND TABLE_NAME NOT IN ('subprojects','projects')", [$col]), 't'); } catch (Throwable $e) { return []; } };
+$refTables = function (string $col): array { try { return cache_remember('dd_tables:' . $col, 600, fn() => array_column(all("SELECT DISTINCT TABLE_NAME AS t FROM information_schema.columns WHERE table_schema = DATABASE() AND COLUMN_NAME = ? AND TABLE_NAME NOT IN ('subprojects','projects')", [$col]), 't')); } catch (Throwable $e) { return []; } };   // R97-079: kept ten minutes
 $linked = function (array $tables, string $col, int $id): array { $o = []; foreach ($tables as $tb) { if (!preg_match('/^[a-z0-9_]+$/', $tb)) continue; try { $n = (int) scalar("SELECT COUNT(*) FROM `{$tb}` WHERE `{$col}` = ?", [$id]); if ($n) $o[$tb] = $n; } catch (Throwable $e) {} } arsort($o); return $o; };
 $show = function (array $o): string { if (!$o) return '<span class="hint">—</span>'; $p = []; foreach (array_slice($o, 0, 6, true) as $k => $n) $p[] = e($k) . ' ' . (int)$n; return '<b>' . array_sum($o) . '</b> <span class="hint">' . implode(' · ', $p) . (count($o) > 6 ? ' …' : '') . '</span>'; };
 $tS = $refTables('subproject_id'); $tP = $refTables('project_id');

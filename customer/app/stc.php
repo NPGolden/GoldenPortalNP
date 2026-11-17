@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 const STK_IN_REASONS  = ['receipt', 'manual', 'return_project', 'return_customer'];
 const STK_OUT_REASONS = ['delivery_customer', 'delivery_production', 'consumption', 'issue', 'manual', 'scrap'];
-function stc_has(): bool { static $h = null; if ($h === null) { try { $h = function_exists('stk_has') && stk_has() && (bool) db()->query("SHOW COLUMNS FROM inv_items LIKE 'alert_low'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function stc_has(): bool { static $h = null; if ($h === null) { try { $h = function_exists('stk_has') && stk_has() && (bool) scalar("SHOW COLUMNS FROM inv_items LIKE 'alert_low'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function stc_reason_label(?string $r): string { $r = (string)$r; if ($r === '') return ''; $k = 'stk.r_' . $r; $v = t($k); return $v === $k ? $r : $v; }
 /** The company's Stock project / sub-project (Settings › Procurement). */
 function stc_stock_sub(): ?array { $sid = (int) cp_setting('proc_stock_subproject_id', '0'); if (!$sid) return null; return one('SELECT s.id, s.code, s.name, s.project_id, p.project_code, p.name AS project_name FROM subprojects s JOIN projects p ON p.id = s.project_id WHERE s.id = ?', [$sid]); }

@@ -124,6 +124,8 @@ try {
         }
         $ran[] = ['ref' => $ref, 'file' => $dbf, 'state' => 'applied', 'statements' => $n, 'tolerated' => $tolerated];
     }
+    // R97-079: the kept schema (tables / columns) is dropped so the new tables and columns are seen at once
+    try { if (is_file($root . '/app/cache.php')) { require_once $root . '/app/cache.php'; if (function_exists('db_schema_forget')) db_schema_forget(); } } catch (Throwable $e) {}
     $step('migrations', 'ok', ['pending' => count($pending), 'runs' => $ran]);
 } catch (Throwable $e) { $fail(500, 'migration step failed: ' . $e->getMessage()); }
 

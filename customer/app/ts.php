@@ -16,7 +16,7 @@ function ts_ip(): string {
 function ts_has(): bool {
     static $has = null;
     if ($has === null) {
-        try { $has = (bool) db()->query("SHOW TABLES LIKE 'timesheets'")->fetch(); } catch (Throwable $e) { $has = false; }
+        try { $has = (bool) scalar("SHOW TABLES LIKE 'timesheets'"); } catch (Throwable $e) { $has = false; }
     }
     return $has;
 }

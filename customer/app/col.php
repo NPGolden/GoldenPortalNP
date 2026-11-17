@@ -17,7 +17,7 @@ declare(strict_types=1);
 const COL_OPEN = ['issued', 'sent', 'partly_paid'];
 const COL_BUCKETS = ['current', 'd30', 'd60', 'd90', 'd90p'];   // not yet due · 1–30 · 31–60 · 61–90 · > 90 days overdue
 
-function col_has(): bool { static $h = null; if ($h === null) { try { $h = function_exists('pi_has') && pi_has() && (bool) db()->query("SHOW TABLES LIKE 'pi_followups'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function col_has(): bool { static $h = null; if ($h === null) { try { $h = function_exists('pi_has') && pi_has() && (bool) scalar("SHOW TABLES LIKE 'pi_followups'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** The Golden A/S role name of the signed-in account, lower-case ('' when none). */
 function cp_role_name(): string { static $n = null; if ($n === null) { $u = current_user(); $n = ''; if ($u && !empty($u['staff_role_id'])) { try { $n = strtolower(trim((string) scalar('SELECT name FROM staff_roles WHERE id = ?', [(int)$u['staff_role_id']]))); } catch (Throwable $e) {} } } return $n; }
 /** Management: the Owner scope, the CEO and the General Manager — the only ones who manage portal accounts (R78-001). */

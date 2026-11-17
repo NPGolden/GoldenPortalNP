@@ -15,8 +15,8 @@ const SWL_ASSIGN = ['none', 'project', 'vessel', 'user', 'company'];
 const SWL_WARN_DAYS = 60;
 const ITEM_TYPES = ['part', 'software', 'service'];
 
-function ilk_has(): bool { static $h = null; if ($h === null) { try { $h = function_exists('stk_has') && stk_has() && (bool) db()->query("SHOW TABLES LIKE 'inv_item_links'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
-function swl_has(): bool { static $h = null; if ($h === null) { try { $h = function_exists('stk_has') && stk_has() && (bool) db()->query("SHOW TABLES LIKE 'inv_licences'")->fetch() && (bool) db()->query("SHOW COLUMNS FROM inv_items LIKE 'item_type'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function ilk_has(): bool { static $h = null; if ($h === null) { try { $h = function_exists('stk_has') && stk_has() && (bool) scalar("SHOW TABLES LIKE 'inv_item_links'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function swl_has(): bool { static $h = null; if ($h === null) { try { $h = function_exists('stk_has') && stk_has() && (bool) scalar("SHOW TABLES LIKE 'inv_licences'") && (bool) scalar("SHOW COLUMNS FROM inv_items LIKE 'item_type'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function swl_keys_visible(): bool { return function_exists('pr_admin') && pr_admin(); }
 
 /* ------------------------------------------------------------------ links */

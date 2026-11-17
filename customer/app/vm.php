@@ -88,7 +88,7 @@ function vm_aliases(int $vid): array { return vm_has() ? all('SELECT id, alias, 
 function vm_alias_remove(int $id): void { if (vm_has()) q('DELETE FROM vessel_aliases WHERE id = ?', [$id]); }
 
 /** Related companies of a vessel (management company, yard, agent …) — customer records with a role. */
-function vm_orgs_has(): bool { static $h = null; if ($h === null) { try { $h = vm_has() && (bool) db()->query("SHOW COLUMNS FROM vessel_companies LIKE 'company_id'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function vm_orgs_has(): bool { static $h = null; if ($h === null) { try { $h = vm_has() && (bool) scalar("SHOW COLUMNS FROM vessel_companies LIKE 'company_id'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** R85-004: the related companies are organisations of the Contacts module (old rows that only carry a customer are shown through the customer's organisation or name). */
 function vm_related(int $vid): array {
     if (!vm_has()) return [];

@@ -17,7 +17,7 @@ const BOM_TONE   = ['draft' => 'mute', 'issued' => 'gold', 'approved' => 'ok', '
 const BOM_KINDS  = ['alternative', 'qty', 'remove', 'add'];
 const BOM_C_TONE = ['proposed' => 'gold', 'accepted' => 'ok', 'rejected' => 'bad', 'withdrawn' => 'mute'];
 
-function bom_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW TABLES LIKE 'bom_revisions'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function bom_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'bom_revisions'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Engineering side: admins, PMs, the sub-project team, the enabled disciplines. */
 function bom_eng_can(int $sid): bool {
     $u = current_user(); if (!$u || !is_staff() || !bom_has()) return false; static $c = [];
@@ -232,7 +232,7 @@ function bom_to_kit(int $bid): int {
 /* ======================================================================================================================
  * GAS-CP-R93-006 — delete a revision; import template; staged import with inventory cross-check and AI proposals
  * ==================================================================================================================== */
-function bom_imp_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW TABLES LIKE 'bom_import_rows'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function bom_imp_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'bom_import_rows'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Administrators and Procurement may delete a revision; an approved revision that already produced a requisition / kit stays (it is part of the audit trail). */
 function bom_can_delete(array $b): bool { return bom_has() && is_staff() && (is_cp_admin() || bom_pr_can()); }
 function bom_delete(int $bid): int {

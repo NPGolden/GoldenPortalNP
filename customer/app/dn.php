@@ -11,7 +11,7 @@ declare(strict_types=1);
 const DN_KINDS = ['project', 'customer', 'production', 'return'];
 const DN_REASON = ['project' => 'issue', 'customer' => 'delivery_customer', 'production' => 'delivery_production', 'return' => 'manual'];
 
-function dn_has(): bool { static $h = null; if ($h === null) { try { $h = function_exists('stk_has') && stk_has() && (bool) db()->query("SHOW TABLES LIKE 'inv_delivery_notes'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function dn_has(): bool { static $h = null; if ($h === null) { try { $h = function_exists('stk_has') && stk_has() && (bool) scalar("SHOW TABLES LIKE 'inv_delivery_notes'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function dn_can(): bool { return dn_has() && function_exists('pr_can') && pr_can(); }
 function dn_wh(): bool { return dn_has() && function_exists('pr_wh') && pr_wh(); }
 const DN_SELECT = "SELECT d.*, p.project_code, p.name AS project_name, s.code AS sub_code, s.name AS sub_name, co.name AS company, v.name AS vessel, w.code AS wh_code, w.name AS warehouse, r.receipt_no, o.po_no,
@@ -138,7 +138,7 @@ function dn_pdf(array $d): string {
  *   invoiced accounting registered the invoice number and date
  * Procurement (pr_admin) decides, accounting (acc_is_accounting) registers the invoice or sends a line back. */
 const DNI_STATES = ['open', 'invoice', 'offer', 'invoiced'];
-function dni_has(): bool { static $h = null; if ($h === null) { try { $h = dn_has() && (bool) db()->query("SHOW COLUMNS FROM inv_dn_lines LIKE 'inv_state'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function dni_has(): bool { static $h = null; if ($h === null) { try { $h = dn_has() && (bool) scalar("SHOW COLUMNS FROM inv_dn_lines LIKE 'inv_state'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function dni_can_decide(): bool { return dni_has() && function_exists('pr_admin') && pr_admin(); }
 function dni_can_invoice(): bool { return dni_has() && function_exists('acc_is_accounting') && acc_is_accounting(); }
 function dni_visible(): bool { return dni_has() && is_staff() && (dni_can_decide() || dni_can_invoice() || (function_exists('pr_can') && pr_can())); }

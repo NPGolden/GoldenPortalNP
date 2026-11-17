@@ -8,7 +8,7 @@
 
 const SL_LOST = ['price', 'timing', 'competitor', 'scope', 'no_answer', 'other'];
 
-function sl_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW COLUMNS FROM offers LIKE 'lost_reason'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function sl_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM offers LIKE 'lost_reason'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function sl_can(): bool { return sl_has() && is_staff() && fin_visible() && function_exists('of_visible') && of_visible(); }
 function sl_prob(): array { static $c = null; if ($c === null) { $c = []; try { foreach (all('SELECT * FROM offer_status_prob') as $r) $c[$r['skey']] = (int)$r['probability']; } catch (Throwable $e) {} } return $c; }
 function sl_prob_of(string $status): int { $p = sl_prob(); if (isset($p[$status])) return $p[$status]; $b = function_exists('of_status_behaves') ? of_status_behaves($status) : 'open'; return $b === 'open' ? 30 : (in_array($b, ['approved', 'closed_won'], true) ? 100 : 0); }

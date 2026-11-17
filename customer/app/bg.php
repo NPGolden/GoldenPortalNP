@@ -14,7 +14,7 @@
 
 function bg_has(): bool {
     static $h = null;
-    if ($h === null) { try { $h = (bool) db()->query("SHOW TABLES LIKE 'sp_budget_hours'")->fetch(); } catch (Throwable $e) { $h = false; } }
+    if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'sp_budget_hours'"); } catch (Throwable $e) { $h = false; } }
     return $h;
 }
 function bg_has_sections(): bool { static $h = null; if ($h === null) { try { $h = bg_has() && (bool) scalar("SHOW COLUMNS FROM sp_budget_hours LIKE 'section_id'"); } catch (Throwable $e) { $h = false; } } return $h; }   // R48-001

@@ -14,7 +14,7 @@ const OB_PLACEHOLDERS = ['no', 'title', 'vessel', 'customer', 'project', 'ticket
 
 function ob_has(): bool {
     static $h = null;
-    if ($h === null) { try { $h = (bool) db()->query("SHOW TABLES LIKE 'offer_lines'")->fetch() && (bool) db()->query("SHOW COLUMNS FROM offers LIKE 'layout'")->fetch(); } catch (Throwable $e) { $h = false; } }
+    if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'offer_lines'") && (bool) scalar("SHOW COLUMNS FROM offers LIKE 'layout'"); } catch (Throwable $e) { $h = false; } }
     return $h;
 }
 /** May the signed-in person prepare offers (lines, texts, issue)? */
@@ -25,7 +25,7 @@ function ob_can(): bool {
     if (is_cp_admin()) return $v = true;
     $u = current_user();
     try {
-        if (!(bool) db()->query("SHOW COLUMNS FROM staff_roles LIKE 'can_offer'")->fetch() || empty($u['staff_role_id'])) return $v = true;
+        if (!(bool) scalar("SHOW COLUMNS FROM staff_roles LIKE 'can_offer'") || empty($u['staff_role_id'])) return $v = true;
         $f = scalar('SELECT can_offer FROM staff_roles WHERE id = ?', [(int)$u['staff_role_id']]);
         return $v = ($f === null || (int)$f === 1);
     } catch (Throwable $e) { return $v = true; }
@@ -111,7 +111,7 @@ function ob_vars(array $o): array {
 }
 function ob_fill(string $s, array $vars): string { return strtr($s, $vars); }
 /** R97-036: estimated delivery time on offers — two free texts (parts, labour) in offers.delivery_parts / delivery_labour. */
-function ob_delivery_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW COLUMNS FROM offers LIKE 'delivery_parts'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function ob_delivery_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM offers LIKE 'delivery_parts'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** The "Delivery time" section of the document: [title, [lines]] — null when nothing was filled in, or when a text block of the offer already prints
  *  the values through {delivery_parts} / {delivery_labour} (then the wording of that block rules and nothing is printed twice). */
 function ob_delivery_section(array $o, callable $T): ?array {

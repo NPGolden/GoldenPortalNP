@@ -15,7 +15,7 @@ const PRQ_TONE    = ['draft' => 'mute', 'submitted' => 'gold', 'mgmt' => 'warn',
 const PRQ_L_TONE  = ['open' => 'mute', 'reserved' => 'ok', 'to_buy' => 'gold', 'ordered' => 'navy', 'received' => 'ok', 'issued' => 'navy', 'cancelled' => 'mute'];
 const PRQ_PURPOSE = ['project', 'stock', 'service'];
 
-function prq_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW TABLES LIKE 'pr_requests'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function prq_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'pr_requests'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Sub-project PM, project PM or the user's discipline manager scope: anyone who runs a project may raise a requisition for it. */
 function prq_is_pm(?int $pid = null): bool {
     $u = current_user(); if (!$u || !is_staff()) return false; static $c = [];

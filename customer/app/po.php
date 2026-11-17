@@ -16,7 +16,7 @@ const PO_TONE     = ['draft' => 'mute', 'sent' => 'gold', 'quoted' => 'navy', 'a
 const PO_OPEN     = ['sent', 'confirmed', 'partial'];
 const PO_INCOTERMS = ['EXW', 'FCA', 'CPT', 'CIP', 'DAP', 'DPU', 'DDP', 'FOB', 'CFR', 'CIF'];
 
-function po_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW TABLES LIKE 'po_orders'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function po_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'po_orders'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function po_can(): bool { return po_has() && function_exists('pr_can') && pr_can(); }
 function po_admin(): bool { return po_has() && function_exists('pr_admin') && pr_admin(); }
 function require_po_admin(): array { $u = require_staff(); if (!po_admin()) { http_response_code(403); exit(t('err.noaccess')); } return $u; }
@@ -261,7 +261,7 @@ const PO_MILESTONES = ['confirmed', 'ready', 'shipped', 'export', 'arrived', 'cu
 const PO_COST_KINDS = ['freight', 'insurance', 'customs', 'duties', 'import_vat', 'handling', 'other'];
 const PO_NCR_ACTIONS = ['none', 'return', 'replace', 'credit'];
 
-function po_r4(): bool { static $h = null; if ($h === null) { try { $h = po_has() && (bool) db()->query("SHOW TABLES LIKE 'po_receipts'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function po_r4(): bool { static $h = null; if ($h === null) { try { $h = po_has() && (bool) scalar("SHOW TABLES LIKE 'po_receipts'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Expected delivery of a line: promised date, else need date, else (confirmed / sent) + lead days. */
 function po_line_expected(array $o, array $l): ?string {
     if (!empty($l['promised_date'])) return $l['promised_date'];

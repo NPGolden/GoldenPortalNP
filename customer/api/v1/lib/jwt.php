@@ -33,7 +33,7 @@ final class Jwt {
         $u = api_act_as((int)$c['sub']);
         if (array_key_exists('session_epoch', $u) && (int)($c['ep'] ?? 0) !== (int)$u['session_epoch']) throw new ApiException(401, 'Signed out everywhere');   // R52: portal "Sign out everywhere" also ends app sessions
         if (function_exists('lic_locked') && lic_locked()) throw new ApiException(402, 'Portal licence locked');
-        q('UPDATE mob_devices SET last_seen_at = NOW(), app_version = COALESCE(?, app_version) WHERE id = ?', [$_SERVER['HTTP_X_APP_VERSION'] ?? null, (int)$c['dev']]);
+        q('UPDATE mob_devices SET last_seen_at = NOW(), app_version = COALESCE(?, app_version) WHERE id = ? AND (last_seen_at IS NULL OR last_seen_at < NOW() - INTERVAL 5 MINUTE OR (? IS NOT NULL AND (app_version IS NULL OR app_version <> ?)))', [$_SERVER['HTTP_X_APP_VERSION'] ?? null, (int)$c['dev'], $_SERVER['HTTP_X_APP_VERSION'] ?? null, $_SERVER['HTTP_X_APP_VERSION'] ?? null]);   // R97-079: the row is written at most every five minutes, or when the app version changes
         $u['device_id'] = (int)$c['dev']; $u['platform'] = (string)$d['platform'];
         return $u;
     }

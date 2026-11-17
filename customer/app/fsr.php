@@ -74,7 +74,7 @@ function fsr_specialty_default(?int $userId = null): string { $n = $userId ? (st
 function fsr_time_types(): array { return ['WT' => 'WT', 'TT' => 'TT', 'NC' => 'NC']; }   // NC = not chargeable (R46-005)
 /** R95-004: why a line is not chargeable — decided by the engineer on the service report; accounting only confirms. */
 function fsr_nc_reasons(): array { return ['warranty' => t('fsr.ncr_warranty'), 'goodwill' => t('fsr.ncr_goodwill'), 'internal' => t('fsr.ncr_internal'), 'training' => t('fsr.ncr_training'), 'rework' => t('fsr.ncr_rework'), 'other' => t('fsr.ncr_other')]; }
-function fsr_nc_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW COLUMNS FROM fsr_lines LIKE 'nc_reason'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function fsr_nc_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM fsr_lines LIKE 'nc_reason'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function fsr_time_type_label(string $k): string { return ['WT' => t('fsr.tt_wt'), 'TT' => t('fsr.tt_tt'), 'NC' => t('fsr.tt_nc')][$k] ?? $k; }
 function fsr_part_types(): array { return ['W' => 'W', 'G' => 'G', 'I' => 'I']; }
 
@@ -597,7 +597,7 @@ function fsr_docx_vmerge(array $rows): array {
 
 /* ------------------------------------------------------------ R38-003: service calls without project, external reports */
 
-function fsr_ext_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW COLUMNS FROM fsr_reports LIKE 'kind'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function fsr_ext_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM fsr_reports LIKE 'kind'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** External report number: EXT-YYYYMMDD-INI-n. */
 function fsr_ext_number(string $engineer, string $date): string {
     $ini = ''; foreach (preg_split('/\s+/', trim($engineer)) as $part) if ($part !== '') $ini .= mb_strtoupper(mb_substr($part, 0, 1));

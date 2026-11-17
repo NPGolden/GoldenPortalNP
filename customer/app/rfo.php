@@ -11,7 +11,7 @@ declare(strict_types=1);
 const RFO_STATES = ['invited', 'sent', 'quoted', 'declined', 'awarded', 'lost'];
 const RFO_TONE = ['invited' => 'mute', 'sent' => 'gold', 'quoted' => 'navy', 'declined' => 'bad', 'awarded' => 'ok', 'lost' => 'mute'];
 
-function rfo_has(): bool { static $h = null; if ($h === null) { try { $h = function_exists('po_has') && po_has() && (bool) db()->query("SHOW TABLES LIKE 'po_rfq_suppliers'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function rfo_has(): bool { static $h = null; if ($h === null) { try { $h = function_exists('po_has') && po_has() && (bool) scalar("SHOW TABLES LIKE 'po_rfq_suppliers'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function rfo_pill(string $s): string { return pill(RFO_TONE[$s] ?? 'mute', t('rfo.s_' . $s)); }
 
 /** Invited suppliers of an RFQ with their quote totals (over the non-cancelled lines, qty × unit price) and the number of lines quoted. */

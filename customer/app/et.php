@@ -14,7 +14,7 @@ const ET_PLACEHOLDERS = ['no', 'title', 'vessel', 'customer', 'project', 'week',
 
 function et_has(): bool {
     static $h = null;
-    if ($h === null) { try { $h = (bool) db()->query("SHOW TABLES LIKE 'email_templates'")->fetch(); } catch (Throwable $e) { $h = false; } }
+    if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'email_templates'"); } catch (Throwable $e) { $h = false; } }
     return $h;
 }
 function et_kind_label(string $k): string { return t('et.k_' . $k); }

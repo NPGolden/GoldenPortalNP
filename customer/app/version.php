@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.157.2';
+const CP_VERSION = '1.158.0';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-079', 'version' => '1.158.0', 'date' => '2026-11-17', 'title' => 'Speed: the checks whether a table or column exists are answered from a kept copy of the schema (about 38 database statements fewer on every page); leave totals use the date index; presence and device stamps are written less often.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-078', 'version' => '1.157.2', 'date' => '2026-11-17', 'title' => 'Service reports: the list Older documents is back on the first tab and the warning logged on every opening of the page is gone (a query dropped by mistake in v1.157.1).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-077', 'version' => '1.157.1', 'date' => '2026-11-17', 'title' => 'Service reports page in three tabs — Field service reports, Inspection reports, Function checks / commissioning — each with filters (word, vessel, project, status, order) and a Needs action view that says what each report still needs.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-076', 'version' => '1.157.0', 'date' => '2026-11-17', 'title' => 'Projects › Doubled codes: two sub-projects of a project with the same code can be merged — a preview shows what moves, the merge is all-or-nothing, and a restore file is kept on the server.', 'db' => null, 'check' => null],
@@ -465,7 +466,7 @@ function cp_migration_state(): array {
         'r29b' => $has("SHOW COLUMNS FROM sp_issues LIKE 'issue_no'"),
         'r38' => $has("SHOW TABLES LIKE 'acc_reports'") && $has("SHOW COLUMNS FROM timesheets LIKE 'invoicing'"),
         'r38b' => $has("SHOW COLUMNS FROM fsr_reports LIKE 'kind'"),
-        'r46' => (function () use ($has) { try { $r = db()->query("SHOW COLUMNS FROM fsr_lines LIKE 'time_type'")->fetch(); return $r && str_contains((string)$r['Type'], 'NC'); } catch (Throwable $e) { return false; } })(),
+        'r46' => (function () use ($has) { try { $r = scalar("SHOW COLUMNS FROM fsr_lines LIKE 'time_type'"); return $r && str_contains((string)$r['Type'], 'NC'); } catch (Throwable $e) { return false; } })(),
         'r45' => $has("SHOW COLUMNS FROM customer_users LIKE 'can_cashflow'"),
         'r47' => $has("SHOW TABLES LIKE 'eng_budgets'") && $has("SHOW COLUMNS FROM timesheet_lines LIKE 'activity'"),
         'r47b' => $has("SHOW TABLES LIKE 'eng_sections'") && $has("SHOW COLUMNS FROM disciplines LIKE 'eng_section_id'"),

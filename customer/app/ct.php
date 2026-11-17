@@ -65,7 +65,7 @@ function ct_subscribe_all(bool $dry = false): int {
     foreach (all("SELECT id, email, subscriptions FROM contacts WHERE is_active = 1 AND email IS NOT NULL AND email <> ''") as $r) { if (ct_default_subs((string)$r['email']) === '') continue; $cur = array_filter(explode(',', (string)$r['subscriptions'])); if (!array_diff(array_keys(ct_subscriptions()), $cur)) continue; $n++; if (!$dry) q('UPDATE contacts SET subscriptions = ? WHERE id = ?', [$all, (int)$r['id']]); }
     return $n;
 }
-function ct_origin_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW COLUMNS FROM contacts LIKE 'needs_review'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function ct_origin_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM contacts LIKE 'needs_review'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Normalise a free-text category (English or the portal language) to a key. */
 function ct_norm_category(string $v): ?string {
     $n = mb_strtolower(trim($v)); if ($n === '') return 'other';
@@ -97,8 +97,8 @@ function co_norm_kind(string $v): ?string {
     return ['customer' => 'owner', 'shipowner' => 'owner', 'owners' => 'owner', 'shipyard' => 'yard', 'classification' => 'class', 'class society' => 'class', 'vendor' => 'supplier', 'manufacturer' => 'supplier', 'management company' => 'management', 'manager' => 'management', 'designer' => 'consultant', 'naval architect' => 'consultant', 'brokerage' => 'broker', 'port agent' => 'agent'][$n] ?? null;
 }
 /* ---- R85-002: roles — an organisation may be several things at once; `kind` stays the main role for old code, `roles` is the full list. */
-function co_roles_has(): bool { static $h = null; if ($h === null) { try { $h = co_has() && (bool) db()->query("SHOW COLUMNS FROM companies LIKE 'roles'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
-function cc_has(): bool { static $h = null; if ($h === null) { try { $h = co_has() && (bool) db()->query("SHOW TABLES LIKE 'contact_companies'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function co_roles_has(): bool { static $h = null; if ($h === null) { try { $h = co_has() && (bool) scalar("SHOW COLUMNS FROM companies LIKE 'roles'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function cc_has(): bool { static $h = null; if ($h === null) { try { $h = co_has() && (bool) scalar("SHOW TABLES LIKE 'contact_companies'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Role → label; 'customer' is the billing role, the rest are the kinds. */
 function co_role_list(): array { return ['customer' => t('co.role_customer')] + array_diff_key(co_kinds(), ['other' => 1]) + ['other' => t('co.kind_other')]; }
 function co_roles(array $co): array {

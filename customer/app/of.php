@@ -7,7 +7,7 @@
 
 function of_has(): bool {
     static $has = null;
-    if ($has === null) { try { $has = (bool) db()->query("SHOW TABLES LIKE 'offers'")->fetch(); } catch (Throwable $e) { $has = false; } }
+    if ($has === null) { try { $has = (bool) scalar("SHOW TABLES LIKE 'offers'"); } catch (Throwable $e) { $has = false; } }
     return $has;
 }
 /** R31-006: may the signed-in person open Offers at all? Owners always; Golden A/S staff only when their role shows financial data. */
@@ -18,7 +18,7 @@ function of_require(): void { if (!of_visible()) { flash('bad', t('of.no_access'
 function of_users(array $ids): array {
     $ids = array_values(array_unique(array_filter(array_map('intval', $ids)))); if (!$ids) return [];
     try {
-        if (!(bool) db()->query("SHOW COLUMNS FROM staff_roles LIKE 'see_financials'")->fetch()) return $ids;
+        if (!(bool) scalar("SHOW COLUMNS FROM staff_roles LIKE 'see_financials'")) return $ids;
         $in = implode(',', array_fill(0, count($ids), '?'));
         return array_map('intval', array_column(all("SELECT cu.id FROM customer_users cu LEFT JOIN staff_roles r ON r.id = cu.staff_role_id WHERE cu.id IN ($in) AND (cu.customer_id IS NOT NULL OR r.see_financials IS NULL OR r.see_financials = 1)", $ids), 'id'));
     } catch (Throwable $e) { return $ids; }

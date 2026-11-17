@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.157.2** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.158.0** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.158.0 | GAS-CP-R97-079 | 2026-11-17 | Speed: the checks whether a table or column exists are answered from a kept copy of the schema (about 38 database statements fewer on every page); leave totals use the date index; presence and device stamps are written less often. | — |
 | 1.157.2 | GAS-CP-R97-078 | 2026-11-17 | Service reports: the list Older documents is back on the first tab and the warning logged on every opening of the page is gone (a query dropped by mistake in v1.157.1). | — |
 | 1.157.1 | GAS-CP-R97-077 | 2026-11-17 | Service reports page in three tabs — Field service reports, Inspection reports, Function checks / commissioning — each with filters (word, vessel, project, status, order) and a Needs action view that says what each report still needs. | — |
 | 1.157.0 | GAS-CP-R97-076 | 2026-11-17 | Projects › Doubled codes: two sub-projects of a project with the same code can be merged — a preview shows what moves, the merge is all-or-nothing, and a restore file is kept on the server. | — |

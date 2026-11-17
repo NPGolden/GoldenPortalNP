@@ -17,7 +17,7 @@
 
 const ACC_TYPES = ['normal', 'overtime', 'holiday', 'travel'];
 
-function acc_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW TABLES LIKE 'acc_reports'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function acc_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'acc_reports'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function acc_user_flag(string $col): bool { $u = current_user(); if (!$u || !acc_has()) return false; static $c = []; $k = $col . (int)$u['id']; if (!isset($c[$k])) $c[$k] = (bool) scalar("SELECT {$col} FROM customer_users WHERE id = ?", [(int)$u['id']]); return $c[$k]; }
 /** May prepare accounting reports: administrators, accounts ticked "May prepare accounting reports", the PM of the project. */
 function acc_can_prepare(?int $pid = null): bool {

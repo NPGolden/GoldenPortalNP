@@ -5,7 +5,7 @@
  */
 function theme_has(): bool {
     static $has = null;
-    if ($has === null) { try { $has = (bool) db()->query("SHOW COLUMNS FROM customer_users LIKE 'ui_theme'")->fetch(); } catch (Throwable $e) { $has = false; } }
+    if ($has === null) { try { $has = (bool) scalar("SHOW COLUMNS FROM customer_users LIKE 'ui_theme'"); } catch (Throwable $e) { $has = false; } }
     return $has;
 }
 function theme_valid(string $t): bool { return in_array($t, ['light', 'dark'], true); }

@@ -148,7 +148,7 @@ const KYM_SITES = ['golden' => 'Golden A/S', 'kyma' => 'KYMA Marine Power'];
 const KYM_HOME = ['golden' => 'https://www.goldenas.com.gr/', 'kyma' => 'https://kyma-marinepower.eu/'];
 const KYM_PRIVACY = ['golden' => 'https://www.goldenas.com.gr/privacy.html', 'kyma' => 'https://kyma-marinepower.eu/privacy.html'];
 /** The migration of R97-050 has run (site / brands columns exist). Until then the portal behaves as a one-site portal. */
-function kym_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW COLUMNS FROM web_inquiries LIKE 'site'")->fetch() && (bool) db()->query("SHOW COLUMNS FROM contacts LIKE 'brands'")->fetch() && (bool) db()->query("SHOW COLUMNS FROM nl_subs LIKE 'site'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function kym_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM web_inquiries LIKE 'site'") && (bool) scalar("SHOW COLUMNS FROM contacts LIKE 'brands'") && (bool) scalar("SHOW COLUMNS FROM nl_subs LIKE 'site'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function kym_site($s): string { return (string)$s === 'kyma' ? 'kyma' : 'golden'; }
 /** " AND <col> = ?" for a site (binds it) — nothing before the migration, and nothing found for KYMA then. */
 function kym_w(string $col, string $site, array &$b): string { if (!kym_has()) return kym_site($site) === 'kyma' ? ' AND 0' : ''; $b[] = kym_site($site); return ' AND ' . $col . ' = ?'; }

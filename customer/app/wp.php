@@ -15,7 +15,7 @@ const WP_OPEN = ['planned', 'assigned', 'in_progress'];
 
 function wp_has(): bool {
     static $h = null;
-    if ($h === null) { try { $h = (bool) db()->query("SHOW TABLES LIKE 'sp_work_people'")->fetch() && (bool) db()->query("SHOW COLUMNS FROM plan_entries LIKE 'work_id'")->fetch(); } catch (Throwable $e) { $h = false; } }
+    if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'sp_work_people'") && (bool) scalar("SHOW COLUMNS FROM plan_entries LIKE 'work_id'"); } catch (Throwable $e) { $h = false; } }
     return $h;
 }
 function wp_status_label(string $s): string { return t('wp.s_' . $s); }
@@ -29,7 +29,7 @@ function wp_can_manage(int $pid): bool {
     return function_exists('pl_can_edit') && pl_can_edit();
 }
 /** customer_users.can_works exists (migration R36-005). */
-function wp_perm_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW COLUMNS FROM customer_users LIKE 'can_works'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function wp_perm_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM customer_users LIKE 'can_works'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function wp_user_can_works(int $uid): bool { static $c = []; if (!isset($c[$uid])) $c[$uid] = (bool) scalar('SELECT can_works FROM customer_users WHERE id = ?', [$uid]); return $c[$uid]; }
 function wp_people_options(): array { return all("SELECT cu.id, cu.full_name, cu.discipline_id, COALESCE(d.name, '') AS discipline FROM customer_users cu LEFT JOIN disciplines d ON d.id = cu.discipline_id WHERE cu.role IN ('staff','admin') AND cu.is_active = 1 ORDER BY ISNULL(d.sort_order), d.sort_order, cu.full_name"); }
 

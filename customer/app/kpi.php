@@ -18,7 +18,7 @@
 const KPI_KEYS = ['pcr', 'pcrt', 'bai_b', 'bai_o', 'rui_s', 'rui_a', 'psc', 'rmi', 'roi', 'cpi', 'spi'];
 const KPI_LOWER_BETTER = ['psc'];
 
-function kpi_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW TABLES LIKE 'kpi_targets'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function kpi_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'kpi_targets'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function kpi_can(): bool { return kpi_has() && is_staff() && (is_cp_admin() || fin_visible() || (function_exists('pl_can_edit') && pl_can_edit()) || (function_exists('bg_can') && bg_can())); }
 function kpi_label(string $k): string { return t('kpi.' . $k); }
 function kpi_targets(): array { static $c = null; if ($c === null) { $c = []; foreach (all('SELECT * FROM kpi_targets') as $r) $c[$r['kpi']] = $r; foreach (KPI_KEYS as $k) $c[$k] ??= ['kpi' => $k, 'target' => $k === 'psc' || $k === 'roi' ? 0 : 1, 'tolerance' => $k === 'psc' ? 1 : ($k === 'roi' ? 10 : 0.1), 'notify' => 1]; } return $c; }
@@ -229,7 +229,7 @@ function kpi_targets_save_from_post(): void {
 
 const RK_CATS = ['technical', 'schedule', 'cost', 'safety', 'class', 'supply', 'access', 'other'];
 const RK_STATUSES = ['open', 'mitigated', 'accepted', 'occurred', 'closed'];
-function rk_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW TABLES LIKE 'sp_risks'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function rk_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'sp_risks'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function rk_list(int $pid, ?int $sid = null): array {
     if (!rk_has()) return [];
     return all('SELECT r.*, u.full_name AS owner_name, s.code AS sub_code, s.name AS sub_name FROM sp_risks r LEFT JOIN customer_users u ON u.id = r.owner_user_id LEFT JOIN subprojects s ON s.id = r.subproject_id WHERE r.project_id = ?' . ($sid ? ' AND r.subproject_id = ?' : '') . " ORDER BY FIELD(r.status,'open','occurred','accepted','mitigated','closed'), (r.likelihood * r.impact) DESC, r.id", $sid ? [$pid, $sid] : [$pid]);

@@ -17,7 +17,7 @@ const STK_RULES = ['last', 'mean2', 'meann', 'wmeann', 'minn', 'same_supplier', 
 const STK_UNITS = ['pcs', 'm', 'kg', 'set', 'pack', 'm2', 'l', 'h', 'sys'];
 const STK_MOVE_REASONS = ['stocktake', 'damaged', 'scrap', 'correction', 'sample', 'warranty', 'other'];
 
-function stk_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW TABLES LIKE 'inv_items'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function stk_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'inv_items'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function stk_flag(string $col): bool { return function_exists('col_flag') ? col_flag($col) : false; }
 /** Procurement, warehouse or management. */
 function pr_can(): bool { static $v = null; if ($v === null) $v = is_staff() && stk_has() && ((function_exists('mgmt_can') && mgmt_can()) || stk_flag('can_procurement') || stk_flag('can_warehouse')); return $v; }
@@ -346,7 +346,7 @@ function stk_export_xlsx(array $items, string $name = 'GAS-INV'): void {
 }
 
 /* ------------------------------------------------------------------ procurement assistant (R79-002): replacements and market prices with web search */
-function stk_research_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW TABLES LIKE 'inv_research'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function stk_research_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'inv_research'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** The assistant is available for procurement when the portal assistant is on, the key is set and the page is enabled (Settings › Assistant). */
 function stk_ai_can(): bool { return stk_research_has() && pr_admin() && function_exists('ai_can') && ai_can('inventory_item'); }
 function stk_research_of(?int $itemId, int $limit = 10): array { if (!stk_research_has()) return []; return $itemId ? all('SELECT * FROM inv_research WHERE item_id = ? ORDER BY id DESC LIMIT ' . (int)$limit, [$itemId]) : all('SELECT r.*, i.code FROM inv_research r LEFT JOIN inv_items i ON i.id = r.item_id ORDER BY r.id DESC LIMIT ' . (int)$limit); }
@@ -402,9 +402,9 @@ function stk_alternative_delete(int $id): void { require_pr_admin(); q('DELETE F
 
 /* ================================================================== R82-002: supplier ↔ makers · ERP supplier import */
 /** R84-003: companies.is_supplier — a company may be a customer / owner / yard and a supplier at once. */
-function sup_flag_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW COLUMNS FROM companies LIKE 'is_supplier'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function sup_flag_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM companies LIKE 'is_supplier'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function sup_where(): string { return sup_flag_has() ? 'co.is_supplier = 1' : "co.kind = 'supplier'"; }
-function sup_makers_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) db()->query("SHOW TABLES LIKE 'supplier_makers'")->fetch(); } catch (Throwable $e) { $h = false; } } return $h; }
+function sup_makers_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'supplier_makers'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Makers a supplier sells (free text, matched case-insensitively to inv_items.maker). */
 function sup_makers(int $supplierId): array { return sup_makers_has() ? all('SELECT * FROM supplier_makers WHERE supplier_id = ? ORDER BY is_primary DESC, maker', [$supplierId]) : []; }
 function sup_maker_add(int $supplierId, string $maker, bool $primary = false, ?string $note = null): void {

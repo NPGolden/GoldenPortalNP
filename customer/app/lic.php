@@ -52,6 +52,7 @@ function cp_setting_set(string $k, ?string $v): void {
     if (!lic_has()) return;
     q('INSERT INTO cp_settings (k, v) VALUES (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)', [$k, $v]);
     $c = &cp_settings_all(); $c[$k] = $v;
+    if ($k === 'tz_db' && function_exists('cache_forget')) cache_forget('tz_db');   // R97-079: the connection reads it from the cache
 }
 /** Random id of this installation, created once; the vendor may bind a licence to it. */
 function lic_instance_id(): string {

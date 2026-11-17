@@ -14,7 +14,7 @@ function oa_ip(): string {
 function oa_has_r10(): bool {
     static $has = null;
     if ($has === null) {
-        try { $has = (bool) db()->query("SHOW COLUMNS FROM owner_approvals LIKE 'decided_time'")->fetch(); } catch (Throwable $e) { $has = false; }
+        try { $has = (bool) scalar("SHOW COLUMNS FROM owner_approvals LIKE 'decided_time'"); } catch (Throwable $e) { $has = false; }
     }
     return $has;
 }
@@ -90,7 +90,7 @@ function oa_comment_delete(int $approvalId, int $cid): void {
 function thread_has_replies(): bool {
     static $has = null;
     if ($has === null) {
-        try { $has = (bool) db()->query("SHOW COLUMNS FROM oa_comments LIKE 'parent_id'")->fetch(); } catch (Throwable $e) { $has = false; }
+        try { $has = (bool) scalar("SHOW COLUMNS FROM oa_comments LIKE 'parent_id'"); } catch (Throwable $e) { $has = false; }
     }
     return $has;
 }

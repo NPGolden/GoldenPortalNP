@@ -9,7 +9,7 @@
 
 function rl_has(): bool {
     static $h = null;
-    if ($h === null) { try { $h = (bool) db()->query("SHOW TABLES LIKE 'rate_items'")->fetch(); } catch (Throwable $e) { $h = false; } }
+    if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'rate_items'"); } catch (Throwable $e) { $h = false; } }
     return $h;
 }
 const RL_SECTIONS = ['hourly', 'remote', 'fixed'];
