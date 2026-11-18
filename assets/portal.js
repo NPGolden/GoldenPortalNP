@@ -661,3 +661,6 @@ document.addEventListener('change', function (e) { var c = e.target; if (!c.matc
 
 /* R97-044: background work (notifications, website statistics, news feeds, newsletter batches) is started by the page after it is shown, never while it loads */
 (function(){ try { if (!document.body || document.body.dataset.bg !== '1') return; var go = function(){ try { fetch('index.php?p=bg', { method: 'POST', credentials: 'same-origin', keepalive: true, headers: { 'X-Requested-With': 'fetch' } }).catch(function(){}); } catch (e) {} }; if (document.readyState === 'complete') setTimeout(go, 400); else window.addEventListener('load', function(){ setTimeout(go, 400); }); } catch (e) {} })();
+
+/* R97-102: a form that returns to a section of the page (#parts, #labour …) hid the error message shown at the top — the page now goes to the message */
+(function(){ try { if (!location.hash) return; var show = function(){ try { var f = document.querySelector('#main > .flash--bad'); if (f) f.scrollIntoView({ block: 'center' }); } catch (e) {} }; if (document.readyState === 'complete') setTimeout(show, 150); else window.addEventListener('load', function(){ setTimeout(show, 150); }); } catch (e) {} })();

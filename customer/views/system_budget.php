@@ -145,31 +145,33 @@ layout_head(sb_label($B) . ' · ' . $B['title'], 'system_budgets');
   </form>
 </div>
 
+<?php $pLock = $ed && function_exists('sbp_state') && sbp_state($CUR) === 'requested'; $edP = $ed && !$pLock; $roP = $edP ? '' : ' readonly';   // R97-102: part lines are locked while procurement prices them ?>
 <div class="card" id="parts">
   <div class="card-head"><h2>🔩 <?= tt('sb.parts') ?> <span class="count"><?= count($B['parts']) ?> / <?= SB_MAX_PARTS ?></span></h2><span class="hint"><?= e(t('sb.parts_hint', ['m' => rtrim(rtrim(number_format((float)$B['parts_margin'], 2, ',', ''), '0'), ',')])) ?></span></div>
+  <?php if ($pLock): ?><div class="flash flash--warn" style="margin:0 0 10px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;"><span>🔒 <?= tt('sbp.locked_parts') ?></span><form method="post" action="<?= $self ?>#parts" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sbp_recall"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--sm" type="submit">↩ <?= tt('sbp.recall') ?></button></form></div><?php endif; ?>
   <form method="post" action="<?= $self ?>#parts" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_parts"><input type="hidden" name="id" value="<?= $id ?>">
-  <div class="table-scroll"><table class="tbl" data-nosort><thead><tr><th>#</th><th><?= tt('th.code') ?></th><th style="min-width:260px;"><?= tt('sb.p_descr') ?></th><th class="num"><?= tt('sb.qty') ?></th><th><?= tt('sb.unit') ?></th><th class="num"><?= tt('sb.unit_cost') ?></th><th class="num"><?= tt('sb.margin_pct') ?></th><th class="num"><?= tt('sb.unit_sale') ?></th><?php if ($dOn): ?><th class="num" title="<?= tt('sb.disc_hint') ?>"><?= tt('sb.disc_pct') ?></th><?php endif; ?><th class="num"><?= tt('sb.cost') ?></th><th class="num"><?= tt('sb.sale') ?></th><th style="min-width:150px;"><?= tt('th.remarks') ?></th><?php if ($ed): ?><th title="<?= tt('btn.delete') ?>">🗑</th><?php endif; ?></tr></thead><tbody>
-  <?php $prows = $B['parts']; if ($ed) for ($i = 0; $i < $nNewP; $i++) $prows[] = ['id' => 'n' . $i, '_new' => true, 'code' => '', 'descr' => '', 'qty' => 0, 'unit' => '', 'unit_cost' => 0, 'margin_pct' => null, 'discount_pct' => null, 'remarks' => '', 'item_id' => null, 'cost_origin' => ''];
+  <div class="table-scroll"><table class="tbl" data-nosort><thead><tr><th>#</th><th><?= tt('th.code') ?></th><th style="min-width:260px;"><?= tt('sb.p_descr') ?></th><th class="num"><?= tt('sb.qty') ?></th><th><?= tt('sb.unit') ?></th><th class="num"><?= tt('sb.unit_cost') ?></th><th class="num"><?= tt('sb.margin_pct') ?></th><th class="num"><?= tt('sb.unit_sale') ?></th><?php if ($dOn): ?><th class="num" title="<?= tt('sb.disc_hint') ?>"><?= tt('sb.disc_pct') ?></th><?php endif; ?><th class="num"><?= tt('sb.cost') ?></th><th class="num"><?= tt('sb.sale') ?></th><th style="min-width:150px;"><?= tt('th.remarks') ?></th><?php if ($edP): ?><th title="<?= tt('btn.delete') ?>">🗑</th><?php endif; ?></tr></thead><tbody>
+  <?php $prows = $B['parts']; if ($edP) for ($i = 0; $i < $nNewP; $i++) $prows[] = ['id' => 'n' . $i, '_new' => true, 'code' => '', 'descr' => '', 'qty' => 0, 'unit' => '', 'unit_cost' => 0, 'margin_pct' => null, 'discount_pct' => null, 'remarks' => '', 'item_id' => null, 'cost_origin' => ''];
   $pn = 0; foreach ($prows as $p): $k = 'p[' . $p['id'] . ']'; $new = !empty($p['_new']); $c = $new ? null : sb_part_calc($B, $p); $bad = !$new && (float)$p['qty'] > 0 && (float)$p['unit_cost'] <= 0 && !sb_part_excluded($p); ?>
   <tr<?= $new ? ' class="hint"' : '' ?>>
     <td class="hint"><?= $new ? '+' : ++$pn ?></td>
-    <td><input name="<?= $k ?>[code]" maxlength="20" value="<?= e((string)$p['code']) ?>" style="width:90px;"<?= $ro ?>></td>
-    <td><input name="<?= $k ?>[descr]" maxlength="400" style="width:100%;min-width:260px;" value="<?= e((string)$p['descr']) ?>"<?= $new ? ' placeholder="' . tt('sb.new_part') . '"' : '' ?><?= $ro ?>><?php if (!$new && ((int)$p['item_id'] || (string)$p['cost_origin'] !== '')): ?><br><span class="hint"><?= (int)$p['item_id'] ? '📦 <a href="' . url('inventory_item', ['id' => (int)$p['item_id']]) . '">' . e((string)$p['item_code']) . '</a> · ' : '' ?><?= e((string)$p['cost_origin']) ?></span><?php endif; ?></td>
-    <td class="num"><input name="<?= $k ?>[qty]" inputmode="decimal" value="<?= e($hv($p['qty'])) ?>" style="width:70px;text-align:right;"<?= $ro ?>></td>
-    <td><input name="<?= $k ?>[unit]" maxlength="12" value="<?= e((string)$p['unit']) ?>" style="width:54px;"<?= $ro ?>></td>
-    <td class="num"><input name="<?= $k ?>[unit_cost]" inputmode="decimal" value="<?= (float)$p['unit_cost'] > 0 ? e($n2((float)$p['unit_cost'])) : '' ?>" style="width:92px;text-align:right;<?= $bad ? 'border-color:#9B2C2C;' : '' ?>"<?= $ro ?>></td>
-    <td class="num"><input name="<?= $k ?>[margin_pct]" inputmode="decimal" value="<?= $p['margin_pct'] !== null ? e($n2((float)$p['margin_pct'])) : '' ?>" placeholder="<?= e($n2((float)$B['parts_margin'])) ?>" style="width:66px;text-align:right;"<?= $ro ?>></td>
+    <td><input name="<?= $k ?>[code]" maxlength="20" value="<?= e((string)$p['code']) ?>" style="width:90px;"<?= $roP ?>></td>
+    <td><input name="<?= $k ?>[descr]" maxlength="400" style="width:100%;min-width:260px;" value="<?= e((string)$p['descr']) ?>"<?= $new ? ' placeholder="' . tt('sb.new_part') . '"' : '' ?><?= $roP ?>><?php if (!$new && ((int)$p['item_id'] || (string)$p['cost_origin'] !== '')): ?><br><span class="hint"><?= (int)$p['item_id'] ? '📦 <a href="' . url('inventory_item', ['id' => (int)$p['item_id']]) . '">' . e((string)$p['item_code']) . '</a> · ' : '' ?><?= e((string)$p['cost_origin']) ?></span><?php endif; ?></td>
+    <td class="num"><input name="<?= $k ?>[qty]" inputmode="decimal" value="<?= e($hv($p['qty'])) ?>" style="width:70px;text-align:right;"<?= $roP ?>></td>
+    <td><input name="<?= $k ?>[unit]" maxlength="12" value="<?= e((string)$p['unit']) ?>" style="width:54px;"<?= $roP ?>></td>
+    <td class="num"><input name="<?= $k ?>[unit_cost]" inputmode="decimal" value="<?= (float)$p['unit_cost'] > 0 ? e($n2((float)$p['unit_cost'])) : '' ?>" style="width:92px;text-align:right;<?= $bad ? 'border-color:#9B2C2C;' : '' ?>"<?= $roP ?>></td>
+    <td class="num"><input name="<?= $k ?>[margin_pct]" inputmode="decimal" value="<?= $p['margin_pct'] !== null ? e($n2((float)$p['margin_pct'])) : '' ?>" placeholder="<?= e($n2((float)$B['parts_margin'])) ?>" style="width:66px;text-align:right;"<?= $roP ?>></td>
     <td class="num"><?php if ($new): ?><input name="<?= $k ?>[unit_sale]" inputmode="decimal" value="" style="width:92px;text-align:right;"><?php else: ?><?= e($n2($c['unit_sale'])) ?><?php endif; ?></td>
-    <?php if ($dOn): ?><td class="num"><input name="<?= $k ?>[discount_pct]" inputmode="decimal" value="<?= ($p['discount_pct'] ?? null) !== null && (float)$p['discount_pct'] > 0 ? e($n2((float)$p['discount_pct'])) : '' ?>" style="width:58px;text-align:right;"<?= $ro ?>></td><?php endif; ?>
+    <?php if ($dOn): ?><td class="num"><input name="<?= $k ?>[discount_pct]" inputmode="decimal" value="<?= ($p['discount_pct'] ?? null) !== null && (float)$p['discount_pct'] > 0 ? e($n2((float)$p['discount_pct'])) : '' ?>" style="width:58px;text-align:right;"<?= $roP ?>></td><?php endif; ?>
     <td class="num"><?= $c ? e($n2($c['cost'])) : '' ?></td><td class="num"><b><?= $c ? e($n2($c['sale'])) : '' ?></b><?= $c && !sb_part_excluded($p) ? sb_low_mark($c['cost'], $c['sale']) : '' ?><?= $c && $c['disc_amt'] > 0.005 ? '<br><span class="hint" style="text-decoration:line-through;">' . e($n2($c['gross'])) . '</span>' : '' ?></td>
-    <td><input name="<?= $k ?>[remarks]" maxlength="500" style="width:100%;min-width:150px;" value="<?= e((string)$p['remarks']) ?>"<?= $ro ?>></td>
-    <?php if ($ed): ?><td><?= $new ? '' : '<input type="checkbox" name="' . $k . '[del]" value="1">' ?></td><?php endif; ?>
+    <td><input name="<?= $k ?>[remarks]" maxlength="500" style="width:100%;min-width:150px;" value="<?= e((string)$p['remarks']) ?>"<?= $roP ?>></td>
+    <?php if ($edP): ?><td><?= $new ? '' : '<input type="checkbox" name="' . $k . '[del]" value="1">' ?></td><?php endif; ?>
   </tr><?php endforeach; ?>
-  <tr><td></td><td></td><td><b><?= tt('sb.total') ?></b></td><td></td><td></td><td></td><td></td><td></td><?php if ($dOn): ?><td class="num hint"><?= $T['parts_disc'] > 0.005 ? '−' . e($n2($T['parts_disc'])) : '' ?></td><?php endif; ?><td class="num"><b><?= e($n2($T['parts_cost'])) ?></b></td><td class="num"><b><?= e($n2($T['parts_sale'])) ?></b></td><td></td><?php if ($ed): ?><td></td><?php endif; ?></tr>
+  <tr><td></td><td></td><td><b><?= tt('sb.total') ?></b></td><td></td><td></td><td></td><td></td><td></td><?php if ($dOn): ?><td class="num hint"><?= $T['parts_disc'] > 0.005 ? '−' . e($n2($T['parts_disc'])) : '' ?></td><?php endif; ?><td class="num"><b><?= e($n2($T['parts_cost'])) ?></b></td><td class="num"><b><?= e($n2($T['parts_sale'])) ?></b></td><td></td><?php if ($edP): ?><td></td><?php endif; ?></tr>
   </tbody></table></div>
-  <?php if ($ed): ?><div class="btn-row" style="margin-top:8px;"><button class="btn btn--gold btn--sm" type="submit"><?= tt('sb.save_lines') ?></button><span class="hint"><?= tt('sb.parts_lines_hint') ?></span></div><?php endif; ?>
+  <?php if ($edP): ?><div class="btn-row" style="margin-top:8px;"><button class="btn btn--gold btn--sm" type="submit"><?= tt('sb.save_lines') ?></button><span class="hint"><?= tt('sb.parts_lines_hint') ?></span></div><?php endif; ?>
   </form>
-  <?php if ($ed && $r3): ?>
+  <?php if ($edP && $r3): ?>
   <?php if ($nStaged): ?><p class="flash flash--warn" style="margin:12px 0 0;"><?= e(t('sb.stage_waiting', ['n' => $nStaged])) ?> <a href="<?= url('system_budget_bom', ['id' => $id]) ?>"><b><?= tt('sb.stage_open') ?> ›</b></a></p><?php endif; ?>
   <div class="grid grid-2" style="align-items:start;margin-top:12px;">
     <form method="post" action="<?= $self ?>#parts" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_bom_upload"><input type="hidden" name="id" value="<?= $id ?>">
@@ -184,7 +186,7 @@ layout_head(sb_label($B) . ' · ' . $B['title'], 'system_budgets');
     </form>
   </div>
   <?php endif; ?>
-  <?php if ($ed && count($B['parts']) < SB_MAX_PARTS && ($inv = sb_inv_options())): ?>
+  <?php if ($edP && count($B['parts']) < SB_MAX_PARTS && ($inv = sb_inv_options())): ?>
   <form method="post" action="<?= $self ?>#parts" data-lock style="margin-top:12px;"><?= csrf_field() ?><input type="hidden" name="action" value="sb_part_inv"><input type="hidden" name="id" value="<?= $id ?>">
     <h3 style="margin:0 0 6px;">📦 <?= tt('sb.inv_add') ?></h3>
     <div class="grid grid-3"><div class="field" style="grid-column:span 2;"><select name="item_id" required><option value=""><?= tt('sb.inv_pick') ?></option><?php foreach ($inv as $i): ?><option value="<?= (int)$i['id'] ?>"><?= e($i['code'] . ' · ' . mb_substr((string)$i['description'], 0, 90)) ?></option><?php endforeach; ?></select><p class="hint" style="margin:4px 0 0;"><?= tt('sb.inv_hint') ?></p></div>

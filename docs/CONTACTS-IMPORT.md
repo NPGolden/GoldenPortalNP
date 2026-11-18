@@ -2999,3 +2999,15 @@ The page on screen stays the internal version for staff.
 **Tests (sandbox) — forms posted**: template download (administrator 200, staff without procurement rights 403, HR redirected); upload of an ERP export with title line (header found on line 2) and of the prepared workbook; Apply in mode full with about 14 000 lines: 16 s, items, opening stock, prices and categories as in the file; the same file applied again: nothing new, no stock or price doubled (6 s); inventory list, search, valuation and item card with that volume under 0.3 s; a file that is not a workbook and the template itself uploaded; no new lines in the PHP error log. Not tested: the duration on the live hosting and behind the WAF.
 
 **Security review**: the import stays limited to procurement administrators, CSRF-protected, nothing is written before Apply. New: the line limit. Proposal: refuse workbooks whose sheet is larger than a set size when unpacked, in `xlsx_rows()`, for all imports.
+
+## §386 v1.176.1 (R97-102) — System budget: parts locked at procurement are shown as locked; errors brought into view
+
+**Report**: "I cannot delete parts from the list in the System budget". Deleting works (tick 🗑, Save lines) — except while the budget is at procurement (`sbp_state() === 'requested'`, R97-049), where `sb_save_parts_from_post()` refuses the save. The form still looked editable and returned to `#parts`, so the red message at the top of the page was never seen.
+
+**Parts card** (`views/system_budget.php`): `$pLock`, `$edP`, `$roP` — while locked: notice `sbp.locked_parts` with the Take back form (`sbp_recall`), fields read-only, no new lines, no delete ticks, no Save lines, no BOM import / inventory proposals / add from inventory. Server rules unchanged.
+
+**All pages** (`assets/portal.js`): with a `#section` in the address and a `.flash--bad` on the page, the message is scrolled into view after load.
+
+**Tests (sandbox) — forms posted**: parts card normal (ticks, Save, three add forms); at procurement (notice, Take back, nothing to post); forced post of a delete while locked refused, line kept; Take back posted, card editable again, delete posted and line gone; in a browser: tick and Save deletes the line; a refused save shows the message in view; other budgets and a revision view open; PHP error log clean. Not confirmed: that the user's budget was at procurement — the screenshot (lines waiting for a cost) points to it.
+
+**Security review**: no new input; the lock was and stays enforced on the server. No proposal.

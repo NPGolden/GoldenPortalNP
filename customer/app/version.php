@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.176.0';
+const CP_VERSION = '1.176.1';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-102', 'version' => '1.176.1', 'date' => '2026-11-18', 'title' => 'System budget: while the part lines are at procurement for pricing the Parts card says so, shows Take back and no longer offers Save or the delete ticks; an error after saving a section of a page is brought into view instead of staying hidden at the top.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-101', 'version' => '1.176.0', 'date' => '2026-11-18', 'title' => 'Inventory import: downloadable import template; the ERP warehouse export is accepted with its title line above the header; pack units such as 10ΤΜΧ recognised; files limited to 30 000 lines; longer time allowed for large files.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-100', 'version' => '1.175.0', 'date' => '2026-11-18', 'title' => 'Owner\'s copy also for the monthly sub-project report and the vessel technical history (download and filing; internal versions marked -INT and filed for staff only); System health lists the reports filed for customers before Owner\'s copies existed, with Make internal.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-099', 'version' => '1.174.0', 'date' => '2026-11-18', 'title' => 'Weekly vessel report: Owner\'s copy for staff — download, e-mail attachment (ticked by default) and filing produce the report exactly as the owner sees it; the internal version is marked -INT and is filed for staff only.', 'db' => null, 'check' => null],
