@@ -11,13 +11,14 @@ $sups = sup_list(['status' => 'active']); $sel = fn($a, $b) => (string)$a === (s
 $preO = (int)($_GET['order_id'] ?? ($i['order_id'] ?? 0)); $PO = $preO ? po_load($preO) : null;
 $pos = all("SELECT o.id, o.po_no, o.supplier_id, co.name AS supplier, o.title FROM po_orders o JOIN companies co ON co.id = o.supplier_id WHERE o.kind = 'po' AND o.status IN ('sent','confirmed','partial','received','closed') ORDER BY o.id DESC LIMIT 400");
 $self = url('payable', ['id' => $id]); $back = url('payables'); $open = $i ? round((float)$i['gross'] - (float)$i['paid'], 2) : 0.0;
-$openLines = $i && $i['order_id'] && $edit ? si_po_open_lines((int)$i['order_id']) : [];
+$pfHas = function_exists('si_pf_has') && si_pf_has(); $isPf = $pfHas && ($i ? si_is_pf($i) : (!$isCredit && !empty($_GET['proforma'])));   // R97-118
+$openLines = $i && $i['order_id'] && $edit ? si_po_open_lines((int)$i['order_id'], $pfHas && si_prepaid($i)) : [];
 $credits = $isCredit && !$i ? all("SELECT id, inv_no, si_no, supplier_id FROM si_invoices WHERE kind = 'invoice' AND status <> 'cancelled' ORDER BY id DESC LIMIT 300") : [];
 layout_head(($i ? $i['si_no'] : ($isCredit ? t('si.new_credit') : t('si.new'))) . ' · ' . t('si.title'), 'payables');
 ?>
 <p class="eyebrow"><a href="<?= $back ?>"><?= tt('si.title') ?></a> › <?= $i ? e($i['si_no']) : ($isCredit ? tt('si.new_credit') : tt('si.new')) ?></p>
 <div class="page-head">
-  <div><h1>💸 <?= $i ? e($i['si_no']) : ($isCredit ? tt('si.new_credit') : tt('si.new')) ?> <?= $i ? si_pill($i['status']) : '' ?><?= $i ? ' ' . si_m_pill($i['match_status']) : '' ?><?= $isCredit ? ' ' . pill('gold', t('si.credit')) : '' ?></h1>
+  <div><h1>💸 <?= $i ? e($i['si_no']) : ($isCredit ? tt('si.new_credit') : tt('si.new')) ?> <?= $i ? si_pill($i['status']) : '' ?><?= $i ? ' ' . si_m_pill($i['match_status']) : '' ?><?= $isCredit ? ' ' . pill('gold', t('si.credit')) : '' ?><?= $i && $pfHas ? si_pf_pill($i) : ($isPf ? ' ' . pill('warn', t('si.pf')) : '') ?></h1>
     <?php if ($i): ?><p class="lede" style="margin-bottom:0;"><a href="<?= url('suppliers', ['id' => (int)$i['supplier_id']]) ?>"><?= e($i['supplier']) ?></a> · <?= tt('si.inv_no') ?> <b><?= e($i['inv_no']) ?></b><?= $i['order_id'] ? ' · <a href="' . url('purchase_order', ['id' => (int)$i['order_id']]) . '">' . e($i['po_no']) . '</a>' : '' ?><?= $i['project_id'] ? ' · ' . pr_link((int)$i['project_id'], $i['project_code'], $i['project_name']) . ($i['sub_code'] ? ' › <a href="' . url('subproject', ['id' => (int)$i['subproject_id'], 'tab' => 'procurement']) . '">' . e($i['sub_code']) . '</a>' : '') : '' ?><?= $i['credit_of'] ? ' · ' . tt('si.credit_of') . ' <a href="' . url('payable', ['id' => (int)$i['credit_of']]) . '">' . e((string) scalar('SELECT inv_no FROM si_invoices WHERE id = ?', [(int)$i['credit_of']])) . '</a>' : '' ?><?= $i['file_id'] ? ' · <a href="' . url('file', ['id' => (int)$i['file_id']]) . '" target="_blank">📎 ' . tt('si.document') . '</a>' : '' ?></p><?php endif; ?></div>
   <div class="btn-row">
     <?php if ($i && in_array($i['status'], ['draft', 'disputed'], true)): ?><form method="post" action="<?= $self ?>" data-lock class="btn-row"><?= csrf_field() ?><input type="hidden" name="action" value="si_check"><input type="hidden" name="id" value="<?= $id ?>"><?php if ($i['status'] === 'disputed'): ?><input name="note" maxlength="400" placeholder="<?= tt('si.force_reason') ?>" style="width:14em;"><label class="chk"><input type="checkbox" name="force" value="1"> <?= tt('si.force') ?></label><?php endif; ?><button class="btn btn--gold btn--sm" type="submit"<?= $lines ? '' : ' disabled' ?>>✓ <?= tt('si.check') ?></button></form><?php endif; ?>
@@ -35,6 +36,21 @@ layout_head(($i ? $i['si_no'] : ($isCredit ? t('si.new_credit') : t('si.new'))) 
 </div>
 <?php endif; ?>
 
+<?php if ($i && $pfHas && si_is_pf($i) && $i['status'] !== 'cancelled' && si_can()): ?>
+<div class="card" id="final" style="margin-bottom:12px; border-left:4px solid var(--cp-gold,#C9A227);">
+  <h2><?= tt('si.final_title') ?></h2><p class="hint"><?= tt('si.final_hint') ?></p>
+  <form method="post" action="<?= $self ?>" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="si_final"><input type="hidden" name="id" value="<?= $id ?>">
+    <div class="form-grid">
+      <div class="field"><label><?= tt('si.final_no') ?> *</label><input name="inv_no" maxlength="80" required></div>
+      <div class="field"><label><?= tt('si.issue') ?> *</label><input name="issue_date" type="date" required value="<?= date('Y-m-d') ?>"></div>
+      <div class="field field--full"><label><?= tt('si.document') ?> <span class="hint">(PDF)</span></label><input type="file" name="file" accept=".pdf,.jpg,.jpeg,.png"></div>
+    </div>
+    <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit"><?= tt('si.final_btn') ?></button></div>
+  </form>
+</div>
+<?php elseif ($i && $pfHas && (int)$i['is_proforma'] === 2): ?>
+<p class="hint" style="margin-bottom:10px;"><?= e(t('si.final_was', ['p' => (string)$i['proforma_no'], 'd' => fmt_datetime($i['final_at']), 'u' => (string)$i['final_name']])) ?></p>
+<?php endif; ?>
 <div class="grid grid-2">
 <div class="card">
   <h2><?= tt('si.header') ?></h2>
@@ -43,6 +59,7 @@ layout_head(($i ? $i['si_no'] : ($isCredit ? t('si.new_credit') : t('si.new'))) 
     <div class="form-grid">
       <div class="field field--full"><label><?= tt('po.one') ?> <span class="hint"><?= tt('si.po_hint') ?></span></label><select name="order_id" id="si-po"<?= $i && $i['order_id'] ? ' disabled' : '' ?>><option value="">—</option><?php foreach ($pos as $o): ?><option value="<?= (int)$o['id'] ?>" data-sup="<?= (int)$o['supplier_id'] ?>"<?= $sel($o['id'], $preO) ?>><?= e($o['po_no'] . ' · ' . $o['supplier'] . ($o['title'] ? ' · ' . $o['title'] : '')) ?></option><?php endforeach; ?></select></div>
       <div class="field field--full"><label><?= tt('po.supplier') ?> *</label><select name="supplier_id" id="si-sup" required><option value=""><?= tt('flt.any') ?></option><?php foreach ($sups as $s): ?><option value="<?= (int)$s['id'] ?>"<?= $sel($s['id'], $PO ? $PO['supplier_id'] : ($i['supplier_id'] ?? 0)) ?>><?= e($s['name']) ?></option><?php endforeach; ?></select></div>
+      <?php if ($pfHas && !$isCredit && (int)($i['is_proforma'] ?? 0) < 2): ?><div class="field field--full"><label><?= tt('si.doc_type') ?></label><select name="is_proforma" data-nosearch><option value="0"<?= $isPf ? '' : ' selected' ?>><?= tt('si.dt_invoice') ?></option><option value="1"<?= $isPf ? ' selected' : '' ?>><?= tt('si.dt_pf') ?></option></select><p class="hint"><?= tt('si.doc_type_hint') ?></p></div><?php endif; ?>
       <div class="field"><label><?= tt('si.inv_no') ?> *</label><input name="inv_no" maxlength="80" required value="<?= e($i['inv_no'] ?? '') ?>"></div>
       <div class="field"><label><?= tt('si.issue') ?> *</label><input name="issue_date" type="date" required value="<?= e($i['issue_date'] ?? date('Y-m-d')) ?>"></div>
       <div class="field"><label><?= tt('si.due') ?> <span class="hint"><?= tt('si.due_hint') ?></span></label><input name="due_date" type="date" value="<?= e($i['due_date'] ?? '') ?>"></div>

@@ -3237,3 +3237,23 @@ The page on screen stays the internal version for staff.
 **Open point**: an invoice without project cannot keep a payment proof (`cp_store_file()` needs a project). Proposal: a storage place for documents of Accounting that do not belong to a project — needs a decision on who may see it.
 
 **Security review**: only files already stored as payment proofs of this invoice are offered; the attachment key is resolved on the server at send time, staff only, as for the other cards. The proof is an internal file that now leaves to the supplier's address chosen by the sender — it is ticked by default but visible in the card before sending. No further proposal.
+
+## §402 v1.185.0 (R97-118) — Payables: statement Excel / PDF / e-mail, supplier proforma; inventory items out of the valuation
+
+**Asked**: (1) the Excel button of Payables puts erroneous data on the screen; (2) choose between a proforma to prepay, with the sales invoice assigned when it arrives, or a sales invoice directly; (3) the statement as PDF like the other reports, with e-mail to the supplier; (4) some inventory items not in the valuation, chosen per item.
+
+**Database** (`install/migrate_cp_r97_118_si_proforma.sql`, state key `r98l`): `si_invoices.is_proforma` (0 invoice · 1 proforma waiting for the invoice · 2 proforma with the invoice assigned), `proforma_no`, `final_at`, `final_name`; `inv_items.no_valuation`.
+
+**1 Excel** — `views/payables.php` built the workbook in the middle of the page, after the layout had been sent, so the browser showed the bytes. The files are now produced before `layout_head()`. The opening row had one cell too few; fixed in `si_statement_sheets()`, which also adds a totals row.
+
+**2 Proforma** (`app/si.php`): `si_pf_has()`, `si_is_pf()`, `si_prepaid()`, `si_pf_pill()`. Field Document (`is_proforma`) on a new or still editable invoice; button "Register proforma (prepayment)" (`payable&id=0&proforma=1`). For a prepaid document `si_lines_from_po()`, `si_po_open_lines()` and `si_match()` work on ordered minus invoiced instead of accepted minus invoiced. `si_final_from_post()` (action `si_final`): number (unique per supplier), date, optional file; the old number goes to `proforma_no`, `is_proforma` becomes 2, the sub-project cost row is refreshed, event `final`. List filter `status=proforma`; statement kind `proforma`.
+
+**3 Statement** — `si_statement_doc()`, `si_statement_pdf()` (letterhead of the default branch, A4), `si_em_attachment()` with key `ss:<supplier>:<from|->:<to>:pdf|xlsx` resolved in `em_attachment()`; e-mail kind `sup_statement` (`app/et.php`, texts `et.k_/d_s_/d_b_sup_statement`) so the wording can be changed in Settings › E-mail templates.
+
+**4 Valuation** (`app/inv.php`): `stk_nv_has()`, `stk_nv()`; tick on the item form (`nv_sent` + `no_valuation`); `stk_valuation()` leaves the value of such items out of the totals and of the per-category table and returns `excluded` / `value_excluded`; list total, list filter `nv=1`, Excel value column.
+
+**Tests (sandbox) — forms posted**: order sent, nothing received → proforma registered with the ordered line, checked (match OK), paid with a proof, empty number refused, invoice assigned with a file, second assignment refused, events and sub-project cost reference updated; list filter; statement page, Excel (opens, 9 columns, totals), PDF (rendered and looked at), with and without a from-date; e-mail card with both attachments. Item ticked → valuation 1 200 → 0 with the line "1 item left out", list filter and mark; unticked → back. Error log clean; sweeps as usual.
+
+**Not tested**: sending the statement through Microsoft 365; a proforma in a payment request above the Management threshold; partial receipts after a proforma was checked (the received goods are then already counted as invoiced — intended); the health report or other reports that might quote an inventory value were not searched beyond the inventory pages.
+
+**Security review**: the statement files are served only to accounts with payables rights (`si_can()` inside `si_statement_doc()`, also at e-mail time); dates and ids are validated; PDF sent with `nosniff` and `no-store`. Assigning an invoice needs payables rights and is logged with user and time. The valuation tick is limited to Procurement administrators. Proposal (no effect on speed): require a second person (Accounting or Management) when an invoice is assigned to a proforma that is already paid, as is done for payments above the threshold.

@@ -17,6 +17,12 @@ const SI_R_TONE = ['submitted' => 'gold', 'mgmt' => 'warn', 'approved' => 'ok', 
 const SI_METHODS = ['transfer', 'card', 'cash', 'cheque', 'other'];
 const SI_TOL_PCT = 2.0;   // price tolerance of the three-way check
 
+/** R97-118: the proforma columns are there (0 = invoice, 1 = proforma waiting for the supplier's invoice, 2 = proforma with the invoice assigned). */
+function si_pf_has(): bool { static $h = null; if ($h === null) { try { $h = si_has() && (bool) scalar("SHOW COLUMNS FROM si_invoices LIKE 'is_proforma'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function si_is_pf(?array $i): bool { return $i && (int)($i['is_proforma'] ?? 0) === 1; }
+/** Prepaid basis: the document is, or started as, a proforma — it is checked against what was ordered, not what was received. */
+function si_prepaid(?array $i): bool { return $i && (int)($i['is_proforma'] ?? 0) > 0; }
+function si_pf_pill(?array $i): string { $v = (int)($i['is_proforma'] ?? 0); return $v === 1 ? ' ' . pill('warn', t('si.pf')) : ($v === 2 ? ' ' . pill('mute', t('si.pf_done')) : ''); }
 function si_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'si_invoices'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Accounting, Procurement and Management see and register; payments are recorded by Accounting / Management. */
 function si_can(): bool { static $v = null; if ($v === null) $v = is_staff() && si_has() && ((function_exists('mgmt_can') && mgmt_can()) || (function_exists('col_flag') && col_flag('is_accounting')) || (function_exists('pr_admin') && pr_admin())); return $v; }
@@ -42,7 +48,7 @@ const SI_SELECT = "SELECT i.*, co.name AS supplier, o.po_no, p.project_code, p.n
 function si_load(int $id): ?array { return si_has() && $id ? one(SI_SELECT . ' WHERE i.id = ?', [$id]) ?: null : null; }
 function si_list(array $f = []): array {
     if (!si_has()) return []; $w = []; $a = [];
-    if (!empty($f['status'])) { if ($f['status'] === 'open') $w[] = "i.status IN ('draft','checked','disputed','requested','approved')"; elseif ($f['status'] === 'overdue') $w[] = "i.status IN ('checked','disputed','requested','approved') AND i.due_date < CURDATE()"; elseif (in_array($f['status'], SI_STATES, true)) { $w[] = 'i.status = ?'; $a[] = $f['status']; } }
+    if (!empty($f['status'])) { if ($f['status'] === 'open') $w[] = "i.status IN ('draft','checked','disputed','requested','approved')"; elseif ($f['status'] === 'overdue') $w[] = "i.status IN ('checked','disputed','requested','approved') AND i.due_date < CURDATE()"; elseif ($f['status'] === 'proforma') $w[] = si_pf_has() ? "i.is_proforma = 1 AND i.status <> 'cancelled'" : '0'; elseif (in_array($f['status'], SI_STATES, true)) { $w[] = 'i.status = ?'; $a[] = $f['status']; } }
     if (!empty($f['supplier_id'])) { $w[] = 'i.supplier_id = ?'; $a[] = (int)$f['supplier_id']; }
     if (!empty($f['order_id'])) { $w[] = 'i.order_id = ?'; $a[] = (int)$f['order_id']; }
     if (!empty($f['subproject_id'])) { $w[] = 'i.subproject_id = ?'; $a[] = (int)$f['subproject_id']; }
@@ -85,12 +91,15 @@ function si_save_from_post(): int {
     if ($fileId) $v['file_id'] = $fileId;
     if ($id) {
         $i = si_load($id); if (!$i || !si_editable($i)) throw new RuntimeException(t('err.noaccess'));
+        if ($i['kind'] !== 'credit' && isset($_POST['is_proforma']) && si_pf_has() && (int)$i['is_proforma'] < 2) $v['is_proforma'] = $_POST['is_proforma'] === '1' ? 1 : 0;   // R97-118: invoice or proforma, while it can still be edited
         if (scalar('SELECT 1 FROM si_invoices WHERE supplier_id = ? AND inv_no = ? AND id <> ?', [$sup, $invNo, $id])) throw new RuntimeException(t('si.dup_inv_no'));
         q('UPDATE si_invoices SET ' . implode(', ', array_map(fn($k) => "$k = ?", array_keys($v))) . ' WHERE id = ?', array_merge(array_values($v), [$id])); si_recalc($id); si_event($id, null, 'edit');
     } else {
         if (scalar('SELECT 1 FROM si_invoices WHERE supplier_id = ? AND inv_no = ?', [$sup, $invNo])) throw new RuntimeException(t('si.dup_inv_no'));
         $br = $O ? ($O['branch_id'] ? (int)$O['branch_id'] : null) : (function_exists('br_default') ? (int)br_default()['id'] : null);
         $v = ['kind' => $kind, 'si_no' => si_number($kind === 'credit' ? 'SCN' : 'SI', $br), 'branch_id' => $br] + $v + ['created_by' => (int)$u['id'], 'created_name' => $u['full_name']];
+        if ($kind !== 'credit' && ($_POST['is_proforma'] ?? '') === '1' && si_pf_has()) $v['is_proforma'] = 1;   // R97-118
+
         q('INSERT INTO si_invoices (' . implode(', ', array_keys($v)) . ') VALUES (' . implode(', ', array_fill(0, count($v), '?')) . ')', array_values($v));
         $id = (int) db()->lastInsertId(); si_event($id, null, 'create', $v['si_no']);
         if ($O && !empty($_POST['pull_lines'])) { si_lines_from_po($id, (int)$O['id']); si_costs_from_po($id, (int)$O['id']); }   // R97-071: and the logistic costs of the supplier
@@ -100,9 +109,9 @@ function si_save_from_post(): int {
 }
 /** Pre-fill the invoice lines from the PO: every line with accepted goods not yet invoiced, at the PO price. */
 function si_lines_from_po(int $iid, int $oid): int {
-    $n = 0; $seq = (int) scalar('SELECT COALESCE(MAX(seq),0) FROM si_lines WHERE invoice_id = ?', [$iid]);
+    $n = 0; $seq = (int) scalar('SELECT COALESCE(MAX(seq),0) FROM si_lines WHERE invoice_id = ?', [$iid]); $pre = si_prepaid(si_load($iid));   // R97-118: a proforma takes what was ordered — the goods are not in yet
     foreach (all("SELECT * FROM po_lines WHERE order_id = ? AND status <> 'cancelled' ORDER BY seq", [$oid]) as $l) {
-        $open = (float)$l['qty_accepted'] - (float)$l['qty_invoiced']; if ($open <= 0.0005) continue;
+        $open = (float)$l[$pre ? 'qty' : 'qty_accepted'] - (float)$l['qty_invoiced']; if ($open <= 0.0005) continue;
         if (scalar('SELECT 1 FROM si_lines WHERE invoice_id = ? AND po_line_id = ?', [$iid, (int)$l['id']])) continue;
         $price = round((float)($l['unit_price'] ?? 0) * (1 - (float)$l['discount_pct'] / 100), 4);
         q('INSERT INTO si_lines (invoice_id, seq, po_line_id, description, qty, unit_price, line_total) VALUES (?,?,?,?,?,?,?)', [$iid, ++$seq, (int)$l['id'], $l['description'], round($open, 3), $price, round($open * $price, 2)]); $n++;
@@ -165,7 +174,7 @@ function si_match(int $iid): string {
     $i = si_load($iid); $worst = 'none'; $rank = ['none' => 0, 'ok' => 1, 'qty' => 2, 'price' => 2, 'both' => 3];
     foreach (si_lines($iid) as $l) {
         if (!$l['po_line_id']) { q("UPDATE si_lines SET match_status = 'none', po_qty_open = NULL, po_price = NULL WHERE id = ?", [(int)$l['id']]); continue; }
-        $open = (float)$l['qty_accepted'] - (float)$l['qty_invoiced']; $pp = round((float)($l['po_unit_price'] ?? 0) * (1 - (float)$l['discount_pct'] / 100), 4);
+        $open = (float)$l[si_prepaid($i) ? 'po_qty' : 'qty_accepted'] - (float)$l['qty_invoiced']; $pp = round((float)($l['po_unit_price'] ?? 0) * (1 - (float)$l['discount_pct'] / 100), 4);
         $qOk = (float)$l['qty'] <= $open + 0.0005; $pOk = $pp > 0 ? abs((float)$l['unit_price'] - $pp) / $pp * 100 <= SI_TOL_PCT : true;
         $st = $qOk && $pOk ? 'ok' : (!$qOk && !$pOk ? 'both' : ($qOk ? 'price' : 'qty'));
         q('UPDATE si_lines SET match_status = ?, po_qty_open = ?, po_price = ? WHERE id = ?', [$st, round($open, 3), $pp, (int)$l['id']]);
@@ -263,12 +272,84 @@ function si_payment_delete(int $iid, int $pid): void { require_si_pay(); $p = on
 /** Supplier statement: invoices (+), credit notes (−), payments (−) in date order with the running balance. */
 function si_statement(int $supplierId, ?string $from = null, ?string $to = null): array {
     $rows = []; $to = $to ?: date('Y-m-d');
-    foreach (all("SELECT i.id, i.kind, i.si_no, i.inv_no, i.issue_date AS d, i.due_date, i.gross, i.currency, i.status, o.po_no FROM si_invoices i LEFT JOIN po_orders o ON o.id = i.order_id WHERE i.supplier_id = ? AND i.status NOT IN ('draft','cancelled') AND i.issue_date <= ?", [$supplierId, $to]) as $r) $rows[] = ['d' => $r['d'], 'kind' => $r['kind'], 'ref' => $r['inv_no'], 'si_no' => $r['si_no'], 'id' => (int)$r['id'], 'po' => $r['po_no'], 'due' => $r['due_date'], 'debit' => $r['kind'] === 'credit' ? 0.0 : (float)$r['gross'], 'credit' => $r['kind'] === 'credit' ? (float)$r['gross'] : 0.0, 'cur' => $r['currency'], 'status' => $r['status']];
+    foreach (all("SELECT i.*, i.issue_date AS d, o.po_no FROM si_invoices i LEFT JOIN po_orders o ON o.id = i.order_id WHERE i.supplier_id = ? AND i.status NOT IN ('draft','cancelled') AND i.issue_date <= ?", [$supplierId, $to]) as $r) $rows[] = ['d' => $r['d'], 'kind' => si_is_pf($r) ? 'proforma' : $r['kind'], 'ref' => $r['inv_no'], 'si_no' => $r['si_no'], 'id' => (int)$r['id'], 'po' => $r['po_no'], 'due' => $r['due_date'], 'debit' => $r['kind'] === 'credit' ? 0.0 : (float)$r['gross'], 'credit' => $r['kind'] === 'credit' ? (float)$r['gross'] : 0.0, 'cur' => $r['currency'], 'status' => $r['status'], 'pf_no' => $r['proforma_no'] ?? null];
     foreach (all("SELECT p.*, i.inv_no FROM si_payments p JOIN si_invoices i ON i.id = p.invoice_id WHERE i.supplier_id = ? AND p.pay_date <= ?", [$supplierId, $to]) as $p) $rows[] = ['d' => $p['pay_date'], 'kind' => 'payment', 'ref' => $p['ref'] ?: t('si.pm_' . $p['method']), 'si_no' => null, 'id' => (int)$p['invoice_id'], 'po' => null, 'due' => null, 'debit' => 0.0, 'credit' => (float)$p['amount'], 'cur' => $p['currency'], 'status' => null, 'inv_no' => $p['inv_no']];
     usort($rows, fn($a, $b) => [$a['d'], $a['kind'] === 'payment' ? 1 : 0] <=> [$b['d'], $b['kind'] === 'payment' ? 1 : 0]);
     $bal = 0.0; $open = 0.0; $out = [];
     foreach ($rows as $r) { $bal += $r['debit'] - $r['credit']; $r['balance'] = $bal; if ($from && $r['d'] < $from) { $open = $bal; continue; } $out[] = $r; }
     return ['rows' => $out, 'opening' => $open, 'balance' => $bal, 'from' => $from, 'to' => $to];
+}
+/* ------------------------------------------------------------------ R97-118: proforma → the supplier's invoice · statement as PDF / e-mail */
+/** The supplier's invoice arrived for a proforma: its number and date take the place of the proforma's, which is kept in proforma_no. Amounts, payments and the request stay. */
+function si_final_from_post(): int {
+    require_si(); $iid = (int)($_POST['id'] ?? 0); $i = si_load($iid); if (!$i || !si_pf_has() || !si_is_pf($i) || $i['status'] === 'cancelled') throw new RuntimeException(t('err.noaccess'));
+    $no = mb_substr(trim((string)($_POST['inv_no'] ?? '')), 0, 80); if ($no === '') throw new RuntimeException(t('si.need_inv_no'));
+    if (scalar('SELECT 1 FROM si_invoices WHERE supplier_id = ? AND inv_no = ? AND id <> ?', [(int)$i['supplier_id'], $no, $iid])) throw new RuntimeException(t('si.dup_inv_no'));
+    $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['issue_date'] ?? '')) ? $_POST['issue_date'] : date('Y-m-d'); $u = current_user();
+    $fileId = null; if (!empty($_FILES['file']['tmp_name']) && $i['project_id']) $fileId = cp_store_file($_FILES['file'], (int)$i['project_id'], $i['subproject_id'] ? (int)$i['subproject_id'] : null, 'file', 'internal', t('si.file_title', ['s' => $i['supplier'], 'n' => $no]));
+    q('UPDATE si_invoices SET is_proforma = 2, proforma_no = ?, inv_no = ?, issue_date = ?, final_at = NOW(), final_name = ?' . ($fileId ? ', file_id = ' . (int)$fileId : '') . ' WHERE id = ?', [$i['inv_no'], $no, $date, $u['full_name'], $iid]);
+    si_sp_cost_sync($iid); si_event($iid, null, 'final', $i['inv_no'] . ' → ' . $no); cache_bump_later('eng'); return $iid;
+}
+/** Statement of a supplier as a document: number, rows, totals. */
+function si_statement_doc(int $supplierId, ?string $from, ?string $to): ?array {
+    if (!si_can()) return null; $S = sup_load($supplierId); if (!$S) return null; $ST = si_statement($supplierId, $from, $to);
+    $deb = 0.0; $cre = 0.0; foreach ($ST['rows'] as $r) { $deb += $r['debit']; $cre += $r['credit']; }
+    return ['S' => $S, 'ST' => $ST, 'cur' => ($S['sup_currency'] ?? '') ?: 'EUR', 'debit' => $deb, 'credit' => $cre, 'doc_no' => 'SUP-STMT-' . $supplierId . '-' . str_replace('-', '', $ST['to'])];
+}
+function si_statement_sheets(array $D): array {
+    $ST = $D['ST']; $rows = []; if ($ST['from']) $rows[] = [$ST['from'], t('si.opening'), '', '', '', '', null, null, (float)$ST['opening']];
+    foreach ($ST['rows'] as $r) $rows[] = [$r['d'], t('si.st_' . $r['kind']), $r['ref'], $r['si_no'] ?? ($r['inv_no'] ?? ''), $r['po'] ?? '', $r['due'] ?? '', $r['debit'] ?: null, $r['credit'] ?: null, (float)$r['balance']];
+    $rows[] = ['', t('si.balance_due'), '', '', '', '', round($D['debit'], 2), round($D['credit'], 2), (float)$ST['balance']];
+    return [['name' => 'Statement', 'first' => true, 'header' => [t('si.date'), t('si.kind'), t('si.ref'), t('si.no'), t('po.no'), t('si.due'), t('si.debit'), t('si.credit_col'), t('si.balance')], 'rows' => $rows]];
+}
+function si_statement_pdf(array $D): string {
+    require_once __DIR__ . '/pdf.php';
+    $S = $D['S']; $ST = $D['ST']; $cur = $D['cur']; $n = fn(float $v) => number_format($v, 2, ',', '.'); $m = fn(float $v) => $n($v) . ' ' . $cur;
+    $pdf = new PdfWriter(); $navy = '#0B1E2D'; $gold = '#C89B3C'; $ink = '#1F2933'; $line = '#C8CED6'; $head = '#EEF2F6'; $green = '#2E7D32';
+    $L = 15.0; $R = 195.0; $W = $R - $L; $y = 0.0;
+    $bd = function_exists('br_doc') ? br_doc(null) : ['logo' => null, 'name' => 'Golden Automation Systems', 'lines' => [], 'footer' => ''];
+    $cols = [[t('si.date'), 19, 'L'], [t('si.kind'), 24, 'L'], [t('si.ref'), 39, 'L'], [t('po.no'), 26, 'L'], [t('si.due'), 19, 'L'], [t('si.debit'), 18, 'R'], [t('si.credit_col'), 17, 'R'], [t('si.balance'), 18, 'R']];
+    $hrow = function () use ($pdf, $cols, $navy, $head, $L, &$y) { $pdf->setFont('B', 7.2); $pdf->setColor($head); $pdf->rect($L, $y, array_sum(array_column($cols, 1)), 6, 'F'); $pdf->setColor($navy); $x = $L; foreach ($cols as [$lab, $cw, $al]) { $pdf->text($x + 1.5, $y + 4.2, $lab, $al, $cw - 3); $x += $cw; } $y += 6; };
+    $header = function () use ($pdf, &$y, $navy, $gold, $L, $R, $D, $bd, $ST) {
+        $pdf->addPage(); if (!empty($bd['logo'])) $pdf->image($bd['logo'], $L, 10, 45, 16);
+        $pdf->setColor($navy); $pdf->setFont('B', 15); $pdf->text($R, 18, mb_strtoupper(t('si.statement')), 'R');
+        $pdf->setFont('R', 8.5); $pdf->setColor($gold); $pdf->text($R, 24, $D['doc_no'] . ' · ' . ($ST['from'] ? fmt_date($ST['from']) . ' – ' : '') . fmt_date($ST['to']), 'R');
+        $pdf->setLineWidth(0.6); $pdf->line($L, 30, $R, 30); $y = 36;
+    };
+    $footer = function () use ($pdf, $L, $R, $D, $bd) { $pdf->setFont('R', 7); $pdf->setColor('#6a7179'); $pdf->text($L, 290, ($bd['footer'] ?: $bd['name']) . ' · ' . $D['doc_no']); $pdf->text($R, 290, (string)$pdf->pageNo(), 'R'); };
+    $need = function (float $hh) use (&$y, $header, $footer, $hrow) { if ($y + $hh > 276) { $footer(); $header(); $hrow(); } };
+    $header(); $footer();
+    $pdf->setFont('B', 8); $pdf->setColor($navy); $pdf->text($L, $y, mb_strtoupper(t('pi.from'))); $pdf->text(110, $y, mb_strtoupper(t('po.supplier'))); $y += 4.5;
+    $pdf->setFont('R', 8.5); $pdf->setColor($ink); $yl = $y; foreach (array_merge([(string)$bd['name']], $bd['lines']) as $ln0) foreach ($pdf->wrap((string)$ln0, 88) as $ln) { $pdf->text($L, $yl, $ln); $yl += 4; }
+    $addr = array_values(array_filter([(string)$S['name'], (string)($S['address'] ?? ''), trim(($S['postal_code'] ?? '') . ' ' . ($S['city'] ?? '') . ' ' . ($S['country'] ?? '')), !empty($S['vat_no']) ? 'VAT ' . $S['vat_no'] : '']));
+    $yr = $y; foreach ($addr as $ln0) foreach ($pdf->wrap($ln0, 85) as $ln) { $pdf->text(110, $yr, $ln); $yr += 4; }
+    $y = max($yl, $yr) + 4;
+    $y += $pdf->paragraph($L, $y, $W, t('si.st_intro', ['d' => fmt_date($ST['to'])]), 4.2) + 3;
+    $hrow();
+    if ($ST['from']) { $pdf->setFont('R', 7.6); $pdf->setColor($ink); $pdf->text($L + 1.5, $y + 3.8, fmt_date($ST['from'])); $pdf->text($L + 20.5, $y + 3.8, t('si.opening')); $pdf->text($R - 1.5, $y + 3.8, $n((float)$ST['opening']), 'R'); $y += 5.6; }
+    if (!$ST['rows'] && !$ST['from']) { $pdf->setFont('R', 8.5); $pdf->setColor($ink); $pdf->text($L + 1.5, $y + 4, t('si.none')); $y += 8; }
+    foreach ($ST['rows'] as $r) {
+        $pdf->setFont('R', 7.4); $ref = (string)$r['ref'] . ($r['kind'] === 'payment' && !empty($r['inv_no']) ? ' · ' . $r['inv_no'] : '') . (!empty($r['pf_no']) ? ' (' . t('si.pf') . ' ' . $r['pf_no'] . ')' : '');
+        $refL = $pdf->wrap($ref, 36); $poL = $pdf->wrap((string)($r['po'] ?? ''), 23); $hh = max(5.4, max(count($refL), count($poL)) * 3.6 + 1.8); $need($hh + 2);
+        $pdf->setColor($r['kind'] === 'payment' ? $green : $ink); $x = $L;
+        $cells = [fmt_date($r['d']), t('si.st_' . $r['kind']), $refL, $poL, $r['due'] ? fmt_date($r['due']) : '', $r['debit'] ? $n($r['debit']) : '', $r['credit'] ? $n($r['credit']) : '', $n((float)$r['balance'])];
+        foreach ($cells as $k => $val) { if (is_array($val)) foreach ($val as $j => $ln) $pdf->text($x + 1.5, $y + 3.8 + $j * 3.6, $ln); else $pdf->text($x + 1.5, $y + 3.8, (string)$val, $cols[$k][2], $cols[$k][1] - 3); $x += $cols[$k][1]; }
+        $y += $hh; $pdf->setColor($line); $pdf->setLineWidth(0.2); $pdf->line($L, $y, $R, $y);
+    }
+    $need(16); $y += 2; $pdf->setFont('B', 8.4); $pdf->setColor($navy); $pdf->text($L + 1.5, $y + 4.5, t('ob.c_total'));
+    $x = $L; foreach ($cols as $k => $c) { if ($k === 5) $pdf->text($x + 1.5, $y + 4.5, $n($D['debit']), 'R', $c[1] - 3); if ($k === 6) $pdf->text($x + 1.5, $y + 4.5, $n($D['credit']), 'R', $c[1] - 3); $x += $c[1]; } $y += 8;
+    $pdf->setColor($gold); $pdf->setLineWidth(0.4); $pdf->line($L, $y, $R, $y); $y += 2;
+    $pdf->setFont('B', 10); $pdf->setColor($navy); $pdf->text($L + 1.5, $y + 5, t('si.balance_due')); $pdf->text($R - 1.5, $y + 5, $m((float)$ST['balance']), 'R'); $y += 11;
+    $need(18); $pdf->setFont('R', 8.5); $pdf->setColor($ink); $y += $pdf->paragraph($L, $y, $W, t('si.st_closing'), 4.2) + 4;
+    $u = current_user(); $pdf->setFont('R', 8); $pdf->setColor('#6a7179'); $pdf->text($L, $y + 3, t('ob.prepared_by') . ': ' . (string)($u['full_name'] ?? '') . ' · ' . $bd['name'] . ' · ' . fmt_date(date('Y-m-d')));
+    return $pdf->bytes($D['doc_no']);
+}
+/** E-mail attachment key  ss:<supplier id>:<from or ->:<to>:pdf|xlsx */
+function si_em_attachment(array $p): ?array {
+    $d = fn($v) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$v) ? (string)$v : null;
+    $D = si_statement_doc((int)($p[1] ?? 0), $d($p[2] ?? ''), $d($p[3] ?? '')); if (!$D) return null;
+    if (($p[4] ?? 'pdf') === 'xlsx') { require_once __DIR__ . '/xlsxw.php'; return [xlsx_bytes(si_statement_sheets($D)), $D['doc_no'] . '.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet']; }
+    return [si_statement_pdf($D), $D['doc_no'] . '.pdf', 'application/pdf'];
 }
 /** Payables aging per supplier: open invoice amounts by days past due (not due · 1–30 · 31–60 · 61–90 · 90+), credit notes deducted from "not due". */
 function si_aging(): array {
@@ -282,4 +363,4 @@ function si_aging(): array {
     uasort($B, fn($a, $b) => $b['total'] <=> $a['total']); return ['rows' => $B, 'totals' => $T];
 }
 /** Open PO lines that can still be invoiced (accepted − invoiced) for the invoice line picker. */
-function si_po_open_lines(int $oid): array { return all("SELECT l.*, l.qty_accepted - l.qty_invoiced AS open_qty FROM po_lines l WHERE l.order_id = ? AND l.status <> 'cancelled' ORDER BY l.seq", [$oid]); }
+function si_po_open_lines(int $oid, bool $ordered = false): array { return all('SELECT l.*, ' . ($ordered ? 'l.qty' : 'l.qty_accepted') . " - l.qty_invoiced AS open_qty FROM po_lines l WHERE l.order_id = ? AND l.status <> 'cancelled' ORDER BY l.seq", [$oid]); }

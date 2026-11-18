@@ -108,6 +108,8 @@ function em_attachment(string $key): ?array {
             return function_exists('col_em_attachment') ? col_em_attachment($p) : null;
         case 'po':   // R80-003: purchase order / RFQ PDF (R88-001: po:<id>:<supplier_id> addresses the RFQ to one invited supplier)
             return function_exists('po_em_attachment') ? po_em_attachment($p) : null;
+        case 'ss':   // R97-118: supplier statement (payables) PDF / Excel
+            return function_exists('si_em_attachment') ? si_em_attachment($p) : null;
         case 'dn':   // R88-001: delivery note PDF
             return function_exists('dn_em_attachment') ? dn_em_attachment($p) : null;
     }

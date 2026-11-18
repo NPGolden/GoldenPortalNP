@@ -6,11 +6,20 @@ if (!function_exists('si_can') || !si_can()) { http_response_code(403); layout_h
 $tab = in_array($_GET['tab'] ?? '', ['invoices', 'requests', 'aging', 'statement'], true) ? $_GET['tab'] : 'invoices';
 $cnt = si_counts(); $sups = sup_list(['status' => 'all']); $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : ''; $pay = si_pay_can(); $mgmt = function_exists('mgmt_can') && mgmt_can();
 $f = ['status' => (string)($_GET['status'] ?? (isset($_GET['status']) ? '' : 'open')), 'supplier_id' => (int)($_GET['supplier_id'] ?? 0), 'q' => trim((string)($_GET['q'] ?? ''))];
+if ($tab === 'statement' && in_array($_GET['format'] ?? '', ['xlsx', 'pdf'], true)) {   // R97-118: the files are sent before any page output (the Excel used to be written into the page)
+    $d = fn($v) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$v) ? (string)$v : null;
+    $D = si_statement_doc((int)($_GET['supplier_id'] ?? 0), $d($_GET['from'] ?? ''), $d($_GET['to'] ?? '') ?: date('Y-m-d'));
+    if ($D) {
+        if ($_GET['format'] === 'xlsx') { require_once __DIR__ . '/../app/xlsxw.php'; xlsx_download($D['doc_no'] . '.xlsx', si_statement_sheets($D)); exit; }
+        $b = si_statement_pdf($D); while (ob_get_level()) ob_end_clean();
+        header('Content-Type: application/pdf'); header('Content-Disposition: ' . (!empty($_GET['dl']) ? 'attachment' : 'inline') . '; filename="' . $D['doc_no'] . '.pdf"'); header('Content-Length: ' . strlen($b)); header('Cache-Control: private, no-store'); header('X-Content-Type-Options: nosniff'); echo $b; exit;
+    }
+}
 layout_head(t('si.title'), 'payables');
 ?>
 <div class="page-head">
   <div><h1>💸 <?= tt('si.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('si.lede') ?></p></div>
-  <div class="btn-row"><a class="btn btn--gold btn--sm" href="<?= url('payable', ['id' => 0]) ?>">+ <?= tt('si.new') ?></a><a class="btn btn--ghost btn--sm" href="<?= url('payable', ['id' => 0, 'kind' => 'credit']) ?>">+ <?= tt('si.new_credit') ?></a></div>
+  <div class="btn-row"><a class="btn btn--gold btn--sm" href="<?= url('payable', ['id' => 0]) ?>">+ <?= tt('si.new') ?></a><?php if (si_pf_has()): ?><a class="btn btn--ghost btn--sm" href="<?= url('payable', ['id' => 0, 'proforma' => 1]) ?>">+ <?= tt('si.new_pf') ?></a><?php endif; ?><a class="btn btn--ghost btn--sm" href="<?= url('payable', ['id' => 0, 'kind' => 'credit']) ?>">+ <?= tt('si.new_credit') ?></a></div>
 </div>
 <div class="kpi kpi--4" style="margin-bottom:10px;">
   <a class="stat gold" href="<?= url('payables', ['status' => 'open']) ?>"><b><?= e(si_money($cnt['open_sum'])) ?></b><?= tt('si.k_open') ?><span class="s"><?= e(t('si.k_open_n', ['n' => $cnt['open']])) ?></span></a>
@@ -23,7 +32,7 @@ layout_head(t('si.title'), 'payables');
 <?php if ($tab === 'invoices'): $rows = si_list($f); [$rows, $pg] = page_list($rows, 'payables', array_filter($f + ['tab' => 'invoices'])); ?>
 <form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1fr 1.2fr 1.6fr auto;">
   <input type="hidden" name="p" value="payables"><input type="hidden" name="tab" value="invoices">
-  <div class="field"><label><?= tt('prq.status') ?></label><select name="status"><option value=""<?= $sel($f['status'], '') ?>><?= tt('prq.all') ?></option><option value="open"<?= $sel($f['status'], 'open') ?>><?= tt('si.f_open') ?></option><option value="overdue"<?= $sel($f['status'], 'overdue') ?>><?= tt('si.k_overdue') ?></option><?php foreach (SI_STATES as $s): ?><option value="<?= $s ?>"<?= $sel($f['status'], $s) ?>><?= tt('si.s_' . $s) ?></option><?php endforeach; ?></select></div>
+  <div class="field"><label><?= tt('prq.status') ?></label><select name="status"><option value=""<?= $sel($f['status'], '') ?>><?= tt('prq.all') ?></option><option value="open"<?= $sel($f['status'], 'open') ?>><?= tt('si.f_open') ?></option><option value="overdue"<?= $sel($f['status'], 'overdue') ?>><?= tt('si.k_overdue') ?></option><?php if (si_pf_has()): ?><option value="proforma"<?= $sel($f['status'], 'proforma') ?>><?= tt('si.f_pf') ?></option><?php endif; ?><?php foreach (SI_STATES as $s): ?><option value="<?= $s ?>"<?= $sel($f['status'], $s) ?>><?= tt('si.s_' . $s) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label><?= tt('po.supplier') ?></label><select name="supplier_id"><option value=""><?= tt('flt.any') ?></option><?php foreach ($sups as $s): ?><option value="<?= (int)$s['id'] ?>"<?= $sel($s['id'], $f['supplier_id']) ?>><?= e($s['name']) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label><?= tt('pr.search') ?></label><input name="q" value="<?= e($f['q']) ?>" placeholder="<?= tt('si.search_ph') ?>"></div>
   <div class="field"><label>&nbsp;</label><button class="btn btn--sm" type="submit"><?= tt('btn.apply') ?></button></div>
@@ -37,8 +46,8 @@ layout_head(t('si.title'), 'payables');
   <?php foreach ($rows as $r): $od = $r['due_date'] && in_array($r['status'], ['checked', 'disputed', 'requested', 'approved'], true) && $r['due_date'] < date('Y-m-d'); ?>
     <tr<?= $r['kind'] === 'credit' ? ' style="background:rgba(201,162,39,.06)"' : '' ?>>
       <td><?php if ($r['status'] === 'checked'): ?><input type="checkbox" name="inv[]" value="<?= (int)$r['id'] ?>" data-sup="<?= (int)$r['supplier_id'] ?>"><?php elseif (in_array($r['status'], ['draft', 'disputed'], true)): /* R97-066: say why there is no tick box */ ?><a class="btn btn--ghost btn--sm" href="<?= url('payable', ['id' => (int)$r['id']]) ?>" title="<?= tt('si.tick_why') ?>" style="white-space:nowrap;">☑ <?= tt('si.tick_check') ?></a><?php endif; ?></td>
-      <td><a href="<?= url('payable', ['id' => (int)$r['id']]) ?>" style="font-family:var(--mono);"><?= e($r['si_no']) ?></a><?= $r['kind'] === 'credit' ? ' ' . pill('gold', t('si.credit')) : '' ?></td>
-      <td><?= e($r['supplier']) ?></td><td><?= e($r['inv_no']) ?></td>
+      <td><a href="<?= url('payable', ['id' => (int)$r['id']]) ?>" style="font-family:var(--mono);"><?= e($r['si_no']) ?></a><?= $r['kind'] === 'credit' ? ' ' . pill('gold', t('si.credit')) : '' ?><?= si_pf_pill($r) ?></td>
+      <td><?= e($r['supplier']) ?></td><td><?= e($r['inv_no']) ?><?= !empty($r['proforma_no']) ? '<br><small class="hint">' . tt('si.pf') . ' ' . e($r['proforma_no']) . '</small>' : '' ?></td>
       <td><?= $r['order_id'] ? '<a href="' . url('purchase_order', ['id' => (int)$r['order_id']]) . '" style="font-family:var(--mono);">' . e($r['po_no']) . '</a>' : '—' ?><?= $r['sub_code'] ? '<br><small class="hint">' . e($r['project_code'] . ' · ' . $r['sub_code']) . '</small>' : '' ?></td>
       <td><?= fmt_date($r['issue_date']) ?></td><td<?= $od ? ' style="color:var(--red)"' : '' ?>><?= fmt_date($r['due_date']) ?></td>
       <td class="num"><?= e(si_money((float)$r['gross'], $r['currency'])) ?></td><td class="num"><?= (float)$r['open_amount'] > 0.005 && $r['status'] !== 'cancelled' ? e(si_money((float)$r['open_amount'], $r['currency'])) : '—' ?></td>
@@ -91,14 +100,14 @@ layout_head(t('si.title'), 'payables');
 </div>
 
 <?php else: $sid = (int)($_GET['supplier_id'] ?? 0); $from = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['from'] ?? '')) ? $_GET['from'] : null; $to = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['to'] ?? '')) ? $_GET['to'] : date('Y-m-d'); $ST = $sid ? si_statement($sid, $from, $to) : null; $S = $sid ? sup_load($sid) : null;
-if ($ST && ($_GET['format'] ?? '') === 'xlsx') { require_once __DIR__ . '/../app/xlsxw.php'; $rows = []; if ($from) $rows[] = [$from, t('si.opening'), '', '', '', '', '', (float)$ST['opening']]; foreach ($ST['rows'] as $r) $rows[] = [$r['d'], t('si.st_' . $r['kind']), $r['ref'], $r['si_no'] ?? ($r['inv_no'] ?? ''), $r['po'] ?? '', $r['due'] ?? '', $r['debit'] ?: null, $r['credit'] ?: null, (float)$r['balance']]; xlsx_download('Statement-' . preg_replace('/[^A-Za-z0-9]/', '_', $S['name']) . '-' . $to . '.xlsx', [['name' => 'Statement', 'first' => true, 'header' => [t('si.date'), t('si.kind'), t('si.ref'), t('si.no'), t('po.no'), t('si.due'), t('si.debit'), t('si.credit_col'), t('si.balance')], 'rows' => $rows]]); exit; } ?>
+?>
 <form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1.4fr 1fr 1fr auto auto;">
   <input type="hidden" name="p" value="payables"><input type="hidden" name="tab" value="statement">
   <div class="field"><label><?= tt('po.supplier') ?></label><select name="supplier_id" required><option value=""><?= tt('flt.any') ?></option><?php foreach ($sups as $s): ?><option value="<?= (int)$s['id'] ?>"<?= $sel($s['id'], $sid) ?>><?= e($s['name']) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label><?= tt('si.from') ?></label><input name="from" type="date" value="<?= e($from ?? '') ?>"></div>
   <div class="field"><label><?= tt('si.to') ?></label><input name="to" type="date" value="<?= e($to) ?>"></div>
   <div class="field"><label>&nbsp;</label><button class="btn btn--sm" type="submit"><?= tt('btn.apply') ?></button></div>
-  <div class="field"><label>&nbsp;</label><?php if ($ST): ?><a class="btn btn--ghost btn--sm" href="<?= url('payables', ['tab' => 'statement', 'supplier_id' => $sid, 'from' => $from ?? '', 'to' => $to, 'format' => 'xlsx']) ?>">⤓ Excel</a><?php endif; ?></div>
+  <div class="field"><label>&nbsp;</label><?php if ($ST): ?><span class="btn-row"><a class="btn btn--gold btn--sm" target="_blank" rel="noopener" href="<?= url('payables', ['tab' => 'statement', 'supplier_id' => $sid, 'from' => $from ?? '', 'to' => $to, 'format' => 'pdf']) ?>">⤓ PDF</a><a class="btn btn--ghost btn--sm" href="<?= url('payables', ['tab' => 'statement', 'supplier_id' => $sid, 'from' => $from ?? '', 'to' => $to, 'format' => 'xlsx']) ?>">⤓ Excel</a></span><?php endif; ?></div>
 </form>
 <div class="card">
   <?php if (!$ST): ?><p class="hint"><?= tt('si.st_pick') ?></p><?php else: $cur = $S['sup_currency'] ?: 'EUR'; ?>
@@ -110,5 +119,9 @@ if ($ST && ($_GET['format'] ?? '') === 'xlsx') { require_once __DIR__ . '/../app
   </tbody></table>
   <?php endif; ?>
 </div>
+<?php if ($ST && function_exists('em_card_html')): $stKey = 'ss:' . $sid . ':' . ($from ?: '-') . ':' . $to . ':%s';
+  $sp = function_exists('po_people') ? po_people(['supplier_email' => null, 'supplier_contact' => null, 'supplier' => $S['name'], 'supplier_id' => $sid, 'supplier_co_email' => $S['email'] ?? null]) : []; ?>
+<div style="margin-top:10px;"><?= em_card_html(['kind' => 'sup_statement', 'company_id' => $sid, 'ctx' => ['no' => 'SUP-STMT-' . $sid . '-' . str_replace('-', '', $to), 'title' => '', 'vessel' => '', 'customer' => (string)$S['name'], 'project' => '', 'doc' => t('si.statement') . ' ' . fmt_date($to), 'project_id' => 0], 'people' => $sp, 'atts' => [[sprintf($stKey, 'pdf'), t('si.st_att_pdf', ['s' => $S['name']])], [sprintf($stKey, 'xlsx'), t('si.st_att_xlsx')]], 'back' => url('payables', ['tab' => 'statement', 'supplier_id' => $sid, 'from' => $from ?? '', 'to' => $to])]) ?></div>
+<?php endif; ?>
 <?php endif; ?>
 <?php layout_foot();
