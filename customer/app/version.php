@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.181.0';
+const CP_VERSION = '1.182.0';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-109', 'version' => '1.182.0', 'date' => '2026-11-18', 'title' => 'Warehouse: page Received per project and vessel — what is in the warehouse for each project (bought for it or reserved from stock), sent and still to come; delivery notes issued from ticked lines and quantities, one per sub-project or per project; a cancelled note reserves the goods again for the same requisition.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-108', 'version' => '1.181.0', 'date' => '2026-11-18', 'title' => 'One path to purchase orders: a purchase order or RFQ states its purpose (Project, Stock, Own use); a BOM workbook can be imported into a draft requisition; an approved requisition creates draft purchase orders per supplier like a BOM; the RFQs of a sub-project are listed with its orders.', 'db' => 'install/migrate_cp_r97_108_po_purpose.sql', 'check' => 'r98j'],
         ['ref' => 'GAS-CP-R97-107', 'version' => '1.180.0', 'date' => '2026-11-18', 'title' => 'Inventory proposals everywhere: free-text lines of requisitions, purchase orders and BOMs show similar inventory items with stock; System Budget BOM review too; a part number that is our code without its maker prefix counts as a match; new inventory codes only by Procurement, who can turn a free-text line into an item; tool to fill maker part numbers from our codes per prefix, with undo.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-106', 'version' => '1.179.0', 'date' => '2026-11-18', 'title' => 'Similar inventory items (same or similar code, maker part number or description, with stock) are proposed in the BOM import review and on purchase orders; a BOM workbook can be imported into a draft purchase order or RFQ; a BOM revision can be deleted with a reason by management too, unless requisitions or order lines made from it exist.', 'db' => 'install/migrate_cp_r97_106_bom_deleted.sql', 'check' => 'r98i'],

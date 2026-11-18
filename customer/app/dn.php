@@ -81,6 +81,11 @@ function dn_cancel(int $id, string $note): void {
     foreach (dn_lines($id) as $l) { if (!$l['item_id'] || !$l['move_id']) continue; $mv = one('SELECT * FROM inv_moves WHERE id = ?', [(int)$l['move_id']]); if (!$mv) continue;
         stk_move((int)$l['item_id'], (int)$mv['warehouse_id'], 'in', abs((float)$mv['qty']), ['unit_price' => $mv['unit_price'], 'project_id' => $mv['project_id'], 'subproject_id' => $mv['subproject_id'], 'reason' => $d['kind'] === 'customer' ? 'return_customer' : 'return_project', 'ref_kind' => 'dn', 'ref_id' => $id, 'ref_no' => $d['dn_no'], 'company_id' => $mv['company_id'], 'note' => t('dn.cancelled_note', ['no' => $d['dn_no']])]);
         if ($l['pr_line_id']) q('UPDATE pr_lines SET qty_issued = GREATEST(0, qty_issued - ?), status = IF(status = \'issued\', \'received\', status) WHERE id = ?', [(float)$l['qty'], (int)$l['pr_line_id']]);
+        if ($l['pr_line_id']) {   // R97-109: the goods are back in the warehouse for the same requisition — reserved again, so they can go on another note
+            q('UPDATE pr_lines SET qty_reserved = qty_reserved + ?, warehouse_id = COALESCE(warehouse_id, ?) WHERE id = ?', [(float)$l['qty'], (int)$mv['warehouse_id'], (int)$l['pr_line_id']]);
+            q('UPDATE inv_stock SET qty_reserved = qty_reserved + ? WHERE item_id = ? AND warehouse_id = ?', [(float)$l['qty'], (int)$l['item_id'], (int)$mv['warehouse_id']]);
+            q("UPDATE pr_requests r JOIN pr_lines pl ON pl.request_id = r.id SET r.status = 'approved' WHERE pl.id = ? AND r.status = 'closed'", [(int)$l['pr_line_id']]);
+        }
     }
     $u = current_user(); q('UPDATE inv_delivery_notes SET status = ?, note = CONCAT(COALESCE(note, \'\'), ?) WHERE id = ?', ['cancelled', "\n[" . date('Y-m-d') . ' ' . $u['full_name'] . '] ' . t('dn.cancelled') . ($note !== '' ? ': ' . mb_substr($note, 0, 300) : ''), $id]);
     cache_bump_later('inv');
@@ -188,3 +193,57 @@ function dni_back_from_post(): int {
     $c2 = q("UPDATE inv_dn_lines SET inv_state = 'open' WHERE inv_state = 'invoice' AND id IN ($in) AND ? = 'invoice'", [(string)($_POST['from'] ?? '')]);
     return ($c1 && method_exists($c1, 'rowCount') ? $c1->rowCount() : 0) + ($c2 && method_exists($c2, 'rowCount') ? $c2->rowCount() : 0);
 }
+
+/* ------------------------------------------------------------------ R97-109: what the warehouse holds per vessel, project and sub-project — and delivery notes made from a selection */
+/** Lines of approved project requisitions (goods bought for the project are reserved at receipt; stock covering a requisition is reserved at approval) and lines of
+ *  project purchase orders that did not come from a requisition. Each row: key, src (pr|po), ids, texts, qty, received, ready (in the warehouse for the project), sent, to come, origin. */
+function whr_rows(array $f = []): array {
+    if (!dn_has()) return []; $w = ''; $a = [];
+    if (!empty($f['project_id'])) { $w .= ' AND p.id = ?'; $a[] = (int)$f['project_id']; }
+    if (!empty($f['subproject_id'])) { $w .= ' AND s.id = ?'; $a[] = (int)$f['subproject_id']; }
+    if (!empty($f['vessel_id'])) { $w .= ' AND p.vessel_id = ?'; $a[] = (int)$f['vessel_id']; }
+    if (!empty($f['ids']) && is_array($f['ids'])) { foreach (['pr' => 'l.id', 'po' => 'pl.id'] as $k => $col) { $ids = array_map('intval', $f['ids'][$k] ?? []); $f['_in'][$k] = ' AND ' . $col . ' IN (' . ($ids ? implode(',', $ids) : '0') . ')'; } }
+    $head = "p.id AS project_id, p.project_code, p.name AS project_name, p.vessel_id, v.name AS vessel, s.id AS subproject_id, s.code AS sub_code, s.name AS sub_name";
+    $rows = [];
+    try {
+        foreach (all("SELECT 'pr' AS src, l.id AS line_id, r.id AS doc_id, r.pr_no AS doc_no, $head, l.item_id, i.code AS item_code, l.description, l.unit, l.qty, l.qty_received AS received, l.qty_reserved AS ready, l.qty_issued AS sent, l.qty_ordered AS ordered, COALESCE(l.warehouse_id, 0) AS warehouse_id
+                      FROM pr_lines l JOIN pr_requests r ON r.id = l.request_id JOIN projects p ON p.id = r.project_id LEFT JOIN subprojects s ON s.id = r.subproject_id LEFT JOIN vessels v ON v.id = p.vessel_id LEFT JOIN inv_items i ON i.id = l.item_id
+                      WHERE r.status IN ('approved','closed') AND l.status <> 'cancelled' AND l.item_id IS NOT NULL" . $w . ($f['_in']['pr'] ?? '') . " ORDER BY v.name, p.project_code, s.code, r.id, l.seq LIMIT 3000", $a) as $x) $rows[] = $x;
+        if (function_exists('po_has') && po_has()) foreach (all("SELECT 'po' AS src, pl.id AS line_id, o.id AS doc_id, o.po_no AS doc_no, $head, pl.item_id, i.code AS item_code, pl.description, pl.unit, pl.qty, pl.qty_accepted AS received, 0 AS ready,
+                      (SELECT COALESCE(SUM(d.qty), 0) FROM inv_dn_lines d JOIN inv_delivery_notes n ON n.id = d.dn_id WHERE d.po_line_id = pl.id AND n.status = 'issued') AS sent, pl.qty AS ordered, COALESCE(o.warehouse_id, 0) AS warehouse_id
+                      FROM po_lines pl JOIN po_orders o ON o.id = pl.order_id JOIN projects p ON p.id = o.project_id LEFT JOIN subprojects s ON s.id = o.subproject_id LEFT JOIN vessels v ON v.id = p.vessel_id LEFT JOIN inv_items i ON i.id = pl.item_id
+                      WHERE o.kind = 'po' AND o.status NOT IN ('draft','cancelled') AND pl.status <> 'cancelled' AND (pl.pr_line_id IS NULL OR pl.item_id IS NULL)" . $w . ($f['_in']['po'] ?? '') . " ORDER BY v.name, p.project_code, s.code, o.id, pl.seq LIMIT 3000", $a) as $x) $rows[] = $x;
+    } catch (Throwable $e) { return []; }
+    $out = []; $show = (string)($f['show'] ?? 'ready');
+    foreach ($rows as $x) {
+        $x['qty'] = (float)$x['qty']; $x['received'] = (float)$x['received']; $x['sent'] = (float)$x['sent'];
+        if ($x['src'] === 'po') { $x['ready'] = max(0.0, $x['received'] - $x['sent']); $x['origin'] = 'order'; $x['come'] = max(0.0, $x['qty'] - $x['received']); }
+        else { $x['ready'] = (float)$x['ready']; $x['origin'] = $x['received'] > 0.0005 ? 'order' : 'stock'; $x['come'] = max(0.0, $x['qty'] - $x['ready'] - $x['sent']); }
+        $x['key'] = $x['src'] . '-' . (int)$x['line_id'];
+        if ($show === 'ready' && $x['ready'] <= 0.0005) continue; if ($show === 'open' && $x['ready'] <= 0.0005 && $x['come'] <= 0.0005) continue;
+        $out[] = $x;
+    }
+    usort($out, fn($a, $b) => [(string)$a['vessel'], (string)$a['project_code'], (string)$a['sub_code'], $a['src'], (int)$a['doc_id'], (int)$a['line_id']] <=> [(string)$b['vessel'], (string)$b['project_code'], (string)$b['sub_code'], $b['src'], (int)$b['doc_id'], (int)$b['line_id']]);
+    return $out;
+}
+/** Delivery notes from the ticked lines: one per sub-project (or one per project) and warehouse. Quantities are checked again against what is in the warehouse now. Returns the ids. */
+function whr_create_from_post(): array {
+    require_pr_wh(); $pick = (array)($_POST['pick'] ?? []); $qty = (array)($_POST['qty'] ?? []); $ids = ['pr' => [], 'po' => []];
+    foreach ($pick as $k => $on) { if (!$on || !preg_match('/^(pr|po)-(\d+)$/', (string)$k, $m)) continue; $ids[$m[1]][] = (int)$m[2]; }
+    if (!$ids['pr'] && !$ids['po']) throw new RuntimeException(t('whr.need_pick'));
+    $perSub = ($_POST['split'] ?? 'sub') !== 'project'; $G = [];
+    foreach (whr_rows(['ids' => $ids, 'show' => 'all']) as $x) {
+        $q = (float) str_replace(',', '.', (string)($qty[$x['key']] ?? '')); if ($q <= 0) continue;
+        if ($q > $x['ready'] + 0.0005) throw new RuntimeException(t('whr.too_much', ['c' => (string)($x['item_code'] ?: $x['description']), 'q' => stk_qty($x['ready'])]));
+        $wh = (int)$x['warehouse_id'] ?: stk_default_wh(); $gk = (int)$x['project_id'] . '|' . ($perSub ? (int)$x['subproject_id'] : 0) . '|' . $wh;
+        $G[$gk] = $G[$gk] ?? ['project_id' => (int)$x['project_id'], 'subproject_id' => $perSub ? (int)$x['subproject_id'] : 0, 'warehouse_id' => $wh, 'lines' => []];
+        $G[$gk]['lines'][] = ['item_id' => (int)$x['item_id'], 'description' => (string)$x['description'], 'unit' => (string)$x['unit'], 'qty' => $q, 'pr_line_id' => $x['src'] === 'pr' ? (int)$x['line_id'] : 0, 'po_line_id' => $x['src'] === 'po' ? (int)$x['line_id'] : 0, 'skip_move' => !(int)$x['item_id'], 'note' => (string)$x['doc_no']];
+    }
+    if (!$G) throw new RuntimeException(t('whr.need_pick'));
+    $h = ['kind' => 'project', 'issued_at' => (string)($_POST['issued_at'] ?? ''), 'address' => (string)($_POST['address'] ?? ''), 'attention' => (string)($_POST['attention'] ?? ''), 'carrier' => (string)($_POST['carrier'] ?? ''), 'ref_no' => (string)($_POST['ref_no'] ?? ''), 'note' => (string)($_POST['note'] ?? '')];
+    $out = []; $pdo = db(); $own = !$pdo->inTransaction(); if ($own) $pdo->beginTransaction();
+    try { foreach ($G as $g) $out[] = dn_create($h + ['project_id' => $g['project_id'], 'subproject_id' => $g['subproject_id'], 'warehouse_id' => $g['warehouse_id']], $g['lines']); if ($own) $pdo->commit(); }
+    catch (Throwable $e) { if ($own && $pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+    return $out;
+}
+
