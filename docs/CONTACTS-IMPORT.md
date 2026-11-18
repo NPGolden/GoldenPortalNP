@@ -2983,3 +2983,19 @@ The page on screen stays the internal version for staff.
 **Tests (sandbox) — forms posted**: monthly Word and print view, vessel history PDF: internal version has the internal note / issue and the label Internal, the Owner's copy only the external ones and the label Owner's copy; file names; filing Owner's and Internal copies of both with the right visibility; the filed Owner's monthly file re-read; card lists the earlier revisions by kind; Make internal for one and for all; refused for an account without the right; no PHP errors. Not tested: the reports opened by a customer account (unchanged path).
 
 **Security review**: the three customer-facing reports now have one rule and one switch. No further proposal; open point for the user — go through the list in System health.
+
+## §385 v1.176.0 (R97-101) — Inventory import: template, ERP export with a title line
+
+**Why**: the inventory import (R79-001) expected the header on the first line and offered no template. The ERP warehouse export starts with a title line, so the upload answered "columns not found".
+
+**Template** (`stk_import_template()` in `app/inv.php`, `inventory_import&template=1`, procurement administrators only): workbook `GAS-inventory-import-template.xlsx`, sheet Inventory (Code, Description, Description EN, Category, Unit, Qty, Last price, Location, Maker, Factory code, Barcode, Min stock, Supplier, one example line) and sheet Read me. The headers are the English names the column map already knows.
+
+**Header search** (`stk_import_parse()`): the header is the first of the first 15 lines that maps both code and description; the lines above it are skipped, warnings keep the line numbers of the file, the preview shows "Header found on line n" (`header_line`) when it is not line 1.
+
+**Other**: pack units written as 10ΤΜΧ are packs (`stk_unit_norm()`, `stk_pack_from_unit()`); a file with more than `STK_IMPORT_MAX` = 30 000 lines is refused; `stk_import_apply()` allows 900 s and continues when the browser connection drops (everything in one transaction, as before).
+
+**The company's item list is not in the repository**: it was prepared as a workbook for upload (header on line 1, codes trimmed, non-warehouse lines moved to a second sheet) and handed to the user.
+
+**Tests (sandbox) — forms posted**: template download (administrator 200, staff without procurement rights 403, HR redirected); upload of an ERP export with title line (header found on line 2) and of the prepared workbook; Apply in mode full with about 14 000 lines: 16 s, items, opening stock, prices and categories as in the file; the same file applied again: nothing new, no stock or price doubled (6 s); inventory list, search, valuation and item card with that volume under 0.3 s; a file that is not a workbook and the template itself uploaded; no new lines in the PHP error log. Not tested: the duration on the live hosting and behind the WAF.
+
+**Security review**: the import stays limited to procurement administrators, CSRF-protected, nothing is written before Apply. New: the line limit. Proposal: refuse workbooks whose sheet is larger than a set size when unpacked, in `xlsx_rows()`, for all imports.

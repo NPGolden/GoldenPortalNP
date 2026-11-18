@@ -36,10 +36,10 @@ function stk_unit_norm(string $u): string {
     $u = mb_strtolower(trim($u)); if ($u === '') return 'pcs';
     $m = ['τεμ' => 'pcs', 'τεμ.' => 'pcs', 'pcs' => 'pcs', 'pc' => 'pcs', 'τμχ' => 'pcs', 'm' => 'm', 'μ' => 'm', 'mtr' => 'm', 'kg' => 'kg', 'set' => 'set', 'σετ' => 'set', 'm2' => 'm2', 'lt' => 'l', 'l' => 'l', 'sys' => 'sys', 'h' => 'h'];
     if (isset($m[$u])) return $m[$u];
-    if (preg_match('/^(\d+)\s*(τμ|τεμ|tmx|pcs)$/u', $u)) return 'pack';
+    if (preg_match('/^(\d+)\s*(τμχ|τμ|τεμ|tmx|pcs)$/u', $u)) return 'pack';
     return mb_substr($u, 0, 12);
 }
-function stk_pack_from_unit(string $u): ?float { return preg_match('/^(\d+)\s*(τμ|τεμ|tmx|pcs)$/iu', trim($u), $m) ? (float)$m[1] : null; }
+function stk_pack_from_unit(string $u): ?float { return preg_match('/^(\d+)\s*(τμχ|τμ|τεμ|tmx|pcs)$/iu', trim($u), $m) ? (float)$m[1] : null; }
 
 /* ------------------------------------------------------------------ categories & warehouses */
 function stk_categories(bool $activeOnly = true): array { if (!stk_has()) return []; return all('SELECT c.*, (SELECT COUNT(*) FROM inv_items i WHERE i.category_id = c.id) AS n_items FROM inv_categories c ' . ($activeOnly ? 'WHERE c.is_active = 1 ' : '') . 'ORDER BY c.sort_order, c.name'); }
@@ -290,25 +290,41 @@ function stk_import_map(array $header): array {
     foreach ($header as $i => $h) { $n = mb_strtolower(trim((string)$h)); if ($n === '') continue; foreach ($H as $k => $alts) if (!isset($map[$k]) && in_array($n, $alts, true)) { $map[$k] = $i; break; } }
     return $map;
 }
+const STK_IMPORT_MAX = 30000;   // rows in one file
+/** The empty import workbook with one example line (R97-101). */
+function stk_import_template(): void {
+    require_pr_admin(); require_once __DIR__ . '/xlsxw.php';
+    xlsx_download('GAS-inventory-import-template.xlsx', [
+        ['name' => 'Inventory', 'first' => true, 'header' => ['Code', 'Description', 'Description EN', 'Category', 'Unit', 'Qty', 'Last price', 'Location', 'Maker', 'Factory code', 'Barcode', 'Min stock', 'Supplier'],
+         'rows' => [['EXM.1000-27', 'Example part — delete this line', 'Example part', 'Enclosures', 'pcs', 12, 1.30, 'SHELF 1', 'Example Maker', '1000-27', '5200000000001', 5, 'Example Marine Electric S.A.']],
+         'widths' => [22, 46, 34, 22, 8, 9, 11, 14, 20, 20, 16, 10, 30]],
+        ['name' => 'Read me', 'header' => ['Column', 'Required', 'What to enter'],
+         'rows' => [['Code', 'yes', 'The item code, unique. A line whose code already exists updates that item.'], ['Description', 'yes', 'Up to 255 characters.'], ['Description EN', 'no', 'English description when the first one is Greek.'], ['Category', 'no', 'A missing category is created.'], ['Unit', 'no', 'pcs, m, kg, set, m2, l, sys, h — or the ERP units (ΤΕΜ, 100ΤΜ = pack of 100). Empty = pcs.'], ['Qty', 'no', 'Stock on hand in the warehouse chosen at step 3. Empty = stock not touched.'], ['Last price', 'no', 'Last buying price per unit in EUR, without VAT. Empty = no price line.'], ['Location', 'no', 'Shelf / bin.'], ['Maker', 'no', 'Manufacturer.'], ['Factory code', 'no', 'The maker\'s part number.'], ['Barcode', 'no', 'EAN / barcode.'], ['Min stock', 'no', 'Level below which the item is shown as low.'], ['Supplier', 'no', 'Preferred supplier by name; a missing one is created.'], ['', '', 'Keep the header line. The ERP warehouse export (Κωδικός · Περιγραφή · Υπόλοιπο · Μ.Μ …) can also be uploaded as it is, title line included.']],
+         'widths' => [18, 10, 100]],
+    ]);
+}
 /** Parse the file → rows ready to apply + warnings; nothing written. */
 function stk_import_parse(string $path): array {
     require_once __DIR__ . '/xlsx.php'; $rows = xlsx_rows($path); if (count($rows) < 2) throw new RuntimeException(t('stk.imp_empty'));
-    $map = stk_import_map($rows[0]); if (!isset($map['code'], $map['description'])) throw new RuntimeException(t('stk.imp_no_cols'));
+    if (count($rows) > STK_IMPORT_MAX + 20) throw new RuntimeException(t('stk.imp_too_many', ['n' => STK_IMPORT_MAX]));
+    $hdr = null; $map = [];   // R97-101: the ERP export carries a title line above the header — the header is looked for in the first 15 lines
+    foreach (array_slice($rows, 0, 15, true) as $hi => $hr) { $m = stk_import_map((array)$hr); if (isset($m['code'], $m['description'])) { $hdr = $hi; $map = $m; break; } }
+    if ($hdr === null) throw new RuntimeException(t('stk.imp_no_cols'));
     $out = []; $warn = []; $seen = []; $existing = []; foreach (all('SELECT id, code FROM inv_items') as $e) $existing[$e['code']] = (int)$e['id'];
     $num = function ($v): ?float { $v = trim((string)$v); if ($v === '') return null; $v = str_replace(['€', ' '], '', $v); if (preg_match('/^-?\d{1,3}(\.\d{3})+(,\d+)?$/', $v)) $v = str_replace('.', '', $v); $v = str_replace(',', '.', $v); return is_numeric($v) ? (float)$v : null; };
-    foreach (array_slice($rows, 1) as $i => $r) {
-        $line = $i + 2; $g = fn(string $k) => isset($map[$k]) ? trim((string)($r[$map[$k]] ?? '')) : '';
+    foreach (array_slice($rows, $hdr + 1) as $i => $r) {
+        $line = $i + $hdr + 2; $g = fn(string $k) => isset($map[$k]) ? trim((string)($r[$map[$k]] ?? '')) : '';
         $code = $g('code'); $desc = $g('description'); if ($code === '' && $desc === '') continue;
         if ($code === '') { $warn[] = t('stk.imp_w_nocode', ['l' => $line]); continue; } if ($desc === '') { $warn[] = t('stk.imp_w_nodesc', ['l' => $line, 'c' => $code]); continue; }
         if (isset($seen[$code])) { $warn[] = t('stk.imp_w_dup', ['l' => $line, 'c' => $code]); continue; } $seen[$code] = true;
         $qty = $num($g('qty')); $price = $num($g('price')); $unitRaw = $g('unit');
         $out[] = ['line' => $line, 'code' => mb_substr($code, 0, 60), 'description' => mb_substr($desc, 0, 255), 'description_en' => mb_substr($g('description_en'), 0, 255) ?: null, 'qty' => $qty, 'unit' => stk_unit_norm($unitRaw), 'pack_qty' => stk_pack_from_unit($unitRaw), 'price' => $price, 'location' => mb_substr($g('location'), 0, 60) ?: null, 'category' => mb_substr($g('category'), 0, 120) ?: null, 'barcode' => mb_substr($g('barcode'), 0, 64) ?: null, 'factory_code' => mb_substr($g('factory_code'), 0, 80) ?: null, 'maker' => mb_substr($g('maker'), 0, 80) ?: null, 'min_stock' => $num($g('min_stock')), 'supplier' => mb_substr($g('supplier'), 0, 160) ?: null, 'exists' => isset($existing[$code])];
     }
-    return ['rows' => $out, 'warnings' => $warn, 'map' => $map, 'n_new' => count(array_filter($out, fn($r) => !$r['exists'])), 'n_upd' => count(array_filter($out, fn($r) => $r['exists'])), 'n_price' => count(array_filter($out, fn($r) => $r['price'] !== null)), 'n_qty' => count(array_filter($out, fn($r) => $r['qty'] !== null))];
+    return ['rows' => $out, 'warnings' => $warn, 'map' => $map, 'header_line' => $hdr + 1, 'n_new' => count(array_filter($out, fn($r) => !$r['exists'])), 'n_upd' => count(array_filter($out, fn($r) => $r['exists'])), 'n_price' => count(array_filter($out, fn($r) => $r['price'] !== null)), 'n_qty' => count(array_filter($out, fn($r) => $r['qty'] !== null))];
 }
 /** Apply parsed rows. $mode: 'full' (items + opening stock + opening price) | 'items' (no stock) | 'stock' (stock only, as a stocktake count) | 'prices' (price lines only). */
 function stk_import_apply(array $parsed, string $mode, int $whId, string $priceDate): array {
-    require_pr_admin(); $res = ['new' => 0, 'updated' => 0, 'stock' => 0, 'prices' => 0, 'categories' => 0, 'suppliers' => 0]; $u = current_user(); $cats = []; $sups = [];
+    require_pr_admin(); @set_time_limit(900); ignore_user_abort(true); $res = ['new' => 0, 'updated' => 0, 'stock' => 0, 'prices' => 0, 'categories' => 0, 'suppliers' => 0]; $u = current_user(); $cats = []; $sups = [];
     $catOf = function (?string $n) use (&$cats, &$res): ?int { if (!$n) return null; if (!isset($cats[$n])) { $id = stk_category_find($n, false); if (!$id) { $id = stk_category_find($n, true); $res['categories']++; } $cats[$n] = $id; } return $cats[$n]; };
     $supOf = function (?string $n) use (&$sups, &$res): ?int { if (!$n || !co_has()) return null; if (!isset($sups[$n])) { $id = co_find($n, 'supplier', false); if (!$id) { $id = co_find($n, 'supplier', true); $res['suppliers']++; } $sups[$n] = $id; } return $sups[$n]; };
     db()->beginTransaction();
@@ -442,8 +458,8 @@ function sup_import_parse(string $path): array {
     foreach (all('SELECT co.id, co.name, sd.vat_no, sd.erp_code FROM companies co LEFT JOIN supplier_details sd ON sd.company_id = co.id ORDER BY (co.kind = \'supplier\') DESC, co.id') as $e) { /* R84-002: any company of the Contacts module (name is unique) — it becomes a supplier on apply */ if ($e['vat_no']) $byVat[preg_replace('/\D/', '', (string)$e['vat_no'])] = (int)$e['id']; if ($e['erp_code']) $byErp[mb_strtolower((string)$e['erp_code'])] = (int)$e['id']; $byName[mb_strtolower(trim((string)$e['name']))] = (int)$e['id']; }
     $out = []; $warn = []; $seen = []; $nNew = 0; $nUpd = 0;
     $num = function ($v): ?float { $v = str_replace(['%', ' '], '', trim((string)$v)); if ($v === '') return null; $v = str_replace(',', '.', $v); return is_numeric($v) ? (float)$v : null; };
-    foreach (array_slice($rows, 1) as $i => $r) {
-        $line = $i + 2; $g = fn(string $k) => isset($map[$k]) ? trim((string)($r[$map[$k]] ?? '')) : '';
+    foreach (array_slice($rows, $hdr + 1) as $i => $r) {
+        $line = $i + $hdr + 2; $g = fn(string $k) => isset($map[$k]) ? trim((string)($r[$map[$k]] ?? '')) : '';
         $name = mb_substr($g('name'), 0, 160); if ($name === '') continue; $key = mb_strtolower($name); if (isset($seen[$key])) { $warn[] = t('sup.imp_w_dup', ['l' => $line, 'n' => $name]); continue; } $seen[$key] = true;
         $vat = preg_replace('/\D/', '', $g('vat_no')) ?: null; $erp = mb_substr($g('erp_code'), 0, 40) ?: null;
         $id = ($vat && isset($byVat[$vat])) ? $byVat[$vat] : (($erp && isset($byErp[mb_strtolower($erp)])) ? $byErp[mb_strtolower($erp)] : 0);   // R85-003: VAT first, then the ERP's own code (same source system) — never the name
