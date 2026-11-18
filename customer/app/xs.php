@@ -29,8 +29,22 @@ function xs_has(): bool { static $h = null; if ($h === null) { try { $h = (bool)
 function xs_can_edit(int $pid): bool {
     if (!xs_has() || !is_staff()) return false;
     if (is_cp_admin() || (function_exists('mgmt_can') && mgmt_can())) return true;
+    if (xs_quality()) return true;   // R97-120
     $uid = (int)(current_user()['id'] ?? 0);
     return $uid && ((int) scalar('SELECT pm_user_id FROM projects WHERE id = ?', [$pid]) === $uid || (function_exists('pm_is_pm') && pm_is_pm()));
+}
+/** R97-120: Quality (QHSE position, discipline or team) keeps the milestones and the safety log of every project. */
+function xs_quality(): bool { return is_staff() && ((function_exists('qh_role') && qh_role()) || (function_exists('qh_can') && qh_can() && function_exists('qh_team') && in_array((int)(current_user()['id'] ?? 0), qh_team(), true))); }
+/** Projects for the chooser of the Milestones / Safety log page: the running ones, with what is open on each. */
+function xs_projects(): array {
+    if (!xs_has() || !is_staff()) return []; [$sc, $sa] = scope_sql('p');
+    return all("SELECT p.id, p.project_code, p.name, v.name AS vessel,
+                       (SELECT COUNT(*) FROM pm_milestones m WHERE m.project_id = p.id) ms_n,
+                       (SELECT COUNT(*) FROM pm_milestones m WHERE m.project_id = p.id AND m.achieved_date IS NULL) ms_open,
+                       (SELECT COUNT(*) FROM pm_safety s WHERE s.project_id = p.id) sf_n,
+                       (SELECT MAX(s.event_date) FROM pm_safety s WHERE s.project_id = p.id) sf_last
+                  FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id
+                 WHERE {$sc} AND p.status NOT IN ('quoted','closed','cancelled','lost') ORDER BY p.project_code, p.name", $sa);
 }
 function xs_project(int $pid): ?array { [$sc, $sa] = scope_sql('p'); return one("SELECT p.*, v.name AS vessel FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id WHERE p.id = ? AND {$sc}", array_merge([$pid], $sa)) ?: null; }
 function xs_week(string $d): string { $t = strtotime($d); return 'W' . date('W', $t); }

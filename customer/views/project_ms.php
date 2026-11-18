@@ -2,6 +2,16 @@
 /** Project milestones and safety log — the sources of the Milestones table and the LTI tile of the weekly / monthly reports (GAS-CP-R96-001). ?p=project_ms&project=ID[&edit=<milestone>] */
 require __DIR__ . '/_layout.php';
 $u = require_staff(); $pid = (int)($_GET['project'] ?? 0);
+if (!$pid && function_exists('xs_has') && xs_has()) {   // R97-120: opened from the QHSE menu — choose the project
+    $rows = xs_projects(); layout_head(t('ms.title') . ' · ' . t('sf.title'), 'project_ms'); ?>
+<div class="page-head"><div><h1>🏁 <?= tt('ms.title') ?> · 🦺 <?= tt('sf.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('ms.pick_lede') ?></p></div></div>
+<div class="card"><h2><?= tt('pr.title') ?> <span class="count"><?= count($rows) ?></span></h2>
+  <?php if (!$rows): ?><div class="empty"><?= tt('ms.pick_none') ?></div><?php else: ?>
+  <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('pr.one') ?></th><th><?= tt('pr.vessel') ?></th><th class="num"><?= tt('ms.title') ?></th><th class="num"><?= tt('ms.pick_open') ?></th><th class="num"><?= tt('sf.title') ?></th><th><?= tt('ms.pick_last') ?></th><th></th></tr></thead><tbody>
+  <?php foreach ($rows as $r): ?><tr><td><a href="<?= url('project_ms', ['project' => (int)$r['id']]) ?>"><b><?= e($r['project_code'] ?: '—') ?></b> <?= e($r['name']) ?></a></td><td class="hint"><?= e($r['vessel'] ?? '') ?></td><td class="num"><?= (int)$r['ms_n'] ?></td><td class="num"><?= (int)$r['ms_open'] ? pill('warn', (string)(int)$r['ms_open']) : '0' ?></td><td class="num"><?= (int)$r['sf_n'] ?></td><td class="hint"><?= $r['sf_last'] ? fmt_date($r['sf_last']) : '—' ?></td><td class="row-actions"><a class="btn btn--ghost btn--sm" href="<?= url('project_ms', ['project' => (int)$r['id']]) ?>"><?= tt('ms.pick_go') ?></a></td></tr><?php endforeach; ?>
+  </tbody></table></div><?php endif; ?>
+</div>
+<?php layout_foot(); return; }
 $p = function_exists('xs_has') && xs_has() ? xs_project($pid) : null;
 if (!$p) { http_response_code(404); layout_head(t('err.notfound'), 'projects'); echo '<h1>' . tt('err.notfound') . '</h1>'; layout_foot(); return; }
 $can = xs_can_edit($pid); $self = url('project_ms', ['project' => $pid]);

@@ -511,8 +511,19 @@ function sys_select_options($selected): string {
 /** Pages that show financial data: closed to an account that is fin_blocked(), in the router, before any page code runs. */
 const FIN_PAGES = ['pipeline', 'report_fin', 'report_sales', 'sales', 'admin_sales', 'collections', 'statement', 'cashflow', 'cost_control', 'acc_register', 'acc_report', 'acc_reports', 'acc_vessel', 'dn_invoicing', 'invoice_new', 'proforma', 'proformas', 'payable', 'payables', 'offer', 'offer_edit', 'offers', 'admin_offer_classes', 'admin_offer_statuses', 'admin_offer_texts', 'system_budget', 'system_budget_bom', 'system_budget_checks', 'system_budget_convert', 'system_budget_feed', 'system_budget_import', 'system_budget_proc', 'system_budgets', 'system_budgets_proc'];
 function fin_blocked(): bool {
-    static $v = null; if ($v !== null) return $v; $u = current_user(); if (!$u || !is_staff() || empty($u['staff_role_id'])) return $v = false;
-    try { $n = mb_strtolower(trim((string) scalar('SELECT name FROM staff_roles WHERE id = ?', [(int)$u['staff_role_id']]))); return $v = (bool) preg_match('/\b(qhse|hse|ehs|quality)\b|ποιότητ/u', $n); } catch (Throwable $e) { return $v = false; }
+    static $v = null; if ($v !== null) return $v; $u = current_user(); if (!$u || !is_staff()) return $v = false; if (empty($u['staff_role_id'])) return $v = fin_blocked_more($u);
+    try { $n = mb_strtolower(trim((string) scalar('SELECT name FROM staff_roles WHERE id = ?', [(int)$u['staff_role_id']]))); if (preg_match(FIN_QRX, $n)) return $v = true; } catch (Throwable $e) { return $v = false; }
+    return $v = fin_blocked_more($u);
+}
+/** R97-120: the same words that give a position the QHSE menu (QA, QC, quality, HSE …) now also close the financial data — on the staff role (above),
+ *  on the discipline, and for a member of the QHSE team. Administrators and Management named in the team keep their figures. */
+const FIN_QRX = '/\b(qhse|hse|ehs|quality|qa|qc)\b|ποιότητ|ποιοτικ|ασφάλεια[ςσ]? και υγε/u';
+function fin_blocked_more(array $u): bool {
+    try {
+        if (!empty($u['discipline_id']) && preg_match(FIN_QRX, mb_strtolower(trim((string) scalar('SELECT name FROM disciplines WHERE id = ?', [(int)$u['discipline_id']]))))) return true;
+        if (function_exists('qh_team') && in_array((int)$u['id'], qh_team(), true) && !is_cp_admin() && !(function_exists('mgmt_can') && mgmt_can())) return true;
+    } catch (Throwable $e) {}
+    return false;
 }
 function fin_visible(): bool {
     static $v = null;

@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.185.1** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.185.2** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.185.2 | GAS-CP-R97-120 | 2026-11-18 | Quality: financial data is closed for every Quality position (QA, QC, quality or HSE in the staff role or the discipline, and members of the QHSE team); Quality keeps the Milestones and the Safety log of every project, from the QHSE menu. | — |
 | 1.185.1 | GAS-CP-R97-119 | 2026-11-18 | Sessions: an open page leaves the screen for the sign-in page as soon as the idle time has run out (it used to stay readable until the next click). | — |
 | 1.185.0 | GAS-CP-R97-118 | 2026-11-18 | Payables: supplier statement Excel fixed and now also as PDF with e-mail to the supplier; a supplier proforma can be registered and prepaid and the sales invoice assigned to it later. Inventory: an item can be left out of the valuation. | `install/migrate_cp_r97_118_si_proforma.sql` |
 | 1.184.3 | GAS-CP-R97-117 | 2026-11-18 | Payables: the payment proof uploaded with a payment is attached by itself to the payment e-mail to the supplier (every proof of the invoice, ticked); a warning when a proof cannot be kept. | — |

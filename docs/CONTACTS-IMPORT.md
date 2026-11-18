@@ -3273,3 +3273,21 @@ The page on screen stays the internal version for staff.
 **Not tested**: the real 30-minute wait; a phone browser that suspends timers in the background (the check then runs when the tab is shown again).
 
 **Security review**: closes an exposure — content of an expired session no longer stays on an unattended screen. Cost: one small request per page per idle period and one per tab activation. Proposals (no effect on speed): (1) set the idle time for administrators and Accounting lower than for the rest; (2) a warning one minute before the time-out with "Stay signed in".
+
+## §404 v1.185.2 (R97-120) — Quality: no financial data; Milestones and Safety log
+
+**Asked**: Quality should not see financial data and should have access to Project Milestones and Safety Log.
+
+**Found**: `fin_blocked()` (R97-086) recognised Quality only by the staff-role name `qhse|hse|ehs|quality`, while QHSE access (`QH_RX`) also accepts `qa|qc`; access by discipline or through the QHSE team was not covered at all. The Milestones / Safety log page (`project_ms`) could be read by staff but edited only by administrators, Management and project managers, and was reached only through a project.
+
+**Change**
+- `app/pm.php`: `FIN_QRX` (adds `qa`, `qc`, Greek forms); `fin_blocked()` also true through `fin_blocked_more()`: discipline name matching the same words, or membership of `qh_team()` unless administrator / Management. Everything already hanging on `fin_blocked()` follows (router `FIN_PAGES`, `fin_visible()`, `stk_price_visible()`, `sb_can()`, `col_can()`, accounting flags, `pi_is_sales()`).
+- `app/xs.php`: `xs_quality()`; `xs_can_edit()` true for Quality; `xs_projects()`.
+- `views/project_ms.php`: without a project → chooser of the running projects (milestones, not yet achieved, safety entries, last entry).
+- `views/_layout.php`: QHSE menu item "Milestones & safety log" for accounts with QHSE access.
+
+**Tests (sandbox) — forms posted**: one staff account in four set-ups — role Engineering (offers / pipeline open, no menu item); role "QA/QC Engineer"; discipline "Quality Control"; member of the QHSE team → offers, pipeline, payables redirected to the dashboard, menu item present, safety entry and milestone saved. Administrator named in the team keeps the pages. Test role, discipline, team and entries removed afterwards. Error log clean; sweeps as usual.
+
+**Not tested**: the live roles and disciplines (their names decide who is Quality); every single amount on every page was not walked again — the rule is the one of R97-086, now reached by more accounts.
+
+**Security review**: this narrows access. A position whose name contains QA / QC as a separate word now loses financial data even if it is not meant to be Quality — check the list of staff roles. Proposal (no effect on speed): replace the name rule by a tick "No financial data" on the staff role and the discipline, so the choice is explicit and shown in Administration.
