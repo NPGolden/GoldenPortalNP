@@ -3427,3 +3427,15 @@ The page on screen stays the internal version for staff.
 **Not tested**: a real answer of the assistant on a real offer — how well it matches depends on the document; the proposals are for checking, not for trust. The hosting time limit on a very long PDF.
 
 **Security review**: the offer and the order lines leave the portal for the assistant only when an administrator has ticked the page and the user has the assistant; our prices are not sent — only the lines to be priced; the file is not stored; the answer cannot write anything by itself and can only address lines of this order; values are bound and escaped. Proposals (no effect on speed): (1) keep the offer as a document of the order automatically, so the price can always be traced to its file; (2) a warning when a proposed price differs by more than 20 % from the last buying price.
+
+## §413 v1.190.1 (R97-129) — Purchase order: "Pull requisition line" renamed
+
+**Asked**: what "Pull requisition line" is and where it takes its lines from, since the items of the requisition were converted correctly into the order — then: rename it.
+
+**Answer**: `po_to_buy()` — lines of approved requisitions of the same project / sub-project with `qty − reserved − ordered > 0`, less those already on the order; `po_pull` adds the chosen one. It is an optional extra, not a step of the conversion.
+
+**Change** — `views/purchase_order.php`: label "Still to buy in this project, from other requisitions:" before the selector, button "＋ Add this line to the order", the explanation as tooltip (`po.pull_label`, `po.pull_line`, `po.pull_hint`). The box was already hidden when the list is empty. Older handbook sentence corrected.
+
+**Tests (sandbox)**: page of a draft order with and without open requisition lines; language key counts equal. Error log clean.
+
+**Security review**: wording only — no change of access or data. No proposal.

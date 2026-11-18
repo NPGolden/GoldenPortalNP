@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.190.0** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.190.1** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.190.1 | GAS-CP-R97-129 | 2026-11-19 | Purchase order: the selector of open requisition lines is labelled for what it is — still to buy in this project, from other requisitions — and its button reads "Add this line to the order". | — |
 | 1.190.0 | GAS-CP-R97-128 | 2026-11-19 | Purchase orders: every field of a line is edited in the table and saved with one button; the assistant reads the supplier's offer (PDF, Excel, photo) and proposes price, discount and lead time per line for checking. | — |
 | 1.189.2 | GAS-CP-R97-127 | 2026-11-19 | Procurement: a BOM created with its file attached no longer loses the maker part number; lines without numbers take them from the file and are linked when the part number is in the inventory; the new code prefix.<maker part number> stands in the field and all new items can be created in one step. | — |
 | 1.189.1 | GAS-CP-R97-126 | 2026-11-18 | Procurement: the code written in an imported file stays on a line that names no inventory item and is proposed in "New inventory item"; lines imported earlier take their codes from the same file. | `install/migrate_cp_r97_126_typed_code.sql` |
