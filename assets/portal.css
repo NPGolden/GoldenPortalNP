@@ -2000,3 +2000,20 @@ body.sgn { background: #F3F5F8; margin: 0; }
 .tick-list { max-height: 264px; overflow: auto; border: 1px solid var(--line, #d9dee5); border-radius: 8px; padding: 8px 12px; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 2px 16px; }
 .field .tick-list label.chk { display: flex; align-items: center; gap: 8px; margin: 0; padding: 4px 0; font-size: 13.5px; font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--ink-2); cursor: pointer; }
 .field .tick-list label.chk input { width: 16px; height: 16px; min-width: 16px; flex: 0 0 16px; margin: 0; padding: 0; accent-color: var(--cp-gold); }
+
+/* R97-122 — the HR year: thirteen marks on one line (Jan … Dec, 31 Jan), the steps under it */
+.hry-line { display: grid; grid-template-columns: repeat(13, 1fr); gap: 0; margin: 10px 0 12px; position: relative; }
+.hry-line::before { content: ''; position: absolute; left: 3.8%; right: 3.8%; top: 8px; height: 3px; background: var(--cp-gold, #C9A227); border-radius: 2px; }
+.hry-m { text-align: center; position: relative; font-size: 12px; color: var(--ink-3, #6a7179); }
+.hry-m i { display: block; width: 17px; height: 17px; margin: 0 auto 6px; border-radius: 50%; background: var(--surface, #fff); border: 3px solid #b9c0c9; position: relative; }
+.hry-m b { font-weight: 600; }
+.hry-m.hry-none i { width: 9px; height: 9px; margin-top: 4px; margin-bottom: 10px; border-width: 2px; }
+.hry-m.hry-done i { background: #2E7D32; border-color: #2E7D32; }
+.hry-m.hry-late i { background: #B23B3B; border-color: #B23B3B; }
+.hry-m.hry-due i { background: var(--cp-gold, #C9A227); border-color: var(--cp-gold, #C9A227); }
+.hry-m.hry-soon i { border-color: #1F3A5F; }
+.hry-m.hry-later i { border-color: #1F3A5F; background: #1F3A5F; opacity: .35; }
+.hry-m.is-now b { color: var(--ink, #0B1E2D); text-decoration: underline; text-decoration-color: var(--cp-gold, #C9A227); text-underline-offset: 3px; }
+.hry-tbl td { vertical-align: top; } .hry-tbl .hry-when { width: 74px; white-space: nowrap; }
+.hry-tbl tr.hry-r-due td:first-child { box-shadow: inset 3px 0 0 var(--cp-gold, #C9A227); } .hry-tbl tr.hry-r-late td:first-child { box-shadow: inset 3px 0 0 #B23B3B; }
+@media (max-width: 720px) { .hry-m b { font-size: 10px; } }

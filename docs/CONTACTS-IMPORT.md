@@ -3309,3 +3309,23 @@ The page on screen stays the internal version for staff.
 **Not tested**: a real answer of the assistant; the General Manager step with a real account; the HR-only and employee-only menus in the browser (their page and action lists were extended, the pages were opened as administrator, HR officer and engineer).
 
 **Security review**: the texts are role descriptions, no personal data; the assistant receives the brief and the form fields only. Approvals are tied to the account (discipline manager id, staff role names General Manager / Managing Director, CEO / Owner scope) and checked on the server at each press; an administrator cannot sign for somebody else. An employee reaches only the issue in force of his or her own description. PDFs are sent `no-store` / `nosniff`. Proposal (no effect on speed): a weekly line in the HR dashboard of employees without a job description or who have not confirmed the current revision.
+
+## §406 v1.187.0 (R97-122) — The HR year: annual flow on the HR dashboard, warnings, weekly e-mail
+
+**Asked**: integrate the HR-year planning (Jan targets and entitlements · Feb training plan · Apr / Jul / Oct quarterly target review, Jul summer leave groups · Nov targets closed, evaluations drafted · Dec HR reviews, company closures · 31 Jan evaluations acknowledged) in HR, show the annual flow on the dashboard and warn the HR Manager of delays by notifications and weekly e-mails.
+
+**Database** (`install/migrate_cp_r97_122_hr_year.sql`, state key `r98n`): `hr_year_steps (year, step_key, done_at, done_by, done_name, note)` — the ticks only; everything else is read from the existing tables.
+
+**Code** (`app/hry.php`)
+- `HRY_STEPS` (twelve steps, month 13 = January of the next year); `hry_window()`, `hry_staff()` (registry, no contractors).
+- `hry_measure()` per step: personal targets per employee (`hr_targets`), annual entitlement per employee (`hr_entitlements`), trainings of the year (`hr_trainings`, never automatic), targets with a log line in the quarter (`hr_target_log`), leave periods over 15 Jun – 15 Sep, targets closed, evaluations by state (`hr_evaluations`), mandatory periods over 15 Dec – 10 Jan applied (`hr_leave_periods`).
+- `hry_cycle()` → state done / late (days) / due / soon / later; `hry_attention()` over the current and the previous cycle (a previous year with nothing in the portal is not reported); `hry_cycle_started()`.
+- `hry_tick_from_post()` (action `hry_tick`), `hry_handle_action()` (`hry_tick`, `hry_mail`).
+- `hry_recipients()`, `hry_weekly_build()`, `hry_weekly()` (settings `hry_weekly`, `hry_weekly_on`), `hry_sweep()` once a day (setting `hry_day`), registered in `nf_sweep()` as job `hr-year`.
+- `hry_card_html()`: HR view on `hr_dashboard.php` (figures, names missing, ticks, mail switch), plain calendar on `my_leave.php`. Styles `.hry-*` in `assets/portal.css`.
+
+**Tests (sandbox) — forms posted**: card on the dashboard with the red line; tick with note, undo, unknown step refused, non-HR account refused; mail switch off / on and "send now" (text built, transport absent in the sandbox → 0 of 1 sent, reported on the page); daily sweep run three times from the command line: one notification for the late steps, one per step due, no doubles on the second run, nothing on the third; e-mail text read; employee calendar on My leave; screenshots looked at. Error log clean; sweeps as usual.
+
+**Not tested**: delivery of the e-mail through Microsoft 365; the turn of the year (January card of the previous cycle) with real data; a registry of several hundred employees (about thirty small queries per dashboard view; nothing is computed on other pages).
+
+**Security review**: the e-mail and the notifications carry counts only; names of employees still missing are shown on the HR dashboard alone (HR and Owner). Ticks and the mail switch need HR rights, checked on the server; the step key is validated against the fixed list. Proposal (no effect on speed): send the managers of the disciplines a reminder in November listing how many of their people still have no evaluation draft — counts only.

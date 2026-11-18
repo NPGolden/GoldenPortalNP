@@ -21,6 +21,9 @@ layout_head(t('hr.dashboard'), 'hr_dashboard');
 <div class="page-head"><div><h1>📊 <?= tt('hr.dashboard') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('hr.dashboard_lede') ?></p></div>
   <form method="get" action="index.php" class="inline"><input type="hidden" name="p" value="hr_dashboard"><select name="year" data-nosearch data-js-submit="1"><?php foreach (array_unique(array_merge(hr_years(), [$year])) as $yy): ?><option value="<?= $yy ?>"<?= $yy === $year ? ' selected' : '' ?>><?= $yy ?></option><?php endforeach; ?></select></form></div>
 
+<?php if (function_exists('hry_has') && hry_has()): $hryA = hry_attention(); if ($hryA['late']): ?><div class="flash flash--bad"><b><?= e(t('hry.banner_late', ['n' => count($hryA['late'])])) ?></b> <?= e(implode(' · ', array_map(fn($s) => $s['label'] . ' (' . t('hry.late_days', ['n' => $s['late_days']]) . ')', array_slice($hryA['late'], 0, 6)))) ?> — <a href="#hr-year"><?= tt('hry.title') ?></a></div><?php endif;
+  if ($year === (int) date('Y') && (int) date('n') === 1 && hry_cycle_started($year - 1)) echo hry_card_html($year - 1, true, url('hr_dashboard', ['year' => $year]));   /* January closes the last cycle */
+  echo hry_card_html($year, true, url('hr_dashboard', ['year' => $year])); endif; ?>
 <div class="kpi kpi--4" style="margin-bottom:14px;">
   <a class="stat" href="#hr-today"><b><?= count($todayAway) ?></b><span class="s"><?= tt('hr.d_away_today') ?></span></a>
   <a class="stat<?= $pending ? ' gold' : '' ?>" href="<?= url('hr_requests', ['st' => 'open']) ?>"><b><?= count($pending) ?></b><span class="s"><?= tt('hr.d_pending') ?></span></a>

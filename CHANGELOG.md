@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.186.0** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.187.0** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.187.0 | GAS-CP-R97-122 | 2026-11-18 | HR › The HR year: the annual cycle on the HR dashboard with what is done, due and late, measured from the portal; warnings to the HR managers by notification and a weekly e-mail; the calendar for every employee on My leave. | `install/migrate_cp_r97_122_hr_year.sql` |
 | 1.186.0 | GAS-CP-R97-121 | 2026-11-18 | HR › Job descriptions: the company set in one structure, writing with the assistant, approval by Discipline Manager, General Manager and CEO, revisions, link to employees (My job description, read confirmation) and to vacancies, PDF. | `install/migrate_cp_r97_121_job_descriptions.sql` |
 | 1.185.2 | GAS-CP-R97-120 | 2026-11-18 | Quality: financial data is closed for every Quality position (QA, QC, quality or HSE in the staff role or the discipline, and members of the QHSE team); Quality keeps the Milestones and the Safety log of every project, from the QHSE menu. | — |
 | 1.185.1 | GAS-CP-R97-119 | 2026-11-18 | Sessions: an open page leaves the screen for the sign-in page as soon as the idle time has run out (it used to stay readable until the next click). | — |

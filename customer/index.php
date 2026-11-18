@@ -70,6 +70,7 @@ require __DIR__ . '/app/rcr.php';    // R89-001 recruiting
 require __DIR__ . '/app/pmt.php';    // R93-001 work permits
 require __DIR__ . '/app/vd.php';     // R93-005 vessel documents
 require __DIR__ . '/app/jd.php';     // R97-121 HR job descriptions
+require __DIR__ . '/app/hry.php';    // R97-122 the HR year
 require __DIR__ . '/app/rcr_actions.php';
 require __DIR__ . '/app/mailer.php'; // R91-003 outgoing mail (SMTP)
 require __DIR__ . '/app/web.php';    // R90-001 website statistics feed
@@ -169,6 +170,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (function_exists('pa_only') && pa_only() && !in_array($action, PA_ACTIONS, true)) throw new RuntimeException(t('err.noaccess'));     // R75-005: assistant scope
         if (lic_locked() && !in_array($action, ['login', 'twofa', 'logout', 'lic_install', 'lic_remove', 'theme_save', 'account_save', 'avatar_save', 'twofa_begin', 'twofa_confirm', 'twofa_off'], true)) { flash('bad', t('lic.locked_title')); redirect('license'); }   // R22-001
         if (function_exists('jd_handle_action') && jd_handle_action($action)) exit;   // R97-121
+        if (function_exists('hry_handle_action') && hry_handle_action($action)) exit;   // R97-122
         if (function_exists('rcr_handle_action') && rcr_handle_action($action)) exit;
         if (function_exists('mi_handle_action') && mi_handle_action($action)) exit;   // R97-027
         if (function_exists('nl_handle_action') && nl_handle_action($action)) exit;   // R97-039
