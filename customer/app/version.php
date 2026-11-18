@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.184.2';
+const CP_VERSION = '1.184.3';
 const CP_BUILD   = '2026-11-18';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-117', 'version' => '1.184.3', 'date' => '2026-11-18', 'title' => 'Payables: the payment proof uploaded with a payment is attached by itself to the payment e-mail to the supplier (every proof of the invoice, ticked); a warning when a proof cannot be kept.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-116', 'version' => '1.184.2', 'date' => '2026-11-18', 'title' => 'Purchase order: when an inventory item is picked, the price field is filled with the proposed price and shows where it comes from; an item that carries a last price on its card but has no price-history line now also gets a proposal (order lines, BOM import into an order, requisition estimates).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-115', 'version' => '1.184.1', 'date' => '2026-11-18', 'title' => 'Item search in purchase orders: an item that exists in the inventory is always found, whoever the supplier of the order is (it was hidden when it did not belong to that supplier); a code or maker part number typed in full picks its item by itself; BOM import also matches our code written in the part-number column.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-114', 'version' => '1.184.0', 'date' => '2026-11-18', 'title' => 'Work permits: one permit can cover several employees — tick them from the HR registry on the permit form; their names are listed with the permit and found by the search.', 'db' => 'install/migrate_cp_r97_114_permit_people.sql', 'check' => 'r98k'],

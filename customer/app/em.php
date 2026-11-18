@@ -69,7 +69,7 @@ function em_card_html(array $o): string {
     $h .= '<div class="field"><label>' . tt('em.text') . '</label><textarea name="body" rows="8">' . e($tx['body']) . '</textarea></div>';
     if ($o['atts']) {
         $h .= '<div class="em-atts"><label class="em-l">' . tt('em.atts') . '</label>';
-        foreach ($o['atts'] as $i => [$k, $label]) $h .= '<label class="chk em-a"><input type="checkbox" name="att[]" value="' . e($k) . '"' . ($i === 0 ? ' checked' : '') . '> 📎 ' . e($label) . '</label>';
+        foreach ($o['atts'] as $i => [$k, $label]) $h .= '<label class="chk em-a"><input type="checkbox" name="att[]" value="' . e($k) . '"' . ($i === 0 || !empty($o['atts_all']) ? ' checked' : '') . '> 📎 ' . e($label) . '</label>';
         $h .= '</div>';
     }
     $snd = em_can_send();   // R97-023: send straight from the sender's own Microsoft 365 mailbox

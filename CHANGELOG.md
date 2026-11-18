@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.184.2** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.184.3** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.184.3 | GAS-CP-R97-117 | 2026-11-18 | Payables: the payment proof uploaded with a payment is attached by itself to the payment e-mail to the supplier (every proof of the invoice, ticked); a warning when a proof cannot be kept. | — |
 | 1.184.2 | GAS-CP-R97-116 | 2026-11-18 | Purchase order: when an inventory item is picked, the price field is filled with the proposed price and shows where it comes from; an item that carries a last price on its card but has no price-history line now also gets a proposal (order lines, BOM import into an order, requisition estimates). | — |
 | 1.184.1 | GAS-CP-R97-115 | 2026-11-18 | Item search in purchase orders: an item that exists in the inventory is always found, whoever the supplier of the order is (it was hidden when it did not belong to that supplier); a code or maker part number typed in full picks its item by itself; BOM import also matches our code written in the part-number column. | — |
 | 1.184.0 | GAS-CP-R97-114 | 2026-11-18 | Work permits: one permit can cover several employees — tick them from the HR registry on the permit form; their names are listed with the permit and found by the search. | `install/migrate_cp_r97_114_permit_people.sql` |

@@ -3218,3 +3218,22 @@ The page on screen stays the internal version for staff.
 **Not tested**: the live inventory and the pricing rules set there (mean / lowest / same supplier); an account without the right to see prices was not available in the sandbox — the rule is the existing `stk_price_visible()`.
 
 **Security review**: the new answer gives one price only to accounts that already see buying prices in the same picker; item id and supplier id are cast to integers; no price is added for other roles. No proposal.
+
+## §401 v1.184.3 (R97-117) — Payables: payment proof attached to the e-mail by itself
+
+**Asked**: the e-mail of a payable payment must take the attachment automatically.
+
+**Found**: `views/payable.php` built the remittance card with `'atts' => []`; the proof stored by `si_pay_from_post()` (`si_payments.file_id`) was never offered. `em_card_html()` ticks only the first attachment.
+
+**Change**
+- `views/payable.php`: `$payAtts` — one entry `f:<file id>` per payment that has a proof, newest first, label `si.pay_att` (date · amount); passed to the card with `'atts_all' => true`.
+- `em_card_html()` (`app/em.php`): option `atts_all` ticks every attachment (other cards unchanged).
+- Payment form: hint under "Payment document" (`si.pay_doc_hint`, or `si.pay_doc_nop` when the invoice has no project); action `si_pay`: red message `si.pay_doc_lost` when a file was chosen and not kept.
+
+**Tests (sandbox) — forms posted**: invoice with project, two payments each with a PDF → both listed and ticked on the card; `em_attachment('f:<id>')` returns the file; invoice without project → hint shown, payment recorded, file not kept. Error log clean.
+
+**Not tested**: sending through Microsoft 365 on the live server (the sandbox has no mail connection); the red message was posted but its text was not read back on the page.
+
+**Open point**: an invoice without project cannot keep a payment proof (`cp_store_file()` needs a project). Proposal: a storage place for documents of Accounting that do not belong to a project — needs a decision on who may see it.
+
+**Security review**: only files already stored as payment proofs of this invoice are offered; the attachment key is resolved on the server at send time, staff only, as for the other cards. The proof is an internal file that now leaves to the supplier's address chosen by the sender — it is ticked by default but visible in the card before sending. No further proposal.
