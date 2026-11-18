@@ -165,6 +165,10 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
   <form method="post" action="<?= $self ?>#lines" id="po-prices" data-lock class="btn-row" style="margin-top:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="po_prices"><input type="hidden" name="id" value="<?= $id ?>">
     <button class="btn btn--gold btn--sm" type="submit">💾 <?= tt('po.lines_save') ?></button><span class="hint"><?= tt($pricing ? 'po.prices_hint' : 'po.lines_hint') ?></span></form>
   <?php endif; ?>
+  <?php if ($pricing && ($estN_ = count(po_est_lines($id)))): /* R97-130 */ ?>
+  <form method="post" action="<?= $self ?>#lines" data-lock class="btn-row" style="margin-top:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="po_prices_est"><input type="hidden" name="id" value="<?= $id ?>">
+    <button class="btn btn--sm" type="submit">⤵ <?= e(t('po.est_btn', ['n' => $estN_])) ?></button><span class="hint"><?= tt('po.est_hint') ?></span></form>
+  <?php endif; ?>
   <?php if ($aiCan && $lines): ?>
   <form method="post" action="<?= $self ?>#lines" enctype="multipart/form-data" data-lock class="btn-row" style="margin-top:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="po_prices_ai"><input type="hidden" name="id" value="<?= $id ?>">
     <b>✨ <?= tt('po.ai_title') ?></b><input type="file" name="file" accept=".pdf,.xlsx,.jpg,.jpeg,.png,.webp" required><button class="btn btn--sm" type="submit"><?= tt('po.ai_btn') ?></button></form>

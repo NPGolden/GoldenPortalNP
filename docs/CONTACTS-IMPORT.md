@@ -3439,3 +3439,15 @@ The page on screen stays the internal version for staff.
 **Tests (sandbox)**: page of a draft order with and without open requisition lines; language key counts equal. Error log clean.
 
 **Security review**: wording only — no change of access or data. No proposal.
+
+## §414 v1.190.2 (R97-130) — Purchase order: estimated prices of the requisition carried over, and taken on existing orders
+
+**Asked**: why the estimated prices of the requisition are not brought into the order when it is converted — or let them be retrieved from the order when the requisition had prices.
+
+**Found**: `po_line_from_pr()` priced a line with an inventory item only from `stk_price_proposal()` (supplier price, last buying price, card price) and used `pr_lines.est_price` only for free-text lines. An item never bought before has no proposal, so its line arrived without a price although the requisition had an estimate.
+
+**Change** — `app/po.php`: the estimate is the fallback for every line without a price (origin `po.price_est`, with the number of the requisition); `po_est_lines()`, `po_prices_est()` (action `po_prices_est`, Procurement with prices, editable order) fill the lines of an existing order that have no price and whose requisition line has an estimate; button under the lines of the order.
+
+**Tests (sandbox)**: requisition with four lines (item without buying price, free text, item with last price, no estimate) pulled into an order → 55 and 12 as estimates, 100 from the item card, the fourth empty; prices cleared → button "(3 lines)" → three filled, totals recalculated, button gone; staff without Procurement refused. Sandbox restored. Error log clean.
+
+**Security review**: no new data leaves or enters — the estimate was already visible to the same people on the requisition; the action checks the same rights as the price fields. No proposal.

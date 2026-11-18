@@ -141,7 +141,7 @@ function po_line_from_pr(int $oid, int $plid): ?int {
     if (scalar('SELECT 1 FROM po_lines WHERE order_id = ? AND pr_line_id = ?', [$oid, $plid])) return null;
     $it = $l['item_id'] ? stk_item((int)$l['item_id']) : null; $price = null; $origin = null;
     if ($it && $o['kind'] === 'po') { $p = stk_price_proposal($it, (int)$o['supplier_id']); if ($p['price'] !== null) { $price = $p['price']; $origin = mb_substr($p['origin'], 0, 160); } }
-    elseif (!$it && $o['kind'] === 'po' && $l['est_price'] !== null) { $price = (float)$l['est_price']; $origin = t('prq.est_typed'); }
+    if ($price === null && $o['kind'] === 'po' && $l['est_price'] !== null) { $price = (float)$l['est_price']; $origin = mb_substr(t('po.price_est', ['n' => (string) scalar('SELECT pr_no FROM pr_requests WHERE id = ?', [(int)$l['request_id']])]), 0, 160); }   // R97-130: no buying price known for the item → the estimate of the requisition, also for an inventory item
     $seq = (int) scalar('SELECT COALESCE(MAX(seq),0) + 1 FROM po_lines WHERE order_id = ?', [$oid]);
     q('INSERT INTO po_lines (order_id, seq, item_id, description, maker, part_no, unit, qty, unit_price, price_origin, need_date, pr_line_id, note) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)', [$oid, $seq, $l['item_id'], $l['description'], $l['maker'], $l['part_no'], $l['unit'], round($open, 3), $price, $origin, $l['need_date'], $plid, $l['note']]); line_code_keep('po_lines', $l['item_id'], $l['typed_code'] ?? '');
     return (int) db()->lastInsertId();
@@ -199,6 +199,15 @@ function po_prices_from_post(): int {
     if ($ai && (string)($ai['ref'] ?? '') !== '' && trim((string)($o['supplier_ref'] ?? '')) === '') q('UPDATE po_orders SET supplier_ref = ? WHERE id = ?', [mb_substr((string)$ai['ref'], 0, 80), $oid]);
     unset($_SESSION['po_ai'][$oid]);
     if ($n) { po_recalc($oid); po_event($oid, 'prices', t('po.prices_ev', ['n' => $n]) . ($fromAi ? ' · ' . t('po.prices_ev_ai', ['n' => $fromAi, 'f' => (string)($ai['file'] ?? '')]) : '')); }
+    return $n;
+}
+/** R97-130 — lines of the order that came from a requisition, have no price, and whose requisition line carries an estimate. */
+function po_est_lines(int $oid): array { try { return all("SELECT l.id, pl.est_price, r.pr_no FROM po_lines l JOIN pr_lines pl ON pl.id = l.pr_line_id JOIN pr_requests r ON r.id = pl.request_id WHERE l.order_id = ? AND l.status <> 'cancelled' AND l.unit_price IS NULL AND pl.est_price IS NOT NULL", [$oid]); } catch (Throwable $e) { return []; } }
+/** Those lines take the estimated price of their requisition line (marked as an estimate — to be replaced by the supplier's price). Returns the number filled. */
+function po_prices_est(int $oid): int {
+    $o = po_load($oid); if (!po_prices_can($o)) throw new RuntimeException(t('err.noaccess')); $n = 0;
+    foreach (po_est_lines($oid) as $x) { q('UPDATE po_lines SET unit_price = ?, price_origin = ? WHERE id = ? AND order_id = ? AND unit_price IS NULL', [round((float)$x['est_price'], 4), mb_substr(t('po.price_est', ['n' => (string)$x['pr_no']]), 0, 160), (int)$x['id'], $oid]); $n++; }
+    if ($n) { po_recalc($oid); po_event($oid, 'prices', t('po.est_ev', ['n' => $n])); }
     return $n;
 }
 /** May the assistant read a supplier's offer for this document? An order being edited, or an RFQ waiting for / holding its quotation. */

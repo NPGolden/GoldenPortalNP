@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.190.1';
+const CP_VERSION = '1.190.2';
 const CP_BUILD   = '2026-11-18';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-130', 'version' => '1.190.2', 'date' => '2026-11-19', 'title' => 'Purchase order: a line from a requisition takes the estimated price of the requisition when no buying price is known for the item; on existing orders one button takes the estimates for the lines without price.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-129', 'version' => '1.190.1', 'date' => '2026-11-19', 'title' => 'Purchase order: the selector of open requisition lines is labelled for what it is — still to buy in this project, from other requisitions — and its button reads "Add this line to the order".', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-128', 'version' => '1.190.0', 'date' => '2026-11-19', 'title' => 'Purchase orders: every field of a line is edited in the table and saved with one button; the assistant reads the supplier\'s offer (PDF, Excel, photo) and proposes price, discount and lead time per line for checking.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-127', 'version' => '1.189.2', 'date' => '2026-11-19', 'title' => 'Procurement: a BOM created with its file attached no longer loses the maker part number; lines without numbers take them from the file and are linked when the part number is in the inventory; the new code prefix.<maker part number> stands in the field and all new items can be created in one step.', 'db' => null, 'check' => null],
