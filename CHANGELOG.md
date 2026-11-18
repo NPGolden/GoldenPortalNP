@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.180.0** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.181.0** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.181.0 | GAS-CP-R97-108 | 2026-11-18 | One path to purchase orders: a purchase order or RFQ states its purpose (Project, Stock, Own use); a BOM workbook can be imported into a draft requisition; an approved requisition creates draft purchase orders per supplier like a BOM; the RFQs of a sub-project are listed with its orders. | `install/migrate_cp_r97_108_po_purpose.sql` |
 | 1.180.0 | GAS-CP-R97-107 | 2026-11-18 | Inventory proposals everywhere: free-text lines of requisitions, purchase orders and BOMs show similar inventory items with stock; System Budget BOM review too; a part number that is our code without its maker prefix counts as a match; new inventory codes only by Procurement, who can turn a free-text line into an item; tool to fill maker part numbers from our codes per prefix, with undo. | — |
 | 1.179.0 | GAS-CP-R97-106 | 2026-11-18 | Similar inventory items (same or similar code, maker part number or description, with stock) are proposed in the BOM import review and on purchase orders; a BOM workbook can be imported into a draft purchase order or RFQ; a BOM revision can be deleted with a reason by management too, unless requisitions or order lines made from it exist. | `install/migrate_cp_r97_106_bom_deleted.sql` |
 | 1.178.0 | GAS-CP-R97-105 | 2026-11-18 | Procurement: Cancel on a purchase order works again (the reason box did nothing); a draft or cancelled purchase order / RFQ and a draft, rejected or cancelled requisition can be deleted with a reason, when nothing depends on them; deleted documents are kept in a list. | `install/migrate_cp_r97_105_proc_deleted.sql` |

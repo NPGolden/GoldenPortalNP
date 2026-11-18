@@ -126,6 +126,31 @@ layout_head(($r ? $r['pr_no'] : t('prq.new')) . ' · ' . t('prq.title'), 'requis
     </tbody>
   </table>
 
+  <?php /* R97-108: the approved requisition goes to draft purchase orders, one per supplier — the same step as from a BOM */
+  $rPos = $r && function_exists('prq_pos') ? prq_pos($id) : []; $rCan = $r && function_exists('prq_po_can') && prq_po_can($r); $rPlan = $rCan ? prq_po_plan($id) : null;
+  if ($rPos || ($rPlan && ($rPlan['groups'] || $rPlan['none']))): ?>
+  <div id="to-po" style="margin-top:14px;">
+    <h3 style="margin:0 0 6px;">🛒 <?= tt('prq.po_title') ?></h3>
+    <?php if ($rPos): ?><p style="margin:0 0 6px;"><?php foreach ($rPos as $x): ?><a href="<?= url('purchase_order', ['id' => (int)$x['id']]) ?>" style="font-family:var(--mono);"><?= e($x['po_no']) ?></a> <?= po_pill($x['status']) ?> <span class="hint"><?= e((string)$x['supplier']) ?> · <?= (int)$x['n_lines'] ?></span> &nbsp; <?php endforeach; ?></p><?php endif; ?>
+    <?php if ($rPlan && ($rPlan['groups'] || $rPlan['none'])): ?>
+    <p class="hint" style="margin:0 0 6px;"><?= tt('prq.po_hint') ?></p>
+    <form method="post" action="<?= url('requisition', ['id' => $id]) ?>#to-po" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="prq_to_po"><input type="hidden" name="id" value="<?= $id ?>">
+      <table class="tbl tbl--compact"><thead><tr><th><?= tt('po.supplier') ?></th><th><?= tt('prq.lines') ?></th><th><?= tt('bom.po_what') ?></th></tr></thead><tbody>
+        <?php foreach ($rPlan['groups'] as $g): ?><tr><td><b><?= e($g['name']) ?></b></td><td><?= count($g['lines']) ?></td><td class="hint"><?= e(mb_strimwidth(implode(' · ', array_map(fn($l) => (string)($l['item_code'] ?: $l['part_no'] ?: $l['description']), $g['lines'])), 0, 160, '…')) ?></td></tr><?php endforeach; ?>
+        <?php if ($rPlan['none']): ?><tr><td><select name="supplier_id" style="max-width:260px;"><option value=""><?= tt('bom.po_later') ?></option><?php foreach (sup_list() as $sx): ?><option value="<?= (int)$sx['id'] ?>"><?= e($sx['name']) ?></option><?php endforeach; ?></select><p class="hint" style="margin:2px 0 0;"><?= tt('bom.po_nosup') ?></p></td><td><?= count($rPlan['none']) ?></td><td class="hint"><?= e(mb_strimwidth(implode(' · ', array_map(fn($l) => (string)($l['item_code'] ?: $l['part_no'] ?: $l['description']), $rPlan['none'])), 0, 160, '…')) ?></td></tr><?php endif; ?>
+      </tbody></table>
+      <div class="btn-row" style="margin-top:6px;"><button class="btn btn--gold btn--sm" type="submit"><?= tt('prq.po_btn') ?></button></div>
+    </form>
+    <?php endif; ?>
+  </div>
+  <?php endif; ?>
+  <?php if ($r && $edit && function_exists('prq_import_bom')): ?>
+  <form method="post" action="<?= url('requisition', ['id' => $id]) ?>" enctype="multipart/form-data" data-lock style="margin-top:14px;"><?= csrf_field() ?><input type="hidden" name="action" value="prq_import_bom"><input type="hidden" name="id" value="<?= $id ?>">
+    <h3 style="margin:0 0 6px;">📑 <?= tt('prq.imp_title') ?></h3>
+    <div class="btn-row"><input type="file" name="file" accept=".xlsx" required><button class="btn btn--sm" type="submit">⤒ <?= tt('po.imp_btn') ?></button><a class="btn btn--ghost btn--sm" href="<?= url('bom_template') ?>">⤓ <?= tt('bom.imp_template') ?></a></div>
+    <p class="hint" style="margin:6px 0 0;"><?= tt('po.imp_hint') ?></p>
+  </form>
+  <?php endif; ?>
   <?php if ($r && function_exists('line_sim_card')) echo line_sim_card('pr', $id, url('requisition', ['id' => $id]));   // R97-107 ?>
   <?php if ($edit): ?>
   <h3 id="line-form-title" style="margin-top:14px;"><?= tt('prq.add_line') ?></h3>

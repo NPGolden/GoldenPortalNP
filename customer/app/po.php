@@ -30,6 +30,9 @@ const PO_SELECT = "SELECT o.*, co.name AS supplier, co.email AS supplier_co_emai
                    (SELECT COUNT(*) FROM po_lines l WHERE l.order_id = o.id AND l.status <> 'cancelled') AS n_lines,
                    (SELECT COUNT(*) FROM po_lines l WHERE l.order_id = o.id AND l.status IN ('open','partial')) AS n_open
                    FROM po_orders o JOIN companies co ON co.id = o.supplier_id LEFT JOIN projects p ON p.id = o.project_id LEFT JOIN subprojects s ON s.id = o.subproject_id LEFT JOIN inv_warehouses w ON w.id = o.warehouse_id";
+const PO_PURPOSE = ['project', 'stock', 'use'];
+function po_purpose_has(): bool { static $h = null; if ($h === null) { try { $h = po_has() && (bool) scalar("SHOW COLUMNS FROM po_orders LIKE 'purpose'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function po_purpose_pill(array $o): string { if (!po_purpose_has()) return ''; $p = (string)($o['purpose'] ?? 'project'); return $p === 'project' ? '' : pill($p === 'stock' ? 'navy' : 'gold', t('po.pu_' . $p)); }
 function po_load(int $id): ?array { $o = po_has() && $id ? one(PO_SELECT . ' WHERE o.id = ?', [$id]) ?: null : null; if ($o && po_it() && !it_sub_ok((int)$o['subproject_id'] ?: null)) return null; return $o; }
 function po_list(array $f = []): array {
     if (!po_has()) return []; $w = []; $a = [];
@@ -38,6 +41,7 @@ function po_list(array $f = []): array {
     if (!empty($f['status'])) { if ($f['status'] === 'open') $w[] = "o.status IN ('draft','sent','quoted','awarded','confirmed','partial')"; elseif (in_array($f['status'], PO_STATES, true)) { $w[] = 'o.status = ?'; $a[] = $f['status']; } }
     if (!empty($f['supplier_id'])) { $w[] = 'o.supplier_id = ?'; $a[] = (int)$f['supplier_id']; }
     if (!empty($f['subproject_id'])) { $w[] = 'o.subproject_id = ?'; $a[] = (int)$f['subproject_id']; }
+    if (!empty($f['purpose']) && in_array($f['purpose'], PO_PURPOSE, true) && po_purpose_has()) { $w[] = 'o.purpose = ?'; $a[] = $f['purpose']; }   // R97-108
     if (!empty($f['project_id'])) { $w[] = 'o.project_id = ?'; $a[] = (int)$f['project_id']; }
     if (!empty($f['q'])) { $l = '%' . trim((string)$f['q']) . '%'; $w[] = '(o.po_no LIKE ? OR o.title LIKE ? OR co.name LIKE ? OR o.supplier_ref LIKE ? OR p.project_code LIKE ? OR EXISTS (SELECT 1 FROM po_lines l WHERE l.order_id = o.id AND (l.description LIKE ? OR l.part_no LIKE ?)))'; array_push($a, $l, $l, $l, $l, $l, $l, $l); }
     return all(PO_SELECT . ' WHERE ' . implode(' AND ', $w) . ' ORDER BY o.id DESC', $a);
@@ -87,6 +91,11 @@ function po_save_from_post(): int {
     if ($sid) { $pp = (int) scalar('SELECT project_id FROM subprojects WHERE id = ?', [$sid]); if (!$pp) $sid = null; elseif (!$pid) $pid = $pp; elseif ($pp !== $pid) $sid = null; }
     if (po_it() && !it_sub_ok($sid)) throw new RuntimeException(t('it.e_sub'));
     if (function_exists('sup_po_check') && (($id ? (string) scalar('SELECT kind FROM po_orders WHERE id = ?', [$id]) : (($_POST['kind'] ?? 'po') === 'rfq' ? 'rfq' : 'po')) === 'po') && (!$id || (int) scalar("SELECT supplier_id FROM po_orders WHERE id = ? AND status = 'draft'", [$id]) !== $sup && (string) scalar('SELECT status FROM po_orders WHERE id = ?', [$id]) === 'draft')) sup_po_check($sup);   // R97-087: purchase orders go to approved suppliers
+    $purpose = null; if (po_purpose_has()) {   // R97-108: a direct order says what it is for — a project, stock, or own use
+        $purpose = in_array($_POST['purpose'] ?? '', PO_PURPOSE, true) ? (string)$_POST['purpose'] : ($pid ? 'project' : (isset($_POST['purpose']) ? 'project' : 'stock'));
+        if ($purpose === 'project' && !$pid) throw new RuntimeException(t('po.need_project'));
+        if ($purpose !== 'project') { if ($id && scalar("SELECT 1 FROM po_lines pl JOIN pr_lines l ON l.id = pl.pr_line_id JOIN pr_requests r ON r.id = l.request_id WHERE pl.order_id = ? AND r.purpose <> 'stock' LIMIT 1", [$id])) throw new RuntimeException(t('po.purpose_pr')); $pid = null; $sid = null; }
+    }
     $v = ['supplier_id' => $sup, 'project_id' => $pid, 'subproject_id' => $sid, 'title' => mb_substr(trim((string)($_POST['title'] ?? '')), 0, 160) ?: null,
           'currency' => preg_match('/^[A-Z]{3}$/', (string)($_POST['currency'] ?? '')) ? $_POST['currency'] : (string)(($S['sup_currency'] ?? '') ?: 'EUR'),
           'incoterms' => in_array($_POST['incoterms'] ?? '', PO_INCOTERMS, true) ? $_POST['incoterms'] : ($S['incoterms'] ?? null),
@@ -99,6 +108,7 @@ function po_save_from_post(): int {
           'supplier_email' => filter_var(trim((string)($_POST['supplier_email'] ?? '')), FILTER_VALIDATE_EMAIL) ? strtolower(trim((string)$_POST['supplier_email'])) : ($S['email'] ?? null),
           'supplier_ref' => mb_substr(trim((string)($_POST['supplier_ref'] ?? '')), 0, 80) ?: null,
           'note' => trim((string)($_POST['note'] ?? '')) ?: null, 'internal_note' => trim((string)($_POST['internal_note'] ?? '')) ?: null];
+    if ($purpose !== null) $v['purpose'] = $purpose;
     if ($id) {
         $o = po_load($id); if (!$o || !po_editable($o)) throw new RuntimeException(t('err.noaccess'));
         if ($o['status'] !== 'draft') unset($v['supplier_id']);   // the supplier of a sent RFQ cannot change
@@ -501,5 +511,63 @@ function po_line_use_item(int $oid, int $lid, int $itemId): void {
     $note = trim((string)$l['note']); $was = t('po.sim_was', ['d' => (string)$l['description']]); if (mb_strtolower((string)$l['description']) !== mb_strtolower((string)$it['description'])) $note = mb_substr(trim($note . ($note !== '' ? ' · ' : '') . $was), 0, 255);
     q('UPDATE po_lines SET item_id = ?, description = ?, maker = ?, part_no = ?, unit = ?, unit_price = ?, price_origin = ?, note = ? WHERE id = ?', [(int)$it['id'], mb_substr((string)$it['description'], 0, 255), ($it['maker'] ?? '') !== '' ? $it['maker'] : ($l['maker'] ?: null), ($it['factory_code'] ?? '') !== '' ? $it['factory_code'] : ($l['part_no'] ?: null), (string)$it['unit'], $price, $origin, $note ?: null, $lid]);   // the typed maker / part number stay when the item has none
     po_recalc($oid);
+}
+
+/* ------------------------------------------------------------------ R97-108: the same steps to an order from a requisition as from a BOM */
+/** BOM workbook into a draft requisition: exact matches linked, the rest free text (the card below proposes similar items). */
+function prq_import_bom(int $rid, array $file): array {
+    $r = prq_load($rid); if (!$r || !prq_can_edit($r) || !function_exists('bom_file_rows')) throw new RuntimeException(t('err.noaccess'));
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) throw new RuntimeException(t('im.file'));
+    if (($file['size'] ?? 0) > 8 * 1024 * 1024) throw new RuntimeException(t('bom.file_big'));
+    $P = bom_file_rows($file['tmp_name'], 400); if (!$P['rows']) throw new RuntimeException(t('stk.imp_empty'));
+    $res = ['rows' => 0, 'linked' => 0, 'free' => 0, 'cut' => $P['cut']]; $seq = (int) scalar('SELECT COALESCE(MAX(seq),0) FROM pr_lines WHERE request_id = ?', [$rid]); $pdo = db(); $pdo->beginTransaction();
+    try {
+        foreach ($P['rows'] as $x) {
+            [$it] = bom_row_exact($x); $note = trim(($x['section'] !== '' ? $x['section'] : '') . ($x['note'] !== '' ? ($x['section'] !== '' ? ' · ' : '') . $x['note'] : ''));
+            q('INSERT INTO pr_lines (request_id, seq, item_id, description, maker, part_no, unit, qty, est_price, note) VALUES (?,?,?,?,?,?,?,?,?,?)',
+              [$rid, ++$seq, $it ? (int)$it['id'] : null, mb_substr($x['description'] !== '' ? $x['description'] : (string)($it['description'] ?? ''), 0, 255), $it ? (($it['maker'] ?? '') ?: ($x['maker'] ?: null)) : ($x['maker'] ?: null), $it ? (($it['factory_code'] ?? '') ?: ($x['part_no'] ?: null)) : ($x['part_no'] ?: null), $it ? (string)$it['unit'] : $x['unit'], $x['qty'], $it ? null : $x['price'], mb_substr($note, 0, 255) ?: null]);
+            $res['rows']++; $res[$it ? 'linked' : 'free']++;
+        }
+        $pdo->commit();
+    } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+    if (function_exists('prq_recalc')) prq_recalc($rid); prq_event($rid, 'import', t('po.imp_ev', ['n' => $res['rows'], 'm' => $res['linked']]));
+    return $res;
+}
+function prq_po_can(array $r): bool { return $r['status'] === 'approved' && po_admin() && !(po_it() && !it_sub_ok((int)$r['subproject_id'] ?: null)); }
+/** Orders that carry lines of this requisition. */
+function prq_pos(int $rid): array { try { return all("SELECT o.id, o.po_no, o.status, o.kind, co.name AS supplier, COUNT(*) AS n_lines FROM po_lines pl JOIN pr_lines l ON l.id = pl.pr_line_id JOIN po_orders o ON o.id = pl.order_id LEFT JOIN companies co ON co.id = o.supplier_id WHERE l.request_id = ? AND pl.status <> 'cancelled' GROUP BY o.id ORDER BY o.id", [$rid]); } catch (Throwable $e) { return []; } }
+/** What is still to buy of the requisition, by the supplier each line would go to (preferred, last bought from, supplier of the maker). Lines already on a draft order are not offered again. */
+function prq_po_plan(int $rid): array {
+    $P = ['groups' => [], 'none' => []]; $names = [];
+    foreach (all("SELECT l.*, i.code AS item_code, i.preferred_supplier_id, i.last_supplier_id, i.maker AS item_maker FROM pr_lines l LEFT JOIN inv_items i ON i.id = l.item_id WHERE l.request_id = ? AND l.status NOT IN ('cancelled','issued','received') ORDER BY l.seq, l.id", [$rid]) as $l) {
+        $open = round((float)$l['qty'] - (float)$l['qty_reserved'] - (float)$l['qty_ordered'], 3); if ($open <= 0.0005) continue;
+        if (scalar("SELECT 1 FROM po_lines pl JOIN po_orders o ON o.id = pl.order_id WHERE pl.pr_line_id = ? AND pl.status <> 'cancelled' AND o.status = 'draft' LIMIT 1", [(int)$l['id']])) continue;
+        $l['open'] = $open; $sup = (int)($l['preferred_supplier_id'] ?? 0) ?: (int)($l['last_supplier_id'] ?? 0);
+        if (!$sup && function_exists('sup_for_maker') && ($mk = sup_for_maker(($l['item_maker'] ?? '') ?: $l['maker']))) $sup = (int)$mk[0]['id'];
+        if ($sup && !isset($names[$sup])) $names[$sup] = (string) scalar('SELECT co.name FROM companies co WHERE co.id = ? AND co.is_active = 1 AND ' . sup_where(), [$sup]);
+        if ($sup && $names[$sup] !== '') { $P['groups'][$sup] = $P['groups'][$sup] ?? ['name' => $names[$sup], 'lines' => []]; $P['groups'][$sup]['lines'][] = $l; } else $P['none'][] = $l;
+    }
+    return $P;
+}
+/** Draft purchase orders from the approved requisition — one per supplier, as from a BOM. */
+function prq_to_po(int $rid, int $fallback = 0): array {
+    $r = prq_load($rid); if (!$r || !prq_po_can($r)) throw new RuntimeException(t('err.noaccess')); $u = current_user(); $P = prq_po_plan($rid);
+    if ($fallback && $P['none']) { $S = sup_load($fallback); if ($S && ($S['kind'] === 'supplier' || !empty($S['is_supplier']))) { $P['groups'][$fallback] = $P['groups'][$fallback] ?? ['name' => (string)$S['name'], 'lines' => []]; foreach ($P['none'] as $l) $P['groups'][$fallback]['lines'][] = $l; $P['none'] = []; } }
+    if (!$P['groups']) throw new RuntimeException(t($P['none'] ? 'bom.po_need_sup' : 'prq.po_nothing'));
+    $br = null; try { $br = $r['project_id'] ? ((int) scalar('SELECT branch_id FROM projects WHERE id = ?', [(int)$r['project_id']]) ?: null) : (function_exists('br_default') ? (int)br_default()['id'] : null); } catch (Throwable $e) {}
+    $out = ['orders' => [], 'left' => count($P['none']), 'refused' => []]; $purp = $r['purpose'] === 'stock' ? 'stock' : 'project';
+    foreach ($P['groups'] as $sup => $g) {
+        $S = sup_load((int)$sup); if (!$S) { $out['left'] += count($g['lines']); continue; }
+        try { if (function_exists('sup_po_check')) sup_po_check((int)$sup); } catch (Throwable $e) { $out['refused'][] = $g['name']; $out['left'] += count($g['lines']); continue; }
+        $no = po_number('po', $br);
+        q('INSERT INTO po_orders (kind, po_no, branch_id, supplier_id, project_id, subproject_id, title, currency, incoterms, terms_days, advance_pct, warehouse_id, vat_pct, supplier_email, internal_note, created_by, created_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+          ['po', $no, $br, (int)$sup, $r['project_id'] ? (int)$r['project_id'] : null, $r['subproject_id'] ? (int)$r['subproject_id'] : null, mb_substr((string)($r['title'] ?: $r['pr_no']), 0, 160), (string)(($S['sup_currency'] ?? '') ?: 'EUR'), $S['incoterms'] ?? null, $S['terms_days'] ?? null, $S['advance_pct'] ?? null, stk_default_wh(), 0, $S['email'] ?? null, t('po.from_pr', ['n' => $r['pr_no']]), (int)$u['id'], $u['full_name']]);
+        $oid = (int) db()->lastInsertId(); if (po_purpose_has()) q('UPDATE po_orders SET purpose = ? WHERE id = ?', [$r['project_id'] ? $purp : 'stock', $oid]);
+        $n = 0; foreach ($g['lines'] as $l) if (po_line_from_pr($oid, (int)$l['id'])) $n++;
+        if (!$n) { q('DELETE FROM po_orders WHERE id = ?', [$oid]); $out['left'] += count($g['lines']); continue; }
+        po_recalc($oid); po_event($oid, 'create', $no . ' · ' . $r['pr_no']); $out['orders'][] = ['id' => $oid, 'po_no' => $no, 'supplier' => $g['name'], 'lines' => $n];
+    }
+    if ($out['orders']) prq_event($rid, 'to_po', implode(', ', array_column($out['orders'], 'po_no')));
+    return $out;
 }
 
