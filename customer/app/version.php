@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.185.0';
+const CP_VERSION = '1.185.1';
 const CP_BUILD   = '2026-11-18';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-119', 'version' => '1.185.1', 'date' => '2026-11-18', 'title' => 'Sessions: an open page leaves the screen for the sign-in page as soon as the idle time has run out (it used to stay readable until the next click).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-118', 'version' => '1.185.0', 'date' => '2026-11-18', 'title' => 'Payables: supplier statement Excel fixed and now also as PDF with e-mail to the supplier; a supplier proforma can be registered and prepaid and the sales invoice assigned to it later. Inventory: an item can be left out of the valuation.', 'db' => 'install/migrate_cp_r97_118_si_proforma.sql', 'check' => 'r98l'],
         ['ref' => 'GAS-CP-R97-117', 'version' => '1.184.3', 'date' => '2026-11-18', 'title' => 'Payables: the payment proof uploaded with a payment is attached by itself to the payment e-mail to the supplier (every proof of the invoice, ticked); a warning when a proof cannot be kept.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-116', 'version' => '1.184.2', 'date' => '2026-11-18', 'title' => 'Purchase order: when an inventory item is picked, the price field is filled with the proposed price and shows where it comes from; an item that carries a last price on its card but has no price-history line now also gets a proposal (order lines, BOM import into an order, requisition estimates).', 'db' => null, 'check' => null],

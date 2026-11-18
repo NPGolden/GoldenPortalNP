@@ -3257,3 +3257,19 @@ The page on screen stays the internal version for staff.
 **Not tested**: sending the statement through Microsoft 365; a proforma in a payment request above the Management threshold; partial receipts after a proforma was checked (the received goods are then already counted as invoiced — intended); the health report or other reports that might quote an inventory value were not searched beyond the inventory pages.
 
 **Security review**: the statement files are served only to accounts with payables rights (`si_can()` inside `si_statement_doc()`, also at e-mail time); dates and ids are validated; PDF sent with `nosniff` and `no-store`. Assigning an invoice needs payables rights and is logged with user and time. The valuation tick is limited to Procurement administrators. Proposal (no effect on speed): require a second person (Accounting or Management) when an invoice is assigned to a proforma that is already paid, as is done for payments above the threshold.
+
+## §403 v1.185.1 (R97-119) — Idle time-out: the open page goes to the sign-in page
+
+**Reported**: the portal stayed open for 45 minutes without signing out.
+
+**Found**: the server does end the session after `sec_idle_minutes` (default 30; Settings › Login history) — `session_boot()` checks it on every request and the heartbeat `?p=ping` does not extend it. No background request keeps a session alive (the weather badge calls an outside service; `ping`, `bg`, `csp_report` aside). But the heartbeat in `assets/portal.js` only stopped itself on the answer 401, so the page stayed on the screen, readable, until the next click. If the live value of the idle time is above 45 minutes, the session was simply still valid — check the value in Settings › Login history.
+
+**Change**
+- `assets/portal.js` (presence heartbeat): on 401 → `location.replace('index.php?p=login')` (the sign-in page shows `login.idle`). One extra heartbeat is sent when the idle time of the page runs out (`data-idle` + 5 s) and one whenever the tab becomes visible again.
+- `views/_layout.php`: `<body data-idle="<seconds>">` for signed-in pages.
+
+**Tests (sandbox)**: browser — active session, tab looked at again → stays; session file aged by 40 minutes on the server → the open page went to the sign-in page with the message; no script error. PHP error log clean.
+
+**Not tested**: the real 30-minute wait; a phone browser that suspends timers in the background (the check then runs when the tab is shown again).
+
+**Security review**: closes an exposure — content of an expired session no longer stays on an unattended screen. Cost: one small request per page per idle period and one per tab activation. Proposals (no effect on speed): (1) set the idle time for administrators and Accounting lower than for the rest; (2) a warning one minute before the time-out with "Stay signed in".

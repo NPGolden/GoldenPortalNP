@@ -244,11 +244,17 @@
 (function () {
   if (!document.querySelector('.who')) return;                       // not signed in
   var stop = false;
-  function beat() {
-    if (stop || document.hidden && Math.random() < 0.5) return;        // hidden tabs still beat, half as often
-    fetch('index.php?p=ping', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { if (r.status === 401) stop = true; }).catch(function () {});
+  /* R97-119: when the server says the session is over (idle time-out, sign-out elsewhere), the page leaves the screen for the
+     sign-in page instead of staying readable until the next click. */
+  function gone() { if (stop) return; stop = true; location.replace('index.php?p=login'); }
+  function beat(force) {
+    if (stop || !force && document.hidden && Math.random() < 0.5) return;   // hidden tabs still beat, half as often
+    fetch('index.php?p=ping', { credentials: 'same-origin', cache: 'no-store' }).then(function (r) { if (r.status === 401) gone(); }).catch(function () {});
   }
-  setInterval(beat, 120000);                                          // R69-002: every 2 min (presence window 5 min)
+  setInterval(function () { beat(false); }, 120000);                  // R69-002: every 2 min (presence window 5 min)
+  var idle = parseInt(document.body.getAttribute('data-idle') || '0', 10);
+  if (idle > 0) setTimeout(function () { beat(true); }, (idle + 5) * 1000);   // asked once, right when the idle time of this page runs out
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) beat(true); });   // and when the tab is looked at again
 })();
 
 /* ---- R49-001: sign out when the browser is closed. Every signed-in tab refreshes a window marker in localStorage every
