@@ -112,7 +112,9 @@ function eng_rows_build(int $sid): array {
 /** Engineering % of the sub-project (weighted by allowed hours); null when no section is budgeted. */
 function eng_sub_pct(int $sid, string $stage = 'engineering'): ?int { $rows = eng_rows($sid); $num = 0.0; $den = 0.0; foreach ($rows as $r) { if ($r['stage'] !== $stage || $r['allowed'] <= 0) continue; $num += $r['earned']; $den += $r['allowed']; } return $den > 0 ? (int) round(min(100, $num / $den * 100)) : null; }
 /** [stage => %] for every stage that has budgeted sections on this sub-project. */
-function eng_stage_pcts(int $sid): array { $out = []; foreach (ENG_STAGES as $st) { $p = eng_sub_pct($sid, $st); if ($p !== null) $out[$st] = $p; } return $out; }
+function eng_stage_pcts(int $sid): array { $out = [];
+    $with = eng_has() && eng_has2() ? sub_ids_with('eng', array_merge(['SELECT DISTINCT subproject_id FROM eng_budgets', "SELECT DISTINCT subproject_id FROM eng_requests WHERE status = 'approved'"], function_exists('bg_has') && bg_has() ? ['SELECT DISTINCT subproject_id FROM sp_budgets'] : [])) : null; if ($with !== null && !isset($with[$sid])) return [];   // R97-104: a % needs budgeted or approved hours
+    foreach (ENG_STAGES as $st) { $p = eng_sub_pct($sid, $st); if ($p !== null) $out[$st] = $p; } return $out; }
 /** Worst state of a sub-project's sections for the ⚠ marks: exceeded > pending > warn > ok / none. */
 function eng_sub_state(int $sid): string { $rank = ['exceeded' => 5, 'pending' => 4, 'warn' => 3, 'extended' => 2, 'ok' => 1, 'done' => 0, 'nobudget' => 0]; $w = 0; $s = 'none'; foreach (eng_rows($sid) as $r) if (($rank[$r['state']] ?? 0) > $w) { $w = $rank[$r['state']]; $s = $r['state']; } return $s; }
 function eng_state_pill(string $st, ?string $extra = null): string { $m = ['exceeded' => ['bad', 'eng.st_exceeded'], 'pending' => ['gold', 'eng.st_pending'], 'warn' => ['gold', 'eng.st_warn'], 'extended' => ['gold', 'eng.st_extended'], 'ok' => ['green', 'eng.st_ok'], 'done' => ['green', 'eng.st_done'], 'nobudget' => ['mute', 'eng.st_nobudget']]; [$tone, $k] = $m[$st] ?? ['mute', 'eng.st_nobudget']; return pill($tone, t($k) . ($extra !== null ? ' ' . $extra : '')); }

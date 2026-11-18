@@ -231,6 +231,7 @@ function bg_strip_html(array $sp): string {
 /** The small result pill in the project tree. */
 function bg_pill(array $sub): string {
     if (!bg_can()) return '';
+    $with = bg_has() ? sub_ids_with('bg', ['SELECT DISTINCT subproject_id FROM sp_budgets']) : null; if ($with !== null && !isset($with[(int)$sub['id']])) return '';   // R97-104: no budget, no calculation
     $C = bg_calc((int)$sub['id'], $sub); if (!$C['has_budget']) return '';
     $tone = $C['tone'] === 'red' ? 'bad' : ($C['tone'] === 'amber' ? 'gold' : 'green');
     return '<a class="bg-pill" href="' . url('subproject', ['id' => (int)$sub['id'], 'tab' => 'budget']) . '" title="' . e(t('bg.pill_title', ['h' => bg_h($C['actual_h']) . '/' . bg_h($C['budget_h']), 'p' => bg_money($C['parts_committed']) . '/' . bg_money($C['parts_budget'])])) . '">' . pill($tone, ($C['result'] >= 0 ? '+' : '−') . bg_money(abs($C['result']))) . '</a>';

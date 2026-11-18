@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.177.0';
+const CP_VERSION = '1.177.1';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-104', 'version' => '1.177.1', 'date' => '2026-11-18', 'title' => 'Health report follow-up: Projects list no longer runs the budget, engineering and procurement calculations for sub-projects that have no such data; the false alarm "Database steps: GAS-CP-R46-005" is corrected; old update backups are really removed (the last three are kept).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-103', 'version' => '1.177.0', 'date' => '2026-11-18', 'title' => 'System budget: up to 1024 part lines (was 124) and up to 1024 lines per BOM file (was 400); large tables are sent as one packed field so no line is lost; a form cut by the server limit is refused instead of half saved; unchanged lines are not rewritten.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-102', 'version' => '1.176.1', 'date' => '2026-11-18', 'title' => 'System budget: while the part lines are at procurement for pricing the Parts card says so, shows Take back and no longer offers Save or the delete ticks; an error after saving a section of a page is brought into view instead of staying hidden at the top.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-101', 'version' => '1.176.0', 'date' => '2026-11-18', 'title' => 'Inventory import: downloadable import template; the ERP warehouse export is accepted with its title line above the header; pack units such as 10ΤΜΧ recognised; files limited to 30 000 lines; longer time allowed for large files.', 'db' => null, 'check' => null],
@@ -490,7 +491,7 @@ function cp_migration_state(): array {
         'r29b' => $has("SHOW COLUMNS FROM sp_issues LIKE 'issue_no'"),
         'r38' => $has("SHOW TABLES LIKE 'acc_reports'") && $has("SHOW COLUMNS FROM timesheets LIKE 'invoicing'"),
         'r38b' => $has("SHOW COLUMNS FROM fsr_reports LIKE 'kind'"),
-        'r46' => (function () use ($has) { try { $r = scalar("SHOW COLUMNS FROM fsr_lines LIKE 'time_type'"); return $r && str_contains((string)$r['Type'], 'NC'); } catch (Throwable $e) { return false; } })(),
+        'r46' => (function () use ($has) { try { $r = one("SHOW COLUMNS FROM fsr_lines LIKE 'time_type'"); return $r && str_contains((string)$r['Type'], 'NC'); } catch (Throwable $e) { return false; } })(),
         'r45' => $has("SHOW COLUMNS FROM customer_users LIKE 'can_cashflow'"),
         'r47' => $has("SHOW TABLES LIKE 'eng_budgets'") && $has("SHOW COLUMNS FROM timesheet_lines LIKE 'activity'"),
         'r47b' => $has("SHOW TABLES LIKE 'eng_sections'") && $has("SHOW COLUMNS FROM disciplines LIKE 'eng_section_id'"),

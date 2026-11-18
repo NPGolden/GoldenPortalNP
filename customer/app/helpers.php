@@ -269,3 +269,11 @@ function post_unpack(): void {
     }
 }
 
+/** R97-104: on a page that only reads (GET), the ids of the sub-projects that have any row in the given tables — one statement per table and request.
+ *  Lists with many sub-projects ask it before running the per-sub-project calculations; null = not known (a POST, or a table that is missing), calculate as before. */
+function sub_ids_with(string $key, array $sqls): ?array {
+    static $c = []; if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'GET') return null; if (array_key_exists($key, $c)) return $c[$key];
+    $set = []; try { foreach ($sqls as $q) foreach (all($q) as $r) { $v = (int) reset($r); if ($v) $set[$v] = true; } } catch (Throwable $e) { return $c[$key] = null; }
+    return $c[$key] = $set;
+}
+

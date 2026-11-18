@@ -301,6 +301,7 @@ function prq_item_search(string $q, int $limit = 15, int $supplier = 0, bool $re
  *  Requisitions still waiting for approval count with 0 %; drafts, rejected and cancelled ones do not count. */
 function proc_sub_pct(int $sid): ?array {
     static $c = []; if (array_key_exists($sid, $c)) return $c[$sid]; if (!$sid) return $c[$sid] = null;
+    $with = sub_ids_with('proc', ['SELECT DISTINCT subproject_id FROM pr_requests WHERE subproject_id IS NOT NULL', "SELECT DISTINCT subproject_id FROM po_orders WHERE subproject_id IS NOT NULL AND kind = 'po'"]); if ($with !== null && !isset($with[$sid])) return null;   // R97-104 (not kept in \$c: a later write in the same request must be seen)
     $L = []; $nPr = 0; $nPo = 0;
     try {
         if (function_exists('pr_has') ? pr_has() : true) foreach (all("SELECT l.qty, l.qty_reserved, l.qty_ordered, l.qty_received, l.qty_issued, l.est_price, l.status, r.status AS rst, r.id AS rid FROM pr_lines l JOIN pr_requests r ON r.id = l.request_id

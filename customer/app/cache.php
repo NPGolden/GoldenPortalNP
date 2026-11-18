@@ -68,8 +68,16 @@ function hk_tick(): void {
         try { if (function_exists('proc_feed_all') && cp_setting('proc_feed_v1', '') !== '1') { cp_setting_set('proc_feed_v1', '1'); $log[] = 'procurement stage ' . proc_feed_all(); } } catch (Throwable $e) { $log[] = 'procurement stage err'; }   // R97-096: once
         try { if (function_exists('rs_weekly')) $log[] = rs_weekly(); } catch (Throwable $e) { $log[] = 'subscriptions err'; }   // R97-092
         try { if (function_exists('hr_doc_daily')) $log[] = hr_doc_daily(); } catch (Throwable $e) { $log[] = 'hr-doc err'; }   // R77-007
-        $dirs = (array) @glob($storage . '/backups/*', GLOB_ONLYDIR); rsort($dirs); $n = 0; foreach (array_slice($dirs, 3) as $d) { foreach ((array) @glob($d . '/*') as $f) @unlink($f); if (@rmdir($d)) $n++; } $log[] = 'backups ' . $n;
+        $dirs = (array) @glob($storage . '/backups/*', GLOB_ONLYDIR); rsort($dirs); $n = 0; foreach (array_slice($dirs, 3) as $d) { cp_rmtree((string)$d, $storage . '/backups'); if (!is_dir($d)) $n++; }   // R97-104: backup folders hold sub-folders — the old loop could not empty them $log[] = 'backups ' . $n;
         foreach (['/slow-pages.log' => 2, '/php-errors.log' => 20, '/gate_debug.log' => 2] as $f => $mb) { $p = $storage . $f; if (is_file($p) && filesize($p) > $mb * 1048576) { $tail = (string) @file_get_contents($p, false, null, max(0, filesize($p) - 512 * 1024)); @file_put_contents($p, $tail); $log[] = basename($f) . ' trimmed'; } }
         cp_setting_set('hk_last', $day . ' ' . implode(' · ', $log));
     } catch (Throwable $e) { error_log('hk_tick: ' . $e->getMessage()); }
 }
+
+/** Remove a folder with everything in it — only below $root, never through a link. */
+function cp_rmtree(string $dir, string $root, int $depth = 0): void {
+    $rr = realpath($root); $rd = realpath($dir); if ($rr === false || $rd === false || $depth > 12 || is_link($dir) || !str_starts_with($rd, $rr . DIRECTORY_SEPARATOR)) return;
+    foreach ((array) @scandir($rd) as $f) { if ($f === '.' || $f === '..' || $f === false) continue; $p = $rd . DIRECTORY_SEPARATOR . $f; if (is_link($p) || !is_dir($p)) @unlink($p); else cp_rmtree($p, $root, $depth + 1); }
+    @rmdir($rd);
+}
+
