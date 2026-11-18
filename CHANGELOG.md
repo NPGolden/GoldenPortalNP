@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.184.0** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.184.1** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.184.1 | GAS-CP-R97-115 | 2026-11-18 | Item search in purchase orders: an item that exists in the inventory is always found, whoever the supplier of the order is (it was hidden when it did not belong to that supplier); a code or maker part number typed in full picks its item by itself; BOM import also matches our code written in the part-number column. | — |
 | 1.184.0 | GAS-CP-R97-114 | 2026-11-18 | Work permits: one permit can cover several employees — tick them from the HR registry on the permit form; their names are listed with the permit and found by the search. | `install/migrate_cp_r97_114_permit_people.sql` |
 | 1.183.2 | GAS-CP-R97-113 | 2026-11-18 | Work permits: Accounting can create and update permits of every project, like HR and the administrators. | — |
 | 1.183.1 | GAS-CP-R97-112 | 2026-11-18 | Purchase order: the VAT rate can be set or corrected after the order was sent; the order document (PDF and e-mail attachment) always carries totals worked out from the lines and the VAT rate as they are at that moment. | — |

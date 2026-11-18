@@ -309,6 +309,12 @@ function bom_row_exact(array $r): array {
         if (($tid = stk_by_code_tail($r['part_no'])) && ($it = stk_item($tid))) return [$it, 'part_no_norm'];
         $n = stk_sim_norm($r['part_no']); if ($n !== '') foreach (stk_sim_index()['pre'][substr($n, 0, 4)] ?? [] as $id) if (stk_sim_index()['items'][$id]['np'] === $n && ($it = stk_item($id))) return [$it, 'part_no_norm'];
     }
+    // R97-115: our own code written in the part-number column, or a code column that holds the maker part number
+    if ($r['part_no'] !== '' && ($it = stk_item_by_code($r['part_no']))) return [$it, 'code'];
+    if ($r['code'] !== '') {
+        if ($it = one(STK_SELECT . " WHERE i.status <> 'blocked' AND LOWER(i.factory_code) = LOWER(?) LIMIT 1", [$r['code']])) return [$it, 'part_no'];
+        if (($tid = stk_by_code_tail($r['code'])) && ($it = stk_item($tid))) return [$it, 'part_no_norm'];
+    }
     return [null, 'none'];
 }
 function bom_imp_norm(string $s): string { return strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $s)); }

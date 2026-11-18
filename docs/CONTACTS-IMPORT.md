@@ -3181,3 +3181,20 @@ The page on screen stays the internal version for staff.
 **Not tested**: the expiry warning e-mail with names on the live server; lists of several hundred employees (the list scrolls; the filter was tried with three).
 
 **Security review**: the ticked ids are cast to integers and accepted only if they exist in the HR registry; the count is limited; only names are read from the registry for this list — no personal or payroll field reaches the page; the edit rule is unchanged and is checked on save. Proposal (no effect on speed): write the change of the people of a permit into the audit trail (who added or removed whom).
+
+## §399 v1.184.1 (R97-115) — Existing inventory code not found on a purchase order
+
+**Reported**: on a purchase order a code that exists in the inventory did not come up; the portal asked to create a new code.
+
+**Cause**: the picker of the purchase order calls `?p=prq_items&supplier=<supplier of the order>&q=…`; `prq_item_search()` passed the supplier to `stk_items()` together with the text, which limits the result to the items of that supplier (preferred / last supplier, a price from him, or a maker he represents — R86-002). Meant to order the list on focus, it also hid every other item when a text was typed. Reproduced in the sandbox: supplier representing maker A, item of maker B → 0 results before, found after.
+
+**Change**
+- `prq_item_search()` (`app/prq.php`): with a text, first the items whose code or maker part number equals it (not blocked), then the supplier's matches, then the matches of the whole inventory, without doubles.
+- `views/purchase_order.php`, `views/requisition.php`, `views/bom.php`: on `change` of the search box with no item picked, one request; when exactly one result has that code (else that part number), `choose()` is called. A partial code picks nothing.
+- `bom_row_exact()` (`app/bom.php`): after the existing rules, the part-number column is tried as our code, and the code column as maker part number (exact, then by code tail).
+
+**Tests (sandbox) — forms posted**: search with the old and the new code (0 → 1 result; the supplier's own items still found); browser: full code typed, field left without clicking, line added and saved with the item; lower-case part number picks the item; partial code picks nothing; `bom_row_exact()` with the code in either column, with punctuation, unknown code → none. Error log clean.
+
+**Not tested**: the live inventory (3 860 items) — in particular an item marked Obsolete is still not offered by the picker, by design.
+
+**Security review**: the endpoint keeps its access rule (staff with requisition or offer-builder rights), the text is bound as a parameter, the result stays limited (20 + at most 5 exact). One more indexed query per search (code is unique-indexed); no proposal.

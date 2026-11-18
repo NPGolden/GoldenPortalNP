@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.184.0';
+const CP_VERSION = '1.184.1';
 const CP_BUILD   = '2026-11-18';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-115', 'version' => '1.184.1', 'date' => '2026-11-18', 'title' => 'Item search in purchase orders: an item that exists in the inventory is always found, whoever the supplier of the order is (it was hidden when it did not belong to that supplier); a code or maker part number typed in full picks its item by itself; BOM import also matches our code written in the part-number column.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-114', 'version' => '1.184.0', 'date' => '2026-11-18', 'title' => 'Work permits: one permit can cover several employees — tick them from the HR registry on the permit form; their names are listed with the permit and found by the search.', 'db' => 'install/migrate_cp_r97_114_permit_people.sql', 'check' => 'r98k'],
         ['ref' => 'GAS-CP-R97-113', 'version' => '1.183.2', 'date' => '2026-11-18', 'title' => 'Work permits: Accounting can create and update permits of every project, like HR and the administrators.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-112', 'version' => '1.183.1', 'date' => '2026-11-18', 'title' => 'Purchase order: the VAT rate can be set or corrected after the order was sent; the order document (PDF and e-mail attachment) always carries totals worked out from the lines and the VAT rate as they are at that moment.', 'db' => null, 'check' => null],

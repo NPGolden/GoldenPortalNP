@@ -285,6 +285,11 @@ function prq_recent_items(int $limit = 20): array {
 function prq_item_search(string $q, int $limit = 15, int $supplier = 0, bool $recent = false): array {
     $rows = $q === '' && $recent && !$supplier ? prq_recent_items($limit) : stk_items(array_filter(['q' => $q, 'status' => 'active', 'supplier' => $supplier ?: null]), $limit); $out = [];
     if ($q === '' && $supplier && count($rows) < $limit) $rows = array_merge($rows, array_slice(stk_items(['status' => 'active'], $limit * 2), 0, $limit - count($rows)));   // R86-002: dropdown on focus — the supplier's items first, then the rest
+    if ($q !== '') {   // R97-115: the supplier only orders the list — an item of the inventory is always found: exact code or part number first, the supplier's items next, the rest of the inventory after
+        $ex = all(STK_SELECT . " WHERE i.status <> 'blocked' AND (i.code = ? OR i.factory_code = ?) ORDER BY (i.code = ?) DESC, (i.status = 'active') DESC LIMIT 5", [$q, $q, $q]);
+        if ($supplier && count($rows) < $limit) $rows = array_merge($rows, stk_items(['q' => $q, 'status' => 'active'], $limit));
+        $rows = array_slice(array_merge($ex, $rows), 0, $limit + count($ex));
+    }
     $seen = []; $rows = array_values(array_filter($rows, function ($r) use (&$seen) { if (isset($seen[$r['id']])) return false; return $seen[$r['id']] = true; }));
     $withAlts = !empty($_GET['alts']) && function_exists('stk_alternatives_of');
     foreach ($rows as $r) { $alts = [];
