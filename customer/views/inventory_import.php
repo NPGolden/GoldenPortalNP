@@ -47,4 +47,18 @@ layout_head(t('stk.import'), 'inventory');
 </div>
 <div><div class="card"><h2>ℹ <?= tt('stk.imp_how') ?></h2><ol class="hint" style="padding-left:18px;"><li><?= tt('stk.imp_how1') ?></li><li><?= tt('stk.imp_how2') ?></li><li><?= tt('stk.imp_how3') ?></li><li><?= tt('stk.imp_how4') ?></li></ol></div></div>
 </div>
+<?php /* R97-107: maker part number from our own code "prefix.partnumber" */ $pnOn = isset($_GET['pn']); $pnPlan = $pnOn ? stk_pn_fill_plan() : []; $pnLast = stk_pn_fill_last(); ?>
+<div class="card" id="pn">
+  <div class="card-head"><h2>🏷 <?= tt('stk.pn_title') ?></h2><?php if (!$pnOn): ?><a class="btn btn--sm" href="<?= url('inventory_import', ['pn' => 1]) ?>#pn"><?= tt('stk.pn_open') ?></a><?php endif; ?></div>
+  <p class="hint"><?= tt('stk.pn_lede') ?></p>
+  <?php if ($pnLast): ?><form method="post" action="<?= url('inventory_import', ['pn' => 1]) ?>#pn" data-lock data-confirm="<?= e(t('stk.pn_undo_q', ['n' => count($pnLast['ids'])])) ?>" style="margin:0 0 10px;"><?= csrf_field() ?><input type="hidden" name="action" value="stk_pn_undo"><span class="hint"><?= e(t('stk.pn_last', ['n' => count($pnLast['ids']), 'd' => fmt_datetime((string)$pnLast['at']), 'u' => (string)$pnLast['by']])) ?></span> <button class="btn btn--ghost btn--sm" type="submit">↩ <?= tt('stk.pn_undo') ?></button></form><?php endif; ?>
+  <?php if ($pnOn && !$pnPlan): ?><p class="hint"><?= tt('stk.pn_none') ?></p><?php elseif ($pnOn): ?>
+  <form method="post" action="<?= url('inventory_import', ['pn' => 1]) ?>#pn" data-lock data-confirm="<?= e(t('stk.pn_q')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="stk_pn_fill">
+    <div class="table-scroll" style="max-height:460px;"><table class="tbl tbl--compact"><thead><tr><th></th><th><?= tt('stk.pn_c_prefix') ?></th><th class="num"><?= tt('stk.pn_c_n') ?></th><th class="num"><?= tt('stk.pn_c_known') ?></th><th><?= tt('stk.pn_c_ex') ?></th></tr></thead><tbody>
+    <?php foreach ($pnPlan as $b): ?><tr><td><input type="checkbox" name="prefix[]" value="<?= e($b['prefix']) ?>"<?= $b['sure'] ? ' checked' : '' ?> aria-label="<?= e($b['prefix']) ?>"></td><td class="mono"><b><?= e($b['prefix']) ?>.</b></td><td class="num"><?= (int)$b['n'] ?></td><td class="num"><?= $b['known'] ? pill($b['pct'] >= 80 ? 'green' : ($b['pct'] >= 50 ? 'gold' : 'bad'), $b['pct'] . ' %') . ' <span class="hint">' . (int)$b['same'] . ' / ' . (int)$b['known'] . '</span>' : '<span class="hint">—</span>' ?></td><td class="mono hint"><?= e(implode(' · ', $b['ex'])) ?></td></tr><?php endforeach; ?>
+    </tbody></table></div>
+    <div class="btn-row" style="margin-top:8px;"><button class="btn btn--gold" type="submit"><?= tt('stk.pn_apply') ?></button><span class="hint"><?= tt('stk.pn_foot') ?></span></div>
+  </form>
+  <?php endif; ?>
+</div>
 <?php layout_foot(); ?>

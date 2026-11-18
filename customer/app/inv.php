@@ -543,11 +543,12 @@ function stk_sim_norm(?string $s): string { return strtoupper((string) preg_repl
 function stk_sim_tokens(string $s): array { $o = []; foreach (preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($s)) ?: [] as $t) if (mb_strlen($t) >= 4 && !in_array($t, ['with', 'type', 'from', 'και', 'για', 'ειδ', 'κατασκευη'], true)) $o[$t] = true; return array_keys($o); }
 /** The whole inventory once per request: items with stock, an index by the first 4 characters of the normalised code / part number, and an index by word. */
 function stk_sim_index(): array {
-    static $ix = null; if ($ix !== null) return $ix; $ix = ['items' => [], 'pre' => [], 'tok' => []]; if (!stk_has()) return $ix;
+    static $ix = null; if ($ix !== null) return $ix; $ix = ['items' => [], 'pre' => [], 'tok' => [], 'tail' => []]; if (!stk_has()) return $ix;
     foreach (all("SELECT i.id, i.code, i.description, i.description_en, i.maker, i.factory_code, i.unit, i.status, COALESCE(s.oh, 0) AS on_hand, COALESCE(s.rs, 0) AS reserved FROM inv_items i LEFT JOIN (SELECT item_id, SUM(qty_on_hand) oh, SUM(qty_reserved) rs FROM inv_stock GROUP BY item_id) s ON s.item_id = i.id WHERE i.status <> 'blocked'") as $r) {
         $id = (int)$r['id']; $nc = stk_sim_norm($r['code']); $np = stk_sim_norm($r['factory_code']); $dot = strpos((string)$r['code'], '.'); $nt = $dot !== false && $dot <= 6 ? stk_sim_norm(substr((string)$r['code'], $dot + 1)) : '';   // "SE.A9F74316" → A9F74316: our codes carry a maker prefix
         $ix['items'][$id] = ['id' => $id, 'code' => (string)$r['code'], 'description' => (string)$r['description'], 'maker' => (string)($r['maker'] ?? ''), 'pn' => (string)($r['factory_code'] ?? ''), 'unit' => (string)$r['unit'], 'status' => (string)$r['status'], 'on_hand' => (float)$r['on_hand'], 'reserved' => (float)$r['reserved'], 'nc' => $nc, 'np' => $np, 'nt' => $nt];
         foreach (array_unique([$nc, $np, $nt]) as $k) if (strlen($k) >= 4) $ix['pre'][substr($k, 0, 4)][] = $id;
+        if (strlen($nt) >= 5 && preg_match('/\d/', $nt)) $ix['tail'][$nt][] = $id;
         foreach (stk_sim_tokens($r['description'] . ' ' . ($r['description_en'] ?? '') . ' ' . ($r['factory_code'] ?? '')) as $t) $ix['tok'][$t][] = $id;
     }
     foreach ($ix['tok'] as $t => $ids) if (count($ids) > 400) unset($ix['tok'][$t]);   // words that say nothing (cable, relay …)
@@ -583,4 +584,102 @@ function stk_similar(array $r, int $limit = 4, array $exclude = []): array {
 /** One line of text for a similar item: code — description · maker pn · stock. */
 function stk_sim_label(array $x): string { return $x['code'] . ' — ' . mb_substr($x['description'], 0, 70) . (trim($x['maker'] . ' ' . $x['pn']) !== '' ? ' · ' . trim($x['maker'] . ' ' . $x['pn']) : ''); }
 function stk_sim_stock_pill(array $x): string { return $x['on_hand'] > 0.0005 ? pill('green', t('stk.sim_stock', ['q' => stk_qty($x['on_hand']), 'u' => $x['unit']]) . ($x['reserved'] > 0.0005 ? ' · ' . t('stk.sim_free', ['q' => stk_qty(max(0.0, $x['free']))]) : '')) : pill('mute', t('stk.sim_nostock')); }
+/** The one inventory item whose code is "prefix.<this part number>" (R97-107) — null when none or when several makers share that number. */
+function stk_by_code_tail(string $pn): ?int { $n = stk_sim_norm($pn); if (strlen($n) < 5) return null; $ids = stk_sim_index()['tail'][$n] ?? []; return count($ids) === 1 ? (int)$ids[0] : null; }
+
+/* ------------------------------------------------------------------ R97-107: free-text lines of a requisition, purchase order or BOM → inventory item (proposals for everybody who may edit; new codes by Procurement only) */
+/** Who may link / create for this document. Returns [doc row, canUse, canNew] or throws. */
+function line_doc(string $kind, int $docId): array {
+    $adm = function_exists('pr_admin') && pr_admin();
+    if ($kind === 'po') { $o = function_exists('po_load') ? po_load($docId) : null; if (!$o) throw new RuntimeException(t('err.notfound')); $use = po_editable($o); return [$o, $use, $use && $adm]; }
+    if ($kind === 'pr') { $r = function_exists('prq_load') ? prq_load($docId) : null; if (!$r || !prq_can_view($r)) throw new RuntimeException(t('err.notfound')); $use = prq_can_edit($r) || ($adm && in_array($r['status'], ['draft', 'submitted', 'mgmt', 'approved'], true)); return [$r, $use, $use && $adm]; }
+    if ($kind === 'bom') { $b = function_exists('bom_load') ? bom_load($docId) : null; if (!$b || !bom_can_view((int)$b['subproject_id'])) throw new RuntimeException(t('err.notfound')); $pr = $adm || bom_pr_can(); $use = bom_editable($b) || ($pr && in_array($b['status'], ['draft', 'issued', 'approved'], true)); return [$b, $use, $use && $pr]; }
+    throw new RuntimeException(t('err.notfound'));
+}
+/** The free-text lines of a document, in one shape: id, seq, description, maker, part_no, unit, qty. */
+function line_free(string $kind, int $docId): array {
+    if ($kind === 'po') return all("SELECT id, seq, description, maker, part_no, unit, qty FROM po_lines WHERE order_id = ? AND item_id IS NULL AND pr_line_id IS NULL AND status <> 'cancelled' ORDER BY seq, id", [$docId]);
+    if ($kind === 'pr') return all("SELECT id, seq, description, maker, part_no, unit, qty FROM pr_lines WHERE request_id = ? AND item_id IS NULL AND status NOT IN ('cancelled','issued') AND qty_ordered <= 0.0005 AND qty_received <= 0.0005 AND qty_issued <= 0.0005 ORDER BY seq, id", [$docId]);
+    return all("SELECT id, seq, description, maker, part_no, unit, qty FROM bom_lines WHERE bom_rev_id = ? AND item_id IS NULL AND status <> 'removed' ORDER BY seq, id", [$docId]);
+}
+function line_use_item(string $kind, int $docId, int $lineId, int $itemId): void {
+    [$doc, $use] = line_doc($kind, $docId); if (!$use) throw new RuntimeException(t('err.noaccess'));
+    $it = stk_item($itemId); if (!$it || $it['status'] === 'blocked') throw new RuntimeException(t('err.notfound'));
+    $l = null; foreach (line_free($kind, $docId) as $x) if ((int)$x['id'] === $lineId) $l = $x; if (!$l) throw new RuntimeException(t('err.noaccess'));
+    if ($kind === 'po') { po_line_use_item($docId, $lineId, $itemId); return; }
+    $was = mb_strtolower((string)$l['description']) !== mb_strtolower((string)$it['description']) ? t('po.sim_was', ['d' => (string)$l['description']]) : '';
+    if ($kind === 'pr') {
+        $note = trim((string) scalar('SELECT note FROM pr_lines WHERE id = ?', [$lineId])); if ($was !== '') $note = mb_substr(trim($note . ($note !== '' ? ' · ' : '') . $was), 0, 255);
+        q('UPDATE pr_lines SET item_id = ?, description = ?, maker = ?, part_no = ?, unit = ?, note = ? WHERE id = ? AND request_id = ?', [(int)$it['id'], mb_substr((string)$it['description'], 0, 255), ($it['maker'] ?? '') !== '' ? $it['maker'] : ($l['maker'] ?: null), ($it['factory_code'] ?? '') !== '' ? $it['factory_code'] : ($l['part_no'] ?: null), (string)$it['unit'], $note ?: null, $lineId, $docId]);
+        if (function_exists('prq_event')) prq_event($docId, 'line_item', (string)$it['code']); cache_bump_later('inv'); return;
+    }
+    $note = trim((string) scalar('SELECT note FROM bom_lines WHERE id = ?', [$lineId])); if ($was !== '') $note = mb_substr(trim($note . ($note !== '' ? ' · ' : '') . $was), 0, 255);
+    q('UPDATE bom_lines SET item_id = ?, code = ?, description = ?, maker = ?, part_no = ?, unit = ?, note = ? WHERE id = ? AND bom_rev_id = ?', [(int)$it['id'], (string)$it['code'], mb_substr((string)$it['description'], 0, 255), ($it['maker'] ?? '') !== '' ? $it['maker'] : ($l['maker'] ?: null), ($it['factory_code'] ?? '') !== '' ? $it['factory_code'] : ($l['part_no'] ?: null), (string)$it['unit'], $note ?: null, $lineId, $docId]);
+    bom_recalc($docId); bom_event($docId, 'line_item', '#' . (int)$l['seq'] . ' → ' . (string)$it['code']);
+}
+/** Procurement turns a free-text line into a new inventory item (code typed, or the maker part number when it is free) and links the line to it. */
+function line_new_item(string $kind, int $docId, int $lineId, string $code): int {
+    [$doc, $use, $new] = line_doc($kind, $docId); if (!$new) throw new RuntimeException(t('err.noaccess'));
+    $l = null; foreach (line_free($kind, $docId) as $x) if ((int)$x['id'] === $lineId) $l = $x; if (!$l) throw new RuntimeException(t('err.noaccess'));
+    $code = trim($code); if ($code === '') $code = trim((string)$l['part_no']); if ($code === '') throw new RuntimeException(t('stk.need_code_desc'));
+    if (stk_item_by_code($code)) throw new RuntimeException(t('stk.code_taken', ['c' => $code]));
+    $id = stk_item_quick_create(['code' => $code, 'description' => (string)$l['description'], 'maker' => (string)$l['maker'], 'part_no' => (string)$l['part_no'], 'unit' => (string)$l['unit'], 'supplier_id' => $kind === 'po' ? (int)($doc['supplier_id'] ?? 0) : 0]);
+    line_use_item($kind, $docId, $lineId, $id); return $id;
+}
+/** The card under the lines: every free-text line with the similar inventory items (stock shown) and, for Procurement, "New inventory item". */
+function line_sim_card(string $kind, int $docId, string $self): string {
+    try { [$doc, $use, $new] = line_doc($kind, $docId); } catch (Throwable $e) { return ''; } if (!$use) return '';
+    $free = line_free($kind, $docId); if (!$free) return ''; $rows = []; $n = 0;
+    foreach ($free as $l) { $sx = $n < 150 ? stk_similar(['code' => '', 'part_no' => (string)$l['part_no'], 'maker' => (string)$l['maker'], 'description' => (string)$l['description']], 4) : []; if ($sx) $n++; if ($sx || $new) $rows[] = [$l, $sx]; }
+    if (!$rows) return '';
+    $hid = csrf_field() . '<input type="hidden" name="kind" value="' . e($kind) . '"><input type="hidden" name="id" value="' . $docId . '">';
+    $h = '<div id="similar" style="margin-top:14px;"><h3 style="margin:0 0 4px;">🔎 ' . tt('po.sim_title') . ' <span class="count">' . count($rows) . '</span></h3><p class="hint" style="margin:0 0 8px;">' . e(t('po.sim_hint', ['n' => count($free)])) . ($new ? ' ' . tt('stk.sim_new_hint') : ' ' . tt('stk.sim_new_proc')) . '</p>'
+       . '<div class="table-scroll"><table class="tbl tbl--compact"><thead><tr><th>#</th><th style="min-width:220px;">' . tt('po.sim_line') . '</th><th>' . tt('stk.sim_title') . '</th>' . ($new ? '<th>' . tt('bom.imp_d_new') . '</th>' : '') . '</tr></thead><tbody>';
+    foreach ($rows as [$l, $sx]) {
+        $h .= '<tr><td class="num">' . (int)$l['seq'] . '</td><td><b>' . e((string)$l['description']) . '</b><br><span class="hint">' . e(stk_qty((float)$l['qty'])) . ' ' . e((string)$l['unit']) . (trim((string)$l['maker'] . ' ' . (string)$l['part_no']) !== '' ? ' · ' . e(trim((string)$l['maker'] . ' ' . (string)$l['part_no'])) : '') . '</span></td><td>';
+        if (!$sx) $h .= '<span class="hint">' . tt('stk.sim_none') . '</span>';
+        foreach ($sx as $x) $h .= '<form method="post" action="' . $self . '" data-lock style="margin:3px 0;">' . $hid . '<input type="hidden" name="action" value="line_use_item"><input type="hidden" name="line_id" value="' . (int)$l['id'] . '"><input type="hidden" name="item_id" value="' . (int)$x['id'] . '"><button class="btn btn--ghost btn--sm" type="submit">' . tt('stk.sim_use') . '</button> <a href="' . url('inventory_item', ['id' => (int)$x['id']]) . '" target="_blank" rel="noopener">' . e(stk_sim_label($x)) . '</a> ' . stk_sim_stock_pill($x) . ' ' . pill('mute', t('stk.sim_why_' . $x['why']) . ' ' . (int)$x['score'] . ' %') . '</form>';
+        $h .= '</td>';
+        if ($new) $h .= '<td style="white-space:nowrap;"><form method="post" action="' . $self . '" data-lock' . ($sx ? ' data-confirm="' . e(t('stk.sim_new_q')) . '"' : '') . ' style="display:flex;gap:6px;">' . $hid . '<input type="hidden" name="action" value="line_new_item"><input type="hidden" name="line_id" value="' . (int)$l['id'] . '"><input name="code" maxlength="60" placeholder="' . e((string)$l['part_no'] !== '' ? (string)$l['part_no'] : t('stk.code')) . '" style="width:150px;" aria-label="' . tt('stk.code') . '"><button class="btn btn--sm" type="submit">＋</button></form></td>';
+        $h .= '</tr>';
+    }
+    return $h . '</tbody></table></div></div>';
+}
+
+/* ------------------------------------------------------------------ R97-107: maker part number from our own code "prefix.partnumber" — per prefix, checked by Procurement before it is written */
+function stk_pn_tail(string $code): ?array { if (!preg_match('/^([A-Za-z0-9]{1,8})\.(.+)$/', $code, $m)) return null; return [strtoupper($m[1]), $m[2]]; }
+function stk_pn_tail_ok(string $t): bool { return !preg_match('/\s/', $t) && preg_match('/\d/', $t) && strlen(stk_sim_norm($t)) >= 4 && mb_strlen($t) <= 80; }
+/** Per prefix: items without a maker part number that could take it from the code (n), how many items of the prefix already have one (known) and for how many of those it is the code's tail (same), examples. */
+function stk_pn_fill_plan(): array {
+    require_pr_admin(); $P = [];
+    foreach (all("SELECT id, code, factory_code FROM inv_items WHERE status <> 'blocked' AND code LIKE '%.%'") as $r) {
+        $pt = stk_pn_tail((string)$r['code']); if (!$pt) continue; [$pre, $tail] = $pt; $b = &$P[$pre]; $b = $b ?? ['prefix' => $pre, 'n' => 0, 'known' => 0, 'same' => 0, 'ex' => []];
+        $fc = trim((string)($r['factory_code'] ?? ''));
+        if ($fc !== '') { $b['known']++; if (stk_sim_norm($fc) === stk_sim_norm($tail)) $b['same']++; }
+        elseif (stk_pn_tail_ok($tail)) { $b['n']++; if (count($b['ex']) < 3) $b['ex'][] = (string)$r['code']; }
+        unset($b);
+    }
+    $P = array_filter($P, fn($b) => $b['n'] > 0); foreach ($P as &$b) { $b['pct'] = $b['known'] ? (int) round($b['same'] / $b['known'] * 100) : null; $b['sure'] = $b['known'] >= 5 && $b['pct'] >= 80; } unset($b);
+    uasort($P, fn($a, $b) => [$b['sure'], $b['n']] <=> [$a['sure'], $a['n']]); return $P;
+}
+function stk_pn_fill_apply(array $prefixes): int {
+    require_pr_admin(); $want = array_flip(array_map(fn($p) => strtoupper((string)$p), $prefixes)); if (!$want) return 0; $ids = []; $pdo = db(); $pdo->beginTransaction();
+    try {
+        foreach (all("SELECT id, code FROM inv_items WHERE status <> 'blocked' AND code LIKE '%.%' AND (factory_code IS NULL OR factory_code = '')") as $r) {
+            $pt = stk_pn_tail((string)$r['code']); if (!$pt || !isset($want[$pt[0]]) || !stk_pn_tail_ok($pt[1])) continue;
+            q("UPDATE inv_items SET factory_code = ? WHERE id = ? AND (factory_code IS NULL OR factory_code = '')", [$pt[1], (int)$r['id']]); $ids[] = (int)$r['id'];
+        }
+        $pdo->commit();
+    } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+    if ($ids) { $u = current_user(); @file_put_contents(stk_pn_fill_file(), json_encode(['at' => date('Y-m-d H:i:s'), 'by' => (string)($u['full_name'] ?? ''), 'prefixes' => array_keys($want), 'ids' => $ids])); cache_bump_later('inv'); }
+    return count($ids);
+}
+function stk_pn_fill_file(): string { $d = dirname(__DIR__) . '/storage/private'; if (!is_dir($d)) @mkdir($d, 0750, true); return $d . '/pn_fill_last.json'; }
+function stk_pn_fill_last(): ?array { $f = stk_pn_fill_file(); $d = is_file($f) ? json_decode((string) @file_get_contents($f), true) : null; return is_array($d) && !empty($d['ids']) ? $d : null; }
+/** Undo the last fill: only where the value is still the one that was written. */
+function stk_pn_fill_undo(): int {
+    require_pr_admin(); $L = stk_pn_fill_last(); if (!$L) return 0; $n = 0;
+    foreach (array_chunk(array_map('intval', $L['ids']), 500) as $ch) foreach (all('SELECT id, code, factory_code FROM inv_items WHERE id IN (' . implode(',', $ch) . ')') as $r) { $pt = stk_pn_tail((string)$r['code']); if ($pt && (string)$r['factory_code'] === $pt[1]) { q('UPDATE inv_items SET factory_code = NULL WHERE id = ?', [(int)$r['id']]); $n++; } }
+    @unlink(stk_pn_fill_file()); cache_bump_later('inv'); return $n;
+}
 

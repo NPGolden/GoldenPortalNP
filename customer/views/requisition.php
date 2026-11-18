@@ -126,6 +126,7 @@ layout_head(($r ? $r['pr_no'] : t('prq.new')) . ' · ' . t('prq.title'), 'requis
     </tbody>
   </table>
 
+  <?php if ($r && function_exists('line_sim_card')) echo line_sim_card('pr', $id, url('requisition', ['id' => $id]));   // R97-107 ?>
   <?php if ($edit): ?>
   <h3 id="line-form-title" style="margin-top:14px;"><?= tt('prq.add_line') ?></h3>
   <form method="post" action="<?= url('requisition', ['id' => $id]) ?>" id="line-form" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="prq_line_save"><input type="hidden" name="request_id" value="<?= $id ?>"><input type="hidden" name="line_id" id="lf-id" value="0"><input type="hidden" name="item_id" id="lf-item" value="">

@@ -639,6 +639,7 @@ function sb_match_row(string $code, string $pn, string $maker, array $normMap): 
     if ($code !== '' && ($it = stk_item_by_code($code))) return [$it, 'code', 100, t('bom.imp_r_code')];
     if ($pn !== '' && ($it = one(STK_SELECT . " WHERE i.status <> 'blocked' AND LOWER(i.factory_code) = LOWER(?)" . ($maker !== '' ? ' ORDER BY (LOWER(i.maker) = LOWER(?)) DESC' : '') . ' LIMIT 1', $maker !== '' ? [$pn, $maker] : [$pn]))) return [$it, 'part_no', 95, t('bom.imp_r_pn')];
     if ($pn !== '' && ($nk = bom_imp_norm($pn)) !== '' && isset($normMap[$nk]) && ($it = stk_item((int)($normMap[$nk][mb_strtolower($maker)] ?? reset($normMap[$nk]))))) return [$it, 'part_no_norm', 85, t('bom.imp_r_pn_norm')];
+    if ($pn !== '' && function_exists('stk_by_code_tail') && ($tid = stk_by_code_tail($pn)) && ($it = stk_item($tid))) return [$it, 'part_no_norm', 90, t('bom.imp_r_tail')];   // R97-107
     return [null, 'none', 0, null];
 }
 function sb_norm_map(): array { $m = []; try { foreach (all("SELECT id, maker, factory_code FROM inv_items WHERE status <> 'blocked' AND factory_code IS NOT NULL AND factory_code <> ''") as $x) { $k = bom_imp_norm((string)$x['factory_code']); if ($k !== '') $m[$k][mb_strtolower((string)$x['maker'])] = (int)$x['id']; } } catch (Throwable $e) {} return $m; }

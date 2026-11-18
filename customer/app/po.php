@@ -499,7 +499,7 @@ function po_line_use_item(int $oid, int $lid, int $itemId): void {
     $price = $l['unit_price'] !== null ? (float)$l['unit_price'] : null; $origin = $l['price_origin'];
     if ($price === null && $o['kind'] === 'po') { $p = stk_price_proposal($it, (int)$o['supplier_id']); if ($p['price'] !== null) { $price = $p['price']; $origin = mb_substr((string)$p['origin'], 0, 160); } }
     $note = trim((string)$l['note']); $was = t('po.sim_was', ['d' => (string)$l['description']]); if (mb_strtolower((string)$l['description']) !== mb_strtolower((string)$it['description'])) $note = mb_substr(trim($note . ($note !== '' ? ' · ' : '') . $was), 0, 255);
-    q('UPDATE po_lines SET item_id = ?, description = ?, maker = ?, part_no = ?, unit = ?, unit_price = ?, price_origin = ?, note = ? WHERE id = ?', [(int)$it['id'], mb_substr((string)$it['description'], 0, 255), $it['maker'] ?? null, $it['factory_code'] ?? null, (string)$it['unit'], $price, $origin, $note ?: null, $lid]);
+    q('UPDATE po_lines SET item_id = ?, description = ?, maker = ?, part_no = ?, unit = ?, unit_price = ?, price_origin = ?, note = ? WHERE id = ?', [(int)$it['id'], mb_substr((string)$it['description'], 0, 255), ($it['maker'] ?? '') !== '' ? $it['maker'] : ($l['maker'] ?: null), ($it['factory_code'] ?? '') !== '' ? $it['factory_code'] : ($l['part_no'] ?: null), (string)$it['unit'], $price, $origin, $note ?: null, $lid]);   // the typed maker / part number stay when the item has none
     po_recalc($oid);
 }
 

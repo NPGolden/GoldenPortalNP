@@ -306,6 +306,7 @@ function bom_row_exact(array $r): array {
     if ($r['code'] !== '' && ($it = stk_item_by_code($r['code']))) return [$it, 'code'];
     if ($r['part_no'] !== '') {
         if ($it = one(STK_SELECT . " WHERE i.status <> 'blocked' AND LOWER(i.factory_code) = LOWER(?)" . ($r['maker'] !== '' ? ' ORDER BY (LOWER(i.maker) = LOWER(?)) DESC' : '') . ' LIMIT 1', $r['maker'] !== '' ? [$r['part_no'], $r['maker']] : [$r['part_no']])) return [$it, 'part_no'];
+        if (($tid = stk_by_code_tail($r['part_no'])) && ($it = stk_item($tid))) return [$it, 'part_no_norm'];
         $n = stk_sim_norm($r['part_no']); if ($n !== '') foreach (stk_sim_index()['pre'][substr($n, 0, 4)] ?? [] as $id) if (stk_sim_index()['items'][$id]['np'] === $n && ($it = stk_item($id))) return [$it, 'part_no_norm'];
     }
     return [null, 'none'];
@@ -335,6 +336,7 @@ function bom_import_stage(int $bid, array $file): array {
         if ($code !== '' && ($it = stk_item_by_code($code))) { $kind = 'code'; $conf = 100; $reason = t('bom.imp_r_code'); }
         elseif ($pn !== '' && ($it = one(STK_SELECT . " WHERE i.status <> 'blocked' AND LOWER(i.factory_code) = LOWER(?)" . ($maker !== '' ? ' ORDER BY (LOWER(i.maker) = LOWER(?)) DESC' : '') . ' LIMIT 1', $maker !== '' ? [$pn, $maker] : [$pn]))) { $kind = 'part_no'; $conf = 95; $reason = t('bom.imp_r_pn'); }
         elseif ($pn !== '' && ($nk = bom_imp_norm($pn)) !== '' && isset($normMap[$nk]) && ($it = stk_item((int)($normMap[$nk][mb_strtolower($maker)] ?? reset($normMap[$nk]))))) { $kind = 'part_no_norm'; $conf = 85; $reason = t('bom.imp_r_pn_norm'); }
+        if (!$it && $pn !== '' && function_exists('stk_by_code_tail') && ($tid = stk_by_code_tail($pn)) && ($it = stk_item($tid))) { $kind = 'part_no_norm'; $conf = 90; $reason = t('bom.imp_r_tail'); }   // R97-107: our code is "prefix.<part number>"
         if ($desc === '' && $it) $desc = (string)$it['description'];
         if ($desc === '') { $warn[] = t('stk.imp_w_nodesc', ['l' => $i + $hdrIdx + 2, 'c' => $code ?: $pn]); continue; }
         $qty = $num($g('qty')) ?? 1.0; if ($qty <= 0) $qty = 1.0;
@@ -416,6 +418,7 @@ function bom_import_apply(int $bid): array {
         $d = (string)$r['decision']; if ($d === 'pending') { $n['pending']++; continue; }
         $it = null;
         if ($d === 'accept') { $it = $r['item_id'] ? stk_item((int)$r['item_id']) : null; if (!$it) { $n['pending']++; continue; } }
+        if ($d === 'new' && !(bom_pr_can() || (function_exists('pr_admin') && pr_admin()))) $d = 'reject';   // R97-107: new inventory codes are created by Procurement — for an engineer the row becomes a free-text line
         if ($d === 'new') { $it = stk_item(bom_imp_create_item($r, $bid)); }
         q('INSERT INTO bom_lines (bom_rev_id, seq, item_id, code, description, maker, part_no, unit, qty, section, note) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
           [$bid, ++$seq, $it ? (int)$it['id'] : null, $it ? $it['code'] : ($r['code'] ?: null), $it && $r['description'] === '' ? $it['description'] : $r['description'], $it ? $it['maker'] : $r['maker'], $it ? $it['factory_code'] : $r['part_no'], $it ? $it['unit'] : $r['unit'], (float)$r['qty'], $r['section'], $r['note']]);

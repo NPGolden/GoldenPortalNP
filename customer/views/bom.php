@@ -92,6 +92,7 @@ layout_head($b['sub_code'] . ' · BOM ' . $rev, 'projects');
     </tbody>
   </table>
 
+  <?php if (function_exists('line_sim_card')) echo line_sim_card('bom', $id, url('bom', ['id' => $id]));   // R97-107 ?>
   <?php if ($edit): ?>
   <h3 id="line-form-title" style="margin-top:14px;"><?= tt('prq.add_line') ?></h3>
   <form method="post" action="<?= url('bom', ['id' => $id]) ?>" id="line-form" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="bom_line_save"><input type="hidden" name="bom_id" value="<?= $id ?>"><input type="hidden" name="line_id" id="lf-id" value="0"><input type="hidden" name="item_id" id="lf-item" value="">
@@ -137,7 +138,7 @@ layout_head($b['sub_code'] . ' · BOM ' . $rev, 'projects');
           <div class="prq-pick" style="margin-top:4px;"><input type="text" class="imp-pick" data-row="<?= (int)$r['id'] ?>" placeholder="<?= tt('bom.imp_pick_other') ?>" autocomplete="off" style="max-width:280px;"><input type="hidden" name="item[<?= (int)$r['id'] ?>]" value=""></div>
           <?php $simN = $simN ?? 0; $sim = function_exists('stk_similar') && !($r['item_id'] && (int)$r['confidence'] >= 95) && $simN++ < 400 ? stk_similar(['code' => (string)$r['code'], 'part_no' => (string)$r['part_no'], 'maker' => (string)$r['maker'], 'description' => (string)$r['description']], 4, [(int)$r['item_id']]) : []; if ($sim): ?><div class="hint" style="margin-top:6px;"><b><?= tt('stk.sim_title') ?></b><?php foreach ($sim as $x): ?><div style="margin:3px 0;"><button type="button" class="btn btn--ghost btn--sm imp-sim" data-item="<?= (int)$x['id'] ?>" data-label="<?= e($x['code'] . ' — ' . $x['description']) ?>"><?= tt('stk.sim_use') ?></button> <a href="<?= url('inventory_item', ['id' => (int)$x['id']]) ?>" target="_blank" rel="noopener"><?= e(stk_sim_label($x)) ?></a> <?= stk_sim_stock_pill($x) ?> <?= pill('mute', t('stk.sim_why_' . $x['why']) . ' ' . (int)$x['score'] . ' %') ?></div><?php endforeach; ?></div><?php endif; ?></td>
         <td style="white-space:nowrap;">
-          <?php foreach (['accept' => $r['item_id'] ? '' : ' disabled', 'reject' => '', 'new' => ''] as $d => $dis): ?><label class="check" style="display:block;margin:2px 0;"><input type="radio" name="dec[<?= (int)$r['id'] ?>]" value="<?= $d ?>"<?= $r['decision'] === $d ? ' checked' : '' ?><?= $dis ?>> <?= tt('bom.imp_d_' . $d) ?><?= $d === 'new' && !empty($sim) ? ' ' . pill('gold', t('stk.sim_warn')) : '' ?></label><?php endforeach; ?>
+          <?php foreach (['accept' => $r['item_id'] ? '' : ' disabled', 'reject' => '', 'new' => ($proc || pr_admin()) ? '' : ' disabled title="' . tt('stk.sim_new_proc') . '"'] as $d => $dis): ?><label class="check" style="display:block;margin:2px 0;"><input type="radio" name="dec[<?= (int)$r['id'] ?>]" value="<?= $d ?>"<?= $r['decision'] === $d ? ' checked' : '' ?><?= $dis ?>> <?= tt('bom.imp_d_' . $d) ?><?= $d === 'new' && !empty($sim) ? ' ' . pill('gold', t('stk.sim_warn')) : '' ?></label><?php endforeach; ?>
           <label class="check" style="display:block;margin:2px 0;"><input type="radio" name="dec[<?= (int)$r['id'] ?>]" value="pending"<?= $r['decision'] === 'pending' ? ' checked' : '' ?>> <?= tt('bom.imp_d_pending') ?></label></td>
       </tr>
     <?php endforeach; ?></tbody></table></div>

@@ -150,19 +150,7 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
   <?php endif; ?>
   <?php foreach ($delForms ?? [] as $dl): /* R86-001: line deletion forms live outside the quote form (nested forms are dropped by browsers and would hijack "Save quotes") */ ?><form method="post" action="<?= $self ?>" id="dl<?= $dl ?>" data-lock data-confirm="<?= e(t('prq.del_line_q')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="po_line_del"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="line_id" value="<?= $dl ?>"></form><?php endforeach; ?>
 
-  <?php /* R97-106: lines without an inventory item — similar items of the inventory, with stock */
-  $simRows = []; if ($o && $edit && function_exists('stk_similar')) foreach ($lines as $l) { if ($l['item_id'] || $l['pr_line_id'] || $l['status'] === 'cancelled') continue; $sx = stk_similar(['code' => '', 'part_no' => (string)$l['part_no'], 'maker' => (string)$l['maker'], 'description' => (string)$l['description']], 4); if ($sx) $simRows[] = [$l, $sx]; if (count($simRows) >= 150) break; }
-  $nFree = $o ? count(array_filter($lines, fn($l) => !$l['item_id'] && $l['status'] !== 'cancelled')) : 0;
-  if ($simRows): ?>
-  <div id="similar" style="margin-top:14px;">
-    <h3 style="margin:0 0 4px;">🔎 <?= tt('po.sim_title') ?> <span class="count"><?= count($simRows) ?></span></h3>
-    <p class="hint" style="margin:0 0 8px;"><?= e(t('po.sim_hint', ['n' => $nFree])) ?></p>
-    <div class="table-scroll"><table class="tbl tbl--compact"><thead><tr><th>#</th><th style="min-width:220px;"><?= tt('po.sim_line') ?></th><th><?= tt('stk.sim_title') ?></th></tr></thead><tbody>
-    <?php foreach ($simRows as [$l, $sx]): ?><tr><td class="num"><?= (int)$l['seq'] ?></td><td><b><?= e($l['description']) ?></b><br><span class="hint"><?= e(stk_qty((float)$l['qty'])) ?> <?= e($l['unit']) ?><?= trim((string)$l['maker'] . ' ' . (string)$l['part_no']) !== '' ? ' · ' . e(trim((string)$l['maker'] . ' ' . (string)$l['part_no'])) : '' ?></span></td>
-      <td><?php foreach ($sx as $x): ?><form method="post" action="<?= $self ?>" data-lock style="margin:3px 0;"><?= csrf_field() ?><input type="hidden" name="action" value="po_line_item"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="line_id" value="<?= (int)$l['id'] ?>"><input type="hidden" name="item_id" value="<?= (int)$x['id'] ?>"><button class="btn btn--ghost btn--sm" type="submit"><?= tt('stk.sim_use') ?></button> <a href="<?= url('inventory_item', ['id' => (int)$x['id']]) ?>" target="_blank" rel="noopener"><?= e(stk_sim_label($x)) ?></a> <?= stk_sim_stock_pill($x) ?> <?= pill('mute', t('stk.sim_why_' . $x['why']) . ' ' . (int)$x['score'] . ' %') ?></form><?php endforeach; ?></td></tr><?php endforeach; ?>
-    </tbody></table></div>
-  </div>
-  <?php endif; ?>
+  <?php if ($o && function_exists('line_sim_card')) echo line_sim_card('po', $id, $self);   // R97-106 / R97-107: free-text lines → similar inventory items, new item by Procurement ?>
   <?php if ($o && function_exists('po_import_can') && po_import_can($o)): ?>
   <form method="post" action="<?= $self ?>" enctype="multipart/form-data" data-lock style="margin-top:14px;"><?= csrf_field() ?><input type="hidden" name="action" value="po_import_bom"><input type="hidden" name="id" value="<?= $id ?>">
     <h3 style="margin:0 0 6px;">📑 <?= tt('po.imp_title') ?></h3>

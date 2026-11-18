@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.179.0';
+const CP_VERSION = '1.180.0';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-107', 'version' => '1.180.0', 'date' => '2026-11-18', 'title' => 'Inventory proposals everywhere: free-text lines of requisitions, purchase orders and BOMs show similar inventory items with stock; System Budget BOM review too; a part number that is our code without its maker prefix counts as a match; new inventory codes only by Procurement, who can turn a free-text line into an item; tool to fill maker part numbers from our codes per prefix, with undo.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-106', 'version' => '1.179.0', 'date' => '2026-11-18', 'title' => 'Similar inventory items (same or similar code, maker part number or description, with stock) are proposed in the BOM import review and on purchase orders; a BOM workbook can be imported into a draft purchase order or RFQ; a BOM revision can be deleted with a reason by management too, unless requisitions or order lines made from it exist.', 'db' => 'install/migrate_cp_r97_106_bom_deleted.sql', 'check' => 'r98i'],
         ['ref' => 'GAS-CP-R97-105', 'version' => '1.178.0', 'date' => '2026-11-18', 'title' => 'Procurement: Cancel on a purchase order works again (the reason box did nothing); a draft or cancelled purchase order / RFQ and a draft, rejected or cancelled requisition can be deleted with a reason, when nothing depends on them; deleted documents are kept in a list.', 'db' => 'install/migrate_cp_r97_105_proc_deleted.sql', 'check' => 'r98h'],
         ['ref' => 'GAS-CP-R97-104', 'version' => '1.177.1', 'date' => '2026-11-18', 'title' => 'Health report follow-up: Projects list no longer runs the budget, engineering and procurement calculations for sub-projects that have no such data; the false alarm "Database steps: GAS-CP-R46-005" is corrected; old update backups are really removed (the last three are kept).', 'db' => null, 'check' => null],
