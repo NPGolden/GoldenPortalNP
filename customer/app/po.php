@@ -396,3 +396,75 @@ function po_progress_apply(?int $sid): void {
     if (!$sid) return; $p = po_progress($sid); if ($p === null) return;
     try { $cur = scalar('SELECT pct_procurement FROM subprojects WHERE id = ?', [$sid]); if ($cur === null || (int)$cur === PCT_NA || (int)$cur >= $p) return; q('UPDATE subprojects SET pct_procurement = ? WHERE id = ?', [$p, $sid]); } catch (Throwable $e) {}
 }
+
+/* ------------------------------------------------------------------ R97-105: delete a purchase order / RFQ / requisition (with a record of what was deleted) */
+function procdel_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'proc_deleted'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function procdel_can_see(): bool { return procdel_has() && is_staff() && ((function_exists('mgmt_can') && mgmt_can()) || is_cp_admin() || (function_exists('pr_admin') && pr_admin())); }
+/** Number of rows of a table that still point to this document; a missing table counts as none. */
+function procdel_n(string $sql, array $args): int { try { return (int) scalar($sql, $args); } catch (Throwable $e) { return 0; } }
+function procdel_record(string $kind, array $h, array $lines, string $reason): void {
+    $u = current_user();
+    q('INSERT INTO proc_deleted (doc_kind, doc_no, title, party, project_ref, status_was, total, currency, n_lines, reason, snapshot, deleted_by, deleted_name, ip) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [$kind, (string)$h['no'], mb_substr((string)($h['title'] ?? ''), 0, 255) ?: null, mb_substr((string)($h['party'] ?? ''), 0, 200) ?: null, mb_substr((string)($h['project_ref'] ?? ''), 0, 120) ?: null, (string)$h['status'], $h['total'] ?? null, $h['currency'] ?? null, count($lines), mb_substr($reason, 0, 300),
+       json_encode(['header' => $h['row'], 'lines' => $lines], JSON_UNESCAPED_UNICODE | JSON_PARTIAL_OUTPUT_ON_ERROR), $u['id'] ?? null, $u['full_name'] ?? null, substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 64)]);
+}
+function procdel_list(int $limit = 50): array { return procdel_can_see() ? all('SELECT id, doc_kind, doc_no, title, party, project_ref, status_was, total, currency, n_lines, reason, deleted_name, deleted_at FROM proc_deleted ORDER BY id DESC LIMIT ' . (int)$limit) : []; }
+/** May this order be deleted, and if not why. Draft: procurement administrators. Cancelled: management and portal administrators only. */
+function po_delete_block(array $o): ?string {
+    if (!procdel_has() || !po_admin()) return t('err.noaccess');
+    if (!in_array($o['status'], ['draft', 'cancelled'], true)) return t('po.del_only');
+    if ($o['status'] === 'cancelled' && !((function_exists('mgmt_can') && mgmt_can()) || is_cp_admin())) return t('po.del_mgmt');
+    $oid = (int)$o['id'];
+    if (procdel_n('SELECT COUNT(*) FROM po_receipts WHERE order_id = ?', [$oid])) return t('po.del_has', ['w' => t('po.del_w_receipts')]);
+    if (procdel_n('SELECT COUNT(*) FROM si_invoices WHERE order_id = ?', [$oid]) || procdel_n('SELECT COUNT(*) FROM si_lines sl JOIN po_lines l ON l.id = sl.po_line_id WHERE l.order_id = ?', [$oid])) return t('po.del_has', ['w' => t('po.del_w_invoices')]);
+    if (procdel_n('SELECT COUNT(*) FROM inv_delivery_notes WHERE order_id = ?', [$oid]) || procdel_n('SELECT COUNT(*) FROM inv_dn_lines d JOIN po_lines l ON l.id = d.po_line_id WHERE l.order_id = ?', [$oid])) return t('po.del_has', ['w' => t('po.del_w_dn')]);
+    if (procdel_n('SELECT COUNT(*) FROM inv_prices p JOIN po_lines l ON l.id = p.po_line_id WHERE l.order_id = ?', [$oid]) || procdel_n('SELECT COUNT(*) FROM inv_licences p JOIN po_lines l ON l.id = p.po_line_id WHERE l.order_id = ?', [$oid]) || procdel_n("SELECT COUNT(*) FROM inv_moves WHERE ref_kind = 'po' AND ref_id = ?", [$oid])) return t('po.del_has', ['w' => t('po.del_w_stock')]);
+    if (procdel_n('SELECT COUNT(*) FROM po_costs WHERE order_id = ?', [$oid])) return t('po.del_has', ['w' => t('po.del_w_costs')]);
+    if ($o['kind'] === 'rfq' && procdel_n('SELECT COUNT(*) FROM po_orders WHERE rfq_id = ?', [$oid])) return t('po.del_has', ['w' => t('po.del_w_award')]);
+    return null;
+}
+function po_delete(int $oid, string $reason): string {
+    $o = po_load($oid); if (!$o) throw new RuntimeException(t('err.notfound')); $reason = trim($reason);
+    if (($why = po_delete_block($o)) !== null) throw new RuntimeException($why); if ($reason === '') throw new RuntimeException(t('prq.need_reason'));
+    $raw = one('SELECT * FROM po_orders WHERE id = ?', [$oid]); $lines = all('SELECT * FROM po_lines WHERE order_id = ? ORDER BY id', [$oid]); $pdo = db(); $pdo->beginTransaction();
+    try {
+        procdel_record($o['kind'] === 'rfq' ? 'rfq' : 'po', ['no' => $o['po_no'], 'title' => $o['title'], 'party' => $o['supplier'] ?? null, 'project_ref' => trim((string)($o['project_code'] ?? '') . ' ' . (string)($o['sub_code'] ?? '')), 'status' => $o['status'], 'total' => $o['subtotal'], 'currency' => $o['currency'], 'row' => $raw], $lines, $reason);
+        try { q('DELETE qq FROM po_rfq_quotes qq JOIN po_lines l ON l.id = qq.po_line_id WHERE l.order_id = ?', [$oid]); q('DELETE FROM po_rfq_suppliers WHERE rfq_id = ?', [$oid]); } catch (Throwable $e) {}
+        try { q('DELETE FROM po_milestones WHERE order_id = ?', [$oid]); } catch (Throwable $e) {}
+        if (!empty($raw['cost_id'])) { try { q('DELETE FROM sp_costs WHERE id = ?', [(int)$raw['cost_id']]); } catch (Throwable $e) {} }
+        q('DELETE FROM po_lines WHERE order_id = ?', [$oid]); q('DELETE FROM po_events WHERE order_id = ?', [$oid]); q('DELETE FROM po_orders WHERE id = ?', [$oid]);
+        $pdo->commit();
+    } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+    cache_bump_later('inv'); cache_bump_later('eng'); if (function_exists('eng_rows_reset')) eng_rows_reset(); if (function_exists('proc_feed_later') && !empty($raw['subproject_id'])) proc_feed_later((int)$raw['subproject_id']);
+    return (string)$o['po_no'];
+}
+/** Requisition: the requester may delete an own draft; procurement administrators a draft, rejected or cancelled one. Nothing may hang on it. */
+function prq_delete_block(array $r): ?string {
+    $u = current_user(); if (!procdel_has() || !$u) return t('err.noaccess');
+    $own = (int)$r['requester_id'] === (int)$u['id'] && $r['status'] === 'draft'; $adm = function_exists('pr_admin') && pr_admin() && in_array($r['status'], ['draft', 'rejected', 'cancelled'], true);
+    if (!in_array($r['status'], ['draft', 'rejected', 'cancelled'], true)) return t('prq.del_only'); if (!$own && !$adm) return t('err.noaccess');
+    $rid = (int)$r['id'];
+    if (procdel_n('SELECT COUNT(*) FROM po_lines pl JOIN pr_lines l ON l.id = pl.pr_line_id WHERE l.request_id = ?', [$rid])) return t('po.del_has', ['w' => t('prq.del_w_po')]);
+    if (procdel_n('SELECT COUNT(*) FROM pr_lines WHERE request_id = ? AND (qty_reserved > 0.0005 OR qty_ordered > 0.0005 OR qty_received > 0.0005 OR qty_issued > 0.0005)', [$rid]) || procdel_n('SELECT COUNT(*) FROM inv_dn_lines d JOIN pr_lines l ON l.id = d.pr_line_id WHERE l.request_id = ?', [$rid])) return t('po.del_has', ['w' => t('po.del_w_stock')]);
+    return null;
+}
+function prq_delete(int $rid, string $reason): string {
+    $r = function_exists('prq_load') ? prq_load($rid) : null; if (!$r || !prq_can_view($r)) throw new RuntimeException(t('err.notfound')); $reason = trim($reason);
+    if (($why = prq_delete_block($r)) !== null) throw new RuntimeException($why); if ($reason === '') throw new RuntimeException(t('prq.need_reason'));
+    $raw = one('SELECT * FROM pr_requests WHERE id = ?', [$rid]); $lines = all('SELECT * FROM pr_lines WHERE request_id = ? ORDER BY seq, id', [$rid]); $pdo = db(); $pdo->beginTransaction();
+    try {
+        procdel_record('pr', ['no' => $r['pr_no'], 'title' => $r['title'], 'party' => $r['requester_name'], 'project_ref' => trim((string)($r['project_code'] ?? '') . ' ' . (string)($r['sub_code'] ?? '')), 'status' => $r['status'], 'total' => $r['est_total'], 'currency' => $r['currency'], 'row' => $raw], $lines, $reason);
+        q('DELETE FROM pr_lines WHERE request_id = ?', [$rid]); q('DELETE FROM pr_events WHERE request_id = ?', [$rid]); q('DELETE FROM pr_requests WHERE id = ?', [$rid]);
+        $pdo->commit();
+    } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+    cache_bump_later('inv'); if (function_exists('proc_feed_later') && !empty($raw['subproject_id'])) proc_feed_later((int)$raw['subproject_id']);
+    return (string)$r['pr_no'];
+}
+/** The card "Deleted documents" under the lists (management, administrators, procurement administrators). */
+function procdel_card(array $kinds): string {
+    $rows = array_values(array_filter(procdel_list(100), fn($d) => in_array($d['doc_kind'], $kinds, true))); if (!$rows) return '';
+    $h = '<details class="card" id="deleted"><summary><b>🗑 ' . tt('po.del_list') . '</b> <span class="count">' . count($rows) . '</span></summary><p class="hint">' . tt('po.del_list_hint') . '</p><div class="table-scroll"><table class="tbl tbl--compact"><thead><tr><th>' . tt('th.no') . '</th><th>' . tt('th.title') . '</th><th>' . tt('po.del_c_party') . '</th><th>' . tt('th.status') . '</th><th class="num">' . tt('sb.total') . '</th><th>' . tt('po.del_c_reason') . '</th><th>' . tt('po.del_c_by') . '</th></tr></thead><tbody>';
+    foreach ($rows as $d) $h .= '<tr><td class="mono">' . e($d['doc_no']) . '</td><td>' . e((string)$d['title']) . ($d['project_ref'] ? '<br><span class="hint">' . e((string)$d['project_ref']) . '</span>' : '') . '</td><td>' . e((string)$d['party']) . '</td><td class="hint">' . e((string)$d['status_was']) . ' · ' . (int)$d['n_lines'] . '</td><td class="num">' . ((function_exists('stk_price_visible') && stk_price_visible() && $d['total'] !== null) ? e(number_format((float)$d['total'], 2, ',', '.') . ' ' . (string)$d['currency']) : '') . '</td><td>' . e((string)$d['reason']) . '</td><td class="hint">' . e((string)$d['deleted_name']) . '<br>' . e(fmt_datetime((string)$d['deleted_at'])) . '</td></tr>';
+    return $h . '</tbody></table></div></details>';
+}
+

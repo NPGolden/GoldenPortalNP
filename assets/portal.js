@@ -638,11 +638,12 @@ document.querySelectorAll('[data-tl-more]').forEach(function (b) { var more = b.
 (function () {
   document.addEventListener('submit', function (e) {
     var f = e.target; if (!f.matches || !f.matches('form[data-prompt]') || f.dataset.promptDone === '1') return;
-    e.preventDefault(); var r = window.prompt(f.getAttribute('data-prompt') || '', '');
+    e.preventDefault(); e.stopImmediatePropagation();   // R97-105: the one-submit lock must not see this first attempt
+    var r = window.prompt(f.getAttribute('data-prompt') || '', '');
     if (r === null || !r.trim()) return;
     var name = f.getAttribute('data-prompt-field') || 'note'; var inp = f.querySelector('[name="' + name + '"]');
     if (!inp) { inp = document.createElement('input'); inp.type = 'hidden'; inp.name = name; f.appendChild(inp); }
-    inp.value = r.trim(); f.dataset.promptDone = '1'; if (f.requestSubmit) f.requestSubmit(); else f.submit();
+    inp.value = r.trim(); f.dataset.promptDone = '1'; setTimeout(function () { if (f.requestSubmit) f.requestSubmit(); else f.submit(); }, 0);   // R97-105: a form can not be sent again from inside its own submit event — the browser ignores it; that is why Cancel did nothing
   }, true);
 })();
 

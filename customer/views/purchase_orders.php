@@ -82,4 +82,5 @@ layout_head(t('po.title'), 'purchase_orders');
 <?= $pg ?>
 </div>
 <?php endif; ?>
+<?php if (function_exists('procdel_card')) echo procdel_card(['po', 'rfq']);   // R97-105 ?>
 <?php layout_foot();

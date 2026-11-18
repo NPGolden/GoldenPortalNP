@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.177.1';
+const CP_VERSION = '1.178.0';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-105', 'version' => '1.178.0', 'date' => '2026-11-18', 'title' => 'Procurement: Cancel on a purchase order works again (the reason box did nothing); a draft or cancelled purchase order / RFQ and a draft, rejected or cancelled requisition can be deleted with a reason, when nothing depends on them; deleted documents are kept in a list.', 'db' => 'install/migrate_cp_r97_105_proc_deleted.sql', 'check' => 'r98h'],
         ['ref' => 'GAS-CP-R97-104', 'version' => '1.177.1', 'date' => '2026-11-18', 'title' => 'Health report follow-up: Projects list no longer runs the budget, engineering and procurement calculations for sub-projects that have no such data; the false alarm "Database steps: GAS-CP-R46-005" is corrected; old update backups are really removed (the last three are kept).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-103', 'version' => '1.177.0', 'date' => '2026-11-18', 'title' => 'System budget: up to 1024 part lines (was 124) and up to 1024 lines per BOM file (was 400); large tables are sent as one packed field so no line is lost; a form cut by the server limit is refused instead of half saved; unchanged lines are not rewritten.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-102', 'version' => '1.176.1', 'date' => '2026-11-18', 'title' => 'System budget: while the part lines are at procurement for pricing the Parts card says so, shows Take back and no longer offers Save or the delete ticks; an error after saving a section of a page is brought into view instead of staying hidden at the top.', 'db' => null, 'check' => null],
@@ -549,6 +550,7 @@ function cp_migration_state(): array {
         'r97p' => $has("SHOW TABLES LIKE 'nl_issues'"),
         'r97q' => $has("SHOW TABLES LIKE 'nl_lists'"),
         'r97r' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'proc_state'") && $has("SHOW COLUMNS FROM sb_parts LIKE 'proc_at'"),
+        'r98h' => $has("SHOW TABLES LIKE 'proc_deleted'"),
         'r98g' => $has("SHOW COLUMNS FROM sp_risks LIKE 'visibility'"),
         'r98f' => $has("SHOW COLUMNS FROM production_orders LIKE 'cyber_e27'"),
         'r98e' => $has("SHOW COLUMNS FROM ism_records LIKE 'equipment_id'"),
