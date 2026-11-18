@@ -3385,3 +3385,17 @@ The page on screen stays the internal version for staff.
 **Not tested**: live data; warehouse and QHSE as preparers (same code path as IT, other category list); the phone app.
 
 **Security review**: preparers reach no personal data — names and disciplines of active employees and the lines of their own categories only; kit, import, issue and acceptance stay with HR; the upload is limited to .xlsx up to 5 MB, read and discarded, and never sent to the assistant; the automatic evaluation writes QHSE records only and reads no supplier prices. Proposals (no effect on speed): (1) a tick on the user account for "may prepare equipment" instead of the position rules, if the positions do not fit; (2) the employee's signature drawn on the phone for the paper cases; (3) periodic re-evaluation of suppliers planned automatically 12 months after the last one.
+
+## §410 v1.189.1 (R97-126) — The code of the imported file is kept on a free-text line and proposed for the new inventory item
+
+**Reported**: on the card "Lines without an inventory item — similar items" of a purchase order the field Code of "New inventory item" is empty, although the imported file had a code for every row.
+
+**Found**: `po_import_bom()` and `prq_import_bom()` link a row whose code exists and write the others as free text — `po_lines` / `pr_lines` had no place for the code, so it was dropped; the field is filled only by `stk_code_propose()`, which needs a maker part number, and these rows had none.
+
+**Change** — migration `install/migrate_cp_r97_126_typed_code.sql` (key `r98r`): `po_lines.typed_code`, `pr_lines.typed_code`. `app/inv.php`: `line_code_has()`, `line_code_keep()` after the INSERT of a line without item; `line_free()` returns the code (for a BOM line its own `code`); `line_sim_card()` shows it and puts it in the field unless an item with that code exists meanwhile; `line_new_item()` uses it when the field is empty, before the proposal from the part number; `stk_similar()` is asked with it. Carried on: BOM → requisition, BOM → order, requisition → order, RFQ → order (`app/bom.php`, `app/po.php`). `line_codes_from_file()` (action `line_codes_file`, Procurement only): for lines imported earlier, the same file read again, codes put on free-text lines by description; a description with two different codes is left alone.
+
+**Tests (sandbox)**: draft order, file with four rows (two with new codes, one without code, one with an existing code) → two free lines carry the code and the field shows it, the third is empty, the fourth linked; ＋ with the field emptied → item created with the code of the file; codes cleared → "Take the codes from the file" fills two lines; a member of staff without Procurement is refused. Migration run twice. Sandbox restored. Error log clean.
+
+**Not tested**: the order of the report itself — its 81 lines were imported before this version and take their codes with "Take the codes from the file".
+
+**Security review**: the upload is limited to 8 MB, read by the same reader as the import and not kept; only Procurement can use it, on a document it may edit; the code is written through bound parameters and printed escaped. No proposal for this change.

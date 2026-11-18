@@ -143,7 +143,7 @@ function po_line_from_pr(int $oid, int $plid): ?int {
     if ($it && $o['kind'] === 'po') { $p = stk_price_proposal($it, (int)$o['supplier_id']); if ($p['price'] !== null) { $price = $p['price']; $origin = mb_substr($p['origin'], 0, 160); } }
     elseif (!$it && $o['kind'] === 'po' && $l['est_price'] !== null) { $price = (float)$l['est_price']; $origin = t('prq.est_typed'); }
     $seq = (int) scalar('SELECT COALESCE(MAX(seq),0) + 1 FROM po_lines WHERE order_id = ?', [$oid]);
-    q('INSERT INTO po_lines (order_id, seq, item_id, description, maker, part_no, unit, qty, unit_price, price_origin, need_date, pr_line_id, note) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)', [$oid, $seq, $l['item_id'], $l['description'], $l['maker'], $l['part_no'], $l['unit'], round($open, 3), $price, $origin, $l['need_date'], $plid, $l['note']]);
+    q('INSERT INTO po_lines (order_id, seq, item_id, description, maker, part_no, unit, qty, unit_price, price_origin, need_date, pr_line_id, note) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)', [$oid, $seq, $l['item_id'], $l['description'], $l['maker'], $l['part_no'], $l['unit'], round($open, 3), $price, $origin, $l['need_date'], $plid, $l['note']]); line_code_keep('po_lines', $l['item_id'], $l['typed_code'] ?? '');
     return (int) db()->lastInsertId();
 }
 function po_line_save_from_post(): int {
@@ -181,7 +181,7 @@ function po_award(int $rfqId, int $rsId = 0): int {
     q('INSERT INTO po_orders (kind, po_no, branch_id, supplier_id, project_id, subproject_id, rfq_id, title, currency, incoterms, terms_days, advance_pct, delivery_date, warehouse_id, supplier_ref, supplier_contact, supplier_email, vat_pct, note, created_by, created_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       ['po', $no, $r['branch_id'], $r['supplier_id'], $r['project_id'], $r['subproject_id'], $rfqId, $r['title'], $r['currency'], $r['incoterms'], $r['terms_days'], $r['advance_pct'], $r['delivery_date'], $r['warehouse_id'], $r['supplier_ref'], $r['supplier_contact'], $r['supplier_email'], $r['vat_pct'], $r['note'], (int)$u['id'], $u['full_name']]);
     $oid = (int) db()->lastInsertId();
-    foreach (all("SELECT * FROM po_lines WHERE order_id = ? AND status <> 'cancelled' ORDER BY seq", [$rfqId]) as $l) q('INSERT INTO po_lines (order_id, seq, item_id, alt_of_item_id, description, maker, part_no, unit, qty, unit_price, price_origin, discount_pct, lead_days, need_date, pr_line_id, bom_line_id, note) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [$oid, $l['seq'], $l['item_id'], $l['alt_of_item_id'], $l['description'], $l['maker'], $l['part_no'], $l['unit'], $l['qty'], $l['unit_price'], $l['unit_price'] !== null ? t('po.price_quoted') . ' · ' . $r['po_no'] : null, $l['discount_pct'], $l['lead_days'], $l['need_date'], $l['pr_line_id'], $l['bom_line_id'], $l['note']]);
+    foreach (all("SELECT * FROM po_lines WHERE order_id = ? AND status <> 'cancelled' ORDER BY seq", [$rfqId]) as $l) { q('INSERT INTO po_lines (order_id, seq, item_id, alt_of_item_id, description, maker, part_no, unit, qty, unit_price, price_origin, discount_pct, lead_days, need_date, pr_line_id, bom_line_id, note) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', [$oid, $l['seq'], $l['item_id'], $l['alt_of_item_id'], $l['description'], $l['maker'], $l['part_no'], $l['unit'], $l['qty'], $l['unit_price'], $l['unit_price'] !== null ? t('po.price_quoted') . ' · ' . $r['po_no'] : null, $l['discount_pct'], $l['lead_days'], $l['need_date'], $l['pr_line_id'], $l['bom_line_id'], $l['note']]); line_code_keep('po_lines', $l['item_id'], $l['typed_code'] ?? ''); }
     po_recalc($oid); q('UPDATE po_orders SET status = ? WHERE id = ?', ['awarded', $rfqId]); po_event($rfqId, 'award', $no); po_event($oid, 'create', t('po.from_rfq', ['no' => $r['po_no']]));
     return $oid;
 }
@@ -504,6 +504,7 @@ function po_import_bom(int $oid, array $file): array {
             $note = trim(($r['section'] !== '' ? $r['section'] : '') . ($r['note'] !== '' ? ($r['section'] !== '' ? ' · ' : '') . $r['note'] : ''));
             q('INSERT INTO po_lines (order_id, seq, item_id, description, maker, part_no, unit, qty, unit_price, price_origin, note) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
               [$oid, ++$seq, $it ? (int)$it['id'] : null, mb_substr($r['description'] !== '' ? $r['description'] : (string)($it['description'] ?? ''), 0, 255), $it ? ($it['maker'] ?? null) : ($r['maker'] ?: null), $it ? ($it['factory_code'] ?? null) : ($r['part_no'] ?: null), $it ? (string)$it['unit'] : $r['unit'], $r['qty'], $price, $origin, mb_substr($note, 0, 255) ?: null]);
+            line_code_keep('po_lines', $it ? 1 : 0, $r['code']);   // R97-126
             $res['rows']++; $res[$it ? 'linked' : 'free']++;
         }
         $pdo->commit();
@@ -536,6 +537,7 @@ function prq_import_bom(int $rid, array $file): array {
             [$it] = bom_row_exact($x); $note = trim(($x['section'] !== '' ? $x['section'] : '') . ($x['note'] !== '' ? ($x['section'] !== '' ? ' · ' : '') . $x['note'] : ''));
             q('INSERT INTO pr_lines (request_id, seq, item_id, description, maker, part_no, unit, qty, est_price, note) VALUES (?,?,?,?,?,?,?,?,?,?)',
               [$rid, ++$seq, $it ? (int)$it['id'] : null, mb_substr($x['description'] !== '' ? $x['description'] : (string)($it['description'] ?? ''), 0, 255), $it ? (($it['maker'] ?? '') ?: ($x['maker'] ?: null)) : ($x['maker'] ?: null), $it ? (($it['factory_code'] ?? '') ?: ($x['part_no'] ?: null)) : ($x['part_no'] ?: null), $it ? (string)$it['unit'] : $x['unit'], $x['qty'], $it ? null : $x['price'], mb_substr($note, 0, 255) ?: null]);
+            line_code_keep('pr_lines', $it ? 1 : 0, $x['code']);   // R97-126
             $res['rows']++; $res[$it ? 'linked' : 'free']++;
         }
         $pdo->commit();

@@ -205,7 +205,7 @@ function bom_to_requisition(int $bid): int {
     q('INSERT INTO pr_requests (pr_no, branch_id, project_id, subproject_id, bom_rev_id, purpose, title, requester_id, requester_name, discipline_id) VALUES (?,?,?,?,?,?,?,?,?,?)',
       [prq_number((int)$b['project_id'], (int)$b['subproject_id']), $br, (int)$b['project_id'], (int)$b['subproject_id'], $bid, 'project', mb_substr(t('bom.pr_title', ['r' => 'R' . $b['revision'], 't' => $b['title'] ?: $b['sub_name']]), 0, 160), (int)$u['id'], $u['full_name'], (int)($u['discipline_id'] ?? 0) ?: null]);
     $rid = (int) db()->lastInsertId(); $seq = 0;
-    foreach ($lines as $l) q('INSERT INTO pr_lines (request_id, seq, item_id, description, maker, part_no, unit, qty, est_price, note) VALUES (?,?,?,?,?,?,?,?,?,?)', [$rid, ++$seq, $l['item_id'], $l['description'], $l['maker'], $l['part_no'], $l['unit'], round((float)$l['to_buy'], 3), $l['item_id'] ? null : $l['est_price'], $l['section'] ? mb_substr($l['section'], 0, 255) : null]);
+    foreach ($lines as $l) { q('INSERT INTO pr_lines (request_id, seq, item_id, description, maker, part_no, unit, qty, est_price, note) VALUES (?,?,?,?,?,?,?,?,?,?)', [$rid, ++$seq, $l['item_id'], $l['description'], $l['maker'], $l['part_no'], $l['unit'], round((float)$l['to_buy'], 3), $l['item_id'] ? null : $l['est_price'], $l['section'] ? mb_substr($l['section'], 0, 255) : null]); line_code_keep('pr_lines', $l['item_id'], $l['code'] ?? ''); }
     prq_recalc($rid); prq_event($rid, 'create', t('bom.from_bom', ['r' => 'R' . $b['revision']])); bom_event($bid, 'to_pr', (string) scalar('SELECT pr_no FROM pr_requests WHERE id = ?', [$rid]));
     return $rid;
 }
@@ -222,7 +222,7 @@ function bom_to_kit(int $bid): int {
     q('INSERT INTO pr_requests (pr_no, branch_id, project_id, subproject_id, bom_rev_id, purpose, title, requester_id, requester_name, discipline_id) VALUES (?,?,?,?,?,?,?,?,?,?)',
       [prq_number((int)$b['project_id'], (int)$b['subproject_id']), $br, (int)$b['project_id'], (int)$b['subproject_id'], $bid, 'project', mb_substr(t('bom.kit_title', ['r' => 'R' . $b['revision'], 't' => $b['title'] ?: $b['sub_name']]), 0, 160), (int)$u['id'], $u['full_name'], (int)($u['discipline_id'] ?? 0) ?: null]);
     $rid = (int) db()->lastInsertId(); $seq = 0;
-    foreach ($lines as $l) q('INSERT INTO pr_lines (request_id, seq, item_id, description, maker, part_no, unit, qty, est_price, note) VALUES (?,?,?,?,?,?,?,?,?,?)', [$rid, ++$seq, $l['item_id'], $l['description'], $l['maker'], $l['part_no'], $l['unit'], (float)$l['qty'], $l['item_id'] ? null : $l['est_price'], $l['section'] ? mb_substr($l['section'], 0, 255) : null]);
+    foreach ($lines as $l) { q('INSERT INTO pr_lines (request_id, seq, item_id, description, maker, part_no, unit, qty, est_price, note) VALUES (?,?,?,?,?,?,?,?,?,?)', [$rid, ++$seq, $l['item_id'], $l['description'], $l['maker'], $l['part_no'], $l['unit'], (float)$l['qty'], $l['item_id'] ? null : $l['est_price'], $l['section'] ? mb_substr($l['section'], 0, 255) : null]); line_code_keep('pr_lines', $l['item_id'], $l['code'] ?? ''); }
     prq_recalc($rid); prq_event($rid, 'create', t('bom.kit_from', ['r' => 'R' . $b['revision']])); bom_event($bid, 'to_kit', (string) scalar('SELECT pr_no FROM pr_requests WHERE id = ?', [$rid]));
     prq_submit($rid);
     return $rid;
@@ -484,7 +484,7 @@ function bom_to_po(int $bid, int $fallback = 0): array {
             $price = null; $origin = null; $it = $l['item_id'] ? stk_item((int)$l['item_id']) : null;
             if ($it) { $pp = stk_price_proposal($it, (int)$sup); if ($pp['price'] !== null) { $price = $pp['price']; $origin = mb_substr((string)$pp['origin'], 0, 160); } }
             elseif ($l['est_price'] !== null) { $price = (float)$l['est_price']; $origin = t('prq.est_typed'); }
-            q('INSERT INTO po_lines (order_id, seq, item_id, description, maker, part_no, unit, qty, unit_price, price_origin, bom_line_id, note) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', [$oid, ++$seq, $l['item_id'], $l['description'], $l['maker'], $l['part_no'], $l['unit'], $l['open'], $price, $origin, (int)$l['id'], $l['section'] ? mb_substr((string)$l['section'], 0, 255) : null]);
+            q('INSERT INTO po_lines (order_id, seq, item_id, description, maker, part_no, unit, qty, unit_price, price_origin, bom_line_id, note) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', [$oid, ++$seq, $l['item_id'], $l['description'], $l['maker'], $l['part_no'], $l['unit'], $l['open'], $price, $origin, (int)$l['id'], $l['section'] ? mb_substr((string)$l['section'], 0, 255) : null]); line_code_keep('po_lines', $l['item_id'], $l['code'] ?? '');
         }
         po_recalc($oid); po_event($oid, 'create', $no . ' · BOM ' . $rev); $out['orders'][] = ['id' => $oid, 'po_no' => $no, 'supplier' => $g['name'], 'lines' => $seq];
     }
