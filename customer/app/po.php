@@ -468,3 +468,38 @@ function procdel_card(array $kinds): string {
     return $h . '</tbody></table></div></details>';
 }
 
+/* ------------------------------------------------------------------ R97-106: BOM file into a draft purchase order / RFQ; similar inventory items for the lines without an item */
+function po_import_can(?array $o): bool { return $o && po_editable($o) && !po_it() && function_exists('bom_file_rows'); }
+/** Lines of the workbook become lines of the order: a row that names an inventory item exactly is linked, the others stay free text (nothing is created in the inventory). */
+function po_import_bom(int $oid, array $file): array {
+    $o = po_load($oid); if (!po_import_can($o)) throw new RuntimeException(t('err.noaccess'));
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) throw new RuntimeException(t('im.file'));
+    if (($file['size'] ?? 0) > 8 * 1024 * 1024) throw new RuntimeException(t('bom.file_big'));
+    $P = bom_file_rows($file['tmp_name'], 400); if (!$P['rows']) throw new RuntimeException(t('stk.imp_empty'));
+    $res = ['rows' => 0, 'linked' => 0, 'free' => 0, 'cut' => $P['cut']]; $seq = (int) scalar('SELECT COALESCE(MAX(seq),0) FROM po_lines WHERE order_id = ?', [$oid]); $pdo = db(); $pdo->beginTransaction();
+    try {
+        foreach ($P['rows'] as $r) {
+            [$it, $kind] = bom_row_exact($r); $price = $r['price']; $origin = $price !== null ? t('sb.org_file') : null;
+            if ($it && $price === null && $o['kind'] === 'po') { $p = stk_price_proposal($it, (int)$o['supplier_id']); if ($p['price'] !== null) { $price = $p['price']; $origin = mb_substr((string)$p['origin'], 0, 160); } }
+            $note = trim(($r['section'] !== '' ? $r['section'] : '') . ($r['note'] !== '' ? ($r['section'] !== '' ? ' · ' : '') . $r['note'] : ''));
+            q('INSERT INTO po_lines (order_id, seq, item_id, description, maker, part_no, unit, qty, unit_price, price_origin, note) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+              [$oid, ++$seq, $it ? (int)$it['id'] : null, mb_substr($r['description'] !== '' ? $r['description'] : (string)($it['description'] ?? ''), 0, 255), $it ? ($it['maker'] ?? null) : ($r['maker'] ?: null), $it ? ($it['factory_code'] ?? null) : ($r['part_no'] ?: null), $it ? (string)$it['unit'] : $r['unit'], $r['qty'], $price, $origin, mb_substr($note, 0, 255) ?: null]);
+            $res['rows']++; $res[$it ? 'linked' : 'free']++;
+        }
+        $pdo->commit();
+    } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+    po_recalc($oid); po_event($oid, 'import', t('po.imp_ev', ['n' => $res['rows'], 'm' => $res['linked']]));
+    return $res;
+}
+/** Give a free-text line the inventory item chosen from the proposals (the line keeps its quantity; code, unit, maker and part number come from the item; the typed text is kept in the note). */
+function po_line_use_item(int $oid, int $lid, int $itemId): void {
+    $o = po_load($oid); if (!$o || !po_editable($o)) throw new RuntimeException(t('err.noaccess'));
+    $l = one('SELECT * FROM po_lines WHERE id = ? AND order_id = ?', [$lid, $oid]); $it = stk_item($itemId); if (!$l || !$it || $it['status'] === 'blocked') throw new RuntimeException(t('err.notfound'));
+    if ($l['item_id'] || $l['pr_line_id']) throw new RuntimeException(t('err.noaccess'));
+    $price = $l['unit_price'] !== null ? (float)$l['unit_price'] : null; $origin = $l['price_origin'];
+    if ($price === null && $o['kind'] === 'po') { $p = stk_price_proposal($it, (int)$o['supplier_id']); if ($p['price'] !== null) { $price = $p['price']; $origin = mb_substr((string)$p['origin'], 0, 160); } }
+    $note = trim((string)$l['note']); $was = t('po.sim_was', ['d' => (string)$l['description']]); if (mb_strtolower((string)$l['description']) !== mb_strtolower((string)$it['description'])) $note = mb_substr(trim($note . ($note !== '' ? ' · ' : '') . $was), 0, 255);
+    q('UPDATE po_lines SET item_id = ?, description = ?, maker = ?, part_no = ?, unit = ?, unit_price = ?, price_origin = ?, note = ? WHERE id = ?', [(int)$it['id'], mb_substr((string)$it['description'], 0, 255), $it['maker'] ?? null, $it['factory_code'] ?? null, (string)$it['unit'], $price, $origin, $note ?: null, $lid]);
+    po_recalc($oid);
+}
+

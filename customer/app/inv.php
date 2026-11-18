@@ -537,3 +537,50 @@ function sup_import_apply(array $pv, bool $updateExisting = true): array {
     }
     cache_bump_later('inv'); return ['created' => $created, 'updated' => $updated, 'makers' => $makersN, 'contacts' => $ctN, 'errors' => $errors, 'proposals' => $proposals ?? []];
 }
+
+/* ------------------------------------------------------------------ R97-106: similar inventory items (same or similar code / maker part number / description), with stock */
+function stk_sim_norm(?string $s): string { return strtoupper((string) preg_replace('/[^A-Za-z0-9]/', '', (string)$s)); }
+function stk_sim_tokens(string $s): array { $o = []; foreach (preg_split('/[^\p{L}\p{N}]+/u', mb_strtolower($s)) ?: [] as $t) if (mb_strlen($t) >= 4 && !in_array($t, ['with', 'type', 'from', 'και', 'για', 'ειδ', 'κατασκευη'], true)) $o[$t] = true; return array_keys($o); }
+/** The whole inventory once per request: items with stock, an index by the first 4 characters of the normalised code / part number, and an index by word. */
+function stk_sim_index(): array {
+    static $ix = null; if ($ix !== null) return $ix; $ix = ['items' => [], 'pre' => [], 'tok' => []]; if (!stk_has()) return $ix;
+    foreach (all("SELECT i.id, i.code, i.description, i.description_en, i.maker, i.factory_code, i.unit, i.status, COALESCE(s.oh, 0) AS on_hand, COALESCE(s.rs, 0) AS reserved FROM inv_items i LEFT JOIN (SELECT item_id, SUM(qty_on_hand) oh, SUM(qty_reserved) rs FROM inv_stock GROUP BY item_id) s ON s.item_id = i.id WHERE i.status <> 'blocked'") as $r) {
+        $id = (int)$r['id']; $nc = stk_sim_norm($r['code']); $np = stk_sim_norm($r['factory_code']); $dot = strpos((string)$r['code'], '.'); $nt = $dot !== false && $dot <= 6 ? stk_sim_norm(substr((string)$r['code'], $dot + 1)) : '';   // "SE.A9F74316" → A9F74316: our codes carry a maker prefix
+        $ix['items'][$id] = ['id' => $id, 'code' => (string)$r['code'], 'description' => (string)$r['description'], 'maker' => (string)($r['maker'] ?? ''), 'pn' => (string)($r['factory_code'] ?? ''), 'unit' => (string)$r['unit'], 'status' => (string)$r['status'], 'on_hand' => (float)$r['on_hand'], 'reserved' => (float)$r['reserved'], 'nc' => $nc, 'np' => $np, 'nt' => $nt];
+        foreach (array_unique([$nc, $np, $nt]) as $k) if (strlen($k) >= 4) $ix['pre'][substr($k, 0, 4)][] = $id;
+        foreach (stk_sim_tokens($r['description'] . ' ' . ($r['description_en'] ?? '') . ' ' . ($r['factory_code'] ?? '')) as $t) $ix['tok'][$t][] = $id;
+    }
+    foreach ($ix['tok'] as $t => $ids) if (count($ids) > 400) unset($ix['tok'][$t]);   // words that say nothing (cable, relay …)
+    return $ix;
+}
+/** How alike two normalised codes are: 100 equal · 85 one inside the other · up to 84 for a long common beginning · 0. */
+function stk_sim_code(string $a, string $b): int {
+    if ($a === '' || $b === '' || strlen($a) < 4 || strlen($b) < 4) return 0; if ($a === $b) return 100;
+    $sa = strlen($a); $sb = strlen($b); if (min($sa, $sb) >= 5 && (str_contains($a, $b) || str_contains($b, $a))) return 85;
+    $l = 0; $m = min($sa, $sb); while ($l < $m && $a[$l] === $b[$l]) $l++; $mx = max($sa, $sb);
+    return ($l >= 5 && $l / $mx >= 0.6) ? (int) round(50 + 34 * $l / $mx) : 0;
+}
+/** Items like this line (code, part_no, maker, description). Each: id, code, description, maker, pn, unit, on_hand, reserved, free, score, why (code|part|text). */
+function stk_similar(array $r, int $limit = 4, array $exclude = []): array {
+    $ix = stk_sim_index(); if (!$ix['items']) return [];
+    $keys = []; foreach ([$r['code'] ?? '', $r['part_no'] ?? ''] as $k) { $n = stk_sim_norm($k); if (strlen($n) >= 4) $keys[$n] = true; }
+    foreach (preg_split('/[\s,;|()]+/u', (string)($r['description'] ?? '')) ?: [] as $w) { $n = stk_sim_norm($w); if (strlen($n) >= 5 && preg_match('/\d/', $n) && preg_match('/[A-Z]/', $n)) $keys[$n] = true; }   // a part number written inside the description
+    $keys = array_map('strval', array_keys($keys)); $toks = stk_sim_tokens((string)($r['description'] ?? '')); $mk = mb_strtolower(trim((string)($r['maker'] ?? '')));
+    $cand = []; foreach ($keys as $k) foreach ($ix['pre'][substr($k, 0, 4)] ?? [] as $id) $cand[$id] = 0;
+    $hits = []; foreach ($toks as $t) foreach ($ix['tok'][$t] ?? [] as $id) { $hits[$id] = ($hits[$id] ?? 0) + 1; }
+    foreach ($hits as $id => $n) if ($n >= 2) $cand[$id] = $n;
+    $ex = array_flip(array_map('intval', array_filter($exclude))); $out = [];
+    foreach ($cand as $id => $_) {
+        if (isset($ex[$id])) continue; $it = $ix['items'][$id]; $sc = 0; $why = '';
+        foreach ($keys as $k) { $a = stk_sim_code($k, $it['np']); $b = max(stk_sim_code($k, $it['nc']), $it['nt'] !== '' ? stk_sim_code($k, $it['nt']) : 0); if ($it['nt'] !== '' && $k === $it['nt']) $b = 97; if ($a > $sc) { $sc = $a; $why = 'part'; } if ($b > $sc) { $sc = $b; $why = $b >= 97 ? 'same' : 'code'; } }
+        $n = $hits[$id] ?? 0; if ($n >= 2) { $t = min(80, 30 + 10 * min($n, 5) + ($mk !== '' && $mk === mb_strtolower($it['maker']) ? 10 : 0)); if ($t > $sc) { $sc = $t; $why = 'text'; } elseif ($sc) $sc = min(99, $sc + 5); }
+        if ($sc < 45) continue;
+        $out[] = $it + ['free' => $it['on_hand'] - $it['reserved'], 'score' => $sc, 'why' => $why];
+    }
+    usort($out, fn($a, $b) => [$b['score'], $b['on_hand']] <=> [$a['score'], $a['on_hand']]);
+    return array_slice($out, 0, $limit);
+}
+/** One line of text for a similar item: code — description · maker pn · stock. */
+function stk_sim_label(array $x): string { return $x['code'] . ' — ' . mb_substr($x['description'], 0, 70) . (trim($x['maker'] . ' ' . $x['pn']) !== '' ? ' · ' . trim($x['maker'] . ' ' . $x['pn']) : ''); }
+function stk_sim_stock_pill(array $x): string { return $x['on_hand'] > 0.0005 ? pill('green', t('stk.sim_stock', ['q' => stk_qty($x['on_hand']), 'u' => $x['unit']]) . ($x['reserved'] > 0.0005 ? ' · ' . t('stk.sim_free', ['q' => stk_qty(max(0.0, $x['free']))]) : '')) : pill('mute', t('stk.sim_nostock')); }
+

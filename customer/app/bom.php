@@ -233,15 +233,27 @@ function bom_to_kit(int $bid): int {
  * GAS-CP-R93-006 — delete a revision; import template; staged import with inventory cross-check and AI proposals
  * ==================================================================================================================== */
 function bom_imp_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'bom_import_rows'"); } catch (Throwable $e) { $h = false; } } return $h; }
-/** Administrators and Procurement may delete a revision; an approved revision that already produced a requisition / kit stays (it is part of the audit trail). */
-function bom_can_delete(array $b): bool { return bom_has() && is_staff() && (is_cp_admin() || bom_pr_can()); }
-function bom_delete(int $bid): int {
-    $b = bom_load($bid); if (!$b || !bom_can_delete($b)) throw new RuntimeException(t('err.noaccess'));
-    if ($b['status'] === 'approved' && scalar("SELECT COUNT(*) FROM bom_events WHERE bom_rev_id = ? AND event IN ('to_pr','to_kit')", [$bid])) throw new RuntimeException(t('bom.del_blocked'));
-    q('DELETE FROM bom_changes WHERE bom_rev_id = ?', [$bid]); q('DELETE FROM bom_lines WHERE bom_rev_id = ?', [$bid]); q('DELETE FROM bom_events WHERE bom_rev_id = ?', [$bid]);
-    if (bom_imp_has()) q('DELETE FROM bom_import_rows WHERE bom_rev_id = ?', [$bid]);
-    q('DELETE FROM bom_revisions WHERE id = ?', [$bid]);
-    if (function_exists('sp_log')) try { sp_log((int)$b['subproject_id'], 'bom_deleted', 'R' . (int)$b['revision'] . ' ' . ($b['title'] ?? '')); } catch (Throwable $e) {}
+/** Administrators, management and Procurement may delete a revision — unless a requisition (or kit) or purchase-order lines made from it still exist; delete those first.   R97-106 */
+function bom_can_delete(array $b): bool { return bom_has() && is_staff() && (is_cp_admin() || bom_pr_can() || (function_exists('mgmt_can') && mgmt_can())); }
+function bom_delete_block(array $b): ?string {
+    if (!bom_can_delete($b)) return t('err.noaccess'); $bid = (int)$b['id']; $n = 0; $m = 0;
+    try { $n = (int) scalar('SELECT COUNT(*) FROM pr_requests WHERE bom_rev_id = ?', [$bid]); } catch (Throwable $e) {}
+    try { $m = (int) scalar('SELECT COUNT(*) FROM po_lines pl JOIN bom_lines l ON l.id = pl.bom_line_id WHERE l.bom_rev_id = ?', [$bid]); } catch (Throwable $e) {}
+    if ($n) return t('bom.del_has_pr', ['n' => $n]); if ($m) return t('bom.del_has_po', ['n' => $m]);
+    return null;
+}
+function bom_delete(int $bid, string $reason = ''): int {
+    $b = bom_load($bid); if (!$b) throw new RuntimeException(t('err.notfound')); if (($why = bom_delete_block($b)) !== null) throw new RuntimeException($why);
+    $reason = trim($reason); if ($reason === '') throw new RuntimeException(t('prq.need_reason'));
+    $pdo = db(); $pdo->beginTransaction();
+    try {
+        if (function_exists('procdel_has') && procdel_has()) { try { procdel_record('bom', ['no' => trim(($b['project_code'] ?? '') . ' ' . ($b['sub_code'] ?? '') . ' BOM R' . (int)$b['revision']), 'title' => $b['title'] ?? null, 'party' => $b['created_name'] ?? null, 'project_ref' => trim((string)($b['project_code'] ?? '') . ' ' . (string)($b['sub_code'] ?? '')), 'status' => $b['status'], 'total' => $b['est_total'] ?? null, 'currency' => $b['currency'] ?? null, 'row' => one('SELECT * FROM bom_revisions WHERE id = ?', [$bid])], all('SELECT * FROM bom_lines WHERE bom_rev_id = ? ORDER BY seq, id', [$bid]), $reason); } catch (Throwable $e) {} }
+        q('DELETE FROM bom_changes WHERE bom_rev_id = ?', [$bid]); q('DELETE FROM bom_lines WHERE bom_rev_id = ?', [$bid]); q('DELETE FROM bom_events WHERE bom_rev_id = ?', [$bid]);
+        if (bom_imp_has()) q('DELETE FROM bom_import_rows WHERE bom_rev_id = ?', [$bid]);
+        q('DELETE FROM bom_revisions WHERE id = ?', [$bid]);
+        $pdo->commit();
+    } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+    if (function_exists('sp_log')) try { sp_log((int)$b['subproject_id'], 'bom_deleted', 'R' . (int)$b['revision'] . ' ' . ($b['title'] ?? '') . ' — ' . mb_substr($reason, 0, 120)); } catch (Throwable $e) {}
     return (int)$b['subproject_id'];
 }
 /** The sheets of the BOM template — the columns both importers read (Engineering BOM of a sub-project, System Budget), two example lines, the units, the rules.   R93-006, R97-064 */
@@ -265,6 +277,39 @@ function bom_template_sheets(): array {
     ];
 }
 function bom_import_template(): void { require_once __DIR__ . '/xlsxw.php'; xlsx_download('GAS-BOM-import-template.xlsx', bom_template_sheets()); }
+/** Header names the BOM importers accept (template names first). */
+function bom_imp_aliases(): array {
+    return ['section' => ['section', 'τμήμα', 'area', 'system', 'panel', 'location'], 'qty' => ['qty', 'quantity', 'q.ty', 'ποσότητα', 'ποσ.', 'pcs', 'amount'], 'unit' => ['unit', 'um', 'uom', 'μ.μ', 'μ.μ.', 'μον.'],
+          'description' => ['description', 'desc', 'περιγραφή', 'designation', 'item description', 'material'], 'maker' => ['maker', 'manufacturer', 'brand', 'κατασκευαστής', 'make', 'vendor'],
+          'part_no' => ['maker part no', 'part no', 'part no.', 'part number', 'p/n', 'pn', 'type', 'type no', 'article', 'article no', 'order code', 'factory code', 'κωδ. κατασκευαστή', 'ref'], 'code' => ['golden code', 'code', 'κωδικός', 'κωδ.', 'item code', 'our code', 'stock code'], 'note' => ['note', 'notes', 'remark', 'remarks', 'σημείωση', 'comment']];
+}
+/** Read a BOM workbook into plain rows (section, qty, unit, description, maker, part_no, code, price, note) — for importers that do not stage (purchase orders).   R97-106 */
+function bom_file_rows(string $path, int $max = 400): array {
+    require_once __DIR__ . '/xlsx.php'; $rows = xlsx_rows($path); if (count($rows) < 2) throw new RuntimeException(t('stk.imp_empty'));
+    $H = bom_imp_aliases() + ['price' => ['unit price', 'price', 'τιμή', 'τιμή μονάδας', 'unit cost']];
+    $hdrIdx = 0; foreach ($rows as $ri => $r) { $hits = 0; foreach ($r as $c) { $n = mb_strtolower(trim((string)$c)); foreach ($H as $alts) if ($n !== '' && in_array($n, $alts, true)) $hits++; } if ($hits >= 2) { $hdrIdx = $ri; break; } if ($ri > 10) break; }
+    $map = []; foreach ($rows[$hdrIdx] as $i => $h) { $n = mb_strtolower(trim((string)$h)); if ($n === '') continue; foreach ($H as $k => $alts) if (!isset($map[$k]) && in_array($n, $alts, true)) { $map[$k] = $i; break; } }
+    if (!isset($map['description'])) throw new RuntimeException(t('bom.imp_need_desc_col'));
+    $num = function ($v): ?float { $v = str_replace(['€', ' '], '', trim((string)$v)); if ($v === '') return null; if (preg_match('/^-?\d{1,3}(\.\d{3})+(,\d+)?$/', $v)) $v = str_replace('.', '', $v); $v = str_replace(',', '.', $v); return is_numeric($v) ? (float)$v : null; };
+    $out = []; $cut = false;
+    foreach (array_slice($rows, $hdrIdx + 1) as $r) {
+        $g = fn(string $k, int $mx = 255) => isset($map[$k]) ? mb_substr(trim((string)($r[$map[$k]] ?? '')), 0, $mx) : '';
+        $desc = $g('description'); $code = $g('code', 60); $pn = $g('part_no', 80); if ($desc === '' && $code === '' && $pn === '') continue;
+        if (count($out) >= $max) { $cut = true; break; }
+        $qty = $num($g('qty')) ?? 1.0; if ($qty <= 0) $qty = 1.0; $price = $num($g('price')); if ($price !== null && $price < 0) $price = null;
+        $out[] = ['section' => $g('section', 80), 'qty' => $qty, 'unit' => stk_unit_norm($g('unit', 12)) ?: 'pcs', 'description' => $desc, 'maker' => $g('maker', 80), 'part_no' => $pn, 'code' => $code, 'price' => $price, 'note' => $g('note')];
+    }
+    return ['rows' => $out, 'cut' => $cut];
+}
+/** The inventory item a file row names exactly: Golden code, then maker part number, then the part number without spaces and dashes. Returns [item|null, kind]. */
+function bom_row_exact(array $r): array {
+    if ($r['code'] !== '' && ($it = stk_item_by_code($r['code']))) return [$it, 'code'];
+    if ($r['part_no'] !== '') {
+        if ($it = one(STK_SELECT . " WHERE i.status <> 'blocked' AND LOWER(i.factory_code) = LOWER(?)" . ($r['maker'] !== '' ? ' ORDER BY (LOWER(i.maker) = LOWER(?)) DESC' : '') . ' LIMIT 1', $r['maker'] !== '' ? [$r['part_no'], $r['maker']] : [$r['part_no']])) return [$it, 'part_no'];
+        $n = stk_sim_norm($r['part_no']); if ($n !== '') foreach (stk_sim_index()['pre'][substr($n, 0, 4)] ?? [] as $id) if (stk_sim_index()['items'][$id]['np'] === $n && ($it = stk_item($id))) return [$it, 'part_no_norm'];
+    }
+    return [null, 'none'];
+}
 function bom_imp_norm(string $s): string { return strtoupper(preg_replace('/[^A-Za-z0-9]/', '', $s)); }
 /** Stage the file: parse with the template headers (old aliases tolerated), match deterministically, keep rows for review. Returns counts. */
 function bom_import_stage(int $bid, array $file): array {
@@ -273,9 +318,7 @@ function bom_import_stage(int $bid, array $file): array {
     if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) throw new RuntimeException(t('im.file'));
     if (($file['size'] ?? 0) > 8 * 1024 * 1024) throw new RuntimeException(t('bom.file_big'));
     require_once __DIR__ . '/xlsx.php'; $rows = xlsx_rows($file['tmp_name']); if (count($rows) < 2) throw new RuntimeException(t('stk.imp_empty'));
-    $H = ['section' => ['section', 'τμήμα', 'area', 'system', 'panel', 'location'], 'qty' => ['qty', 'quantity', 'q.ty', 'ποσότητα', 'ποσ.', 'pcs', 'amount'], 'unit' => ['unit', 'um', 'uom', 'μ.μ', 'μ.μ.', 'μον.'],
-          'description' => ['description', 'desc', 'περιγραφή', 'designation', 'item description', 'material'], 'maker' => ['maker', 'manufacturer', 'brand', 'κατασκευαστής', 'make', 'vendor'],
-          'part_no' => ['maker part no', 'part no', 'part no.', 'part number', 'p/n', 'pn', 'type', 'type no', 'article', 'article no', 'order code', 'factory code', 'κωδ. κατασκευαστή', 'ref'], 'code' => ['golden code', 'code', 'κωδικός', 'κωδ.', 'item code', 'our code', 'stock code'], 'note' => ['note', 'notes', 'remark', 'remarks', 'σημείωση', 'comment']];
+    $H = bom_imp_aliases();
     $hdrIdx = 0; foreach ($rows as $ri => $r) { $hits = 0; foreach ($r as $c) { $n = mb_strtolower(trim((string)$c)); foreach ($H as $alts) if ($n !== '' && in_array($n, $alts, true)) $hits++; } if ($hits >= 2) { $hdrIdx = $ri; break; } if ($ri > 10) break; }
     $map = []; foreach ($rows[$hdrIdx] as $i => $h) { $n = mb_strtolower(trim((string)$h)); if ($n === '') continue; foreach ($H as $k => $alts) if (!isset($map[$k]) && in_array($n, $alts, true)) { $map[$k] = $i; break; } }
     if (!isset($map['description'])) throw new RuntimeException(t('bom.imp_need_desc_col'));

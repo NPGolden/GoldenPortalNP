@@ -47,5 +47,5 @@ layout_head(t('prq.title'), 'requisitions');
 </table>
 <?= $pg ?>
 </div>
-<?php if (function_exists('procdel_card')) echo procdel_card(['pr']);   // R97-105 ?>
+<?php if (function_exists('procdel_card')) echo procdel_card(['pr', 'bom']);   // R97-105 ?>
 <?php layout_foot();
