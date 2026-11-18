@@ -3147,3 +3147,13 @@ The page on screen stays the internal version for staff.
 **Tests (sandbox, full inventory)**: proposals for the unmatched lines of a real switchboard BOM with makers filled (by maker) and not filled (by similar items; none for a maker without any item); review page with 35 fields; apply with an empty field (proposal used), a typed code, a typed code for a maker without prefix, an existing code (refused); requisition card: prefilled field, empty field without prefix refused with the hint, existing code refused, proposal used; PHP error log clean; page sweep. Not tested: an engineer account (sees the hint without the field).
 
 **Security review**: no new input path — the code field goes through the same validation as before (allowed characters, uniqueness) and only Procurement can create. No proposal.
+
+## §396 v1.183.1 (R97-112) — Purchase order: VAT after sending; document totals worked out again
+
+**Report**: "the VAT, when other than 0 %, is not calculated in the PO document". Not reproduced: with a rate in the header of a draft order `po_recalc()` stores subtotal, VAT and total, and `po_pdf()` prints the VAT line (checked in the sandbox, also with the rate changed on an existing draft in a Greek-locale browser). The gap found: once an order is sent `po_editable()` is false, the header form is gone and the rate cannot be set — an order sent at 0 % stays without VAT.
+
+**Changes**: `po_vat_can()`, `po_vat_set()` (action `po_vat`): Procurement sets the rate (0–30) on a sent / confirmed / partial / received purchase order; totals recalculated; event `edit` "VAT a % → b %". Inline form in the read-only header of `views/purchase_order.php`. The PDF route and `po_em_attachment()` call `po_recalc()` first (not for closed / cancelled orders), so stored totals that are out of date cannot reach the document.
+
+**Tests (sandbox) — forms posted**: order sent at 0 %, rate set to 24 → page, database, log and PDF (Subtotal 150,00 · VAT 24% 36,00 · Total 186,00); stored totals made wrong by hand → corrected when the PDF is opened; rate 45 refused; staff without procurement rights 403; PHP error log clean; page sweep. Not confirmed: that this was the case on the user's order — number of the order asked.
+
+**Security review**: the action is limited to procurement administrators and to open orders, validates the number and leaves a log line. No proposal.

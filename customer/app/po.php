@@ -82,6 +82,15 @@ function po_recalc(int $oid): void {
     $vat = round($sub * (float)($o['vat_pct'] ?? 0) / 100, 2);
     q('UPDATE po_orders SET subtotal = ?, vat_total = ?, gross_total = ? WHERE id = ?', [round($sub, 2), $vat, round($sub + $vat, 2), $oid]);
 }
+/** R97-112: the VAT rate of an order that was already sent (the header is read-only then). Not on a closed or cancelled order. */
+function po_vat_can(array $o): bool { return $o['kind'] === 'po' && po_admin() && in_array($o['status'], ['sent', 'confirmed', 'partial', 'received'], true); }
+function po_vat_set(int $oid, string $pct): void {
+    $o = po_load($oid); if (!$o || !po_vat_can($o)) throw new RuntimeException(t('err.noaccess'));
+    $pct = str_replace(',', '.', trim($pct)); if ($pct === '' || !is_numeric($pct) || (float)$pct < 0 || (float)$pct > 30) throw new RuntimeException(t('po.vat_bad'));
+    $new = round((float)$pct, 2); $old = (float)$o['vat_pct']; if (abs($new - $old) < 0.005) { po_recalc($oid); return; }
+    q('UPDATE po_orders SET vat_pct = ? WHERE id = ?', [$new, $oid]); po_recalc($oid);
+    po_event($oid, 'edit', t('po.vat_ev', ['a' => rtrim(rtrim(number_format($old, 2, '.', ''), '0'), '.'), 'b' => rtrim(rtrim(number_format($new, 2, '.', ''), '0'), '.')]));
+}
 function po_editable(array $o): bool { return po_admin() && in_array($o['status'], ['draft', 'sent', 'quoted'], true) && ($o['kind'] === 'rfq' || $o['status'] === 'draft'); }
 /** Header create / update. */
 function po_save_from_post(): int {
@@ -223,7 +232,7 @@ function po_people(array $o): array {
     if ($o['supplier_co_email']) $add((string)$o['supplier'], $o['supplier_co_email'], t('po.supplier'), !$out);
     return $out;
 }
-function po_em_attachment(array $p): ?array { if (!po_can()) return null; $o = po_load((int)($p[1] ?? 0)); if (!$o) return null; if (!empty($p[2]) && function_exists('rfo_order_for')) $o = rfo_order_for($o, (int)$p[2]); return [po_pdf($o), $o['po_no'] . '.pdf', 'application/pdf']; }
+function po_em_attachment(array $p): ?array { if (!po_can()) return null; $o = po_load((int)($p[1] ?? 0)); if ($o && !in_array($o['status'], ['closed', 'cancelled'], true)) { po_recalc((int)$o['id']); $o = po_load((int)$o['id']); }   /* R97-112 */ if (!$o) return null; if (!empty($p[2]) && function_exists('rfo_order_for')) $o = rfo_order_for($o, (int)$p[2]); return [po_pdf($o), $o['po_no'] . '.pdf', 'application/pdf']; }
 
 /* ------------------------------------------------------------------ PDF */
 function po_pdf(array $o): string {

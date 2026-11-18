@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.183.0** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.183.1** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.183.1 | GAS-CP-R97-112 | 2026-11-18 | Purchase order: the VAT rate can be set or corrected after the order was sent; the order document (PDF and e-mail attachment) always carries totals worked out from the lines and the VAT rate as they are at that moment. | — |
 | 1.183.0 | GAS-CP-R97-111 | 2026-11-18 | New inventory items follow the rule prefix.maker part number: the portal proposes the code (prefix of the maker as used in the inventory, else the prefix of the similar items) in the BOM import review and next to every free-text line; Procurement can change it; a new item without a prefix is refused. | — |
 | 1.182.1 | GAS-CP-R97-110 | 2026-11-18 | Budget pricing requests: tabs Waiting for prices (shown first), Priced and All — the budgets already priced by Procurement are no longer mixed with the ones waiting. | — |
 | 1.182.0 | GAS-CP-R97-109 | 2026-11-18 | Warehouse: page Received per project and vessel — what is in the warehouse for each project (bought for it or reserved from stock), sent and still to come; delivery notes issued from ticked lines and quantities, one per sub-project or per project; a cancelled note reserves the goods again for the same requisition. | — |
