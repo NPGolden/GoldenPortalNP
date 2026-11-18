@@ -98,6 +98,8 @@ function bom_import(int $bid, array $file): array {
     if (($file['size'] ?? 0) > 8 * 1024 * 1024) throw new RuntimeException(t('bom.file_big'));
     require_once __DIR__ . '/xlsx.php'; $rows = xlsx_rows($file['tmp_name']); if (count($rows) < 2) throw new RuntimeException(t('stk.imp_empty'));
     $H = ['code' => ['κωδικός', 'code', 'κωδ.', 'item', 'part code', 'article'], 'description' => ['περιγραφή', 'description', 'desc'], 'qty' => ['ποσότητα', 'ποσ.', 'qty', 'quantity', 'q.ty', 'υπόλοιπο'], 'unit' => ['μ.μ', 'μ.μ.', 'unit', 'um', 'uom', 'μον.'], 'maker' => ['κατασκευαστής', 'maker', 'manufacturer', 'brand'], 'part_no' => ['κωδ. εργοστασίου', 'κωδ.εργοστασίου', 'part no', 'part no.', 'part number', 'p/n', 'factory code', 'type'], 'section' => ['section', 'ενότητα', 'group', 'panel', 'drawing', 'σχέδιο'], 'note' => ['note', 'notes', 'σημείωση', 'remarks']];
+    foreach (bom_imp_aliases() as $k_ => $al_) $H[$k_] = array_values(array_unique(array_merge($al_, $H[$k_] ?? [])));   // R97-127: "Maker part no" and "Golden code" of the template were not read here, so the part number was lost
+    $H = ['part_no' => $H['part_no'], 'code' => $H['code']] + $H;   // "article" / "type" mean the maker's number first
     $map = []; foreach ($rows[0] as $i => $h) { $n = mb_strtolower(trim((string)$h)); if ($n === '') continue; foreach ($H as $k => $alts) if (!isset($map[$k]) && in_array($n, $alts, true)) { $map[$k] = $i; break; } }
     if (!isset($map['description']) && !isset($map['code'])) throw new RuntimeException(t('stk.imp_no_cols'));
     $seq = (int) scalar('SELECT COALESCE(MAX(seq),0) FROM bom_lines WHERE bom_rev_id = ?', [$bid]); $n = 0; $matched = 0; $warn = [];
@@ -105,12 +107,14 @@ function bom_import(int $bid, array $file): array {
     foreach (array_slice($rows, 1) as $i => $r) {
         $g = fn(string $k) => isset($map[$k]) ? trim((string)($r[$map[$k]] ?? '')) : '';
         $code = mb_substr($g('code'), 0, 60); $desc = $g('description'); if ($code === '' && $desc === '') continue;
-        $it = $code !== '' ? stk_item_by_code($code) : null; if ($it) $matched++;
+        $it = $code !== '' ? stk_item_by_code($code) : null;
+        if (!$it && function_exists('bom_row_exact')) { [$it] = bom_row_exact(['code' => $code, 'part_no' => mb_substr($g('part_no'), 0, 80), 'maker' => mb_substr($g('maker'), 0, 80), 'description' => $desc]); }   // R97-127: also by the maker part number
+        if ($it) $matched++;
         if ($desc === '' && $it) $desc = (string)$it['description']; if ($desc === '') { $warn[] = t('stk.imp_w_nodesc', ['l' => $i + 2, 'c' => $code]); continue; }
         $qty = $num($g('qty')) ?? 1.0; if ($qty <= 0) $qty = 1.0;
         $unit = $it ? (string)$it['unit'] : (stk_unit_norm($g('unit')) ?: 'pcs');
         q('INSERT INTO bom_lines (bom_rev_id, seq, item_id, code, description, maker, part_no, unit, qty, section, note) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
-          [$bid, ++$seq, $it ? (int)$it['id'] : null, $code ?: null, mb_substr($desc, 0, 255), $it ? $it['maker'] : (mb_substr($g('maker'), 0, 80) ?: null), $it ? $it['factory_code'] : (mb_substr($g('part_no'), 0, 80) ?: null), $unit, $qty, mb_substr($g('section'), 0, 80) ?: null, mb_substr($g('note'), 0, 255) ?: null]);
+          [$bid, ++$seq, $it ? (int)$it['id'] : null, $it ? (string)$it['code'] : ($code ?: null), mb_substr($desc, 0, 255), $it ? $it['maker'] : (mb_substr($g('maker'), 0, 80) ?: null), $it ? $it['factory_code'] : (mb_substr($g('part_no'), 0, 80) ?: null), $unit, $qty, mb_substr($g('section'), 0, 80) ?: null, mb_substr($g('note'), 0, 255) ?: null]);
         $n++;
     }
     bom_event($bid, 'import', t('bom.imported_n', ['n' => $n, 'm' => $matched]) . ($warn ? ' · ' . implode(' · ', array_slice($warn, 0, 5)) : ''));

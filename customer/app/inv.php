@@ -639,17 +639,44 @@ function line_code_keep(string $table, $itemId, $code): void {
     $code = mb_substr(trim((string)$code), 0, 60); if ($itemId || $code === '' || !in_array($table, ['po_lines', 'pr_lines'], true) || !line_code_has()) return;
     try { q('UPDATE ' . $table . ' SET typed_code = ? WHERE id = ?', [$code, (int) db()->lastInsertId()]); } catch (Throwable $e) {}
 }
-/** For lines imported before the code was kept: read the same file again and put its codes on the free-text lines that carry none.
- *  A row is matched to a line by its description (case and spacing ignored); nothing else of the line changes. Returns the number of lines filled. */
-function line_codes_from_file(string $kind, int $docId, array $file): int {
-    [$doc, $use, $new] = line_doc($kind, $docId); if (!$new || !in_array($kind, ['po', 'pr'], true) || !line_code_has() || !function_exists('bom_file_rows')) throw new RuntimeException(t('err.noaccess'));
+/** For lines that came without their numbers: read the same file again. A row is matched to a line by its description (case and spacing
+ *  ignored) and gives the line what it lacks — the maker part number, the maker, our code; a row that names an inventory item exactly
+ *  (by code or maker part number) links the line to it. Nothing else of the line changes and no line is added. Returns [filled, linked]. */
+function line_codes_from_file(string $kind, int $docId, array $file): array {
+    [$doc, $use, $new] = line_doc($kind, $docId); if (!$new || !in_array($kind, ['po', 'pr', 'bom'], true) || !function_exists('bom_file_rows')) throw new RuntimeException(t('err.noaccess'));
     if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) throw new RuntimeException(t('im.file'));
     if (($file['size'] ?? 0) > 8 * 1024 * 1024) throw new RuntimeException(t('bom.file_big'));
-    $nrm = fn(string $s) => preg_replace('/\s+/u', ' ', mb_strtolower(trim($s))); $byDesc = [];
-    foreach (bom_file_rows($file['tmp_name'], 2000)['rows'] as $r) { $c = mb_substr(trim((string)$r['code']), 0, 60); $d = $nrm((string)$r['description']); if ($c === '' || $d === '') continue; $byDesc[$d] = isset($byDesc[$d]) && $byDesc[$d] !== $c ? '' : $c; }   // the same description with two codes: left alone
-    $n = 0; $tbl = $kind === 'po' ? 'po_lines' : 'pr_lines';
-    foreach (line_free($kind, $docId) as $l) { if (trim((string)$l['typed_code']) !== '') continue; $c = $byDesc[$nrm((string)$l['description'])] ?? ''; if ($c === '') continue; q('UPDATE ' . $tbl . ' SET typed_code = ? WHERE id = ?', [$c, (int)$l['id']]); $n++; }
-    return $n;
+    $nrm = fn(string $s) => preg_replace('/\s+/u', ' ', mb_strtolower(trim($s))); $by = [];
+    foreach (bom_file_rows($file['tmp_name'], 2000)['rows'] as $r) { $d = $nrm((string)$r['description']); if ($d === '' || ($r['code'] === '' && $r['part_no'] === '')) continue;
+        $by[$d] = isset($by[$d]) && ($by[$d]['code'] !== $r['code'] || $by[$d]['part_no'] !== $r['part_no']) ? false : $r; }   // the same description with two numbers: left alone
+    $tbl = ['po' => 'po_lines', 'pr' => 'pr_lines', 'bom' => 'bom_lines'][$kind]; $codeCol = $kind === 'bom' ? 'code' : (line_code_has() ? 'typed_code' : null); $n = 0; $linked = 0;
+    foreach (line_free($kind, $docId) as $l) {
+        $r = $by[$nrm((string)$l['description'])] ?? false; if (!$r) continue; $set = []; $a = [];
+        if (trim((string)$l['part_no']) === '' && $r['part_no'] !== '') { $set[] = 'part_no = ?'; $a[] = mb_substr($r['part_no'], 0, 80); }
+        if (trim((string)$l['maker']) === '' && $r['maker'] !== '') { $set[] = 'maker = ?'; $a[] = mb_substr($r['maker'], 0, 80); }
+        if ($codeCol && trim((string)$l['typed_code']) === '' && $r['code'] !== '') { $set[] = $codeCol . ' = ?'; $a[] = mb_substr($r['code'], 0, 60); }
+        if ($set) { $a[] = (int)$l['id']; q('UPDATE ' . $tbl . ' SET ' . implode(', ', $set) . ' WHERE id = ?', $a); $n++; }
+        [$it] = bom_row_exact($r); if ($it) { try { line_use_item($kind, $docId, (int)$l['id'], (int)$it['id']); $linked++; } catch (Throwable $e) {} }
+    }
+    return [$n, $linked];
+}
+/** The code a new item of this line gets: the code of the file, else prefix.<maker part number>; '' when there is none or it is taken. */
+function line_new_code(array $l, ?array $sim = null): string {
+    $tc = trim((string)($l['typed_code'] ?? '')); if ($tc !== '') return stk_item_by_code($tc) ? '' : $tc;
+    $pc = stk_code_propose(['code' => '', 'part_no' => (string)$l['part_no'], 'maker' => (string)$l['maker'], 'description' => (string)$l['description']], $sim); return $pc['exists'] ? '' : (string)$pc['code'];
+}
+/** Lines that can become new items in one step: a code is proposed and no inventory item carries the same part number or code. */
+function line_new_all_rows(string $kind, int $docId): array {
+    $o = []; foreach (array_slice(line_free($kind, $docId), 0, 400) as $l) { $q = ['code' => trim((string)($l['typed_code'] ?? '')), 'part_no' => (string)$l['part_no'], 'maker' => (string)$l['maker'], 'description' => (string)$l['description']]; $sx = stk_similar($q, 4);
+        $code = line_new_code($l, $sx); if ($code === '') continue; $same = false; foreach ($sx as $x) if (in_array($x['why'], ['same', 'code', 'part'], true) && $x['score'] >= 85) $same = true; if ($same) continue;   // probably the same item: decided by hand
+        $o[] = [$l, $code]; }
+    return $o;
+}
+/** Procurement: every such line becomes a new inventory item with its proposed code. Returns [made, failed]. */
+function line_new_all(string $kind, int $docId): array {
+    [$doc, $use, $new] = line_doc($kind, $docId); if (!$new) throw new RuntimeException(t('err.noaccess')); $made = 0; $fail = 0;
+    foreach (line_new_all_rows($kind, $docId) as [$l, $code]) { try { line_new_item($kind, $docId, (int)$l['id'], $code); $made++; } catch (Throwable $e) { $fail++; } }
+    return [$made, $fail];
 }
 function line_free(string $kind, int $docId): array {
     $tc = line_code_has() ? ', typed_code' : ", '' AS typed_code";
@@ -692,14 +719,18 @@ function line_sim_card(string $kind, int $docId, string $self): string {
     $hid = csrf_field() . '<input type="hidden" name="kind" value="' . e($kind) . '"><input type="hidden" name="id" value="' . $docId . '">';
     $h = '<div id="similar" style="margin-top:14px;"><h3 style="margin:0 0 4px;">🔎 ' . tt('po.sim_title') . ' <span class="count">' . count($rows) . '</span></h3><p class="hint" style="margin:0 0 8px;">' . e(t('po.sim_hint', ['n' => count($free)])) . ($new ? ' ' . tt('stk.sim_new_hint') : ' ' . tt('stk.sim_new_proc')) . '</p>'
        . '<div class="table-scroll"><table class="tbl tbl--compact"><thead><tr><th>#</th><th style="min-width:220px;">' . tt('po.sim_line') . '</th><th>' . tt('stk.sim_title') . '</th>' . ($new ? '<th>' . tt('bom.imp_d_new') . '</th>' : '') . '</tr></thead><tbody>';
-    if ($new && in_array($kind, ['po', 'pr'], true) && line_code_has() && array_filter($free, fn($l) => trim((string)$l['typed_code']) === ''))
-        $h = str_replace('<div class="table-scroll"><table class="tbl tbl--compact"><thead>', '<form method="post" action="' . $self . '" enctype="multipart/form-data" data-lock class="btn-row" style="margin:0 0 8px;">' . $hid . '<input type="hidden" name="action" value="line_codes_file"><span class="hint">' . tt('stk.codes_file_hint') . '</span><input type="file" name="file" accept=".xlsx" required><button class="btn btn--ghost btn--sm" type="submit">' . tt('stk.codes_file_btn') . '</button></form><div class="table-scroll"><table class="tbl tbl--compact"><thead>', $h);
+    $tools = '';
+    if ($new && array_filter($free, fn($l) => trim((string)$l['typed_code']) === '' && trim((string)$l['part_no']) === ''))
+        $tools .= '<form method="post" action="' . $self . '" enctype="multipart/form-data" data-lock class="btn-row" style="margin:0 0 8px;">' . $hid . '<input type="hidden" name="action" value="line_codes_file"><span class="hint">' . tt('stk.codes_file_hint') . '</span><input type="file" name="file" accept=".xlsx" required><button class="btn btn--ghost btn--sm" type="submit">' . tt('stk.codes_file_btn') . '</button></form>';
+    if ($new) { $allN = 0; foreach ($rows as [$l_, $sx_, $pc_]) { if (line_new_code($l_, $sx_) === '') continue; $sm_ = false; foreach ($sx_ as $x_) if (in_array($x_['why'], ['same', 'code', 'part'], true) && $x_['score'] >= 85) $sm_ = true; if (!$sm_) $allN++; }
+        if ($allN > 1) $tools .= '<form method="post" action="' . $self . '" data-lock data-confirm="' . e(t('stk.new_all_q', ['n' => $allN])) . '" class="btn-row" style="margin:0 0 8px;">' . $hid . '<input type="hidden" name="action" value="line_new_all"><button class="btn btn--gold btn--sm" type="submit">＋ ' . e(t('stk.new_all_btn', ['n' => $allN])) . '</button><span class="hint">' . tt('stk.new_all_hint') . '</span></form>'; }
+    if ($tools !== '') $h = str_replace('<div class="table-scroll"><table class="tbl tbl--compact"><thead>', $tools . '<div class="table-scroll"><table class="tbl tbl--compact"><thead>', $h);
     foreach ($rows as [$l, $sx, $pc]) {
         $h .= '<tr><td class="num">' . (int)$l['seq'] . '</td><td><b>' . e((string)$l['description']) . '</b><br><span class="hint">' . e(stk_qty((float)$l['qty'])) . ' ' . e((string)$l['unit']) . (trim((string)$l['maker'] . ' ' . (string)$l['part_no']) !== '' ? ' · ' . e(trim((string)$l['maker'] . ' ' . (string)$l['part_no'])) : '') . '</span>' . (($tcd = trim((string)($l['typed_code'] ?? ''))) !== '' ? '<br><span class="hint">' . e(t('stk.typed_code')) . ' <b class="mono">' . e($tcd) . '</b></span>' : '') . (stk_code_hint($pc) !== '' ? '<br>' . stk_code_hint($pc) : '') . '</td><td>';
         if (!$sx) $h .= '<span class="hint">' . tt('stk.sim_none') . '</span>';
         foreach ($sx as $x) $h .= '<form method="post" action="' . $self . '" data-lock style="margin:3px 0;">' . $hid . '<input type="hidden" name="action" value="line_use_item"><input type="hidden" name="line_id" value="' . (int)$l['id'] . '"><input type="hidden" name="item_id" value="' . (int)$x['id'] . '"><button class="btn btn--ghost btn--sm" type="submit">' . tt('stk.sim_use') . '</button> <a href="' . url('inventory_item', ['id' => (int)$x['id']]) . '" target="_blank" rel="noopener">' . e(stk_sim_label($x)) . '</a> ' . stk_sim_stock_pill($x) . ' ' . pill('mute', t('stk.sim_why_' . $x['why']) . ' ' . (int)$x['score'] . ' %') . '</form>';
         $h .= '</td>';
-        if ($new) $h .= '<td style="white-space:nowrap;"><form method="post" action="' . $self . '" data-lock' . ($sx ? ' data-confirm="' . e(t('stk.sim_new_q')) . '"' : '') . ' style="display:flex;gap:6px;">' . $hid . '<input type="hidden" name="action" value="line_new_item"><input type="hidden" name="line_id" value="' . (int)$l['id'] . '"><input name="code" maxlength="60" value="' . e(($tcv = trim((string)($l['typed_code'] ?? ''))) !== '' && !stk_item_by_code($tcv) ? $tcv : ($pc['exists'] ? '' : $pc['code'])) . '" placeholder="' . e($pc['pn'] !== '' ? t('stk.newcode_ph', ['pn' => $pc['pn']]) : t('stk.code')) . '" style="width:190px;" aria-label="' . tt('stk.code') . '"><button class="btn btn--sm" type="submit">＋</button></form></td>';
+        if ($new) $h .= '<td style="white-space:nowrap;"><form method="post" action="' . $self . '" data-lock' . ($sx ? ' data-confirm="' . e(t('stk.sim_new_q')) . '"' : '') . ' style="display:flex;gap:6px;">' . $hid . '<input type="hidden" name="action" value="line_new_item"><input type="hidden" name="line_id" value="' . (int)$l['id'] . '"><input name="code" maxlength="60" value="' . e(line_new_code($l, $sx)) . '" placeholder="' . e($pc['pn'] !== '' ? t('stk.newcode_ph', ['pn' => $pc['pn']]) : t('stk.code')) . '" style="width:190px;" aria-label="' . tt('stk.code') . '"><button class="btn btn--sm" type="submit">＋</button></form></td>';
         $h .= '</tr>';
     }
     return $h . '</tbody></table></div></div>';

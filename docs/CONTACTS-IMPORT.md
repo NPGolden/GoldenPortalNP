@@ -3399,3 +3399,17 @@ The page on screen stays the internal version for staff.
 **Not tested**: the order of the report itself — its 81 lines were imported before this version and take their codes with "Take the codes from the file".
 
 **Security review**: the upload is limited to 8 MB, read by the same reader as the import and not kept; only Procurement can use it, on a document it may edit; the code is written through bound parameters and printed escaped. No proposal for this change.
+
+## §411 v1.189.2 (R97-127) — Maker part number lost by the BOM importer; numbers taken from the file; all new items in one step
+
+**Reported**: the file has the column "Maker part no" filled for every row, yet the 81 lines of the order show no part number and the Code field of "New inventory item" is empty; creating the items one by one "will take years"; matching must always look at the maker's number and the description.
+
+**Found**: `bom_file_rows()` (import into an order / requisition) and the staged BOM import read the template columns; `bom_import()` — used when a BOM is created with its file attached, and as fallback — had its own older list of header names without "maker part no" and "golden code". Rows came in with description and maker only; `bom_to_po()` copied them; `stk_code_propose()` needs the part number, so nothing was proposed, and `stk_similar()` could only compare descriptions (the "similar description 60 %" of the screenshot).
+
+**Change** — `app/bom.php` `bom_import()`: header names merged with `bom_imp_aliases()` (part number before code for ambiguous names), match by `bom_row_exact()` (code, maker part number). `app/inv.php`: `line_codes_from_file()` now for orders, requisitions and BOMs — a line takes part number, maker and code from the row with the same description and is linked when the row names an inventory item exactly; `line_new_code()`; `line_new_all_rows()` / `line_new_all()` (action `line_new_all`): every line with a proposed code and no item with the same / nearly the same part number (reason same, code or part at 85 % or more) becomes an item in one step. No schema change.
+
+**Tests (sandbox)**: a file with the columns of the report — BOM created with the file attached: part numbers kept, the row whose part number is in the inventory linked; order with four lines without numbers → three completed from the file, one of them linked, the fourth untouched; fields show SE.18639 and SE.A9F74316; "Create the 2 new items" → both created with maker and part number and linked; staff without Procurement refused. Sandbox restored. Error log clean.
+
+**Not tested**: the order of the report (81 lines) — to be completed with "Take the numbers from the file".
+
+**Security review**: the bulk creation runs through the same checks as the single one (Procurement, editable document, code not taken) and is limited to 400 lines per run; the upload is read and not kept. Proposal (no effect on speed): a line in the inventory item's history "created from <document>" so a bulk creation can be traced and undone per document.

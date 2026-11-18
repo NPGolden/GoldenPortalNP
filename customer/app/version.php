@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.189.1';
+const CP_VERSION = '1.189.2';
 const CP_BUILD   = '2026-11-18';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-127', 'version' => '1.189.2', 'date' => '2026-11-19', 'title' => 'Procurement: a BOM created with its file attached no longer loses the maker part number; lines without numbers take them from the file and are linked when the part number is in the inventory; the new code prefix.<maker part number> stands in the field and all new items can be created in one step.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-126', 'version' => '1.189.1', 'date' => '2026-11-18', 'title' => 'Procurement: the code written in an imported file stays on a line that names no inventory item and is proposed in "New inventory item"; lines imported earlier take their codes from the same file.', 'db' => 'install/migrate_cp_r97_126_typed_code.sql', 'check' => 'r98r'],
         ['ref' => 'GAS-CP-R97-125', 'version' => '1.189.0', 'date' => '2026-11-18', 'title' => 'QHSE: the selected standard is marked and a new supplier gets its initial evaluation; HR: process flow of onboarding and handover on the card and the dashboard, equipment import from Excel, standard kits per discipline, lines prepared by IT / QHSE / warehouse, IT assets as source, replacement dates.', 'db' => 'install/migrate_cp_r97_125_hr_equipment_kits.sql', 'check' => 'r98q'],
         ['ref' => 'GAS-CP-R97-124', 'version' => '1.188.0', 'date' => '2026-11-18', 'title' => 'HR: equipment given to employees — lines per person, issue list accepted by the employee (portal or paper), handover list accepted by HR line by line, numbered PDF documents, register with Excel, reminders, and equipment not handed over shown for people who left.', 'db' => 'install/migrate_cp_r97_124_hr_equipment.sql', 'check' => 'r98p'],
