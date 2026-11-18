@@ -82,6 +82,7 @@ function nf_sweep(int $every = 60, bool $force = false): int {
             nf_job('doc-links', fn() => function_exists('dl_sweep') ? dl_sweep() : 0);                                // R97-058: reminders for acceptance links
             nf_job('hr-assessments', fn() => function_exists('hrs_sweep') ? hrs_sweep() : 0);                       // R97-063: campaigns start, remind and close on their dates
             nf_job('hr-leavers', function () { if (!function_exists('hr_leavers_reconcile') || (string) cp_setting('hr_lv_day', '') === date('Y-m-d')) return 0; cp_setting_set('hr_lv_day', date('Y-m-d')); return count(hr_leavers_reconcile()); });   // R97-123: once a day — a card that says employed after the employment ended is put right
+            $n += nf_job('hr-equipment', function () { if (!function_exists('hre_sweep') || (string) cp_setting('hre_day', '') === date('Y-m-d')) return 0; cp_setting_set('hre_day', date('Y-m-d')); return hre_sweep(); });   // R97-124: lists not accepted after 3 days
             $n += nf_job('hr-year', fn() => function_exists('hry_sweep') ? hry_sweep() : 0);                       // R97-122: steps of the HR year that are due or late, weekly e-mail
             nf_job('isms', fn() => function_exists('ism_sweep') ? ism_sweep() : 0);                                  // R97-080: due and review dates of the ISMS registers
             nf_job('kpi-cockpit', fn() => function_exists('kpi_cockpit_refresh') ? kpi_cockpit_refresh() : 0);       // R97-056: dashboard KPI block renewed here, not while a page is drawn

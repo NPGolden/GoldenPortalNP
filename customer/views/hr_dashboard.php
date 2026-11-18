@@ -31,6 +31,14 @@ layout_head(t('hr.dashboard'), 'hr_dashboard');
 </div>
 <?php endif; ?>
 
+<?php $eqW = function_exists('hre_can') && hre_can() ? hre_waiting() : null; if ($eqW && ($eqW['issue'] || $eqW['return'] || $eqW['leavers'] || $eqW['new'])): /* R97-124 */ ?>
+<div class="card" id="hr-equipment" style="border-left:4px solid var(--cp-gold,#C9A227);">
+  <div class="page-head" style="margin-bottom:4px;"><h2 style="margin:0;">🧰 <?= tt('hre.w_title') ?></h2><div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('hr_equipment') ?>"><?= tt('hre.title') ?></a></div></div>
+  <p><?= e(t('hre.w_line', ['i' => count($eqW['issue']), 'r' => count($eqW['return']), 'l' => count($eqW['leavers']), 'n' => count($eqW['new'])])) ?></p>
+  <?php foreach (array_slice(array_merge($eqW['return'], $eqW['issue']), 0, 8) as $d_): ?><a href="<?= url('hr_person', ['id' => (int)$d_['person_id'], 'tab' => 'eq']) ?>#eq-docs"><?= e($d_['name_en'] . ' — ' . $d_['doc_no']) ?></a> · <?php endforeach; ?>
+</div>
+<?php endif; ?>
+
 <div class="kpi kpi--4" style="margin-bottom:14px;">
   <a class="stat" href="#hr-today"><b><?= count($todayAway) ?></b><span class="s"><?= tt('hr.d_away_today') ?></span></a>
   <a class="stat<?= $pending ? ' gold' : '' ?>" href="<?= url('hr_requests', ['st' => 'open']) ?>"><b><?= count($pending) ?></b><span class="s"><?= tt('hr.d_pending') ?></span></a>

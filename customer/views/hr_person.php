@@ -32,9 +32,9 @@ layout_head($p['name_en'] . ' — ' . t('hr.card'), 'admin_hr');
   </div>
 </div>
 <?php endif; ?>
-<?php $tab = (string)($_GET['tab'] ?? 'data'); if (!in_array($tab, ['data', 'emp', 'req', 'msg', 'docs', 'ent', 'types', 'train', 'eval', 'log'], true) || ($tab === 'docs' && !hr_files_can())) $tab = 'data'; /* R76-005 */ $T = fn($k, $lbl) => '<a class="tab' . ($tab === $k ? ' is-on' : '') . '" href="' . url('hr_person', ['id' => $pid, 'tab' => $k]) . '">' . $lbl . '</a>';
+<?php $tab = (string)($_GET['tab'] ?? 'data'); if (!in_array($tab, ['data', 'emp', 'eq', 'req', 'msg', 'docs', 'ent', 'types', 'train', 'eval', 'log'], true) || ($tab === 'docs' && !hr_files_can())) $tab = 'data'; /* R76-005 */ $T = fn($k, $lbl) => '<a class="tab' . ($tab === $k ? ' is-on' : '') . '" href="' . url('hr_person', ['id' => $pid, 'tab' => $k]) . '">' . $lbl . '</a>';
 $pend = count(array_filter(hr_requests_for('hr', 0), fn($r) => (int)$r['person_id'] === $pid && in_array($r['status'], ['pending_mgr', 'pending_hr'], true))); $um = function_exists('hr_msg_has') && hr_msg_has() ? hr_messages_unread($pid) : 0; ?>
-<nav class="tabs" style="margin-bottom:12px;"><?= $T('data', '🪪 ' . t('hr.tab_data')) . $T('emp', '📑 ' . t('hr.employments')) . $T('req', '✅ ' . t('hr.requests') . ($pend ? ' <b>' . $pend . '</b>' : '')) . $T('msg', '💬 ' . t('hr.msg_title') . ($um ? ' <b>' . $um . '</b>' : '')) . (hr_files_can() ? $T('docs', '📎 ' . t('hr.documents') . ' (' . count($docs) . ')') : '') . (function_exists('hr4_has') && hr4_has() ? $T('ent', '🗓 ' . t('hr.entitlements')) . (function_exists('hr5_has') && hr5_has() ? $T('types', '🏷 ' . t('hr.types')) : '') . (function_exists('hr_tr_has') && hr_tr_has() ? $T('train', '🎓 ' . t('hr.training')) . $T('eval', '📈 ' . t('hr.evaluations')) : '') . $T('log', '🕘 ' . t('hr.changes')) : '') ?></nav>
+<nav class="tabs" style="margin-bottom:12px;"><?= $T('data', '🪪 ' . t('hr.tab_data')) . $T('emp', '📑 ' . t('hr.employments')) . (function_exists('hre_can') && hre_can() ? $T('eq', '🧰 ' . t('hre.tab') . (($eqN_ = hre_with_count($pid)) ? ' (' . $eqN_ . ')' : '')) : '') . $T('req', '✅ ' . t('hr.requests') . ($pend ? ' <b>' . $pend . '</b>' : '')) . $T('msg', '💬 ' . t('hr.msg_title') . ($um ? ' <b>' . $um . '</b>' : '')) . (hr_files_can() ? $T('docs', '📎 ' . t('hr.documents') . ' (' . count($docs) . ')') : '') . (function_exists('hr4_has') && hr4_has() ? $T('ent', '🗓 ' . t('hr.entitlements')) . (function_exists('hr5_has') && hr5_has() ? $T('types', '🏷 ' . t('hr.types')) : '') . (function_exists('hr_tr_has') && hr_tr_has() ? $T('train', '🎓 ' . t('hr.training')) . $T('eval', '📈 ' . t('hr.evaluations')) : '') . $T('log', '🕘 ' . t('hr.changes')) : '') ?></nav>
 
 <?php if ($tab === 'data' || $tab === 'emp'): ?>
 <div class="cols">
@@ -162,6 +162,7 @@ $pend = count(array_filter(hr_requests_for('hr', 0), fn($r) => (int)$r['person_i
 </div>
 <?php endif; ?>
 
+<?php if ($tab === 'eq' && function_exists('hre_can') && hre_can()) require __DIR__ . '/_hr_eq.php';   /* R97-124 */ ?>
 <?php if ($tab === 'req'): $reqs = array_values(array_filter(hr_requests_for('hr', 0), fn($r) => (int)$r['person_id'] === $pid)); $openR = array_filter($reqs, fn($r) => in_array($r['status'], ['pending_mgr', 'pending_hr'], true)); $recent = array_slice(array_filter($reqs, fn($r) => !in_array($r['status'], ['pending_mgr', 'pending_hr'], true)), 0, 8); $fh = fn($v) => $v === null ? '—' : rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.'); ?>
 <div class="card" id="hr-req">
   <?php $missingP = function_exists('hr_missing_docs') ? hr_missing_docs($pid) : []; ?>

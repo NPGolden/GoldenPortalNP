@@ -232,7 +232,9 @@ function hr_leaver_release(int $pid): array {
 }
 /** What a person who left still holds and somebody has to take over: [[label, number, url], …]. Empty = nothing left. */
 function hr_leaver_holds(array $p): array {
-    $uid = (int)($p['user_id'] ?? 0); $o = []; if (!$uid) return $o;
+    $uid = (int)($p['user_id'] ?? 0); $o = [];
+    if (function_exists('hre_with_count') && ($eqn = hre_with_count((int)$p['id']))) $o[] = [t('hr.lv_equip'), $eqn, url('hr_person', ['id' => (int)$p['id'], 'tab' => 'eq'])];   // R97-124: equipment still in the name of the person
+    if (!$uid) return $o;
     $add = function (string $k, string $sql, array $a, string $url) use (&$o) { try { $n = (int) scalar($sql, $a); if ($n) $o[] = [t('hr.lv_' . $k), $n, $url]; } catch (Throwable $e) {} };
     $add('admin', "SELECT COUNT(*) FROM customer_users WHERE id = ? AND is_active = 1", [$uid], url('admin_users', ['q' => (string)($p['account_name'] ?? '')]));
     $add('disc', 'SELECT COUNT(*) FROM disciplines WHERE manager_user_id = ? AND is_active = 1', [$uid], url('admin_hr', ['tab' => 'people']));
@@ -244,8 +246,8 @@ function hr_leaver_holds(array $p): array {
 }
 /** All who left and still hold something (HR dashboard, daily health report). */
 function hr_leavers_holding(): array {
-    if (!hr2_has()) return []; $o = [];
-    foreach (hr_people(false) as $p) { if ($p['is_active'] || empty($p['user_id'])) continue; $h = hr_leaver_holds($p); if ($h) $o[] = ['p' => $p, 'holds' => $h]; }
+    if (!hr2_has()) return []; $o = []; $eq = []; if (function_exists('hre_has') && hre_has()) { try { $eq = array_flip(array_column(all("SELECT DISTINCT person_id FROM hr_eq_items WHERE status IN ('pending','held','missing')"), 'person_id')); } catch (Throwable $e) {} }
+    foreach (hr_people(false) as $p) { if ($p['is_active'] || (empty($p['user_id']) && !isset($eq[(int)$p['id']]))) continue; $h = hr_leaver_holds($p); if ($h) $o[] = ['p' => $p, 'holds' => $h]; }
     return $o;
 }
 

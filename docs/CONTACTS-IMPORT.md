@@ -3345,3 +3345,25 @@ The page on screen stays the internal version for staff.
 **Not tested**: the live registry (which of the two writers re-activated the person reported); the Excel update itself was changed but not re-run with a file; app sign-ins (the phone app does not open a row in `login_sessions`).
 
 **Security review**: leaving now also ends every open session and app token of the person at once. Session rows hold the account, times, the address and the browser family — no content; the report is for administrators only and the staff handbook states that the time signed in is recorded. Proposals (no effect on speed): (1) delete session rows older than 24 months; (2) show each person his or her own sessions on My account.
+
+## §408 v1.188.0 (R97-124) — Equipment given to employees: issue list accepted by the employee, handover list accepted by HR
+
+**Asked**: how do we manage onboarding and the equipment given to the employee — instrumentation, tools, laptop, telephone, working clothes, safety equipment — and his acceptance; the same for the handover list and its acceptance by HR.
+
+**Before**: onboarding had the checklist "My first weeks" with a buddy (Community), and the release of contract had one tick "Company property returned". Nothing recorded *what* was given, and nothing was accepted by anyone.
+
+**Change** — new module `app/hre.php`, migration `install/migrate_cp_r97_124_hr_equipment.sql` (state key `r98p`): `hr_eq_items` (one line per thing: category, description, serial, company number, quantity, size, condition, state) and `hr_eq_docs` (issue and handover lists: number, state, acceptance of the employee with name / time / address / how, acceptance of HR).
+- States of a line: `draft` → `pending` (on an issue list) → `held` → `returned` | `missing` | `writeoff`. A `missing` line put on a later handover list is copied to it (`clone_of`) and the old one stays on its list as `followed`, so an accepted list never changes.
+- Issue list `EQI-yyyy-nnnn`: `sent` → `accepted` | `disputed` | `cancelled`. Handover list `EQR-yyyy-nnnn`: `open` → `accepted` | `cancelled`; HR gives every line a result.
+- Actions (`hre_handle_action()`, before `pm_handle_action`): HR — `hre_add`, `hre_del`, `hre_issue`, `hre_paper`, `hre_cancel`, `hre_receive`; employee — `hre_accept`, `hre_dispute`; both — `hre_handover`. Scopes: `HR_PAGES/HR_ACTIONS`, `EMP_*`, `PA_*`.
+- Views: `_hr_eq.php` (tab Equipment of `hr_person`), `my_equipment.php` (also serves the PDF of a list to HR and to the employee concerned), `hr_equipment.php` (register, Excel), card on `hr_dashboard.php`. PDF `hre_pdf()`.
+- Instruments can be taken from the calibration register (`ism_records`, `reg = qequip`); one instrument, one holder.
+- People who left: `hr_leaver_holds()` counts equipment (also for a person without an account); `hr_leavers_holding()` reads them in one statement.
+- Daily job `hr-equipment` (`hre_sweep()`, setting `hre_day`): reminder after 3 days, then weekly.
+- 173 language keys (`hre.*`, `hr.lv_equip`, `hr.ck_equipment`).
+
+**Tests (sandbox) — every form posted**: lines added (also without description → refused), removed, issue list, acceptance without the tick → refused, difference reported, withdrawn and re-issued, accepted (name, time, address recorded, lines held); handover started by the employee and by HR, confirmed by the employee, HR acceptance with a missing result → refused, then accepted with in order / damaged / not returned / not to be returned; the not-returned line on a later list and returned; acceptance on paper (empty name refused); instrument from the register and refused for a second person; staff posting HR actions → refused, register 403, PDF of another person 403, accepting another person's list refused; Excel opened; PDFs rendered and looked at; leaver → equipment in "After leaving" and on the dashboard; reminder once, second run none. Sandbox restored from a dump. Error log clean.
+
+**Not tested**: real data; the phone app (no screen for it there); e-mail — the module notifies in the portal only.
+
+**Security review**: an acceptance can only be given by the account linked to the card (or recorded by HR as paper, and shown as such); lists are read by HR and by the person concerned only; accepted lists cannot be edited; nothing goes to the assistant. Proposals (no effect on speed): (1) let IT and the warehouse / QHSE prepare lines for their own categories without access to the HR card; (2) standard kits per discipline so onboarding is one click; (3) take laptops and telephones from the ISMS asset inventory as instruments are taken from the calibration register, and show the holder there; (4) expiry / replacement dates for PPE.

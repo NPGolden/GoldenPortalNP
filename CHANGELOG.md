@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.187.1** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.188.0** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.188.0 | GAS-CP-R97-124 | 2026-11-18 | HR: equipment given to employees — lines per person, issue list accepted by the employee (portal or paper), handover list accepted by HR line by line, numbered PDF documents, register with Excel, reminders, and equipment not handed over shown for people who left. | `install/migrate_cp_r97_124_hr_equipment.sql` |
 | 1.187.1 | GAS-CP-R97-123 | 2026-11-18 | HR: a person whose employment has ended can no longer come back as active through an Excel update or a card save, is corrected every day from the employment periods and is released from the portal; login history records the duration of each session and the usage per person. | `install/migrate_cp_r97_123_login_sessions.sql` |
 | 1.187.0 | GAS-CP-R97-122 | 2026-11-18 | HR › The HR year: the annual cycle on the HR dashboard with what is done, due and late, measured from the portal; warnings to the HR managers by notification and a weekly e-mail; the calendar for every employee on My leave. | `install/migrate_cp_r97_122_hr_year.sql` |
 | 1.186.0 | GAS-CP-R97-121 | 2026-11-18 | HR › Job descriptions: the company set in one structure, writing with the assistant, approval by Discipline Manager, General Manager and CEO, revisions, link to employees (My job description, read confirmation) and to vacancies, PDF. | `install/migrate_cp_r97_121_job_descriptions.sql` |
