@@ -49,7 +49,7 @@ layout_head(t('pmt.title'), 'projects');
   <tbody>
   <?php foreach ($rows as $p): ?>
     <tr class="<?= pmt_state($p) === 'expired' ? 'is-bad' : '' ?>">
-      <td><a href="<?= url('permit_edit', ['id' => $p['id']]) ?>"><b><?= e($p['holder_name']) ?></b></a><?php if ($p['person_name'] && $p['person_name'] !== $p['holder_name']): ?><br><small class="hint"><?= e($p['person_name']) ?></small><?php endif; ?></td>
+      <td><a href="<?= url('permit_edit', ['id' => $p['id']]) ?>"><b><?= e($p['holder_name']) ?></b></a><?php $pt = function_exists('pmt_people_text') ? pmt_people_text($p) : ''; if ($pt !== '' && $pt !== $p['holder_name']): ?><br><small class="hint">👥 <?= count($p['people']) ?> · <?= e($pt) ?></small><?php elseif ($pt === '' && $p['person_name'] && $p['person_name'] !== $p['holder_name']): ?><br><small class="hint"><?= e($p['person_name']) ?></small><?php endif; ?></td>
       <td><a href="<?= url('permits', ['project' => $p['project_id']]) ?>"><?= e($p['project_code'] ?: $p['project_name']) ?></a><?php if ($p['project_code']): ?><br><small class="hint"><?= e($p['project_name']) ?></small><?php endif; ?></td>
       <td><?= e($types[$p['permit_type']] ?? $p['permit_type']) ?><?= $p['country'] ? ' <span class="hint">' . e($p['country']) . '</span>' : '' ?></td>
       <td class="mono"><?= e($p['permit_no'] ?: '—') ?></td>

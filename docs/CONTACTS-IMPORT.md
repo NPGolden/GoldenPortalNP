@@ -3165,3 +3165,19 @@ The page on screen stays the internal version for staff.
 **Tests (sandbox) — forms posted**: staff account that is not the PM of the project: no button, form 403, save refused; same account with the Accounting flag: button, form, permit created and updated; flag removed again: update refused; PHP error log clean; page sweep.
 
 **Security review**: one more role on an existing rule; the QHSE role, which has no financial rights (R97-086), does not get it through this flag. No proposal.
+
+## §398 v1.184.0 (R97-114) — Work permits: several employees under one permit
+
+**Asked**: tick the employees a permit is for and list their names, because each permit concerns specific people only.
+
+**Database** (`install/migrate_cp_r97_114_permit_people.sql`, state key `r98k`): table `work_permit_people (permit_id, person_id)`, primary key on both, index on `person_id`; the single employee of the existing permits is copied in (`INSERT IGNORE … WHERE person_id IS NOT NULL`). The step can run twice.
+
+**Code** (`app/pmt.php`): `pmt_people_has()`, `pmt_people($ids)` (one query for a page of permits), `pmt_with_people()`, `pmt_people_text()`. `pmt_load()` and `pmt_list()` return `people`; filter `person` and search `q` also look in the new table. `pmt_save_from_post()` reads `people[]` when `people_sent` is posted: ids are checked against `hr_people`, at most 300, the old rows are replaced; `work_permits.person_id` keeps the first name (alphabetical) for older screens; an empty Holder takes the names (three, then "+n"). `pmt_delete()` removes the rows. `pmt_remind()` adds the names to the warning text when there are more than one. Before the database step has run, the form shows the former single-employee list.
+
+**Screens**: `views/permit_edit.php` — tick list (`.tick-list` in `assets/portal.css`), filter by name that never hides a ticked person, counter; an employee who has left but is still on the permit stays listed and marked. `views/permits.php` — names under the holder.
+
+**Tests (sandbox) — forms posted**: new permit with three ticks and an unknown id (unknown id dropped, holder filled from the names); update to two ticks with a title; list and search by an employee's name; nobody ticked and no holder → refused with the message; free holder only; delete (rows removed); as project manager; in the browser: filter, counter, save. Migration run twice. PHP error log clean; page sweeps as before (admin 9, PM 0, HR 2 flagged — the usual ones).
+
+**Not tested**: the expiry warning e-mail with names on the live server; lists of several hundred employees (the list scrolls; the filter was tried with three).
+
+**Security review**: the ticked ids are cast to integers and accepted only if they exist in the HR registry; the count is limited; only names are read from the registry for this list — no personal or payroll field reaches the page; the edit rule is unchanged and is checked on save. Proposal (no effect on speed): write the change of the people of a permit into the audit trail (who added or removed whom).

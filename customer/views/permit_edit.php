@@ -16,8 +16,16 @@ layout_head($p ? t('pmt.edit') : t('pmt.new'), 'projects');
 <form method="post" action="<?= url('permit_edit', $id ? ['id' => $id] : []) ?>" enctype="multipart/form-data" class="card form-grid" data-lock>
   <?= csrf_field() ?><input type="hidden" name="action" value="pmt_save"><input type="hidden" name="id" value="<?= $id ?>">
   <div class="field span2"><label><?= tt('pmt.project') ?> *</label><select name="project_id" required><option value=""></option><?php foreach ($projects as $pr): ?><option value="<?= $pr['id'] ?>"<?= (int)$v['project_id'] === (int)$pr['id'] ? ' selected' : '' ?>><?= e(($pr['project_code'] ? $pr['project_code'] . ' — ' : '') . $pr['name']) ?></option><?php endforeach; ?></select></div>
-  <?php if ($people): ?><div class="field"><label><?= tt('pmt.person') ?></label><select name="person_id"><option value=""><?= tt('pmt.person_none') ?></option><?php foreach ($people as $hp): ?><option value="<?= $hp['id'] ?>"<?= (int)($v['person_id'] ?? 0) === (int)$hp['id'] ? ' selected' : '' ?>><?= e($hp['name_en']) ?></option><?php endforeach; ?></select><p class="hint"><?= tt('pmt.person_hint') ?></p></div><?php endif; ?>
-  <div class="field"><label><?= tt('pmt.holder') ?><?= $people ? '' : ' *' ?></label><input name="holder_name" maxlength="160" value="<?= e((string)($v['holder_name'] ?? '')) ?>"<?= $people ? '' : ' required' ?>></div>
+  <?php if ($people && pmt_people_has()): $tick = array_flip(array_column($p['people'] ?? [], 'id')); $gone = array_filter($p['people'] ?? [], fn($x) => !in_array($x['id'], array_map('intval', array_column($people, 'id')), true)); ?>
+  <div class="field field--full"><label><?= tt('pmt.people') ?> <span class="count" id="pmt-n"><?= count($tick) ?></span></label><input type="hidden" name="people_sent" value="1">
+    <input type="search" id="pmt-f" class="tick-filter" placeholder="<?= tt('pmt.people_filter') ?>" autocomplete="off" aria-label="<?= tt('pmt.people_filter') ?>">
+    <div id="pmt-people" class="tick-list">
+      <?php foreach ($gone as $x): ?><label class="chk" data-n="<?= e(mb_strtolower($x['name'])) ?>"><input type="checkbox" name="people[]" value="<?= (int)$x['id'] ?>" checked> <?= e($x['name']) ?> <span class="hint">(<?= tt('pmt.people_left') ?>)</span></label><?php endforeach; ?>
+      <?php foreach ($people as $hp): ?><label class="chk" data-n="<?= e(mb_strtolower((string)$hp['name_en'])) ?>"><input type="checkbox" name="people[]" value="<?= (int)$hp['id'] ?>"<?= isset($tick[(int)$hp['id']]) ? ' checked' : '' ?>> <?= e((string)$hp['name_en']) ?></label><?php endforeach; ?>
+    </div>
+    <p class="hint"><?= tt('pmt.people_hint') ?></p></div>
+  <?php elseif ($people): ?><div class="field"><label><?= tt('pmt.person') ?></label><select name="person_id"><option value=""><?= tt('pmt.person_none') ?></option><?php foreach ($people as $hp): ?><option value="<?= $hp['id'] ?>"<?= (int)($v['person_id'] ?? 0) === (int)$hp['id'] ? ' selected' : '' ?>><?= e($hp['name_en']) ?></option><?php endforeach; ?></select><p class="hint"><?= tt('pmt.person_hint') ?></p></div><?php endif; ?>
+  <div class="field"><label><?= tt('pmt.holder') ?><?= $people ? '' : ' *' ?></label><input name="holder_name" maxlength="160" value="<?= e((string)($v['holder_name'] ?? '')) ?>"<?= $people ? '' : ' required' ?>><?php if ($people && pmt_people_has()): ?><p class="hint"><?= tt('pmt.holder_hint') ?></p><?php endif; ?></div>
   <div class="field"><label><?= tt('pmt.type') ?> *</label><select name="permit_type"><?php foreach ($types as $k => $l): ?><option value="<?= $k ?>"<?= $v['permit_type'] === $k ? ' selected' : '' ?>><?= e($l) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label><?= tt('pmt.no') ?></label><input name="permit_no" maxlength="80" class="mono" value="<?= e((string)($v['permit_no'] ?? '')) ?>"></div>
   <div class="field"><label><?= tt('pmt.authority') ?></label><input name="authority" maxlength="160" value="<?= e((string)($v['authority'] ?? '')) ?>" placeholder="<?= tt('pmt.authority_ph') ?>"></div>
@@ -33,4 +41,7 @@ layout_head($p ? t('pmt.edit') : t('pmt.new'), 'projects');
 <form method="post" action="<?= url('permit_edit', ['id' => $id]) ?>" style="margin-top:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="pmt_delete"><input type="hidden" name="id" value="<?= $id ?>">
   <button class="btn btn--ghost btn--sm" data-confirm="<?= e(t('pmt.delete_confirm')) ?>" data-confirm-ok="<?= tt('btn.delete') ?>">🗑 <?= tt('btn.delete') ?></button></form>
 <?php endif; ?>
+<script nonce="<?= csp_nonce() ?>">(function(){ var box=document.getElementById('pmt-people'); if(!box) return; var f=document.getElementById('pmt-f'), n=document.getElementById('pmt-n');
+  box.addEventListener('change',function(){ n.textContent=box.querySelectorAll('input:checked').length; });
+  f.addEventListener('input',function(){ var q=f.value.trim().toLowerCase(); box.querySelectorAll('label').forEach(function(l){ l.style.display=(!q||l.dataset.n.indexOf(q)>=0||l.querySelector('input').checked)?'':'none'; }); }); })();</script>
 <?php layout_foot(); ?>

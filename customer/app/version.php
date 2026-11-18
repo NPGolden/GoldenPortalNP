@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.183.2';
-const CP_BUILD   = '2026-11-17';
+const CP_VERSION = '1.184.0';
+const CP_BUILD   = '2026-11-18';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-114', 'version' => '1.184.0', 'date' => '2026-11-18', 'title' => 'Work permits: one permit can cover several employees — tick them from the HR registry on the permit form; their names are listed with the permit and found by the search.', 'db' => 'install/migrate_cp_r97_114_permit_people.sql', 'check' => 'r98k'],
         ['ref' => 'GAS-CP-R97-113', 'version' => '1.183.2', 'date' => '2026-11-18', 'title' => 'Work permits: Accounting can create and update permits of every project, like HR and the administrators.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-112', 'version' => '1.183.1', 'date' => '2026-11-18', 'title' => 'Purchase order: the VAT rate can be set or corrected after the order was sent; the order document (PDF and e-mail attachment) always carries totals worked out from the lines and the VAT rate as they are at that moment.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-111', 'version' => '1.183.0', 'date' => '2026-11-18', 'title' => 'New inventory items follow the rule prefix.maker part number: the portal proposes the code (prefix of the maker as used in the inventory, else the prefix of the similar items) in the BOM import review and next to every free-text line; Procurement can change it; a new item without a prefix is refused.', 'db' => null, 'check' => null],
@@ -558,6 +559,7 @@ function cp_migration_state(): array {
         'r97p' => $has("SHOW TABLES LIKE 'nl_issues'"),
         'r97q' => $has("SHOW TABLES LIKE 'nl_lists'"),
         'r97r' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'proc_state'") && $has("SHOW COLUMNS FROM sb_parts LIKE 'proc_at'"),
+        'r98k' => $has("SHOW TABLES LIKE 'work_permit_people'"),
         'r98j' => $has("SHOW COLUMNS FROM po_orders LIKE 'purpose'"),
         'r98i' => (function () { try { $r = one("SHOW COLUMNS FROM proc_deleted LIKE 'doc_kind'"); return $r && str_contains((string)$r['Type'], 'bom'); } catch (Throwable $e) { return false; } })(),
         'r98h' => $has("SHOW TABLES LIKE 'proc_deleted'"),
