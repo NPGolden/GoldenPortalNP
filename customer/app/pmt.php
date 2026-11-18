@@ -13,10 +13,11 @@ const PMT_WARN_DAYS = 30;          // "expiring soon" on the dashboards
 
 function pmt_has(): bool { static $v = null; if ($v === null) { try { $v = (bool) scalar("SHOW TABLES LIKE 'work_permits'"); } catch (Throwable $e) { $v = false; } } return $v; }
 function pmt_can_view(): bool { return pmt_has() && is_staff(); }
-/** Edit rights: administrators, HR, the project's PM (or any PM when no project is given yet). */
+/** Edit rights: administrators, HR, Accounting (R97-113), the project's PM (or any PM when no project is given yet). */
 function pmt_can_edit(int $projectId = 0): bool {
     if (!pmt_can_view()) return false;
     if (is_cp_admin() || (function_exists('hr_can') && hr_can())) return true;
+    if (function_exists('col_flag') && col_flag('is_accounting')) return true;   // R97-113: Accounting creates and updates permits (fees, renewals)
     $u = current_user();
     if ($projectId) return (int) scalar('SELECT COUNT(*) FROM projects WHERE id = ? AND pm_user_id = ?', [$projectId, (int)$u['id']]) > 0;
     return function_exists('pm_is_pm') ? pm_is_pm() : false;

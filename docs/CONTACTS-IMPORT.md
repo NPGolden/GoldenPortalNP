@@ -3157,3 +3157,11 @@ The page on screen stays the internal version for staff.
 **Tests (sandbox) — forms posted**: order sent at 0 %, rate set to 24 → page, database, log and PDF (Subtotal 150,00 · VAT 24% 36,00 · Total 186,00); stored totals made wrong by hand → corrected when the PDF is opened; rate 45 refused; staff without procurement rights 403; PHP error log clean; page sweep. Not confirmed: that this was the case on the user's order — number of the order asked.
 
 **Security review**: the action is limited to procurement administrators and to open orders, validates the number and leaves a log line. No proposal.
+
+## §397 v1.183.2 (R97-113) — Work permits: Accounting may create and update
+
+`pmt_can_edit()` (`app/pmt.php`): besides administrators, HR and the project's PM, a staff account with the Accounting flag (`col_flag('is_accounting')`) edits permits of every project. The pages and the actions `pmt_save` / `pmt_delete` already use this one rule. Viewing is unchanged (all staff).
+
+**Tests (sandbox) — forms posted**: staff account that is not the PM of the project: no button, form 403, save refused; same account with the Accounting flag: button, form, permit created and updated; flag removed again: update refused; PHP error log clean; page sweep.
+
+**Security review**: one more role on an existing rule; the QHSE role, which has no financial rights (R97-086), does not get it through this flag. No proposal.
