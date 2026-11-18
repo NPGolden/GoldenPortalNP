@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.182.0** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.182.1** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.182.1 | GAS-CP-R97-110 | 2026-11-18 | Budget pricing requests: tabs Waiting for prices (shown first), Priced and All — the budgets already priced by Procurement are no longer mixed with the ones waiting. | — |
 | 1.182.0 | GAS-CP-R97-109 | 2026-11-18 | Warehouse: page Received per project and vessel — what is in the warehouse for each project (bought for it or reserved from stock), sent and still to come; delivery notes issued from ticked lines and quantities, one per sub-project or per project; a cancelled note reserves the goods again for the same requisition. | — |
 | 1.181.0 | GAS-CP-R97-108 | 2026-11-18 | One path to purchase orders: a purchase order or RFQ states its purpose (Project, Stock, Own use); a BOM workbook can be imported into a draft requisition; an approved requisition creates draft purchase orders per supplier like a BOM; the RFQs of a sub-project are listed with its orders. | `install/migrate_cp_r97_108_po_purpose.sql` |
 | 1.180.0 | GAS-CP-R97-107 | 2026-11-18 | Inventory proposals everywhere: free-text lines of requisitions, purchase orders and BOMs show similar inventory items with stock; System Budget BOM review too; a part number that is our code without its maker prefix counts as a match; new inventory codes only by Procurement, who can turn a free-text line into an item; tool to fill maker part numbers from our codes per prefix, with undo. | — |

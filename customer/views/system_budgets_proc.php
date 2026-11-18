@@ -1,12 +1,15 @@
 <?php
 /** Procurement › Budget pricing requests — system budgets waiting for prices and delivery times.   GAS-CP-R97-049 */
 require __DIR__ . '/_layout.php';
-$u = sbp_require(); $rows = sbp_queue(); $nW = count(array_filter($rows, fn($r) => $r['proc_state'] === 'requested'));
+$u = sbp_require(); $all = sbp_queue(); $nW = count(array_filter($all, fn($r) => $r['proc_state'] === 'requested')); $nD = count($all) - $nW;
+$show = in_array($_GET['show'] ?? '', ['waiting', 'done', 'all'], true) ? $_GET['show'] : 'waiting';   // R97-110: the priced ones are hidden unless asked for
+$rows = array_values(array_filter($all, fn($r) => $show === 'all' || ($show === 'waiting') === ($r['proc_state'] === 'requested')));
 layout_head(t('sbp.q_title'), 'system_budgets_proc');
 ?>
 <div class="page-head"><div><h1>💶 <?= tt('sbp.q_title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('sbp.q_lede') ?></p></div></div>
+<nav class="tabs" style="margin-bottom:12px;"><?php foreach (['waiting' => $nW, 'done' => $nD, 'all' => count($all)] as $k => $n): ?><a class="tab<?= $show === $k ? ' is-on' : '' ?>" href="<?= url('system_budgets_proc', ['show' => $k]) ?>"><?= tt('sbp.q_f_' . $k) ?> <span class="count"><?= $n ?></span></a><?php endforeach; ?></nav>
 <div class="card"><div class="card-head"><h2><?= tt('sbp.q_list') ?> <span class="count"><?= count($rows) ?></span> <?= $nW ? pill('gold', $nW . ' ' . t('sbp.q_waiting')) : pill('green', t('sbp.q_nothing')) ?></h2></div>
-  <?php if (!$rows): ?><p class="hint"><?= tt('sbp.q_empty') ?></p><?php else: ?><div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('sb.no') ?></th><th><?= tt('sb.f_title') ?></th><th><?= tt('sb.project') ?></th><th><?= tt('sb.priority') ?></th><th><?= tt('sbp.q_target') ?></th><th><?= tt('sbp.q_from') ?></th><th class="num"><?= tt('sbp.q_lines') ?></th><th><?= tt('th.status') ?></th><th></th></tr></thead><tbody>
+  <?php if (!$rows): ?><p class="hint"><?= tt($all && $show === 'waiting' ? 'sbp.q_none_waiting' : 'sbp.q_empty') ?></p><?php else: ?><div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('sb.no') ?></th><th><?= tt('sb.f_title') ?></th><th><?= tt('sb.project') ?></th><th><?= tt('sb.priority') ?></th><th><?= tt('sbp.q_target') ?></th><th><?= tt('sbp.q_from') ?></th><th class="num"><?= tt('sbp.q_lines') ?></th><th><?= tt('th.status') ?></th><th></th></tr></thead><tbody>
   <?php foreach ($rows as $r): $late = $r['target_date'] && $r['target_date'] < date('Y-m-d') && $r['proc_state'] === 'requested'; ?><tr>
     <td class="mono"><b><?= e($r['sb_no'] . ' R' . (int)$r['revision']) ?></b></td><td><?= e((string)$r['title']) ?><?= trim((string)($r['proc_note'] ?? '')) !== '' ? '<br><span class="hint">' . e((string)$r['proc_note']) . '</span>' : '' ?></td>
     <td><?= e(trim((string)$r['project_code'])) ?><?= $r['vessel_name'] ? '<br><span class="hint">' . e((string)$r['vessel_name']) . '</span>' : '' ?></td><td><?= function_exists('sb_prio_pill') ? sb_prio_pill((string)$r['priority']) : e((string)$r['priority']) ?></td>

@@ -3125,3 +3125,11 @@ The page on screen stays the internal version for staff.
 **Tests (sandbox) — forms posted; browser for the selection**: test case with a requisition covered by stock, a requisition bought on an order (partial receipt), a direct project order with an item line and a free-text line; page for ready / open / all; in the browser: four lines ticked with a partial quantity → two notes (one per sub-project), stock, reservations and requisition lines as expected, page afterwards shows sent and to come; refused: quantity above ready, nothing ticked, a line already sent; staff without procurement rights 403, HR redirected, forced posts refused; one note per project across two sub-projects (requisitions closed); filters; cancel of that note: stock and reservations back, requisitions approved again, lines ready again; links present; PHP error log clean; page sweep. Not tested: several warehouses; a few thousand lines.
 
 **Security review**: quantities and line ownership are never taken from the browser — only the ids and the quantity to send, re-checked against the database; issuing needs the warehouse right. No proposal.
+
+## §394 v1.182.1 (R97-110) — Budget pricing requests: priced ones hidden by default
+
+`views/system_budgets_proc.php`: tabs `show=waiting` (default) | `done` | `all` with counts over `sbp_queue()`; the list is filtered in the view, the query is unchanged. Empty waiting tab: `sbp.q_none_waiting`.
+
+**Tests (sandbox)**: one budget waiting and one priced — each tab, an invalid value (falls back to waiting), nothing waiting; PHP error log clean; page sweep.
+
+**Security review**: read-only filter on a page that already checks `sbp_require()`. No proposal.
