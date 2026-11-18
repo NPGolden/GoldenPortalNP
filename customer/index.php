@@ -158,6 +158,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && $page === 'pk') { pk_endpoint(); } 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     up_overflow_check();   // R76-003: oversized upload → clear message, not "session expired"
     csrf_check();
+    $cpPacked = isset($_POST['_packed']); if (!$cpPacked) { $cpN = 0; array_walk_recursive($_POST, function () use (&$cpN) { $cpN++; }); $cpLim = (int) ini_get('max_input_vars'); if ($cpLim > 0 && $cpN >= $cpLim) { flash('bad', t('err.form_cut')); redirect((string)$page, array_intersect_key($_GET, ['id' => 1])); } }   // R97-103: a form cut by max_input_vars is refused, never half saved
+    try { post_unpack(); } catch (Throwable $e) { flash('bad', $e->getMessage()); redirect((string)$page, array_intersect_key($_GET, ['id' => 1])); }   // R97-103
     if (function_exists('cache_forget') && ($cuPost = current_user())) cache_forget('badges:' . (int)$cuPost['id']);   // R69-002: an action may change what waits for me
     $action = (string)($_POST['action'] ?? '');
     try {

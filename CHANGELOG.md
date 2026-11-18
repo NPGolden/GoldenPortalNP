@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.176.1** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.177.0** (build 2026-11-17). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.177.0 | GAS-CP-R97-103 | 2026-11-18 | System budget: up to 1024 part lines (was 124) and up to 1024 lines per BOM file (was 400); large tables are sent as one packed field so no line is lost; a form cut by the server limit is refused instead of half saved; unchanged lines are not rewritten. | — |
 | 1.176.1 | GAS-CP-R97-102 | 2026-11-18 | System budget: while the part lines are at procurement for pricing the Parts card says so, shows Take back and no longer offers Save or the delete ticks; an error after saving a section of a page is brought into view instead of staying hidden at the top. | — |
 | 1.176.0 | GAS-CP-R97-101 | 2026-11-18 | Inventory import: downloadable import template; the ERP warehouse export is accepted with its title line above the header; pack units such as 10ΤΜΧ recognised; files limited to 30 000 lines; longer time allowed for large files. | — |
 | 1.175.0 | GAS-CP-R97-100 | 2026-11-18 | Owner's copy also for the monthly sub-project report and the vessel technical history (download and filing; internal versions marked -INT and filed for staff only); System health lists the reports filed for customers before Owner's copies existed, with Make internal. | — |

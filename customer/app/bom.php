@@ -261,7 +261,7 @@ function bom_template_sheets(): array {
             ['Section = panel, area or system the part belongs to. Optional. Note is optional.'],
             ['Where to upload: Projects › sub-project › Procurement › New BOM (or Import on a draft BOM revision), and System Budgets › a budget › Parts › Import BOM parts.'],
             ['After the upload nothing is written: you review every proposed match and Accept, Reject (free-text line) or Create a new inventory item, then Apply.'],
-            ['File type .xlsx. A System Budget reads at most 400 lines per file.']], 'widths' => [140]],
+            ['File type .xlsx. A System Budget reads at most 1024 lines per file.']], 'widths' => [140]],
     ];
 }
 function bom_import_template(): void { require_once __DIR__ . '/xlsxw.php'; xlsx_download('GAS-BOM-import-template.xlsx', bom_template_sheets()); }

@@ -3,7 +3,7 @@
  * System Budgets — GAS-CP-R97-001 (design GAS-2026-PORTAL-DES-001 R0, release 1: core) + import of the GLD-BUD budget working file.
  *
  * A System Budget (SB-YYYY-NNNN) is the internal estimate of a system before the offer: labour lines (section × discipline rows and
- * rate-card rows; normal / travelling / overtime hours, daily allowances), up to 124 part lines (free or from inventory; cost and sale
+ * rate-card rows; normal / travelling / overtime hours, daily allowances), up to 1024 part lines (free or from inventory; cost and sale
  * side by side, margin 40 % on cost by default), other costs (travelling expenses, logistics, pass-through), a rich-text description,
  * comments and a history. Visible to Sales, project managers, management and administrators only — enforced here, not in the menu.
  * New tables only (sb_*): the sub-project budget, offers, tickets, inventory and BOM tables are not touched.
@@ -12,7 +12,9 @@ declare(strict_types=1);
 
 const SB_STATUSES = ['draft', 'working', 'finished', 'converted', 'cancelled'];
 const SB_TONE = ['draft' => 'mute', 'working' => 'gold', 'finished' => 'green', 'converted' => 'navy', 'cancelled' => 'bad'];
-const SB_MAX_PARTS = 124;
+const SB_MAX_PARTS = 1024;   // R97-103 (was 124): large BOMs
+const SB_AI_PARTS = 250;    // part lines sent to the assistant in one request
+const SB_AI_ROWS = 125;     // staged BOM rows the assistant matches per press
 const SB_PRIORITIES = ['urgent', 'high', 'normal', 'low'];   // R97-006 — in the order the team handles them
 const SB_PRIO_TONE = ['urgent' => 'bad', 'high' => 'gold', 'normal' => 'mute', 'low' => 'mute'];
 const SB_EXP_KINDS = ['travel', 'logistics', 'pass', 'permit', 'other'];
@@ -255,6 +257,12 @@ function sb_save_parts_from_post(int $id): int {
         $m = trim((string)($r['margin_pct'] ?? '')) === '' ? null : min(900.0, $f('margin_pct'));
         if (!$pid && trim((string)($r['unit_sale'] ?? '')) !== '' && $m === null && $cost > 0) { $us = $f('unit_sale'); if ($us > 0) $m = round(($us / $cost - 1) * 100, 2); }   // a typed sale price becomes the line's margin
         $vals = [$s('code', 20) ?: null, $descr, $qty, $s('unit', 12) ?: null, $cost, $m, $s('remarks', 500) ?: null];
+        if ($pid) {   // R97-103: with up to 1024 lines, a line that did not change is not written again
+            $o = $own[$pid]; $dNew = sb_disc() && array_key_exists('discount_pct', $r) ? (trim((string)$r['discount_pct']) === '' ? null : (min(100.0, $f('discount_pct')) ?: null)) : false;
+            $same = (string)($o['code'] ?? '') === (string)($vals[0] ?? '') && (string)$o['descr'] === $descr && abs((float)$o['qty'] - $qty) < 0.0005 && (string)($o['unit'] ?? '') === (string)($vals[3] ?? '') && abs((float)$o['unit_cost'] - $cost) < 0.00005 && (($o['margin_pct'] === null) === ($m === null)) && ($m === null || abs((float)$o['margin_pct'] - $m) < 0.005) && (string)($o['remarks'] ?? '') === (string)($vals[6] ?? '') && (int)$o['sort_order'] === ($sort + 1) * 10
+                && ($dNew === false || ((($o['discount_pct'] ?? null) === null || (float)$o['discount_pct'] == 0.0) ? $dNew === null : ($dNew !== null && abs((float)$o['discount_pct'] - $dNew) < 0.005)));
+            if ($same) { $sort++; continue; }
+        }
         if ($pid) { q('UPDATE sb_parts SET code = ?, descr = ?, qty = ?, unit = ?, unit_cost = ?, margin_pct = ?, remarks = ?, sort_order = ? WHERE id = ? AND budget_id = ?', array_merge($vals, [++$sort * 10, $pid, $id])); $rowId = $pid; }
         else { if ($count >= SB_MAX_PARTS) { $over = true; continue; } q('INSERT INTO sb_parts (code, descr, qty, unit, unit_cost, margin_pct, remarks, sort_order, budget_id) VALUES (?,?,?,?,?,?,?,?,?)', array_merge($vals, [9000 + (++$sort), $id])); $rowId = (int) db()->lastInsertId(); $count++; }
         if (sb_disc() && $rowId && array_key_exists('discount_pct', $r)) q('UPDATE sb_parts SET discount_pct = ? WHERE id = ? AND budget_id = ?', [trim((string)$r['discount_pct']) === '' ? null : (min(100.0, $f('discount_pct')) ?: null), $rowId, $id]);
@@ -634,10 +642,10 @@ function sb_match_row(string $code, string $pn, string $maker, array $normMap): 
     return [null, 'none', 0, null];
 }
 function sb_norm_map(): array { $m = []; try { foreach (all("SELECT id, maker, factory_code FROM inv_items WHERE status <> 'blocked' AND factory_code IS NOT NULL AND factory_code <> ''") as $x) { $k = bom_imp_norm((string)$x['factory_code']); if ($k !== '') $m[$k][mb_strtolower((string)$x['maker'])] = (int)$x['id']; } } catch (Throwable $e) {} return $m; }
-/** Ask the assistant to choose among inventory candidates for the staged rows still unmatched (batches of 25, at most 124). Only descriptions, makers, part numbers and units leave the portal. */
+/** Ask the assistant to choose among inventory candidates for the staged rows still unmatched (batches of 25, at most SB_AI_ROWS per press). Only descriptions, makers, part numbers and units leave the portal. */
 function sb_stage_ai(int $id): int {
     if (!sb_ai_on() || !function_exists('bom_imp_candidates')) return 0;
-    $rows = all("SELECT * FROM sb_import_rows WHERE budget_id = ? AND match_kind = 'none' AND decision = 'pending' ORDER BY seq LIMIT " . SB_MAX_PARTS, [$id]); $done = 0;
+    $rows = all("SELECT * FROM sb_import_rows WHERE budget_id = ? AND match_kind = 'none' AND decision = 'pending' ORDER BY seq LIMIT " . SB_AI_ROWS, [$id]); $done = 0;
     foreach (array_chunk($rows, 25) as $chunk) {
         $lines = []; $cands = [];
         foreach ($chunk as $r) {
@@ -674,7 +682,7 @@ function sb_bom_stage(int $id, array $file): array {
         $g = fn(string $k, int $max = 255) => isset($map[$k]) ? mb_substr(trim((string)($r[$map[$k]] ?? '')), 0, $max) : '';
         $desc = $g('description', 400); $code = $g('code', 60); $pn = $g('part_no', 80); $maker = $g('maker', 80); if ($desc === '' && $code === '' && $pn === '') continue;
         [$it, $kind, $conf, $reason] = sb_match_row($code, $pn, $maker, $normMap); if ($desc === '' && $it) $desc = (string)$it['description']; if ($desc === '') continue;
-        if ($seq >= 400) { $st['warn'][] = t('sb.bom_cut', ['n' => 400]); break; }
+        if ($seq >= SB_MAX_PARTS) { $st['warn'][] = t('sb.bom_cut', ['n' => SB_MAX_PARTS]); break; }
         $qty = $num($g('qty')) ?? 1.0; if ($qty <= 0) $qty = 1.0; $price = $num($g('price')); if ($price !== null && $price < 0) $price = null;
         q('INSERT INTO sb_import_rows (budget_id, seq, section, qty, unit, description, maker, part_no, code, note, unit_cost, item_id, match_kind, confidence, reason) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
           [$id, ++$seq, $g('section', 80) ?: null, $qty, $it ? (string)$it['unit'] : (function_exists('stk_unit_norm') ? (stk_unit_norm($g('unit', 12)) ?: 'pcs') : ($g('unit', 12) ?: 'pcs')), $desc, $maker ?: null, $pn ?: null, $code ?: null, $g('note') ?: null, $price, $it ? (int)$it['id'] : null, $kind, $conf, $reason]);
@@ -738,7 +746,7 @@ function sb_ai_description(int $id, string $ask = ''): string {
     $B = sb_load_editable($id); if (!sb_ai_on()) throw new RuntimeException(t('sb.ai_off'));
     $sec = sb_sections(); $L = ['System budget title: ' . $B['title']];
     if ($B['labour']) { $L[] = 'Work packages (code | description | section | hours):'; foreach ($B['labour'] as $l) { $c = sb_labour_calc($B, $l); $L[] = '- ' . trim((string)$l['code']) . ' | ' . $l['descr'] . ' | ' . (string)($sec[(int)$l['section_id']]['name'] ?? ($l['bucket'] ?? '')) . ' | ' . sb_h($c['hours']) . ' h' . ($c['hours'] <= 0 ? ' (excluded / by others)' : '') . ($l['remarks'] ? ' | ' . mb_substr((string)$l['remarks'], 0, 160) : ''); } }
-    if ($B['parts']) { $L[] = 'Parts (code | description | quantity | unit):'; foreach (array_slice($B['parts'], 0, SB_MAX_PARTS) as $p) $L[] = '- ' . trim((string)$p['code']) . ' | ' . $p['descr'] . ' | ' . sb_h((float)$p['qty']) . ' | ' . (string)$p['unit'] . (sb_part_excluded($p) ? ' | EXCLUDED' : ''); }
+    if ($B['parts']) { $L[] = 'Parts (code | description | quantity | unit):'; foreach (array_slice($B['parts'], 0, SB_AI_PARTS) as $p) $L[] = '- ' . trim((string)$p['code']) . ' | ' . $p['descr'] . ' | ' . sb_h((float)$p['qty']) . ' | ' . (string)$p['unit'] . (sb_part_excluded($p) ? ' | EXCLUDED' : ''); if (count($B['parts']) > SB_AI_PARTS) $L[] = '(… and ' . (count($B['parts']) - SB_AI_PARTS) . ' more part lines not listed)'; }
     if ($B['expenses']) $L[] = 'Other cost headings: ' . implode(', ', array_unique(array_map(fn($x) => (string)$x['descr'], $B['expenses'])));
     if (trim((string)$B['description']) !== '') $L[] = "Existing description (keep its facts):\n" . mb_substr(rt_plain((string)$B['description']), 0, 3000);
     $prompt = "Write the Description of this internal system budget for the sales department: (1) Scope of supply and works — one short paragraph; (2) Included — bullets grouped engineering / materials / installation / commissioning as applicable; (3) Excluded / by others — from the lines marked excluded or at 0 hours; (4) Assumptions and open points — only what the data supports. "

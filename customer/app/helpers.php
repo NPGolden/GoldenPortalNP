@@ -246,3 +246,26 @@ function vg_slug(string $vessel): string { return $vessel === '' ? '_none' : sub
 /** The toggle button (grouped ⇄ flat) for the page head. */
 function vg_toggle(string $page): string { $on = vg_on($page); $h = '<span class="vg-tools">'; if ($on) $h .= '<button type="button" class="btn btn--ghost btn--sm vg-all" data-vg-all="1" title="' . tt('vg.expand_all') . '">⊞</button><button type="button" class="btn btn--ghost btn--sm vg-all" data-vg-all="0" title="' . tt('vg.collapse_all') . '">⊟</button>'; return $h . '<button type="button" class="btn btn--ghost btn--sm vg-toggle' . ($on ? ' is-on' : '') . '" data-vg-page="' . e($page) . '" title="' . tt('vg.toggle_hint') . '">' . ($on ? '▤ ' . tt('vg.grouped') : '☰ ' . tt('vg.flat')) . '</button></span>'; }
 
+/** R97-103: a form marked data-pack sends its fields as one JSON list (_packed) so that tables with hundreds of lines pass PHP's max_input_vars.
+ *  The list is put back into $_POST exactly as the fields would have arrived. Real fields (_csrf, action, id …) always win. */
+function post_unpack(): void {
+    if (!isset($_POST['_packed']) || !is_string($_POST['_packed'])) return; $raw = $_POST['_packed']; unset($_POST['_packed']);
+    if (strlen($raw) > 8 * 1048576) throw new RuntimeException(t('err.form_too_big'));
+    $pairs = json_decode($raw, true, 4); if (!is_array($pairs) || count($pairs) > 40000) throw new RuntimeException(t('err.form_too_big'));
+    foreach ($pairs as $pr) {
+        if (!is_array($pr) || count($pr) !== 2 || !is_string($pr[0]) || !is_string($pr[1])) continue;
+        if (!preg_match('/^([A-Za-z][A-Za-z0-9_]{0,40})((?:\[[A-Za-z0-9_.-]{0,40}\]){0,3})$/', $pr[0], $m)) continue;
+        $base = $m[1]; if ($base === '_packed' || $base === '_csrf') continue;
+        if ($m[2] === '') { if (!array_key_exists($base, $_POST)) $_POST[$base] = $pr[1]; continue; }
+        if (isset($_POST[$base]) && !is_array($_POST[$base])) continue; if (!isset($_POST[$base])) $_POST[$base] = [];
+        preg_match_all('/\[([^\]]*)\]/', $m[2], $km); $ref = &$_POST[$base]; $ok = true;
+        foreach ($km[1] as $i => $k) {
+            $last = $i === count($km[1]) - 1;
+            if ($k === '') { if (!$last) { $ok = false; break; } $ref[] = $pr[1]; $ok = false; break; }
+            if ($last) { $ref[$k] = $pr[1]; break; }
+            if (!isset($ref[$k]) || !is_array($ref[$k])) $ref[$k] = []; $ref = &$ref[$k];
+        }
+        unset($ref);
+    }
+}
+

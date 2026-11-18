@@ -21,7 +21,7 @@ layout_head(t($isProp ? 'sb.prop_title' : 'sb.bom_title') . ' · ' . sb_label($B
   <div class="stat"><b><?= $nNone ?></b><?= tt('sb.stage_k_none') ?></div>
 </div>
 <?php if (!$isProp && count($rows) > $room): ?><p class="flash flash--warn"><?= e(t('sb.stage_room', ['n' => count($rows), 'r' => max(0, $room), 'm' => SB_MAX_PARTS])) ?></p><?php endif; ?>
-<form method="post" action="<?= $self ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sb_stage_apply"><input type="hidden" name="id" value="<?= $id ?>">
+<form method="post" action="<?= $self ?>" data-lock data-pack><?= csrf_field() ?><input type="hidden" name="action" value="sb_stage_apply"><input type="hidden" name="id" value="<?= $id ?>">
 <div class="card">
   <div class="card-head"><h2><?= tt('sb.stage_rows') ?> <span class="count"><?= count($rows) ?></span></h2><span class="hint"><?= tt($isProp ? 'sb.stage_hint_prop' : 'sb.stage_hint_bom') ?></span></div>
   <div class="table-scroll"><table class="tbl" data-nosort><thead><tr><th>#</th><th style="min-width:240px;"><?= tt($isProp ? 'sb.stage_line' : 'sb.stage_file_row') ?></th><th class="num"><?= tt('sb.qty') ?></th><th class="num"><?= tt('sb.unit_cost') ?></th><th style="min-width:260px;"><?= tt('sb.stage_proposal') ?></th><th><?= tt('sb.stage_how') ?></th><th><?= tt('sb.stage_other') ?></th><th style="min-width:210px;"><?= tt('sb.stage_decision') ?></th></tr></thead><tbody>

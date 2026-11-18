@@ -3011,3 +3011,19 @@ The page on screen stays the internal version for staff.
 **Tests (sandbox) — forms posted**: parts card normal (ticks, Save, three add forms); at procurement (notice, Take back, nothing to post); forced post of a delete while locked refused, line kept; Take back posted, card editable again, delete posted and line gone; in a browser: tick and Save deletes the line; a refused save shows the message in view; other budgets and a revision view open; PHP error log clean. Not confirmed: that the user's budget was at procurement — the screenshot (lines waiting for a cost) points to it.
 
 **Security review**: no new input; the lock was and stays enforced on the server. No proposal.
+
+## §387 v1.177.0 (R97-103) — System budget: 1024 part lines; packed forms
+
+**Limits**: `SB_MAX_PARTS` 124 → 1024 (`app/sb.php`); BOM file for a budget 400 → `SB_MAX_PARTS` lines (`sb_bom_stage()`, text of the template). New `SB_AI_PARTS` = 250 (part lines listed to the assistant in `sb_ai_description()` and the consistency check, with a "… and n more" line) and `SB_AI_ROWS` = 125 (staged rows matched per press). No database change: `sb_parts` has no limit of its own, `sb_revisions.snapshot` is MEDIUMTEXT (1024 lines ≈ 0.4 MB).
+
+**Why a new transport**: PHP accepts `max_input_vars` fields per request (1000 by default). A parts table of 1024 lines posts about 8 000 fields; PHP would silently drop everything after the limit.
+- `data-pack` on a form (`assets/portal.js`, `formdata` event): with 200 or more text fields, all of them except `_csrf`, `action`, `id` are replaced by one field `_packed` = JSON list of [name, value]. Files are not touched. Works for user submits and for `form.submit()` (confirm dialogs).
+- `post_unpack()` (`app/helpers.php`, called in `index.php` after `csrf_check()`): puts the list back into `$_POST`. Rules: at most 8 MB and 40 000 pairs; names `base[k][k][k]` with letters, digits, `_ . -` only, at most three levels; `_csrf` never taken from the list; a real field always wins over a packed one.
+- Guard for every POST (`index.php`): a request that is not packed and carries `max_input_vars` or more values is refused with `err.form_cut` — it was cut by PHP and must not be half saved.
+- Forms marked: Parts of a System Budget, BOM staging (`system_budget_bom`), procurement pricing (`system_budget_proc`).
+
+**Save of part lines** (`sb_save_parts_from_post()`): a line whose values and position did not change is not written.
+
+**Tests (sandbox) — forms posted, in a browser unless noted**: budget with 1023 lines: page 1.4 MB, opens in about 1.4 s; Save lines packed (0.5 MB), all lines kept; second save writes nothing; edit of line 501 and of the last line (quotes, ampersand, Greek), delete of line 3, new line — all correct, order numbers unique; at 1024 no new line offered and add-from-inventory hidden; curl: unpacked form with 1 400 fields refused and nothing saved; malformed `_packed` refused; hand-made `_packed` trying to replace `action`, `id`, `_csrf`, a four-level name and a path-like name — ignored, only the valid fields applied; Excel export 1 024 lines; new revision stored and opened; send to procurement, pricing form with 1 024 lines saved packed; BOM file of 1 100 lines: 1 024 staged, applied until the budget was full; PHP error log clean; page sweep unchanged. Not tested: conversion to an offer with more than 124 part lines listed one by one (the offer editor is not packed), BOM matching time against the full inventory on the live server, the WAF with a 0.5 MB form.
+
+**Security review**: the packed field passes the same CSRF check and the same permission checks as a normal form; it cannot set the CSRF token, cannot override fields that were really posted, accepts only plain names and is size-limited. The new guard closes a silent data-loss case on every large form of the portal. Proposal: mark the offer editor and the engineering BOM editor with `data-pack` as well.

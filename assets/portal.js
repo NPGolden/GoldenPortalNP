@@ -664,3 +664,6 @@ document.addEventListener('change', function (e) { var c = e.target; if (!c.matc
 
 /* R97-102: a form that returns to a section of the page (#parts, #labour …) hid the error message shown at the top — the page now goes to the message */
 (function(){ try { if (!location.hash) return; var show = function(){ try { var f = document.querySelector('#main > .flash--bad'); if (f) f.scrollIntoView({ block: 'center' }); } catch (e) {} }; if (document.readyState === 'complete') setTimeout(show, 150); else window.addEventListener('load', function(){ setTimeout(show, 150); }); } catch (e) {} })();
+
+/* R97-103: data-pack — a form with hundreds of lines sends its text fields as one JSON list (_packed); the server puts them back (post_unpack). Files and _csrf / action / id stay as they are. */
+(function(){ try { document.querySelectorAll('form[data-pack]').forEach(function (f) { f.addEventListener('formdata', function (e) { try { var fd = e.formData, keep = { _csrf: 1, action: 1, id: 1 }, pairs = [], names = {}; fd.forEach(function (v, k) { if (typeof v !== 'string' || keep[k]) return; pairs.push([k, v]); names[k] = 1; }); if (pairs.length < 200) return; Object.keys(names).forEach(function (k) { fd.delete(k); }); fd.set('_packed', JSON.stringify(pairs)); } catch (x) {} }); }); } catch (e) {} })();
