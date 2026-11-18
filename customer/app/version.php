@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.185.2';
+const CP_VERSION = '1.186.0';
 const CP_BUILD   = '2026-11-18';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-121', 'version' => '1.186.0', 'date' => '2026-11-18', 'title' => 'HR › Job descriptions: the company set in one structure, writing with the assistant, approval by Discipline Manager, General Manager and CEO, revisions, link to employees (My job description, read confirmation) and to vacancies, PDF.', 'db' => 'install/migrate_cp_r97_121_job_descriptions.sql', 'check' => 'r98m'],
         ['ref' => 'GAS-CP-R97-120', 'version' => '1.185.2', 'date' => '2026-11-18', 'title' => 'Quality: financial data is closed for every Quality position (QA, QC, quality or HSE in the staff role or the discipline, and members of the QHSE team); Quality keeps the Milestones and the Safety log of every project, from the QHSE menu.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-119', 'version' => '1.185.1', 'date' => '2026-11-18', 'title' => 'Sessions: an open page leaves the screen for the sign-in page as soon as the idle time has run out (it used to stay readable until the next click).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-118', 'version' => '1.185.0', 'date' => '2026-11-18', 'title' => 'Payables: supplier statement Excel fixed and now also as PDF with e-mail to the supplier; a supplier proforma can be registered and prepaid and the sales invoice assigned to it later. Inventory: an item can be left out of the valuation.', 'db' => 'install/migrate_cp_r97_118_si_proforma.sql', 'check' => 'r98l'],
@@ -565,6 +566,7 @@ function cp_migration_state(): array {
         'r97p' => $has("SHOW TABLES LIKE 'nl_issues'"),
         'r97q' => $has("SHOW TABLES LIKE 'nl_lists'"),
         'r97r' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'proc_state'") && $has("SHOW COLUMNS FROM sb_parts LIKE 'proc_at'"),
+        'r98m' => $has("SHOW TABLES LIKE 'hr_jds'"),
         'r98l' => $has("SHOW COLUMNS FROM si_invoices LIKE 'is_proforma'"),
         'r98k' => $has("SHOW TABLES LIKE 'work_permit_people'"),
         'r98j' => $has("SHOW COLUMNS FROM po_orders LIKE 'purpose'"),

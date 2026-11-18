@@ -13,6 +13,19 @@ layout_head(($v['title'] ?? t('rc.new_vacancy')), 'rcr_dashboard');
 <?php /* R92-001: assistant draft — kept in the session, merged into the form values, nothing saved until Save */
 $aiOn = function_exists('ai_can') && ai_can('rcr_vacancy'); $aiD = $aiOn ? ($_SESSION['rc_vac_ai'][$id] ?? null) : null; $aiM = $aiOn ? ($_SESSION['rc_vac_ai_msg'] ?? null) : null; unset($_SESSION['rc_vac_ai_msg']);
 if ($aiD) { $v = (array)$v; foreach ($aiD['fields'] as $k => $val) { if ($k === 'requirements') $v[$k] = json_encode(array_values(array_filter(array_map('trim', explode("\n", (string)$val)), 'strlen'))); elseif ($k === 'tags') $v[$k] = json_encode(array_values(array_filter(array_map('trim', explode(',', (string)$val)), 'strlen'))); else $v[$k] = $val; } }
+/* R97-121: texts taken from an approved job description — kept in the session like the assistant draft, saved only with the vacancy */
+$jdOn = function_exists('jd_has') && jd_has(); $jdP = $jdOn ? ($_SESSION['rc_vac_jd'][$id] ?? null) : null;
+if ($jdP) { $v = (array)$v; foreach ($jdP['fields'] as $k => $val) { if ($val === '') continue; if ($k === 'requirements') $v[$k] = json_encode(array_values(array_filter(array_map('trim', explode("\n", (string)$val)), 'strlen'))); else $v[$k] = $val; } $v['jd_id'] = (int)$jdP['jd_id']; }
+if ($jdOn): $jdOpts = jd_options(); ?>
+<div class="card" id="rc-jd"><h2>📄 <?= tt('jd.vac_title') ?></h2><p class="hint"><?= tt('jd.vac_hint') ?></p>
+  <?php if ($jdP): ?><p class="flash flash--info"><?= e(t('jd.vac_prefilled', ['j' => (string)$jdP['label']])) ?></p><?php endif; ?>
+  <?php if (!$jdOpts): ?><p class="hint"><?= tt('jd.vac_noapproved') ?></p><?php else: ?>
+  <form method="post" class="form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="jd_vacancy"><input type="hidden" name="id" value="<?= $id ?>">
+    <div class="field field--full"><select name="jd_id" required><option value=""></option><?php foreach ($jdOpts as $o): ?><option value="<?= (int)$o['id'] ?>"<?= (int)($v['jd_id'] ?? 0) === (int)$o['id'] ? ' selected' : '' ?>><?= e(jd_option_label($o)) ?></option><?php endforeach; ?></select></div>
+    <div class="btn-row"><button class="btn btn--ghost btn--sm" type="submit"><?= tt('jd.vac_take') ?></button></div>
+  </form><?php endif; ?>
+</div>
+<?php endif;
 if ($aiOn): ?>
 <div class="card" id="rc-ai"><h2>✨ <?= tt('rc.ai_title') ?></h2><p class="hint"><?= tt('rc.ai_hint') ?></p>
   <?php if ($aiM && $aiM['err'] !== ''): ?><p class="flash flash--bad"><?= e($aiM['err']) ?></p><?php elseif ($aiM && $aiM['a'] !== ''): ?><p class="flash flash--good"><?= e($aiM['a']) ?></p><?php endif; ?>
@@ -26,7 +39,7 @@ if ($aiOn): ?>
   <?php if ($aiD): ?><form method="post" style="display:inline"><?= csrf_field() ?><input type="hidden" name="action" value="rcr_vacancy_ai_clear"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost"><?= tt('rc.ai_discard') ?></button></form><?php endif; ?>
 </div>
 <?php endif; ?>
-<form method="post" class="card form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="rcr_vacancy_save"><input type="hidden" name="id" value="<?= $id ?>">
+<form method="post" class="card form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="rcr_vacancy_save"><input type="hidden" name="id" value="<?= $id ?>"><?php if (!empty($jdOn)): ?><input type="hidden" name="jd_id" value="<?= (int)($v['jd_id'] ?? 0) ?>"><?php endif; ?>
   <div class="field"><label><?= tt('rc.code') ?></label><input value="<?= e($v['code'] ?? rcr_code('VAC', 'rc_vacancies')) ?>" readonly class="mono" title="<?= e(t('rc.code_auto')) ?>"><p class="hint"><?= tt('rc.code_auto') ?></p></div>
   <div class="field"><label><?= tt('rc.job_title') ?> *</label><input name="title" required maxlength="190" value="<?= e((string)($v['title'] ?? '')) ?>"></div>
   <div class="field"><label><?= tt('hr.department') ?></label><select name="department_id"><option value=""></option><?php foreach ($depts as $d): ?><option value="<?= (int)$d['id'] ?>"<?= (int)($v['department_id'] ?? 0) === (int)$d['id'] ? ' selected' : '' ?>><?= e($d['name']) ?></option><?php endforeach; ?></select></div>
@@ -48,6 +61,7 @@ if ($aiOn): ?>
 <?php else: $apps = rcr_applications(['vacancy_id' => $id]); $st = fn(string $s) => pill(in_array($s, ['open', 'hired', 'offer'], true) ? 'gold' : (in_array($s, ['rejected', 'closed', 'withdrawn'], true) ? 'grey' : 'navy'), t('rc.st_' . $s)); ?>
 <div class="page-head"><div><h1><?= e($v['title']) ?></h1><p class="lede" style="margin-bottom:0;"><?= e($v['code']) ?> · <?= $st($v['status']) ?><?= $v['publish_web'] ? ' 🌐' : '' ?> · <?= e((string)$v['department']) ?> · <?= e((string)$v['branch']) ?> · <?= e((string)$v['location']) ?> · <?= tt('rc.' . $v['emp_type']) ?> · <?= tt('rc.' . $v['seniority']) ?><?= $v['closes_at'] ? ' · ' . tt('rc.closes') . ' ' . e(fmt_date($v['closes_at'])) : '' ?></p></div>
 <?php if (rcr_can()): ?><div class="btn-row"><a class="btn btn--ghost" href="<?= url('rcr_vacancy', ['id' => $id, 'edit' => 1]) ?>"><?= tt('btn.edit') ?></a></div><?php endif; ?></div>
+<?php if (function_exists('jd_has') && jd_has() && !empty($v['jd_id']) && ($vjd = jd_load((int)$v['jd_id'])) && jd_can_view($vjd)): ?><p class="hint" style="margin:-4px 0 10px;">📄 <?= tt('jd.one') ?>: <a href="<?= url('hr_jd', ['id' => (int)$vjd['id']]) ?>"><?= e($vjd['code'] . ' · ' . $vjd['title'] . ' · ' . jd_rev($vjd)) ?></a> <?= jd_state_pill((string)$vjd['status']) ?> · <a href="<?= url('hr_jd', ['id' => (int)$vjd['id'], 'format' => 'pdf']) ?>" target="_blank" rel="noopener">⤓ PDF</a></p><?php endif; ?>
 <div class="cols" style="grid-template-columns:2fr 1fr;"><div>
 <?php if (rcr_eval_has() && $apps): $rk = rcr_vacancy_ranking($id); ?><div class="card"><h2>🏁 <?= tt('rc.ev_ranking') ?></h2><p class="hint"><?= tt('rc.ev_ranking_hint') ?></p>
 <div class="table-scroll"><table class="tbl"><thead><tr><th>#</th><th><?= tt('rc.candidate') ?></th><th><?= tt('rc.screening') ?></th><th class="num"><?= tt('rc.ev_title') ?></th><th><?= tt('rc.ev_reco') ?></th><th><?= tt('th.status') ?></th></tr></thead><tbody>

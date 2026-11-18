@@ -105,6 +105,17 @@ $pend = count(array_filter(hr_requests_for('hr', 0), fn($r) => (int)$r['person_i
 </div>
 
 <?php endif; if ($tab === 'emp'): ?>
+<?php if (function_exists('jd_has') && jd_has() && jd_manage()): $pjd = (int)($p['jd_id'] ?? 0); $jdo = jd_options(); $pj = $pjd ? jd_load($pjd) : null; $pc = $pj ? jd_current($pj) : null; $pdisc = (int)($p['department_id'] ?? 0) ?: (int)($p['discipline_id'] ?? 0);
+  usort($jdo, fn($a, $b) => [(int)((int)$a['discipline_id'] !== $pdisc), $a['title']] <=> [(int)((int)$b['discipline_id'] !== $pdisc), $b['title']]); ?>
+<div class="card" id="hr-jd">
+  <h2>📄 <?= tt('jd.one') ?></h2>
+  <?php if ($pj): ?><p><a href="<?= url('hr_jd', ['id' => $pjd]) ?>"><b><?= e($pj['code'] . ' · ' . $pj['title']) ?></b></a> <?= jd_state_pill((string)$pj['status']) ?><?php if ($pc): ?> · <a href="<?= url('hr_jd', ['id' => $pjd, 'format' => 'pdf', 'person' => (int)$p['id']]) ?>" target="_blank" rel="noopener">⤓ PDF</a><?php $pa = one('SELECT acked_at FROM hr_jd_acks WHERE jd_id = ? AND person_id = ? AND rev = ?', [$pjd, (int)$p['id'], (int)$pc['rev']]); ?> · <span class="hint"><?= $pa ? e(t('jd.ack_done', ['d' => fmt_date(substr((string)$pa['acked_at'], 0, 10)), 'r' => 'R' . (int)$pc['rev']])) : tt('jd.unread') ?></span><?php endif; ?></p><?php endif; ?>
+  <form method="post" class="form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="jd_person"><input type="hidden" name="person_id" value="<?= (int)$p['id'] ?>">
+    <div class="field field--full"><label><?= tt('jd.person_pick') ?></label><select name="jd_id"><option value="0">—</option><?php foreach ($jdo as $o): ?><option value="<?= (int)$o['id'] ?>"<?= $pjd === (int)$o['id'] ? ' selected' : '' ?>><?= (int)$o['discipline_id'] === $pdisc && $pdisc ? '★ ' : '' ?><?= e(jd_option_label($o)) ?></option><?php endforeach; ?></select><p class="hint"><?= tt('jd.person_hint') ?></p></div>
+    <div class="btn-row"><button class="btn btn--sm" type="submit"><?= tt('btn.save') ?></button></div>
+  </form>
+</div>
+<?php endif; ?>
 <div class="card" id="hr-emp">
   <h2><?= tt('hr.employments') ?></h2>
   <p class="hint"><?= tt('hr.employments_hint') ?></p>
