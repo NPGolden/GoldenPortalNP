@@ -218,7 +218,10 @@ function stk_price_proposal(array $item, ?int $supplierId = null): array {
     $R = stk_rule_for((int)($item['category_id'] ?? 0) ?: null, $supplierId); $rule = $R['rule']; $n = $R['n'];
     $rows = all("SELECT p.*, co.name AS supplier FROM inv_prices p LEFT JOIN companies co ON co.id = p.supplier_id WHERE p.item_id = ? AND p.source <> 'rollup' ORDER BY p.priced_at DESC, p.id DESC LIMIT 10", [(int)$item['id']]);
     $out = ['price' => null, 'origin' => t('stk.rule_none'), 'n' => count($rows), 'age' => null, 'rule' => $rule, 'from' => $R['from'], 'currency' => $item['currency'] ?? 'EUR'];
-    if (!$rows) return $out;
+    if (!$rows) {   // R97-116: no price history line, but the item card carries a last price (older imports) — propose that one
+        if (($item['last_price'] ?? null) !== null && (float)$item['last_price'] > 0) { $out['price'] = (float)$item['last_price']; $out['origin'] = t('stk.rule_card') . (!empty($item['last_price_at']) ? ' · ' . fmt_date($item['last_price_at']) : ''); if (!empty($item['last_price_at'])) $out['age'] = (int) floor((time() - strtotime((string)$item['last_price_at'])) / 86400); }
+        return $out;
+    }
     $age = (int) floor((time() - strtotime($rows[0]['priced_at'])) / 86400); $out['age'] = $age;
     $lab = fn(array $r) => fmt_date($r['priced_at']) . ($r['supplier'] ? ' · ' . $r['supplier'] : '') . ($r['note'] && $r['source'] !== 'receipt' ? ' · ' . $r['note'] : '');
     $take = fn(int $k) => array_slice($rows, 0, max(1, min($k, count($rows))));

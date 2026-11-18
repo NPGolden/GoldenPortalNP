@@ -3198,3 +3198,23 @@ The page on screen stays the internal version for staff.
 **Not tested**: the live inventory (3 860 items) — in particular an item marked Obsolete is still not offered by the picker, by design.
 
 **Security review**: the endpoint keeps its access rule (staff with requisition or offer-builder rights), the text is bound as a parameter, the result stays limited (20 + at most 5 exact). One more indexed query per search (code is unique-indexed); no proposal.
+
+## §400 v1.184.2 (R97-116) — Price proposed when an item is picked on a purchase order
+
+**Reported**: for parts that have a price, the last price from the inventory is not proposed.
+
+**Found**
+1. On the purchase order form `choose()` emptied the price field; `stk_price_proposal()` was applied only in `po_line_save_from_post()` when the field was left empty. The proposal was therefore invisible until after saving.
+2. `stk_price_proposal()` reads `inv_prices` only. An item with `inv_items.last_price` set and no history line returned no price (the offer builder already fell back to the card price; orders and requisitions did not).
+
+**Change**
+- `stk_price_proposal()` (`app/inv.php`): with no history line and a card price above zero → that price, origin `stk.rule_card` with its date.
+- `views/prq_items.php`: `?p=prq_items&price_of=<item>&supplier=<id>` returns `{price, origin, cur, age}`; `{}` unless `stk_price_visible()`.
+- `views/purchase_order.php`: on `choose()` of an order (not an RFQ) one request; the field is filled if still empty and the same item is still picked; origin under the field (`#lf-price-h`, key `po.price_prop`).
+- `po_line_save_from_post()`: a posted price equal to the proposal keeps the origin of the proposal; another figure is "typed" as before.
+
+**Tests (sandbox) — forms posted**: item with card price only (100 → proposed, saved with origin "Last price on the item card"); item with history (49.9, origin with date); same item with the figure changed (saved as typed); item without any price (field empty, nothing under it); endpoint as administrator and as a project manager. Error log clean.
+
+**Not tested**: the live inventory and the pricing rules set there (mean / lowest / same supplier); an account without the right to see prices was not available in the sandbox — the rule is the existing `stk_price_visible()`.
+
+**Security review**: the new answer gives one price only to accounts that already see buying prices in the same picker; item id and supplier id are cast to integers; no price is added for other roles. No proposal.
