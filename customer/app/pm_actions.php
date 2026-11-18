@@ -473,6 +473,7 @@ function pm_handle_action(string $action, string $page): bool {
             $me = (string)(current_user()['email'] ?? ''); $eml = em_build($me !== '' ? [$me] : ['test@example.com'], [], $tx['subject'] ?: t('et.k_' . $k), $tx['body'], []);
             header('Content-Type: message/rfc822'); header('Content-Length: ' . strlen($eml)); header('Content-Disposition: attachment; filename="template-test.eml"'); echo $eml; exit;
         }           // R31-008: .eml draft with attachments
+        case 'ar_old_hide': { $n = ar_old_reports_hide(!empty($_POST['all']) ? null : array_map('intval', (array)($_POST['ids'] ?? []))); flash('good', t('ar.old_done', ['n' => $n])); redirect('admin_health', ['_r' => uniqid()], '#ar-old'); }   // R97-100
         case 'doc_issue': {                                   // archive a portal-generated document as the next revision
             require_staff();
             if (!ar_has()) throw new RuntimeException(t('ar.need_r20'));
@@ -487,16 +488,18 @@ function pm_handle_action(string $action, string $page): bool {
                 $files = [[wk_render_pdf($W), 'pdf', 'application/pdf'], [wk_render_docx($W), 'docx', $docxMime]];
                 $backPage = 'weekly_vessel'; $backParams = array_filter(['vessel' => $vid, 'project' => $pid0, 'week' => $ws]);
             } elseif ($kind === 'monthly') {
+                $wkInt = ($_POST['copy'] ?? 'owner') === 'internal'; wk_as_owner(!$wkInt);   // R97-100
                 $sid = (int)$_POST['id']; $D = rp_sp_data($sid); if (!$D) throw new RuntimeException(t('err.notfound'));
-                $docNo = $D['docNo']; $pid = (int)$D['sp']['project_id'];
-                $files = [[rp_sp_docx($D), 'docx', $docxMime]];
+                $docNo = $D['docNo'] . ($wkInt ? '-INT' : ''); $pid = (int)$D['sp']['project_id'];
+                $files = [[rp_sp_docx($D), 'docx', $docxMime]]; wk_as_owner(false);
                 $backPage = 'subproject'; $backParams = ['id' => $sid, 'tab' => 'reports'];
             } elseif ($kind === 'vessel') {
                 $vid = (int)$_POST['id']; $pid0 = (int)($_POST['project'] ?? 0) ?: null;
+                $wkInt = ($_POST['copy'] ?? 'owner') === 'internal'; wk_as_owner(!$wkInt);   // R97-100
                 $h = vessel_history($vid, $pid0); if (!$h) throw new RuntimeException(t('err.notfound'));
-                $docNo = vh_doc_no($h['vessel'], $h['only_project'] ?? null);
+                $docNo = vh_doc_no($h['vessel'], $h['only_project'] ?? null) . ($wkInt ? '-INT' : '');
                 $pid = (int)($h['only_project']['id'] ?? 0) ?: ar_vessel_project($vid);
-                $files = [[vh_render_pdf($h), 'pdf', 'application/pdf'], [vh_render_docx($h), 'docx', $docxMime]];
+                $files = [[vh_render_pdf($h), 'pdf', 'application/pdf'], [vh_render_docx($h), 'docx', $docxMime]]; wk_as_owner(false);
                 $backPage = 'vessel'; $backParams = array_filter(['id' => $vid, 'project' => $pid0]);
             } elseif ($kind === 'timesheet') {
                 $pid = (int)($_POST['project'] ?? 0); if (!$pid) throw new RuntimeException(t('ar.need_project'));

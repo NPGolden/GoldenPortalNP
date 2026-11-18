@@ -2969,3 +2969,17 @@ The page on screen stays the internal version for staff.
 **Not changed**: revisions of weekly reports filed before this release are the internal version and remain visible to customers — see the proposal.
 
 **Security review — proposals** (no cost in speed): (1) list the weekly-report revisions filed before v1.174.0 so that the ones containing internal notes can be withdrawn or re-filed as Owner's copy; (2) the same Owner's copy choice for the monthly sub-project report and the vessel technical history, which are built the same way.
+
+## §384 v1.175.0 (R97-100) — Owner's copy for the monthly report and the vessel history; reports filed earlier
+
+**Requests**: "Do the same also for the monthly report if not the same and the vessel history report" and "apply also the cybersecurity proposals of yours" (§383: the list of reports filed before Owner's copies; the same choice for the other two reports).
+
+**Finding**: both reports had the same exposure as the weekly one. The monthly report takes its notes and comments through `vis_sql()` and its open issues through `iss_vis_sql()`; the vessel history decides with `is_staff()` (drafts, timesheet hours, internal issues). Filed by staff as external documents, they carried the internal content.
+
+**Change**: `staff_view()` (`app/pm.php`) = staff and not building an Owner's copy; `vis_sql()`, `vessel_history()`, `vh_report_tables()` and the scope label of the history use it; `iss_vis_sql()` already followed `wk_as_owner()`. `views/report_sp.php` and `views/report_vessel.php` take `copy=owner` (staff) and switch the mode for the request; internal files get -INT in their name. `doc_issue` for kinds monthly and vessel builds the Owner's copy unless Internal copy is chosen (then number-INT, visibility internal). Buttons and the select on `views/subproject.php` (Reports tab) and `views/vessel_view.php`.
+
+**Reports filed earlier** (`ar_old_reports()`, `ar_old_reports_hide()`, action `ar_old_hide`, card on `views/admin_health.php`; administrators and management): issued files with visibility external, document number containing -WR-, -PR- or -VH-, created before the moment this list was first opened (setting `owner_copy_from`). Per revision: open the files, Make internal (visibility → internal; staff keep it, the customer no longer sees it); Make all internal. Each use writes a line to the PHP log (who, how many).
+
+**Tests (sandbox) — forms posted**: monthly Word and print view, vessel history PDF: internal version has the internal note / issue and the label Internal, the Owner's copy only the external ones and the label Owner's copy; file names; filing Owner's and Internal copies of both with the right visibility; the filed Owner's monthly file re-read; card lists the earlier revisions by kind; Make internal for one and for all; refused for an account without the right; no PHP errors. Not tested: the reports opened by a customer account (unchanged path).
+
+**Security review**: the three customer-facing reports now have one rule and one switch. No further proposal; open point for the user — go through the list in System health.

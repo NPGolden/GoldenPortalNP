@@ -38,8 +38,10 @@ function scope_sql(string $alias = 'p'): array {
 
 /** Visibility filter for comments / notes / files: customers only ever
  *  see 'external'; staff see both. */
+/** R97-100: staff, and not building the owner's copy of a report right now. Content that is internal is decided with this, not with is_staff(). */
+function staff_view(): bool { return is_staff() && !(function_exists('wk_as_owner') && wk_as_owner()); }
 function vis_sql(string $col = 'visibility'): array {
-    return is_staff() ? ['1 = 1', []] : ["{$col} = 'external'", []];
+    return staff_view() ? ['1 = 1', []] : ["{$col} = 'external'", []];
 }
 
 /** Breadcrumb link to a project on the project list (opened and scrolled to).   R24-002 */

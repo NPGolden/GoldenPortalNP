@@ -367,3 +367,25 @@ function ar_issued_html(string $docNo, int $pid, array $issueParams, string $bac
         $h .= '</tbody></table>'; }
     return $h . '</div>';
 }
+
+/* ------------------------------------------------------------ R97-100 — reports filed before the Owner's copy existed */
+/** Weekly, monthly and vessel-history reports filed as external documents before Owner's copies were introduced: built under a staff account, so they may hold internal notes. */
+function ar_old_reports(): array {
+    if (!ar_has() || !(is_cp_admin() || (function_exists('mgmt_can') && mgmt_can()))) return [];
+    $cut = (string) cp_setting('owner_copy_from', ''); if ($cut === '') { $cut = date('Y-m-d H:i:s'); cp_setting_set('owner_copy_from', $cut); }
+    $out = [];
+    foreach (all("SELECT f.id, f.doc_no, f.revision, f.created_at, f.project_id, f.stored_name, p.project_code, p.name AS project_name, u.full_name AS issued_by FROM sp_files f JOIN projects p ON p.id = f.project_id LEFT JOIN customer_users u ON u.id = f.uploaded_by
+                  WHERE f.kind = 'issued' AND f.visibility = 'external' AND f.created_at < ? AND (f.doc_no LIKE '%-WR-%' OR f.doc_no LIKE '%-PR-%' OR f.doc_no LIKE '%-VH-%') AND f.doc_no NOT LIKE '%-INT' ORDER BY f.created_at DESC, f.id DESC LIMIT 600", [$cut]) as $f) {
+        $k = $f['project_id'] . '|' . $f['doc_no'] . '|' . $f['revision']; $out[$k] ??= ['doc_no' => $f['doc_no'], 'revision' => $f['revision'], 'at' => $f['created_at'], 'by' => $f['issued_by'], 'project' => trim((string)$f['project_code'] . ' ' . (string)$f['project_name']), 'kind' => str_contains($f['doc_no'], '-WR-') ? 'weekly' : (str_contains($f['doc_no'], '-PR-') ? 'monthly' : 'vessel'), 'ids' => [], 'files' => []];
+        $out[$k]['ids'][] = (int)$f['id']; $out[$k]['files'][strtolower(pathinfo((string)$f['stored_name'], PATHINFO_EXTENSION))] = (int)$f['id'];
+    }
+    return array_values($out);
+}
+/** Take such revisions away from the customer: they become internal documents (staff keep them). null = all of the list. Returns the number of files changed. */
+function ar_old_reports_hide(?array $ids): int {
+    if (!(is_cp_admin() || (function_exists('mgmt_can') && mgmt_can()))) throw new RuntimeException(t('err.noaccess'));
+    $ok = []; foreach (ar_old_reports() as $r) foreach ($r['ids'] as $i) $ok[] = $i; $ids = $ids === null ? $ok : array_values(array_intersect($ids, $ok)); if (!$ids) return 0;
+    $n = q("UPDATE sp_files SET visibility = 'internal' WHERE kind = 'issued' AND id IN (" . implode(',', array_map('intval', $ids)) . ')')->rowCount();
+    error_log('[ar_old] ' . $n . ' issued report file(s) made internal by user ' . (int)(current_user()['id'] ?? 0));
+    return $n;
+}

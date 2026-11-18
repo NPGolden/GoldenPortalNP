@@ -23,6 +23,17 @@ layout_head(t('ph.title'), 'admin_health');
   $ser = []; foreach ($T as $day => $d) { $r = $pg !== '' ? ($d['pages'][$pg] ?? null) : $d['all']; $ser[$day] = $r ?: ['n' => 0, 'p50' => 0, 'p95' => 0, 'max' => 0, 'q' => 0, 'db' => 0]; }
   $pagesAgg = []; foreach (array_slice($T, -7, null, true) as $d) foreach ($d['pages'] as $k => $r) { $b = &$pagesAgg[$k]; $b = $b ?? ['n' => 0, 'w50' => 0, 'p95' => 0, 'max' => 0, 'q' => 0]; $b['n'] += $r['n']; $b['w50'] += $r['p50'] * $r['n']; $b['p95'] = max($b['p95'], $r['p95']); $b['max'] = max($b['max'], $r['max']); $b['q'] = max($b['q'], $r['q']); unset($b); }
   uasort($pagesAgg, fn($a, $b) => $b['w50'] <=> $a['w50']); ?>
+<?php $arOld = function_exists('ar_old_reports') ? ar_old_reports() : []; if ($arOld): /* R97-100 */ ?>
+<div class="card" id="ar-old" style="border-left:4px solid var(--red, #b3261e);">
+  <div class="card-head"><h2>⚠ <?= tt('ar.old_h') ?> <span class="count"><?= count($arOld) ?></span></h2>
+    <form method="post" action="<?= url('admin_health') ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="ar_old_hide"><input type="hidden" name="all" value="1"><button class="btn btn--sm" type="submit" data-confirm="<?= e(t('ar.old_q')) ?>"><?= tt('ar.old_all') ?></button></form></div>
+  <p class="hint"><?= tt('ar.old_hint') ?></p>
+  <div class="table-scroll" style="max-height:420px;overflow:auto;"><table class="tbl"><thead><tr><th><?= tt('rp.docno') ?></th><th><?= tt('sub.rev') ?></th><th><?= tt('pr.one') ?></th><th><?= tt('th.date') ?></th><th><?= tt('ar.issued_by') ?></th><th></th></tr></thead><tbody>
+    <?php foreach ($arOld as $r): ?><tr><td class="mono"><?= e($r['doc_no']) ?><br><span class="hint"><?= tt('ar.old_k_' . $r['kind']) ?></span></td><td><?= e($r['revision']) ?></td><td><?= e($r['project']) ?></td><td><?= e(fmt_datetime($r['at'])) ?></td><td><?= e($r['by'] ?: '—') ?></td>
+      <td class="row-actions"><?php foreach ($r['files'] as $ext => $fid): ?><a class="btn btn--ghost btn--sm" href="<?= url('file', ['id' => $fid]) ?>" target="_blank">⤓ <?= strtoupper($ext) ?></a> <?php endforeach; ?><form method="post" action="<?= url('admin_health') ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="ar_old_hide"><?php foreach ($r['ids'] as $i): ?><input type="hidden" name="ids[]" value="<?= $i ?>"><?php endforeach; ?><button class="btn btn--ghost btn--sm" type="submit"><?= tt('ar.old_one') ?></button></form></td></tr><?php endforeach; ?>
+  </tbody></table></div>
+</div>
+<?php endif; ?>
 <div class="card"><div class="card-head"><h2>📈 <?= tt('ph.trend_h') ?><?= $pg !== '' ? ' — ' . e($pg) : '' ?></h2><?php if ($pg !== ''): ?><a class="btn btn--ghost btn--sm" href="<?= url('admin_health', ['tab' => 'trend']) ?>">✕ <?= tt('ph.all_pages') ?></a><?php endif; ?></div>
   <p class="hint" style="margin:0 0 8px;"><?= tt('ph.trend_hint') ?></p>
   <?php $days = array_keys($ser); $nD = count($days); $vals = array_filter(array_merge(array_column($ser, 'p95'), array_column($ser, 'p50')));

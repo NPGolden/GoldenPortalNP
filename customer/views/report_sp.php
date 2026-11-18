@@ -7,6 +7,7 @@
 require __DIR__ . '/_layout.php';
 $u  = require_login();
 $id = (int)($_GET['id'] ?? 0);
+$own = is_staff() && ($_GET['copy'] ?? '') === 'owner'; if ($own) wk_as_owner(true);   // R97-100: the owner's copy, built by staff
 $D = rp_sp_data($id);
 if (!$D) { http_response_code(404); exit(t('err.notfound')); }
 extract($D);
@@ -15,7 +16,7 @@ extract($D);
 if (($_GET['format'] ?? '') === 'docx') {
     $bytes = rp_sp_docx($D);
     header('Content-Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document');
-    header('Content-Disposition: attachment; filename="' . $docNo . '-' . $rev . '.docx"');
+    header('Content-Disposition: attachment; filename="' . $docNo . (is_staff() && !$own ? '-INT' : '') . '-' . $rev . '.docx"');
     header('Content-Length: ' . strlen($bytes));
     echo $bytes; exit;
 }
@@ -27,7 +28,7 @@ layout_head($title, 'projects');
   <p class="eyebrow"><a href="<?= url('subproject', ['id' => $id]) ?>">← <?= e($sp['name']) ?></a></p>
   <div class="actions">
     <button class="btn btn--gold" type="button" data-js-print="1"><?= tt('rp.print') ?></button>
-    <a class="btn" href="<?= url('report_sp', ['id' => $id, 'format' => 'docx']) ?>"><?= tt('rp.word') ?></a>
+    <a class="btn" href="<?= url('report_sp', array_filter(['id' => $id, 'format' => 'docx', 'copy' => $own ? 'owner' : null])) ?>"><?= tt('rp.word') ?></a>
   </div>
 </div>
 <div class="report">

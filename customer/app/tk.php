@@ -285,7 +285,7 @@ function vessel_history(int $vid, ?int $onlyProject = null): ?array {
     [$scope, $args] = tk_scope(); array_unshift($args, $vid);
     $v = one("SELECT v.*, c.name AS customer_name FROM vessels v LEFT JOIN customers c ON c.id = v.customer_id WHERE v.id = ? AND {$scope}", $args);
     if (!$v) return null;
-    $staff = is_staff();
+    $staff = staff_view();   /* R97-100 */
     $h = ['vessel' => $v];
     $h['projects'] = all("SELECT p.*, (SELECT COUNT(*) FROM subprojects s WHERE s.project_id = p.id) AS n_subs FROM projects p WHERE p.vessel_id = ? ORDER BY p.created_at, p.project_code", [$vid]);
     $h['subs'] = all("SELECT s.*, p.project_code, vs.abbr AS system_abbr, vs.name AS system_name FROM subprojects s JOIN projects p ON p.id = s.project_id LEFT JOIN vessel_systems vs ON vs.id = s.system_id

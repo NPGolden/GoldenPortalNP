@@ -531,13 +531,17 @@ layout_head($sp['code'] . ' · ' . $sp['name'], 'projects');
   <h2><?= tt('tab.reports') ?></h2>
   <p><?= tt('rp.lede') ?></p>
   <div class="actions">
-    <a class="btn btn--gold" href="<?= url('report_sp', ['id' => $id]) ?>" target="_blank"><?= tt('rp.pdf') ?></a>
-    <a class="btn" href="<?= url('report_sp', ['id' => $id, 'format' => 'docx']) ?>"><?= tt('rp.word') ?></a>
+    <?php if ($staff): /* R97-100 */ ?><a class="btn btn--gold" href="<?= url('report_sp', ['id' => $id, 'copy' => 'owner']) ?>" target="_blank" title="<?= tt('wv.owner_copy_hint') ?>"><?= tt('wv.owner_copy') ?> · <?= tt('rp.pdf') ?></a>
+    <a class="btn btn--gold" href="<?= url('report_sp', ['id' => $id, 'format' => 'docx', 'copy' => 'owner']) ?>" title="<?= tt('wv.owner_copy_hint') ?>"><?= tt('wv.owner_copy') ?> · <?= tt('rp.word') ?></a>
+    <a class="btn btn--ghost" href="<?= url('report_sp', ['id' => $id]) ?>" target="_blank" title="<?= tt('wv.int_copy_hint') ?>"><?= tt('wv.int_copy') ?> · <?= tt('rp.pdf') ?></a>
+    <a class="btn btn--ghost" href="<?= url('report_sp', ['id' => $id, 'format' => 'docx']) ?>" title="<?= tt('wv.int_copy_hint') ?>"><?= tt('wv.int_copy') ?> · <?= tt('rp.word') ?></a>
+    <?php else: ?><a class="btn btn--gold" href="<?= url('report_sp', ['id' => $id]) ?>" target="_blank"><?= tt('rp.pdf') ?></a>
+    <a class="btn" href="<?= url('report_sp', ['id' => $id, 'format' => 'docx']) ?>"><?= tt('rp.word') ?></a><?php endif; ?>
     <a class="btn btn--ghost" href="<?= url('weekly', ['project' => $pid]) ?>"><?= tt('wk.report') ?></a>
     <a class="btn btn--ghost" href="<?= url('monthly', ['project' => $pid]) ?>"><?= tt('mo.title') ?></a>
     <?php if (is_staff() && function_exists('xs_has') && xs_has()): ?><a class="btn btn--ghost" href="<?= url('project_ms', ['project' => $pid]) ?>">🏁 <?= tt('ms.title') ?></a><?php endif; ?>
   </div>
-  <?php if (ar_has() && $staff) { $D0 = rp_sp_data($id); echo ar_issued_html($D0['docNo'], $pid, ['kind' => 'monthly', 'id' => $id], url('subproject', ['id' => $id, 'tab' => 'reports'])); } ?>
+  <?php if (ar_has() && $staff) { $D0 = rp_sp_data($id); echo ar_issued_html($D0['docNo'], $pid, ['kind' => 'monthly', 'id' => $id], url('subproject', ['id' => $id, 'tab' => 'reports']), '<select name="copy" data-nosearch title="' . tt('wv.copy_hint') . '" style="max-width:230px;margin-right:6px;"><option value="owner">' . tt('wv.copy_owner_opt') . '</option><option value="internal">' . tt('wv.copy_int_opt') . '</option></select>'); $arInt = ar_issued($D0['docNo'] . '-INT', $pid); if ($arInt) { echo '<p class="hint" style="margin:4px 0 10px;">' . tt('wv.int_filed') . ' '; foreach ($arInt as $r) foreach ($r['files'] as $ext => $fid) echo '<a class="btn btn--ghost btn--sm" href="' . url('file', ['id' => $fid]) . '">' . e($r['revision']) . ' ' . strtoupper($ext) . '</a> '; echo '</p>'; } } ?>
   <p class="hint" style="margin-top:12px;"><?= tt('rp.pdf_hint') ?></p>
 </div>
 <?php endif; ?>

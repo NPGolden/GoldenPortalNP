@@ -20,7 +20,7 @@ function vh_sub_pct(array $s): int {
 
 /** Rows for every table, shared by PDF and Word so both documents say the same. */
 function vh_tables(array $h): array {
-    $staff = is_staff(); $T = [];
+    $staff = staff_view(); $T = [];   // R97-100
     $T[] = ['title' => t('vh.t_projects'), 'cols' => [[t('th.code'), 28, 'L'], [t('pr.one'), 62, 'L'], [t('sys.one'), 40, 'L'], [t('th.status'), 24, 'L'], [t('vh.progress'), 26, 'R']],
             'rows' => (function () use ($h) { $o = [];
                 foreach ($h['projects'] as $p) { $o[] = ['b' => true, 'tone' => rc_status($p['status']) ?? 'navy', 'v' => [$p['project_code'] ?: '', $p['name'], '', t('pr.' . $p['status']), '']];
@@ -104,7 +104,7 @@ function vh_render_pdf(array $h): string {
 
     $header(); $footer();
     $kv = [[t('v.one'), $v['name'] . ($v['imo'] ? ' · IMO ' . $v['imo'] : '')], [t('v.customer'), (string)($v['customer_name'] ?: '—')], [t('v.yard'), (string)($v['yard'] ?: '—')],
-           [t('rp.issued'), date('d.m.Y H:i') . ' · ' . (current_user()['full_name'] ?? '')], [t('vh.scope'), (!empty($h['only_project']) ? t('pr.one') . ' ' . ($h['only_project']['project_code'] ?: $h['only_project']['name']) . ' · ' : t('vh.all_projects') . ' · ') . t(is_staff() ? 'vh.scope_internal' : 'vh.scope_external')]];
+           [t('rp.issued'), date('d.m.Y H:i') . ' · ' . (current_user()['full_name'] ?? '')], [t('vh.scope'), (!empty($h['only_project']) ? t('pr.one') . ' ' . ($h['only_project']['project_code'] ?: $h['only_project']['name']) . ' · ' : t('vh.all_projects') . ' · ') . t(staff_view() ? 'vh.scope_internal' : 'vh.scope_external')]];
     foreach ($kv as [$k, $val]) $y += $pdf->kvCell($L, $y, $W, 45, $k, $val, ['minH' => 6, 'line' => $line, 'navy' => $navy, 'ink' => $ink]);   // R59-002: wraps
     $y += 4;
     $s = $h['stats'];
@@ -127,7 +127,7 @@ function vh_render_docx(array $h): string {
     rc_legend_docx($w);
     $kv = fn($l) => ['lines' => [$l], 'b' => true, 'sz' => 8]; $vv = fn($x) => ['text' => (string)$x, 'sz' => 9];
     $w->grid([[$kv(t('v.one')), $vv($v['name'] . ($v['imo'] ? ' · IMO ' . $v['imo'] : ''))], [$kv(t('v.customer')), $vv($v['customer_name'] ?: '—')], [$kv(t('v.yard')), $vv($v['yard'] ?: '—')],
-              [$kv(t('rp.issued')), $vv(date('d.m.Y H:i') . ' · ' . (current_user()['full_name'] ?? ''))], [$kv(t('vh.scope')), $vv((!empty($h['only_project']) ? t('pr.one') . ' ' . ($h['only_project']['project_code'] ?: $h['only_project']['name']) . ' · ' : t('vh.all_projects') . ' · ') . t(is_staff() ? 'vh.scope_internal' : 'vh.scope_external'))]], [2400, 7240], ['border' => '9AA5B1']);
+              [$kv(t('rp.issued')), $vv(date('d.m.Y H:i') . ' · ' . (current_user()['full_name'] ?? ''))], [$kv(t('vh.scope')), $vv((!empty($h['only_project']) ? t('pr.one') . ' ' . ($h['only_project']['project_code'] ?: $h['only_project']['name']) . ' · ' : t('vh.all_projects') . ' · ') . t(staff_view() ? 'vh.scope_internal' : 'vh.scope_external'))]], [2400, 7240], ['border' => '9AA5B1']);
     $s = $h['stats'];
     $tile = fn($lab, $val, $col) => ['lines' => [[(string)$val, ['sz' => 14]], [mb_strtoupper($lab), ['sz' => 6.5, 'b' => false, 'color' => '1F2937']]], 'b' => true, 'color' => $col, 'fill' => $HEAD, 'align' => 'center', 'valign' => 'center'];
     $w->grid([[$tile(t('vh.k_projects'), $s['projects'] . ' / ' . $s['subs'], $NAVY), $tile(t('vh.k_disciplines'), $s['disciplines'], 'C89B3C'), $tile(t('vh.k_technicians'), $s['technicians'], '2F7D5C'),

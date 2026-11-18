@@ -52,8 +52,12 @@ layout_head($v['name'], 'vessels');
       </select>
     </form>
     <a class="btn btn--ghost btn--sm" href="<?= url('weekly_vessel', array_filter(['vessel' => $id, 'project' => $pid])) ?>">📅 <?= tt('wv.title') ?></a>
-    <a class="btn btn--ghost btn--sm" href="<?= url('report_vessel', $rq) ?>" target="_blank">⤓ <?= tt('vh.report_pdf') ?></a>
-    <a class="btn btn--ghost btn--sm" href="<?= url('report_vessel', $rq + ['format' => 'docx']) ?>">⤓ <?= tt('vh.report_docx') ?></a>
+    <?php if (is_staff()): /* R97-100 */ ?><a class="btn btn--gold btn--sm" href="<?= url('report_vessel', $rq + ['copy' => 'owner']) ?>" target="_blank" title="<?= tt('wv.owner_copy_hint') ?>">⤓ <?= tt('wv.owner_copy') ?> PDF</a>
+    <a class="btn btn--gold btn--sm" href="<?= url('report_vessel', $rq + ['format' => 'docx', 'copy' => 'owner']) ?>" title="<?= tt('wv.owner_copy_hint') ?>">⤓ <?= tt('wv.owner_copy') ?> Word</a>
+    <a class="btn btn--ghost btn--sm" href="<?= url('report_vessel', $rq) ?>" target="_blank" title="<?= tt('wv.int_copy_hint') ?>">⤓ <?= tt('wv.int_copy') ?> PDF</a>
+    <a class="btn btn--ghost btn--sm" href="<?= url('report_vessel', $rq + ['format' => 'docx']) ?>" title="<?= tt('wv.int_copy_hint') ?>">⤓ <?= tt('wv.int_copy') ?> Word</a>
+    <?php else: ?><a class="btn btn--ghost btn--sm" href="<?= url('report_vessel', $rq) ?>" target="_blank">⤓ <?= tt('vh.report_pdf') ?></a>
+    <a class="btn btn--ghost btn--sm" href="<?= url('report_vessel', $rq + ['format' => 'docx']) ?>">⤓ <?= tt('vh.report_docx') ?></a><?php endif; ?>
     <a class="btn btn--gold btn--sm" href="<?= url('ticket_edit', array_filter(['vessel' => $id, 'project' => $pid])) ?>">+ <?= tt('tk.new') ?></a>
     <?php if ($staff): ?><a class="btn btn--gold btn--sm" href="<?= url('fsr_edit', array_filter(['vessel' => $id, 'project' => $pid])) ?>" title="<?= tt('fsr.service_call_hint') ?>">+ <?= tt('fsr.one') ?></a><?php if (function_exists('fsr_ext_has') && fsr_ext_has()): ?><a class="btn btn--ghost btn--sm" href="<?= url('fsr_ext', array_filter(['vessel' => $id, 'project' => $pid])) ?>">📎 <?= tt('fsr.ext_new') ?></a><?php endif; ?><?php endif; ?>
     <?php if ($staff): ?><a class="btn btn--ghost btn--sm" href="<?= url('vessel_edit', ['id' => $id]) ?>">✎ <?= tt('btn.edit') ?></a><?php endif; ?>
@@ -235,7 +239,7 @@ layout_head($v['name'], 'vessels');
   <?php endif; ?>
 </div>
 <?php endif; ?>
-<?php if (ar_has() && $staff && !in_array($tab, ['equipment', 'invoicing', 'documents'], true)) { $arPid = (int)($h['only_project']['id'] ?? 0) ?: ar_vessel_project($id); if ($arPid) echo ar_issued_html(vh_doc_no($h['vessel'], $h['only_project'] ?? null), $arPid, ['kind' => 'vessel', 'id' => $id, 'project' => $pid], url('vessel', $rq)); } ?>
+<?php if (ar_has() && $staff && !in_array($tab, ['equipment', 'invoicing', 'documents'], true)) { $arPid = (int)($h['only_project']['id'] ?? 0) ?: ar_vessel_project($id); if ($arPid) { echo ar_issued_html(vh_doc_no($h['vessel'], $h['only_project'] ?? null), $arPid, ['kind' => 'vessel', 'id' => $id, 'project' => $pid], url('vessel', $rq), '<select name="copy" data-nosearch title="' . tt('wv.copy_hint') . '" style="max-width:230px;margin-right:6px;"><option value="owner">' . tt('wv.copy_owner_opt') . '</option><option value="internal">' . tt('wv.copy_int_opt') . '</option></select>'); $arInt = ar_issued(vh_doc_no($h['vessel'], $h['only_project'] ?? null) . '-INT', $arPid); if ($arInt) { echo '<p class="hint" style="margin:4px 0 10px;">' . tt('wv.int_filed') . ' '; foreach ($arInt as $r) foreach ($r['files'] as $ext => $fid) echo '<a class="btn btn--ghost btn--sm" href="' . url('file', ['id' => $fid]) . '">' . e($r['revision']) . ' ' . strtoupper($ext) . '</a> '; echo '</p>'; } } } ?>
 <?php if ($tab === 'invoicing' && $staff && function_exists('iv_vessel_has') && iv_vessel_has() && fin_visible()): ?>
 <div class="card"><p class="hint" style="margin-top:0;"><?= tt('iv.vessel_lede') ?></p><?php iv_section('vessel', $id, url('vessel', ['id' => $id, 'tab' => 'invoicing']), (int)($_GET['iv'] ?? 0)); ?></div>
 <?php endif; ?>

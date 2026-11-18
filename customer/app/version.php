@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.174.0';
+const CP_VERSION = '1.175.0';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-100', 'version' => '1.175.0', 'date' => '2026-11-18', 'title' => 'Owner\'s copy also for the monthly sub-project report and the vessel technical history (download and filing; internal versions marked -INT and filed for staff only); System health lists the reports filed for customers before Owner\'s copies existed, with Make internal.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-099', 'version' => '1.174.0', 'date' => '2026-11-18', 'title' => 'Weekly vessel report: Owner\'s copy for staff — download, e-mail attachment (ticked by default) and filing produce the report exactly as the owner sees it; the internal version is marked -INT and is filed for staff only.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-098', 'version' => '1.173.0', 'date' => '2026-11-18', 'title' => 'Risk log: a risk is internal unless it is ticked Show in the weekly report; the weekly vessel report prints the ticked risks with mitigation, score, owner, due date, status and the counts of the week.', 'db' => 'install/migrate_cp_r97_098_risk_visibility.sql', 'check' => 'r98g'],
         ['ref' => 'GAS-CP-R97-097', 'version' => '1.172.0', 'date' => '2026-11-18', 'title' => 'Procurement: an approved BOM of a sub-project is converted into draft purchase orders, one per supplier, with what is still to buy; the BOM lists its orders and no line is ordered twice.', 'db' => null, 'check' => null],
