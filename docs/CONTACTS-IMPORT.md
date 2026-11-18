@@ -3133,3 +3133,17 @@ The page on screen stays the internal version for staff.
 **Tests (sandbox)**: one budget waiting and one priced — each tab, an invalid value (falls back to waiting), nothing waiting; PHP error log clean; page sweep.
 
 **Security review**: read-only filter on a page that already checks `sbp_require()`. No proposal.
+
+## §395 v1.183.0 (R97-111) — New item code = prefix.<maker part number>
+
+**Rule stated by Nikos**: a new inventory item is always coded prefix.[maker code]; the import and the proposals must show the maker code and the code to create.
+
+**Engine** (`app/inv.php`): `stk_maker_prefixes()` — lower(maker) → prefix learned from the inventory (at least two items of the maker carry the prefix and it is 60 % of them; the first word of a maker name also finds it when unambiguous). `stk_code_propose(row, sim)` — prefix by maker; else the prefix of a similar item by code / part number (score 70 or more); else the prefix all similar items share; code = prefix.<part number as written>; `exists` when an item already has that code. `stk_code_hint()` renders the line.
+
+**Where**: BOM import review (`views/bom.php`) — hint for every row not matched at 95 % or more, field `newcode[row]` for Procurement, passed by action `bom_import_decide` (apply) to `bom_import_apply($bid, $codes)` → `bom_imp_create_item($r, $bid, $want)`; card of free-text lines (`line_sim_card()`) — hint and prefilled field; `line_new_item()` with an empty code uses the proposal.
+
+**Stricter**: a typed code that exists is refused (`stk.code_taken`); with a part number but no known prefix the item is not created (`stk.newcode_none`) — before, the bare part number or BOM-<id>-<seq> was used. Rows without any part number keep the old fallback code.
+
+**Tests (sandbox, full inventory)**: proposals for the unmatched lines of a real switchboard BOM with makers filled (by maker) and not filled (by similar items; none for a maker without any item); review page with 35 fields; apply with an empty field (proposal used), a typed code, a typed code for a maker without prefix, an existing code (refused); requisition card: prefilled field, empty field without prefix refused with the hint, existing code refused, proposal used; PHP error log clean; page sweep. Not tested: an engineer account (sees the hint without the field).
+
+**Security review**: no new input path — the code field goes through the same validation as before (allowed characters, uniqueness) and only Procurement can create. No proposal.

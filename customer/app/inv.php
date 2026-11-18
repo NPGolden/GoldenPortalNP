@@ -581,6 +581,32 @@ function stk_similar(array $r, int $limit = 4, array $exclude = []): array {
     usort($out, fn($a, $b) => [$b['score'], $b['on_hand']] <=> [$a['score'], $a['on_hand']]);
     return array_slice($out, 0, $limit);
 }
+/** The prefix our codes use for each maker, learned from the inventory: lower(maker) => prefix, when at least two items of the maker carry it and it is the usual one (60 %).   R97-111 */
+function stk_maker_prefixes(): array {
+    static $m = null; if ($m !== null) return $m; $m = []; $c = [];
+    foreach (stk_sim_index()['items'] as $it) { $mk = mb_strtolower(trim($it['maker'])); if ($mk === '') continue; $pt = stk_pn_tail($it['code']); if (!$pt) continue; $c[$mk][$pt[0]] = ($c[$mk][$pt[0]] ?? 0) + 1; }
+    foreach ($c as $mk => $ps) { arsort($ps); $top = (string) array_key_first($ps); $n = $ps[$top]; if ($n >= 2 && $n / array_sum($ps) >= 0.6) $m[$mk] = $top; }
+    $fw = []; foreach ($m as $mk => $pre) { $w = (string) strtok($mk, ' '); if (mb_strlen($w) >= 3) $fw[$w][$pre] = true; }   // "schneider" finds "schneider electric" when only one prefix goes with that first word
+    foreach ($fw as $w => $ps) if (count($ps) === 1 && !isset($m[$w])) $m[$w] = (string) array_key_first($ps);
+    return $m;
+}
+/** The code a new inventory item for this line should get — our rule is prefix.<maker part number>. The prefix comes from the maker (as used on that maker's items),
+ *  else from the items most like this part number. Returns ['code', 'prefix', 'from' (maker|similar|''), 'pn', 'exists' (an item with that code is already there)]. */
+function stk_code_propose(array $r, ?array $sim = null): array {
+    $pn = trim((string)($r['part_no'] ?? '')); $out = ['code' => '', 'prefix' => '', 'from' => '', 'pn' => $pn, 'exists' => false];
+    if ($pn === '' || !preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._\-\/+]*$/u', $pn)) return $out;
+    $mk = mb_strtolower(trim((string)($r['maker'] ?? ''))); $mp = stk_maker_prefixes(); $pre = $mk !== '' ? ($mp[$mk] ?? ($mp[(string) strtok($mk, ' ')] ?? '')) : ''; $from = $pre !== '' ? 'maker' : '';
+    if ($pre === '') { foreach ($sim ?? stk_similar($r, 4) as $x) { if (!in_array($x['why'], ['same', 'code', 'part'], true) || $x['score'] < 70) continue; $pt = stk_pn_tail($x['code']); if ($pt) { $pre = $pt[0]; $from = 'similar'; break; } } }
+    if ($pre === '') { $v = []; foreach ($sim ?? stk_similar($r, 4) as $x) { if ($x['score'] < 50) continue; $pt = stk_pn_tail($x['code']); if ($pt) $v[$pt[0]] = ($v[$pt[0]] ?? 0) + 1; } arsort($v); if ($v && (count($v) === 1 || reset($v) >= 2 * (array_values($v)[1] ?? 0))) { $pre = (string) array_key_first($v); $from = 'similar'; } }   // all the similar items carry one prefix
+    if ($pre === '') return $out;
+    $code = mb_substr($pre . '.' . $pn, 0, 60); return ['code' => $code, 'prefix' => $pre, 'from' => $from, 'pn' => $pn, 'exists' => (bool) stk_item_by_code($code)];
+}
+/** The hint shown next to a line: the code for a new item and where the prefix comes from. */
+function stk_code_hint(array $pc): string {
+    if ($pc['pn'] === '') return '';
+    if ($pc['code'] === '') return '<span class="hint">' . e(t('stk.newcode_none', ['pn' => $pc['pn']])) . '</span>';
+    return '<span class="hint">' . tt($pc['exists'] ? 'stk.newcode_exists' : 'stk.newcode') . ' <b class="mono">' . e($pc['code']) . '</b> · ' . e(t('stk.newcode_from_' . $pc['from'], ['p' => $pc['prefix']])) . '</span>';
+}
 /** One line of text for a similar item: code — description · maker pn · stock. */
 function stk_sim_label(array $x): string { return $x['code'] . ' — ' . mb_substr($x['description'], 0, 70) . (trim($x['maker'] . ' ' . $x['pn']) !== '' ? ' · ' . trim($x['maker'] . ' ' . $x['pn']) : ''); }
 function stk_sim_stock_pill(array $x): string { return $x['on_hand'] > 0.0005 ? pill('green', t('stk.sim_stock', ['q' => stk_qty($x['on_hand']), 'u' => $x['unit']]) . ($x['reserved'] > 0.0005 ? ' · ' . t('stk.sim_free', ['q' => stk_qty(max(0.0, $x['free']))]) : '')) : pill('mute', t('stk.sim_nostock')); }
@@ -621,7 +647,8 @@ function line_use_item(string $kind, int $docId, int $lineId, int $itemId): void
 function line_new_item(string $kind, int $docId, int $lineId, string $code): int {
     [$doc, $use, $new] = line_doc($kind, $docId); if (!$new) throw new RuntimeException(t('err.noaccess'));
     $l = null; foreach (line_free($kind, $docId) as $x) if ((int)$x['id'] === $lineId) $l = $x; if (!$l) throw new RuntimeException(t('err.noaccess'));
-    $code = trim($code); if ($code === '') $code = trim((string)$l['part_no']); if ($code === '') throw new RuntimeException(t('stk.need_code_desc'));
+    $code = trim($code); if ($code === '') { $pc = stk_code_propose(['part_no' => (string)$l['part_no'], 'maker' => (string)$l['maker'], 'description' => (string)$l['description'], 'code' => '']); if ($pc['code'] === '') throw new RuntimeException(t('stk.newcode_none', ['pn' => $pc['pn'] !== '' ? $pc['pn'] : '…'])); $code = $pc['code']; }   // R97-111: prefix.<maker part number> — never the bare part number
+    if ($code === '') throw new RuntimeException(t('stk.need_code_desc'));
     if (stk_item_by_code($code)) throw new RuntimeException(t('stk.code_taken', ['c' => $code]));
     $id = stk_item_quick_create(['code' => $code, 'description' => (string)$l['description'], 'maker' => (string)$l['maker'], 'part_no' => (string)$l['part_no'], 'unit' => (string)$l['unit'], 'supplier_id' => $kind === 'po' ? (int)($doc['supplier_id'] ?? 0) : 0]);
     line_use_item($kind, $docId, $lineId, $id); return $id;
@@ -630,17 +657,17 @@ function line_new_item(string $kind, int $docId, int $lineId, string $code): int
 function line_sim_card(string $kind, int $docId, string $self): string {
     try { [$doc, $use, $new] = line_doc($kind, $docId); } catch (Throwable $e) { return ''; } if (!$use) return '';
     $free = line_free($kind, $docId); if (!$free) return ''; $rows = []; $n = 0;
-    foreach ($free as $l) { $sx = $n < 150 ? stk_similar(['code' => '', 'part_no' => (string)$l['part_no'], 'maker' => (string)$l['maker'], 'description' => (string)$l['description']], 4) : []; if ($sx) $n++; if ($sx || $new) $rows[] = [$l, $sx]; }
+    foreach ($free as $l) { $q = ['code' => '', 'part_no' => (string)$l['part_no'], 'maker' => (string)$l['maker'], 'description' => (string)$l['description']]; $sx = $n < 150 ? stk_similar($q, 4) : []; if ($sx) $n++; if ($sx || $new) $rows[] = [$l, $sx, stk_code_propose($q, $sx)]; }
     if (!$rows) return '';
     $hid = csrf_field() . '<input type="hidden" name="kind" value="' . e($kind) . '"><input type="hidden" name="id" value="' . $docId . '">';
     $h = '<div id="similar" style="margin-top:14px;"><h3 style="margin:0 0 4px;">🔎 ' . tt('po.sim_title') . ' <span class="count">' . count($rows) . '</span></h3><p class="hint" style="margin:0 0 8px;">' . e(t('po.sim_hint', ['n' => count($free)])) . ($new ? ' ' . tt('stk.sim_new_hint') : ' ' . tt('stk.sim_new_proc')) . '</p>'
        . '<div class="table-scroll"><table class="tbl tbl--compact"><thead><tr><th>#</th><th style="min-width:220px;">' . tt('po.sim_line') . '</th><th>' . tt('stk.sim_title') . '</th>' . ($new ? '<th>' . tt('bom.imp_d_new') . '</th>' : '') . '</tr></thead><tbody>';
-    foreach ($rows as [$l, $sx]) {
-        $h .= '<tr><td class="num">' . (int)$l['seq'] . '</td><td><b>' . e((string)$l['description']) . '</b><br><span class="hint">' . e(stk_qty((float)$l['qty'])) . ' ' . e((string)$l['unit']) . (trim((string)$l['maker'] . ' ' . (string)$l['part_no']) !== '' ? ' · ' . e(trim((string)$l['maker'] . ' ' . (string)$l['part_no'])) : '') . '</span></td><td>';
+    foreach ($rows as [$l, $sx, $pc]) {
+        $h .= '<tr><td class="num">' . (int)$l['seq'] . '</td><td><b>' . e((string)$l['description']) . '</b><br><span class="hint">' . e(stk_qty((float)$l['qty'])) . ' ' . e((string)$l['unit']) . (trim((string)$l['maker'] . ' ' . (string)$l['part_no']) !== '' ? ' · ' . e(trim((string)$l['maker'] . ' ' . (string)$l['part_no'])) : '') . '</span>' . (stk_code_hint($pc) !== '' ? '<br>' . stk_code_hint($pc) : '') . '</td><td>';
         if (!$sx) $h .= '<span class="hint">' . tt('stk.sim_none') . '</span>';
         foreach ($sx as $x) $h .= '<form method="post" action="' . $self . '" data-lock style="margin:3px 0;">' . $hid . '<input type="hidden" name="action" value="line_use_item"><input type="hidden" name="line_id" value="' . (int)$l['id'] . '"><input type="hidden" name="item_id" value="' . (int)$x['id'] . '"><button class="btn btn--ghost btn--sm" type="submit">' . tt('stk.sim_use') . '</button> <a href="' . url('inventory_item', ['id' => (int)$x['id']]) . '" target="_blank" rel="noopener">' . e(stk_sim_label($x)) . '</a> ' . stk_sim_stock_pill($x) . ' ' . pill('mute', t('stk.sim_why_' . $x['why']) . ' ' . (int)$x['score'] . ' %') . '</form>';
         $h .= '</td>';
-        if ($new) $h .= '<td style="white-space:nowrap;"><form method="post" action="' . $self . '" data-lock' . ($sx ? ' data-confirm="' . e(t('stk.sim_new_q')) . '"' : '') . ' style="display:flex;gap:6px;">' . $hid . '<input type="hidden" name="action" value="line_new_item"><input type="hidden" name="line_id" value="' . (int)$l['id'] . '"><input name="code" maxlength="60" placeholder="' . e((string)$l['part_no'] !== '' ? (string)$l['part_no'] : t('stk.code')) . '" style="width:150px;" aria-label="' . tt('stk.code') . '"><button class="btn btn--sm" type="submit">＋</button></form></td>';
+        if ($new) $h .= '<td style="white-space:nowrap;"><form method="post" action="' . $self . '" data-lock' . ($sx ? ' data-confirm="' . e(t('stk.sim_new_q')) . '"' : '') . ' style="display:flex;gap:6px;">' . $hid . '<input type="hidden" name="action" value="line_new_item"><input type="hidden" name="line_id" value="' . (int)$l['id'] . '"><input name="code" maxlength="60" value="' . e($pc['exists'] ? '' : $pc['code']) . '" placeholder="' . e($pc['pn'] !== '' ? t('stk.newcode_ph', ['pn' => $pc['pn']]) : t('stk.code')) . '" style="width:190px;" aria-label="' . tt('stk.code') . '"><button class="btn btn--sm" type="submit">＋</button></form></td>';
         $h .= '</tr>';
     }
     return $h . '</tbody></table></div></div>';

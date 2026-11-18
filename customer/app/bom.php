@@ -400,8 +400,11 @@ function bom_import_decide(int $bid, array $dec, array $items = []): void {
     }
 }
 /** Create an inventory item from a staged row (engineer may do this from the import review). Code: Golden code if free, else the maker part number, else BOM-<rev>-<seq>. */
-function bom_imp_create_item(array $r, int $bid): int {
-    $code = (string)($r['code'] ?? ''); if ($code === '' || !preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._\-\/+]*$/u', $code) || stk_item_by_code($code)) $code = '';
+function bom_imp_create_item(array $r, int $bid, string $want = ''): int {
+    $ok = fn(string $c) => $c !== '' && preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._\-\/+]*$/u', $c) && !stk_item_by_code($c);
+    $want = mb_substr(trim($want), 0, 60); if ($want !== '' && stk_item_by_code($want)) throw new RuntimeException(t('stk.code_taken', ['c' => $want]));
+    if (!$ok($want)) { $pc = function_exists('stk_code_propose') ? stk_code_propose(['part_no' => (string)($r['part_no'] ?? ''), 'maker' => (string)($r['maker'] ?? ''), 'description' => (string)$r['description'], 'code' => (string)($r['code'] ?? '')]) : ['code' => '']; $want = $ok($pc['code']) ? $pc['code'] : ''; if ($want === '' && trim((string)($r['part_no'] ?? '')) !== '') throw new RuntimeException('#' . (int)$r['seq'] . ' — ' . t('stk.newcode_none', ['pn' => (string)$r['part_no']])); }   // R97-111: our rule — prefix.<maker part number>; without a known prefix the code must be typed
+    $code = $want !== '' ? $want : (string)($r['code'] ?? ''); if ($code === '' || !preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._\-\/+]*$/u', $code) || stk_item_by_code($code)) $code = '';
     if ($code === '' && !empty($r['part_no']) && preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._\-\/+]*$/u', (string)$r['part_no']) && !stk_item_by_code((string)$r['part_no'])) $code = mb_substr((string)$r['part_no'], 0, 60);
     if ($code === '') { $code = 'BOM-' . $bid . '-' . (int)$r['seq']; $n = 0; while (stk_item_by_code($code)) $code = 'BOM-' . $bid . '-' . (int)$r['seq'] . '-' . (++$n); }
     $u = current_user();
@@ -410,7 +413,7 @@ function bom_imp_create_item(array $r, int $bid): int {
     $id = (int) db()->lastInsertId(); cache_bump_later('inv'); return $id;
 }
 /** Apply the decisions: accept → line linked to the item; reject → free-text line; new → create the item then link; pending rows stay for later. */
-function bom_import_apply(int $bid): array {
+function bom_import_apply(int $bid, array $codes = []): array {
     $b = bom_load($bid); if (!$b || !bom_editable($b)) throw new RuntimeException(t('err.noaccess'));
     $rows = bom_import_rows($bid); $seq = (int) scalar('SELECT COALESCE(MAX(seq),0) FROM bom_lines WHERE bom_rev_id = ?', [$bid]);
     $n = ['accept' => 0, 'reject' => 0, 'new' => 0, 'pending' => 0];
@@ -419,7 +422,7 @@ function bom_import_apply(int $bid): array {
         $it = null;
         if ($d === 'accept') { $it = $r['item_id'] ? stk_item((int)$r['item_id']) : null; if (!$it) { $n['pending']++; continue; } }
         if ($d === 'new' && !(bom_pr_can() || (function_exists('pr_admin') && pr_admin()))) $d = 'reject';   // R97-107: new inventory codes are created by Procurement — for an engineer the row becomes a free-text line
-        if ($d === 'new') { $it = stk_item(bom_imp_create_item($r, $bid)); }
+        if ($d === 'new') { $it = stk_item(bom_imp_create_item($r, $bid, (string)($codes[(int)$r['id']] ?? ''))); }
         q('INSERT INTO bom_lines (bom_rev_id, seq, item_id, code, description, maker, part_no, unit, qty, section, note) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
           [$bid, ++$seq, $it ? (int)$it['id'] : null, $it ? $it['code'] : ($r['code'] ?: null), $it && $r['description'] === '' ? $it['description'] : $r['description'], $it ? $it['maker'] : $r['maker'], $it ? $it['factory_code'] : $r['part_no'], $it ? $it['unit'] : $r['unit'], (float)$r['qty'], $r['section'], $r['note']]);
         q('DELETE FROM bom_import_rows WHERE id = ?', [(int)$r['id']]); $n[$d]++;

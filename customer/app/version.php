@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.182.1';
+const CP_VERSION = '1.183.0';
 const CP_BUILD   = '2026-11-17';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-111', 'version' => '1.183.0', 'date' => '2026-11-18', 'title' => 'New inventory items follow the rule prefix.maker part number: the portal proposes the code (prefix of the maker as used in the inventory, else the prefix of the similar items) in the BOM import review and next to every free-text line; Procurement can change it; a new item without a prefix is refused.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-110', 'version' => '1.182.1', 'date' => '2026-11-18', 'title' => 'Budget pricing requests: tabs Waiting for prices (shown first), Priced and All — the budgets already priced by Procurement are no longer mixed with the ones waiting.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-109', 'version' => '1.182.0', 'date' => '2026-11-18', 'title' => 'Warehouse: page Received per project and vessel — what is in the warehouse for each project (bought for it or reserved from stock), sent and still to come; delivery notes issued from ticked lines and quantities, one per sub-project or per project; a cancelled note reserves the goods again for the same requisition.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-108', 'version' => '1.181.0', 'date' => '2026-11-18', 'title' => 'One path to purchase orders: a purchase order or RFQ states its purpose (Project, Stock, Own use); a BOM workbook can be imported into a draft requisition; an approved requisition creates draft purchase orders per supplier like a BOM; the RFQs of a sub-project are listed with its orders.', 'db' => 'install/migrate_cp_r97_108_po_purpose.sql', 'check' => 'r98j'],
