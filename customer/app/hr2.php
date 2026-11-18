@@ -39,6 +39,7 @@ function hr_person_save_from_post(): int {
     $dept = (int)($_POST['department_id'] ?? 0) ?: null; $hire = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['hire_date'] ?? '')) ? $_POST['hire_date'] : null;
     $v = [$uid, $el, $en, $dept, (int)!empty($_POST['is_technical']), $hire, max(0, min(600, (int)($_POST['prior_months'] ?? 0))), in_array((int)($_POST['week_days'] ?? 5), [5, 6], true) ? (int)$_POST['week_days'] : 5, max(0, min(12, (int)($_POST['children'] ?? 0))), mb_substr(trim((string)($_POST['children_years'] ?? '')), 0, 60) ?: null, (int)!empty($_POST['is_active']), mb_substr(trim((string)($_POST['notes'] ?? '')), 0, 500) ?: null];
     if (isset($_POST['prior_years'])) $v[6] = max(0, min(600, (int)$_POST['prior_years'] * 12 + (int)($_POST['prior_months'] ?? 0)));   // R56: entered as years + months
+    if ($id && !empty($v[10]) && function_exists('hr_employment_ended') && hr_employment_ended($id)) { $v[10] = 0; flash('warn', t('hr.lv_still_left')); }   // R97-123: "Active" cannot be ticked back on a person whose employment has ended — a rehire is recorded under Employment
     if ($id) { q('UPDATE hr_people SET user_id = ?, name_el = ?, name_en = ?, department_id = ?, is_technical = ?, hire_date = ?, prior_months = ?, week_days = ?, children = ?, children_years = ?, is_active = ?, notes = ? WHERE id = ?', [...$v, $id]); }
     else { q('INSERT INTO hr_people (user_id, name_el, name_en, department_id, is_technical, hire_date, prior_months, week_days, children, children_years, is_active, notes) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', $v); $id = (int) db()->lastInsertId(); }
     if (function_exists('hr3_has') && hr3_has()) {   // R56-001: card fields + the open employment period follows the hiring date
@@ -474,6 +475,7 @@ function hr_people_import_apply(array $rows, array $sel): array {
         }
         db()->commit();
     } catch (Throwable $e) { db()->rollBack(); throw $e; }
+    if (function_exists('hr_leavers_reconcile')) { try { hr_leavers_reconcile(); } catch (Throwable $e) { error_log('[hr_leavers] ' . $e->getMessage()); } }   // R97-123
     return ['updated' => $n, 'created' => $c, 'warn' => $res['warn'] ?? []];
 }
 
@@ -537,7 +539,7 @@ function hr_leave_import_apply(array $rows, array $sel, bool $historyOnly = fals
 /** R56: card fields of an imported row (code, title, contract, marital, left date) and the employment period that matches the hiring / leaving dates. */
 function hr_people_import_card(int $pid, array $r): void {
     if ($r['emp_code'] && scalar('SELECT COUNT(*) FROM hr_people WHERE emp_code = ? AND id <> ?', [$r['emp_code'], $pid])) $r['emp_code'] = null;
-    q('UPDATE hr_people SET emp_code = COALESCE(?, emp_code), job_title = COALESCE(?, job_title), contract_type = COALESCE(?, contract_type), part_time = COALESCE(?, part_time), contract_end = COALESCE(?, contract_end), marital = COALESCE(?, marital), left_date = ?, is_active = ? WHERE id = ?', [$r['emp_code'], $r['job_title'], $r['contract_type'], $r['part_time'], $r['contract_end'], $r['marital'], $r['left_date'], $r['left_date'] ? 0 : 1, $pid]);
+    q('UPDATE hr_people SET emp_code = COALESCE(?, emp_code), job_title = COALESCE(?, job_title), contract_type = COALESCE(?, contract_type), part_time = COALESCE(?, part_time), contract_end = COALESCE(?, contract_end), marital = COALESCE(?, marital), left_date = COALESCE(?, left_date), is_active = ? WHERE id = ?', [$r['emp_code'], $r['job_title'], $r['contract_type'], $r['part_time'], $r['contract_end'], $r['marital'], $r['left_date'], ($r['left_date'] || (function_exists('hr_employment_ended') && hr_employment_ended($pid))) ? 0 : 1, $pid]);   // R97-123: a file without a leaving date no longer switches a person who left back on
     if (function_exists('hr_jurisdiction')) { try { q('UPDATE hr_people SET jurisdiction = COALESCE(?, jurisdiction), employment_kind = COALESCE(?, employment_kind), single_parent = GREATEST(single_parent, ?) WHERE id = ?', [$r['jurisdiction'] ?? null, $r['employment_kind'] ?? null, (int)($r['single_parent'] ?? 0), $pid]); } catch (Throwable $e) {} }
     if (function_exists('hr5_has') && hr5_has() && !empty($r['gender'])) q('UPDATE hr_people SET gender = ? WHERE id = ?', [$r['gender'], $pid]);
     $p = hr_person($pid); $open = hr_employment_open($pid); $me = (int)(current_user()['id'] ?? 0);

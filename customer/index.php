@@ -222,7 +222,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
             case 'logout':
                 $lu = require_login();
-                login_log((int)$lu['id'], (string)$lu['email'], 'logout');
+                login_log((int)$lu['id'], (string)$lu['email'], 'logout'); ls_end('logout');   // R97-123
                 presence_leave((int)$lu['id']);
                 session_unset(); session_destroy();
                 header('Location: index.php?p=login'); exit;

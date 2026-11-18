@@ -24,6 +24,13 @@ layout_head(t('hr.dashboard'), 'hr_dashboard');
 <?php if (function_exists('hry_has') && hry_has()): $hryA = hry_attention(); if ($hryA['late']): ?><div class="flash flash--bad"><b><?= e(t('hry.banner_late', ['n' => count($hryA['late'])])) ?></b> <?= e(implode(' · ', array_map(fn($s) => $s['label'] . ' (' . t('hry.late_days', ['n' => $s['late_days']]) . ')', array_slice($hryA['late'], 0, 6)))) ?> — <a href="#hr-year"><?= tt('hry.title') ?></a></div><?php endif;
   if ($year === (int) date('Y') && (int) date('n') === 1 && hry_cycle_started($year - 1)) echo hry_card_html($year - 1, true, url('hr_dashboard', ['year' => $year]));   /* January closes the last cycle */
   echo hry_card_html($year, true, url('hr_dashboard', ['year' => $year])); endif; ?>
+<?php $lvHold = function_exists('hr_leavers_holding') ? hr_leavers_holding() : []; if ($lvHold): /* R97-123 */ ?>
+<div class="card" id="hr-leavers" style="border-left:4px solid var(--red, #b3261e);">
+  <h2>⚠ <?= tt('hr.lv_dash') ?> <span class="count"><?= count($lvHold) ?></span></h2><p class="hint"><?= tt('hr.lv_hint') ?></p>
+  <table class="tbl" data-nosort><tbody><?php foreach ($lvHold as $x): ?><tr><td><a href="<?= url('hr_person', ['id' => (int)$x['p']['id'], 'tab' => 'emp']) ?>#hr-left"><b><?= e($x['p']['name_en']) ?></b></a><?= $x['p']['left_date'] ? ' <span class="hint">' . e(fmt_date($x['p']['left_date'])) . '</span>' : '' ?></td><td><?= e(implode(' · ', array_map(fn($h) => $h[0] . ': ' . $h[1], $x['holds']))) ?></td></tr><?php endforeach; ?></tbody></table>
+</div>
+<?php endif; ?>
+
 <div class="kpi kpi--4" style="margin-bottom:14px;">
   <a class="stat" href="#hr-today"><b><?= count($todayAway) ?></b><span class="s"><?= tt('hr.d_away_today') ?></span></a>
   <a class="stat<?= $pending ? ' gold' : '' ?>" href="<?= url('hr_requests', ['st' => 'open']) ?>"><b><?= count($pending) ?></b><span class="s"><?= tt('hr.d_pending') ?></span></a>

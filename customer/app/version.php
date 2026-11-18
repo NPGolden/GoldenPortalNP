@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.187.0';
+const CP_VERSION = '1.187.1';
 const CP_BUILD   = '2026-11-18';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-123', 'version' => '1.187.1', 'date' => '2026-11-18', 'title' => 'HR: a person whose employment has ended can no longer come back as active through an Excel update or a card save, is corrected every day from the employment periods and is released from the portal; login history records the duration of each session and the usage per person.', 'db' => 'install/migrate_cp_r97_123_login_sessions.sql', 'check' => 'r98o'],
         ['ref' => 'GAS-CP-R97-122', 'version' => '1.187.0', 'date' => '2026-11-18', 'title' => 'HR › The HR year: the annual cycle on the HR dashboard with what is done, due and late, measured from the portal; warnings to the HR managers by notification and a weekly e-mail; the calendar for every employee on My leave.', 'db' => 'install/migrate_cp_r97_122_hr_year.sql', 'check' => 'r98n'],
         ['ref' => 'GAS-CP-R97-121', 'version' => '1.186.0', 'date' => '2026-11-18', 'title' => 'HR › Job descriptions: the company set in one structure, writing with the assistant, approval by Discipline Manager, General Manager and CEO, revisions, link to employees (My job description, read confirmation) and to vacancies, PDF.', 'db' => 'install/migrate_cp_r97_121_job_descriptions.sql', 'check' => 'r98m'],
         ['ref' => 'GAS-CP-R97-120', 'version' => '1.185.2', 'date' => '2026-11-18', 'title' => 'Quality: financial data is closed for every Quality position (QA, QC, quality or HSE in the staff role or the discipline, and members of the QHSE team); Quality keeps the Milestones and the Safety log of every project, from the QHSE menu.', 'db' => null, 'check' => null],
@@ -567,6 +568,7 @@ function cp_migration_state(): array {
         'r97p' => $has("SHOW TABLES LIKE 'nl_issues'"),
         'r97q' => $has("SHOW TABLES LIKE 'nl_lists'"),
         'r97r' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'proc_state'") && $has("SHOW COLUMNS FROM sb_parts LIKE 'proc_at'"),
+        'r98o' => $has("SHOW TABLES LIKE 'login_sessions'"),
         'r98n' => $has("SHOW TABLES LIKE 'hr_year_steps'"),
         'r98m' => $has("SHOW TABLES LIKE 'hr_jds'"),
         'r98l' => $has("SHOW COLUMNS FROM si_invoices LIKE 'is_proforma'"),

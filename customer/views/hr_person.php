@@ -105,6 +105,13 @@ $pend = count(array_filter(hr_requests_for('hr', 0), fn($r) => (int)$r['person_i
 </div>
 
 <?php endif; if ($tab === 'emp'): ?>
+<?php if (!$p['is_active'] && function_exists('hr_leaver_holds')): $lvh = hr_leaver_holds($p); ?>
+<div class="card" id="hr-left" style="border-left:4px solid <?= $lvh ? 'var(--red, #b3261e)' : '#2E7D32' ?>;">
+  <h2><?= $lvh ? '⚠' : '✓' ?> <?= tt('hr.lv_title') ?></h2>
+  <p class="hint"><?= tt('hr.lv_hint') ?></p>
+  <?php if (!$lvh): ?><p><?= tt('hr.lv_none') ?></p><?php else: ?><ul><?php foreach ($lvh as [$lbl_, $n_, $url_]): ?><li><a href="<?= e($url_) ?>"><?= e($lbl_) ?></a>: <b><?= (int)$n_ ?></b></li><?php endforeach; ?></ul><?php endif; ?>
+</div>
+<?php endif; ?>
 <?php if (function_exists('jd_has') && jd_has() && jd_manage()): $pjd = (int)($p['jd_id'] ?? 0); $jdo = jd_options(); $pj = $pjd ? jd_load($pjd) : null; $pc = $pj ? jd_current($pj) : null; $pdisc = (int)($p['department_id'] ?? 0) ?: (int)($p['discipline_id'] ?? 0);
   usort($jdo, fn($a, $b) => [(int)((int)$a['discipline_id'] !== $pdisc), $a['title']] <=> [(int)((int)$b['discipline_id'] !== $pdisc), $b['title']]); ?>
 <div class="card" id="hr-jd">

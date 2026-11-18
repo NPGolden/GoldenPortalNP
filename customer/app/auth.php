@@ -52,7 +52,7 @@ function sec_ua_hash(): string { return substr(hash('sha256', (string)($_SERVER[
 function sec_ip_net(): string { $ip = trim(explode(',', (string)($_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? ''))[0]); return str_contains($ip, ':') ? implode(':', array_slice(explode(':', $ip), 0, 4)) : implode('.', array_slice(explode('.', $ip), 0, 3)); }   // /24 or /64
 /** End the current session for a policy reason: log it, mark the person offline, start a clean session with a message. */
 function sec_end_session(string $outcome, string $msgKey): void {
-    $uid = (int)($_SESSION['cu_id'] ?? 0);
+    $uid = (int)($_SESSION['cu_id'] ?? 0); ls_end($outcome);   // R97-123
     if ($uid) { try { $em = (string) scalar('SELECT email FROM customer_users WHERE id = ?', [$uid]); login_log($uid, $em, $outcome); } catch (Throwable $e) { try { login_log($uid, '', 'logout'); } catch (Throwable $e2) {} } try { q('UPDATE customer_users SET last_seen_at = NULL WHERE id = ?', [$uid]); } catch (Throwable $e) {} }
     session_unset(); session_destroy(); session_start(); session_regenerate_id(true);
     flash('warn', t($msgKey));
@@ -78,7 +78,7 @@ function current_user(): ?array {
                   LEFT JOIN customers c ON c.id = cu.customer_id
                   WHERE cu.id = ? AND cu.is_active = 1 AND (c.id IS NULL OR c.is_active = 1)', [$_SESSION['cu_id']]);
         if ($u && array_key_exists('session_epoch', $u) && isset($_SESSION['epoch']) && (int)$_SESSION['epoch'] !== (int)$u['session_epoch']) { $u = null; sec_end_session('revoked', 'login.revoked'); return null; }   // R49-001: signed out everywhere
-        if ($u) presence_touch($u);
+        if ($u) { presence_touch($u); ls_touch(); }
     }
     return $u ?: null;
 }
@@ -159,6 +159,41 @@ function require_login(): array {
 /** Record a sign-in event (success, failed, locked, disabled, logout) in
  *  login_log. Never breaks a sign-in: a missing table (migration not yet
  *  run) is silently ignored.                                 GAS-CP-R5-001 */
+/* ------------------------------------------------------------------ R97-123: sessions — how long the portal is used
+ * One row per sign-in: started, last activity (a page opened or a form sent — the background heartbeat does not count), ended and why.
+ * The duration of a session is start → last activity; a session that was never signed out ends at its last activity. */
+function ls_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'login_sessions'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function ls_device(): string { $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? ''); $os = preg_match('/iPhone|iPad/', $ua) ? 'iOS' : (str_contains($ua, 'Android') ? 'Android' : (str_contains($ua, 'Windows') ? 'Windows' : (str_contains($ua, 'Mac OS') ? 'macOS' : (str_contains($ua, 'Linux') ? 'Linux' : ''))));
+    $br = str_contains($ua, 'Edg/') ? 'Edge' : (str_contains($ua, 'Firefox/') ? 'Firefox' : (str_contains($ua, 'Chrome/') ? 'Chrome' : (str_contains($ua, 'Safari/') ? 'Safari' : ''))); return mb_substr(trim($br . ' ' . $os), 0, 40); }
+function ls_start(int $uid): void {
+    if (!ls_has()) return;
+    try { ls_end('replaced'); $ip = trim(explode(',', (string)($_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? ''))[0]);
+        q('INSERT INTO login_sessions (user_id, started_at, last_at, ip, device) VALUES (?, NOW(), NOW(), ?, ?)', [$uid, mb_substr($ip, 0, 45) ?: null, ls_device() ?: null]);
+        $_SESSION['ls_id'] = (int) db()->lastInsertId(); $_SESSION['ls_t'] = time(); } catch (Throwable $e) {}
+}
+/** Activity: written at most once a minute per session; never for the heartbeat or the background calls. */
+function ls_touch(): void {
+    if (empty($_SESSION['ls_id']) || in_array((string)($_GET['p'] ?? ''), ['ping', 'bg', 'csp_report', 'relock'], true) || time() - (int)($_SESSION['ls_t'] ?? 0) < 60) return;
+    if (session_status() !== PHP_SESSION_ACTIVE || !ls_has()) return; $_SESSION['ls_t'] = time();
+    try { q('UPDATE login_sessions SET last_at = NOW() WHERE id = ? AND ended_at IS NULL', [(int)$_SESSION['ls_id']]); } catch (Throwable $e) {}
+}
+/** Close the session row. A time-out ends the session at its last activity, not at the moment the time-out is noticed. */
+function ls_end(string $reason): void {
+    if (empty($_SESSION['ls_id']) || !ls_has()) return; $id = (int)$_SESSION['ls_id']; unset($_SESSION['ls_id'], $_SESSION['ls_t']);
+    try { q('UPDATE login_sessions SET ' . (in_array($reason, ['logout', 'replaced'], true) ? 'last_at = NOW(), ended_at = NOW()' : 'ended_at = last_at') . ', end_reason = ? WHERE id = ? AND ended_at IS NULL', [mb_substr($reason, 0, 12), $id]); } catch (Throwable $e) {}
+}
+function ls_dur(int $sec): string { $sec = max(0, $sec); $h = intdiv($sec, 3600); $m = intdiv($sec % 3600, 60); return $h ? $h . ' h ' . str_pad((string)$m, 2, '0', STR_PAD_LEFT) : ($m ? $m . ' min' : '< 1 min'); }
+/** Usage per person over the last $days: sessions, total and average time, days with a sign-in, last sign-in. Staff and administrators only. */
+function ls_usage(int $days = 30): array {
+    if (!ls_has()) return []; $days = max(1, min(366, $days));
+    return all("SELECT cu.id, cu.full_name, cu.role, cu.is_active, COUNT(s.id) AS n, COALESCE(SUM(TIMESTAMPDIFF(SECOND, s.started_at, s.last_at)), 0) AS secs, COUNT(DISTINCT DATE(s.started_at)) AS days_n, MAX(s.started_at) AS last_start
+                  FROM customer_users cu LEFT JOIN login_sessions s ON s.user_id = cu.id AND s.started_at >= DATE_SUB(NOW(), INTERVAL $days DAY)
+                 WHERE cu.role IN ('staff','admin') AND (cu.is_active = 1 OR s.id IS NOT NULL) GROUP BY cu.id, cu.full_name, cu.role, cu.is_active ORDER BY secs DESC, cu.full_name");
+}
+function ls_recent(?int $uid = null, int $limit = 60): array {
+    if (!ls_has()) return [];
+    return all('SELECT s.*, cu.full_name, TIMESTAMPDIFF(SECOND, s.started_at, s.last_at) AS secs FROM login_sessions s JOIN customer_users cu ON cu.id = s.user_id' . ($uid ? ' WHERE s.user_id = ' . (int)$uid : '') . ' ORDER BY s.started_at DESC LIMIT ' . max(1, min(500, $limit)));
+}
 function login_log(?int $userId, string $email, string $outcome): void {
     try {
         $ip = (string)($_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '');
@@ -236,6 +271,7 @@ function finish_login(int $userId): void {
     catch (Throwable $e) { q('UPDATE customer_users SET last_login_at = NOW() WHERE id = ?', [$userId]); }   // before R6
     if (locale_valid($u['locale'] ?? null)) { $_SESSION['locale'] = $u['locale']; locale($u['locale']); }
     login_log($userId, (string)$u['email'], 'success');
+    ls_start($userId);   // R97-123
 }
 
 /** The account waiting for its second factor, or null (10-minute window). */

@@ -149,6 +149,28 @@ layout_head(t('ll.title'), 'admin_log');
   </form>
 </div>
 
+<?php if (function_exists('ls_has') && ls_has()): /* R97-123: how long the portal is used */
+  $lsD = (int)($_GET['use'] ?? 30); if (!in_array($lsD, [7, 30, 90, 365], true)) $lsD = 30; $lsU = ls_usage($lsD); $lsOne = (int)($_GET['su'] ?? 0); $lsR = ls_recent($lsOne ?: null, $lsOne ? 200 : 40);
+  $lsTot = array_sum(array_map(fn($r) => (int)$r['secs'], $lsU)); $lsAct = count(array_filter($lsU, fn($r) => (int)$r['n'] > 0)); ?>
+<div class="card" id="usage">
+  <div class="card-head"><h2>⏱ <?= tt('ls.title') ?></h2>
+    <form method="get" action="index.php#usage" class="inline"><input type="hidden" name="p" value="admin_log"><select name="use" data-nosearch data-js-submit="1"><?php foreach ([7, 30, 90, 365] as $d_): ?><option value="<?= $d_ ?>"<?= $lsD === $d_ ? ' selected' : '' ?>><?= e(t('ls.last_days', ['n' => $d_])) ?></option><?php endforeach; ?></select></form></div>
+  <p class="hint"><?= tt('ls.hint') ?></p>
+  <div class="kpi kpi--3" style="margin-bottom:10px;">
+    <span class="stat"><b><?= $lsAct ?> / <?= count($lsU) ?></b><span class="s"><?= tt('ls.k_people') ?></span></span>
+    <span class="stat gold"><b><?= e(ls_dur($lsTot)) ?></b><span class="s"><?= tt('ls.k_total') ?></span></span>
+    <span class="stat"><b><?= e(ls_dur($lsAct ? intdiv($lsTot, $lsAct) : 0)) ?></b><span class="s"><?= tt('ls.k_avg') ?></span></span>
+  </div>
+  <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('ll.who') ?></th><th class="num"><?= tt('ls.sessions') ?></th><th class="num"><?= tt('ls.days') ?></th><th class="num"><?= tt('ls.time') ?></th><th class="num"><?= tt('ls.per_session') ?></th><th><?= tt('ls.last') ?></th></tr></thead><tbody>
+  <?php foreach ($lsU as $r): $n_ = (int)$r['n']; ?><tr<?= $r['is_active'] ? '' : ' class="is-retired"' ?>><td><a href="<?= url('admin_log', ['use' => $lsD, 'su' => (int)$r['id']]) ?>#usage-s"><?= e($r['full_name']) ?></a><?= $r['role'] === 'admin' ? ' ' . pill('navy', 'admin') : '' ?></td><td class="num"><?= $n_ ?></td><td class="num"><?= (int)$r['days_n'] ?></td><td class="num" data-sort="<?= (int)$r['secs'] ?>"><?= $n_ ? e(ls_dur((int)$r['secs'])) : '—' ?></td><td class="num" data-sort="<?= $n_ ? intdiv((int)$r['secs'], $n_) : 0 ?>"><?= $n_ ? e(ls_dur(intdiv((int)$r['secs'], $n_))) : '—' ?></td><td class="hint"><?= $r['last_start'] ? e(fmt_datetime($r['last_start'])) : e(t('ls.never', ['n' => $lsD])) ?></td></tr><?php endforeach; ?>
+  </tbody></table></div>
+  <h3 id="usage-s" style="margin-top:14px;"><?= tt('ls.recent') ?><?php if ($lsOne): ?> — <?= e((string) scalar('SELECT full_name FROM customer_users WHERE id = ?', [$lsOne])) ?> <a class="btn btn--ghost btn--sm" href="<?= url('admin_log', ['use' => $lsD]) ?>#usage">× <?= tt('ls.all_people') ?></a><?php endif; ?></h3>
+  <?php if (!$lsR): ?><p class="hint"><?= tt('ls.none') ?></p><?php else: ?>
+  <div class="table-scroll"><table class="tbl" data-nosort><thead><tr><th><?= tt('ll.who') ?></th><th><?= tt('ls.start') ?></th><th><?= tt('ls.last_act') ?></th><th class="num"><?= tt('ls.duration') ?></th><th><?= tt('ls.end') ?></th><th><?= tt('ls.device') ?></th></tr></thead><tbody>
+  <?php foreach ($lsR as $r): ?><tr><td><?= e($r['full_name']) ?></td><td><?= e(fmt_datetime($r['started_at'])) ?></td><td class="hint"><?= e(fmt_datetime($r['last_at'])) ?></td><td class="num"><b><?= e(ls_dur((int)$r['secs'])) ?></b></td><td><?= $r['ended_at'] ? pill('mute', t('ls.r_' . (in_array($r['end_reason'], ['logout', 'expired', 'closed', 'device', 'revoked', 'replaced'], true) ? $r['end_reason'] : 'other'))) : (tz_age((string)$r['last_at']) < 1800 ? pill('green', t('ls.r_open')) : pill('mute', t('ls.r_left'))) ?></td><td class="hint"><?= e((string)$r['device']) ?></td></tr><?php endforeach; ?>
+  </tbody></table></div><?php endif; ?>
+</div>
+<?php endif; ?>
 <div class="card">
 <?php if (!$rows): ?>
   <div class="empty"><?= tt('ll.none') ?></div>

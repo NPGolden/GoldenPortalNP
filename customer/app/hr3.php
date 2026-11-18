@@ -61,10 +61,12 @@ function hr_employment_event_from_post(int $pid): int {
             q('UPDATE hr_people SET left_date = ?, is_active = 0, contract_end = NULL WHERE id = ?', [$date, $pid]);
             if (!empty($p['user_id'])) q('UPDATE customer_users SET is_active = 0 WHERE id = ? AND role = ?', [(int)$p['user_id'], 'staff']);   // the portal account closes with the employment (administrators are never touched)
             hr_off_open($pid, $id);                                                                                      // R60-001: release-of-contract procedure
+            $relLater = $pid;   // R97-123: released from the portal once the transaction is through
         } else throw new RuntimeException(t('err.notfound'));
         if (function_exists('hr_files_can') && hr_files_can()) hr_docs_store_from_files($pid, $id, (string)($_POST['doc_kind'] ?? ($ev === 'end' ? 'termination' : 'contract')), $note);   // R76-005: administrators cannot file documents
         db()->commit();
     } catch (Throwable $e) { db()->rollBack(); throw $e; }
+    if (!empty($relLater)) { try { hr_leaver_release((int)$relLater); } catch (Throwable $e) { error_log('[hr_leaver] ' . $e->getMessage()); } }
     return $id;
 }
 /** Delete a mistaken event (last one only, HR). */
@@ -183,6 +185,68 @@ function hr_off_save_from_post(int $pid): void {
 function hr_off_pending(): array {
     if (!hr_off_has()) return [];
     return all("SELECT p.id, p.name_en, e.id AS employment_id, e.date_from AS end_date, e.reason, SUM(o.done) AS done, COUNT(*) AS total FROM hr_offboarding o JOIN hr_employments e ON e.id = o.employment_id JOIN hr_people p ON p.id = o.person_id GROUP BY p.id, p.name_en, e.id, e.date_from, e.reason HAVING done < total ORDER BY e.date_from DESC");
+}
+
+/* ------------------------------------------------------------ R97-123 — a person whose employment has ended is out, whatever was saved afterwards */
+/** The employment periods decide: true when the person has a closed hire / rehire period, no open one, and the end date has come. */
+function hr_employment_ended(int $pid): ?string {
+    if (!hr3_has()) return null;
+    if (scalar("SELECT 1 FROM hr_employments WHERE person_id = ? AND kind IN ('hire','rehire') AND date_to IS NULL LIMIT 1", [$pid])) return null;
+    $d = scalar("SELECT MAX(date_to) FROM hr_employments WHERE person_id = ? AND kind IN ('hire','rehire') AND date_to IS NOT NULL", [$pid]);
+    return $d && (string)$d <= date('Y-m-d') ? (string)$d : null;
+}
+/** Put right every card that says "employed" although the employment has ended (an Excel update or a card save used to switch such a person back on).
+ *  Returns the ids set to "left". Called once a day, after an import and after a card save; needs no rights of its own. */
+function hr_leavers_reconcile(?int $personId = null): array {
+    if (!hr3_has()) return [];
+    $rows = all("SELECT p.id, p.name_en, (SELECT MAX(e.date_to) FROM hr_employments e WHERE e.person_id = p.id AND e.kind IN ('hire','rehire')) AS ended
+                   FROM hr_people p
+                  WHERE p.is_active = 1" . ($personId ? ' AND p.id = ' . (int)$personId : '') . "
+                    AND EXISTS (SELECT 1 FROM hr_employments e WHERE e.person_id = p.id AND e.kind IN ('hire','rehire') AND e.date_to IS NOT NULL)
+                    AND NOT EXISTS (SELECT 1 FROM hr_employments e WHERE e.person_id = p.id AND e.kind IN ('hire','rehire') AND e.date_to IS NULL)
+                 HAVING ended <= CURDATE()");
+    $ids = [];
+    foreach ($rows as $r) {
+        q('UPDATE hr_people SET is_active = 0, left_date = COALESCE(left_date, ?), contract_end = NULL WHERE id = ?', [$r['ended'], (int)$r['id']]);
+        if (function_exists('hr_audit')) { try { hr_audit((int)$r['id'], 'employment', 'is_active', '1', '0', 'employment ended ' . $r['ended'] . ' — card corrected by the portal'); } catch (Throwable $e) {} }
+        $ids[] = (int)$r['id'];
+    }
+    foreach ($ids as $pid) { try { hr_leaver_release($pid); } catch (Throwable $e) { error_log('[hr_leaver] ' . $e->getMessage()); } }
+    if ($ids) { error_log('[hr_leavers] ' . count($ids) . ' card(s) set to left from the employment periods'); if (function_exists('cache_bump_later')) cache_bump_later('hr'); }
+    return $ids;
+}
+/** What the portal takes away by itself when a person has left: the staff account, the sessions and app sign-ins, the planning and the leave requests
+ *  after the last day, the QHSE / ISMS team lists. Things that need a successor are not touched here — hr_leaver_holds() lists them. Returns what was done. */
+function hr_leaver_release(int $pid): array {
+    $p = one('SELECT id, user_id, left_date, is_active FROM hr_people WHERE id = ?', [$pid]); if (!$p || $p['is_active']) return [];
+    $uid = (int)($p['user_id'] ?? 0); $left = (string)($p['left_date'] ?: date('Y-m-d')); $done = [];
+    if ($uid) {
+        $n = q("UPDATE customer_users SET is_active = 0 WHERE id = ? AND role = 'staff' AND is_active = 1", [$uid])->rowCount(); if ($n) $done['account'] = 1;
+        if (function_exists('sec_revoke_all')) { try { sec_revoke_all($uid); } catch (Throwable $e) {} }
+        try { $n = q("DELETE FROM plan_entries WHERE user_id = ? AND plan_date > ?", [$uid, $left])->rowCount(); if ($n) $done['planning'] = $n; } catch (Throwable $e) {}
+        foreach (['qh_team', 'ism_team', 'ism_mteam'] as $k) { try { $v = json_decode((string) cp_setting($k, '[]'), true); if (is_array($v) && in_array($uid, array_map('intval', $v), true)) { cp_setting_set($k, json_encode(array_values(array_diff(array_map('intval', $v), [$uid])))); $done['teams'] = ($done['teams'] ?? 0) + 1; } } catch (Throwable $e) {} }
+    }
+    try { $n = q("UPDATE hr_requests SET status = 'cancelled' WHERE person_id = ? AND status IN ('pending_mgr','pending_hr') AND date_from > ?", [$pid, $left])->rowCount(); if ($n) $done['requests'] = $n; } catch (Throwable $e) {}
+    if ($done && function_exists('hr_audit')) { try { hr_audit($pid, 'employment', 'release', null, json_encode($done), 'released from the portal after leaving'); } catch (Throwable $e) {} }
+    return $done;
+}
+/** What a person who left still holds and somebody has to take over: [[label, number, url], …]. Empty = nothing left. */
+function hr_leaver_holds(array $p): array {
+    $uid = (int)($p['user_id'] ?? 0); $o = []; if (!$uid) return $o;
+    $add = function (string $k, string $sql, array $a, string $url) use (&$o) { try { $n = (int) scalar($sql, $a); if ($n) $o[] = [t('hr.lv_' . $k), $n, $url]; } catch (Throwable $e) {} };
+    $add('admin', "SELECT COUNT(*) FROM customer_users WHERE id = ? AND is_active = 1", [$uid], url('admin_users', ['q' => (string)($p['account_name'] ?? '')]));
+    $add('disc', 'SELECT COUNT(*) FROM disciplines WHERE manager_user_id = ? AND is_active = 1', [$uid], url('admin_hr', ['tab' => 'people']));
+    $add('mgr', 'SELECT COUNT(*) FROM customer_users WHERE manager_user_id = ? AND is_active = 1', [$uid], url('admin_users'));
+    $add('pm', "SELECT COUNT(*) FROM projects WHERE pm_user_id = ? AND status NOT IN ('closed','cancelled','lost')", [$uid], url('projects'));
+    $add('tasks', "SELECT COUNT(*) FROM tasks WHERE assignee_id = ? AND status = 'open'", [$uid], url('tasks'));
+    $add('vac', "SELECT COUNT(*) FROM rc_vacancies WHERE hiring_manager_id = ? AND status IN ('draft','open')", [$uid], url('rcr_dashboard'));
+    return $o;
+}
+/** All who left and still hold something (HR dashboard, daily health report). */
+function hr_leavers_holding(): array {
+    if (!hr2_has()) return []; $o = [];
+    foreach (hr_people(false) as $p) { if ($p['is_active'] || empty($p['user_id'])) continue; $h = hr_leaver_holds($p); if ($h) $o[] = ['p' => $p, 'holds' => $h]; }
+    return $o;
 }
 
 /* ------------------------------------------------------------ R97-093 — people who are no longer in the company do not stand in the lists of personnel */
