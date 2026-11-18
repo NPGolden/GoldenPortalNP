@@ -34,6 +34,14 @@ layout_head($p['name_en'] . ' — ' . t('hr.card'), 'admin_hr');
 <?php endif; ?>
 <?php $tab = (string)($_GET['tab'] ?? 'data'); if (!in_array($tab, ['data', 'emp', 'eq', 'req', 'msg', 'docs', 'ent', 'types', 'train', 'eval', 'log'], true) || ($tab === 'docs' && !hr_files_can())) $tab = 'data'; /* R76-005 */ $T = fn($k, $lbl) => '<a class="tab' . ($tab === $k ? ' is-on' : '') . '" href="' . url('hr_person', ['id' => $pid, 'tab' => $k]) . '">' . $lbl . '</a>';
 $pend = count(array_filter(hr_requests_for('hr', 0), fn($r) => (int)$r['person_id'] === $pid && in_array($r['status'], ['pending_mgr', 'pending_hr'], true))); $um = function_exists('hr_msg_has') && hr_msg_has() ? hr_messages_unread($pid) : 0; ?>
+<?php if (function_exists('hrf_onboarding')): /* R97-125: where this person stands */
+  $fEnd_ = !$p['is_active'] || (bool) scalar("SELECT COUNT(*) FROM hr_employments e WHERE e.person_id = ? AND e.kind = 'end' AND NOT EXISTS (SELECT 1 FROM hr_employments x WHERE x.person_id = e.person_id AND x.kind IN ('hire','rehire') AND x.date_from > e.date_from)", [$pid]);
+  $fS_ = $fEnd_ ? hrf_handover($p) : hrf_onboarding($p); $fP_ = hrf_progress($fS_); ?>
+<div class="card card--tight" id="hr-flow" style="margin-bottom:12px;">
+  <div class="page-head" style="margin-bottom:8px;"><h3 style="margin:0;"><?= $fEnd_ ? '↩' : '🟢' ?> <?= tt($fEnd_ ? 'hrf.off_title' : 'hrf.on_title') ?> <?= $fP_['complete'] ? pill('green', t('hrf.complete')) : pill('gold', $fP_['done'] . ' / ' . $fP_['total']) ?></h3></div>
+  <?= hrf_html($fS_) ?>
+</div>
+<?php endif; ?>
 <nav class="tabs" style="margin-bottom:12px;"><?= $T('data', '🪪 ' . t('hr.tab_data')) . $T('emp', '📑 ' . t('hr.employments')) . (function_exists('hre_can') && hre_can() ? $T('eq', '🧰 ' . t('hre.tab') . (($eqN_ = hre_with_count($pid)) ? ' (' . $eqN_ . ')' : '')) : '') . $T('req', '✅ ' . t('hr.requests') . ($pend ? ' <b>' . $pend . '</b>' : '')) . $T('msg', '💬 ' . t('hr.msg_title') . ($um ? ' <b>' . $um . '</b>' : '')) . (hr_files_can() ? $T('docs', '📎 ' . t('hr.documents') . ' (' . count($docs) . ')') : '') . (function_exists('hr4_has') && hr4_has() ? $T('ent', '🗓 ' . t('hr.entitlements')) . (function_exists('hr5_has') && hr5_has() ? $T('types', '🏷 ' . t('hr.types')) : '') . (function_exists('hr_tr_has') && hr_tr_has() ? $T('train', '🎓 ' . t('hr.training')) . $T('eval', '📈 ' . t('hr.evaluations')) : '') . $T('log', '🕘 ' . t('hr.changes')) : '') ?></nav>
 
 <?php if ($tab === 'data' || $tab === 'emp'): ?>

@@ -21,6 +21,20 @@ layout_head(t('hr.dashboard'), 'hr_dashboard');
 <div class="page-head"><div><h1>📊 <?= tt('hr.dashboard') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('hr.dashboard_lede') ?></p></div>
   <form method="get" action="index.php" class="inline"><input type="hidden" name="p" value="hr_dashboard"><select name="year" data-nosearch data-js-submit="1"><?php foreach (array_unique(array_merge(hr_years(), [$year])) as $yy): ?><option value="<?= $yy ?>"<?= $yy === $year ? ' selected' : '' ?>><?= $yy ?></option><?php endforeach; ?></select></form></div>
 
+<?php $flow_ = function_exists('hrf_overview') ? hrf_overview() : ['on' => [], 'off' => []]; if ($flow_['on'] || $flow_['off']): /* R97-125 */ ?>
+<div class="card" id="hr-flows">
+  <h2>🧭 <?= tt('hrf.dash_title') ?> <span class="count"><?= count($flow_['on']) + count($flow_['off']) ?></span></h2><p class="hint"><?= tt('hrf.dash_hint') ?></p>
+  <?php foreach (['on' => 'hrf.on_title', 'off' => 'hrf.off_title'] as $fk_ => $ft_): if (!$flow_[$fk_]) continue; ?>
+  <h3 style="margin:10px 0 4px;"><?= $fk_ === 'on' ? '🟢' : '↩' ?> <?= tt($ft_) ?> <span class="count"><?= count($flow_[$fk_]) ?></span></h3>
+  <div class="table-scroll"><table class="tbl" data-nosort><thead><tr><th><?= tt('hr.person') ?></th><th><?= tt($fk_ === 'on' ? 'hrf.hired' : 'hrf.left') ?></th><th><?= tt('hrf.flow') ?></th><th><?= tt('hrf.next') ?></th><th class="num"><?= tt('hrf.steps') ?></th></tr></thead><tbody>
+  <?php foreach ($flow_[$fk_] as $x_): $nx_ = null; foreach ($x_['steps'] as $s_) if (in_array($s_['state'], ['run', 'todo'], true)) { $nx_ = $s_; break; } ?>
+    <tr><td><a href="<?= url('hr_person', ['id' => (int)$x_['p']['id']]) ?>#hr-flow"><b><?= e($x_['p']['name_en']) ?></b></a><?= (string)($x_['p']['department'] ?? '') !== '' ? '<br><span class="hint">' . e($x_['p']['department']) . '</span>' : '' ?></td><td class="hint"><?= $x_['date'] ? e(fmt_date($x_['date'])) : '—' ?></td><td><?= hrf_html($x_['steps'], true) ?></td>
+      <td><?php if ($nx_): ?><a href="<?= e($nx_['url']) ?>"><?= e($nx_['label']) ?></a><?= $nx_['note'] !== '' ? '<br><span class="hint">' . e($nx_['note']) . '</span>' : '' ?><?php endif; ?></td><td class="num"><?= $x_['pr']['done'] ?> / <?= $x_['pr']['total'] ?></td></tr>
+  <?php endforeach; ?></tbody></table></div>
+  <?php endforeach; ?>
+  <p class="hint" style="margin-top:8px;"><?= tt('hrf.legend') ?></p>
+</div>
+<?php endif; ?>
 <?php if (function_exists('hry_has') && hry_has()): $hryA = hry_attention(); if ($hryA['late']): ?><div class="flash flash--bad"><b><?= e(t('hry.banner_late', ['n' => count($hryA['late'])])) ?></b> <?= e(implode(' · ', array_map(fn($s) => $s['label'] . ' (' . t('hry.late_days', ['n' => $s['late_days']]) . ')', array_slice($hryA['late'], 0, 6)))) ?> — <a href="#hr-year"><?= tt('hry.title') ?></a></div><?php endif;
   if ($year === (int) date('Y') && (int) date('n') === 1 && hry_cycle_started($year - 1)) echo hry_card_html($year - 1, true, url('hr_dashboard', ['year' => $year]));   /* January closes the last cycle */
   echo hry_card_html($year, true, url('hr_dashboard', ['year' => $year])); endif; ?>
@@ -31,10 +45,10 @@ layout_head(t('hr.dashboard'), 'hr_dashboard');
 </div>
 <?php endif; ?>
 
-<?php $eqW = function_exists('hre_can') && hre_can() ? hre_waiting() : null; if ($eqW && ($eqW['issue'] || $eqW['return'] || $eqW['leavers'] || $eqW['new'])): /* R97-124 */ ?>
+<?php $eqW = function_exists('hre_can') && hre_can() ? hre_waiting() : null; if ($eqW && ($eqW['issue'] || $eqW['return'] || $eqW['leavers'] || $eqW['new'] || $eqW['exp'])): /* R97-124 */ ?>
 <div class="card" id="hr-equipment" style="border-left:4px solid var(--cp-gold,#C9A227);">
   <div class="page-head" style="margin-bottom:4px;"><h2 style="margin:0;">🧰 <?= tt('hre.w_title') ?></h2><div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('hr_equipment') ?>"><?= tt('hre.title') ?></a></div></div>
-  <p><?= e(t('hre.w_line', ['i' => count($eqW['issue']), 'r' => count($eqW['return']), 'l' => count($eqW['leavers']), 'n' => count($eqW['new'])])) ?></p>
+  <p><?= e(t('hre.w_line', ['i' => count($eqW['issue']), 'r' => count($eqW['return']), 'l' => count($eqW['leavers']), 'n' => count($eqW['new'])])) ?><?= $eqW['exp'] ? ' · <a href="' . url('hr_equipment', ['st' => 'exp']) . '">' . e(t('hre.w_exp_line', ['n' => count($eqW['exp'])])) . '</a>' : '' ?></p>
   <?php foreach (array_slice(array_merge($eqW['return'], $eqW['issue']), 0, 8) as $d_): ?><a href="<?= url('hr_person', ['id' => (int)$d_['person_id'], 'tab' => 'eq']) ?>#eq-docs"><?= e($d_['name_en'] . ' — ' . $d_['doc_no']) ?></a> · <?php endforeach; ?>
 </div>
 <?php endif; ?>

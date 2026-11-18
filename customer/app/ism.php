@@ -574,6 +574,44 @@ function qh_export(string $std): void {
 
 /* ------------------------------------------------------------ R97-087 — approved suppliers for procurement, Excel import, read-only library */
 function qh_has_sup(): bool { return ism_has_ext(); }
+/** R97-125 — a new supplier of the supplier list gets its record in "Approved suppliers" (to evaluate) and a planned initial evaluation
+ *  (ISO 9001, 8.4.1) due in 14 days; the QHSE team is told. Returns the id of the evaluation, or null when nothing was needed. */
+function qh_supplier_new(int $companyId): ?int {
+    if (!ism_has_ext() || $companyId <= 0) return null;
+    try {
+        $co = one('SELECT co.id, co.name FROM companies co WHERE co.id = ? AND co.is_active = 1 AND ' . sup_where(), [$companyId]); if (!$co) return null;
+        $u = current_user(); $by = mb_substr((string)($u['full_name'] ?? 'Portal'), 0, 120); $uid = (int)($u['id'] ?? 0) ?: null; $name = mb_substr((string)$co['name'], 0, 255);
+        $sup = one("SELECT id, code, status FROM ism_records WHERE reg = 'qsup' AND supplier_id = ?", [$companyId]);
+        if ($sup && $sup['status'] !== 'candidate') return null;                       // already evaluated once: the periodic review takes over
+        if (!$sup) {
+            $code = ism_next_code('qsup');
+            q("INSERT INTO ism_records (reg, code, title, status, data, updated_name, created_by, created_name) VALUES ('qsup', ?, ?, 'candidate', '{}', ?, ?, ?)", [$code, $name, $by, $uid, $by]);
+            $sid = (int) db()->lastInsertId(); q('UPDATE ism_records SET supplier_id = ? WHERE id = ?', [$companyId, $sid]); ism_event($sid, 'create', $code . ' — ' . t('qh.sup_auto'));
+        } else $sid = (int)$sup['id'];
+        if (scalar("SELECT COUNT(*) FROM ism_records WHERE reg = 'qsupeval' AND parent_id = ? AND status = 'planned'", [$sid])) return null;
+        $ecode = ism_next_code('qsupeval', $sid); $due = date('Y-m-d', strtotime('+14 days'));
+        q("INSERT INTO ism_records (reg, code, title, status, due_date, data, updated_name, created_by, created_name) VALUES ('qsupeval', ?, ?, 'planned', ?, ?, ?, ?, ?)", [$ecode, mb_substr(t('qh.sup_eval_title', ['n' => $name]), 0, 255), $due, json_encode(['eval_kind' => 'initial'], JSON_UNESCAPED_UNICODE), $by, $uid, $by]);
+        $eid = (int) db()->lastInsertId(); q('UPDATE ism_records SET parent_id = ? WHERE id = ?', [$sid, $eid]); ism_event($eid, 'create', $ecode . ' — ' . t('qh.sup_auto'));
+        if (function_exists('nf_push')) { $to = qh_notify_uids(); if ($to) nf_push($to, 'ism:due', 'qh:supnew:' . $companyId, t('qh.nf_sup_new', ['n' => mb_substr($name, 0, 80), 'c' => $ecode]), t('qh.nf_sup_new_body', ['d' => fmt_date($due)]), url('isms_rec', ['id' => $eid]), $uid, $uid ? $by : null); }
+        return $eid;
+    } catch (Throwable $e) { error_log('qh_supplier_new: ' . $e->getMessage()); return null; }
+}
+/** Who is told about QHSE work: the QHSE team, and the people whose role or discipline gives them QHSE. */
+function qh_notify_uids(): array {
+    $to = qh_team(); $A = qh_access();
+    try { if ($A['roles'] || $A['disc']) { $w = []; if ($A['roles']) $w[] = 'staff_role_id IN (' . implode(',', array_map('intval', $A['roles'])) . ')'; if ($A['disc']) $w[] = 'discipline_id IN (' . implode(',', array_map('intval', $A['disc'])) . ')';
+        $to = array_merge($to, array_map('intval', array_column(all("SELECT id FROM customer_users WHERE is_active = 1 AND role <> 'customer' AND (" . implode(' OR ', $w) . ') LIMIT 40'), 'id'))); } } catch (Throwable $e) {}
+    $to = array_values(array_unique(array_filter($to)));
+    if (!$to) { try { $to = array_map('intval', array_column(all("SELECT id FROM customer_users WHERE is_active = 1 AND role = 'admin' LIMIT 5"), 'id')); } catch (Throwable $e) {} }   // nobody named for QHSE yet: the administrators
+    return $to;
+}
+/** Daily: suppliers that entered the list by another way (import, ERP, accounting) since this function exists. Older suppliers are not touched. */
+function qh_supplier_sweep(): int {
+    if (!ism_has_ext()) return 0; $from = (string) cp_setting('qh_supeval_from', '');
+    if ($from === '') { cp_setting_set('qh_supeval_from', gmdate('Y-m-d H:i:s')); return 0; }
+    $n = 0; try { foreach (all('SELECT co.id FROM companies co WHERE co.is_active = 1 AND ' . sup_where() . " AND co.created_at >= ? AND NOT EXISTS (SELECT 1 FROM ism_records r WHERE r.reg = 'qsup' AND r.supplier_id = co.id) ORDER BY co.id LIMIT 25", [$from]) as $c) if (qh_supplier_new((int)$c['id'])) $n++; } catch (Throwable $e) {}
+    return $n;
+}
 /** Approval of a supplier of the supplier list (ISO 9001 8.4): ['approved'|'conditional'|'blocked'|'candidate'|'ended'|'none', tone]. */
 function sup_approval(int $companyId): array {
     static $M = null; if ($M === null) { $M = []; try { if (function_exists('ism_has_ext') && ism_has_ext()) foreach (all("SELECT supplier_id, status FROM ism_records WHERE reg = 'qsup' AND supplier_id IS NOT NULL") as $r) $M[(int)$r['supplier_id']] = (string)$r['status']; } catch (Throwable $e) {} }

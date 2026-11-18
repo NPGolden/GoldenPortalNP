@@ -20,6 +20,18 @@ const HRE_WITH    = ['pending', 'held', 'missing'];           // still in the na
 
 function hre_has(): bool { static $h = null; if ($h === null) { try { $h = function_exists('hr2_has') && hr2_has() && (bool) scalar("SHOW TABLES LIKE 'hr_eq_items'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function hre_can(): bool { return hre_has() && is_staff() && ((function_exists('hr_can') && hr_can()) || is_cp_admin()); }
+/** R97-125 — categories the signed-in person may prepare lines for: HR and administrators all; the IT & Cybersecurity team computers, telephones
+ *  and keys / cards; QHSE instruments, safety equipment and working clothes; the warehouse tools, working clothes and safety equipment.
+ *  Preparing is not issuing: the lines wait as drafts and HR puts them on the issue list. */
+function hre_prep_cats(): array {
+    static $c = null; if ($c !== null) return $c; $c = []; if (!hre_has() || !is_staff()) return $c; if (hre_can()) return $c = HRE_CATS;
+    try {
+        if (function_exists('ism_team') && (in_array(hre_me(), ism_team(), true) || (function_exists('ism_by_position') && ism_by_position()))) $c = array_merge($c, ['it', 'phone', 'access']);
+        if (function_exists('qh_can') && qh_can()) $c = array_merge($c, ['instrument', 'ppe', 'clothes']);
+        if (function_exists('stk_flag') && stk_flag('can_warehouse')) $c = array_merge($c, ['tool', 'clothes', 'ppe']);
+    } catch (Throwable $e) {}
+    return $c = array_values(array_unique($c));
+}
 function hre_me(): int { return (int)(current_user()['id'] ?? 0); }
 function hre_my_person(): ?array { return hre_has() && function_exists('hr_person_of_user') ? hr_person_of_user(hre_me()) : null; }
 function hre_cat_icon(string $c): string { return ['instrument' => '📏', 'tool' => '🧰', 'it' => '💻', 'phone' => '📱', 'clothes' => '👕', 'ppe' => '🦺', 'access' => '🔑', 'vehicle' => '🚗', 'docs' => '📚', 'other' => '📦'][$c] ?? '📦'; }
@@ -55,28 +67,41 @@ function hre_instruments(): array {
     try { foreach (all("SELECT id, code, title, data FROM ism_records WHERE reg = 'qequip' AND status <> 'retired' ORDER BY code") as $r) { $d = json_decode((string)$r['data'], true) ?: []; $o[(int)$r['id']] = ['label' => trim($r['code'] . ' · ' . $r['title'] . (!empty($d['serial']) ? ' · S/N ' . $d['serial'] : '')), 'title' => trim((string)$r['title'] . (!empty($d['maker_model']) ? ' — ' . $d['maker_model'] : '')), 'serial' => (string)($d['serial'] ?? ''), 'code' => (string)$r['code']]; } } catch (Throwable $e) {}
     return $o;
 }
+/** R97-125 — what can be taken from a register onto a line: instruments of the calibration register and hardware of the IT asset inventory.
+ *  [id => label, title, serial, code, cat, grp] — only code, name and serial number are read. */
+function hre_sources(): array {
+    static $o = null; if ($o !== null) return $o; $o = [];
+    foreach (hre_instruments() as $id => $x) $o[$id] = $x + ['cat' => 'instrument', 'grp' => 'cal'];
+    if (function_exists('ism_has') && ism_has()) { try { foreach (all("SELECT id, code, title, data FROM ism_records WHERE reg = 'asset' AND status <> 'retired' ORDER BY code") as $r) { $d = json_decode((string)$r['data'], true) ?: []; if (($d['type'] ?? 'hardware') !== 'hardware') continue;
+        $o[(int)$r['id']] = ['label' => trim($r['code'] . ' · ' . $r['title']), 'title' => (string)$r['title'], 'serial' => '', 'code' => (string)$r['code'], 'cat' => preg_match('/phone|mobile|smartphone|sim\b|κινητ|τηλ[εέ]φ/iu', (string)$r['title']) ? 'phone' : 'it', 'grp' => 'it']; } } catch (Throwable $e) {} }
+    return $o;
+}
 /** Who holds an instrument of the calibration register now (name or null). */
 function hre_holder_of(int $srcId): ?string { try { return hre_has() ? (scalar("SELECT p.name_en FROM hr_eq_items i JOIN hr_people p ON p.id = i.person_id WHERE i.src_id = ? AND i.status IN ('draft','pending','held','missing') ORDER BY i.id DESC LIMIT 1", [$srcId]) ?: null) : null; } catch (Throwable $e) { return null; } }
 
 /* ------------------------------------------------------------------ lines (HR) */
 function hre_add_from_post(): int {
-    if (!hre_can()) throw new RuntimeException(t('err.noaccess'));
-    $pid = (int)($_POST['person_id'] ?? 0); $p = hr_person($pid); if (!$p) throw new RuntimeException(t('err.notfound'));
+    $mine = hre_prep_cats(); if (!$mine) throw new RuntimeException(t('err.noaccess'));
+    $pid = (int)($_POST['person_id'] ?? 0); $p = hr_person($pid); if (!$p || (!hre_can() && !$p['is_active'])) throw new RuntimeException(t('err.notfound'));
     $cat = (string)($_POST['category'] ?? 'other'); if (!in_array($cat, HRE_CATS, true)) $cat = 'other';
     $desc = mb_substr(trim((string)($_POST['description'] ?? '')), 0, 200); $serial = mb_substr(trim((string)($_POST['serial_no'] ?? '')), 0, 80); $tag = mb_substr(trim((string)($_POST['asset_tag'] ?? '')), 0, 40);
     $src = (int)($_POST['src_id'] ?? 0) ?: null;
-    if ($src) { $ins = hre_instruments()[$src] ?? null; if (!$ins) $src = null; else { if ($desc === '') $desc = mb_substr($ins['title'], 0, 200); if ($serial === '') $serial = mb_substr($ins['serial'], 0, 80); if ($tag === '') $tag = mb_substr($ins['code'], 0, 40); $cat = 'instrument';
+    if ($src) { $ins = hre_sources()[$src] ?? null; if (!$ins) $src = null; else { if ($desc === '') $desc = mb_substr($ins['title'], 0, 200); if ($serial === '') $serial = mb_substr($ins['serial'], 0, 80); if ($tag === '') $tag = mb_substr($ins['code'], 0, 40); $cat = $ins['cat'];
         if ($h = hre_holder_of($src)) throw new RuntimeException(t('hre.err_held', ['n' => $h])); } }
     if ($desc === '') throw new RuntimeException(t('hre.err_desc'));
+    if (!in_array($cat, $mine, true)) throw new RuntimeException(t('hre.err_cat'));
+    $exp = trim((string)($_POST['expires_on'] ?? '')); if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $exp)) $exp = null;
     $qty = (float) str_replace(',', '.', (string)($_POST['qty'] ?? '1')); if ($qty <= 0 || $qty > 9999) $qty = 1.0;
     $cond = (string)($_POST['cond_out'] ?? 'new'); if (!in_array($cond, HRE_CONDS, true)) $cond = 'new';
-    q('INSERT INTO hr_eq_items (person_id, category, description, serial_no, asset_tag, qty, size, cond_out, note, status, src_id, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)',
-      [$pid, $cat, $desc, $serial ?: null, $tag ?: null, $qty, mb_substr(trim((string)($_POST['size'] ?? '')), 0, 20) ?: null, $cond, mb_substr(trim((string)($_POST['note'] ?? '')), 0, 300) ?: null, 'draft', $src, hre_me()]);
+    q('INSERT INTO hr_eq_items (person_id, category, description, serial_no, asset_tag, qty, size, cond_out, note, status, src_id, created_by, expires_on) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [$pid, $cat, $desc, $serial ?: null, $tag ?: null, $qty, mb_substr(trim((string)($_POST['size'] ?? '')), 0, 20) ?: null, $cond, mb_substr(trim((string)($_POST['note'] ?? '')), 0, 300) ?: null, 'draft', $src, hre_me(), $exp]);
+    if (!hre_can() && function_exists('nf_push')) { $u = current_user(); try { nf_push(array_values(array_diff(hre_hr_uids(), [hre_me()])), 'hre', 'hre:prep:' . $pid . ':' . date('Ymd'), t('hre.nf_prepared', ['n' => (string)$p['name_en']]), null, url('hr_person', ['id' => $pid, 'tab' => 'eq']) . '#eq-add', (int)$u['id'], (string)$u['full_name']); } catch (Throwable $e) {} }
     return $pid;
 }
 function hre_del_from_post(): int {
-    if (!hre_can()) throw new RuntimeException(t('err.noaccess'));
+    $mine = hre_prep_cats(); if (!$mine) throw new RuntimeException(t('err.noaccess'));
     $i = one('SELECT * FROM hr_eq_items WHERE id = ?', [(int)($_POST['item_id'] ?? 0)]); if (!$i) throw new RuntimeException(t('err.notfound'));
+    if (!hre_can() && ((int)$i['created_by'] !== hre_me() || !in_array($i['category'], $mine, true))) throw new RuntimeException(t('err.noaccess'));   // a preparer removes only a draft of his / her own
     if ($i['status'] !== 'draft') throw new RuntimeException(t('hre.err_not_draft'));
     q('DELETE FROM hr_eq_items WHERE id = ?', [(int)$i['id']]); return (int)$i['person_id'];
 }
@@ -96,7 +121,7 @@ function hre_notify(array $uids, array $d, string $key, string $url, ?string $bo
 function hre_audit(int $pid, string $what, ?string $new = null, ?string $note = null): void { if (function_exists('hr_audit')) { try { hr_audit($pid, 'equipment', $what, null, $new, $note); } catch (Throwable $e) {} } }
 
 /** HR: the draft lines (all, or the ticked ones) go on an issue list, sent to the employee for acceptance. */
-function hre_issue_from_post(): array {
+function hre_issue_from_post(bool $keepDates = false): array {
     if (!hre_can()) throw new RuntimeException(t('err.noaccess'));
     $pid = (int)($_POST['person_id'] ?? 0); $p = hr_person($pid); if (!$p) throw new RuntimeException(t('err.notfound'));
     $pick = array_map('intval', (array)($_POST['it'] ?? []));
@@ -126,7 +151,7 @@ function hre_accept(int $docId, ?string $paperName = null): array {
         $pdo = db(); $pdo->beginTransaction();
         try {
             q("UPDATE hr_eq_docs SET status = 'accepted', emp_at = NOW(), emp_via = ?, emp_by = ?, emp_name = ?, emp_ip = ? WHERE id = ?", [$via, hre_me(), $name, $ip, $docId]);
-            q("UPDATE hr_eq_items SET status = 'held', issued_on = CURDATE() WHERE issue_doc_id = ? AND status = 'pending'", [$docId]);
+            q("UPDATE hr_eq_items SET status = 'held', issued_on = COALESCE(issued_on, CURDATE()) WHERE issue_doc_id = ? AND status = 'pending'", [$docId]);   // R97-125: a line imported with its date keeps it
             $pdo->commit();
         } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
         hre_audit((int)$d['person_id'], t('hre.issue_list') . ' ' . $d['doc_no'], t('hre.ds_accepted') . ' — ' . $name . ' (' . t('hre.via_' . $via) . ')');
@@ -211,10 +236,11 @@ function hre_receive_from_post(): array {
 /* ------------------------------------------------------------------ overviews (HR dashboard, register, reminders) */
 /** What waits: issue lists not accepted, handover lists for HR, leavers with equipment, new employees with nothing issued. */
 function hre_waiting(): array {
-    $o = ['issue' => [], 'return' => [], 'leavers' => [], 'new' => []]; if (!hre_has()) return $o;
+    $o = ['issue' => [], 'return' => [], 'leavers' => [], 'new' => [], 'exp' => []]; if (!hre_has()) return $o;
     try {
         foreach (all("SELECT d.*, p.name_en, p.is_active FROM hr_eq_docs d JOIN hr_people p ON p.id = d.person_id WHERE d.status IN ('sent','disputed','open') ORDER BY d.created_at") as $d) $o[$d['kind'] === 'issue' ? 'issue' : 'return'][] = $d;
         $o['leavers'] = all("SELECT p.id, p.name_en, p.left_date, COUNT(*) AS n FROM hr_eq_items i JOIN hr_people p ON p.id = i.person_id WHERE p.is_active = 0 AND i.status IN ('pending','held','missing') GROUP BY p.id, p.name_en, p.left_date ORDER BY p.left_date DESC");
+        $o['exp'] = all("SELECT i.id, i.person_id, i.description, i.expires_on, p.name_en FROM hr_eq_items i JOIN hr_people p ON p.id = i.person_id WHERE p.is_active = 1 AND i.status IN ('pending','held') AND i.expires_on IS NOT NULL AND i.expires_on <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) ORDER BY i.expires_on LIMIT 200");
         $o['new'] = all("SELECT p.id, p.name_en, p.hire_date FROM hr_people p WHERE p.is_active = 1 AND p.hire_date >= DATE_SUB(CURDATE(), INTERVAL 90 DAY) AND NOT EXISTS (SELECT 1 FROM hr_eq_items i WHERE i.person_id = p.id) ORDER BY p.hire_date DESC");
     } catch (Throwable $e) {}
     return $o;
@@ -223,14 +249,14 @@ function hre_waiting(): array {
 function hre_register(array $f = []): array {
     if (!hre_has()) return []; $w = ["i.status <> 'followed'"]; $a = [];
     if (in_array($f['cat'] ?? '', HRE_CATS, true)) { $w[] = 'i.category = ?'; $a[] = $f['cat']; }
-    $st = (string)($f['st'] ?? 'with'); if ($st === 'with') $w[] = "i.status IN ('pending','held','missing')"; elseif ($st === 'returned') $w[] = "i.status IN ('returned','writeoff')"; elseif ($st === 'missing') $w[] = "i.status = 'missing'"; elseif ($st === 'draft') $w[] = "i.status = 'draft'";
+    $st = (string)($f['st'] ?? 'with'); if ($st === 'with') $w[] = "i.status IN ('pending','held','missing')"; elseif ($st === 'returned') $w[] = "i.status IN ('returned','writeoff')"; elseif ($st === 'missing') $w[] = "i.status = 'missing'"; elseif ($st === 'draft') $w[] = "i.status = 'draft'"; elseif ($st === 'exp') $w[] = "i.status IN ('pending','held') AND i.expires_on IS NOT NULL AND i.expires_on <= DATE_ADD(CURDATE(), INTERVAL 60 DAY)";
     if (($qq = trim((string)($f['q'] ?? ''))) !== '') { $w[] = '(i.description LIKE ? OR i.serial_no LIKE ? OR i.asset_tag LIKE ? OR p.name_en LIKE ?)'; $l = '%' . $qq . '%'; array_push($a, $l, $l, $l, $l); }
     return all('SELECT i.*, p.name_en, p.is_active AS person_active, di.doc_no AS issue_no, dr.doc_no AS return_no, dr.status AS return_status FROM hr_eq_items i JOIN hr_people p ON p.id = i.person_id LEFT JOIN hr_eq_docs di ON di.id = i.issue_doc_id LEFT JOIN hr_eq_docs dr ON dr.id = i.return_doc_id' . ($w ? ' WHERE ' . implode(' AND ', $w) : '') . ' ORDER BY p.name_en, i.category, i.description LIMIT 3000', $a);
 }
 function hre_register_sheets(array $rows): array {
-    $h = [t('hr.person'), t('hre.category'), t('hre.description'), t('hre.serial'), t('hre.tag'), t('hre.qty'), t('hre.size'), t('hre.cond_out'), t('th.status'), t('hre.issue_list'), t('hre.issued_on'), t('hre.return_list'), t('hre.returned_on'), t('hre.result_note')];
-    $o = []; foreach ($rows as $i) $o[] = [(string)$i['name_en'], hre_cat_label((string)$i['category']), (string)$i['description'], (string)$i['serial_no'], (string)$i['asset_tag'], (float)$i['qty'], (string)$i['size'], t('hre.k_' . $i['cond_out']), t('hre.st_' . $i['status']), (string)$i['issue_no'], (string)$i['issued_on'], (string)$i['return_no'], (string)$i['returned_on'], (string)$i['return_note']];
-    return [['name' => t('hre.title'), 'header' => $h, 'rows' => $o, 'widths' => [28, 18, 40, 20, 14, 8, 10, 12, 16, 16, 12, 16, 12, 30]]];
+    $h = [t('hr.person'), t('hre.category'), t('hre.description'), t('hre.serial'), t('hre.tag'), t('hre.qty'), t('hre.size'), t('hre.cond_out'), t('th.status'), t('hre.issue_list'), t('hre.issued_on'), t('hre.expires'), t('hre.return_list'), t('hre.returned_on'), t('hre.result_note')];
+    $o = []; foreach ($rows as $i) $o[] = [(string)$i['name_en'], hre_cat_label((string)$i['category']), (string)$i['description'], (string)$i['serial_no'], (string)$i['asset_tag'], (float)$i['qty'], (string)$i['size'], t('hre.k_' . $i['cond_out']), t('hre.st_' . $i['status']), (string)$i['issue_no'], (string)$i['issued_on'], (string)$i['expires_on'], (string)$i['return_no'], (string)$i['returned_on'], (string)$i['return_note']];
+    return [['name' => t('hre.title'), 'header' => $h, 'rows' => $o, 'widths' => [28, 18, 40, 20, 14, 8, 10, 12, 16, 16, 12, 12, 16, 12, 30]]];
 }
 /** Daily: the employee is reminded of an issue list not accepted after 3 days (then weekly); HR of a handover list waiting 3 days. */
 function hre_sweep(): int {
@@ -241,8 +267,81 @@ function hre_sweep(): int {
             if ($to) $n += nf_push($to, 'hre', 'hre:' . (int)$d['id'] . ':rem:' . date('oW'), t($d['kind'] === 'issue' ? 'hre.nf_rem_issue' : 'hre.nf_rem_return', ['no' => $d['doc_no'], 'n' => (string)($p['name_en'] ?? '')]), null, $d['kind'] === 'issue' ? url('my_equipment') : url('hr_person', ['id' => (int)$d['person_id'], 'tab' => 'eq']), null, null);
             q('UPDATE hr_eq_docs SET reminded_at = NOW() WHERE id = ?', [(int)$d['id']]);
         }
+        /* R97-125: equipment to be replaced within 30 days — HR and the employee are told once */
+        $hr = hre_hr_uids();
+        foreach (all("SELECT i.id, i.description, i.expires_on, p.name_en, p.user_id, cu.is_active AS acc FROM hr_eq_items i JOIN hr_people p ON p.id = i.person_id LEFT JOIN customer_users cu ON cu.id = p.user_id WHERE p.is_active = 1 AND i.status IN ('pending','held') AND i.expires_on IS NOT NULL AND i.expires_on <= DATE_ADD(CURDATE(), INTERVAL 30 DAY) AND i.exp_notified IS NULL LIMIT 100") as $i) {
+            $to = array_values(array_unique(array_filter(array_merge($hr, (int)$i['user_id'] && (int)$i['acc'] ? [(int)$i['user_id']] : []))));
+            if ($to) $n += nf_push($to, 'hre', 'hre:exp:' . (int)$i['id'], t('hre.nf_exp', ['t' => mb_substr((string)$i['description'], 0, 80), 'n' => (string)$i['name_en'], 'd' => fmt_date($i['expires_on'])]), null, url('hr_equipment', ['st' => 'exp']), null, null);
+            q('UPDATE hr_eq_items SET exp_notified = CURDATE() WHERE id = ?', [(int)$i['id']]);
+        }
     } catch (Throwable $e) {}
     return $n;
+}
+
+/* ------------------------------------------------------------------ standard kits per discipline (R97-125) */
+function hre_kits_has(): bool { static $h = null; if ($h === null) { try { $h = hre_has() && (bool) scalar("SHOW TABLES LIKE 'hr_eq_kits'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** Kit lines: of one discipline (0 = everybody), or all. */
+function hre_kits(?int $disc = null): array { if (!hre_kits_has()) return []; return $disc === null ? all('SELECT k.*, d.name AS discipline FROM hr_eq_kits k LEFT JOIN disciplines d ON d.id = k.discipline_id ORDER BY (k.discipline_id = 0) DESC, d.name, k.category, k.description') : all('SELECT * FROM hr_eq_kits WHERE discipline_id = ? ORDER BY category, description', [$disc]); }
+function hre_kit_for(array $p): array { if (!hre_kits_has()) return []; $d = (int)($p['department_id'] ?? 0); return all('SELECT * FROM hr_eq_kits WHERE discipline_id = 0' . ($d ? ' OR discipline_id = ' . $d : '') . ' ORDER BY category, description'); }
+function hre_kit_save_from_post(): void {
+    if (!hre_can() || !hre_kits_has()) throw new RuntimeException(t('err.noaccess'));
+    $cat = (string)($_POST['category'] ?? 'other'); if (!in_array($cat, HRE_CATS, true)) $cat = 'other'; $desc = mb_substr(trim((string)($_POST['description'] ?? '')), 0, 200); if ($desc === '') throw new RuntimeException(t('hre.err_desc'));
+    $qty = (float) str_replace(',', '.', (string)($_POST['qty'] ?? '1')); if ($qty <= 0 || $qty > 9999) $qty = 1.0; $rm = (int)($_POST['replace_months'] ?? 0); $rm = $rm > 0 && $rm <= 240 ? $rm : null;
+    $disc = (int)($_POST['discipline_id'] ?? 0); if ($disc && !scalar('SELECT COUNT(*) FROM disciplines WHERE id = ?', [$disc])) $disc = 0;
+    q('INSERT INTO hr_eq_kits (discipline_id, category, description, qty, replace_months) VALUES (?,?,?,?,?)', [$disc, $cat, $desc, $qty, $rm]);
+}
+function hre_kit_del_from_post(): void { if (!hre_can() || !hre_kits_has()) throw new RuntimeException(t('err.noaccess')); q('DELETE FROM hr_eq_kits WHERE id = ?', [(int)($_POST['kit_id'] ?? 0)]); }
+/** The kit of the person's discipline (and the kit of everybody) as lines to be issued; a line the person already has is not added twice. Returns the number added. */
+function hre_kit_apply(int $pid): int {
+    $p = hr_person($pid); if (!$p) return 0; $have = array_map(fn($i) => mb_strtolower(trim((string)$i['description'])), hre_items($pid, ['draft', 'pending', 'held'])); $n = 0;
+    foreach (hre_kit_for($p) as $k) { if (in_array(mb_strtolower(trim((string)$k['description'])), $have, true)) continue;
+        q("INSERT INTO hr_eq_items (person_id, category, description, qty, cond_out, status, created_by, expires_on) VALUES (?,?,?,?,'new','draft',?,?)", [$pid, (string)$k['category'], (string)$k['description'], (float)$k['qty'], hre_me() ?: null, $k['replace_months'] ? date('Y-m-d', strtotime('+' . (int)$k['replace_months'] . ' months')) : null]); $n++; }
+    if ($n) hre_audit($pid, t('hre.kit_title'), $n . ' ' . t('hre.lines'));
+    return $n;
+}
+/** "My first weeks" started for an account (soc_onboard_start): the kit of the discipline waits on the card as lines to be issued. */
+function hre_kit_on_start(int $uid): int { try { if (!hre_kits_has() || !function_exists('hr_person_of_user')) return 0; $p = hr_person_of_user($uid); if (!$p || hre_items((int)$p['id'])) return 0; return hre_kit_apply((int)$p['id']); } catch (Throwable $e) { return 0; } }
+
+/* ------------------------------------------------------------------ Excel: what the personnel already hold (R97-125) */
+const HRE_IMPORT_COLS = ['emp_code' => ['Employee code', 'Code'], 'name' => ['Employee', 'Employee name', 'Name'], 'category' => ['Category'], 'description' => ['Description'], 'serial_no' => ['Serial No.', 'Serial', 'Serial number'], 'asset_tag' => ['Company No.', 'Company number', 'Asset tag'],
+                         'qty' => ['Qty', 'Quantity'], 'size' => ['Size'], 'cond_out' => ['Condition'], 'issued_on' => ['Given on', 'Issued on', 'Date'], 'expires_on' => ['Replace by', 'Expiry', 'Expires on'], 'note' => ['Notes', 'Note', 'Remarks']];
+function hre_import_template(): void {
+    if (!hre_can()) throw new RuntimeException(t('err.noaccess')); require_once __DIR__ . '/xlsxw.php';
+    $rows = [['', 'Name Surname', 'Computer / IT', 'Laptop — make and model', 'SERIAL-0001', 'IT-001', 1, '', 'Good', date('Y') . '-01-15', '', 'example row — delete it']];
+    $lists = [['Category', implode(' · ', array_map(fn($c) => t_in('hre.c_' . $c, 'en'), HRE_CATS))], ['Condition', 'New · Good · Used · Worn'], ['Employee', t('hre.imp_n1')], ['Dates', t('hre.imp_n2')], ['', t('hre.imp_n3')]];
+    xlsx_download('GAS-import-hr-equipment.xlsx', [['name' => 'Equipment', 'first' => true, 'header' => array_map(fn($a) => $a[0], array_values(HRE_IMPORT_COLS)), 'rows' => $rows, 'widths' => [16, 28, 20, 40, 20, 16, 8, 10, 12, 14, 14, 30]], ['name' => 'Lists and rules', 'header' => ['Column', 'Values'], 'rows' => $lists, 'widths' => [20, 120]]]);
+}
+/** Reads the workbook: every good row becomes a line to be issued on the card of the person. With $issue, one issue list per person is made
+ *  and sent for acceptance. Returns ['added', 'people', 'lists', 'skipped' => [[row, reason]]]. The file is not kept. */
+function hre_import_from_upload(bool $issue): array {
+    if (!hre_can()) throw new RuntimeException(t('err.noaccess'));
+    $f = $_FILES['file'] ?? null; if (!$f || ($f['error'] ?? 1) !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'])) throw new RuntimeException(t('hre.imp_nofile'));
+    if (strtolower(pathinfo((string)$f['name'], PATHINFO_EXTENSION)) !== 'xlsx' || (int)$f['size'] > 5 * 1024 * 1024) throw new RuntimeException(t('hre.imp_nofile'));
+    require_once __DIR__ . '/xlsx.php'; $rows = xlsx_rows($f['tmp_name']); if (count($rows) < 2) throw new RuntimeException(t('hre.imp_empty'));
+    $map = xlsx_header_map($rows[0], HRE_IMPORT_COLS); if ($map['description'] === null || ($map['emp_code'] === null && $map['name'] === null)) throw new RuntimeException(t('hre.imp_cols'));
+    $norm = fn(string $s) => preg_replace('/\s+/u', ' ', mb_strtolower(trim($s))); $byCode = []; $byName = [];
+    foreach (hr_people(false) as $p) { if (!$p['is_active']) continue; if ((string)$p['emp_code'] !== '') $byCode[$norm((string)$p['emp_code'])] = (int)$p['id']; foreach (['name_en', 'name_el'] as $k) if ((string)($p[$k] ?? '') !== '') { $nn = $norm((string)$p[$k]); $byName[$nn] = isset($byName[$nn]) && $byName[$nn] !== (int)$p['id'] ? 0 : (int)$p['id']; } }
+    $cats = []; foreach (HRE_CATS as $c) { $cats[$norm($c)] = $c; foreach (['en', 'el', 'it'] as $lg) $cats[$norm(t_in('hre.c_' . $c, $lg))] = $c; }
+    $conds = []; foreach (HRE_CONDS as $c) { $conds[$norm($c)] = $c; foreach (['en', 'el', 'it'] as $lg) $conds[$norm(t_in('hre.k_' . $c, $lg))] = $c; }
+    $get = fn(array $r, string $k) => $map[$k] === null ? '' : trim((string)($r[$map[$k]] ?? '')); $o = ['added' => 0, 'people' => [], 'lists' => 0, 'skipped' => []]; $pdo = db(); $pdo->beginTransaction();
+    try {
+        foreach (array_slice($rows, 1, 3000, true) as $ri => $r) {
+            $desc = mb_substr($get($r, 'description'), 0, 200); $code = $get($r, 'emp_code'); $name = $get($r, 'name'); if ($desc === '' && $code === '' && $name === '') continue;
+            if (stripos($get($r, 'note'), 'example row') !== false) continue;
+            $pid = $code !== '' ? ($byCode[$norm($code)] ?? 0) : 0; if (!$pid && $name !== '') $pid = $byName[$norm($name)] ?? 0;
+            if (!$pid) { $o['skipped'][] = [$ri + 1, t('hre.imp_noperson', ['n' => $code !== '' ? $code : $name])]; continue; }
+            if ($desc === '') { $o['skipped'][] = [$ri + 1, t('hre.err_desc')]; continue; }
+            $serial = mb_substr($get($r, 'serial_no'), 0, 80);
+            if ($serial !== '' && scalar("SELECT COUNT(*) FROM hr_eq_items WHERE serial_no = ? AND status IN ('draft','pending','held','missing')", [$serial])) { $o['skipped'][] = [$ri + 1, t('hre.imp_dup', ['s' => $serial])]; continue; }
+            $qty = (float) str_replace(',', '.', $get($r, 'qty') ?: '1'); if ($qty <= 0 || $qty > 9999) $qty = 1.0;
+            q('INSERT INTO hr_eq_items (person_id, category, description, serial_no, asset_tag, qty, size, cond_out, note, status, issued_on, expires_on, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
+              [$pid, $cats[$norm($get($r, 'category'))] ?? 'other', $desc, $serial ?: null, mb_substr($get($r, 'asset_tag'), 0, 40) ?: null, $qty, mb_substr($get($r, 'size'), 0, 20) ?: null, $conds[$norm($get($r, 'cond_out'))] ?? 'used', mb_substr($get($r, 'note'), 0, 300) ?: null, 'draft', xlsx_date($get($r, 'issued_on')), xlsx_date($get($r, 'expires_on')), hre_me()]);
+            $o['added']++; $o['people'][$pid][] = (int)$pdo->lastInsertId();
+        }
+        $pdo->commit();
+    } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+    if ($issue) foreach ($o['people'] as $pid => $ids) { try { $_POST['person_id'] = $pid; $_POST['it'] = $ids; $_POST['note'] = t('hre.imp_list_note'); hre_issue_from_post(true); $o['lists']++; } catch (Throwable $e) {} }
+    $o['people'] = count($o['people']); return $o;
 }
 
 /* ------------------------------------------------------------------ PDF */
@@ -318,8 +417,12 @@ function hre_handle_action(string $action): bool {
     if (!hre_has()) throw new RuntimeException(t('err.noaccess'));
     $back = fn(int $pid, string $hash = '#eq-lines') => redirect('hr_person', ['id' => $pid, 'tab' => 'eq', '_r' => uniqid()], $hash);
     switch ($action) {
-        case 'hre_add':      $pid = hre_add_from_post(); flash('good', t('hre.added')); $back($pid, '#eq-add');
-        case 'hre_del':      $pid = hre_del_from_post(); flash('good', t('hre.removed')); $back($pid, '#eq-add');
+        case 'hre_add':      $pid = hre_add_from_post(); flash('good', t('hre.added')); if (!hre_can()) redirect('eq_prepare', ['person' => $pid, '_r' => uniqid()]); $back($pid, '#eq-add');
+        case 'hre_del':      $pid = hre_del_from_post(); flash('good', t('hre.removed')); if (!hre_can()) redirect('eq_prepare', ['person' => $pid, '_r' => uniqid()]); $back($pid, '#eq-add');
+        case 'hre_kit_save': hre_kit_save_from_post(); flash('good', t('hre.added')); redirect('hr_equipment', ['_r' => uniqid()], '#eq-kits');
+        case 'hre_kit_del':  hre_kit_del_from_post(); flash('good', t('hre.removed')); redirect('hr_equipment', ['_r' => uniqid()], '#eq-kits');
+        case 'hre_kit_apply': { if (!hre_can()) throw new RuntimeException(t('err.noaccess')); $pid = (int)($_POST['person_id'] ?? 0); $n = hre_kit_apply($pid); flash($n ? 'good' : 'warn', t($n ? 'hre.kit_added' : 'hre.kit_nothing', ['n' => $n])); $back($pid, '#eq-add'); }
+        case 'hre_import':   { $r = hre_import_from_upload(!empty($_POST['issue'])); $_SESSION['hre_import'] = $r; flash($r['added'] ? 'good' : 'warn', t('hre.imp_done', ['a' => $r['added'], 'p' => $r['people'], 'l' => $r['lists'], 's' => count($r['skipped'])])); redirect('hr_equipment', ['st' => 'draft', '_r' => uniqid()], '#eq-import'); }
         case 'hre_issue':    $d = hre_issue_from_post(); flash('good', t('hre.issued', ['no' => $d['doc_no']])); $back((int)$d['person_id'], '#eq-docs');
         case 'hre_paper':    $d = hre_accept((int)($_POST['doc_id'] ?? 0), (string)($_POST['signer'] ?? '')); flash('good', t('hre.accepted_ok', ['no' => $d['doc_no']])); $back((int)$d['person_id'], '#eq-docs');
         case 'hre_cancel':   $d = hre_cancel((int)($_POST['doc_id'] ?? 0)); flash('good', t('hre.cancelled', ['no' => $d['doc_no']])); $back((int)$d['person_id'], '#eq-docs');

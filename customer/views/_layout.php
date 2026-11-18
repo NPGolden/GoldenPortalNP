@@ -46,7 +46,7 @@ function nav_groups(): array {
     if ($staff && function_exists('hr2_has') && hr2_has() && (hr_can() || hr_is_manager())) $hr['items'][] = ['hr_requests', t('hr.requests'), '📝'];   // R54-001
     if ($staff && function_exists('hr_lv_has') && hr_lv_has() && hr_can()) $hr['items'][] = ['hr_leaves', t('hr.leaves'), '🏖'];                      // R61-001
     if ($staff && function_exists('jd_has') && jd_has()) { if (jd_manage() || jd_is_gm() || jd_is_ceo() || (function_exists('hr_is_manager') && hr_is_manager())) $hr['items'][] = ['hr_jds', t('jd.title'), '📄']; if (hr_person_of_user((int)(current_user()['id'] ?? 0))) $hr['items'][] = ['my_jd', t('jd.mine'), '📄']; }   // R97-121
-    if ($staff && function_exists('hre_has') && hre_has()) { if (hre_can()) $hr['items'][] = ['hr_equipment', t('hre.title'), '🧰']; if (hr_person_of_user((int)(current_user()['id'] ?? 0))) $hr['items'][] = ['my_equipment', t('hre.mine'), '🧰']; }   // R97-124
+    if ($staff && function_exists('hre_has') && hre_has()) { if (hre_can()) $hr['items'][] = ['hr_equipment', t('hre.title'), '🧰']; elseif (hre_prep_cats()) $hr['items'][] = ['eq_prepare', t('hre.prep_title'), '🧰']; if (hr_person_of_user((int)(current_user()['id'] ?? 0))) $hr['items'][] = ['my_equipment', t('hre.mine'), '🧰']; }   // R97-124
     if ($staff && function_exists('hr_tr_has') && hr_tr_has() && hr_can()) $hr['items'][] = ['hr_training', t('hr.training'), '🎓'];                  // R62-001
     if ($staff && function_exists('hrs_can') && hrs_can()) $hr['items'][] = ['hr_tests', t('hrs.title'), '🧭'];   // R97-063
     if ($staff && function_exists('rcr_can') && rcr_can()) $hr['items'][] = ['rcr_dashboard', t('rc.title'), '🧲'];   // R89-001
