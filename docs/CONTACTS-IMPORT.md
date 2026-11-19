@@ -3574,3 +3574,10 @@ The page on screen stays the internal version for staff.
 - Rule of the searchable drop-down (`assets/portal.js`): more than 8 entries anywhere (unchanged); **4 or more entries inside a filter bar**; always when the list is marked `data-search`; never when marked `data-nosearch`.
 - Purchase orders and Pipeline: the Vessel and Supplier filters are marked always searchable.
 - The native list stays in the form, so values, keyboard use and validation are unchanged. Cybersecurity: browser-side display only, no inline script, CSP unchanged.
+
+## §425 v1.195.4 (R97-141) — Purchase orders and requisitions: remembered filters
+
+- The two lists join the remembered list filters of the portal (R29-008, `app/flt.php`): `purchase_orders` (status, purpose, supplier, vessel, search — one memory per tab) and `requisitions` (search, status, project, mine).
+- Opening the list without any filter in the address (menu, back link, tab) restores the last selection; "Apply" stores the new one; **Clear** forgets it.
+- Tabs Purchase orders / Pipeline / RFQs carry supplier, vessel, purpose and search to each other; the status is per tab.
+- Cybersecurity: the selection is kept in the user's own server session only (not in the browser, not in the database) and ends with the session; values pass through the same validation as typed filters.

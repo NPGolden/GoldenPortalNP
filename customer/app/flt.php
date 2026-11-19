@@ -30,6 +30,8 @@ const FLT_PAGES = [
     'admin_users'     => ['ctx' => [],              'keys' => ['q', 'access', 'customer', 'grole', 'disc', 'status', 'twofa', 'locale', 'login']],
     'admin_log'       => ['ctx' => [],              'keys' => ['q', 'from', 'to', 'outcome']],
     'admin_customers' => ['ctx' => [],              'keys' => ['q', 'status']],
+    'purchase_orders' => ['ctx' => ['tab' => 'po'], 'keys' => ['status', 'purpose', 'supplier_id', 'vessel_id', 'q']],   // R97-141: one memory per tab (orders, pipeline, RFQ)
+    'requisitions'    => ['ctx' => [],              'keys' => ['q', 'status', 'project_id', 'mine']],
     'subproject'      => ['ctx' => ['id', 'tab'],   'keys' => ['ist', 'iside', 'icat', 'iq', 'isort', 'idir'], 'when' => ['tab' => 'issues']],
 ];
 

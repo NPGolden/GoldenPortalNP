@@ -1,8 +1,8 @@
 {
     "name": "Golden A/S Customer Portal",
-    "version": "1.195.3",
+    "version": "1.195.4",
     "build": "2026-11-18",
-    "generated_at": "2026-11-19T11:31:12+00:00",
+    "generated_at": "2026-11-19T11:36:00+00:00",
     "count": 888,
     "files": {
         ".htaccess": {
@@ -10,8 +10,8 @@
             "size": 181
         },
         "CHANGELOG.md": {
-            "sha256": "57ffb595078a2ce81f8aaf2cbc1c28d3216f67e471fc16b132ac4aeb0e5499b7",
-            "size": 191512
+            "sha256": "84911054627ec6fcead05cc466cc54832572540d3cccb4cb79e16b430ae796b8",
+            "size": 191822
         },
         "README.md": {
             "sha256": "aaac31c2a33e616de5c3dc217d5e2f5b7803f116db21e3d4a01cfb1b96e4b974",
@@ -670,8 +670,8 @@
             "size": 5135
         },
         "customer/app/flt.php": {
-            "sha256": "8dbc38630c8df838f71e0e589a918b79a913f356ea38ddd2e7a145cbdf6549fb",
-            "size": 5084
+            "sha256": "bfba217087ba003ec74ad32536d371087169623e45381801fbec7466570d2648",
+            "size": 5362
         },
         "customer/app/fonts/LiberationSans-Bold.ttf": {
             "sha256": "3973aa5054fb467dd5627245d3dc82e37bf16fe075756156a570455871351582",
@@ -998,8 +998,8 @@
             "size": 6873
         },
         "customer/app/version.php": {
-            "sha256": "fa00f9bd41f49456f0c1707c640ea1ef7b9c3f40b46d371d63aa2ebd6734ecfd",
-            "size": 248404
+            "sha256": "bd1eb72869ff239ded4fed390aa6e853cba3068dcbe61b63a46c0de10d8d3762",
+            "size": 248794
         },
         "customer/app/vh.php": {
             "sha256": "06dc02b03a9840b99ce9860942ba8ccf34169b2141ab182a1c34c10716cd6321",
@@ -2426,8 +2426,8 @@
             "size": 35810
         },
         "customer/views/_manual_golden.php": {
-            "sha256": "8ff9712efa14356ad720635631ca7db782944650e5da953289d4445f67a6465a",
-            "size": 395713
+            "sha256": "be740ee3ceb934e4554473d2c658ddb735d9baa246a9de3b632fb4c1b6a1afff",
+            "size": 396515
         },
         "customer/views/_manual_hr.php": {
             "sha256": "e2b6b2380d6f2a87b53ec81db587967d3dceffb6a2957276ad663c4e69d41826",
@@ -2438,16 +2438,16 @@
             "size": 26170
         },
         "customer/views/_manual_pm.php": {
-            "sha256": "360965772daa21980f031c180589182da65ab88b86e739c8f2ccbafc47b14edc",
-            "size": 169357
+            "sha256": "48e8afe92997989845ed89cedf1f9717e44891b741cf4b6d8418110788facf16",
+            "size": 170159
         },
         "customer/views/_manual_qhse.php": {
             "sha256": "2433290a8ff7179fcf16c4f3ba45bed00237d15a6a79d03ef96fda9037b87498",
             "size": 18857
         },
         "customer/views/_manual_staff.php": {
-            "sha256": "8472663a857d8994219e2e0066ba39897d69d27307177b16f2c38c67c09d72e7",
-            "size": 135232
+            "sha256": "68f8dc25bbccf7c052f331ad7c93cfeec1b35d2a9d282f8df784da7dd8f99264",
+            "size": 136034
         },
         "customer/views/_mcs_overview.php": {
             "sha256": "e045d193b36969ea972c9f3bc3e74a20e3f3e2e7859abd6fb9afaa99a71109b0",
@@ -3054,8 +3054,8 @@
             "size": 67292
         },
         "customer/views/purchase_orders.php": {
-            "sha256": "cd0dedae3632a431fd1214185214f9d8abeb9054923b6e8b643c9b8c3e04c7da",
-            "size": 16864
+            "sha256": "771dc74a1c78f720d8a45c2ada767cc921a920b45269a436d627cc9255cbe679",
+            "size": 17508
         },
         "customer/views/qhse.php": {
             "sha256": "b525aca5d8a44541c2da542a697630e02daeb90ecafd77562f2cb851fcd24dd6",
@@ -3142,8 +3142,8 @@
             "size": 31206
         },
         "customer/views/requisitions.php": {
-            "sha256": "4671498bb5b8f06700b1cd1bfe30e07ecb7e1d9893cc4137568c6e224c959618",
-            "size": 5349
+            "sha256": "e9e4878cbb0093e4973009374e6db3bc1659c4f9421bbddf7bc03c1984d2840d",
+            "size": 5579
         },
         "customer/views/risks.php": {
             "sha256": "17baeb8fdc3c7a81eef1b233a1e581e70d3facb69d16b0a5206e7d64ba97bdf6",

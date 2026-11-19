@@ -19,13 +19,13 @@ layout_head(t('po.title'), 'purchase_orders');
   <a class="stat" href="<?= url('purchase_orders', ['tab' => 'po', 'status' => 'open']) ?>"><b><?= $cnt['open'] ?></b><?= tt('po.k_open') ?><span class="s"><?= $cnt['late'] ? '<span style="color:var(--red)">' . e(t('po.k_late', ['n' => $cnt['late']])) . '</span>' : tt('po.k_open_hint') ?></span></a>
   <a class="stat" href="<?= url('purchase_orders', ['tab' => 'rfq']) ?>"><b><?= $cnt['rfq'] ?></b><?= tt('po.k_rfq') ?><span class="s"><?= tt('po.k_rfq_hint') ?></span></a>
 </div>
-<nav class="tabs" style="margin-bottom:12px;"><?php $T = fn($k, $lbl) => '<a class="tab' . ($tab === $k ? ' is-on' : '') . '" href="' . url('purchase_orders', ['tab' => $k]) . '">' . $lbl . '</a>'; echo $T('po', '🛒 ' . t('po.pos')) . $T('pipe', '▦ ' . t('pof.pipe')) . $T('rfq', '📨 ' . t('po.rfqs')) . $T('tobuy', '🧺 ' . t('po.tobuy')); ?></nav>
+<nav class="tabs" style="margin-bottom:12px;"><?php $carry = array_filter(['supplier_id' => $f['supplier_id'], 'vessel_id' => $f['vessel_id'], 'purpose' => $f['purpose'], 'q' => $f['q']]); /* R97-141: supplier, vessel, purpose and search follow to the other tab */ $T = fn($k, $lbl) => '<a class="tab' . ($tab === $k ? ' is-on' : '') . '" href="' . url('purchase_orders', ['tab' => $k] + ($k === 'tobuy' ? [] : $carry)) . '">' . $lbl . '</a>'; echo $T('po', '🛒 ' . t('po.pos')) . $T('pipe', '▦ ' . t('pof.pipe')) . $T('rfq', '📨 ' . t('po.rfqs')) . $T('tobuy', '🧺 ' . t('po.tobuy')); ?></nav>
 
 <?php if ($tab === 'pipe'): /* R97-133: the orders by the stage they wait in */ $PF = array_filter(['supplier_id' => $f['supplier_id'], 'q' => $f['q'], 'purpose' => $f['purpose'], 'vessel_id' => $f['vessel_id']]); $PP = po_pipeline($PF); $nAll = array_sum(array_map('count', $PP['stages'])); ?>
 <form method="get" action="index.php" class="btn-row" style="margin-bottom:10px;"><input type="hidden" name="p" value="purchase_orders"><input type="hidden" name="tab" value="pipe">
   <select name="supplier_id" data-search><option value=""><?= tt('po.supplier') ?> — <?= tt('flt.any') ?></option><?php foreach ($sups as $s): ?><option value="<?= (int)$s['id'] ?>"<?= $sel($s['id'], $f['supplier_id']) ?>><?= e($s['name']) ?></option><?php endforeach; ?></select>
   <select name="vessel_id" data-search><option value=""><?= tt('po.vessel') ?> — <?= tt('flt.any') ?></option><?php foreach ($vessels as $v): ?><option value="<?= (int)$v['id'] ?>"<?= $sel($v['id'], $f['vessel_id']) ?>><?= e($v['name']) ?></option><?php endforeach; ?></select>
-  <input name="q" value="<?= e($f['q']) ?>" placeholder="<?= tt('po.search_ph') ?>" style="min-width:220px;"><button class="btn btn--sm" type="submit"><?= tt('btn.apply') ?></button>
+  <input name="q" value="<?= e($f['q']) ?>" placeholder="<?= tt('po.search_ph') ?>" style="min-width:220px;"><button class="btn btn--sm" type="submit"><?= tt('btn.apply') ?></button><a class="btn btn--ghost btn--sm" href="<?= url('purchase_orders', ['tab' => 'pipe', 'reset' => 1]) ?>"><?= tt('btn.clear') ?></a>
   <span class="hint"><?= e(t('pof.pipe_sum', ['n' => $nAll])) ?></span>
   <?= $PP['late'] ? pill('bad', t('pof.f_late') . ' · ' . $PP['late']) : '' ?> <?= $PP['overdue'] ? pill('bad', t('pof.f_overdue') . ' · ' . $PP['overdue']) : '' ?> <?= $PP['waiting'] ? pill('warn', t('pof.f_waiting') . ' · ' . $PP['waiting']) : '' ?></form>
 <div class="pp-board">
@@ -88,8 +88,9 @@ layout_head(t('po.title'), 'purchase_orders');
   <div class="field"><label><?= tt('po.supplier') ?></label><select name="supplier_id" data-search><option value=""><?= tt('flt.any') ?></option><?php foreach ($sups as $s): ?><option value="<?= (int)$s['id'] ?>"<?= $sel($s['id'], $f['supplier_id']) ?>><?= e($s['name']) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label><?= tt('po.vessel') ?></label><select name="vessel_id" data-search><option value=""><?= tt('flt.any') ?></option><?php foreach ($vessels as $v): ?><option value="<?= (int)$v['id'] ?>"<?= $sel($v['id'], $f['vessel_id']) ?>><?= e($v['name']) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label><?= tt('pr.search') ?></label><input name="q" value="<?= e($f['q']) ?>" placeholder="<?= tt('po.search_ph') ?>"></div>
-  <div class="field"><label>&nbsp;</label><button class="btn btn--sm" type="submit"><?= tt('btn.apply') ?></button></div>
+  <div class="field"><label>&nbsp;</label><div class="btn-row" style="flex-wrap:nowrap;"><button class="btn btn--sm" type="submit"><?= tt('btn.apply') ?></button><a class="btn btn--ghost btn--sm" href="<?= url('purchase_orders', ['tab' => $tab, 'reset' => 1]) ?>"><?= tt('btn.clear') ?></a></div></div>
 </form>
+<?= function_exists('flt_hint') ? flt_hint('purchase_orders', ['tab' => $tab]) : '' ?>
 <div class="card">
 <table class="tbl tbl--wrap">
   <thead><tr><th><?= tt('po.no') ?></th><th><?= tt('po.supplier') ?></th><th><?= tt('prq.project') ?></th><th><?= tt('po.delivery') ?></th><th class="num"><?= tt('prq.lines') ?></th><?php if ($priced): ?><th class="num"><?= tt('po.net') ?></th><?php endif; ?><th><?= tt('pof.col') ?></th><th><?= tt('prq.status') ?></th></tr></thead>

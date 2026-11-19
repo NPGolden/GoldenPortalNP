@@ -24,8 +24,9 @@ layout_head(t('prq.title'), 'requisitions');
   <div class="field"><label><?= tt('prq.status') ?></label><select name="status"><option value=""<?= $sel($f['status'], '') ?>><?= tt('prq.all') ?></option><option value="open"<?= $sel($f['status'], 'open') ?>><?= tt('prq.open') ?></option><option value="pending"<?= $sel($f['status'], 'pending') ?>><?= tt('prq.k_pending') ?></option><?php foreach (PRQ_STATES as $s): ?><option value="<?= $s ?>"<?= $sel($f['status'], $s) ?>><?= tt('prq.s_' . $s) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label>&nbsp;</label><label class="chk"><input type="checkbox" name="mine" value="1"<?= $f['mine'] ? ' checked' : '' ?>> <?= tt('prq.mine') ?></label></div>
   <div class="field"><label><?= tt('pr.search') ?></label><input name="q" value="<?= e($f['q']) ?>" placeholder="<?= tt('prq.search_ph') ?>"></div>
-  <div class="field"><label>&nbsp;</label><button class="btn btn--sm" type="submit"><?= tt('btn.apply') ?></button></div>
+  <div class="field"><label>&nbsp;</label><div class="btn-row" style="flex-wrap:nowrap;"><button class="btn btn--sm" type="submit"><?= tt('btn.apply') ?></button><a class="btn btn--ghost btn--sm" href="<?= url('requisitions', ['reset' => 1]) ?>"><?= tt('btn.clear') ?></a></div></div>
 </form>
+<?= function_exists('flt_hint') ? flt_hint('requisitions') : '' ?>
 <div class="card">
 <table class="tbl tbl--wrap">
   <thead><tr><th><?= tt('prq.no') ?></th><th><?= tt('prq.project') ?></th><th><?= tt('prq.purpose') ?></th><th><?= tt('prq.requester') ?></th><th><?= tt('prq.need') ?></th><th class="num"><?= tt('prq.lines') ?></th><?php if ($priced): ?><th class="num"><?= tt('prq.estimate') ?></th><?php endif; ?><th><?= tt('prq.status') ?></th></tr></thead>

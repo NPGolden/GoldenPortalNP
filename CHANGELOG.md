@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.195.3** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.195.4** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.195.4 | GAS-CP-R97-141 | 2026-11-19 | Purchase orders and requisitions: the filters are remembered — coming back to the list from an order, the menu or another tab shows the previous selection; supplier, vessel, purpose and search follow between the tabs; a Clear button returns to the defaults. | — |
 | 1.195.3 | GAS-CP-R97-140 | 2026-11-19 | Filters: every drop-down of a filter bar with four or more entries is a type-to-search list (it was only from nine entries), so the Vessel and Supplier filters of the purchase orders accept typing; a list can be marked to be always searchable. | — |
 | 1.195.2 | GAS-CP-R97-139 | 2026-11-19 | Purchase order flow: an order paid in full on a proforma that covers the whole order shows the step Paid as done (green, "paid in advance"); only the step Invoiced stays open with the note "proforma — sales invoice awaited". | — |
 | 1.195.1 | GAS-CP-R97-138 | 2026-11-19 | Production › Subcontracting: whoever may edit a production order (production users, the order manager, the project manager) enters and sees the agreed amount of its subcontracts, also without the right to see financial data; lists, totals and PDFs stay under that right. | — |
