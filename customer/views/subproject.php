@@ -71,7 +71,7 @@ layout_head($sp['code'] . ' · ' . $sp['name'], 'projects');
   <?php if ($sp['description']): ?><p class="hint" style="margin:14px 0 0;"><?= rt_html($sp['description']) ?></p><?php endif; ?>
 </div>
 
-<nav class="tabs">
+<nav class="tabs tabs-band">
   <?php foreach ($tabs as $tname): ?>
     <a href="<?= url('subproject', ['id' => $id, 'tab' => $tname]) ?>" class="<?= $tab === $tname ? 'is-on' : '' ?>">
       <?= tt('tab.' . $tname) ?><?php if (isset($cnt[$tname]) && $cnt[$tname]): ?><span class="n"><?= $cnt[$tname] ?></span><?php endif; ?>

@@ -3686,3 +3686,9 @@ The single functions read the batch first and fall back to their own statement, 
 - Cybersecurity: GitHub showed 2 critical Dependabot alerts. Source: `docs-R68/capacitor-customer/package.json`, an archived prototype pinned to `@capacitor/android` / `@capacitor/ios` 6.1.2 (advisory: remote content can be loaded at the app origin through the internal HTTP proxy path). The store builds never used it — they are built from `mobile-native/` on Capacitor 8.6, where `npm audit` reports 0 vulnerabilities. The archive file is renamed `package.R68-archive.json.txt` so it is no longer read as a manifest.
 - Test tooling of the customer client: `@playwright/test` ^1.56.0 (the pinned 1.47.2 had a high advisory on browser download without certificate verification; development machines only).
 - No database change; no effect on performance.
+
+## §436 v1.198.6 (R97-152) — Subproject menu on a gold band
+
+- `customer/views/subproject.php`: the tab menu is `<nav class="tabs tabs-band">`.
+- `assets/portal.css`: `.tabs.tabs-band` (background `--cp-gold-dim`, border `#E8D6A6`, base line `--cp-gold`), open tab `--cp-navy` with white text and gold counter; dark theme: gold-tinted band, open tab gold with navy text. Other pages that use `.tabs` are unchanged.
+- No database change, no new language keys. Cybersecurity: style sheet and one class name only; no script, no inline style, no right or data path changed; no effect on performance.

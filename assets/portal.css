@@ -581,6 +581,10 @@ dialog.gas-confirm p { margin: 0 0 18px; font-size: 14px; color: var(--ink-2); l
           border-bottom: 3px solid transparent; margin-bottom: -2px; border-radius: 6px 6px 0 0; }
 .tabs a.is-on { color: var(--navy-text); border-bottom-color: var(--cp-gold); background: var(--cp-gold-dim); }
 .tabs a .n { font-family: var(--mono); font-size: 12px; color: var(--ink-3); margin-left: 6px; }
+/* R97-152 — subproject menu on a gold band, open tab navy */
+.tabs.tabs-band { background: var(--cp-gold-dim); border: 1px solid #E8D6A6; border-bottom: 2px solid var(--cp-gold); border-radius: 8px 8px 0 0; padding: 5px 6px 0; }
+.tabs.tabs-band a.is-on { background: var(--cp-navy); color: #fff; border-bottom-color: var(--cp-navy); }
+.tabs.tabs-band a.is-on .n { color: var(--gold); }
 
 /* ---- stage editor (staff) -------------------------------------------- */
 .stage-editor { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }
@@ -966,6 +970,8 @@ html[data-theme="dark"] .pill--navy { background: #1B3A52; color: #fff; }
 html[data-theme="dark"] .ofpill { background: rgba(255,255,255,.06); color: var(--ink-2); border-color: var(--glass-line); }
 html[data-theme="dark"] .ofpill--sent { color: #E8C777; } html[data-theme="dark"] .ofpill--approved, html[data-theme="dark"] .ofpill--in_progress, html[data-theme="dark"] .ofpill--to_be_invoiced, html[data-theme="dark"] .ofpill--finished { color: #8FE0BE; } html[data-theme="dark"] .ofpill--rejected, html[data-theme="dark"] .ofpill--cancelled { color: #F8C9C9; }
 html[data-theme="dark"] .tabs a { color: var(--ink-2); } html[data-theme="dark"] .tabs a.is-on { color: #fff; background: rgba(200,155,60,.14); }
+html[data-theme="dark"] .tabs.tabs-band { background: rgba(200,155,60,.10); border-color: rgba(200,155,60,.35); border-bottom-color: var(--cp-gold); }
+html[data-theme="dark"] .tabs.tabs-band a.is-on { background: var(--cp-gold); color: #0B1E2D; border-bottom-color: var(--cp-gold); } html[data-theme="dark"] .tabs.tabs-band a.is-on .n { color: #0B1E2D; }
 html[data-theme="dark"] .fltbar, html[data-theme="dark"] .chips span, html[data-theme="dark"] .tk-file, html[data-theme="dark"] .online-chip { background: transparent; color: var(--ink); border-color: var(--glass-line); }
 html[data-theme="dark"] .tk-file { background: rgba(255,255,255,.06); color: #fff; }
 html[data-theme="dark"] .empty, html[data-theme="dark"] .hint, html[data-theme="dark"] .lede { color: var(--ink-3); }
