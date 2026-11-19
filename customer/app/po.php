@@ -173,6 +173,54 @@ function po_quote_from_post(): void {
     q('UPDATE po_orders SET status = ?, supplier_ref = ?, delivery_date = ? WHERE id = ?', ['quoted', mb_substr(trim((string)($_POST['supplier_ref'] ?? '')), 0, 80) ?: $o['supplier_ref'], preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['delivery_date'] ?? '')) ? $_POST['delivery_date'] : $o['delivery_date'], $oid]);
     po_recalc($oid); po_event($oid, 'quote', trim((string)($_POST['note'] ?? '')) ?: null);
 }
+/* ------------------------------------------------------------------ R97-132: where an order stands — one flow per order */
+/** What the flow needs of a set of orders, read in four statements: lines, receipts, logistics milestones, supplier invoices. [order id => data] */
+function po_flow_data(array $ids): array {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids)))); $D = []; if (!$ids) return $D; $in = implode(',', $ids);
+    foreach ($ids as $i) $D[$i] = ['qty' => 0.0, 'acc' => 0.0, 'inv' => 0.0, 'last_rc' => null, 'ms' => null, 'ms_date' => null, 'n_inv' => 0, 'n_pro' => 0, 'gross' => 0.0, 'paid' => 0.0, 'due' => null, 'overdue' => false];
+    try {
+        foreach (all("SELECT order_id, SUM(qty) AS q, SUM(LEAST(qty, qty_accepted)) AS a, SUM(LEAST(qty, qty_invoiced)) AS i FROM po_lines WHERE order_id IN ($in) AND status <> 'cancelled' GROUP BY order_id") as $r) { $D[(int)$r['order_id']]['qty'] = (float)$r['q']; $D[(int)$r['order_id']]['acc'] = (float)$r['a']; $D[(int)$r['order_id']]['inv'] = (float)$r['i']; }
+        foreach (all("SELECT order_id, MAX(received_at) AS d FROM po_receipts WHERE order_id IN ($in) GROUP BY order_id") as $r) $D[(int)$r['order_id']]['last_rc'] = $r['d'];
+        $rank = array_flip(PO_MILESTONES);
+        foreach (all("SELECT order_id, kind, actual_date FROM po_milestones WHERE order_id IN ($in) AND actual_date IS NOT NULL") as $r) { $o = (int)$r['order_id']; if (!isset($rank[$r['kind']])) continue; if ($D[$o]['ms'] === null || $rank[$r['kind']] > $rank[$D[$o]['ms']]) { $D[$o]['ms'] = $r['kind']; $D[$o]['ms_date'] = $r['actual_date']; } }
+    } catch (Throwable $e) {}
+    try { if ((bool) scalar("SHOW TABLES LIKE 'si_invoices'")) foreach (all("SELECT order_id, kind, " . ((bool) scalar("SHOW COLUMNS FROM si_invoices LIKE 'is_proforma'") ? 'is_proforma' : '0 AS is_proforma') . ", gross, paid, due_date FROM si_invoices WHERE order_id IN ($in) AND status <> 'cancelled'") as $r) { $o = (int)$r['order_id']; $sg = $r['kind'] === 'credit' ? -1 : 1;
+        $D[$o]['gross'] += $sg * (float)$r['gross']; $D[$o]['paid'] += $sg * (float)$r['paid']; if ((int)$r['is_proforma'] === 1) $D[$o]['n_pro']++; else $D[$o]['n_inv']++;
+        if ($sg > 0 && (float)$r['paid'] < (float)$r['gross'] - 0.005 && $r['due_date']) { if ($D[$o]['due'] === null || $r['due_date'] < $D[$o]['due']) $D[$o]['due'] = $r['due_date']; if ($r['due_date'] < date('Y-m-d')) $D[$o]['overdue'] = true; } } } catch (Throwable $e) {}
+    return $D;
+}
+/** The flow of one order: created → sent → confirmed → on the way → received → invoiced → paid → closed. Percentages only, no amounts.
+ *  Steps [key, label, state (done | run | todo | na | bad), note, url] — drawn by hrf_html(). */
+function po_flow(array $o, ?array $d = null): array {
+    $id = (int)$o['id']; $d = $d ?? (po_flow_data([$id])[$id] ?? []); $st = (string)$o['status']; $self = url('purchase_order', ['id' => $id]); $today = date('Y-m-d');
+    $S = []; $add = function (string $k, string $state, string $note = '', ?string $u = null) use (&$S, $self) { $S[] = ['key' => $k, 'label' => t('pof.s_' . $k), 'state' => $state, 'note' => $note, 'url' => $u ?? $self]; };
+    $dt = fn($v) => $v ? fmt_date(substr((string)$v, 0, 10)) : ''; $cancel = $st === 'cancelled'; $off = fn(string $s) => $cancel && $s !== 'done' ? 'na' : $s;
+    if ($o['kind'] === 'rfq') {
+        $add('created', 'done', $dt($o['created_at'] ?? null)); $sent = !empty($o['sent_at']) || !in_array($st, ['draft', 'cancelled'], true);
+        $add('rfq_sent', $off($sent ? 'done' : 'todo'), $dt($o['sent_at'] ?? null)); $add('rfq_quoted', $off(in_array($st, ['quoted', 'awarded', 'closed'], true) ? 'done' : ($sent ? 'run' : 'todo')), $sent && $st === 'sent' ? t('pof.n_waiting') : '');
+        $add('rfq_awarded', $off(in_array($st, ['awarded', 'closed'], true) ? 'done' : 'todo')); return $S;
+    }
+    $pct = fn(float $a, float $b) => $b > 0.0005 ? (int) floor(100 * min(1.0, $a / $b) + 0.0001) : 0;
+    $add('created', 'done', $dt($o['created_at'] ?? null));
+    $sent = !empty($o['sent_at']) || !in_array($st, ['draft', 'cancelled'], true); $add('sent', $off($sent ? 'done' : 'todo'), $dt($o['sent_at'] ?? null));
+    $conf = !empty($o['confirmed_at']) || in_array($st, ['confirmed', 'partial', 'received', 'closed'], true);
+    $add('confirmed', $off($conf ? 'done' : ($sent ? 'run' : 'todo')), $conf ? trim($dt($o['confirmed_at'] ?? null) . ((string)($o['supplier_ref'] ?? '') !== '' ? ' · ' . $o['supplier_ref'] : '')) : ($sent ? t('pof.n_waiting') : ''));
+    $rp = $pct((float)($d['acc'] ?? 0), (float)($d['qty'] ?? 0)); $recv = in_array($st, ['received', 'closed'], true) || $rp >= 100; $exp = ($o['expected_date'] ?? null) ?: ($o['delivery_date'] ?? null);
+    $late = !$recv && $exp && $exp < $today && in_array($st, PO_OPEN, true);
+    if ($recv) $add('transit', 'done', !empty($d['ms']) ? t('po.m_' . $d['ms']) : '');
+    elseif (!empty($d['ms'])) $add('transit', $off($late ? 'bad' : 'run'), t('po.m_' . $d['ms']) . ' ' . $dt($d['ms_date']) . ($late ? ' · ' . t('pof.n_late', ['d' => $dt($exp)]) : ($exp ? ' · ' . t('pof.n_exp', ['d' => $dt($exp)]) : '')));
+    else $add('transit', $off($late ? 'bad' : 'todo'), $late ? t('pof.n_late', ['d' => $dt($exp)]) : ($exp && $sent ? t('pof.n_exp', ['d' => $dt($exp)]) : ''));
+    $add('received', $off($recv ? 'done' : ($rp > 0 ? 'run' : 'todo')), $rp > 0 || $recv ? ($recv ? '100' : $rp) . ' %' . (!empty($d['last_rc']) ? ' · ' . $dt($d['last_rc']) : '') : '', $self . '#receipts');
+    $pay = function_exists('si_can') && si_can() ? url('payables', ['order_id' => $id]) : $self;
+    $ip = $pct((float)($d['inv'] ?? 0), (float)($d['qty'] ?? 0)); $nI = (int)($d['n_inv'] ?? 0); $nP = (int)($d['n_pro'] ?? 0);
+    $invDone = $nI > 0 && $ip >= 100; $add('invoiced', $off($invDone ? 'done' : ($nI + $nP > 0 ? 'run' : 'todo')), $nI > 0 ? $ip . ' %' : ($nP > 0 ? t('pof.n_proforma') : ''), $pay);
+    $g = (float)($d['gross'] ?? 0); $pd = (float)($d['paid'] ?? 0); $pp = $pct($pd, $g); $paidAll = $g > 0.005 && $pd >= $g - 0.005;
+    $ps = $paidAll && ($invDone || $st === 'closed') ? 'done' : (!empty($d['overdue']) ? 'bad' : ($pd > 0.005 || $paidAll ? 'run' : 'todo'));
+    $add('paid', $off($ps), $g > 0.005 ? $pp . ' %' . ($paidAll && !$invDone ? ' · ' . t('pof.n_prepaid') : (!empty($d['due']) ? ' · ' . t(!empty($d['overdue']) ? 'pof.n_overdue' : 'pof.n_due', ['d' => $dt($d['due'])]) : '')) : '', $pay);
+    $add('closed', $st === 'closed' ? 'done' : ($cancel ? 'bad' : 'todo'), $cancel ? t('po.s_cancelled') : '');
+    return $S;
+}
+
 /* ------------------------------------------------------------------ R97-128: prices typed in the lines table; prices read from the supplier's offer by the assistant */
 /** Where prices can be typed in the table: an order that can still be edited (an RFQ takes its prices in the quotation form). */
 function po_prices_can(?array $o): bool { return $o && $o['kind'] === 'po' && po_admin() && po_editable($o) && stk_price_visible(); }

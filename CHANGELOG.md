@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.191.0** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.192.0** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.192.0 | GAS-CP-R97-132 | 2026-11-19 | Purchasing: every order shows where it stands as a flow — created, sent, confirmed, on the way, received, invoiced, paid, closed — on the order and in the list; production orders are renumbered …-PRD-… so they no longer look like purchase orders. | `install/migrate_cp_r97_132_production_order_numbers.sql` |
 | 1.191.0 | GAS-CP-R97-131 | 2026-11-19 | Support: a portrait process-flow page from the offer to the delivery — Sales, Engineering, Purchasing, Warehouse, Accounting — showing per step what happens to quantities, stock and money, with the inventory movements and the delivery notes; printable. | — |
 | 1.190.2 | GAS-CP-R97-130 | 2026-11-19 | Purchase order: a line from a requisition takes the estimated price of the requisition when no buying price is known for the item; on existing orders one button takes the estimates for the lines without price. | — |
 | 1.190.1 | GAS-CP-R97-129 | 2026-11-19 | Purchase order: the selector of open requisition lines is labelled for what it is — still to buy in this project, from other requisitions — and its button reads "Add this line to the order". | — |

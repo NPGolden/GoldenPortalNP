@@ -38,6 +38,9 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
     <?php if ($o && function_exists('po_delete_block') && po_delete_block($o) === null): ?><form method="post" action="<?= $self ?>" data-lock data-prompt="<?= e(t('po.delete_q', ['no' => $o['po_no']])) ?>" data-prompt-field="note"><?= csrf_field() ?><input type="hidden" name="action" value="po_delete"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="note" value=""><button class="btn btn--ghost btn--sm" type="submit" style="color:#9B2C2C;">🗑 <?= tt('btn.delete') ?></button></form><?php elseif ($o && $admin && function_exists('po_delete_block') && in_array($o['status'], ['draft', 'cancelled'], true)): ?><span class="hint" title="<?= e((string)po_delete_block($o)) ?>">🗑 <?= e((string)po_delete_block($o)) ?></span><?php endif; ?>
   </div>
 </div>
+<?php if ($o && function_exists('po_flow') && function_exists('hrf_html')): /* R97-132: where this order stands */ ?>
+<div class="card card--tight" id="po-flow" style="margin-bottom:12px;"><?= hrf_html(po_flow($o)) ?></div>
+<?php endif; ?>
 
 <?php if ($o && $priced && !($rfo && $o['status'] !== 'awarded')): ?>
 <?php $payAll = $r4 && !$isRfq; $lgT = (float)($o['logistics_total'] ?? 0);   /* R97-069: parts + logistics = what the order costs to pay in full */ ?>
@@ -320,7 +323,7 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
 <?php endif; ?>
 
 <?php if ($receipts || $ncrs): ?>
-<div class="card">
+<div class="card" id="receipts">
   <h2><?= tt('po.receipts') ?> <span class="hint" style="font-weight:400;">(<?= count($receipts) ?>)</span></h2>
   <table class="tbl tbl--wrap"><thead><tr><th><?= tt('po.receipt_no') ?></th><th><?= tt('po.received_on') ?></th><th><?= tt('po.delivery_note') ?></th><th><?= tt('prq.who') ?></th><th class="num"><?= tt('prq.lines') ?></th><th>NCR</th></tr></thead><tbody>
   <?php foreach ($receipts as $r): ?><tr><td style="font-family:var(--mono);"><?= e($r['receipt_no']) ?><?= $r['file_id'] ? ' <a href="' . url('file', ['id' => (int)$r['file_id']]) . '" target="_blank">📎</a>' : '' ?></td><td><?= fmt_date($r['received_at']) ?></td><td><?= e($r['delivery_note'] ?? '') ?><?= $r['note'] ? '<br><small class="hint">' . e($r['note']) . '</small>' : '' ?></td><td><?= e($r['user_name'] ?? '') ?></td><td class="num"><?= (int)$r['n_lines'] ?></td><td><?= (int)$r['n_ncr'] ? pill('bad', (int)$r['n_ncr'] . ' ' . t('po.ncr_open')) : '—' ?><?php if ($dnHas) foreach (dn_of_receipt((int)$r['id']) as $dd) echo ' <a class="pill pill--navy" href="', url('delivery_note', ['id' => (int)$dd['id']]), '">🚚 ', e($dd['dn_no']), '</a>'; ?></td></tr>

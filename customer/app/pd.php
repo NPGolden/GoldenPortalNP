@@ -2,7 +2,7 @@
 /**
  * Production orders and production cards.                                                        GAS-CP-R41-001
  *
- * A production order (GAS-PO-YYYY-NNN / GIT-PO-YYYY-NNN) follows the manufacturing of a system from the work package
+ * A production order (GAS-PRD-YYYY-NNN / GIT-PRD-YYYY-NNN — until v1.191.0 "-PO-", the code of the purchase orders; R97-132) follows the manufacturing of a system from the work package
  * that asked for it to the as-built: the units (serial numbers in the Equipment register — one production card
  * each, with the status and the percentage finished set by the production manager), the drawings from draft to
  * approved-for-production to as-built, the FAT / HAT / SAT records, the photos from the shop floor, the delivery
@@ -56,7 +56,7 @@ function pd_can_create(int $pid): bool { return is_staff() && pd_has() && (is_cp
 
 /* ------------------------------------------------------------------ numbering */
 function pd_next_no(int $pid, ?int $sid = null): string {
-    $pre = function_exists('br_prefix') ? br_prefix($pid, $sid) : 'GAS'; $base = $pre . '-PO-' . date('Y') . '-';
+    $pre = function_exists('br_prefix') ? br_prefix($pid, $sid) : 'GAS'; $base = $pre . '-PRD-' . date('Y') . '-';   // R97-132: PRD — "PO" is the purchase order
     $n = (int) scalar('SELECT MAX(CAST(SUBSTRING(po_no, ?) AS UNSIGNED)) FROM production_orders WHERE po_no LIKE ?', [strlen($base) + 1, $base . '%']) + 1;
     return $base . sprintf('%03d', $n);
 }

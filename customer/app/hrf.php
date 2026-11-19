@@ -58,7 +58,7 @@ function hrf_handover(array $p): array {
 }
 /** The flow drawn: boxes of equal width joined by a straight line; green = done, gold = in progress, grey = to do, dashed = does not apply. */
 function hrf_html(array $steps, bool $compact = false): string {
-    $col = ['done' => ['#2E7D32', '#E8F3E9', '✓'], 'run' => ['#C9A227', '#FBF4DC', '…'], 'todo' => ['#8A94A0', '#F2F4F6', ''], 'na' => ['#B8C0C8', 'transparent', '–']];
+    $col = ['done' => ['#2E7D32', '#E8F3E9', '✓'], 'run' => ['#C9A227', '#FBF4DC', '…'], 'todo' => ['#8A94A0', '#F2F4F6', ''], 'na' => ['#B8C0C8', 'transparent', '–'], 'bad' => ['#B3261E', '#FBE9E7', '!']];
     if ($compact) { $h = '<span style="display:inline-flex;align-items:center;white-space:nowrap;">'; foreach ($steps as $i => $s) { [$c, $bg, $ic] = $col[$s['state']];
         $h .= ($i ? '<span style="display:inline-block;width:14px;height:2px;background:' . ($s['state'] === 'done' ? '#2E7D32' : '#C8CED6') . ';"></span>' : '')
             . '<a href="' . e($s['url']) . '" title="' . e($s['label'] . ' — ' . t('hrf.st_' . $s['state']) . ($s['note'] !== '' ? ' · ' . $s['note'] : '')) . '" style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;border:2px ' . ($s['state'] === 'na' ? 'dashed' : 'solid') . ' ' . $c . ';background:' . $bg . ';color:' . $c . ';font-size:12px;font-weight:700;text-decoration:none;">' . ($ic !== '' ? $ic : (string)($i + 1)) . '</a>'; }

@@ -3467,3 +3467,20 @@ The page on screen stays the internal version for staff.
 **Not tested**: printing on paper from a browser (print styles written, not printed); the Greek and Italian texts were written with the page, not reviewed by a native reader of the trade terms.
 
 **Security review**: the page holds no data of the company — no amounts, names or documents — and reads nothing from the database; staff only. No proposal.
+
+## §416 v1.192.0 (R97-132) — Purchase orders: status flow per order; production orders renumbered -PRD-
+
+**Asked**: (1) in Purchasing, the status of each order as a flow, so Procurement and everybody know when it is received, whether it is paid and so on — propose a visual; (2) production orders have the same coding as purchase orders, which is confusing — only two are open, so it can be fixed.
+
+**Change (1)** — `app/po.php`: `po_flow_data()` reads for a set of orders, in four statements, the line quantities (ordered / accepted / invoiced), the last receipt, the furthest logistics milestone reached and the supplier invoices (gross, paid, proforma, earliest unpaid due date); `po_flow()` turns them into eight steps with a state and a note — percentages only. Drawn by `hrf_html()` (new state `bad`, red): full under the title of `purchase_order.php`, compact in a new column of `purchase_orders.php` with a legend. RFQ: four steps. Nothing is stored.
+- On the way: `done` when everything is received; `run` with the last milestone; `bad` when the expected date has passed and the order is open.
+- Paid: `done` when the invoices are paid in full and everything is invoiced; `run` when partly paid or a proforma is paid in advance; `bad` when an unpaid invoice is past its due date.
+- A cancelled order: reached steps stay, the rest do not apply, the last one is red.
+
+**Change (2)** — `app/pd.php` `pd_next_no()`: `<branch>-PRD-YYYY-NNN`. Migration `install/migrate_cp_r97_132_production_order_numbers.sql` (state key `r98s`): `-PO-` → `-PRD-` on numbers of exactly the automatic shape; a number typed by hand is left alone. The column is still called `po_no`.
+
+**Tests (sandbox)**: seven test orders (draft; sent; confirmed, shipped and late; partly received with a paid proforma; received with an overdue invoice; closed and paid; cancelled) — list and order pages opened, screenshots looked at. Migration on three test numbers: two renamed, a custom one left, second run changes nothing; next number continues. Sandbox restored. Error log clean.
+
+**Not tested**: live data; orders with credit notes or several partial invoices were reasoned, not created.
+
+**Security review**: the flow shows states and percentages, no amounts, to whoever may already open the order; the links to Payables appear only for those who have Payables. The renumbering changes one text column. Proposal (no effect on speed): a filter on the list — "late deliveries" and "payment overdue" — fed by the same data.

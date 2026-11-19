@@ -64,9 +64,10 @@ layout_head(t('po.title'), 'purchase_orders');
 </form>
 <div class="card">
 <table class="tbl tbl--wrap">
-  <thead><tr><th><?= tt('po.no') ?></th><th><?= tt('po.supplier') ?></th><th><?= tt('prq.project') ?></th><th><?= tt('po.delivery') ?></th><th class="num"><?= tt('prq.lines') ?></th><?php if ($priced): ?><th class="num"><?= tt('po.net') ?></th><?php endif; ?><th><?= tt('prq.status') ?></th></tr></thead>
+  <thead><tr><th><?= tt('po.no') ?></th><th><?= tt('po.supplier') ?></th><th><?= tt('prq.project') ?></th><th><?= tt('po.delivery') ?></th><th class="num"><?= tt('prq.lines') ?></th><?php if ($priced): ?><th class="num"><?= tt('po.net') ?></th><?php endif; ?><th><?= tt('pof.col') ?></th><th><?= tt('prq.status') ?></th></tr></thead>
   <tbody>
   <?php if (!$rows): ?><tr><td colspan="7" class="hint"><?= tt('po.none') ?></td></tr><?php endif; ?>
+  <?php $flowD = function_exists('po_flow_data') ? po_flow_data(array_column($rows, 'id')) : [];   /* R97-132 */ ?>
   <?php foreach ($rows as $r): $exp = $r['expected_date'] ?? $r['delivery_date']; $late = $exp && in_array($r['status'], PO_OPEN, true) && $exp < date('Y-m-d'); ?>
     <tr>
       <td><a href="<?= url('purchase_order', ['id' => (int)$r['id']]) ?>" style="font-family:var(--mono);"><?= e($r['po_no']) ?></a><?= $r['title'] ? '<br><small class="hint">' . e($r['title']) . '</small>' : '' ?></td>
@@ -75,11 +76,13 @@ layout_head(t('po.title'), 'purchase_orders');
       <td<?= $late ? ' style="color:var(--red)"' : '' ?>><?= fmt_date($exp) ?></td>
       <td class="num"><?= (int)$r['n_lines'] ?><?= (int)$r['n_open'] && in_array($r['status'], ['partial'], true) ? ' <span class="pill pill--gold">' . (int)$r['n_open'] . '</span>' : '' ?></td>
       <?php if ($priced): ?><td class="num"><?= e(po_money((float)$r['subtotal'], $r['currency'])) ?><?php if ((float)($r['logistics_total'] ?? 0) != 0.0): /* R97-069 */ ?><br><small class="hint" title="<?= tt('po.pay_total_long') ?>">+ <?= e(po_money((float)$r['logistics_total'], $r['currency'])) ?> 🚚 · <?= e(po_money((float)$r['gross_total'] + (float)$r['logistics_total'], $r['currency'])) ?></small><?php endif; ?></td><?php endif; ?>
+      <td><?= function_exists('po_flow') && function_exists('hrf_html') ? hrf_html(po_flow($r, $flowD[(int)$r['id']] ?? []), true) : '' ?></td>
       <td><?= po_pill($r['status']) ?></td>
     </tr>
   <?php endforeach; ?>
   </tbody>
 </table>
+<?php if (!empty($rows) && function_exists('po_flow')): ?><p class="hint" style="margin:8px 0 0;"><?= tt('pof.legend') ?></p><?php endif; ?>
 <?= $pg ?>
 </div>
 <?php endif; ?>
