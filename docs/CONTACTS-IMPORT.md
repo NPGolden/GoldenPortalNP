@@ -3529,3 +3529,10 @@ The page on screen stays the internal version for staff.
 **Files.** Files already kept with the invoice (Accounting only) stay there after a link; files uploaded after the link go to the project as before.
 
 **Cybersecurity.** The link action is open to Accounting / management only (same right as registering an invoice); the order must be a sent purchase order of the invoice's supplier; project and sub-project are checked against each other on the server. No new file access path, no migration, no extra query on other pages.
+
+## §420 v1.194.0 (R97-136) — Purchase orders: vessel shown, filter by vessel
+
+- **Where the vessel shows:** Purchasing › Purchase orders, column Project (under project and sub-project, ⚓ name); cards of the Pipeline board; tab RFQ; tab To buy; header of the order page (link to the vessel).
+- **Filter:** field **Vessel** on the filter bar of Purchase orders, RFQ and Pipeline. The list offers only vessels that have orders. Clicking the vessel in a row filters by it. The search box also matches the vessel name.
+- **Source:** the vessel of the project (project card). Orders without a project show no vessel — set the project on the order, or the vessel on the project.
+- **Cybersecurity:** read-only change; the filter value is an integer bound as a query parameter; visibility of orders is unchanged (IT-only buyers still see only IT purchases). One extra join on the order query, no extra queries per row.

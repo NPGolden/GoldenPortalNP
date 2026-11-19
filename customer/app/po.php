@@ -26,10 +26,10 @@ function po_pill(string $s): string { return pill(PO_TONE[$s] ?? 'mute', t('po.s
 function po_money(?float $v, string $cur = 'EUR'): string { return $v === null ? '—' : number_format($v, 2, ',', '.') . ' ' . $cur; }
 
 /* ------------------------------------------------------------------ read */
-const PO_SELECT = "SELECT o.*, co.name AS supplier, co.email AS supplier_co_email, p.project_code, p.name AS project_name, s.code AS sub_code, s.name AS sub_name, w.name AS warehouse,
+const PO_SELECT = "SELECT o.*, co.name AS supplier, co.email AS supplier_co_email, p.project_code, p.name AS project_name, s.code AS sub_code, s.name AS sub_name, w.name AS warehouse, p.vessel_id, v.name AS vessel_name,
                    (SELECT COUNT(*) FROM po_lines l WHERE l.order_id = o.id AND l.status <> 'cancelled') AS n_lines,
                    (SELECT COUNT(*) FROM po_lines l WHERE l.order_id = o.id AND l.status IN ('open','partial')) AS n_open
-                   FROM po_orders o JOIN companies co ON co.id = o.supplier_id LEFT JOIN projects p ON p.id = o.project_id LEFT JOIN subprojects s ON s.id = o.subproject_id LEFT JOIN inv_warehouses w ON w.id = o.warehouse_id";
+                   FROM po_orders o JOIN companies co ON co.id = o.supplier_id LEFT JOIN projects p ON p.id = o.project_id LEFT JOIN subprojects s ON s.id = o.subproject_id LEFT JOIN inv_warehouses w ON w.id = o.warehouse_id LEFT JOIN vessels v ON v.id = p.vessel_id";
 const PO_PURPOSE = ['project', 'stock', 'use'];
 function po_purpose_has(): bool { static $h = null; if ($h === null) { try { $h = po_has() && (bool) scalar("SHOW COLUMNS FROM po_orders LIKE 'purpose'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function po_purpose_pill(array $o): string { if (!po_purpose_has()) return ''; $p = (string)($o['purpose'] ?? 'project'); return $p === 'project' ? '' : pill($p === 'stock' ? 'navy' : 'gold', t('po.pu_' . $p)); }
@@ -43,9 +43,12 @@ function po_list(array $f = []): array {
     if (!empty($f['subproject_id'])) { $w[] = 'o.subproject_id = ?'; $a[] = (int)$f['subproject_id']; }
     if (!empty($f['purpose']) && in_array($f['purpose'], PO_PURPOSE, true) && po_purpose_has()) { $w[] = 'o.purpose = ?'; $a[] = $f['purpose']; }   // R97-108
     if (!empty($f['project_id'])) { $w[] = 'o.project_id = ?'; $a[] = (int)$f['project_id']; }
-    if (!empty($f['q'])) { $l = '%' . trim((string)$f['q']) . '%'; $w[] = '(o.po_no LIKE ? OR o.title LIKE ? OR co.name LIKE ? OR o.supplier_ref LIKE ? OR p.project_code LIKE ? OR EXISTS (SELECT 1 FROM po_lines l WHERE l.order_id = o.id AND (l.description LIKE ? OR l.part_no LIKE ?)))'; array_push($a, $l, $l, $l, $l, $l, $l, $l); }
+    if (!empty($f['vessel_id'])) { $w[] = 'p.vessel_id = ?'; $a[] = (int)$f['vessel_id']; }   // R97-136
+    if (!empty($f['q'])) { $l = '%' . trim((string)$f['q']) . '%'; $w[] = '(o.po_no LIKE ? OR o.title LIKE ? OR co.name LIKE ? OR o.supplier_ref LIKE ? OR p.project_code LIKE ? OR v.name LIKE ? OR EXISTS (SELECT 1 FROM po_lines l WHERE l.order_id = o.id AND (l.description LIKE ? OR l.part_no LIKE ?)))'; array_push($a, $l, $l, $l, $l, $l, $l, $l, $l); }
     return all(PO_SELECT . ' WHERE ' . implode(' AND ', $w) . ' ORDER BY o.id DESC', $a);
 }
+/** R97-136: the vessels that have purchase orders or requests for quotation — for the filter. */
+function po_vessels(): array { try { return all('SELECT DISTINCT v.id, v.name FROM po_orders o JOIN projects p ON p.id = o.project_id JOIN vessels v ON v.id = p.vessel_id ORDER BY v.name'); } catch (Throwable $e) { return []; } }
 function po_lines(int $oid): array { return all('SELECT l.*, i.code AS item_code, i.unit AS item_unit, i.currency AS item_cur, a.code AS alt_of_code, pl.request_id AS pr_id, pr.pr_no FROM po_lines l LEFT JOIN inv_items i ON i.id = l.item_id LEFT JOIN inv_items a ON a.id = l.alt_of_item_id LEFT JOIN pr_lines pl ON pl.id = l.pr_line_id LEFT JOIN pr_requests pr ON pr.id = pl.request_id WHERE l.order_id = ? ORDER BY l.seq, l.id', [$oid]); }
 function po_events(int $oid): array { return all('SELECT * FROM po_events WHERE order_id = ? ORDER BY id DESC', [$oid]); }
 function po_event(int $oid, string $ev, ?string $note = null): void { $u = current_user(); q('INSERT INTO po_events (order_id, event, user_id, user_name, ip, note) VALUES (?,?,?,?,?,?)', [$oid, $ev, $u['id'] ?? null, $u['full_name'] ?? null, substr((string)($_SERVER['REMOTE_ADDR'] ?? ''), 0, 64), $note !== null ? mb_substr($note, 0, 600) : null]);  if (function_exists('proc_feed_later')) { try { $x = one('SELECT o.subproject_id, o.id FROM po_orders o WHERE o.id = ?', [$oid]); proc_feed_later((int)($x['subproject_id'] ?? 0) ?: null); foreach (all('SELECT DISTINCT r.subproject_id FROM po_lines l JOIN pr_lines pl ON pl.id = l.pr_line_id JOIN pr_requests r ON r.id = pl.request_id WHERE l.order_id = ? AND r.subproject_id IS NOT NULL', [$oid]) as $y) proc_feed_later((int)$y['subproject_id']); } catch (Throwable $e) {} } }
@@ -59,8 +62,8 @@ function po_to_buy(array $f = []): array {
     if (!empty($f['subproject_id'])) { $w[] = 'r.subproject_id = ?'; $a[] = (int)$f['subproject_id']; }
     if (!empty($f['project_id'])) { $w[] = 'r.project_id = ?'; $a[] = (int)$f['project_id']; }
     if (po_it()) $w[] = 's.it_purchase = 1';
-    $rows = all('SELECT l.*, r.pr_no, r.project_id, r.subproject_id, r.need_date AS r_need, p.project_code, s.code AS sub_code, i.code AS item_code, i.maker AS item_maker, i.preferred_supplier_id, i.last_supplier_id, ps.name AS preferred_supplier, ls.name AS last_supplier, l.qty - l.qty_reserved - l.qty_ordered AS open_qty
-                 FROM pr_lines l JOIN pr_requests r ON r.id = l.request_id JOIN projects p ON p.id = r.project_id LEFT JOIN subprojects s ON s.id = r.subproject_id LEFT JOIN inv_items i ON i.id = l.item_id LEFT JOIN companies ps ON ps.id = i.preferred_supplier_id LEFT JOIN companies ls ON ls.id = i.last_supplier_id
+    $rows = all('SELECT l.*, r.pr_no, r.project_id, r.subproject_id, r.need_date AS r_need, p.project_code, v.name AS vessel_name, s.code AS sub_code, i.code AS item_code, i.maker AS item_maker, i.preferred_supplier_id, i.last_supplier_id, ps.name AS preferred_supplier, ls.name AS last_supplier, l.qty - l.qty_reserved - l.qty_ordered AS open_qty
+                 FROM pr_lines l JOIN pr_requests r ON r.id = l.request_id JOIN projects p ON p.id = r.project_id LEFT JOIN vessels v ON v.id = p.vessel_id LEFT JOIN subprojects s ON s.id = r.subproject_id LEFT JOIN inv_items i ON i.id = l.item_id LEFT JOIN companies ps ON ps.id = i.preferred_supplier_id LEFT JOIN companies ls ON ls.id = i.last_supplier_id
                  WHERE ' . implode(' AND ', $w) . ' ORDER BY COALESCE(i.preferred_supplier_id, i.last_supplier_id, 0), r.id, l.seq', $a);
     if (function_exists('sup_for_maker')) foreach ($rows as &$r) { if (!$r['preferred_supplier_id'] && !$r['last_supplier_id']) { $mk = sup_for_maker($r['item_maker'] ?: $r['maker']); if ($mk) { $r['maker_supplier_id'] = (int)$mk[0]['id']; $r['maker_supplier'] = $mk[0]['name']; } } } unset($r);   // R82-002: the supplier of the maker when nothing was bought yet
     return $rows;

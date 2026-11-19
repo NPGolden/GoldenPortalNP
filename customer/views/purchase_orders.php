@@ -4,9 +4,9 @@ require __DIR__ . '/_layout.php';
 $u = require_staff();
 if (!function_exists('po_can') || !po_can()) { http_response_code(403); layout_head(t('po.title'), 'purchase_orders'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
 $tab = in_array($_GET['tab'] ?? '', ['po', 'pipe', 'rfq', 'tobuy'], true) ? $_GET['tab'] : 'po'; $admin = po_admin(); $priced = stk_price_visible();
-$f = ['kind' => $tab === 'rfq' ? 'rfq' : 'po', 'status' => (string)($_GET['status'] ?? (isset($_GET['status']) ? '' : 'open')), 'q' => trim((string)($_GET['q'] ?? '')), 'supplier_id' => (int)($_GET['supplier_id'] ?? 0), 'purpose' => (string)($_GET['purpose'] ?? '')];
+$f = ['kind' => $tab === 'rfq' ? 'rfq' : 'po', 'status' => (string)($_GET['status'] ?? (isset($_GET['status']) ? '' : 'open')), 'q' => trim((string)($_GET['q'] ?? '')), 'supplier_id' => (int)($_GET['supplier_id'] ?? 0), 'purpose' => (string)($_GET['purpose'] ?? ''), 'vessel_id' => (int)($_GET['vessel_id'] ?? 0)];
 $cnt = po_counts(); $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : '';
-$sups = sup_list(['status' => 'active']); $keep = array_filter(['tab' => $tab, 'status' => $f['status'], 'q' => $f['q'], 'supplier_id' => $f['supplier_id'], 'purpose' => $f['purpose']]);
+$sups = sup_list(['status' => 'active']); $keep = array_filter(['tab' => $tab, 'status' => $f['status'], 'q' => $f['q'], 'supplier_id' => $f['supplier_id'], 'purpose' => $f['purpose'], 'vessel_id' => $f['vessel_id']]); $vessels = po_vessels();
 layout_head(t('po.title'), 'purchase_orders');
 ?>
 <div class="page-head">
@@ -21,9 +21,10 @@ layout_head(t('po.title'), 'purchase_orders');
 </div>
 <nav class="tabs" style="margin-bottom:12px;"><?php $T = fn($k, $lbl) => '<a class="tab' . ($tab === $k ? ' is-on' : '') . '" href="' . url('purchase_orders', ['tab' => $k]) . '">' . $lbl . '</a>'; echo $T('po', '🛒 ' . t('po.pos')) . $T('pipe', '▦ ' . t('pof.pipe')) . $T('rfq', '📨 ' . t('po.rfqs')) . $T('tobuy', '🧺 ' . t('po.tobuy')); ?></nav>
 
-<?php if ($tab === 'pipe'): /* R97-133: the orders by the stage they wait in */ $PF = array_filter(['supplier_id' => $f['supplier_id'], 'q' => $f['q'], 'purpose' => $f['purpose']]); $PP = po_pipeline($PF); $nAll = array_sum(array_map('count', $PP['stages'])); ?>
+<?php if ($tab === 'pipe'): /* R97-133: the orders by the stage they wait in */ $PF = array_filter(['supplier_id' => $f['supplier_id'], 'q' => $f['q'], 'purpose' => $f['purpose'], 'vessel_id' => $f['vessel_id']]); $PP = po_pipeline($PF); $nAll = array_sum(array_map('count', $PP['stages'])); ?>
 <form method="get" action="index.php" class="btn-row" style="margin-bottom:10px;"><input type="hidden" name="p" value="purchase_orders"><input type="hidden" name="tab" value="pipe">
   <select name="supplier_id"><option value=""><?= tt('po.supplier') ?> — <?= tt('flt.any') ?></option><?php foreach ($sups as $s): ?><option value="<?= (int)$s['id'] ?>"<?= $sel($s['id'], $f['supplier_id']) ?>><?= e($s['name']) ?></option><?php endforeach; ?></select>
+  <select name="vessel_id"><option value=""><?= tt('po.vessel') ?> — <?= tt('flt.any') ?></option><?php foreach ($vessels as $v): ?><option value="<?= (int)$v['id'] ?>"<?= $sel($v['id'], $f['vessel_id']) ?>><?= e($v['name']) ?></option><?php endforeach; ?></select>
   <input name="q" value="<?= e($f['q']) ?>" placeholder="<?= tt('po.search_ph') ?>" style="min-width:220px;"><button class="btn btn--sm" type="submit"><?= tt('btn.apply') ?></button>
   <span class="hint"><?= e(t('pof.pipe_sum', ['n' => $nAll])) ?></span>
   <?= $PP['late'] ? pill('bad', t('pof.f_late') . ' · ' . $PP['late']) : '' ?> <?= $PP['overdue'] ? pill('bad', t('pof.f_overdue') . ' · ' . $PP['overdue']) : '' ?> <?= $PP['waiting'] ? pill('warn', t('pof.f_waiting') . ' · ' . $PP['waiting']) : '' ?></form>
@@ -36,6 +37,7 @@ layout_head(t('po.title'), 'purchase_orders');
     <div class="pp-card" style="<?= $bad ? 'border-left:4px solid #B3261E;' : (in_array('waiting', $r['flags'], true) ? 'border-left:4px solid #C9A227;' : '') ?>">
       <div class="pp-top"><a href="<?= url('purchase_order', ['id' => (int)$r['id']]) ?>"><b style="font-family:var(--mono);"><?= e($r['po_no']) ?></b></a><?= $priced ? '<span class="hint">' . e(po_money((float)$r['subtotal'], $r['currency'])) . '</span>' : '' ?></div>
       <div><?= e($r['supplier']) ?></div>
+      <?php if (!empty($r['vessel_name'])): ?><div class="hint" style="font-weight:600;">⚓ <?= e($r['vessel_name']) ?></div><?php endif; ?>
       <div class="hint"><?= $r['project_id'] ? e((string)$r['project_code']) : (function_exists('po_purpose_pill') ? strip_tags(po_purpose_pill($r)) : '') ?><?= $r['title'] ? ' · ' . e(mb_strimwidth((string)$r['title'], 0, 40, '…')) : '' ?></div>
       <div class="hint"<?= in_array('late', $r['flags'], true) ? ' style="color:#B3261E;font-weight:600;"' : '' ?>><?= $exp ? '📅 ' . e(fmt_date($exp)) : '' ?></div>
       <div style="margin-top:6px;"><?= hrf_html($r['flow'], 'mini') ?></div>
@@ -57,7 +59,7 @@ layout_head(t('po.title'), 'purchase_orders');
     <?php foreach ($rows as $r): $sug = $r['preferred_supplier_id'] ?: ($r['last_supplier_id'] ?: ($r['maker_supplier_id'] ?? 0)); ?>
       <tr><td><input type="checkbox" name="pr_line[]" value="<?= (int)$r['id'] ?>" data-sup="<?= (int)$sug ?>" data-p="<?= (int)$r['project_id'] ?>" data-s="<?= (int)$r['subproject_id'] ?>"></td>
         <td><a href="<?= url('requisition', ['id' => (int)$r['request_id']]) ?>" style="font-family:var(--mono);"><?= e($r['pr_no']) ?></a></td>
-        <td><?= e($r['project_code'] . ($r['sub_code'] ? ' · ' . $r['sub_code'] : '')) ?></td>
+        <td><?= e($r['project_code'] . ($r['sub_code'] ? ' · ' . $r['sub_code'] : '')) ?><?= !empty($r['vessel_name']) ? '<br><small>⚓ ' . e($r['vessel_name']) . '</small>' : '' ?></td>
         <td><?= $r['item_id'] ? '<a href="' . url('inventory_item', ['id' => (int)$r['item_id']]) . '" style="font-family:var(--mono);">' . e($r['item_code']) . '</a>' : '<span class="hint">' . tt('prq.free_text') . '</span>' ?></td>
         <td><?= e($r['description']) ?><?= $r['maker'] || $r['part_no'] ? '<br><small class="hint">' . e(trim(($r['maker'] ?? '') . ' ' . ($r['part_no'] ?? ''))) . '</small>' : '' ?></td>
         <td class="num"><?= stk_qty((float)$r['open_qty']) ?> <?= e($r['unit']) ?><?= (float)$r['qty_ordered'] > 0 ? '<br><small class="hint">' . e(t('po.already_ordered', ['q' => stk_qty((float)$r['qty_ordered'])])) . '</small>' : '' ?></td>
@@ -79,11 +81,12 @@ layout_head(t('po.title'), 'purchase_orders');
 </div>
 
 <?php else: $rows = po_list($f); [$rows, $pg] = page_list($rows, 'purchase_orders', $keep); ?>
-<form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1fr 1fr 1.2fr 1.6fr auto;">
+<form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1fr 1fr 1.2fr 1.2fr 1.6fr auto;">
   <input type="hidden" name="p" value="purchase_orders"><input type="hidden" name="tab" value="<?= $tab ?>">
   <div class="field"><label><?= tt('prq.status') ?></label><select name="status"><option value=""<?= $sel($f['status'], '') ?>><?= tt('prq.all') ?></option><option value="open"<?= $sel($f['status'], 'open') ?>><?= tt('po.f_open') ?></option><?php foreach (PO_STATES as $s): if ($tab === 'po' && in_array($s, ['quoted', 'awarded'], true)) continue; if ($tab === 'rfq' && in_array($s, ['confirmed', 'partial', 'received', 'closed'], true)) continue; ?><option value="<?= $s ?>"<?= $sel($f['status'], $s) ?>><?= tt('po.s_' . $s) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label><?= tt('po.purpose') ?></label><select name="purpose" data-nosearch><option value=""><?= tt('flt.any') ?></option><?php if (function_exists('po_purpose_has') && po_purpose_has()) foreach (PO_PURPOSE as $pu): ?><option value="<?= $pu ?>"<?= $sel($pu, $f['purpose']) ?>><?= tt('po.pu_' . $pu) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label><?= tt('po.supplier') ?></label><select name="supplier_id"><option value=""><?= tt('flt.any') ?></option><?php foreach ($sups as $s): ?><option value="<?= (int)$s['id'] ?>"<?= $sel($s['id'], $f['supplier_id']) ?>><?= e($s['name']) ?></option><?php endforeach; ?></select></div>
+  <div class="field"><label><?= tt('po.vessel') ?></label><select name="vessel_id"><option value=""><?= tt('flt.any') ?></option><?php foreach ($vessels as $v): ?><option value="<?= (int)$v['id'] ?>"<?= $sel($v['id'], $f['vessel_id']) ?>><?= e($v['name']) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label><?= tt('pr.search') ?></label><input name="q" value="<?= e($f['q']) ?>" placeholder="<?= tt('po.search_ph') ?>"></div>
   <div class="field"><label>&nbsp;</label><button class="btn btn--sm" type="submit"><?= tt('btn.apply') ?></button></div>
 </form>
@@ -97,7 +100,7 @@ layout_head(t('po.title'), 'purchase_orders');
     <tr>
       <td><a href="<?= url('purchase_order', ['id' => (int)$r['id']]) ?>" style="font-family:var(--mono);"><?= e($r['po_no']) ?></a><?= $r['title'] ? '<br><small class="hint">' . e($r['title']) . '</small>' : '' ?></td>
       <td><a href="<?= url('suppliers', ['id' => (int)$r['supplier_id']]) ?>"><?= e($r['supplier']) ?></a><?php if ($tab === 'rfq' && function_exists('rfo_has') && rfo_has() && ($nS = (int) scalar('SELECT COUNT(*) FROM po_rfq_suppliers WHERE rfq_id = ?', [(int)$r['id']])) > 1) echo ' <span class="pill pill--navy" title="', e(t('rfo.title')), '">+', $nS - 1, '</span>'; ?><?= $r['supplier_ref'] ? '<br><small class="hint">' . e($r['supplier_ref']) . '</small>' : '' ?></td>
-      <td><?= $r['project_id'] ? pr_link((int)$r['project_id'], $r['project_code'], $r['project_name']) : (function_exists('po_purpose_pill') && po_purpose_pill($r) !== '' ? po_purpose_pill($r) : '—') ?><?= $r['subproject_id'] ? '<br><small><a href="' . url('subproject', ['id' => (int)$r['subproject_id'], 'tab' => 'procurement']) . '">' . e($r['sub_code'] . ' · ' . $r['sub_name']) . '</a></small>' : '' ?></td>
+      <td><?= $r['project_id'] ? pr_link((int)$r['project_id'], $r['project_code'], $r['project_name']) : (function_exists('po_purpose_pill') && po_purpose_pill($r) !== '' ? po_purpose_pill($r) : '—') ?><?= $r['subproject_id'] ? '<br><small><a href="' . url('subproject', ['id' => (int)$r['subproject_id'], 'tab' => 'procurement']) . '">' . e($r['sub_code'] . ' · ' . $r['sub_name']) . '</a></small>' : '' ?><?= !empty($r['vessel_name']) ? '<br><small><a href="' . url('purchase_orders', ['tab' => $tab, 'status' => $f['status'], 'vessel_id' => (int)$r['vessel_id']]) . '" title="' . e(t('po.vessel_only')) . '" style="color:inherit;font-weight:600;">⚓ ' . e($r['vessel_name']) . '</a></small>' : '' ?></td>
       <td<?= $late ? ' style="color:var(--red)"' : '' ?>><?= fmt_date($exp) ?></td>
       <td class="num"><?= (int)$r['n_lines'] ?><?= (int)$r['n_open'] && in_array($r['status'], ['partial'], true) ? ' <span class="pill pill--gold">' . (int)$r['n_open'] . '</span>' : '' ?></td>
       <?php if ($priced): ?><td class="num"><?= e(po_money((float)$r['subtotal'], $r['currency'])) ?><?php if ((float)($r['logistics_total'] ?? 0) != 0.0): /* R97-069 */ ?><br><small class="hint" title="<?= tt('po.pay_total_long') ?>">+ <?= e(po_money((float)$r['logistics_total'], $r['currency'])) ?> 🚚 · <?= e(po_money((float)$r['gross_total'] + (float)$r['logistics_total'], $r['currency'])) ?></small><?php endif; ?></td><?php endif; ?>
