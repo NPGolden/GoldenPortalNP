@@ -477,8 +477,14 @@ function po_line_expected(array $o, array $l): ?string {
 /** Expected delivery of the order = the latest line expectation (or the header date); stored for the lists. */
 function po_expected_update(int $oid): ?string {
     $o = po_load($oid); if (!$o) return null; $max = $o['delivery_date'];
+    try { $pl = scalar("SELECT planned_date FROM po_milestones WHERE order_id = ? AND kind = 'delivered' AND planned_date IS NOT NULL", [$oid]); if ($pl && (!$max || $pl > $max)) $max = $pl; } catch (Throwable $e) {}   // R97-144: the planned date of the step Delivered counts
     foreach (all("SELECT * FROM po_lines WHERE order_id = ? AND status IN ('open','partial')", [$oid]) as $l) { $e = po_line_expected($o, $l); if ($e && (!$max || $e > $max)) $max = $e; }
     q('UPDATE po_orders SET expected_date = ? WHERE id = ?', [$max, $oid]); return $max;
+}
+/** R97-144: once — orders whose step Delivered has a planned date but whose expected / delivery date is empty get it, so the lists show it. */
+function po_expected_backfill(): void {
+    if (!po_r4() || cp_setting('po_exp_fix', '') === '1') return;
+    try { foreach (all("SELECT m.order_id, m.planned_date FROM po_milestones m JOIN po_orders o ON o.id = m.order_id WHERE m.kind = 'delivered' AND m.planned_date IS NOT NULL AND o.status NOT IN ('cancelled','closed') AND (o.delivery_date IS NULL OR o.expected_date IS NULL OR o.expected_date < m.planned_date)") as $r) { q('UPDATE po_orders SET delivery_date = COALESCE(delivery_date, ?) WHERE id = ?', [$r['planned_date'], (int)$r['order_id']]); po_expected_update((int)$r['order_id']); } cp_setting_set('po_exp_fix', '1'); } catch (Throwable $e) { error_log('po_expected_backfill: ' . $e->getMessage()); }
 }
 function po_milestones(int $oid): array { $rows = []; foreach (all('SELECT * FROM po_milestones WHERE order_id = ?', [$oid]) as $m) $rows[$m['kind']] = $m; return $rows; }
 function po_milestone_save_from_post(): void {
@@ -490,6 +496,7 @@ function po_milestone_save_from_post(): void {
     q('INSERT INTO po_milestones (order_id, kind, planned_date, actual_date, carrier, tracking, ref, packages, weight_kg, note, file_id, user_id, user_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE planned_date = VALUES(planned_date), actual_date = VALUES(actual_date), carrier = VALUES(carrier), tracking = VALUES(tracking), ref = VALUES(ref), packages = VALUES(packages), weight_kg = VALUES(weight_kg), note = VALUES(note), file_id = COALESCE(VALUES(file_id), file_id), user_id = VALUES(user_id), user_name = VALUES(user_name)', $v);
     if ($kind === 'confirmed' && $v[3] && $o['status'] === 'sent') { q('UPDATE po_orders SET status = ?, confirmed_at = ? WHERE id = ?', ['confirmed', $v[3] . ' 00:00:00', $oid]); }
     if ($kind === 'delivered' && $v[3]) q('UPDATE po_orders SET delivery_date = COALESCE(delivery_date, ?) WHERE id = ?', [$v[3], $oid]);
+    if ($kind === 'delivered' && $v[2] && !$v[3]) q('UPDATE po_orders SET delivery_date = COALESCE(delivery_date, ?) WHERE id = ?', [$v[2], $oid]);   // R97-144: an order without a delivery date takes the planned date of the step Delivered
     po_event($oid, 'milestone', t('po.m_' . $kind) . ($v[3] ? ' · ' . fmt_date($v[3]) : ($v[2] ? ' · ' . t('po.planned') . ' ' . fmt_date($v[2]) : '')) . ($v[5] ? ' · ' . $v[5] : ''));
     po_expected_update($oid);
 }

@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.196.1';
+const CP_VERSION = '1.196.2';
 const CP_BUILD   = '2026-11-18';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-144', 'version' => '1.196.2', 'date' => '2026-11-19', 'title' => 'Purchase orders: the planned date of the step Delivered in the delivery timeline counts as the expected delivery of the order and fills its empty delivery date; the purchase orders of a sub-project show the expected date; existing orders are completed once.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-143', 'version' => '1.196.1', 'date' => '2026-11-19', 'title' => 'Purchase order document (PDF): a column Delivery per line — the date promised by the supplier, else the lead time in days, else the date the line is needed; shown when at least one line has it.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-142', 'version' => '1.196.0', 'date' => '2026-11-19', 'title' => 'Purchase orders: a cancelled order or request for quotation can be restored by Procurement, with a reason — it returns to the state it had (draft, sent or confirmed), its lines open again and the requisition lines are booked as ordered again; refused when a line was meanwhile ordered on another order.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-141', 'version' => '1.195.4', 'date' => '2026-11-19', 'title' => 'Purchase orders and requisitions: the filters are remembered — coming back to the list from an order, the menu or another tab shows the previous selection; supplier, vessel, purpose and search follow between the tabs; a Clear button returns to the defaults.', 'db' => null, 'check' => null],

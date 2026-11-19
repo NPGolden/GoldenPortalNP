@@ -1,8 +1,8 @@
 {
     "name": "Golden A/S Customer Portal",
-    "version": "1.196.1",
+    "version": "1.196.2",
     "build": "2026-11-18",
-    "generated_at": "2026-11-19T14:34:17+00:00",
+    "generated_at": "2026-11-19T15:10:49+00:00",
     "count": 888,
     "files": {
         ".htaccess": {
@@ -10,8 +10,8 @@
             "size": 181
         },
         "CHANGELOG.md": {
-            "sha256": "5fb4cefb8adcf5df5599a86783a418a113ec0c794db8e814774a0b9408b3dd6b",
-            "size": 192423
+            "sha256": "99a6499b7e27dbe574ab50014d79dfafcf0432ed6ca358b42221015705131f21",
+            "size": 192731
         },
         "README.md": {
             "sha256": "aaac31c2a33e616de5c3dc217d5e2f5b7803f116db21e3d4a01cfb1b96e4b974",
@@ -882,8 +882,8 @@
             "size": 18753
         },
         "customer/app/po.php": {
-            "sha256": "b9d1d88ec015b55644068d9bf34cdca83055d0137cb88a1e9de11862eee1752b",
-            "size": 110158
+            "sha256": "6bb5d2eeaba95c35753dc9cb82dea274e23a3efb67a6b050ef89701bc0de0f13",
+            "size": 111538
         },
         "customer/app/prq.php": {
             "sha256": "8fbd51315f7a967318acc45bec1101389be617904832f91c0204e2efff631090",
@@ -998,8 +998,8 @@
             "size": 6873
         },
         "customer/app/version.php": {
-            "sha256": "ff4f91e6cf45531b856d1ee3d850c4e76db8467c0f14bdcc9144a8a77fb387b6",
-            "size": 249555
+            "sha256": "6d41cef25dda13f1e055f8542b290caf8196475c6a6fad1e83861289df65c4b7",
+            "size": 249943
         },
         "customer/app/vh.php": {
             "sha256": "06dc02b03a9840b99ce9860942ba8ccf34169b2141ab182a1c34c10716cd6321",
@@ -2426,8 +2426,8 @@
             "size": 35810
         },
         "customer/views/_manual_golden.php": {
-            "sha256": "5c0f6a4870790f8aa26d07b81e8306d4653e43a7da8bb58a4889137bd479fc1f",
-            "size": 398572
+            "sha256": "c0c418400cfe7857d4adf63c4baaeff0c31791d6bb1974ced9ee8dbb1790fe5a",
+            "size": 399440
         },
         "customer/views/_manual_hr.php": {
             "sha256": "e2b6b2380d6f2a87b53ec81db587967d3dceffb6a2957276ad663c4e69d41826",
@@ -2438,16 +2438,16 @@
             "size": 26170
         },
         "customer/views/_manual_pm.php": {
-            "sha256": "cf664a2ea91675c1129a6e1b16867b9e209a7f3afb91f5d77ae90a966d52d2c5",
-            "size": 172216
+            "sha256": "57bf2dbb4daa4308a08d9bd8d63b43a4b7e46bca8a6caa778077705f646a9546",
+            "size": 173084
         },
         "customer/views/_manual_qhse.php": {
             "sha256": "2433290a8ff7179fcf16c4f3ba45bed00237d15a6a79d03ef96fda9037b87498",
             "size": 18857
         },
         "customer/views/_manual_staff.php": {
-            "sha256": "03c306c04125d15afe5e57630309c39fb016ab5c8e719c35ed85f7f8126cb4a2",
-            "size": 138091
+            "sha256": "ab6f4217dee7dbad8ff81a4d50d501324c3489410adaabb8237fe5a339222547",
+            "size": 138959
         },
         "customer/views/_mcs_overview.php": {
             "sha256": "e045d193b36969ea972c9f3bc3e74a20e3f3e2e7859abd6fb9afaa99a71109b0",
@@ -2470,8 +2470,8 @@
             "size": 11357
         },
         "customer/views/_procurement_tab.php": {
-            "sha256": "c6a349b0f53e8f68704707efdfbec922b03c4d73b6ba221d270feb9fef91ce7b",
-            "size": 9682
+            "sha256": "78dabbb6100a474d36ff41ee9e936cd046e0566aa68d09ebbbef90b7033b2358",
+            "size": 9890
         },
         "customer/views/_production_sub.php": {
             "sha256": "10bb4d9e9ba324bd7ff73d94b3d8413b6f0d22701ff074de761f71e6f2c7ceb5",
@@ -3054,8 +3054,8 @@
             "size": 67841
         },
         "customer/views/purchase_orders.php": {
-            "sha256": "771dc74a1c78f720d8a45c2ada767cc921a920b45269a436d627cc9255cbe679",
-            "size": 17508
+            "sha256": "3afbcc955ed5450731d71301518a5b9cbb4c3a6e0838dcd5c25a43ff33c2b767",
+            "size": 17599
         },
         "customer/views/qhse.php": {
             "sha256": "b525aca5d8a44541c2da542a697630e02daeb90ecafd77562f2cb851fcd24dd6",

@@ -3597,3 +3597,12 @@ The page on screen stays the internal version for staff.
 - Column **Delivery** on the purchase order PDF (`po_pdf`), between Qty and Unit price: promised date → lead time "N days" → needed date → empty.
 - Printed only when at least one line carries one of the three; the description column narrows from 78 to 56 mm.
 - RFQ document unchanged. No database change. Cybersecurity: the document shows only data already on the order page; no new access.
+
+## §428 v1.196.2 (R97-144) — Purchase orders: planned delivery of the timeline shown in the project
+
+- **Expected delivery of an order** = the latest of: delivery date of the header, planned date of the timeline step *Delivered*, expected date of each open line (promised date, else sent / confirmed + lead time).
+- Saving a planned date on *Delivered* fills the delivery date of the order when it is empty.
+- Sub-project › Procurement › Purchase orders: column Delivery shows the expected date (was: header date only).
+- One-time completion of existing orders on the first opening of the list (setting `po_exp_fix`).
+- Handbook wording of v1.196.1 corrected: the line fields are "Lead time" and "Needed by".
+- Cybersecurity: no new access or input; no database change.
