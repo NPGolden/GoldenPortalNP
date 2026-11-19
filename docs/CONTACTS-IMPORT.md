@@ -3512,3 +3512,20 @@ The page on screen stays the internal version for staff.
 **Not tested**: the invoice of the report itself — its payment stands; attach the proof with the new button.
 
 **Security review**: these files are read only through Payables, which is stricter than the project files — a supplier invoice or a proof filed in a project can be opened by any member of staff who has the link (`cp_stream_file()` checks the customer side only). Proposals (no effect on speed): (1) keep all payables documents in this store, also for project invoices, or mark them so that only who sees financial data can open them; (2) when an invoice is corrected after its payment request was approved, show the difference on the request and ask for a new approval above a tolerance you set (for example 1 % or 20 EUR).
+
+## §419 v1.193.2 (R97-135) — Payables: invoice, order, project and sub-project stay together
+
+**What was wrong.** An invoice or proforma registered from a purchase order took the order's project and sub-project. On the page of a saved invoice the order is shown locked, and a locked field is not sent by the browser — so every later save of the header (amount, date, note) removed the order and the project. The invoice then read "No purchase order — checked by hand", its cost left the sub-project and attached files had no project.
+
+**What changed.**
+
+1. The order of a saved invoice is kept on every edit.
+2. Project and sub-project come from the order. If the order has none, they are taken from the requisition(s) its lines came from, when they all agree.
+3. Without an order, the header has the fields **Project** and **Sub-project**.
+4. On an invoice that can no longer be edited (checked, requested, approved, paid), Accounting uses **Purchase order, project and sub-project › Save the link**. Only orders of the same supplier are offered. The order can be changed while no line of the invoice is matched to an order line. The sub-project cost follows the link.
+5. Payables › Payment requests: each invoice of a request shows its order and project › sub-project; "no project — link it" opens the invoice at the link form.
+6. One-time repair on the first opening of Payables: invoices whose lines still point to one order get the order back; invoices of an order get the order's project. Each repaired invoice has the log line "Linked to order / project — System".
+
+**Files.** Files already kept with the invoice (Accounting only) stay there after a link; files uploaded after the link go to the project as before.
+
+**Cybersecurity.** The link action is open to Accounting / management only (same right as registering an invoice); the order must be a sent purchase order of the invoice's supplier; project and sub-project are checked against each other on the server. No new file access path, no migration, no extra query on other pages.

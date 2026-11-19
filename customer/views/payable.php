@@ -12,6 +12,17 @@ $lines = $i ? si_lines($id) : []; $pays = $i ? si_payments($id) : []; $events = 
 $sups = sup_list(['status' => 'active']); $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : ''; $cur = $i['currency'] ?? 'EUR'; $m = fn(?float $v) => si_money($v, $cur);
 $preO = (int)($_GET['order_id'] ?? ($i['order_id'] ?? 0)); $PO = $preO ? po_load($preO) : null;
 $pos = all("SELECT o.id, o.po_no, o.supplier_id, co.name AS supplier, o.title FROM po_orders o JOIN companies co ON co.id = o.supplier_id WHERE o.kind = 'po' AND o.status IN ('sent','confirmed','partial','received','closed') ORDER BY o.id DESC LIMIT 400");
+if (function_exists('si_link_repair')) si_link_repair();   // R97-135: once
+[$poP, $poS] = $PO && function_exists('si_po_project') ? si_po_project($PO) : [null, null]; $preP = $poP ?: (int)($i['project_id'] ?? 0); $preS = $poS ?: ($poP && (int)($i['project_id'] ?? 0) !== $poP ? 0 : (int)($i['subproject_id'] ?? 0));
+$projects = all("SELECT id, project_code, name FROM projects WHERE status IN ('active','quoted','onhold','planned') OR id = ? ORDER BY project_code DESC LIMIT 400", [$preP]);
+$subs = all("SELECT sp.id, sp.project_id, sp.code, sp.name FROM subprojects sp WHERE sp.status IN ('active','quoted','onhold') OR sp.id = ? ORDER BY sp.sort_order, sp.code LIMIT 1500", [$preS]);
+$linkCan = $i && !$edit && $i['status'] !== 'cancelled' && si_can() && function_exists('si_link_from_post'); $ordFree = $i && function_exists('si_order_free') ? si_order_free($id) : true;
+$projSel = function (bool $lockP, bool $lockS) use ($projects, $subs, $sel, $preP, $preS): string {
+    $h = '<div class="field"><label>' . tt('prq.project') . '</label><select name="project_id" id="si-p"' . ($lockP ? ' disabled' : '') . '><option value="">—</option>'; foreach ($projects as $p) $h .= '<option value="' . (int)$p['id'] . '"' . $sel($p['id'], $preP) . '>' . e(($p['project_code'] ?: '') . ' · ' . $p['name']) . '</option>';
+    $h .= '</select></div><div class="field"><label>' . tt('prq.subproject') . '</label><select name="subproject_id" id="si-s"' . ($lockS ? ' disabled' : '') . '><option value="">—</option>'; foreach ($subs as $s) $h .= '<option value="' . (int)$s['id'] . '" data-p="' . (int)$s['project_id'] . '"' . $sel($s['id'], $preS) . '>' . e(($s['code'] ?: '') . ' · ' . $s['name']) . '</option>';
+    return $h . '</select></div><p class="hint" style="grid-column:1/-1;margin:-4px 0 0;">' . tt($lockP && $lockS ? 'si.proj_from_po' : 'si.proj_hint') . '</p>';
+};
+$projJs = "(function(){var p=document.getElementById('si-p'),s=document.getElementById('si-s');if(!p||!s)return;function f(){var v=p.value;Array.prototype.forEach.call(s.options,function(o){if(!o.value)return;var on=!v||o.getAttribute('data-p')===v;o.hidden=!on;if(!s.disabled)o.disabled=!on;});if(!s.disabled&&s.selectedOptions[0]&&s.selectedOptions[0].disabled)s.value='';}p.addEventListener('change',f);s.addEventListener('change',function(){var o=s.selectedOptions[0];if(o&&o.value&&!p.disabled){p.value=o.getAttribute('data-p');f();}});f();})();";
 $self = url('payable', ['id' => $id]); $back = url('payables'); $open = $i ? round((float)$i['gross'] - (float)$i['paid'], 2) : 0.0;
 $pfHas = function_exists('si_pf_has') && si_pf_has(); $isPf = $pfHas && ($i ? si_is_pf($i) : (!$isCredit && !empty($_GET['proforma'])));   // R97-118
 $openLines = $i && $i['order_id'] && $edit ? si_po_open_lines((int)$i['order_id'], $pfHas && si_prepaid($i)) : [];
@@ -61,6 +72,7 @@ layout_head(($i ? $i['si_no'] : ($isCredit ? t('si.new_credit') : t('si.new'))) 
     <div class="form-grid">
       <div class="field field--full"><label><?= tt('po.one') ?> <span class="hint"><?= tt('si.po_hint') ?></span></label><select name="order_id" id="si-po"<?= $i && $i['order_id'] ? ' disabled' : '' ?>><option value="">—</option><?php foreach ($pos as $o): ?><option value="<?= (int)$o['id'] ?>" data-sup="<?= (int)$o['supplier_id'] ?>"<?= $sel($o['id'], $preO) ?>><?= e($o['po_no'] . ' · ' . $o['supplier'] . ($o['title'] ? ' · ' . $o['title'] : '')) ?></option><?php endforeach; ?></select></div>
       <div class="field field--full"><label><?= tt('po.supplier') ?> *</label><select name="supplier_id" id="si-sup" required><option value=""><?= tt('flt.any') ?></option><?php foreach ($sups as $s): ?><option value="<?= (int)$s['id'] ?>"<?= $sel($s['id'], $PO ? $PO['supplier_id'] : ($i['supplier_id'] ?? 0)) ?>><?= e($s['name']) ?></option><?php endforeach; ?></select></div>
+      <?= $projSel((bool)$poP, (bool)$poS) ?>
       <?php if ($pfHas && !$isCredit && (int)($i['is_proforma'] ?? 0) < 2): ?><div class="field field--full"><label><?= tt('si.doc_type') ?></label><select name="is_proforma" data-nosearch><option value="0"<?= $isPf ? '' : ' selected' ?>><?= tt('si.dt_invoice') ?></option><option value="1"<?= $isPf ? ' selected' : '' ?>><?= tt('si.dt_pf') ?></option></select><p class="hint"><?= tt('si.doc_type_hint') ?></p></div><?php endif; ?>
       <div class="field"><label><?= tt('si.inv_no') ?> *</label><input name="inv_no" maxlength="80" required value="<?= e($i['inv_no'] ?? '') ?>"></div>
       <div class="field"><label><?= tt('si.issue') ?> *</label><input name="issue_date" type="date" required value="<?= e($i['issue_date'] ?? date('Y-m-d')) ?>"></div>
@@ -76,12 +88,24 @@ layout_head(($i ? $i['si_no'] : ($isCredit ? t('si.new_credit') : t('si.new'))) 
     <div class="btn-row"><button class="btn btn--sm" type="submit"><?= $i ? tt('prq.save') : tt('si.register') ?></button></div>
   </form>
   <script nonce="<?= csp_nonce() ?>">(function(){var po=document.getElementById('si-po'),sup=document.getElementById('si-sup');if(!po||!sup)return;function f(){var o=po.selectedOptions[0];if(o&&o.value){sup.value=o.dataset.sup;sup.readOnly=true;}}po.addEventListener('change',f);})();</script>
+  <script nonce="<?= csp_nonce() ?>"><?= $projJs ?></script>
   <?php else: ?>
   <div class="kv-grid">
     <div class="kv"><span><?= tt('si.received_at') ?></span><b><?= fmt_date($i['received_at']) ?></b></div><div class="kv"><span><?= tt('si.registered_by') ?></span><b><?= e($i['created_name'] ?? '') ?></b></div>
     <div class="kv"><span><?= tt('si.checked_by') ?></span><b><?= $i['checked_at'] ? e($i['checked_name']) . ' · ' . fmt_datetime($i['checked_at']) : '—' ?></b></div><div class="kv"><span><?= tt('po.currency') ?></span><b><?= e($i['currency']) ?></b></div>
     <?php if ($i['note']): ?><div class="kv kv--full"><span><?= tt('prq.note') ?></span><b style="white-space:pre-wrap;font-weight:400;"><?= e($i['note']) ?></b></div><?php endif; ?>
   </div>
+  <?php if ($linkCan): /* R97-135: order, project and sub-project of a saved invoice */ ?>
+  <h3 style="margin-top:14px;" id="link"><?= tt('si.link_h') ?></h3>
+  <form method="post" action="<?= $self ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="si_link"><input type="hidden" name="id" value="<?= $id ?>">
+    <div class="form-grid">
+      <div class="field field--full"><label><?= tt('po.one') ?></label><select name="order_id"<?= $ordFree ? '' : ' disabled' ?>><option value="">—</option><?php foreach ($pos as $o) if ((int)$o['supplier_id'] === (int)$i['supplier_id'] || (int)$o['id'] === (int)$i['order_id']): ?><option value="<?= (int)$o['id'] ?>"<?= $sel($o['id'], (int)$i['order_id']) ?>><?= e($o['po_no'] . ($o['title'] ? ' · ' . $o['title'] : '')) ?></option><?php endif; ?></select><?php if (!$ordFree): ?><p class="hint"><?= tt('si.link_locked') ?></p><?php endif; ?></div>
+      <?= $projSel((bool)$poP, (bool)$poS) ?>
+    </div>
+    <div class="btn-row"><button class="btn btn--sm" type="submit"><?= tt('si.link_save') ?></button></div>
+  </form>
+  <script nonce="<?= csp_nonce() ?>"><?= $projJs ?></script>
+  <?php endif; ?>
   <?php endif; ?>
 </div>
 

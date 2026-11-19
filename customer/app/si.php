@@ -75,15 +75,16 @@ function si_editable(array $i): bool { return si_can() && in_array($i['status'],
 function si_save_from_post(): int {
     require_si(); $id = (int)($_POST['id'] ?? 0); $u = current_user();
     $kind = ($_POST['kind'] ?? 'invoice') === 'credit' ? 'credit' : 'invoice';
-    $sup = (int)($_POST['supplier_id'] ?? 0); $oid = (int)($_POST['order_id'] ?? 0) ?: null; $O = $oid ? po_load($oid) : null;
+    $sup = (int)($_POST['supplier_id'] ?? 0); $oid = (int)($_POST['order_id'] ?? 0) ?: null;
+    if ($id && !$oid) $oid = (int) scalar('SELECT order_id FROM si_invoices WHERE id = ?', [$id]) ?: null;   // R97-135: the order of a saved invoice is shown locked and is not posted — it was lost on every edit
+    $O = $oid ? po_load($oid) : null;
     if ($O) { if ($O['kind'] !== 'po') throw new RuntimeException(t('err.notfound')); $sup = (int)$O['supplier_id']; }
     $S = $sup ? sup_load($sup) : null; if (!$S) throw new RuntimeException(t('po.need_supplier'));
     $invNo = mb_substr(trim((string)($_POST['inv_no'] ?? '')), 0, 80); if ($invNo === '') throw new RuntimeException(t('si.need_inv_no'));
     $d = fn(string $k) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST[$k] ?? '')) ? $_POST[$k] : null;
     $issue = $d('issue_date') ?: date('Y-m-d'); $terms = (int)($S['terms_days'] ?? 0); $due = $d('due_date') ?: date('Y-m-d', strtotime($issue . ' +' . max(0, $terms) . ' days'));
     $creditOf = $kind === 'credit' ? ((int)($_POST['credit_of'] ?? 0) ?: null) : null; if ($creditOf && !scalar('SELECT 1 FROM si_invoices WHERE id = ? AND supplier_id = ? AND kind = ?', [$creditOf, $sup, 'invoice'])) $creditOf = null;
-    $pid = $O ? ($O['project_id'] ? (int)$O['project_id'] : null) : ((int)($_POST['project_id'] ?? 0) ?: null); $sid = $O ? ($O['subproject_id'] ? (int)$O['subproject_id'] : null) : ((int)($_POST['subproject_id'] ?? 0) ?: null);
-    if ($sid && !$O) { $pp = (int) scalar('SELECT project_id FROM subprojects WHERE id = ?', [$sid]); if (!$pp) $sid = null; elseif (!$pid) $pid = $pp; }
+    [$pid, $sid] = si_project_pick($O, $id ?: null);   // R97-135: of the order (or of its requisitions); only without those, what was chosen on the form
     $v = ['supplier_id' => $sup, 'inv_no' => $invNo, 'order_id' => $oid, 'credit_of' => $creditOf, 'project_id' => $pid, 'subproject_id' => $sid, 'issue_date' => $issue, 'due_date' => $due, 'received_at' => $d('received_at') ?: date('Y-m-d'),
           'currency' => preg_match('/^[A-Z]{3}$/', (string)($_POST['currency'] ?? '')) ? $_POST['currency'] : ($O['currency'] ?? (($S['sup_currency'] ?? '') ?: 'EUR')),
           'vat_pct' => max(0.0, min(30.0, (float) str_replace(',', '.', (string)($_POST['vat_pct'] ?? ($O['vat_pct'] ?? '0'))))), 'note' => trim((string)($_POST['note'] ?? '')) ?: null];
@@ -108,6 +109,62 @@ function si_save_from_post(): int {
         si_recalc($id);
     }
     return $id;
+}
+/** R97-135: project and sub-project of a purchase order — its own; else the ones of the requisitions its lines came from, when they all agree. */
+function si_po_project(array $O): array {
+    $pid = !empty($O['project_id']) ? (int)$O['project_id'] : null; $sid = !empty($O['subproject_id']) ? (int)$O['subproject_id'] : null; if ($pid && $sid) return [$pid, $sid];
+    try {
+        $rows = all('SELECT DISTINCT r.project_id, r.subproject_id FROM po_lines l JOIN pr_lines pl ON pl.id = l.pr_line_id JOIN pr_requests r ON r.id = pl.request_id WHERE l.order_id = ? AND r.project_id IS NOT NULL' . ($pid ? ' AND r.project_id = ' . $pid : ''), [(int)$O['id']]);
+        $ps = array_values(array_unique(array_map(fn($r) => (int)$r['project_id'], $rows))); $ss = array_values(array_unique(array_map(fn($r) => (int)$r['subproject_id'], $rows)));
+        if (!$pid && count($ps) === 1) $pid = $ps[0];
+        if ($pid && !$sid && count($ps) === 1 && count($ss) === 1 && $ss[0]) $sid = $ss[0];
+    } catch (Throwable $e) {}
+    return [$pid, $sid];
+}
+/** R97-135: project and sub-project of an invoice — of its order when the order has them, else as posted (a sub-project brings its project). */
+function si_project_pick(?array $O, ?int $iid = null): array {
+    [$pid, $sid] = $O ? si_po_project($O) : [null, null];
+    $has = array_key_exists('project_id', $_POST) || array_key_exists('subproject_id', $_POST);
+    if (!$has && $iid) { $x = one('SELECT project_id, subproject_id FROM si_invoices WHERE id = ?', [$iid]); $xp = $x && $x['project_id'] ? (int)$x['project_id'] : null; $xs = $x && $x['subproject_id'] ? (int)$x['subproject_id'] : null; if (!$pid) return [$xp, $xs]; return [$pid, $sid ?: ($xp === $pid ? $xs : null)]; }   // nothing posted: what the invoice has stays
+    if (!$pid) { $pid = (int)($_POST['project_id'] ?? 0) ?: null; $sid = null; }
+    if (!$sid) { $sid = (int)($_POST['subproject_id'] ?? 0) ?: null; if ($sid) { $pp = (int) scalar('SELECT project_id FROM subprojects WHERE id = ?', [$sid]); if (!$pp || ($pid && $pp !== $pid)) $sid = null; elseif (!$pid) $pid = $pp; } }
+    if ($pid && !scalar('SELECT 1 FROM projects WHERE id = ?', [$pid])) { $pid = null; $sid = null; }
+    return [$pid, $sid];
+}
+/** R97-135: whether the order of an invoice may still be changed — no line of it is matched to a line of an order. */
+function si_order_free(int $iid): bool { return !scalar('SELECT 1 FROM si_lines WHERE invoice_id = ? AND po_line_id IS NOT NULL LIMIT 1', [$iid]); }
+/** R97-135: link a saved invoice / proforma (also checked, requested, paid) to its purchase order, project and sub-project. */
+function si_link_from_post(): int {
+    require_si(); $iid = (int)($_POST['id'] ?? 0); $i = si_load($iid); if (!$i || $i['status'] === 'cancelled') throw new RuntimeException(t('err.noaccess'));
+    $oid = $i['order_id'] ? (int)$i['order_id'] : null;
+    if (array_key_exists('order_id', $_POST) && si_order_free($iid)) {
+        $new = (int)$_POST['order_id'] ?: null;
+        if ($new && $new !== $oid) { $N = po_load($new); if (!$N || $N['kind'] !== 'po' || $N['status'] === 'draft' || $N['status'] === 'cancelled') throw new RuntimeException(t('err.notfound')); if ((int)$N['supplier_id'] !== (int)$i['supplier_id']) throw new RuntimeException(t('si.link_sup')); }
+        $oid = $new;
+    }
+    $O = $oid ? po_load($oid) : null; [$pid, $sid] = si_project_pick($O, $iid);
+    $was = [(int)$i['order_id'], (int)$i['project_id'], (int)$i['subproject_id']]; if ($was === [(int)$oid, (int)$pid, (int)$sid]) return $iid;
+    si_link_apply($iid, $oid, $pid, $sid);
+    $n = si_load($iid); si_event($iid, null, 'link', trim(($n['po_no'] ?: '—') . ' · ' . ($n['project_code'] ?: '—') . ($n['sub_code'] ? ' › ' . $n['sub_code'] : '')));
+    return $iid;
+}
+function si_link_apply(int $iid, ?int $oid, ?int $pid, ?int $sid): void {
+    $i = one('SELECT order_id, subproject_id, sp_cost_id FROM si_invoices WHERE id = ?', [$iid]); if (!$i) return;
+    if ($i['sp_cost_id'] && (int)$i['subproject_id'] !== (int)$sid) { q('DELETE FROM sp_costs WHERE id = ?', [(int)$i['sp_cost_id']]); q('UPDATE si_invoices SET sp_cost_id = NULL WHERE id = ?', [$iid]); }   // the cost follows the invoice to the other sub-project
+    q('UPDATE si_invoices SET order_id = ?, project_id = ?, subproject_id = ? WHERE id = ?', [$oid, $pid, $sid, $iid]);
+    si_recalc($iid); try { si_sp_cost_sync($iid); } catch (Throwable $e) {}
+    if ((int)$i['order_id'] && (int)$i['order_id'] !== (int)$oid) { $x = (int) scalar('SELECT id FROM si_invoices WHERE order_id = ? ORDER BY id LIMIT 1', [(int)$i['order_id']]); if ($x) { try { si_sp_cost_sync($x); } catch (Throwable $e) {} } }
+    if (function_exists('cache_bump_later')) cache_bump_later('eng');
+}
+/** R97-135: once — give back the order to invoices that lost it on an edit (their lines still point to its lines), and the project of the order to invoices of an order without one. */
+function si_link_repair(): int {
+    if (!si_has() || cp_setting('si_link_fix', '') === '1') return 0; $n = 0;
+    try {
+        foreach (all('SELECT i.id, MIN(pl.order_id) AS oid FROM si_invoices i JOIN si_lines l ON l.invoice_id = i.id JOIN po_lines pl ON pl.id = l.po_line_id WHERE i.order_id IS NULL GROUP BY i.id HAVING COUNT(DISTINCT pl.order_id) = 1') as $r) { $O = po_load((int)$r['oid']); if (!$O) continue; [$pid, $sid] = si_po_project($O); $x = one('SELECT project_id, subproject_id FROM si_invoices WHERE id = ?', [(int)$r['id']]); si_link_apply((int)$r['id'], (int)$O['id'], $pid ?: ((int)$x['project_id'] ?: null), $pid ? $sid : ((int)$x['subproject_id'] ?: null)); q('INSERT INTO si_events (invoice_id, event, user_name, note) VALUES (?,?,?,?)', [(int)$r['id'], 'link', 'System', $O['po_no']]); $n++; }
+        foreach (all('SELECT i.id, i.order_id, i.project_id FROM si_invoices i WHERE i.order_id IS NOT NULL AND (i.project_id IS NULL OR i.subproject_id IS NULL)') as $r) { $O = po_load((int)$r['order_id']); if (!$O) continue; [$pid, $sid] = si_po_project($O); if (!$pid || ($r['project_id'] && (int)$r['project_id'] !== $pid) || ($r['project_id'] && !$sid)) continue; si_link_apply((int)$r['id'], (int)$O['id'], $pid, $sid); q('INSERT INTO si_events (invoice_id, event, user_name, note) VALUES (?,?,?,?)', [(int)$r['id'], 'link', 'System', $O['po_no']]); $n++; }
+        cp_setting_set('si_link_fix', '1');
+    } catch (Throwable $e) { error_log('si_link_repair: ' . $e->getMessage()); }
+    return $n;
 }
 /** Pre-fill the invoice lines from the PO: every line with accepted goods not yet invoiced, at the PO price. */
 function si_lines_from_po(int $iid, int $oid): int {
@@ -220,7 +277,7 @@ function si_reopen(int $iid): void { require_si(); $i = si_load($iid); if (!$i |
 const SI_R_SELECT = "SELECT r.*, co.name AS supplier, (SELECT COUNT(*) FROM si_request_items ri WHERE ri.request_id = r.id) AS n_inv FROM si_requests r JOIN companies co ON co.id = r.supplier_id";
 function si_request_load(int $id): ?array { return si_has() && $id ? one(SI_R_SELECT . ' WHERE r.id = ?', [$id]) ?: null : null; }
 function si_requests(array $f = []): array { $w = []; $a = []; if (!empty($f['status'])) { if ($f['status'] === 'open') $w[] = "r.status IN ('submitted','mgmt','approved')"; else { $w[] = 'r.status = ?'; $a[] = $f['status']; } } if (!empty($f['supplier_id'])) { $w[] = 'r.supplier_id = ?'; $a[] = (int)$f['supplier_id']; } return all(SI_R_SELECT . ($w ? ' WHERE ' . implode(' AND ', $w) : '') . ' ORDER BY r.id DESC', $a); }
-function si_request_items(int $rid): array { return all('SELECT ri.*, i.si_no, i.inv_no, i.kind, i.gross, i.paid, i.due_date, i.status AS inv_status, i.currency, o.po_no FROM si_request_items ri JOIN si_invoices i ON i.id = ri.invoice_id LEFT JOIN po_orders o ON o.id = i.order_id WHERE ri.request_id = ? ORDER BY i.due_date, i.id', [$rid]); }
+function si_request_items(int $rid): array { return all('SELECT ri.*, i.si_no, i.inv_no, i.kind, i.gross, i.paid, i.due_date, i.status AS inv_status, i.currency, i.order_id, i.project_id, i.subproject_id, o.po_no, p.project_code, s.code AS sub_code FROM si_request_items ri JOIN si_invoices i ON i.id = ri.invoice_id LEFT JOIN po_orders o ON o.id = i.order_id LEFT JOIN projects p ON p.id = i.project_id LEFT JOIN subprojects s ON s.id = i.subproject_id WHERE ri.request_id = ? ORDER BY i.due_date, i.id', [$rid]); }
 /** Payment request: checked invoices (and credit notes) of one supplier → amount = Σ open; over the threshold → management. */
 function si_request_create(array $invoiceIds, ?string $payBy, string $note): int {
     require_si(); $u = current_user(); $ids = array_values(array_unique(array_map('intval', $invoiceIds))); if (!$ids) throw new RuntimeException(t('si.need_invoices'));
