@@ -197,4 +197,9 @@ layout_head(t('dash.title'), 'dashboard');
     </div>
   </div>
 </div>
+<div class="card card--flat apps-card">
+  <h3 class="ed-h"><?= tt('apps.title') ?></h3>
+  <p class="hint" style="margin:0 0 12px;"><?= tt($staff ? 'apps.lede_staff' : 'apps.lede') ?></p>
+  <?= store_apps_html($staff ? ['service', 'pm', 'hr', 'customer'] : ['customer']) ?>
+</div>
 <?php layout_foot(); ?>

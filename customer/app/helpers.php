@@ -277,3 +277,37 @@ function sub_ids_with(string $key, array $sqls): ?array {
     return $c[$key] = $set;
 }
 
+/* ---------------------------------------------- store apps (R97-153) */
+/** The Golden A/S mobile apps: store links, QR images and web apps. 'ios_live' turns on the App Store link once Apple has released the app. */
+function cp_store_apps(): array {
+    $play = 'https://play.google.com/store/apps/details?id=';
+    $ios  = 'https://apps.apple.com/app/id';
+    return [
+        'customer' => ['name' => 'Golden A/S Customer', 'play' => $play . 'gr.goldenas.customer', 'ios' => $ios . '6829433786', 'ios_live' => false, 'web' => 'mobile-customer/'],
+        'service'  => ['name' => 'Golden A/S Service',  'play' => $play . 'gr.goldenas.service',  'ios' => $ios . '6829433629', 'ios_live' => false, 'web' => 'mobile/'],
+        'pm'       => ['name' => 'Golden PM',           'play' => $play . 'gr.goldenas.pm',       'ios' => $ios . '6829433663', 'ios_live' => false, 'web' => 'mobile-pm/'],
+        'hr'       => ['name' => 'Golden HR',           'play' => null, 'ios' => null, 'ios_live' => false, 'web' => 'mobile-hr/'],
+    ];
+}
+/** One card per app: icon, name, a QR tile for Google Play and one for the App Store (or the web app when the app is not in the stores). */
+function store_apps_html(array $keys): string {
+    $apps = cp_store_apps(); $o = '<div class="appgrid">';
+    foreach ($keys as $k) {
+        if (!isset($apps[$k])) continue; $a = $apps[$k];
+        $o .= '<div class="appcard"><div class="appcard-h"><img src="../assets/apps/icon-' . $k . '.png" width="44" height="44" alt="" loading="lazy">'
+            . '<div><b>' . e($a['name']) . '</b><small>' . tt('apps.d.' . $k) . '</small></div></div><div class="appcard-s">';
+        if ($a['play']) {
+            $o .= '<a class="apptile" href="' . e($a['play']) . '" target="_blank" rel="noopener"><img src="../assets/apps/qr-' . $k . '-play.png" width="104" height="104" alt="' . tt('apps.qr_alt', ['app' => $a['name'], 'store' => 'Google Play']) . '" loading="lazy">'
+                . '<span><small>Android</small><b>Google Play</b></span></a>';
+            $live = $a['ios_live'];
+            $o .= ($live ? '<a class="apptile" href="' . e($a['ios']) . '" target="_blank" rel="noopener">' : '<span class="apptile is-soon">')
+                . '<img src="../assets/apps/qr-' . $k . '-ios.png" width="104" height="104" alt="' . ($live ? tt('apps.qr_alt', ['app' => $a['name'], 'store' => 'App Store']) : '') . '" loading="lazy">'
+                . '<span><small>' . ($live ? 'iPhone · iPad' : tt('apps.ios_soon')) . '</small><b>App Store</b></span>' . ($live ? '</a>' : '</span>');
+        } else {
+            $o .= '<a class="apptile apptile--wide" href="' . e($a['web']) . '" target="_blank" rel="noopener"><img src="../assets/apps/qr-' . $k . '-web.png" width="104" height="104" alt="' . tt('apps.qr_alt', ['app' => $a['name'], 'store' => t('apps.web')]) . '" loading="lazy">'
+                . '<span><small>' . tt('apps.no_store') . '</small><b>' . tt('apps.web') . '</b></span></a>';
+        }
+        $o .= '</div><a class="appcard-w" href="' . e($a['web']) . '" target="_blank" rel="noopener">' . tt('apps.open_web') . ' →</a></div>';
+    }
+    return $o . '</div>';
+}

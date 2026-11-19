@@ -48,6 +48,16 @@
     <div style="display:flex;justify-content:center;margin-top:18px;"><?= lang_selector(false) ?></div>
     <p class="buildtag buildtag--gate">v<?= e(CP_VERSION) ?> · <?= e(CP_BUILD) ?></p>
     <p class="gate-foot"><?= tt('login.help') ?></p>
+
+    <div class="gate-apps">
+      <h2><?= tt('apps.title') ?></h2>
+      <p class="hint"><?= tt('apps.lede') ?></p>
+      <?= store_apps_html(['customer']) ?>
+      <details>
+        <summary><?= tt('apps.personnel') ?></summary>
+        <?= store_apps_html(['service', 'pm', 'hr']) ?>
+      </details>
+    </div>
   </div>
 </div>
 </body>

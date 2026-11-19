@@ -2023,3 +2023,35 @@ body.sgn { background: #F3F5F8; margin: 0; }
 .hry-tbl td { vertical-align: top; } .hry-tbl .hry-when { width: 74px; white-space: nowrap; }
 .hry-tbl tr.hry-r-due td:first-child { box-shadow: inset 3px 0 0 var(--cp-gold, #C9A227); } .hry-tbl tr.hry-r-late td:first-child { box-shadow: inset 3px 0 0 #B23B3B; }
 @media (max-width: 720px) { .hry-m b { font-size: 10px; } }
+
+/* R97-153 — mobile apps: QR tiles on the home page and the sign-in page */
+.appgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 12px; }
+.appcard { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: #fff; display: flex; flex-direction: column; gap: 10px; }
+.appcard-h { display: flex; align-items: center; gap: 10px; }
+.appcard-h img { border-radius: 10px; flex: none; }
+.appcard-h b { display: block; color: var(--navy-text); font-size: 15px; }
+.appcard-h small { display: block; color: var(--ink-3); font-size: 12px; line-height: 1.35; }
+.appcard-s { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.apptile { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px; border: 1px solid #E8D6A6; border-radius: 8px; background: var(--cp-gold-dim); text-decoration: none; text-align: center; }
+.apptile img { background: #fff; border-radius: 6px; display: block; }
+.apptile small { display: block; font-size: 11px; color: var(--ink-3); }
+.apptile b { display: block; font-size: 13px; color: var(--navy-text); }
+a.apptile:hover { border-color: var(--cp-gold); box-shadow: 0 2px 8px rgba(11,30,45,.10); }
+.apptile.is-soon { background: #F4F6F8; border-color: var(--line); }
+.apptile.is-soon img { opacity: .14; filter: grayscale(1); }
+.apptile--wide { grid-column: 1 / -1; }
+.appcard-w { font-size: 12px; color: var(--gold-text); text-decoration: none; font-weight: 600; text-align: center; }
+.appcard-w:hover { text-decoration: underline; }
+.apps-card { margin-top: 18px; }
+.gate-apps { width: 100%; max-width: 420px; margin: 18px auto 0; background: rgba(255,255,255,.06); border: 1px solid rgba(215,181,109,.35); border-radius: 14px; padding: 16px; }
+.gate-apps h2 { color: #fff; font-size: 16px; margin: 0 0 4px; text-align: center; }
+.gate-apps > .hint { color: #B9C6D2; text-align: center; margin: 0 0 12px; font-size: 12px; }
+.gate-apps .appgrid { grid-template-columns: 1fr; }
+.gate-apps details { margin-top: 12px; }
+.gate-apps summary { color: var(--gold); font-weight: 600; font-size: 13px; cursor: pointer; text-align: center; padding: 6px; }
+.gate-apps details[open] summary { margin-bottom: 10px; }
+html[data-theme="dark"] .appcard { background: rgba(255,255,255,.04); }
+html[data-theme="dark"] .appcard-h b { color: #fff; }
+html[data-theme="dark"] .gate-apps .appcard { background: #fff; } html[data-theme="dark"] .gate-apps .appcard-h b { color: #0B1E2D; }
+html[data-theme="dark"] .apptile.is-soon { background: #E9EDF1; }
+@media print { .apps-card, .gate-apps { display: none; } }

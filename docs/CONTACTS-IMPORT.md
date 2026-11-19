@@ -3692,3 +3692,13 @@ The single functions read the batch first and fall back to their own statement, 
 - `customer/views/subproject.php`: the tab menu is `<nav class="tabs tabs-band">`.
 - `assets/portal.css`: `.tabs.tabs-band` (background `--cp-gold-dim`, border `#E8D6A6`, base line `--cp-gold`), open tab `--cp-navy` with white text and gold counter; dark theme: gold-tinted band, open tab gold with navy text. Other pages that use `.tabs` are unchanged.
 - No database change, no new language keys. Cybersecurity: style sheet and one class name only; no script, no inline style, no right or data path changed; no effect on performance.
+
+## §437 v1.199.0 (R97-153) — Mobile apps: QR codes and store links on the home page and the sign-in page
+
+- `customer/app/helpers.php`: `cp_store_apps()` (name, Google Play link, App Store link, `ios_live`, web app path per app) and `store_apps_html(array $keys)` (one card per app with two QR tiles). **When Apple releases an app, set its `ios_live` to `true`** — the grey «In review at Apple» tile becomes a link with a live QR code.
+- `customer/views/dashboard.php`: card «Mobile apps» at the end of the page — personnel: service, pm, hr, customer; customers: customer only.
+- `customer/views/login.php`: block under the sign-in form — customer app, and the personnel apps in a folded `<details>`.
+- `assets/apps/`: icons (128 px) and QR codes as static PNG files (no script draws them); `assets/portal.css` block R97-153.
+- Language keys `apps.*` (13) in en, el, it, bg, uk — 12 422 keys each.
+- Golden HR has no store build: one tile with the QR code of the web app.
+- No database change. Cybersecurity: static images and links only, no script and no inline handler (CSP unchanged); outside links open with `rel="noopener"`; the sign-in page shows only public store links and reads no data; images are lazy-loaded, so no effect on performance.

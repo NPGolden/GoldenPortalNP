@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.198.6** (build 2026-11-20). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.199.0** (build 2026-11-20). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.199.0 | GAS-CP-R97-153 | 2026-11-20 | Mobile apps on the home page and the sign-in page: QR codes and store links of the Golden A/S apps for Android (Google Play) and iPhone (App Store, shown as in review at Apple until released), with the link to each web app. Customers see Golden A/S Customer; personnel also see Service, PM and HR (HR as web app). | — |
 | 1.198.6 | GAS-CP-R97-152 | 2026-11-20 | Subproject page: the menu of the subproject (Process, Sections, Works … Contacts) stands on a pale gold band with a gold base line and the open tab is navy with white text, so the menu is told apart from the information shown below it. | — |
 | 1.198.5 | GAS-CP-R97-151 | 2026-11-19 | Customer app (1.0.8): the app is named Golden A/S Customer everywhere — on the phone, in the app and in the stores (it was Golden A/S Portal on the phone). Security: the archived prototype manifest with Capacitor 6 (2 critical advisories, never used by the store builds) is no longer a package manifest; test tooling updated. | — |
 | 1.198.4 | GAS-CP-R97-150 | 2026-11-19 | Customer app (1.0.7): the app icon is the Golden A/S logo on navy with the gold bar, as in the Service and PM apps (it was a gold G mark); used by the installed web app and by the store builds. | — |
