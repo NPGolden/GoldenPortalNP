@@ -69,6 +69,7 @@ layout_head($b['sub_code'] . ' · BOM ' . $rev, 'projects');
 
 <div class="card">
   <div class="page-head" style="margin-bottom:6px;"><div><h2 style="margin:0;"><?= tt('prq.lines') ?></h2><p class="hint"><?= tt('bom.lines_lede') ?></p></div></div>
+  <?= function_exists('bom_price_bar') ? bom_price_bar('bom', $b, $lines) : '' ?>
   <table class="tbl tbl--wrap">
     <thead><tr><th>#</th><th><?= tt('bom.section') ?></th><th><?= tt('prq.item') ?></th><th><?= tt('prq.desc') ?></th><th class="num"><?= tt('prq.qty') ?></th><th class="num"><?= tt('bom.free') ?></th><th><?= tt('bom.coverage') ?></th><?php if ($priced): ?><th class="num"><?= tt('prq.est_unit') ?></th><th class="num"><?= tt('prq.est_line') ?></th><?php endif; ?><th><?= tt('prq.status') ?></th><th></th></tr></thead>
     <tbody>
@@ -81,7 +82,7 @@ layout_head($b['sub_code'] . ' · BOM ' . $rev, 'projects');
         <td class="num"><?= stk_qty((float)$l['qty']) ?> <?= e($l['unit']) ?></td>
         <td class="num"><?= $l['item_id'] ? stk_qty((float)$l['free']) : '—' ?></td>
         <td><?= $l['status'] === 'removed' ? '' : $covPill($l['cover']) ?><?= $l['to_buy'] > 0 && $l['status'] !== 'removed' ? ' <small class="hint">' . stk_qty((float)$l['to_buy']) . '</small>' : '' ?></td>
-        <?php if ($priced): ?><td class="num"><?= $l['est_price'] !== null ? e(number_format((float)$l['est_price'], 2, ',', '.')) : '—' ?><?php if ($l['price_origin']): ?><br><small class="hint"><?= e($l['price_origin']) ?></small><?php endif; ?></td><td class="num"><?= $l['est_price'] !== null ? e($m((float)$l['qty'] * (float)$l['est_price'])) : '—' ?></td><?php endif; ?>
+        <?php if ($priced): ?><td class="num"><?= $l['est_price'] !== null ? e(number_format((float)$l['est_price'], 2, ',', '.')) : '—' ?><?php if ($l['price_origin']): ?><br><small class="hint"><?= e($l['price_origin']) ?></small><?php endif; ?><?= function_exists('bom_price_hint') ? bom_price_hint($l, $b) : '' ?></td><td class="num"><?= $l['est_price'] !== null ? e($m((float)$l['qty'] * (float)$l['est_price'])) : '—' ?></td><?php endif; ?>
         <td><?= $l['status'] === 'ok' ? '' : pill($l['status'] === 'removed' ? 'mute' : 'navy', t('bom.l_' . $l['status'])) ?></td>
         <td class="num" style="white-space:nowrap;">
           <?php if ($edit): ?><button class="btn btn--ghost btn--sm" type="button" data-edit-line='<?= e(json_encode(['id' => (int)$l['id'], 'item_id' => (int)$l['item_id'], 'code' => $l['item_code'] ?: $l['code'], 'description' => $l['description'], 'maker' => $l['maker'], 'part_no' => $l['part_no'], 'unit' => $l['unit'], 'qty' => (float)$l['qty'], 'section' => $l['section'], 'note' => $l['note']])) ?>'>✎</button><form method="post" action="<?= url('bom', ['id' => $id]) ?>" style="display:inline" data-lock data-confirm="<?= e(t('prq.del_line_q')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="bom_line_del"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="line_id" value="<?= (int)$l['id'] ?>"><button class="btn btn--ghost btn--sm" type="submit">🗑</button></form><?php endif; ?>

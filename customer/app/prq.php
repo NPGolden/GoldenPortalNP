@@ -110,14 +110,17 @@ function prq_budget(?int $sid, int $excludeReq = 0): array {
     return $out;
 }
 /** Estimate of a line: the pricing rule of Settings › Procurement on the item's price history, else the last price. Free-text lines carry what the requester typed. */
-function prq_line_estimate(array $l): array {
+function prq_line_estimate(array $l, string $src = 'last'): array {
+    $bp = isset($l['bom_price']) && $l['bom_price'] !== null ? (float)$l['bom_price'] : null;   // R97-137: the unit price of the BOM file
+    if ($src === 'bom' && $bp !== null) return ['price' => $bp, 'origin' => t('prq.est_bom')];
     if (!empty($l['item_id'])) { $it = stk_item((int)$l['item_id']); if ($it) { $p = stk_price_proposal($it); if ($p['price'] !== null) return ['price' => $p['price'], 'origin' => mb_substr($p['origin'], 0, 160)]; if ($it['last_price'] !== null) return ['price' => (float)$it['last_price'], 'origin' => t('stk.rule_last')]; } }
+    if ($bp !== null) return ['price' => $bp, 'origin' => t('prq.est_bom')];   // nothing bought yet: the BOM price
     return ['price' => $l['est_price'] !== null ? (float)$l['est_price'] : null, 'origin' => $l['est_price'] !== null ? t('prq.est_typed') : null];
 }
 function prq_recalc(int $rid): float {
-    $t = 0.0;
+    $t = 0.0; $src = function_exists('bom_price_has') && bom_price_has() ? (string) scalar('SELECT price_src FROM pr_requests WHERE id = ?', [$rid]) : 'last';
     foreach (all("SELECT * FROM pr_lines WHERE request_id = ? AND status <> 'cancelled'", [$rid]) as $l) {
-        $e = prq_line_estimate($l);
+        $e = prq_line_estimate($l, $src);
         q('UPDATE pr_lines SET est_price = ?, price_origin = ? WHERE id = ?', [$e['price'], $e['origin'], (int)$l['id']]);
         if ($e['price'] !== null) $t += (float)$l['qty'] * $e['price'];
     }

@@ -3536,3 +3536,20 @@ The page on screen stays the internal version for staff.
 - **Filter:** field **Vessel** on the filter bar of Purchase orders, RFQ and Pipeline. The list offers only vessels that have orders. Clicking the vessel in a row filters by it. The search box also matches the vessel name.
 - **Source:** the vessel of the project (project card). Orders without a project show no vessel — set the project on the order, or the vessel on the project.
 - **Cybersecurity:** read-only change; the filter value is an integer bound as a query parameter; visibility of orders is unchanged (IT-only buyers still see only IT purchases). One extra join on the order query, no extra queries per row.
+
+## §421 v1.195.0 (R97-137) — BOM and requisition: BOM price or last buying price
+
+**Why.** The Engineering BOM import did not read the column *Unit price*; estimates came only from the buying history of the item.
+
+**Now.**
+
+1. Import (New BOM / Import on a draft revision): the column *Unit price* (also: price, unit cost, cost, net price, τιμή, τιμή μονάδας) is kept on each line as its **BOM price**. If the file brought prices, the revision starts on *BOM price*.
+2. Above the lines of a BOM and of a requisition: **Estimated prices from: Last buying price / BOM price**. The click recalculates lines and total and is logged ("Price source").
+3. Rules per line: *BOM price* → the BOM price when the line has one, else the buying-price rule. *Last buying price* → the pricing rule of Settings › Procurement on the item's history, else the last price of the item card, else the BOM price, else what was typed.
+4. **Take the BOM prices from the file** (same bar): upload the Excel of a BOM / requisition made before this version. Match by description, else maker part number / code; the same key with two different prices is left alone. Only the BOM price is written; the estimate switches to BOM price.
+5. BOM → requisition carries the BOM prices and the choice. Requisition → purchase order and BOM → purchase order: with *BOM price* chosen the order line takes it (origin "BOM price"); otherwise the supplier price rule as before, with the BOM price as fallback.
+6. Who may choose: Procurement; the engineer of the BOM; the requester while the requisition is a draft. Not on cancelled / closed requisitions. Prices are shown only to users who see prices.
+
+**Database.** `install/migrate_cp_r97_137_bom_price.sql` — `bom_price` on `bom_lines`, `bom_import_rows`, `pr_lines`; `price_src` on `bom_revisions`, `pr_requests` (default `last`). State key `r98u`.
+
+**Cybersecurity.** Upload limited to .xlsx up to 8 MB, read with the existing reader and not stored; actions check the right on the document server-side; values are bound parameters; the BOM file content is not sent to the assistant by this function.

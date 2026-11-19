@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.194.0** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.195.0** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.195.0 | GAS-CP-R97-137 | 2026-11-19 | BOM and requisition: the Unit price of the BOM file is kept as the BOM price of each line; the estimate is taken by choice from the BOM price or from the last buying price; the BOM prices of an existing BOM or requisition are read from its file; the choice follows into the requisition and the purchase order. | `install/migrate_cp_r97_137_bom_price.sql` |
 | 1.194.0 | GAS-CP-R97-136 | 2026-11-19 | Purchasing: the vessel of the project is shown with every purchase order and request for quotation (list, pipeline board, lines to buy, order page) and the orders can be filtered and searched by vessel. | — |
 | 1.193.2 | GAS-CP-R97-135 | 2026-11-19 | Payables: an invoice, proforma or payment request that comes from a purchase order keeps the order and takes its project and sub-project (an edit of a saved invoice was removing them); project fields on the invoice; link of a saved or paid invoice to its order and project; payment requests show the project; one-time repair. | — |
 | 1.193.1 | GAS-CP-R97-134 | 2026-11-19 | Payables: the invoice file and the payment proofs of an invoice without a project are kept with the invoice (they were dropped), read by Accounting only; a proof can be attached to a payment afterwards and goes with the remittance e-mail. | `install/migrate_cp_r97_134_si_docs.sql` |

@@ -59,10 +59,57 @@ function bom_coverage(array $lines): array {
     foreach ($lines as $l) { if ($l['status'] === 'removed') continue; $c['lines']++; $c[$l['cover']]++; if ($l['to_buy'] > 0) $c['to_buy']++; if ($l['est_price'] !== null) { $c['est'] += (float)$l['qty'] * (float)$l['est_price']; $c['est_to_buy'] += (float)$l['to_buy'] * (float)$l['est_price']; } }
     return $c;
 }
+/* ---- R97-137: BOM price or buying price ---- */
+function bom_price_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM bom_lines LIKE 'bom_price'") && (bool) scalar("SHOW COLUMNS FROM pr_requests LIKE 'price_src'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** The document (BOM revision or requisition) when the user may choose its price source: Procurement always, the engineer / requester while they may work on it. */
+function bom_price_doc(string $kind, int $id): array {
+    if (!bom_price_has() || !is_staff()) throw new RuntimeException(t('err.noaccess'));
+    if ($kind === 'bom') { $d = bom_load($id); if (!$d || !(bom_pr_can() || bom_eng_can((int)$d['subproject_id']))) throw new RuntimeException(t('err.noaccess')); return $d; }
+    if ($kind === 'pr') { $d = prq_load($id); if (!$d || in_array($d['status'], ['cancelled', 'closed'], true) || !(pr_admin() || prq_can_edit($d))) throw new RuntimeException(t('err.noaccess')); return $d; }
+    throw new RuntimeException(t('err.notfound'));
+}
+function bom_price_may(string $kind, array $d): bool { if (!bom_price_has() || !is_staff() || !stk_price_visible()) return false; return $kind === 'bom' ? (bom_pr_can() || bom_eng_can((int)$d['subproject_id'])) : (!in_array($d['status'], ['cancelled', 'closed'], true) && (pr_admin() || prq_can_edit($d))); }
+function bom_price_src_set(string $kind, int $id, string $src): void {
+    bom_price_doc($kind, $id); $src = $src === 'bom' ? 'bom' : 'last';
+    if ($kind === 'bom') { q('UPDATE bom_revisions SET price_src = ? WHERE id = ?', [$src, $id]); bom_recalc($id); bom_event($id, 'price_src', t('prq.src_' . $src)); }
+    else { q('UPDATE pr_requests SET price_src = ? WHERE id = ?', [$src, $id]); prq_recalc($id); prq_event($id, 'price_src', t('prq.src_' . $src)); }
+}
+/** Read the unit prices of a BOM file onto the lines of a BOM revision or requisition — by description, else by maker part number / code. Returns the lines that got a price. */
+function bom_prices_from_file(string $kind, int $id, array $file): int {
+    bom_price_doc($kind, $id);
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) throw new RuntimeException(t('im.file'));
+    if (($file['size'] ?? 0) > 8 * 1024 * 1024) throw new RuntimeException(t('bom.file_big'));
+    $nrm = fn(string $s) => preg_replace('/\s+/u', ' ', mb_strtolower(trim($s))); $byD = []; $byP = [];
+    $put = function (array &$m, string $k, float $p) { if ($k === '') return; $m[$k] = isset($m[$k]) && ($m[$k] === false || abs($m[$k] - $p) > 0.00005) ? false : $p; };   // the same key with two prices: left alone
+    foreach (bom_file_rows($file['tmp_name'], 2000)['rows'] as $r) { if ($r['price'] === null) continue; $put($byD, $nrm((string)$r['description']), (float)$r['price']); $put($byP, bom_imp_norm((string)$r['part_no']), (float)$r['price']); $put($byP, bom_imp_norm((string)$r['code']), (float)$r['price']); }
+    if (!$byD && !$byP) throw new RuntimeException(t('prq.file_no_prices'));
+    $tbl = $kind === 'bom' ? 'bom_lines' : 'pr_lines'; $n = 0;
+    $rows = $kind === 'bom' ? all("SELECT l.id, l.description, l.part_no, l.code, i.code AS icode, i.factory_code FROM bom_lines l LEFT JOIN inv_items i ON i.id = l.item_id WHERE l.bom_rev_id = ? AND l.status <> 'removed'", [$id])
+                            : all("SELECT l.id, l.description, l.part_no, l.typed_code AS code, i.code AS icode, i.factory_code FROM pr_lines l LEFT JOIN inv_items i ON i.id = l.item_id WHERE l.request_id = ? AND l.status <> 'cancelled'", [$id]);
+    foreach ($rows as $l) {
+        $p = $byD[$nrm((string)$l['description'])] ?? null;
+        if ($p === null || $p === false) foreach ([$l['part_no'], $l['factory_code'], $l['code'], $l['icode']] as $k) { $k = bom_imp_norm((string)$k); if ($k !== '' && isset($byP[$k]) && $byP[$k] !== false) { $p = $byP[$k]; break; } }
+        if ($p === null || $p === false) continue; q("UPDATE $tbl SET bom_price = ? WHERE id = ?", [$p, (int)$l['id']]); $n++;
+    }
+    if ($n) { q('UPDATE ' . ($kind === 'bom' ? 'bom_revisions' : 'pr_requests') . " SET price_src = 'bom' WHERE id = ?", [$id]); if ($kind === 'bom') { bom_recalc($id); bom_event($id, 'price_src', t('prq.file_prices_ev', ['n' => $n])); } else { prq_recalc($id); prq_event($id, 'price_src', t('prq.file_prices_ev', ['n' => $n])); } }
+    return $n;
+}
+/** The bar above the lines: which price the estimate uses, and the upload of the BOM file for its prices. */
+function bom_price_bar(string $kind, array $d, array $lines): string {
+    if (!bom_price_may($kind, $d)) return ''; $id = (int)$d['id']; $src = ($d['price_src'] ?? 'last') === 'bom' ? 'bom' : 'last'; $nb = count(array_filter($lines, fn($l) => ($l['bom_price'] ?? null) !== null));
+    $self = url($kind === 'bom' ? 'bom' : 'requisition', ['id' => $id]); $hid = csrf_field() . '<input type="hidden" name="kind" value="' . $kind . '"><input type="hidden" name="id" value="' . $id . '">';
+    $h = '<div class="btn-row" id="price-src" style="margin:4px 0 10px;align-items:center;"><b>' . tt('prq.src_h') . '</b><form method="post" action="' . $self . '" data-lock class="btn-row">' . $hid . '<input type="hidden" name="action" value="price_src">';
+    foreach (['last', 'bom'] as $k) $h .= '<button class="btn btn--sm ' . ($src === $k ? 'btn--gold' : 'btn--ghost') . '" type="submit" name="src" value="' . $k . '"' . ($k === 'bom' && !$nb ? ' disabled' : '') . '>' . ($src === $k ? '● ' : '') . tt('prq.src_' . $k) . '</button>';
+    $h .= '</form><span class="hint">' . e(t($nb ? 'prq.src_n' : 'prq.src_none', ['n' => $nb, 't' => count($lines)])) . '</span>';
+    $h .= '<form method="post" action="' . $self . '" enctype="multipart/form-data" data-lock class="btn-row" style="margin-left:auto;">' . $hid . '<input type="hidden" name="action" value="line_prices_file"><input type="file" name="file" accept=".xlsx" required style="max-width:220px;"><button class="btn btn--ghost btn--sm" type="submit">⤵ ' . tt('prq.file_prices') . '</button></form></div>';
+    return $h;
+}
+/** Under the estimate of a line: the BOM price, when the estimate uses the other source. */
+function bom_price_hint(array $l, array $d): string { $bp = $l['bom_price'] ?? null; if ($bp === null || ($d['price_src'] ?? 'last') === 'bom' || ($l['est_price'] !== null && abs((float)$l['est_price'] - (float)$bp) < 0.00005)) return ''; return '<br><small class="hint">' . tt('prq.est_bom') . ': ' . e(number_format((float)$bp, 2, ',', '.')) . '</small>'; }
 function bom_recalc(int $bid): float {
-    $t = 0.0;
+    $t = 0.0; $src = bom_price_has() ? (string) scalar('SELECT price_src FROM bom_revisions WHERE id = ?', [$bid]) : 'last';
     foreach (all("SELECT * FROM bom_lines WHERE bom_rev_id = ? AND status <> 'removed'", [$bid]) as $l) {
-        $e = prq_line_estimate($l);
+        $e = prq_line_estimate($l, $src);
         q('UPDATE bom_lines SET est_price = ?, price_origin = ? WHERE id = ?', [$e['price'], $e['origin'], (int)$l['id']]);
         if ($e['price'] !== null) $t += (float)$l['qty'] * $e['price'];
     }
@@ -115,8 +162,10 @@ function bom_import(int $bid, array $file): array {
         $unit = $it ? (string)$it['unit'] : (stk_unit_norm($g('unit')) ?: 'pcs');
         q('INSERT INTO bom_lines (bom_rev_id, seq, item_id, code, description, maker, part_no, unit, qty, section, note) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
           [$bid, ++$seq, $it ? (int)$it['id'] : null, $it ? (string)$it['code'] : ($code ?: null), mb_substr($desc, 0, 255), $it ? $it['maker'] : (mb_substr($g('maker'), 0, 80) ?: null), $it ? $it['factory_code'] : (mb_substr($g('part_no'), 0, 80) ?: null), $unit, $qty, mb_substr($g('section'), 0, 80) ?: null, mb_substr($g('note'), 0, 255) ?: null]);
+        if (bom_price_has() && ($bp_ = $num($g('price'))) !== null && $bp_ >= 0) { q('UPDATE bom_lines SET bom_price = ? WHERE id = ?', [$bp_, (int) db()->lastInsertId()]); $nPrice = ($nPrice ?? 0) + 1; }   // R97-137
         $n++;
     }
+    if (!empty($nPrice)) q("UPDATE bom_revisions SET price_src = 'bom' WHERE id = ?", [$bid]);
     bom_event($bid, 'import', t('bom.imported_n', ['n' => $n, 'm' => $matched]) . ($warn ? ' · ' . implode(' · ', array_slice($warn, 0, 5)) : ''));
     return ['n' => $n, 'matched' => $matched, 'warn' => $warn];
 }
@@ -209,7 +258,8 @@ function bom_to_requisition(int $bid): int {
     q('INSERT INTO pr_requests (pr_no, branch_id, project_id, subproject_id, bom_rev_id, purpose, title, requester_id, requester_name, discipline_id) VALUES (?,?,?,?,?,?,?,?,?,?)',
       [prq_number((int)$b['project_id'], (int)$b['subproject_id']), $br, (int)$b['project_id'], (int)$b['subproject_id'], $bid, 'project', mb_substr(t('bom.pr_title', ['r' => 'R' . $b['revision'], 't' => $b['title'] ?: $b['sub_name']]), 0, 160), (int)$u['id'], $u['full_name'], (int)($u['discipline_id'] ?? 0) ?: null]);
     $rid = (int) db()->lastInsertId(); $seq = 0;
-    foreach ($lines as $l) { q('INSERT INTO pr_lines (request_id, seq, item_id, description, maker, part_no, unit, qty, est_price, note) VALUES (?,?,?,?,?,?,?,?,?,?)', [$rid, ++$seq, $l['item_id'], $l['description'], $l['maker'], $l['part_no'], $l['unit'], round((float)$l['to_buy'], 3), $l['item_id'] ? null : $l['est_price'], $l['section'] ? mb_substr($l['section'], 0, 255) : null]); line_code_keep('pr_lines', $l['item_id'], $l['code'] ?? ''); }
+    foreach ($lines as $l) { q('INSERT INTO pr_lines (request_id, seq, item_id, description, maker, part_no, unit, qty, est_price, note) VALUES (?,?,?,?,?,?,?,?,?,?)', [$rid, ++$seq, $l['item_id'], $l['description'], $l['maker'], $l['part_no'], $l['unit'], round((float)$l['to_buy'], 3), $l['item_id'] ? null : $l['est_price'], $l['section'] ? mb_substr($l['section'], 0, 255) : null]); $plid_ = (int) db()->lastInsertId(); line_code_keep('pr_lines', $l['item_id'], $l['code'] ?? ''); if (bom_price_has() && ($l['bom_price'] ?? null) !== null) q('UPDATE pr_lines SET bom_price = ? WHERE id = ?', [(float)$l['bom_price'], $plid_]); }
+    if (bom_price_has()) q('UPDATE pr_requests SET price_src = ? WHERE id = ?', [($b['price_src'] ?? 'last') === 'bom' ? 'bom' : 'last', $rid]);   // R97-137: the requisition starts with the choice of the BOM
     prq_recalc($rid); prq_event($rid, 'create', t('bom.from_bom', ['r' => 'R' . $b['revision']])); bom_event($bid, 'to_pr', (string) scalar('SELECT pr_no FROM pr_requests WHERE id = ?', [$rid]));
     return $rid;
 }
@@ -273,7 +323,7 @@ function bom_template_sheets(): array {
             ['One line per part. Description is mandatory; Qty defaults to 1; Unit must be one of the Units sheet (default pcs).'],
             ['Golden code = our inventory code when you know it — the line is linked at once.'],
             ['Maker + Maker part no are what the importer uses to find the item in the inventory (exact, then without spaces / dashes, then the assistant proposes).'],
-            ['Unit price = cost per unit in EUR, without VAT. Optional. It is read by System Budgets as the cost of the line; the Engineering BOM of a sub-project ignores it.'],
+            ['Unit price = cost per unit in EUR, without VAT. Optional. System Budgets read it as the cost of the line. The Engineering BOM of a sub-project keeps it as the BOM price: on the BOM and on its requisition you choose whether the estimate uses the BOM price or the last buying price.'],
             ['Section = panel, area or system the part belongs to. Optional. Note is optional.'],
             ['Where to upload: Projects › sub-project › Procurement › New BOM (or Import on a draft BOM revision), and System Budgets › a budget › Parts › Import BOM parts.'],
             ['After the upload nothing is written: you review every proposed match and Accept, Reject (free-text line) or Create a new inventory item, then Apply.'],
@@ -285,7 +335,7 @@ function bom_import_template(): void { require_once __DIR__ . '/xlsxw.php'; xlsx
 function bom_imp_aliases(): array {
     return ['section' => ['section', 'τμήμα', 'area', 'system', 'panel', 'location'], 'qty' => ['qty', 'quantity', 'q.ty', 'ποσότητα', 'ποσ.', 'pcs', 'amount'], 'unit' => ['unit', 'um', 'uom', 'μ.μ', 'μ.μ.', 'μον.'],
           'description' => ['description', 'desc', 'περιγραφή', 'designation', 'item description', 'material'], 'maker' => ['maker', 'manufacturer', 'brand', 'κατασκευαστής', 'make', 'vendor'],
-          'part_no' => ['maker part no', 'part no', 'part no.', 'part number', 'p/n', 'pn', 'type', 'type no', 'article', 'article no', 'order code', 'factory code', 'κωδ. κατασκευαστή', 'ref'], 'code' => ['golden code', 'code', 'κωδικός', 'κωδ.', 'item code', 'our code', 'stock code'], 'note' => ['note', 'notes', 'remark', 'remarks', 'σημείωση', 'comment']];
+          'part_no' => ['maker part no', 'part no', 'part no.', 'part number', 'p/n', 'pn', 'type', 'type no', 'article', 'article no', 'order code', 'factory code', 'κωδ. κατασκευαστή', 'ref'], 'code' => ['golden code', 'code', 'κωδικός', 'κωδ.', 'item code', 'our code', 'stock code'], 'note' => ['note', 'notes', 'remark', 'remarks', 'σημείωση', 'comment'], 'price' => ['unit price', 'price', 'τιμή', 'τιμή μονάδας', 'unit cost', 'τιμή μον.', 'cost', 'net price']];
 }
 /** Read a BOM workbook into plain rows (section, qty, unit, description, maker, part_no, code, price, note) — for importers that do not stage (purchase orders).   R97-106 */
 function bom_file_rows(string $path, int $max = 400): array {
@@ -353,6 +403,7 @@ function bom_import_stage(int $bid, array $file): array {
         $unit = $it ? (string)$it['unit'] : (stk_unit_norm($g('unit', 12)) ?: 'pcs');
         q('INSERT INTO bom_import_rows (bom_rev_id, seq, section, qty, unit, description, maker, part_no, code, note, item_id, match_kind, confidence, reason) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
           [$bid, ++$seq, $g('section', 80) ?: null, $qty, $unit, $desc, $maker ?: null, $pn ?: null, $code ?: null, $g('note') ?: null, $it ? (int)$it['id'] : null, $kind, $conf, $reason]);
+        if (bom_price_has() && ($bp_ = $num($g('price'))) !== null && $bp_ >= 0) q('UPDATE bom_import_rows SET bom_price = ? WHERE id = ?', [$bp_, (int) db()->lastInsertId()]);   // R97-137
         $stats['rows']++; $stats[$kind]++;
     }
     if (!$stats['rows']) throw new RuntimeException(t('stk.imp_empty'));
@@ -435,8 +486,10 @@ function bom_import_apply(int $bid, array $codes = []): array {
         if ($d === 'new') { $it = stk_item(bom_imp_create_item($r, $bid, (string)($codes[(int)$r['id']] ?? ''))); }
         q('INSERT INTO bom_lines (bom_rev_id, seq, item_id, code, description, maker, part_no, unit, qty, section, note) VALUES (?,?,?,?,?,?,?,?,?,?,?)',
           [$bid, ++$seq, $it ? (int)$it['id'] : null, $it ? $it['code'] : ($r['code'] ?: null), $it && $r['description'] === '' ? $it['description'] : $r['description'], $it ? $it['maker'] : $r['maker'], $it ? $it['factory_code'] : $r['part_no'], $it ? $it['unit'] : $r['unit'], (float)$r['qty'], $r['section'], $r['note']]);
+        if (($r['bom_price'] ?? null) !== null) { q('UPDATE bom_lines SET bom_price = ? WHERE id = ?', [(float)$r['bom_price'], (int) db()->lastInsertId()]); $nPrice = ($nPrice ?? 0) + 1; }   // R97-137
         q('DELETE FROM bom_import_rows WHERE id = ?', [(int)$r['id']]); $n[$d]++;
     }
+    if (!empty($nPrice)) q("UPDATE bom_revisions SET price_src = 'bom' WHERE id = ?", [$bid]);
     bom_recalc($bid); bom_event($bid, 'import', t('bom.imp_applied_ev', ['a' => $n['accept'], 'r' => $n['reject'], 'n' => $n['new'], 'p' => $n['pending']]));
     return $n;
 }
@@ -486,8 +539,10 @@ function bom_to_po(int $bid, int $fallback = 0): array {
         $oid = (int) db()->lastInsertId(); $seq = 0;
         foreach ($g['lines'] as $l) {
             $price = null; $origin = null; $it = $l['item_id'] ? stk_item((int)$l['item_id']) : null;
-            if ($it) { $pp = stk_price_proposal($it, (int)$sup); if ($pp['price'] !== null) { $price = $pp['price']; $origin = mb_substr((string)$pp['origin'], 0, 160); } }
-            elseif ($l['est_price'] !== null) { $price = (float)$l['est_price']; $origin = t('prq.est_typed'); }
+            $useBom = ($b['price_src'] ?? 'last') === 'bom' && ($l['bom_price'] ?? null) !== null;   // R97-137
+            if ($useBom) { $price = (float)$l['bom_price']; $origin = t('prq.est_bom'); }
+            elseif ($it) { $pp = stk_price_proposal($it, (int)$sup); if ($pp['price'] !== null) { $price = $pp['price']; $origin = mb_substr((string)$pp['origin'], 0, 160); } elseif (($l['bom_price'] ?? null) !== null) { $price = (float)$l['bom_price']; $origin = t('prq.est_bom'); } }
+            elseif ($l['est_price'] !== null) { $price = (float)$l['est_price']; $origin = (string)($l['price_origin'] ?: t('prq.est_typed')); }
             q('INSERT INTO po_lines (order_id, seq, item_id, description, maker, part_no, unit, qty, unit_price, price_origin, bom_line_id, note) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)', [$oid, ++$seq, $l['item_id'], $l['description'], $l['maker'], $l['part_no'], $l['unit'], $l['open'], $price, $origin, (int)$l['id'], $l['section'] ? mb_substr((string)$l['section'], 0, 255) : null]); line_code_keep('po_lines', $l['item_id'], $l['code'] ?? '');
         }
         po_recalc($oid); po_event($oid, 'create', $no . ' · BOM ' . $rev); $out['orders'][] = ['id' => $oid, 'po_no' => $no, 'supplier' => $g['name'], 'lines' => $seq];

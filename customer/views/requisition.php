@@ -98,6 +98,7 @@ layout_head(($r ? $r['pr_no'] : t('prq.new')) . ' · ' . t('prq.title'), 'requis
 <?php if ($r): ?>
 <div class="card">
   <div class="page-head" style="margin-bottom:6px;"><div><h2 style="margin:0;"><?= tt('prq.lines') ?> <span class="hint" style="font-weight:400;">(<?= count($lines) ?>)</span></h2></div></div>
+  <?= function_exists('bom_price_bar') ? bom_price_bar('pr', $r, $lines) : '' ?>
   <table class="tbl tbl--wrap">
     <thead><tr><th>#</th><th><?= tt('prq.item') ?></th><th><?= tt('prq.desc') ?></th><th class="num"><?= tt('prq.qty') ?></th><th class="num"><?= tt('prq.stock') ?></th><th class="num"><?= tt('prq.reserved') ?></th><th class="num"><?= tt('prq.issued') ?></th><?php if ($priced): ?><th class="num"><?= tt('prq.est_unit') ?></th><th class="num"><?= tt('prq.est_line') ?></th><?php endif; ?><th><?= tt('prq.need') ?></th><th><?= tt('prq.status') ?></th><th></th></tr></thead>
     <tbody>
@@ -111,7 +112,7 @@ layout_head(($r ? $r['pr_no'] : t('prq.new')) . ' · ' . t('prq.title'), 'requis
         <td class="num"><?= $l['item_id'] ? stk_qty((float)$l['on_hand']) . ' <small class="hint">(' . stk_qty($free) . ')</small>' : '—' ?></td>
         <td class="num"><?= (float)$l['qty_reserved'] > 0 ? stk_qty((float)$l['qty_reserved']) : '—' ?></td>
         <td class="num"><?= (float)$l['qty_issued'] > 0 ? stk_qty((float)$l['qty_issued']) : '—' ?></td>
-        <?php if ($priced): ?><td class="num"><?= $l['est_price'] !== null ? e(number_format((float)$l['est_price'], 2, ',', '.')) : '—' ?><?php if ($l['price_origin']): ?><br><small class="hint"><?= e($l['price_origin']) ?></small><?php endif; ?></td><td class="num"><?= $l['est_price'] !== null ? e($m((float)$l['qty'] * (float)$l['est_price'])) : '—' ?></td><?php endif; ?>
+        <?php if ($priced): ?><td class="num"><?= $l['est_price'] !== null ? e(number_format((float)$l['est_price'], 2, ',', '.')) : '—' ?><?php if ($l['price_origin']): ?><br><small class="hint"><?= e($l['price_origin']) ?></small><?php endif; ?><?= function_exists('bom_price_hint') ? bom_price_hint($l, $r) : '' ?></td><td class="num"><?= $l['est_price'] !== null ? e($m((float)$l['qty'] * (float)$l['est_price'])) : '—' ?></td><?php endif; ?>
         <td><?= fmt_date($l['need_date']) ?></td>
         <td><?= prq_line_pill($l['status']) ?></td>
         <td class="num" style="white-space:nowrap;">
