@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.193.0';
+const CP_VERSION = '1.193.1';
 const CP_BUILD   = '2026-11-18';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-134', 'version' => '1.193.1', 'date' => '2026-11-19', 'title' => 'Payables: the invoice file and the payment proofs of an invoice without a project are kept with the invoice (they were dropped), read by Accounting only; a proof can be attached to a payment afterwards and goes with the remittance e-mail.', 'db' => 'install/migrate_cp_r97_134_si_docs.sql', 'check' => 'r98t'],
         ['ref' => 'GAS-CP-R97-133', 'version' => '1.193.0', 'date' => '2026-11-19', 'title' => 'Purchasing: pipeline board of the purchase orders — every open order in the stage it waits in (draft, sent, confirmed, partly received, received, invoiced, paid), with totals and the flags delivery late, payment overdue, no confirmation, paid in advance.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-132', 'version' => '1.192.0', 'date' => '2026-11-19', 'title' => 'Purchasing: every order shows where it stands as a flow — created, sent, confirmed, on the way, received, invoiced, paid, closed — on the order and in the list; production orders are renumbered …-PRD-… so they no longer look like purchase orders.', 'db' => 'install/migrate_cp_r97_132_production_order_numbers.sql', 'check' => 'r98s'],
         ['ref' => 'GAS-CP-R97-131', 'version' => '1.191.0', 'date' => '2026-11-19', 'title' => 'Support: a portrait process-flow page from the offer to the delivery — Sales, Engineering, Purchasing, Warehouse, Accounting — showing per step what happens to quantities, stock and money, with the inventory movements and the delivery notes; printable.', 'db' => null, 'check' => null],
@@ -578,6 +579,7 @@ function cp_migration_state(): array {
         'r97p' => $has("SHOW TABLES LIKE 'nl_issues'"),
         'r97q' => $has("SHOW TABLES LIKE 'nl_lists'"),
         'r97r' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'proc_state'") && $has("SHOW COLUMNS FROM sb_parts LIKE 'proc_at'"),
+        'r98t' => $has("SHOW TABLES LIKE 'si_docs'"),
         'r98s' => !$has("SELECT 1 FROM production_orders WHERE po_no REGEXP '^[A-Za-z0-9]+-PO-[0-9]{4}-[0-9]+$' LIMIT 1"),
         'r98r' => $has("SHOW COLUMNS FROM po_lines LIKE 'typed_code'") && $has("SHOW COLUMNS FROM pr_lines LIKE 'typed_code'"),
         'r98q' => $has("SHOW TABLES LIKE 'hr_eq_kits'") && $has("SHOW COLUMNS FROM hr_eq_items LIKE 'expires_on'"),

@@ -94,6 +94,7 @@ function si_save_from_post(): int {
         if ($i['kind'] !== 'credit' && isset($_POST['is_proforma']) && si_pf_has() && (int)$i['is_proforma'] < 2) $v['is_proforma'] = $_POST['is_proforma'] === '1' ? 1 : 0;   // R97-118: invoice or proforma, while it can still be edited
         if (scalar('SELECT 1 FROM si_invoices WHERE supplier_id = ? AND inv_no = ? AND id <> ?', [$sup, $invNo, $id])) throw new RuntimeException(t('si.dup_inv_no'));
         q('UPDATE si_invoices SET ' . implode(', ', array_map(fn($k) => "$k = ?", array_keys($v))) . ' WHERE id = ?', array_merge(array_values($v), [$id])); si_recalc($id); si_event($id, null, 'edit');
+        if (!$fileId && !empty($_FILES['file']['tmp_name'])) { try { si_doc_store($_FILES['file'], $id, null, 'invoice', t('si.file_title', ['s' => $S['name'], 'n' => $invNo])); } catch (Throwable $e) { flash('bad', $e->getMessage()); } }   // R97-134
     } else {
         if (scalar('SELECT 1 FROM si_invoices WHERE supplier_id = ? AND inv_no = ?', [$sup, $invNo])) throw new RuntimeException(t('si.dup_inv_no'));
         $br = $O ? ($O['branch_id'] ? (int)$O['branch_id'] : null) : (function_exists('br_default') ? (int)br_default()['id'] : null);
@@ -102,6 +103,7 @@ function si_save_from_post(): int {
 
         q('INSERT INTO si_invoices (' . implode(', ', array_keys($v)) . ') VALUES (' . implode(', ', array_fill(0, count($v), '?')) . ')', array_values($v));
         $id = (int) db()->lastInsertId(); si_event($id, null, 'create', $v['si_no']);
+        if (!$fileId && !empty($_FILES['file']['tmp_name'])) { try { si_doc_store($_FILES['file'], $id, null, 'invoice', t('si.file_title', ['s' => $S['name'], 'n' => $invNo])); } catch (Throwable $e) { flash('bad', $e->getMessage()); } }   // R97-134
         if ($O && !empty($_POST['pull_lines'])) { si_lines_from_po($id, (int)$O['id']); si_costs_from_po($id, (int)$O['id']); }   // R97-071: and the logistic costs of the supplier
         si_recalc($id);
     }
@@ -252,6 +254,41 @@ function si_request_cancel(int $rid, string $note): void { require_si(); $R = si
 
 /* ------------------------------------------------------------------ payments */
 /** A payment on an invoice (approved request, or any checked invoice for Management / Accounting); partial allowed; the invoice is paid when the open amount reaches zero; the request is paid when all its invoices are. */
+/* ------------------------------------------------------------------ R97-134: documents of an invoice without a project */
+/** A file of a project is filed in the project (sp_files). An invoice without a project — stock, IT, overheads — had nowhere to put its PDF or the
+ *  proof of a payment, so the file was dropped. Such files are kept here, with the invoice, and are read through the invoice by Accounting only. */
+function si_docs_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'si_docs'"); } catch (Throwable $e) { $h = false; } } return $h; }
+const SI_DOC_EXT = ['pdf' => 'application/pdf', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'xlsx' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'docx' => 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+function si_doc_store(array $file, int $iid, ?int $payId, string $kind, string $title): ?int {
+    if (!si_docs_has() || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK || !is_uploaded_file($file['tmp_name'])) return null;
+    $ext = strtolower(pathinfo((string)$file['name'], PATHINFO_EXTENSION)); $mime = (string)(mime_content_type($file['tmp_name']) ?: '');
+    if (!isset(SI_DOC_EXT[$ext]) || (int)$file['size'] > 15 * 1024 * 1024) throw new RuntimeException(t('si.doc_type'));
+    if (in_array($ext, ['pdf', 'jpg', 'jpeg', 'png', 'webp'], true) && $mime !== SI_DOC_EXT[$ext]) throw new RuntimeException(t('si.doc_type'));   // the content must be what the name says
+    $rel = 'si/' . date('Y/m'); $dir = cp_storage() . '/' . $rel; if (!is_dir($dir)) @mkdir($dir, 0755, true);
+    $stored = $rel . '/' . bin2hex(random_bytes(12)) . '.' . $ext; if (!move_uploaded_file($file['tmp_name'], cp_storage() . '/' . $stored)) throw new RuntimeException(t('err.upload'));
+    $u = current_user();
+    q('INSERT INTO si_docs (invoice_id, payment_id, kind, title, stored_name, original_name, mime_type, size_bytes, uploaded_by, uploaded_name) VALUES (?,?,?,?,?,?,?,?,?,?)', [$iid, $payId, $kind === 'invoice' ? 'invoice' : 'proof', mb_substr($title, 0, 200), $stored, mb_substr((string)$file['name'], 0, 255), SI_DOC_EXT[$ext], (int)$file['size'], (int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? '')]);
+    return (int) db()->lastInsertId();
+}
+function si_docs_of(int $iid): array { return si_docs_has() ? all('SELECT * FROM si_docs WHERE invoice_id = ? ORDER BY id', [$iid]) : []; }
+function si_doc_path(array $d): ?string { $p = cp_storage() . '/' . $d['stored_name']; return str_starts_with((string)$d['stored_name'], 'si/') && !str_contains((string)$d['stored_name'], '..') && is_file($p) ? $p : null; }
+/** Stream a document of an invoice — Accounting / management only, and only through its invoice. */
+function si_doc_stream(int $iid, int $docId): void {
+    if (!si_can()) { http_response_code(403); exit(t('err.noaccess')); }
+    $d = si_docs_has() ? one('SELECT * FROM si_docs WHERE id = ? AND invoice_id = ?', [$docId, $iid]) : null; $p = $d ? si_doc_path($d) : null; if (!$p) { http_response_code(404); exit('Not found'); }
+    while (ob_get_level()) ob_end_clean();
+    header('Content-Type: ' . $d['mime_type']); header('Content-Length: ' . filesize($p)); header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9._ -]+/', '_', (string)$d['original_name']) . '"'); header('Cache-Control: private, no-store'); header('X-Content-Type-Options: nosniff'); readfile($p); exit;
+}
+/** e-mail attachment 'sd:<doc id>' (the remittance e-mail). */
+function si_doc_em_attachment(array $p): ?array { if (!si_can() || !si_docs_has()) return null; $d = one('SELECT * FROM si_docs WHERE id = ?', [(int)($p[1] ?? 0)]); $f = $d ? si_doc_path($d) : null; return $f ? [(string) file_get_contents($f), (string)$d['original_name'], (string)$d['mime_type']] : null; }
+/** Attach the proof to a payment recorded without one (the file could not be kept before, or came later). */
+function si_pay_doc_from_post(): int {
+    require_si_pay(); $iid = (int)($_POST['id'] ?? 0); $i = si_load($iid); $p = $i ? one('SELECT * FROM si_payments WHERE id = ? AND invoice_id = ?', [(int)($_POST['pay_id'] ?? 0), $iid]) : null; if (!$p) throw new RuntimeException(t('err.notfound'));
+    if (empty($_FILES['file']['tmp_name'])) throw new RuntimeException(t('im.file')); $title = t('si.pay_file', ['n' => $i['inv_no']]);
+    if ($i['project_id']) { $fid = cp_store_file($_FILES['file'], (int)$i['project_id'], $i['subproject_id'] ? (int)$i['subproject_id'] : null, 'file', 'internal', $title); if (!$fid) throw new RuntimeException(t('err.upload')); q('UPDATE si_payments SET file_id = ? WHERE id = ?', [$fid, (int)$p['id']]); }
+    elseif (!si_doc_store($_FILES['file'], $iid, (int)$p['id'], 'proof', $title)) throw new RuntimeException(t('err.upload'));
+    si_event($iid, $p['request_id'] ? (int)$p['request_id'] : null, 'doc', t('si.pay_doc_ev', ['d' => fmt_date($p['pay_date'])])); return $iid;
+}
 function si_pay_from_post(): int {
     require_si_pay(); $iid = (int)($_POST['invoice_id'] ?? 0); $i = si_load($iid); if (!$i || !in_array($i['status'], ['approved', 'checked', 'requested'], true)) throw new RuntimeException(t('err.noaccess'));
     $u = current_user(); $amt = round((float) str_replace(',', '.', (string)($_POST['amount'] ?? '0')), 2); $open = round((float)$i['gross'] - (float)$i['paid'], 2); if ($amt <= 0 || $amt > $open + 0.005) throw new RuntimeException(t('si.pay_max', ['v' => si_money($open, $i['currency'])]));
@@ -260,6 +297,7 @@ function si_pay_from_post(): int {
     $fileId = null; if (!empty($_FILES['file']['tmp_name']) && $i['project_id']) $fileId = cp_store_file($_FILES['file'], (int)$i['project_id'], $i['subproject_id'] ? (int)$i['subproject_id'] : null, 'file', 'internal', t('si.pay_file', ['n' => $i['inv_no']]));
     q('INSERT INTO si_payments (invoice_id, request_id, pay_date, amount, currency, method, ref, note, file_id, user_id, user_name) VALUES (?,?,?,?,?,?,?,?,?,?,?)', [$iid, $rid, $date, $amt, $i['currency'], $method, mb_substr(trim((string)($_POST['ref'] ?? '')), 0, 80) ?: null, mb_substr(trim((string)($_POST['note'] ?? '')), 0, 255) ?: null, $fileId, (int)$u['id'], $u['full_name']]);
     $pid = (int) db()->lastInsertId(); $paid = (float)$i['paid'] + $amt; $done = $paid >= (float)$i['gross'] - 0.005;
+    if (!$fileId && !empty($_FILES['file']['tmp_name'])) { try { si_doc_store($_FILES['file'], $iid, $pid, 'proof', t('si.pay_file', ['n' => $i['inv_no']])); } catch (Throwable $e) { flash('bad', $e->getMessage()); } }   // R97-134: no project → kept with the invoice
     q('UPDATE si_invoices SET paid = ?, status = ? WHERE id = ?', [round($paid, 2), $done ? 'paid' : $i['status'], $iid]); si_event($iid, $rid, 'pay', si_money($amt, $i['currency']) . ' · ' . t('si.pm_' . $method) . (($_POST['ref'] ?? '') !== '' ? ' · ' . trim((string)$_POST['ref']) : ''));
     if ($rid && !(int) scalar("SELECT COUNT(*) FROM si_request_items ri JOIN si_invoices i ON i.id = ri.invoice_id WHERE ri.request_id = ? AND i.status <> 'paid'", [$rid])) { q("UPDATE si_requests SET status = 'paid' WHERE id = ?", [$rid]); si_event(null, $rid, 'paid'); }
     // a credit note is "paid" by being deducted: Management / Accounting record it with the payment it offsets, so the statement balances
@@ -288,6 +326,7 @@ function si_final_from_post(): int {
     $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['issue_date'] ?? '')) ? $_POST['issue_date'] : date('Y-m-d'); $u = current_user();
     $fileId = null; if (!empty($_FILES['file']['tmp_name']) && $i['project_id']) $fileId = cp_store_file($_FILES['file'], (int)$i['project_id'], $i['subproject_id'] ? (int)$i['subproject_id'] : null, 'file', 'internal', t('si.file_title', ['s' => $i['supplier'], 'n' => $no]));
     q('UPDATE si_invoices SET is_proforma = 2, proforma_no = ?, inv_no = ?, issue_date = ?, final_at = NOW(), final_name = ?' . ($fileId ? ', file_id = ' . (int)$fileId : '') . ' WHERE id = ?', [$i['inv_no'], $no, $date, $u['full_name'], $iid]);
+    if (!$fileId && !empty($_FILES['file']['tmp_name'])) { try { si_doc_store($_FILES['file'], $iid, null, 'invoice', t('si.file_title', ['s' => $i['supplier'], 'n' => $no])); } catch (Throwable $e) { flash('bad', $e->getMessage()); } }   // R97-134
     si_sp_cost_sync($iid); si_event($iid, null, 'final', $i['inv_no'] . ' → ' . $no); cache_bump_later('eng'); return $iid;
 }
 /** Statement of a supplier as a document: number, rows, totals. */

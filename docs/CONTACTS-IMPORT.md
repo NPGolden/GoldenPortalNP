@@ -3496,3 +3496,19 @@ The page on screen stays the internal version for staff.
 **Not tested**: live data; a very long list (the board shows every open order — with several hundred it will be long).
 
 **Security review**: nothing new is exposed — the same orders and the same price rule as the list. Proposal (no effect on speed): the three attention counts on the main dashboard of Procurement and in the weekly e-mail to the buyer.
+
+## §418 v1.193.1 (R97-134) — Payables: files of an invoice without a project are kept with the invoice
+
+**Reported**: after paying a supplier proforma — a little more than the payment request, the amount having been corrected by hand — the page says "The payment is recorded, but the file was not kept (the invoice has no project, or the file type is not allowed)". What does it mean?
+
+**Answer**: nothing to do with the amount. `si_pay_from_post()` stored the proof with `cp_store_file()`, which files a document in a project (`sp_files.project_id` is mandatory); the invoice of the report has no project, so the upload was skipped and R97-117 said so. The same was true, silently, for the invoice PDF itself (`si_save`) and the invoice assigned to a proforma (`si_final`).
+
+**Change** — migration `install/migrate_cp_r97_134_si_docs.sql` (key `r98t`): `si_docs (invoice_id, payment_id, kind, title, stored_name, original_name, mime_type, size_bytes, uploaded_by, uploaded_name)`. `app/si.php`: `si_doc_store()` (seven extensions, 15 MB, content checked against the extension for PDF and images, random name under `uploads/si/yyyy/mm`), `si_docs_of()`, `si_doc_stream()` (through the invoice, `si_can()` only), `si_doc_em_attachment()` (key `sd:`), `si_pay_doc_from_post()` (action `si_pay_doc` — attach a proof to a payment afterwards; project invoices go to the project as before). Used as fallback in `si_save`, `si_final`, `si_pay`. `views/payable.php`: 📎 links, "Attach the proof" on a payment without one, proofs among the attachments of the remittance e-mail.
+
+**About the amount**: the payment request keeps the amount it was approved for (`si_requests.amount`, `si_request_items.amount` are written when it is made); a payment is accepted up to the open amount of the invoice. When the invoice is corrected afterwards, the payment follows the invoice and the request still shows the approved figure. Not changed here — proposal below.
+
+**Tests (sandbox)** — forms posted: invoice without project, payment with a PDF → kept, shown, downloaded byte for byte; a text file named .pdf → payment recorded, file refused with the reason; proof attached afterwards; staff without Payables 403; the document asked through another invoice 404; attachment keys `sd:` on the e-mail card. Direct address of the stored file: denied on the live site (`storage/.htaccess`, checked: 403). Sandbox restored. Error log clean.
+
+**Not tested**: the invoice of the report itself — its payment stands; attach the proof with the new button.
+
+**Security review**: these files are read only through Payables, which is stricter than the project files — a supplier invoice or a proof filed in a project can be opened by any member of staff who has the link (`cp_stream_file()` checks the customer side only). Proposals (no effect on speed): (1) keep all payables documents in this store, also for project invoices, or mark them so that only who sees financial data can open them; (2) when an invoice is corrected after its payment request was approved, show the difference on the request and ask for a new approval above a tolerance you set (for example 1 % or 20 EUR).
