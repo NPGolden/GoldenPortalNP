@@ -3606,3 +3606,13 @@ The page on screen stays the internal version for staff.
 - One-time completion of existing orders on the first opening of the list (setting `po_exp_fix`).
 - Handbook wording of v1.196.1 corrected: the line fields are "Lead time" and "Needed by".
 - Cybersecurity: no new access or input; no database change.
+
+## §429 v1.197.0 (R97-145) — Goods receipt: split a line between project and stock
+
+- Purchase order › Goods receipt: next to the destination of each line, field **Quantity to the project (blank = all)**. Used only with destination *Project (delivery note)*.
+- Booking: the whole accepted quantity enters the warehouse; the typed quantity leaves on the delivery note of the receipt (project / sub-project of the order); the difference stays as free stock. 0 typed = all to stock.
+- Requisition line behind the order line: received = whole quantity, issued = project part; only the project part is reserved, so the stock part is free.
+- Free-text lines (no inventory item): the typed quantity goes on the delivery note; nothing is stocked.
+- Refused when the quantity is above the accepted quantity of the line.
+- Database: `install/migrate_cp_r97_145_receipt_split.sql` — `po_receipt_lines.dest_qty`. State key `r98v`.
+- Cybersecurity: same right as booking a receipt (warehouse / procurement), quantities validated on the server, no new access.

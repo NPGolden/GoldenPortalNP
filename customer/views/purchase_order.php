@@ -314,11 +314,11 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
         <td class="num"><input name="rej[<?= (int)$l['id'] ?>]" type="number" step="0.001" min="0" value="" style="width:5.5em;"></td>
         <td><select name="ncr[<?= (int)$l['id'] ?>]"><?php foreach (PO_NCR_ACTIONS as $a): ?><option value="<?= $a ?>"><?= tt('po.ncr_' . $a) ?></option><?php endforeach; ?></select></td>
         <td><input name="reason[<?= (int)$l['id'] ?>]" maxlength="400" placeholder="<?= tt('po.ncr_reason_ph') ?>"></td>
-        <td><input name="loc[<?= (int)$l['id'] ?>]" maxlength="40" style="width:6em;"></td><?php if ($dnHas && $o['project_id']): ?><td><select name="dest[<?= (int)$l['id'] ?>]" data-nosearch><option value="stock"><?= tt('dn.dest_stock') ?></option><option value="project"><?= tt('dn.dest_project') ?></option></select></td><?php endif; ?></tr>
+        <td><input name="loc[<?= (int)$l['id'] ?>]" maxlength="40" style="width:6em;"></td><?php if ($dnHas && $o['project_id']): ?><td><select name="dest[<?= (int)$l['id'] ?>]" data-nosearch><option value="stock"><?= tt('dn.dest_stock') ?></option><option value="project"><?= tt('dn.dest_project') ?></option></select> <input name="pq[<?= (int)$l['id'] ?>]" inputmode="decimal" autocomplete="off" placeholder="<?= tt('dn.dest_qty_ph') ?>" title="<?= tt('dn.dest_qty') ?>" aria-label="<?= tt('dn.dest_qty') ?>" style="width:5.5em;text-align:right;"></td><?php endif; ?></tr>
     <?php endforeach; ?>
     </tbody></table>
     <div class="form-grid" style="margin-top:8px;"><div class="field field--full"><label><?= tt('prq.note') ?></label><input name="note" maxlength="400"></div></div>
-    <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit">📥 <?= tt('po.book_receipt') ?></button><label class="chk"><input type="checkbox" name="allow_over" value="1"> <?= tt('po.allow_over') ?></label><?php if ($dnHas && $o['project_id']): ?><span class="hint"><?= tt('dn.dest_hint') ?></span><?php endif; ?></div>
+    <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit">📥 <?= tt('po.book_receipt') ?></button><label class="chk"><input type="checkbox" name="allow_over" value="1"> <?= tt('po.allow_over') ?></label><?php if ($dnHas && $o['project_id']): ?><span class="hint"><?= tt('dn.dest_hint') ?> <?= tt('dn.dest_qty_hint') ?></span><?php endif; ?></div>
   </form>
 </div>
 <?php endif; ?>

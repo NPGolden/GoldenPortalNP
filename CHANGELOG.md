@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.196.2** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.197.0** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.197.0 | GAS-CP-R97-145 | 2026-11-19 | Goods receipt of a purchase order: a received line can be split — the quantity typed next to Project goes to the project on the delivery note, the rest of the accepted quantity stays in the warehouse as free stock. | `install/migrate_cp_r97_145_receipt_split.sql` |
 | 1.196.2 | GAS-CP-R97-144 | 2026-11-19 | Purchase orders: the planned date of the step Delivered in the delivery timeline counts as the expected delivery of the order and fills its empty delivery date; the purchase orders of a sub-project show the expected date; existing orders are completed once. | — |
 | 1.196.1 | GAS-CP-R97-143 | 2026-11-19 | Purchase order document (PDF): a column Delivery per line — the date promised by the supplier, else the lead time in days, else the date the line is needed; shown when at least one line has it. | — |
 | 1.196.0 | GAS-CP-R97-142 | 2026-11-19 | Purchase orders: a cancelled order or request for quotation can be restored by Procurement, with a reason — it returns to the state it had (draft, sent or confirmed), its lines open again and the requisition lines are booked as ordered again; refused when a line was meanwhile ordered on another order. | — |
