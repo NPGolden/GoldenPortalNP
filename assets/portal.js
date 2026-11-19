@@ -339,14 +339,14 @@
   }
 })();
 
-/* R30-007 — searchable drop-downs: every <select> with more than 8 entries gets a type-to-filter list.
+/* R30-007 — searchable drop-downs: every <select> with more than 8 entries (or marked data-search) gets a type-to-filter list.
    The native select stays in the form (value, name, change events, validation); a button shows the choice and opens the panel. */
 (function () {
   var MIN = 8, open = null, txt = document.documentElement.getAttribute('data-ss-search') || 'Type to search…', none = document.documentElement.getAttribute('data-ss-none') || 'No match';
   function optLabel(o) { return (o.textContent || '').replace(/\s+/g, ' ').trim(); }
   function enhance(sel) {
     if (sel.multiple || sel.dataset.ss || sel.hasAttribute('data-nosearch') || sel.closest('.pager, .pager-per, table.fsr-lines, table.acct')) return;
-    if (sel.querySelectorAll('option').length <= MIN) return;
+    if (!sel.hasAttribute('data-search') && sel.querySelectorAll('option').length <= (sel.closest('.fltbar') ? 3 : MIN)) return;   /* R97-140: data-search = always type-to-filter; in a filter bar already from 4 entries */
     sel.dataset.ss = '1'; sel.classList.add('ss-native'); sel.tabIndex = -1;
     var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'ss-btn'; btn.setAttribute('aria-haspopup', 'listbox');
     if (sel.style.minWidth) btn.style.minWidth = sel.style.minWidth; if (sel.style.width) btn.style.width = sel.style.width;

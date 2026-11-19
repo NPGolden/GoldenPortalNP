@@ -3568,3 +3568,9 @@ The page on screen stays the internal version for staff.
 - **Now:** Paid is green when everything registered is paid and the registered documents (invoice or proforma) cover all lines of the order; note "paid in advance" while the sales invoice is missing.
 - Invoiced stays yellow, "proforma — sales invoice awaited", until the sales invoice is assigned on the proforma.
 - No database change. Cybersecurity: display rule only.
+
+## §424 v1.195.3 (R97-140) — Filters: type to pick from the list
+
+- Rule of the searchable drop-down (`assets/portal.js`): more than 8 entries anywhere (unchanged); **4 or more entries inside a filter bar**; always when the list is marked `data-search`; never when marked `data-nosearch`.
+- Purchase orders and Pipeline: the Vessel and Supplier filters are marked always searchable.
+- The native list stays in the form, so values, keyboard use and validation are unchanged. Cybersecurity: browser-side display only, no inline script, CSP unchanged.
