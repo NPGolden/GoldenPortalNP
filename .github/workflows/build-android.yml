@@ -61,6 +61,7 @@ jobs:
           set -e; cd android
           sed -i "s/versionCode 1$/versionCode ${{ github.run_number }}/; s/versionName \"1.0\"/versionName \"${{ steps.prep.outputs.version }}\"/" app/build.gradle
           grep -E "versionCode|versionName|applicationId" app/build.gradle
+          echo "SDK levels (Google Play requires targetSdk 36 since 31 Aug 2026):"; grep -E "minSdkVersion|compileSdkVersion|targetSdkVersion" variables.gradle || true
           [ -n "$KS_B64" ] || { echo "ANDROID_KEYSTORE_B64 secret missing"; exit 1; }
           echo "$KS_B64" | base64 -d > app/golden-upload.keystore
           printf '\nandroid {\n  signingConfigs { release { storeFile file("golden-upload.keystore"); storePassword System.getenv("KS_PASS"); keyAlias System.getenv("KS_ALIAS"); keyPassword System.getenv("KEY_PASS") } }\n  buildTypes { release { signingConfig signingConfigs.release } }\n}\n' >> app/build.gradle
