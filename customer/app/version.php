@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.192.0';
+const CP_VERSION = '1.193.0';
 const CP_BUILD   = '2026-11-18';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-133', 'version' => '1.193.0', 'date' => '2026-11-19', 'title' => 'Purchasing: pipeline board of the purchase orders — every open order in the stage it waits in (draft, sent, confirmed, partly received, received, invoiced, paid), with totals and the flags delivery late, payment overdue, no confirmation, paid in advance.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-132', 'version' => '1.192.0', 'date' => '2026-11-19', 'title' => 'Purchasing: every order shows where it stands as a flow — created, sent, confirmed, on the way, received, invoiced, paid, closed — on the order and in the list; production orders are renumbered …-PRD-… so they no longer look like purchase orders.', 'db' => 'install/migrate_cp_r97_132_production_order_numbers.sql', 'check' => 'r98s'],
         ['ref' => 'GAS-CP-R97-131', 'version' => '1.191.0', 'date' => '2026-11-19', 'title' => 'Support: a portrait process-flow page from the offer to the delivery — Sales, Engineering, Purchasing, Warehouse, Accounting — showing per step what happens to quantities, stock and money, with the inventory movements and the delivery notes; printable.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-130', 'version' => '1.190.2', 'date' => '2026-11-19', 'title' => 'Purchase order: a line from a requisition takes the estimated price of the requisition when no buying price is known for the item; on existing orders one button takes the estimates for the lines without price.', 'db' => null, 'check' => null],

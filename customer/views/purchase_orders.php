@@ -3,7 +3,7 @@
 require __DIR__ . '/_layout.php';
 $u = require_staff();
 if (!function_exists('po_can') || !po_can()) { http_response_code(403); layout_head(t('po.title'), 'purchase_orders'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
-$tab = in_array($_GET['tab'] ?? '', ['po', 'rfq', 'tobuy'], true) ? $_GET['tab'] : 'po'; $admin = po_admin(); $priced = stk_price_visible();
+$tab = in_array($_GET['tab'] ?? '', ['po', 'pipe', 'rfq', 'tobuy'], true) ? $_GET['tab'] : 'po'; $admin = po_admin(); $priced = stk_price_visible();
 $f = ['kind' => $tab === 'rfq' ? 'rfq' : 'po', 'status' => (string)($_GET['status'] ?? (isset($_GET['status']) ? '' : 'open')), 'q' => trim((string)($_GET['q'] ?? '')), 'supplier_id' => (int)($_GET['supplier_id'] ?? 0), 'purpose' => (string)($_GET['purpose'] ?? '')];
 $cnt = po_counts(); $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : '';
 $sups = sup_list(['status' => 'active']); $keep = array_filter(['tab' => $tab, 'status' => $f['status'], 'q' => $f['q'], 'supplier_id' => $f['supplier_id'], 'purpose' => $f['purpose']]);
@@ -19,9 +19,34 @@ layout_head(t('po.title'), 'purchase_orders');
   <a class="stat" href="<?= url('purchase_orders', ['tab' => 'po', 'status' => 'open']) ?>"><b><?= $cnt['open'] ?></b><?= tt('po.k_open') ?><span class="s"><?= $cnt['late'] ? '<span style="color:var(--red)">' . e(t('po.k_late', ['n' => $cnt['late']])) . '</span>' : tt('po.k_open_hint') ?></span></a>
   <a class="stat" href="<?= url('purchase_orders', ['tab' => 'rfq']) ?>"><b><?= $cnt['rfq'] ?></b><?= tt('po.k_rfq') ?><span class="s"><?= tt('po.k_rfq_hint') ?></span></a>
 </div>
-<nav class="tabs" style="margin-bottom:12px;"><?php $T = fn($k, $lbl) => '<a class="tab' . ($tab === $k ? ' is-on' : '') . '" href="' . url('purchase_orders', ['tab' => $k]) . '">' . $lbl . '</a>'; echo $T('po', '🛒 ' . t('po.pos')) . $T('rfq', '📨 ' . t('po.rfqs')) . $T('tobuy', '🧺 ' . t('po.tobuy')); ?></nav>
+<nav class="tabs" style="margin-bottom:12px;"><?php $T = fn($k, $lbl) => '<a class="tab' . ($tab === $k ? ' is-on' : '') . '" href="' . url('purchase_orders', ['tab' => $k]) . '">' . $lbl . '</a>'; echo $T('po', '🛒 ' . t('po.pos')) . $T('pipe', '▦ ' . t('pof.pipe')) . $T('rfq', '📨 ' . t('po.rfqs')) . $T('tobuy', '🧺 ' . t('po.tobuy')); ?></nav>
 
-<?php if ($tab === 'tobuy'): $rows = po_to_buy(); ?>
+<?php if ($tab === 'pipe'): /* R97-133: the orders by the stage they wait in */ $PF = array_filter(['supplier_id' => $f['supplier_id'], 'q' => $f['q'], 'purpose' => $f['purpose']]); $PP = po_pipeline($PF); $nAll = array_sum(array_map('count', $PP['stages'])); ?>
+<form method="get" action="index.php" class="btn-row" style="margin-bottom:10px;"><input type="hidden" name="p" value="purchase_orders"><input type="hidden" name="tab" value="pipe">
+  <select name="supplier_id"><option value=""><?= tt('po.supplier') ?> — <?= tt('flt.any') ?></option><?php foreach ($sups as $s): ?><option value="<?= (int)$s['id'] ?>"<?= $sel($s['id'], $f['supplier_id']) ?>><?= e($s['name']) ?></option><?php endforeach; ?></select>
+  <input name="q" value="<?= e($f['q']) ?>" placeholder="<?= tt('po.search_ph') ?>" style="min-width:220px;"><button class="btn btn--sm" type="submit"><?= tt('btn.apply') ?></button>
+  <span class="hint"><?= e(t('pof.pipe_sum', ['n' => $nAll])) ?></span>
+  <?= $PP['late'] ? pill('bad', t('pof.f_late') . ' · ' . $PP['late']) : '' ?> <?= $PP['overdue'] ? pill('bad', t('pof.f_overdue') . ' · ' . $PP['overdue']) : '' ?> <?= $PP['waiting'] ? pill('warn', t('pof.f_waiting') . ' · ' . $PP['waiting']) : '' ?></form>
+<div class="pp-board">
+<?php foreach (PO_PIPE as $sk): $list = $PP['stages'][$sk]; $sum = array_sum(array_map(fn($r) => (float)$r['subtotal'], $list)); ?>
+  <div class="pp-col">
+    <div class="pp-colhead"><b><?= tt('pof.p_' . $sk) ?></b> <b><?= count($list) ?></b><span class="hint"><?= tt('pof.p_' . $sk . '_h') ?><?= $priced && $list ? ' · ' . e(po_money($sum, (string)($list[0]['currency'] ?? 'EUR'))) : '' ?></span></div>
+    <?php if (!$list): ?><p class="hint" style="text-align:center;">—</p><?php endif; ?>
+    <?php foreach ($list as $r): $exp = ($r['expected_date'] ?? null) ?: $r['delivery_date']; $bad = (bool) array_intersect($r['flags'], ['late', 'overdue']); ?>
+    <div class="pp-card" style="<?= $bad ? 'border-left:4px solid #B3261E;' : (in_array('waiting', $r['flags'], true) ? 'border-left:4px solid #C9A227;' : '') ?>">
+      <div class="pp-top"><a href="<?= url('purchase_order', ['id' => (int)$r['id']]) ?>"><b style="font-family:var(--mono);"><?= e($r['po_no']) ?></b></a><?= $priced ? '<span class="hint">' . e(po_money((float)$r['subtotal'], $r['currency'])) . '</span>' : '' ?></div>
+      <div><?= e($r['supplier']) ?></div>
+      <div class="hint"><?= $r['project_id'] ? e((string)$r['project_code']) : (function_exists('po_purpose_pill') ? strip_tags(po_purpose_pill($r)) : '') ?><?= $r['title'] ? ' · ' . e(mb_strimwidth((string)$r['title'], 0, 40, '…')) : '' ?></div>
+      <div class="hint"<?= in_array('late', $r['flags'], true) ? ' style="color:#B3261E;font-weight:600;"' : '' ?>><?= $exp ? '📅 ' . e(fmt_date($exp)) : '' ?></div>
+      <div style="margin-top:6px;"><?= hrf_html($r['flow'], 'mini') ?></div>
+      <?php if ($r['flags']): ?><div style="margin-top:4px;"><?php foreach ($r['flags'] as $fl): ?><?= pill(in_array($fl, ['late', 'overdue'], true) ? 'bad' : ($fl === 'prepaid' ? 'navy' : 'warn'), t('pof.f_' . $fl)) ?> <?php endforeach; ?></div><?php endif; ?>
+    </div>
+    <?php endforeach; ?>
+  </div>
+<?php endforeach; ?>
+</div>
+<p class="hint" style="margin-top:8px;"><?= tt('pof.pipe_hint') ?> <?= tt('pof.legend') ?></p>
+<?php elseif ($tab === 'tobuy'): $rows = po_to_buy(); ?>
 <div class="card">
   <p class="hint"><?= tt('po.tobuy_lede') ?></p>
   <form method="post" action="<?= url('purchase_order', ['id' => 0]) ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="po_save"><input type="hidden" name="id" value="0">

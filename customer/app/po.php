@@ -221,6 +221,22 @@ function po_flow(array $o, ?array $d = null): array {
     return $S;
 }
 
+/** R97-133 — the purchase orders that are not closed or cancelled, put in the stage they wait in. One stage per order: the first step of its flow
+ *  that is not finished. Returns ['stages' => [key => [orders…]], 'late' => n, 'overdue' => n, 'waiting' => n]; each order carries 'flow' and 'flags'. */
+const PO_PIPE = ['draft', 'sent', 'transit', 'partial', 'toinvoice', 'topay', 'toclose'];
+function po_pipeline(array $f = []): array {
+    $out = ['stages' => array_fill_keys(PO_PIPE, []), 'late' => 0, 'overdue' => 0, 'waiting' => 0];
+    $rows = array_values(array_filter(po_list(['kind' => 'po', 'status' => ''] + $f), fn($r) => !in_array($r['status'], ['closed', 'cancelled'], true))); if (!$rows) return $out;
+    $D = po_flow_data(array_column($rows, 'id'));
+    foreach ($rows as $r) { $S = po_flow($r, $D[(int)$r['id']] ?? []); $st = []; foreach ($S as $s) $st[$s['key']] = $s['state'];
+        $stage = $st['sent'] !== 'done' ? 'draft' : ($st['confirmed'] !== 'done' ? 'sent' : ($st['received'] !== 'done' ? ($st['received'] === 'run' ? 'partial' : 'transit') : ($st['invoiced'] !== 'done' ? 'toinvoice' : ($st['paid'] !== 'done' ? 'topay' : 'toclose'))));
+        $fl = []; if ($st['transit'] === 'bad') { $fl[] = 'late'; $out['late']++; } if ($st['paid'] === 'bad') { $fl[] = 'overdue'; $out['overdue']++; }
+        if ($stage === 'sent' && !empty($r['sent_at']) && strtotime((string)$r['sent_at']) < strtotime('-7 days')) { $fl[] = 'waiting'; $out['waiting']++; }
+        if ($st['paid'] === 'run' && in_array($stage, ['transit', 'partial', 'sent'], true)) $fl[] = 'prepaid';
+        $r['flow'] = $S; $r['flags'] = $fl; $out['stages'][$stage][] = $r; }
+    return $out;
+}
+
 /* ------------------------------------------------------------------ R97-128: prices typed in the lines table; prices read from the supplier's offer by the assistant */
 /** Where prices can be typed in the table: an order that can still be edited (an RFQ takes its prices in the quotation form). */
 function po_prices_can(?array $o): bool { return $o && $o['kind'] === 'po' && po_admin() && po_editable($o) && stk_price_visible(); }

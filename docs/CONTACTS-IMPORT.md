@@ -3484,3 +3484,15 @@ The page on screen stays the internal version for staff.
 **Not tested**: live data; orders with credit notes or several partial invoices were reasoned, not created.
 
 **Security review**: the flow shows states and percentages, no amounts, to whoever may already open the order; the links to Payables appear only for those who have Payables. The renumbering changes one text column. Proposal (no effect on speed): a filter on the list — "late deliveries" and "payment overdue" — fed by the same data.
+
+## §417 v1.193.0 (R97-133) — Purchase orders: pipeline board
+
+**Asked**: a dashboard pipeline for the purchase orders, so Procurement sees the orders and their statuses easily and summarised.
+
+**Change** — `app/po.php`: `PO_PIPE`, `po_pipeline()` — the orders that are not closed or cancelled, each in the stage of the first unfinished step of `po_flow()` (draft · sent · transit · partial · toinvoice · topay · toclose), with flags `late`, `overdue`, `waiting` (sent more than 7 days ago, not confirmed) and `prepaid`; totals of the three attention counts. `views/purchase_orders.php`: tab `pipe` — board in the markup of the sales pipeline (`pp-board`), column head with count and total (prices only for who sees them), cards with the flow in a new smaller size (`hrf_html(…, 'mini')`), filter by supplier and search. Read-only; the data comes from the same four statements as the flow.
+
+**Tests (sandbox)**: eight test orders across the stages (one late, one overdue, one unconfirmed for nine days, one paid in advance) — each in the expected column, flags and counts right, totals per column; screenshot looked at. Sandbox restored. Error log clean.
+
+**Not tested**: live data; a very long list (the board shows every open order — with several hundred it will be long).
+
+**Security review**: nothing new is exposed — the same orders and the same price rule as the list. Proposal (no effect on speed): the three attention counts on the main dashboard of Procurement and in the weekly e-mail to the buyer.
