@@ -3672,3 +3672,10 @@ The single functions read the batch first and fall back to their own statement, 
 - Column headers are printed again at the top of every continuation page.
 - The first line of a continuation page is in the body colour and size (the page header left the gold colour active).
 - `po_pdf()` in `app/po.php`, delivery note PDF in `app/dn.php`. No database change. Cybersecurity: document layout only.
+
+## §434 v1.198.4 (R97-150) — Customer app icon is the Golden A/S logo
+
+- `customer/mobile-customer/icons/icon-192.png`, `icon-512.png`, `icon-1024.png` are the same logo icon as the Service and PM apps (white Golden A/S logo on navy, gold bar); the gold G mark is retired.
+- Client version 1.0.7 (`lib/api.js`, cache name in `sw.js`) so installed web apps fetch the new icon; the Android / iOS shells take the launcher icon from `icon-1024.png` at the next store build.
+- Google Play listing of `gr.goldenas.customer` uses the same icon and a feature graphic with the logo.
+- No database change. Cybersecurity: image files only; no code path, right or data changed.

@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.198.3';
+const CP_VERSION = '1.198.4';
 const CP_BUILD   = '2026-11-18';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-150', 'version' => '1.198.4', 'date' => '2026-11-19', 'title' => 'Customer app (1.0.7): the app icon is the Golden A/S logo on navy with the gold bar, as in the Service and PM apps (it was a gold G mark); used by the installed web app and by the store builds.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-149', 'version' => '1.198.3', 'date' => '2026-11-19', 'title' => 'Purchase order and delivery note documents (PDF): when the table continues on a new page the column headers are printed again and the first line is in the normal text colour (it was gold).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-148', 'version' => '1.198.2', 'date' => '2026-11-19', 'title' => 'Documents: the log / history / audit trail card of every document is folded by default and opens with a click; delivery lots can also be defined on a draft purchase order (lead times counted from today until the order is sent).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-147', 'version' => '1.198.1', 'date' => '2026-11-19', 'title' => 'Performance: the figures of all sub-projects (budget, hours, costs, KPIs) are read in batches instead of 13 statements per sub-project — Dashboard, KPIs, KPI report, Cash flow and the projects list ask a fraction of the statements; HR pages read the people list once; index for the last movement of inventory items.', 'db' => 'install/migrate_cp_r97_147_perf_index.sql', 'check' => 'r98x'],
