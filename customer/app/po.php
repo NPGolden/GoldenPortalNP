@@ -375,6 +375,25 @@ function po_cancel(int $oid, string $note): void {
     }
     if (function_exists('po_sp_cost_sync')) po_sp_cost_sync($oid); cache_bump_later('inv'); cache_bump_later('eng');
 }
+/** R97-142: bring a cancelled order back — to the state it had (draft, sent or confirmed); its lines open again and, for a sent order, the requisition lines are booked as ordered again.
+ *  Refused when a requisition line of it was meanwhile ordered on another order (it would be ordered twice). */
+function po_restore_state(array $o): string { return $o['kind'] === 'po' && !empty($o['confirmed_at']) ? 'confirmed' : (!empty($o['sent_at']) ? 'sent' : 'draft'); }
+function po_restore(int $oid, string $note): string {
+    $o = po_load($oid); if (!$o || !po_admin() || $o['status'] !== 'cancelled') throw new RuntimeException(t('err.noaccess'));
+    if ($note === '') throw new RuntimeException(t('prq.need_reason'));
+    $to = po_restore_state($o); $book = $o['kind'] === 'po' && $to !== 'draft';
+    $lines = all("SELECT l.*, pl.qty AS pr_qty, pl.qty_reserved AS pr_res, pl.qty_ordered AS pr_ord, pl.status AS pr_status, r.status AS r_status, r.pr_no FROM po_lines l LEFT JOIN pr_lines pl ON pl.id = l.pr_line_id LEFT JOIN pr_requests r ON r.id = pl.request_id WHERE l.order_id = ? AND l.status = 'cancelled'", [$oid]);
+    if ($book) {
+        $bad = []; foreach ($lines as $l) { if (!$l['pr_line_id']) continue; $free = (float)$l['pr_qty'] - (float)$l['pr_res'] - (float)$l['pr_ord']; if ($l['pr_qty'] === null || in_array($l['r_status'], ['cancelled', 'rejected'], true) || $l['pr_status'] === 'cancelled' || $free < (float)$l['qty'] - 0.0005) $bad[] = '#' . (int)$l['seq']; }
+        if ($bad) throw new RuntimeException(t('po.restore_blocked', ['l' => implode(', ', array_slice($bad, 0, 12)) . (count($bad) > 12 ? ' …' : '')]));
+        if (function_exists('sup_po_check')) sup_po_check((int)$o['supplier_id']);   // the supplier must still be approved
+        foreach ($lines as $l) if ($l['pr_line_id']) q('UPDATE pr_lines SET qty_ordered = qty_ordered + ?, status = ? WHERE id = ?', [(float)$l['qty'], 'ordered', (int)$l['pr_line_id']]);
+    }
+    q("UPDATE po_lines SET status = 'open' WHERE order_id = ? AND status = 'cancelled'", [$oid]);
+    q('UPDATE po_orders SET status = ? WHERE id = ?', [$to, $oid]); po_event($oid, 'restore', t('po.s_' . $to) . ' · ' . $note); po_recalc($oid);
+    if (function_exists('po_sp_cost_sync')) po_sp_cost_sync($oid); cache_bump_later('inv'); cache_bump_later('eng');
+    return $to;
+}
 function po_close(int $oid, string $note): void { $o = po_load($oid); if (!$o || !po_admin() || !in_array($o['status'], ['received', 'partial', 'confirmed', 'sent'], true)) throw new RuntimeException(t('err.noaccess')); q('UPDATE po_orders SET status = ? WHERE id = ?', ['closed', $oid]); po_event($oid, 'close', $note ?: null); if (function_exists('po_progress_apply')) po_progress_apply($o['subproject_id'] ? (int)$o['subproject_id'] : null); cache_bump_later('eng'); }
 
 /* ------------------------------------------------------------------ people / e-mail */

@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.195.4';
+const CP_VERSION = '1.196.0';
 const CP_BUILD   = '2026-11-18';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-142', 'version' => '1.196.0', 'date' => '2026-11-19', 'title' => 'Purchase orders: a cancelled order or request for quotation can be restored by Procurement, with a reason — it returns to the state it had (draft, sent or confirmed), its lines open again and the requisition lines are booked as ordered again; refused when a line was meanwhile ordered on another order.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-141', 'version' => '1.195.4', 'date' => '2026-11-19', 'title' => 'Purchase orders and requisitions: the filters are remembered — coming back to the list from an order, the menu or another tab shows the previous selection; supplier, vessel, purpose and search follow between the tabs; a Clear button returns to the defaults.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-140', 'version' => '1.195.3', 'date' => '2026-11-19', 'title' => 'Filters: every drop-down of a filter bar with four or more entries is a type-to-search list (it was only from nine entries), so the Vessel and Supplier filters of the purchase orders accept typing; a list can be marked to be always searchable.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-139', 'version' => '1.195.2', 'date' => '2026-11-19', 'title' => 'Purchase order flow: an order paid in full on a proforma that covers the whole order shows the step Paid as done (green, "paid in advance"); only the step Invoiced stays open with the note "proforma — sales invoice awaited".', 'db' => null, 'check' => null],

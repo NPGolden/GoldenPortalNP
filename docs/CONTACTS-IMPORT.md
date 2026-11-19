@@ -3581,3 +3581,13 @@ The page on screen stays the internal version for staff.
 - Opening the list without any filter in the address (menu, back link, tab) restores the last selection; "Apply" stores the new one; **Clear** forgets it.
 - Tabs Purchase orders / Pipeline / RFQs carry supplier, vessel, purpose and search to each other; the status is per tab.
 - Cybersecurity: the selection is kept in the user's own server session only (not in the browser, not in the database) and ends with the session; values pass through the same validation as typed filters.
+
+## §426 v1.196.0 (R97-142) — Purchase orders: restore a cancelled order
+
+- **Who / where:** Procurement and management; button **↺ Restore** on the page of a cancelled order or RFQ; a reason is mandatory.
+- **State after restore:** Confirmed if it had been confirmed, else Sent if it had been sent, else Draft (`po_restore_state`).
+- **What comes back:** all lines open; for Sent / Confirmed the requisition lines are booked as ordered again and the sub-project cost commitment returns.
+- **Refused when:** a requisition line of the order was ordered elsewhere or cancelled meanwhile (message lists the lines); the supplier is no longer approved.
+- **Not covered:** an order whose balance was cancelled after a partial receipt (status Received).
+- **Supplier:** not informed automatically.
+- **Cybersecurity:** same right as Cancel, checked on the server; reason and user are written to the order log; no database change.
