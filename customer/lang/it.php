@@ -12607,4 +12607,7 @@ Cordiali saluti,
 'apps.d.pm' => 'Progetti, approvazioni, rapporti e attività',
 'apps.d.hr' => 'Team HR e direzione; aggiungetela alla schermata Home',
 'login.help_link' => 'Richiedi l’accesso al portale',
+'si.k_mine' => 'In attesa della mia approvazione',
+'si.k_mine_hint' => 'Richieste di pagamento che devo decidere',
+'dash.pay_approve' => 'richiesta di pagamento da approvare',
 ];

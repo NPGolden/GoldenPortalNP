@@ -3707,3 +3707,12 @@ The single functions read the batch first and fall back to their own statement, 
 
 - `customer/views/login.php`: after `login.help`, a link to `https://www.goldenas.com.gr/portal-access.html` (new tab, `rel="noopener"`), label `login.help_link` in en, el, it, bg, uk — 12 423 keys each.
 - No database change. Cybersecurity: one fixed outside link to the company website; no script, no data sent; no effect on performance.
+
+## §439 v1.200.0 (R97-155) — Payables: payment requests awaiting my approval
+
+- `customer/app/si.php`: `si_my_statuses()` (what the signed-in user may decide: `submitted` with `si_pay_can()`, `mgmt` with `mgmt_can()` — the same rule as `si_request_decide()`), `si_my_pending()` (one query per page, static cache), filter `status=mine` in `si_requests()`.
+- `customer/views/dashboard.php`: one attention line per pending request (tone `bad` when `pay_by` has passed, else `gold`).
+- `customer/views/_layout.php` `nav_badges_compute()`: counter `payables` (cached 45 s with the other menu counters).
+- `customer/views/payables.php`: tile «Awaiting my approval» (five tiles, `kpi--5`) and the option in the Status filter of the requests tab.
+- Language keys `si.k_mine`, `si.k_mine_hint`, `dash.pay_approve` in en, el, it, bg, uk — 12 426 keys each.
+- No database change (index `ix_sir_status` serves the query). Cybersecurity: read-only lists limited by the existing decision rights; the status list in the SQL comes from fixed values, not from the request; no new right, no new action.

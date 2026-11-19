@@ -22,7 +22,9 @@ layout_head(t('si.title'), 'payables');
   <div><h1>💸 <?= tt('si.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('si.lede') ?></p></div>
   <div class="btn-row"><a class="btn btn--gold btn--sm" href="<?= url('payable', ['id' => 0]) ?>">+ <?= tt('si.new') ?></a><?php if (si_pf_has()): ?><a class="btn btn--ghost btn--sm" href="<?= url('payable', ['id' => 0, 'proforma' => 1]) ?>">+ <?= tt('si.new_pf') ?></a><?php endif; ?><a class="btn btn--ghost btn--sm" href="<?= url('payable', ['id' => 0, 'kind' => 'credit']) ?>">+ <?= tt('si.new_credit') ?></a></div>
 </div>
-<div class="kpi kpi--4" style="margin-bottom:10px;">
+<?php $mine = count(si_my_pending()); ?>
+<div class="kpi kpi--5" style="margin-bottom:10px;">
+  <a class="stat<?= $mine ? ' red' : '' ?>" href="<?= url('payables', ['tab' => 'requests', 'status' => 'mine']) ?>"><b><?= $mine ?></b><?= tt('si.k_mine') ?><span class="s"><?= tt('si.k_mine_hint') ?></span></a>
   <a class="stat gold" href="<?= url('payables', ['status' => 'open']) ?>"><b><?= e(si_money($cnt['open_sum'])) ?></b><?= tt('si.k_open') ?><span class="s"><?= e(t('si.k_open_n', ['n' => $cnt['open']])) ?></span></a>
   <a class="stat<?= $cnt['overdue'] ? ' red' : '' ?>" href="<?= url('payables', ['status' => 'overdue']) ?>"><b><?= $cnt['overdue'] ?></b><?= tt('si.k_overdue') ?><span class="s"><?= tt('si.k_overdue_hint') ?></span></a>
   <a class="stat<?= $cnt['mgmt'] ? ' red' : '' ?>" href="<?= url('payables', ['tab' => 'requests', 'status' => 'mgmt']) ?>"><b><?= $cnt['mgmt'] ?></b><?= tt('si.k_mgmt') ?><span class="s"><?= e(t('si.k_mgmt_hint', ['v' => si_money(si_threshold())])) ?></span></a>
@@ -79,7 +81,7 @@ layout_head(t('si.title'), 'payables');
 <?php endif; ?>
 <form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1fr 1.2fr auto;">
   <input type="hidden" name="p" value="payables"><input type="hidden" name="tab" value="requests">
-  <div class="field"><label><?= tt('prq.status') ?></label><select name="status"><option value=""<?= $sel($rf['status'], '') ?>><?= tt('prq.all') ?></option><option value="open"<?= $sel($rf['status'], 'open') ?>><?= tt('prq.open') ?></option><?php foreach (['submitted', 'mgmt', 'approved', 'rejected', 'paid', 'cancelled'] as $s): ?><option value="<?= $s ?>"<?= $sel($rf['status'], $s) ?>><?= tt('si.r_' . $s) ?></option><?php endforeach; ?></select></div>
+  <div class="field"><label><?= tt('prq.status') ?></label><select name="status"><option value=""<?= $sel($rf['status'], '') ?>><?= tt('prq.all') ?></option><option value="open"<?= $sel($rf['status'], 'open') ?>><?= tt('prq.open') ?></option><option value="mine"<?= $sel($rf['status'], 'mine') ?>><?= tt('si.k_mine') ?></option><?php foreach (['submitted', 'mgmt', 'approved', 'rejected', 'paid', 'cancelled'] as $s): ?><option value="<?= $s ?>"<?= $sel($rf['status'], $s) ?>><?= tt('si.r_' . $s) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label><?= tt('po.supplier') ?></label><select name="supplier_id"><option value=""><?= tt('flt.any') ?></option><?php foreach ($sups as $s): ?><option value="<?= (int)$s['id'] ?>"<?= $sel($s['id'], $rf['supplier_id']) ?>><?= e($s['name']) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label>&nbsp;</label><button class="btn btn--sm" type="submit"><?= tt('btn.apply') ?></button></div>
 </form>

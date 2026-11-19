@@ -83,6 +83,7 @@ function nav_badges_compute(): array {
     if (is_staff() && function_exists('hr2_has') && hr2_has()) { $n = 0; if (hr_can()) $n = (int) scalar("SELECT COUNT(*) FROM hr_requests WHERE status = 'pending_hr'"); if (hr_is_manager()) $n += count(array_filter(hr_requests_for('manager'), fn($r) => $r['status'] === 'pending_mgr')); if ($n) $b['hr_requests'] = $n; if (function_exists('hr_msg_has') && hr_msg_has()) { $m = hr_messages_unread(); if ($m) { if (hr_can()) $b['admin_hr'] = $m; else $b['my_leave'] = $m; } } }   // R54-001 / R56-002
     if (is_staff() && function_exists('hra_can_manage') && hra_can_manage() && ($n = hra_pending_count())) $b['hra'] = $n;   // R67-001
     if (is_staff() && function_exists('eng_is_management') && eng_has() && (eng_is_management() || eng_is_pm())) $b['eng_requests'] = count(array_filter(eng_requests(['status' => 'pending']), fn($q) => eng_can_decide(['project_id' => (int)$q['project_id'], 'pm_user_id' => null], (string)$q['stage'])));   // R47-001 / R48-001
+    if (is_staff() && function_exists('si_my_pending') && function_exists('si_can') && si_can()) $b['payables'] = count(si_my_pending());   // R97-155: payment requests waiting for my decision
     return array_filter($b);
 }
 

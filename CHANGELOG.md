@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.199.1** (build 2026-11-20). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.200.0** (build 2026-11-20). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.200.0 | GAS-CP-R97-155 | 2026-11-20 | Payables: payment requests waiting for your approval are shown so that none is forgotten — a line each in «Needs your attention» on the home page, a red counter on Payables in the side menu, and a tile and filter «Awaiting my approval» on the Payables page (Management: with Management and with Accounting; Accounting: with Accounting). | — |
 | 1.199.1 | GAS-CP-R97-154 | 2026-11-20 | Sign-in page: under «Need access?» a link «Request portal access» opens the Customer Portal access page of the website (goldenas.com.gr/portal-access.html). | — |
 | 1.199.0 | GAS-CP-R97-153 | 2026-11-20 | Mobile apps on the home page and the sign-in page: QR codes and store links of the Golden A/S apps for Android (Google Play) and iPhone (App Store, shown as in review at Apple until released), with the link to each web app. Customers see Golden A/S Customer; personnel also see Service, PM and HR (HR as web app). | — |
 | 1.198.6 | GAS-CP-R97-152 | 2026-11-20 | Subproject page: the menu of the subproject (Process, Sections, Works … Contacts) stands on a pale gold band with a gold base line and the open tab is navy with white text, so the menu is told apart from the information shown below it. | — |

@@ -12607,4 +12607,7 @@ Best regards,
 'apps.d.pm' => 'Projects, approvals, reports and tasks',
 'apps.d.hr' => 'HR team and management; add it to the Home Screen',
 'login.help_link' => 'Request portal access',
+'si.k_mine' => 'Awaiting my approval',
+'si.k_mine_hint' => 'Payment requests I must decide',
+'dash.pay_approve' => 'payment request to approve',
 ];
