@@ -83,7 +83,8 @@ function cf_series(array $f, string $g, ?string $from = null, ?string $to = null
         else { $put(max((string)($r['due_at'] ?: $today), $today), 'out_f', (float)$r['amount'], $r['supplier'] . ' · ' . $r['scope'] . ' (PO ' . $r['po_no'] . ')'); $D['out_subs_due'] += (float)$r['amount']; }
     }
     // OUT forecast: remaining budgeted hours spread to the deadline
-    if (function_exists('bg_calc') && bg_has()) foreach (all("SELECT s.id, s.deadline, s.status FROM subprojects s WHERE s.project_id IN ({$in}) AND s.status <> 'completed'") as $s) {
+    $cfSubs_ = function_exists('bg_calc') && bg_has() ? all("SELECT s.id, s.deadline, s.status FROM subprojects s WHERE s.project_id IN ({$in}) AND s.status <> 'completed'") : []; if ($cfSubs_ && function_exists('bg_prime')) bg_prime(array_column($cfSubs_, 'id'));   // R97-147
+    foreach ($cfSubs_ as $s) {
         $C = bg_calc((int)$s['id'], $s); $remH = (float)($C['remaining_h'] ?? 0); $avg = (float)($C['budget_h'] ?? 0) > 0 ? (float)$C['budget_cost'] / (float)$C['budget_h'] : 0.0; $rem = $remH * $avg; if ($rem <= 0) continue;
         $end = (string)($s['deadline'] ?: date('Y-m-d', strtotime('+3 months'))); if ($end < $today) $end = $today;
         $pk = cf_periods($today, $end, $g); if (!$pk) continue; $per = $rem / count($pk);

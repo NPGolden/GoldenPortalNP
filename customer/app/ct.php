@@ -296,7 +296,8 @@ function ct_vessels(int $cid): array {
 /** Contacts of one vessel (vessel page card). */
 function ct_for_vessel(int $vid): array {
     if (!ct_has()) return [];
-    return all('SELECT ct.*, cv.role AS vessel_role, cv.is_primary, ' . (co_has() ? 'co.name' : 'ct.company') . ' AS company_name FROM contact_vessels cv JOIN contacts ct ON ct.id = cv.contact_id ' . (co_has() ? 'LEFT JOIN companies co ON co.id = ct.company_id ' : '') . 'WHERE cv.vessel_id = ? AND ct.is_active = 1 ORDER BY cv.is_primary DESC, ct.full_name', [$vid]);
+    static $memo = []; if (isset($memo[$vid])) return $memo[$vid];   // R97-147: projects of the same vessel on one page ask once
+    return $memo[$vid] = all('SELECT ct.*, cv.role AS vessel_role, cv.is_primary, ' . (co_has() ? 'co.name' : 'ct.company') . ' AS company_name FROM contact_vessels cv JOIN contacts ct ON ct.id = cv.contact_id ' . (co_has() ? 'LEFT JOIN companies co ON co.id = ct.company_id ' : '') . 'WHERE cv.vessel_id = ? AND ct.is_active = 1 ORDER BY cv.is_primary DESC, ct.full_name', [$vid]);
 }
 /** Filtered, paged list. $f: q, customer, vessel, category, status, soon, page */
 function ct_list(array $f, int $per = 50): array {

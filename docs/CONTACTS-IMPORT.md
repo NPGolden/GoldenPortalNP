@@ -3631,3 +3631,31 @@ The page on screen stays the internal version for staff.
 **Database.** `install/migrate_cp_r97_146_po_lots.sql` — table `po_lots`, column `po_lines.lot_id`. State key `r98w`.
 
 **Cybersecurity.** Lots are changed only with the Procurement right (checked on the server for every action and every lot / line against its order); read with the order; all changes in the order log; no file upload, no new external access.
+
+## §431 v1.198.1 (R97-147) — Performance: batched figures of sub-projects and projects
+
+**Finding (health report 19/11/2026).** Dashboard up to 4,0 s / ~4 300 statements when the KPI cockpit was renewed (every 10 minutes, on one user's page); projects list 700–1 660 statements; HR dashboard 430–530.
+
+**Cause.** `kpi_projects()` → `kpi_project()` → `kpi_sub()` / `bg_calc()` asked 13 statements per sub-project and 4 per project; other loops did the same (budget attention list, cash-flow forecast, project roll-up); the projects list asked ~12 per project; `hr_people()` was not kept for the request.
+
+**Change.**
+
+| Area | Before | Now |
+|---|---|---|
+| Sub-project figures | 13 statements per sub-project | `bg_prime()` — about 12 statements for all (chunks of 400) |
+| Project KPI (revisions, risks, project, sub-projects) | 4 per project | 4 in total |
+| KPI trends | 1 per project and KPI | `kpi_trend_prime()` — 1 per 300 projects (falls back when the database has no window functions) |
+| Projects list | offers, branch, footprint ×4, tickets card, permits card per project | batches; cards asked only when the project has open tickets / permits |
+| People online | 1 per person | 1 |
+| HR pages | people list read up to 15× | kept for the request (GET only); periods and type switches in one statement from the third person |
+| Inventory list | last movement per item without a fitting index | index `ix_invmv_item_kind_at` |
+
+The single functions read the batch first and fall back to their own statement, so every other caller behaves as before.
+
+**Check.** Page output compared before / after (identical) on a test copy with 153 projects, 463 sub-projects, timesheets, budgets, costs, risks, snapshots: Dashboard 6 448 → 219 statements, KPIs 8 022 → 112, KPI report 6 315 → 87, Cash flow 2 605 → 61, projects list 526 → 215.
+
+**Not changed.** Single simple statements that took 100–300 ms (`SELECT k, v FROM cp_settings`, `SHOW TABLES`, one-row updates): waiting time of the shared database, mostly the first statement of a request.
+
+**Database.** `install/migrate_cp_r97_147_perf_index.sql`. State key `r98x`.
+
+**Cybersecurity.** Read paths only; the batches use integer-cast ids and the same scope rules (the list of projects is still selected by the user's scope before anything is read); no new access; nothing kept between requests or users.

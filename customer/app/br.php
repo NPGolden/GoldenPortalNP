@@ -38,7 +38,9 @@ function br_of(?int $projectId, ?int $subId = null): array {
     if (!isset($cache[$k])) {
         $bid = null;
         if (br_has()) {
-            if ($subId) $bid = (int) scalar('SELECT COALESCE(s.branch_id, p.branch_id, 0) FROM subprojects s JOIN projects p ON p.id = s.project_id WHERE s.id = ?', [$subId]);
+            if ($subId && isset($GLOBALS['_bgp']['branch'][(int)$subId])) $bid = (int)$GLOBALS['_bgp']['branch'][(int)$subId];   // R97-147: from the batch
+            elseif (!$subId && $projectId && isset($GLOBALS['_brp'][(int)$projectId])) $bid = (int)$GLOBALS['_brp'][(int)$projectId];
+            elseif ($subId) $bid = (int) scalar('SELECT COALESCE(s.branch_id, p.branch_id, 0) FROM subprojects s JOIN projects p ON p.id = s.project_id WHERE s.id = ?', [$subId]);
             elseif ($projectId) $bid = (int) scalar('SELECT COALESCE(branch_id, 0) FROM projects WHERE id = ?', [$projectId]);
         }
         $cache[$k] = br_get($bid ?: null);

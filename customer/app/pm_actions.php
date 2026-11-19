@@ -2021,7 +2021,15 @@ function pm_gen_move(int $from, int $to): int {
     if (function_exists('audit')) try { audit('gen_move', 'project', $from, ['to' => $to, 'rows' => $n]); } catch (Throwable $e) {}
     return $n;
 }
+/** R97-147: the footprint of many projects in four statements (the projects list asked four per project). */
+function pm_project_footprint_prime(array $ids): void {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids)))); if (!$ids) return; $in = implode(',', $ids);
+    foreach ($ids as $i) $GLOBALS['_pfp'][$i] = ['subs' => 0, 'drawings' => 0, 'files' => 0, 'comments' => 0];
+    foreach (['subs' => "SELECT project_id AS p, COUNT(*) n FROM subprojects WHERE project_id IN ($in) GROUP BY project_id", 'drawings' => "SELECT project_id AS p, COUNT(*) n FROM drawing_requests WHERE project_id IN ($in) GROUP BY project_id", 'files' => "SELECT project_id AS p, COUNT(*) n FROM sp_files WHERE project_id IN ($in) GROUP BY project_id", 'comments' => "SELECT s.project_id AS p, COUNT(*) n FROM sp_comments c JOIN subprojects s ON s.id = c.subproject_id WHERE s.project_id IN ($in) GROUP BY s.project_id"] as $k => $sql)
+        foreach (all($sql) as $r) $GLOBALS['_pfp'][(int)$r['p']][$k] = (int)$r['n'];
+}
 function pm_project_footprint(int $id): array {
+    if (isset($GLOBALS['_pfp'][$id])) return $GLOBALS['_pfp'][$id];   // R97-147: from the batch of the projects list
     return [
         'subs'     => (int) scalar('SELECT COUNT(*) FROM subprojects WHERE project_id = ?', [$id]),
         'drawings' => (int) scalar('SELECT COUNT(*) FROM drawing_requests WHERE project_id = ?', [$id]),

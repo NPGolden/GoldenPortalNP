@@ -61,7 +61,7 @@ function kpi_sub(int $sid, ?array $sp = null): array {
         $K['v']['cpi'] = $C['actual_h'] > 0 ? $C['earned_h'] / $C['actual_h'] : null;
         // planned hours to date: work packages ended by today, else linear between the start and the deadline
         $planned = null;
-        if (function_exists('wp_has') && wp_has()) { $w = one("SELECT SUM(CASE WHEN end_date <= CURDATE() THEN planned_hours ELSE 0 END) done, SUM(planned_hours) total FROM sp_works WHERE subproject_id = ? AND status <> 'cancelled'", [$sid]); if ($w && (float)$w['total'] > 0 && (float)$w['done'] > 0) $planned = (float)$w['done'] * ($C['budget_h'] > 0 ? $C['budget_h'] / (float)$w['total'] : 1); }
+        if (function_exists('wp_has') && wp_has()) { $w = function_exists('bg_primed') ? bg_primed('works', $sid, $hit_) : null; if (empty($hit_)) $w = one("SELECT SUM(CASE WHEN end_date <= CURDATE() THEN planned_hours ELSE 0 END) done, SUM(planned_hours) total FROM sp_works WHERE subproject_id = ? AND status <> 'cancelled'", [$sid]); if ($w && (float)$w['total'] > 0 && (float)$w['done'] > 0) $planned = (float)$w['done'] * ($C['budget_h'] > 0 ? $C['budget_h'] / (float)$w['total'] : 1); }
         if ($planned === null && $C['budget_h'] > 0 && !empty($sp['deadline'])) {
             $start = scalar('SELECT MIN(d) FROM (SELECT MIN(snap_date) d FROM sp_progress_snapshots WHERE subproject_id = ? UNION SELECT MIN(l.work_date) FROM timesheet_lines l WHERE l.subproject_id = ? UNION SELECT DATE(p.created_at) FROM projects p WHERE p.id = ?) x', [$sid, $sid, (int)$sp['project_id']]);
             if ($start) { $s = strtotime((string)$start); $d = strtotime((string)$sp['deadline']); $frac = $d > $s ? max(0.0, min(1.0, (time() - $s) / ($d - $s))) : 1.0; $planned = $C['budget_h'] * $frac; }
@@ -71,15 +71,16 @@ function kpi_sub(int $sid, ?array $sp = null): array {
         // RUI: budget per card kind vs actual per card kind
         $bud = ['s' => 0.0, 'a' => 0.0]; foreach ($C['rows'] as $did => $r) { $kind = kpi_card_kind(function_exists('acc_card_of') ? acc_card_of((int)$did ?: null) : 'A'); if ($kind) $bud[$kind] += (float)$r['budget_h']; }
         $act = ['s' => 0.0, 'a' => 0.0];
-        foreach (all("SELECT t.user_id, t.discipline_id, SUM(l.hours) h FROM timesheet_lines l JOIN timesheets t ON t.id = l.timesheet_id WHERE l.subproject_id = ? AND t.status IN ('approved','invoiced') GROUP BY t.user_id, t.discipline_id", [$sid]) as $r) { $kind = kpi_card_kind(kpi_user_card((int)$r['user_id'], $r['discipline_id'] !== null ? (int)$r['discipline_id'] : null)); if ($kind) $act[$kind] += (float)$r['h']; }
+        $uh_ = function_exists('bg_primed') ? bg_primed('uh', $sid, $hitU) : null; if (empty($hitU)) $uh_ = all("SELECT t.user_id, t.discipline_id, SUM(l.hours) h FROM timesheet_lines l JOIN timesheets t ON t.id = l.timesheet_id WHERE l.subproject_id = ? AND t.status IN ('approved','invoiced') GROUP BY t.user_id, t.discipline_id", [$sid]);
+        foreach ($uh_ as $r) { $kind = kpi_card_kind(kpi_user_card((int)$r['user_id'], $r['discipline_id'] !== null ? (int)$r['discipline_id'] : null)); if ($kind) $act[$kind] += (float)$r['h']; }
         $K['v']['rui_s'] = $act['s'] > 0 ? $bud['s'] / $act['s'] : null; $K['v']['rui_a'] = $act['a'] > 0 ? $bud['a'] / $act['a'] : null;
         $K['detail']['rui'] = ['bud' => $bud, 'act' => $act];
     }
     // PSC: re-submissions of this sub-project's documents (drawing revisions are counted at project level)
-    $re = (int) scalar("SELECT (SELECT COUNT(*) FROM owner_approvals o WHERE o.subproject_id = ? AND o.status = 'resubmitted') + (SELECT COUNT(*) FROM class_submittals c WHERE c.subproject_id = ? AND c.status = 'resubmitted')", [$sid, $sid]);
+    $re = function_exists('bg_primed') ? bg_primed('re', $sid, $hitR) : null; if (empty($hitR)) $re = (int) scalar("SELECT (SELECT COUNT(*) FROM owner_approvals o WHERE o.subproject_id = ? AND o.status = 'resubmitted') + (SELECT COUNT(*) FROM class_submittals c WHERE c.subproject_id = ? AND c.status = 'resubmitted')", [$sid, $sid]); $re = (int)$re;
     $K['v']['psc'] = (float)$re; $K['detail']['resubmitted'] = $re;
     // RMI
-    $rk = kpi_has() ? one("SELECT COUNT(*) n, SUM(status IN ('mitigated','closed')) m FROM sp_risks WHERE subproject_id = ?", [$sid]) : null;
+    $rk = kpi_has() && function_exists('bg_primed') ? bg_primed('risk', $sid, $hitK) : null; if (empty($hitK)) $rk = kpi_has() ? one("SELECT COUNT(*) n, SUM(status IN ('mitigated','closed')) m FROM sp_risks WHERE subproject_id = ?", [$sid]) : null;
     $K['v']['rmi'] = $rk && (int)$rk['n'] > 0 ? (int)$rk['m'] / (int)$rk['n'] : null; $K['detail']['risks'] = ['n' => (int)($rk['n'] ?? 0), 'm' => (int)($rk['m'] ?? 0)];
     // PCR at sub-project level: on time? (completed)
     $K['v']['pcr'] = $sp['status'] === 'completed' && !empty($sp['completed_at']) ? (empty($sp['deadline']) || $sp['completed_at'] <= $sp['deadline'] ? 1.0 : 0.0) : null;
@@ -90,9 +91,10 @@ function kpi_sub(int $sid, ?array $sp = null): array {
 /* ------------------------------------------------------------------ per project (period) */
 
 /** KPIs of a project: the sub-project KPIs rolled up (hour-weighted where it makes sense), PCR and PSC for the period. */
-function kpi_project(int $pid, string $from, string $to): array {
-    $p = one('SELECT p.*, v.name AS vessel FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id WHERE p.id = ?', [$pid]); if (!$p) return [];
-    $subs = all('SELECT * FROM subprojects WHERE project_id = ? ORDER BY sort_order, code', [$pid]);
+function kpi_project(int $pid, string $from, string $to, ?array $pre = null): array {
+    $p = $pre['p'] ?? one('SELECT p.*, v.name AS vessel FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id WHERE p.id = ?', [$pid]); if (!$p) return [];
+    $subs = $pre !== null ? ($pre['subs'] ?? []) : all('SELECT * FROM subprojects WHERE project_id = ? ORDER BY sort_order, code', [$pid]);
+    if ($pre === null && function_exists('bg_prime')) bg_prime(array_column($subs, 'id'));
     $P = ['pid' => $pid, 'p' => $p, 'subs' => [], 'v' => array_fill_keys(KPI_KEYS, null), 'detail' => []];
     $sum = ['budget_h' => 0.0, 'actual_h' => 0.0, 'earned_h' => 0.0, 'planned_h' => 0.0, 'cost' => 0.0, 'budget_cost' => 0.0, 'offer' => 0.0, 'result' => 0.0, 'rui_bs' => 0.0, 'rui_as' => 0.0, 'rui_ba' => 0.0, 'rui_aa' => 0.0, 'has_planned' => false];
     foreach ($subs as $sp) {
@@ -120,11 +122,11 @@ function kpi_project(int $pid, string $from, string $to): array {
     }
     $P['v']['pcr'] = $active > 0 ? $onTime / $active : null; $P['detail']['pcr'] = ['active' => $active, 'done' => $done, 'on_time' => $onTime];
     // PSC for the period: drawing-tracker revisions issued in the period (R0 excluded) + re-submissions
-    $rev = (int) scalar('SELECT COUNT(*) FROM drawing_tracker_revisions WHERE project_id = ? AND issued_at BETWEEN ? AND ? AND rev_no <> ?', [$pid, $from, $to, 'R0']);
+    $rev = isset($pre['rev']) ? (int)$pre['rev'] : (int) scalar('SELECT COUNT(*) FROM drawing_tracker_revisions WHERE project_id = ? AND issued_at BETWEEN ? AND ? AND rev_no <> ?', [$pid, $from, $to, 'R0']);
     $re = array_sum(array_map(fn($K) => (int)($K['detail']['resubmitted'] ?? 0), $P['subs']));
     $P['v']['psc'] = (float)($rev + $re); $P['detail']['psc'] = ['revisions' => $rev, 'resubmitted' => $re];
     // RMI: whole project (project-level risks + sub-project risks)
-    $rk = kpi_has() ? one("SELECT COUNT(*) n, SUM(status IN ('mitigated','closed')) m FROM sp_risks WHERE project_id = ?", [$pid]) : null;
+    $rk = isset($pre['risk']) ? $pre['risk'] : (kpi_has() ? one("SELECT COUNT(*) n, SUM(status IN ('mitigated','closed')) m FROM sp_risks WHERE project_id = ?", [$pid]) : null);
     $P['v']['rmi'] = $rk && (int)$rk['n'] > 0 ? (int)$rk['m'] / (int)$rk['n'] : null; $P['detail']['risks'] = ['n' => (int)($rk['n'] ?? 0), 'm' => (int)($rk['m'] ?? 0)];
     $P['detail'] += $sum;
     foreach (KPI_KEYS as $k) $P['tone'][$k] = kpi_tone($k, $P['v'][$k]);
@@ -140,7 +142,15 @@ function kpi_projects(string $from, string $to, array $f = []): array {
     if (!empty($f['pm'])) { $w[] = 'p.pm_user_id = ?'; $a[] = (int)$f['pm']; }
     if (!empty($f['vessel'])) { $w[] = 'p.vessel_id = ?'; $a[] = (int)$f['vessel']; }
     $out = [];
-    foreach (all('SELECT p.id FROM projects p WHERE (' . implode(') AND (', $w) . ') ORDER BY p.project_code, p.name', $a) as $r) { $P = kpi_project((int)$r['id'], $from, $to); if ($P) $out[] = $P; }
+    // R97-147: projects, their sub-projects and the figures of all sub-projects are read in batches — it was 13 statements per sub-project
+    $ids = array_map('intval', array_column(all('SELECT p.id FROM projects p WHERE (' . implode(') AND (', $w) . ') ORDER BY p.project_code, p.name', $a), 'id')); $PR = []; $SB = [];
+    foreach (array_chunk($ids, 400) as $ch) { $in = implode(',', $ch); foreach (all("SELECT p.*, v.name AS vessel FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id WHERE p.id IN ($in)") as $r) $PR[(int)$r['id']] = $r; foreach (all("SELECT * FROM subprojects WHERE project_id IN ($in) ORDER BY sort_order, code") as $r) $SB[(int)$r['project_id']][] = $r; }
+    if (function_exists('bg_prime')) bg_prime(array_merge([], ...array_values(array_map(fn($x) => array_column($x, 'id'), $SB))));
+    $RV = []; $RK = []; $kp = kpi_has();
+    foreach (array_chunk($ids, 400) as $ch) { $in = implode(',', $ch); foreach ($ch as $i) { $RV[$i] = 0; if ($kp) $RK[$i] = ['n' => 0, 'm' => null]; }
+        foreach (all("SELECT project_id AS p, COUNT(*) n FROM drawing_tracker_revisions WHERE project_id IN ($in) AND issued_at BETWEEN ? AND ? AND rev_no <> ? GROUP BY project_id", [$from, $to, 'R0']) as $r) $RV[(int)$r['p']] = (int)$r['n'];
+        if ($kp) foreach (all("SELECT project_id AS p, COUNT(*) n, SUM(status IN ('mitigated','closed')) m FROM sp_risks WHERE project_id IN ($in) GROUP BY project_id") as $r) $RK[(int)$r['p']] = ['n' => $r['n'], 'm' => $r['m']]; }
+    foreach ($ids as $pid) { if (!isset($PR[$pid])) continue; $P = kpi_project($pid, $from, $to, ['p' => $PR[$pid], 'subs' => $SB[$pid] ?? [], 'rev' => $RV[$pid] ?? 0] + ($kp ? ['risk' => $RK[$pid]] : [])); if ($P) $out[] = $P; }
     return $out;
 }
 function kpi_period(string $sel): array {
@@ -179,8 +189,16 @@ function kpi_snapshot_monthly(): void {
     cp_setting_set('kpi_snap_done', $d);
 }
 /** Trend of one KPI of a project (last 12 snapshots). */
+/** R97-147: the last 12 project-level snapshots of every KPI of many projects in one statement (the KPI page asked one per project and KPI). */
+function kpi_trend_prime(array $pids): void {
+    $pids = array_values(array_unique(array_filter(array_map('intval', $pids)))); if (!$pids || !kpi_has()) return;
+    try { foreach (array_chunk($pids, 300) as $ch) { $rows = all('SELECT project_id, kpi, snap_date, value, tone FROM (SELECT project_id, kpi, snap_date, value, tone, ROW_NUMBER() OVER (PARTITION BY project_id, kpi ORDER BY snap_date DESC) rn FROM kpi_snapshots WHERE subproject_id IS NULL AND project_id IN (' . implode(',', $ch) . ')) x WHERE rn <= 12 ORDER BY project_id, kpi, snap_date DESC');
+            foreach ($ch as $i) $GLOBALS['_kpt'][$i] = []; foreach ($rows as $r) $GLOBALS['_kpt'][(int)$r['project_id']][(string)$r['kpi']][] = ['snap_date' => $r['snap_date'], 'value' => $r['value'], 'tone' => $r['tone']]; } }
+    catch (Throwable $e) { unset($GLOBALS['_kpt']); }   // a database without window functions: one statement per trend, as before
+}
 function kpi_trend(int $pid, string $k, ?int $sid = null): array {
     if (!kpi_has()) return [];
+    if (!$sid && isset($GLOBALS['_kpt'][$pid])) return $GLOBALS['_kpt'][$pid][$k] ?? [];
     return all('SELECT snap_date, value, tone FROM kpi_snapshots WHERE project_id = ? AND kpi = ? AND subproject_id ' . ($sid ? '= ?' : 'IS NULL') . ' ORDER BY snap_date DESC LIMIT 12', $sid ? [$pid, $k, $sid] : [$pid, $k]);
 }
 /** Inline sparkline SVG of a trend (oldest → newest). */

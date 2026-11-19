@@ -156,7 +156,9 @@ function hr_type_default_enabled(array $p, array $t): bool {
     return true;
 }
 function hr6_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM hr_person_types LIKE 'used_before'"); } catch (Throwable $e) { $h = false; } } return $h; }
-function hr_person_type_overrides(int $pid): array { static $c = []; if (!isset($c[$pid])) { $c[$pid] = []; if (hr5_has()) foreach (all('SELECT * FROM hr_person_types WHERE person_id = ?', [$pid]) as $r) $c[$pid][(int)$r['type_id']] = $r; } return $c[$pid]; }
+function hr_person_type_overrides(int $pid): array { static $c = [], $all = false;
+    if (!isset($c[$pid]) && !$all && count($c) >= 2 && hr5_has() && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET') { $all = true; $m = []; foreach (all('SELECT * FROM hr_person_types') as $r) $m[(int)$r['person_id']][(int)$r['type_id']] = $r; foreach (all('SELECT id FROM hr_people') as $r) $c[(int)$r['id']] = $m[(int)$r['id']] ?? []; }   // R97-147: the third person asked on one page: all switches in one statement
+    if (!isset($c[$pid])) { $c[$pid] = []; if (hr5_has()) foreach (all('SELECT * FROM hr_person_types WHERE person_id = ?', [$pid]) as $r) $c[$pid][(int)$r['type_id']] = $r; } return $c[$pid]; }
 /** Is this type available to the person? Card switch wins, else the default. */
 function hr_type_enabled(array $p, array $t): bool { if (!hr5_has()) return true; $o = hr_person_type_overrides((int)$p['id'])[(int)$t['id']] ?? null; return $o ? (bool)$o['enabled'] : hr_type_default_enabled($p, $t); }
 /** Types the person may request (active, enabled for him). */

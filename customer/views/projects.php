@@ -26,6 +26,11 @@ $pageNo    = max(1, (int)($_GET['page'] ?? 1));
 $res   = project_tree_filtered(['status' => $st, 'customer' => $fCustomer, 'vessel' => $fVessel, 'pm' => $fPm, 'branch' => $fBranch, 'q' => $q], $per, ($pageNo - 1) * $per);
 $tree  = $res['rows']; $total = $res['total'];
 $pmtC = ($staff && function_exists('pmt_can_view') && pmt_can_view() && $tree) ? pmt_project_counts(array_column($tree, 'id')) : [];   // R93-001 work permits per project
+if ($tree) { $ids_ = array_map('intval', array_column($tree, 'id'));   /* R97-147: per-project figures of the page in batches */
+    if (is_cp_admin() && function_exists('pm_project_footprint_prime')) pm_project_footprint_prime($ids_);
+    if (function_exists('br_has') && br_has()) foreach ($tree as $p_) $GLOBALS['_brp'][(int)$p_['id']] = (int)($p_['branch_id'] ?? 0);
+    if (function_exists('of_project_prime')) of_project_prime($ids_);
+    if (function_exists('bg_prime')) bg_prime(array_merge([], ...array_values(array_map(fn($p_) => array_column($p_['subs'] ?? [], 'id'), $tree)))); }
 $tkOpen = []; if (function_exists('tk_has') && tk_has() && $tree) { [$tkScope, $tkArgs] = tk_scope(); foreach (all("SELECT t.project_id, COUNT(*) n FROM tickets t LEFT JOIN vessels v ON v.id = t.vessel_id WHERE {$tkScope} AND t.project_id IS NOT NULL AND t.status IN ('open','in_progress','waiting_customer') GROUP BY t.project_id", $tkArgs) as $r) $tkOpen[(int)$r['project_id']] = (int)$r['n']; }   // R30-003: open tickets per project
 $keep  = array_filter(['q' => $q, 'st' => $st, 'customer' => $fCustomer, 'vessel' => $fVessel, 'pm' => $fPm, 'branch' => $fBranch, 'per' => $per, 'f' => 1]);
 
@@ -148,8 +153,8 @@ layout_head(t('pr.title'), 'projects');
       <div class="subs">
         <?php if ($pof && $pof['n'] && of_visible()): ?><details class="ot-tree fold" data-fold="offers-<?= (int)$p['id'] ?>"><summary class="fold-sum"><span class="fold-tw">▸</span> <?= tt('of.title') ?> <span class="count"><?= (int)$pof['n'] ?></span></summary><?php $otRows = of_list(['project' => (int)$p['id']]); $otShowSub = true; $otNewUrl = url('offer_edit', ['project' => $p['id']]); require __DIR__ . '/_offers_table.php'; ?></details><?php elseif (of_has() && is_staff() && of_visible()): ?><p class="hint ot-none"><?= tt('of.none_here') ?> <a href="<?= url('offer_edit', ['project' => $p['id']]) ?>">+ <?= tt('of.new') ?></a></p><?php endif; ?>
         <?php if (function_exists('td_card_html') && ($tdc = td_card_html(['project' => (int)$p['id']], url('task_edit', ['project' => $p['id']]), true, 6)) !== ''): ?><div class="ot-tree td-tree"><?= $tdc ?></div><?php endif; ?>
-        <?php if (function_exists('tk_card_html') && ($tkc = tk_card_html((int)$p['id'], url('ticket_edit', ['project' => $p['id']]), 6)) !== ''): ?><div class="ot-tree tk-tree"><?= $tkc ?></div><?php endif; ?>
-        <?php if ($staff && function_exists('pmt_card_html') && ($pmc = pmt_card_html((int)$p['id'], pmt_can_edit((int)$p['id']) ? url('permit_edit', ['project' => $p['id']]) : null, 6)) !== ''): ?><div class="ot-tree tk-tree"><?= $pmc ?></div><?php endif; ?>
+        <?php if (function_exists('tk_card_html') && !empty($tkOpen[(int)$p['id']]) && ($tkc = tk_card_html((int)$p['id'], url('ticket_edit', ['project' => $p['id']]), 6)) !== ''): ?><div class="ot-tree tk-tree"><?= $tkc ?></div><?php endif; ?>
+        <?php if ($staff && function_exists('pmt_card_html') && !empty($pmtC[(int)$p['id']]) && ($pmc = pmt_card_html((int)$p['id'], pmt_can_edit((int)$p['id']) ? url('permit_edit', ['project' => $p['id']]) : null, 6)) !== ''): ?><div class="ot-tree tk-tree"><?= $pmc ?></div><?php endif; ?>
         <?php if (!$p['subs'] && !empty($p['subs_hidden'])): ?>
           <p class="hint" style="padding:8px 0;"><?= e(t('pr.completed_hidden', ['n' => (int)$p['subs_hidden']])) ?> · <a href="<?= url('projects', array_filter($_GET + ['p' => null, 'sc' => 1])) ?>"><?= tt('pr.show_completed') ?></a></p>
         <?php elseif (!$p['subs']): ?>

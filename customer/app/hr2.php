@@ -23,7 +23,8 @@ function hr_department_save_from_post(): void { throw new RuntimeException(t('hr
 /** All people of the registry (active first) with their account and department. */
 function hr_people(bool $activeOnly = true): array {
     if (!hr2_has()) return [];
-    return all('SELECT p.*, cu.full_name AS account_name, cu.email, cu.is_active AS account_active, cu.discipline_id, cu.manager_user_id AS account_manager_id, dp.name AS department, dp.manager_user_id AS head_user_id, dc.name AS discipline, dc.manager_user_id
+    static $memo = []; $get = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET'; if ($get && isset($memo[(int)$activeOnly])) return $memo[(int)$activeOnly];   // R97-147: a page asked for the same list up to fifteen times (and once per hr_person() look-up); kept for the request, never while saving
+    return $memo[(int)$activeOnly] = all('SELECT p.*, cu.full_name AS account_name, cu.email, cu.is_active AS account_active, cu.discipline_id, cu.manager_user_id AS account_manager_id, dp.name AS department, dp.manager_user_id AS head_user_id, dc.name AS discipline, dc.manager_user_id
                 FROM hr_people p LEFT JOIN customer_users cu ON cu.id = p.user_id LEFT JOIN disciplines dp ON dp.id = p.department_id LEFT JOIN disciplines dc ON dc.id = cu.discipline_id' . ($activeOnly ? ' WHERE p.is_active = 1' : '') . ' ORDER BY p.is_active DESC, p.is_technical DESC, dp.sort_order, p.name_en');
 }
 function hr_person(int $id): ?array { foreach (hr_people(false) as $p) if ((int)$p['id'] === $id) return $p; return null; }

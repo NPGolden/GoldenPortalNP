@@ -16,9 +16,10 @@ function hr_targets_has(): bool { static $h = null; if ($h === null) { try { $h 
 /** Online staff with the start of their current session (last successful sign-in) and the uptime. */
 function online_detail(): array { return function_exists('cache_remember') ? cache_remember('online_detail', 60, 'online_detail_compute') : online_detail_compute(); }   // R69-002
 function online_detail_compute(): array {
-    $out = [];
-    foreach (online_users() as $o) {
-        $since = null; $up = null; try { $r = one("SELECT MAX(created_at) s, TIMESTAMPDIFF(SECOND, MAX(created_at), NOW()) d FROM login_log WHERE user_id = ? AND outcome = 'success'", [(int)$o['id']]); $since = $r['s'] ?? null; $up = $r['d'] ?? null; } catch (Throwable $e) {}
+    $out = []; $on = online_users(); $L = [];
+    if ($on) { try { foreach (all("SELECT user_id, MAX(created_at) s, TIMESTAMPDIFF(SECOND, MAX(created_at), NOW()) d FROM login_log WHERE user_id IN (" . implode(',', array_map(fn($o) => (int)$o['id'], $on)) . ") AND outcome = 'success' GROUP BY user_id") as $r) $L[(int)$r['user_id']] = $r; } catch (Throwable $e) {} }   // R97-147: one statement for everybody online
+    foreach ($on as $o) {
+        $r = $L[(int)$o['id']] ?? null; $since = $r['s'] ?? null; $up = $r['d'] ?? null;
         $o['since'] = $since; $o['uptime'] = $since ? max(0, (int)$up) : null; $out[] = $o;   // computed by the database clock, so the PHP / MySQL time-zone offset cannot creep in
     }
     return $out;

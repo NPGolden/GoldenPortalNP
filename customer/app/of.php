@@ -115,10 +115,12 @@ function of_list(array $f = []): array {
 /** Offers awaiting the owner's answer (customers: theirs; staff: all). */
 function of_pending(): array { return array_values(array_filter(of_list(['status' => 'open']), fn($o) => of_is_pending($o))); }   // R75-001: every open stage
 /** Per-project roll-up for the project tree and the weekly report. */
+/** R97-147: the offers of many projects in one statement. */
+function of_project_prime(array $pids): void { $pids = array_values(array_unique(array_filter(array_map('intval', $pids)))); if (!$pids || !of_has()) return; foreach ($pids as $i) $GLOBALS['_ofp'][$i] = []; foreach (all('SELECT * FROM offers WHERE project_id IN (' . implode(',', $pids) . ') ORDER BY id') as $o) $GLOBALS['_ofp'][(int)$o['project_id']][] = $o; }
 function of_project_summary(int $pid): array {
     $s = ['n' => 0, 'sent' => 0, 'sent_amount' => 0.0, 'approved' => 0, 'approved_amount' => 0.0, 'oldest_sent' => 0, 'rows' => []];
     if (!of_has()) return $s;
-    foreach (all('SELECT * FROM offers WHERE project_id = ? ORDER BY id', [$pid]) as $o) {
+    foreach ($GLOBALS['_ofp'][$pid] ?? all('SELECT * FROM offers WHERE project_id = ? ORDER BY id', [$pid]) as $o) {   // R97-147: from the batch of the projects list when it was made
         $s['n']++; $s['rows'][] = $o;
         $b = of_status_behaves($o['status']);
         if ($b === 'open') { $s['sent']++; $s['sent_amount'] += (float)$o['amount']; $s['oldest_sent'] = max($s['oldest_sent'], of_age($o) ?? 0); }

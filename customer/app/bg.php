@@ -42,10 +42,10 @@ function bg_current(int $sid): ?array {
     if (array_key_exists($sid, $GLOBALS['_bg_cur'] ?? [])) return $GLOBALS['_bg_cur'][$sid];   // R77-021: per-request memo (the tree asks several times per sub-project)
     return $GLOBALS['_bg_cur'][$sid] = bg_current_build($sid);
 }
-function bg_current_build(int $sid): ?array {
-    $b = one('SELECT * FROM sp_budgets WHERE subproject_id = ? ORDER BY revision DESC, id DESC LIMIT 1', [$sid]); if (!$b) return null;
+function bg_current_build(int $sid, ?array $b = null, ?array $hours = null): ?array {
+    $b = $b ?? one('SELECT * FROM sp_budgets WHERE subproject_id = ? ORDER BY revision DESC, id DESC LIMIT 1', [$sid]); if (!$b) return null;
     $b['hours'] = []; $b['sections'] = [];
-    foreach (all('SELECT * FROM sp_budget_hours WHERE budget_id = ?', [(int)$b['id']]) as $h) {   // R48-001: a discipline may have one row per section; 'hours' stays the discipline total
+    foreach ($hours ?? all('SELECT * FROM sp_budget_hours WHERE budget_id = ?', [(int)$b['id']]) as $h) {   // R48-001: a discipline may have one row per section; 'hours' stays the discipline total
         $k = (int)$h['discipline_id']; $b['hours'][$k] = ['hours' => (float)($b['hours'][$k]['hours'] ?? 0) + (float)$h['hours'], 'rate' => (float)$h['rate']];
         if (!empty($h['section_id'])) $b['sections'][$k][(int)$h['section_id']] = (float)($b['sections'][$k][(int)$h['section_id']] ?? 0) + (float)$h['hours'];
     }
@@ -92,18 +92,50 @@ function bg_prefill_from_offers(int $sid): array {
 }
 
 /* ------------------------------------------------------------------ actuals */
+/** R97-147: one batch for many sub-projects — what bg_calc() and kpi_sub() would otherwise ask sub-project by sub-project (13 statements each)
+ *  is fetched in a dozen statements for all of them and kept for this request. The single functions read the batch first; results are identical. */
+function bg_prime(array $sids): void {
+    $sids = array_values(array_unique(array_filter(array_map('intval', $sids)))); $G = &$GLOBALS['_bgp']; $G ??= [];
+    $sids = array_values(array_filter($sids, fn($i) => !isset($G['done'][$i]))); if (!$sids || !bg_has()) return;
+    $ofOk = function_exists('of_has') && of_has() ? of_statuses_where(['approved', 'closed_won']) : []; $wp = function_exists('wp_has') && wp_has(); $kp = function_exists('kpi_has') && kpi_has(); $brH = function_exists('br_has') && br_has();
+    foreach (array_chunk($sids, 400) as $ch) {
+        $in = implode(',', $ch);
+        foreach ($ch as $i) { $G['done'][$i] = true; $G['act'][$i] = []; $G['costs'][$i] = []; $G['lc'][$i] = [null, null, null]; $G['offer'][$i] = 0.0; $G['works'][$i] = ['done' => null, 'total' => null]; $G['uh'][$i] = []; $G['re'][$i] = 0; $G['risk'][$i] = ['n' => 0, 'm' => null]; }
+        $cur = []; foreach (all("SELECT * FROM sp_budgets WHERE subproject_id IN ($in) ORDER BY subproject_id, revision DESC, id DESC") as $r) { $k = (int)$r['subproject_id']; if (!isset($cur[$k])) $cur[$k] = $r; }   // the current revision of each
+        $bh = []; if ($cur) foreach (all('SELECT * FROM sp_budget_hours WHERE budget_id IN (' . implode(',', array_map(fn($r) => (int)$r['id'], $cur)) . ') ORDER BY id') as $h) $bh[(int)$h['budget_id']][] = $h;
+        foreach ($ch as $i) { if (array_key_exists($i, $GLOBALS['_bg_cur'] ?? [])) continue; $GLOBALS['_bg_cur'][$i] = isset($cur[$i]) ? bg_current_build($i, $cur[$i], $bh[(int)$cur[$i]['id']] ?? []) : null; }
+        foreach (all("SELECT l.subproject_id AS sid, t.discipline_id, MAX(COALESCE(d.name, t.discipline_name)) AS name, l.hour_type, SUM(l.hours) AS h, MAX(d.rate_normal) AS rate_normal, MAX(d.rate_overtime) AS rate_overtime, MAX(d.rate_holiday) AS rate_holiday
+                      FROM timesheet_lines l JOIN timesheets t ON t.id = l.timesheet_id LEFT JOIN disciplines d ON d.id = t.discipline_id
+                      WHERE l.subproject_id IN ($in) AND t.status IN ('approved','invoiced') GROUP BY l.subproject_id, t.discipline_id, l.hour_type") as $r) $G['act'][(int)$r['sid']][] = $r;
+        foreach (all("SELECT c.*, f.original_name FROM sp_costs c LEFT JOIN sp_files f ON f.id = c.file_id WHERE c.subproject_id IN ($in) ORDER BY c.cost_date DESC, c.id DESC") as $r) $G['costs'][(int)$r['subproject_id']][] = $r;
+        foreach (all("SELECT l.subproject_id AS sid, MAX(t.approved_at) AS m FROM timesheets t JOIN timesheet_lines l ON l.timesheet_id = t.id WHERE l.subproject_id IN ($in) AND t.status IN ('approved','invoiced') GROUP BY l.subproject_id") as $r) $G['lc'][(int)$r['sid']][0] = $r['m'];
+        foreach (all("SELECT subproject_id AS sid, MAX(created_at) AS m FROM sp_costs WHERE subproject_id IN ($in) GROUP BY subproject_id") as $r) $G['lc'][(int)$r['sid']][1] = $r['m'];
+        foreach (all("SELECT subproject_id AS sid, MAX(created_at) AS m FROM sp_budgets WHERE subproject_id IN ($in) GROUP BY subproject_id") as $r) $G['lc'][(int)$r['sid']][2] = $r['m'];
+        if ($ofOk) foreach (all("SELECT subproject_id AS sid, COALESCE(SUM(amount), 0) AS a FROM offers WHERE subproject_id IN ($in) AND status IN (" . implode(',', array_fill(0, count($ofOk), '?')) . ') GROUP BY subproject_id', $ofOk) as $r) $G['offer'][(int)$r['sid']] = (float)$r['a'];
+        if ($brH) foreach (all("SELECT s.id, COALESCE(s.branch_id, p.branch_id, 0) AS b FROM subprojects s JOIN projects p ON p.id = s.project_id WHERE s.id IN ($in)") as $r) $G['branch'][(int)$r['id']] = (int)$r['b'];
+        if ($wp) foreach (all("SELECT subproject_id AS sid, SUM(CASE WHEN end_date <= CURDATE() THEN planned_hours ELSE 0 END) done, SUM(planned_hours) total FROM sp_works WHERE subproject_id IN ($in) AND status <> 'cancelled' GROUP BY subproject_id") as $r) $G['works'][(int)$r['sid']] = ['done' => $r['done'], 'total' => $r['total']];
+        foreach (all("SELECT l.subproject_id AS sid, t.user_id, t.discipline_id, SUM(l.hours) h FROM timesheet_lines l JOIN timesheets t ON t.id = l.timesheet_id WHERE l.subproject_id IN ($in) AND t.status IN ('approved','invoiced') GROUP BY l.subproject_id, t.user_id, t.discipline_id") as $r) $G['uh'][(int)$r['sid']][] = $r;
+        try { foreach (all("SELECT subproject_id AS sid, COUNT(*) n FROM owner_approvals WHERE subproject_id IN ($in) AND status = 'resubmitted' GROUP BY subproject_id") as $r) $G['re'][(int)$r['sid']] += (int)$r['n'];
+              foreach (all("SELECT subproject_id AS sid, COUNT(*) n FROM class_submittals WHERE subproject_id IN ($in) AND status = 'resubmitted' GROUP BY subproject_id") as $r) $G['re'][(int)$r['sid']] += (int)$r['n']; }
+        catch (Throwable $e) { foreach ($ch as $i) unset($G['re'][$i]); }   // a table missing: the single statement decides, as before
+        if ($kp) foreach (all("SELECT subproject_id AS sid, COUNT(*) n, SUM(status IN ('mitigated','closed')) m FROM sp_risks WHERE subproject_id IN ($in) GROUP BY subproject_id") as $r) $G['risk'][(int)$r['sid']] = ['n' => $r['n'], 'm' => $r['m']];
+    }
+}
+/** The batch value of one sub-project, or $miss when it was not primed. */
+function bg_primed(string $k, int $sid, &$hit = null) { $G = $GLOBALS['_bgp'][$k] ?? null; $hit = $G !== null && array_key_exists($sid, $G); return $hit ? $G[$sid] : null; }
 function bg_actual_hours(int $sid): array {
     $out = [];
-    foreach (all("SELECT t.discipline_id, MAX(COALESCE(d.name, t.discipline_name)) AS name, l.hour_type, SUM(l.hours) AS h, MAX(d.rate_normal) AS rate_normal, MAX(d.rate_overtime) AS rate_overtime, MAX(d.rate_holiday) AS rate_holiday
+    $rows = bg_primed('act', $sid, $hit); if (!$hit) $rows = all("SELECT t.discipline_id, MAX(COALESCE(d.name, t.discipline_name)) AS name, l.hour_type, SUM(l.hours) AS h, MAX(d.rate_normal) AS rate_normal, MAX(d.rate_overtime) AS rate_overtime, MAX(d.rate_holiday) AS rate_holiday
                   FROM timesheet_lines l JOIN timesheets t ON t.id = l.timesheet_id LEFT JOIN disciplines d ON d.id = t.discipline_id
-                  WHERE l.subproject_id = ? AND t.status IN ('approved','invoiced') GROUP BY t.discipline_id, l.hour_type", [$sid]) as $r) {
+                  WHERE l.subproject_id = ? AND t.status IN ('approved','invoiced') GROUP BY t.discipline_id, l.hour_type", [$sid]);
+    foreach ($rows as $r) {
         $k = (int)($r['discipline_id'] ?? 0); $out[$k] ??= ['name' => (string)($r['name'] ?: t('bg.no_discipline')), 'hours' => 0.0, 'cost' => 0.0, 'h_normal' => 0.0, 'h_overtime' => 0.0, 'h_holiday' => 0.0];
         $h = (float)$r['h']; $rate = function_exists('br_hour_cost') ? br_hour_cost($r, (string)$r['hour_type'], null, $sid) : ((float)($r['rate_' . $r['hour_type']] ?? 0) ?: (float)($r['rate_normal'] ?? 0));   // R40-002
         $out[$k]['hours'] += $h; $out[$k]['cost'] += $h * $rate; $out[$k]['h_' . $r['hour_type']] += $h;
     }
     return $out;
 }
-function bg_costs(int $sid): array { return bg_has() ? all('SELECT c.*, f.original_name FROM sp_costs c LEFT JOIN sp_files f ON f.id = c.file_id WHERE c.subproject_id = ? ORDER BY c.cost_date DESC, c.id DESC', [$sid]) : []; }
+function bg_costs(int $sid): array { $pr = bg_primed('costs', $sid, $hit); if ($hit) return $pr; return bg_has() ? all('SELECT c.*, f.original_name FROM sp_costs c LEFT JOIN sp_files f ON f.id = c.file_id WHERE c.subproject_id = ? ORDER BY c.cost_date DESC, c.id DESC', [$sid]) : []; }
 function bg_cost_save_from_post(int $sid): int {
     $sp = load_subproject($sid); if (!$sp || !bg_can()) throw new RuntimeException(t('err.noaccess'));
     $u = current_user(); $id = (int)($_POST['cost_id'] ?? 0);
@@ -124,6 +156,7 @@ function bg_cost_delete(int $sid, int $id): void { if (!bg_can()) throw new Runt
 function bg_offer_value(int $sid): float {
     if (!function_exists('of_has') || !of_has()) return 0.0;
     $ok = of_statuses_where(['approved', 'closed_won']); if (!$ok) return 0.0;
+    $pr = bg_primed('offer', $sid, $hit); if ($hit) return (float)$pr;
     return (float) scalar('SELECT COALESCE(SUM(amount), 0) FROM offers WHERE subproject_id = ? AND status IN (' . implode(',', array_fill(0, count($ok), '?')) . ')', array_merge([$sid], $ok));
 }
 /** Everything the screens need for one sub-project. $sub = the subproject row (stages) when at hand. */
@@ -161,6 +194,7 @@ function bg_calc(int $sid, ?array $sub = null): array {
     return $cache[$sid] = $C;
 }
 function bg_last_change(int $sid): ?string {
+    $pr = bg_primed('lc', $sid, $hit); if ($hit) { $m = array_filter($pr); return $m ? max($m) : null; }
     $a = scalar("SELECT MAX(t.approved_at) FROM timesheets t JOIN timesheet_lines l ON l.timesheet_id = t.id WHERE l.subproject_id = ? AND t.status IN ('approved','invoiced')", [$sid]);
     $b = bg_has() ? scalar('SELECT MAX(created_at) FROM sp_costs WHERE subproject_id = ?', [$sid]) : null;
     $c = bg_has() ? scalar('SELECT MAX(created_at) FROM sp_budgets WHERE subproject_id = ?', [$sid]) : null;
@@ -171,7 +205,7 @@ function bg_pct_tone(int $pct, int $progress = 0): string { return $pct > 100 ? 
 
 /** Project roll-up: per sub-project calc + totals. */
 function bg_project(int $pid): array {
-    $subs = all('SELECT * FROM subprojects WHERE project_id = ? ORDER BY sort_order, code', [$pid]);
+    $subs = all('SELECT * FROM subprojects WHERE project_id = ? ORDER BY sort_order, code', [$pid]); bg_prime(array_column($subs, 'id'));
     $P = ['subs' => [], 'offer_value' => 0.0, 'budget_h' => 0.0, 'budget_cost' => 0.0, 'actual_h' => 0.0, 'actual_cost' => 0.0, 'parts_budget' => 0.0, 'parts_committed' => 0.0, 'cost_to_date' => 0.0, 'forecast_cost' => 0.0, 'result' => 0.0, 'forecast_result' => 0.0, 'budget_result' => 0.0, 'earned_h' => 0.0, 'at_risk' => 0];
     foreach ($subs as $s) {
         $C = bg_calc((int)$s['id'], $s); $C['sub'] = $s; $P['subs'][] = $C;
@@ -239,8 +273,8 @@ function bg_pill(array $sub): string {
 /** Sub-projects over budget, for the dashboard attention list. */
 function bg_attention(): array {
     if (!bg_can()) return [];
-    $out = [];
-    foreach (all('SELECT s.*, p.project_code FROM sp_budgets b JOIN subprojects s ON s.id = b.subproject_id JOIN projects p ON p.id = s.project_id WHERE p.status = "active" GROUP BY s.id') as $s) {
+    $out = []; $rows_ = all('SELECT s.*, p.project_code FROM sp_budgets b JOIN subprojects s ON s.id = b.subproject_id JOIN projects p ON p.id = s.project_id WHERE p.status = "active" GROUP BY s.id'); bg_prime(array_column($rows_, 'id'));
+    foreach ($rows_ as $s) {
         $C = bg_calc((int)$s['id'], $s); if ($C['tone'] !== 'red') continue;
         $out[] = ['age' => 0, 'late' => true, 'tone' => 'bad', 'ref' => trim(($s['project_code'] ?: '') . ' ' . ($s['code'] ?: '')), 'text' => $s['name'] . ' — ' . implode(', ', array_map('bg_flag_label', $C['flags'])), 'url' => url('subproject', ['id' => (int)$s['id'], 'tab' => 'budget'])];
     }

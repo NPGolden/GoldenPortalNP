@@ -8,6 +8,7 @@ $per = in_array($_GET['period'] ?? 'm', ['m', 'last', 'q', 'ytd', '12'], true) ?
 $f = ['pm' => (int)($_GET['pm'] ?? 0), 'vessel' => (int)($_GET['vessel'] ?? 0), 'status' => in_array($_GET['status'] ?? '', pm_statuses(), true) ? $_GET['status'] : ''];
 $one = (int)($_GET['project'] ?? 0);
 $projects = $one ? array_values(array_filter([kpi_project($one, $from, $to)])) : kpi_projects($from, $to, $f);
+if (function_exists('kpi_trend_prime')) kpi_trend_prime(array_column($projects, 'pid'));   // R97-147
 $fin = fin_visible(); $T = kpi_targets();
 $keys = array_values(array_filter(KPI_KEYS, fn($k) => $fin || !in_array($k, ['bai_b', 'bai_o', 'roi'], true)));
 $pms = all("SELECT DISTINCT cu.id, cu.full_name FROM projects p JOIN customer_users cu ON cu.id = p.pm_user_id ORDER BY cu.full_name");
