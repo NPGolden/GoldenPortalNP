@@ -12606,4 +12606,5 @@ Best regards,
 'apps.d.service' => 'Field service: job orders, reports, timesheets',
 'apps.d.pm' => 'Projects, approvals, reports and tasks',
 'apps.d.hr' => 'HR team and management; add it to the Home Screen',
+'login.help_link' => 'Request portal access',
 ];

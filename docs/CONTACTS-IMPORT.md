@@ -3702,3 +3702,8 @@ The single functions read the batch first and fall back to their own statement, 
 - Language keys `apps.*` (13) in en, el, it, bg, uk — 12 422 keys each.
 - Golden HR has no store build: one tile with the QR code of the web app.
 - No database change. Cybersecurity: static images and links only, no script and no inline handler (CSP unchanged); outside links open with `rel="noopener"`; the sign-in page shows only public store links and reads no data; images are lazy-loaded, so no effect on performance.
+
+## §438 v1.199.1 (R97-154) — Sign-in page: link to the Customer Portal access page
+
+- `customer/views/login.php`: after `login.help`, a link to `https://www.goldenas.com.gr/portal-access.html` (new tab, `rel="noopener"`), label `login.help_link` in en, el, it, bg, uk — 12 423 keys each.
+- No database change. Cybersecurity: one fixed outside link to the company website; no script, no data sent; no effect on performance.

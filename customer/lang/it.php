@@ -12606,4 +12606,5 @@ Cordiali saluti,
 'apps.d.service' => 'Assistenza sul campo: ordini di lavoro, rapporti, fogli ore',
 'apps.d.pm' => 'Progetti, approvazioni, rapporti e attività',
 'apps.d.hr' => 'Team HR e direzione; aggiungetela alla schermata Home',
+'login.help_link' => 'Richiedi l’accesso al portale',
 ];
