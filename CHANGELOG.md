@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.195.1** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.195.2** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.195.2 | GAS-CP-R97-139 | 2026-11-19 | Purchase order flow: an order paid in full on a proforma that covers the whole order shows the step Paid as done (green, "paid in advance"); only the step Invoiced stays open with the note "proforma — sales invoice awaited". | — |
 | 1.195.1 | GAS-CP-R97-138 | 2026-11-19 | Production › Subcontracting: whoever may edit a production order (production users, the order manager, the project manager) enters and sees the agreed amount of its subcontracts, also without the right to see financial data; lists, totals and PDFs stay under that right. | — |
 | 1.195.0 | GAS-CP-R97-137 | 2026-11-19 | BOM and requisition: the Unit price of the BOM file is kept as the BOM price of each line; the estimate is taken by choice from the BOM price or from the last buying price; the BOM prices of an existing BOM or requisition are read from its file; the choice follows into the requisition and the purchase order. | `install/migrate_cp_r97_137_bom_price.sql` |
 | 1.194.0 | GAS-CP-R97-136 | 2026-11-19 | Purchasing: the vessel of the project is shown with every purchase order and request for quotation (list, pipeline board, lines to buy, order page) and the orders can be filtered and searched by vessel. | — |

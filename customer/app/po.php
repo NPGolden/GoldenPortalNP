@@ -219,7 +219,8 @@ function po_flow(array $o, ?array $d = null): array {
     $ip = $pct((float)($d['inv'] ?? 0), (float)($d['qty'] ?? 0)); $nI = (int)($d['n_inv'] ?? 0); $nP = (int)($d['n_pro'] ?? 0);
     $invDone = $nI > 0 && $ip >= 100; $add('invoiced', $off($invDone ? 'done' : ($nI + $nP > 0 ? 'run' : 'todo')), $nI > 0 ? $ip . ' %' : ($nP > 0 ? t('pof.n_proforma') : ''), $pay);
     $g = (float)($d['gross'] ?? 0); $pd = (float)($d['paid'] ?? 0); $pp = $pct($pd, $g); $paidAll = $g > 0.005 && $pd >= $g - 0.005;
-    $ps = $paidAll && ($invDone || $st === 'closed') ? 'done' : (!empty($d['overdue']) ? 'bad' : ($pd > 0.005 || $paidAll ? 'run' : 'todo'));
+    $ps = $paidAll && ($ip >= 100 || $st === 'closed') ? 'done' :   /* R97-139: paid in full on a proforma that covers the whole order is paid — only the step Invoiced waits for the sales invoice */
+          (!empty($d['overdue']) ? 'bad' : ($pd > 0.005 || $paidAll ? 'run' : 'todo'));
     $add('paid', $off($ps), $g > 0.005 ? $pp . ' %' . ($paidAll && !$invDone ? ' · ' . t('pof.n_prepaid') : (!empty($d['due']) ? ' · ' . t(!empty($d['overdue']) ? 'pof.n_overdue' : 'pof.n_due', ['d' => $dt($d['due'])]) : '')) : '', $pay);
     $add('closed', $st === 'closed' ? 'done' : ($cancel ? 'bad' : 'todo'), $cancel ? t('po.s_cancelled') : '');
     return $S;

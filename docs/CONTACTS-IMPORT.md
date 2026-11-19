@@ -3560,3 +3560,11 @@ The page on screen stays the internal version for staff.
 - **Now:** on the page of a production order, anyone who may edit that order (production user, order manager, project manager, administrator) has the fields and sees the amounts of that order's subcontracts.
 - **Unchanged:** Production › Subcontracting (list over all orders), its total and the PDFs show amounts only with the financial right; users marked "no financial data" are excluded everywhere.
 - **Cybersecurity:** the rule is checked on the server when saving (`ps_amount_can`), not only by hiding the field; a user without it keeps the stored amount unchanged.
+
+## §423 v1.195.2 (R97-139) — Purchase order flow: paid in advance on a proforma
+
+- Colours of the flow: green = done, yellow = in progress, grey = not started, red = late / overdue.
+- **Before:** Paid was green only when the order was also fully invoiced with a sales invoice, so an order prepaid on a proforma showed Paid in yellow.
+- **Now:** Paid is green when everything registered is paid and the registered documents (invoice or proforma) cover all lines of the order; note "paid in advance" while the sales invoice is missing.
+- Invoiced stays yellow, "proforma — sales invoice awaited", until the sales invoice is assigned on the proforma.
+- No database change. Cybersecurity: display rule only.
