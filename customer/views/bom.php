@@ -209,12 +209,12 @@ layout_head($b['sub_code'] . ' · BOM ' . $rev, 'projects');
 </div>
 <?php endif; ?>
 
-<div class="card">
-  <h2><?= tt('prq.log') ?></h2>
+<details class="card card--details">
+  <summary><h2><?= tt('prq.log') ?></h2></summary>
   <table class="tbl tbl--wrap"><thead><tr><th><?= tt('prq.when') ?></th><th><?= tt('prq.who') ?></th><th><?= tt('prq.event') ?></th><th><?= tt('prq.note') ?></th></tr></thead><tbody>
   <?php foreach ($events as $ev): ?><tr><td><?= fmt_datetime($ev['created_at']) ?></td><td><?= e($ev['user_name'] ?? '') ?></td><td><?= tt('bom.ev_' . $ev['event']) ?></td><td><?= e($ev['note'] ?? '') ?></td></tr><?php endforeach; ?>
   </tbody></table>
-</div>
+</details>
 <script nonce="<?= csp_nonce() ?>">
 (function(){
   var url=<?= json_encode(url('prq_items')) ?>, FREE=<?= json_encode(t('prq.free')) ?>;

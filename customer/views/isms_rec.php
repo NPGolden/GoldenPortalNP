@@ -126,10 +126,10 @@ layout_head(($r ? $r['code'] . ' · ' : '') . ism_reg_title($reg), $PG);
     <div class="btn-row"><button class="btn btn--sm" type="submit">⤒ <?= tt('ism.file_add') ?></button><span class="hint"><?= tt('ism.file_hint') ?></span></div>
   </form>
 </div>
-<div class="card">
-  <h2>🕘 <?= tt('ism.history') ?></h2>
+<details class="card card--details">
+  <summary><h2>🕘 <?= tt('ism.history') ?></h2></summary>
   <ul class="hint" style="margin:0;padding-left:18px;"><?php foreach ($events as $ev): ?><li><?= e(fmt_datetime($ev['created_at'])) ?> · <b><?= tt('ism.ev_' . $ev['event']) ?></b> · <?= e((string)$ev['user_name']) ?><?= $ev['note'] ? ' — ' . e($ev['note']) : '' ?></li><?php endforeach; ?></ul>
-</div>
+</details>
 <?php else: ?><div class="card"><p class="hint"><?= tt('ism.h_' . $reg) ?></p><p class="hint"><?= tt('ism.new_hint') ?></p></div><?php endif; ?>
 </div>
 </div>

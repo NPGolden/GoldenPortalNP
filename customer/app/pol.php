@@ -42,7 +42,7 @@ function pol_renumber(int $oid): void { $i = 0; foreach (all('SELECT id FROM po_
 function pol_auto(int $oid): int {
     $o = pol_order($oid);
     if (scalar('SELECT 1 FROM po_lots WHERE order_id = ? AND (shipped_date IS NOT NULL OR arrived_date IS NOT NULL OR delivered_date IS NOT NULL OR tracking IS NOT NULL) LIMIT 1', [$oid])) throw new RuntimeException(t('pol.auto_blocked'));
-    $by = []; foreach (all("SELECT * FROM po_lines WHERE order_id = ? AND status <> 'cancelled'", [$oid]) as $l) { $d = !empty($l['promised_date']) ? $l['promised_date'] : (($l['lead_days'] !== null && ($o['confirmed_at'] ?: $o['sent_at'])) ? date('Y-m-d', strtotime(substr((string)($o['confirmed_at'] ?: $o['sent_at']), 0, 10) . ' +' . (int)$l['lead_days'] . ' days')) : null); if ($d) $by[$d][] = (int)$l['id']; }
+    $by = []; foreach (all("SELECT * FROM po_lines WHERE order_id = ? AND status <> 'cancelled'", [$oid]) as $l) { $d = !empty($l['promised_date']) ? $l['promised_date'] : ($l['lead_days'] !== null ? date('Y-m-d', strtotime(substr((string)(($o['confirmed_at'] ?: $o['sent_at']) ?: date('Y-m-d')), 0, 10) . ' +' . (int)$l['lead_days'] . ' days')) : null);   /* a draft counts the lead time from today */ if ($d) $by[$d][] = (int)$l['id']; }
     if (count($by) < 1) throw new RuntimeException(t('pol.auto_none'));
     q('UPDATE po_lines SET lot_id = NULL WHERE order_id = ?', [$oid]); q('DELETE FROM po_lots WHERE order_id = ?', [$oid]); ksort($by); $u = current_user(); $i = 0;
     foreach ($by as $d => $ids) { q('INSERT INTO po_lots (order_id, seq, planned_date, user_name) VALUES (?,?,?,?)', [$oid, ++$i, $d, $u['full_name'] ?? null]); $lid = (int) db()->lastInsertId(); q('UPDATE po_lines SET lot_id = ? WHERE id IN (' . implode(',', $ids) . ')', [$lid]); }

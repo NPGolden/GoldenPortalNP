@@ -135,9 +135,9 @@ layout_head(t('acc.report') . ' ' . $title, 'acc_reports');
 </div>
 <?php endif; ?>
 
-<div class="card">
-  <h2><?= tt('td.history') ?></h2>
+<details class="card card--details">
+  <summary><h2><?= tt('td.history') ?></h2></summary>
   <?php if (!$R['events']): ?><p class="hint">—</p><?php else: ?><ul class="tk-events"><?php foreach ($R['events'] as $ev): ?><li><span class="when"><?= e(fmt_datetime($ev['created_at'])) ?></span> <b><?= e(t('acc.ev_' . $ev['event'])) ?></b> · <?= e($ev['user_name'] ?: '') ?><?= $ev['note'] ? ' <span class="hint">— ' . e($ev['note']) . '</span>' : '' ?></li><?php endforeach; ?></ul><?php endif; ?>
   <?php if (function_exists('ar_issued') && !$draftNo && $R['project_id']): $iss = ar_issued($R['report_no'], (int)$R['project_id']); if ($iss): ?><h3 class="ed-h" style="margin-top:12px;"><?= tt('ar.issued') ?></h3><ul class="hint"><?php foreach ($iss as $rv): ?><li><b><?= e($rv['revision']) ?></b> · <?= e(fmt_datetime($rv['at'])) ?> · <?= e($rv['by'] ?: '') ?> <?php foreach ($rv['files'] as $ext => $fid): ?><a href="<?= url('file', ['id' => $fid]) ?>">⤓ <?= e(strtoupper($ext)) ?></a> <?php endforeach; ?></li><?php endforeach; ?></ul><?php endif; endif; ?>
-</div>
+</details>
 <?php layout_foot(); ?>

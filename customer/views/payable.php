@@ -181,11 +181,11 @@ layout_head(($i ? $i['si_no'] : ($isCredit ? t('si.new_credit') : t('si.new'))) 
   <?php endif; ?>
 </div>
 
-<div class="card">
-  <h2><?= tt('prq.log') ?></h2>
+<details class="card card--details">
+  <summary><h2><?= tt('prq.log') ?></h2></summary>
   <table class="tbl tbl--wrap"><thead><tr><th><?= tt('prq.when') ?></th><th><?= tt('prq.who') ?></th><th><?= tt('prq.event') ?></th><th><?= tt('prq.note') ?></th></tr></thead><tbody>
   <?php foreach ($events as $ev): ?><tr><td><?= fmt_datetime($ev['created_at']) ?></td><td><?= e($ev['user_name'] ?? '') ?></td><td><?= tt('si.ev_' . $ev['event']) ?></td><td><?= e($ev['note'] ?? '') ?></td></tr><?php endforeach; ?>
   </tbody></table>
-</div>
+</details>
 <?php endif; ?>
 <?php layout_foot();

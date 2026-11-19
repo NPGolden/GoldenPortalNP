@@ -158,11 +158,11 @@ document.querySelectorAll('.hra-use').forEach(function(b){b.addEventListener('cl
   <?php if ($f['status'] === 'applied'): ?><p class="hint" style="margin-top:8px;"><?= tt('hra.docs_filed') ?></p><?php endif; ?>
 </div>
 <?php if ($manage): ?>
-<div class="card" id="hra-log">
-  <h2>🕒 <?= tt('hra.log') ?></h2>
+<details class="card card--details" id="hra-log">
+  <summary><h2>🕒 <?= tt('hra.log') ?></h2></summary>
   <ul class="hint" style="padding-left:18px;margin:0;"><?php foreach (hra_log_list((int)$f['id']) as $l): ?><li><?= e(fmt_datetime($l['created_at'])) ?> · <b><?= e(t('hra.ev_' . $l['event'])) ?></b><?= $l['full_name'] ? ' · ' . e($l['full_name']) : '' ?><?= $l['detail'] ? ' · ' . e($l['detail']) : '' ?></li><?php endforeach; ?></ul>
   <?php if ($f['consent_at']): ?><p class="hint" style="margin-top:8px;">🔏 <?= e(t('hra.consent_given', ['d' => fmt_datetime($f['consent_at'])])) ?><?= $f['consent_ip'] ? ' · ' . e($f['consent_ip']) : '' ?></p><?php endif; ?>
-</div>
+</details>
 <?php endif; ?>
 </div>
 </div>

@@ -341,6 +341,7 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
 <?php endif; ?>
 <?php endif; ?>
 
+<?php if ($o && !$isRfq && $o['status'] === 'draft') include __DIR__ . '/_po_lots.php';   // R97-148: delivery lots on a draft order ?>
 <?php if ($o && !$isRfq && function_exists('si_can') && si_can() && $o['status'] !== 'draft'): $sis = si_list(['order_id' => $id, 'status' => '']); ?>
 <div class="card" id="invoices">
   <div class="page-head" style="margin-bottom:6px;"><div><h2 style="margin:0;">💸 <?= tt('si.invoices') ?> <span class="hint" style="font-weight:400;">(<?= count($sis) ?>)</span></h2><p class="hint"><?= tt('si.po_block_lede') ?></p></div>
@@ -352,11 +353,11 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
 </div>
 <?php endif; ?>
 
-<div class="card">
-  <h2><?= tt('prq.log') ?></h2>
+<details class="card card--details">
+  <summary><h2><?= tt('prq.log') ?></h2></summary>
   <table class="tbl tbl--wrap"><thead><tr><th><?= tt('prq.when') ?></th><th><?= tt('prq.who') ?></th><th><?= tt('prq.event') ?></th><th><?= tt('prq.note') ?></th></tr></thead><tbody>
   <?php foreach ($events as $ev): ?><tr><td><?= fmt_datetime($ev['created_at']) ?></td><td><?= e($ev['user_name'] ?? '') ?></td><td><?= tt('po.ev_' . $ev['event']) ?></td><td><?= e($ev['note'] ?? '') ?></td></tr><?php endforeach; ?>
   </tbody></table>
-</div>
+</details>
 <?php endif; ?>
 <?php layout_foot();

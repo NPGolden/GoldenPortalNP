@@ -150,12 +150,12 @@ layout_head($t['ticket_no'] . ' · ' . $t['title'], 'tickets');
       </div>
     <?php endif; ?>
 
-    <div class="card">
-      <h2><?= tt('fsr.trail') ?></h2>
+    <details class="card card--details">
+      <summary><h2><?= tt('fsr.trail') ?></h2></summary>
       <ul class="trail"><?php foreach ($t['events'] as $x): ?>
         <li><b><?= e($ev[$x['event']] ?? $x['event']) ?></b> — <?= e($x['user_name'] ?: '') ?> · <?= e(fmt_datetime($x['created_at'])) ?><?= $x['ip'] ? ' · IP ' . e($x['ip']) : '' ?><?= $x['note'] ? '<br><span class="hint">' . e(mb_substr($x['note'], 0, 200)) . '</span>' : '' ?></li>
       <?php endforeach; ?></ul>
-    </div>
+    </details>
   </div>
 
   <div class="card">

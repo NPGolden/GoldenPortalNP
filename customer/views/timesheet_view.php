@@ -115,8 +115,8 @@ layout_head($t['ts_no'], 'timesheets');
     <?php endif; ?>
   </div>
 
-  <div class="card">
-    <h2><?= tt('fsr.trail') ?></h2>
+  <details class="card card--details">
+    <summary><h2><?= tt('fsr.trail') ?></h2></summary>
     <div class="table-scroll"><table>
       <thead><tr><th><?= tt('ll.when') ?></th><th><?= tt('fsr.event') ?></th><th><?= tt('ll.who') ?></th><th><?= tt('th.remarks') ?></th></tr></thead>
       <tbody><?php $tone = ['created' => 'mute', 'saved' => 'mute', 'submitted' => 'gold', 'approved' => 'green', 'rejected' => 'bad', 'invoiced' => 'navy', 'uninvoiced' => 'mute', 'withdrawn' => 'mute'];
@@ -124,7 +124,7 @@ layout_head($t['ts_no'], 'timesheets');
         <tr><td class="date"><?= e(fmt_datetime($ev['created_at'])) ?></td><td><?= pill($tone[$ev['event']] ?? 'mute', $evLabel($ev['event'])) ?></td><td><?= e($ev['user_name'] ?: '—') ?><?= $ev['ip'] ? '<br><span class="hint">' . e($ev['ip']) . '</span>' : '' ?></td><td><?= e($ev['note'] ?: '') ?></td></tr>
       <?php endforeach; ?></tbody>
     </table></div>
-  </div>
+  </details>
 </div>
 <?php if (is_cp_admin() && !in_array($t['status'], ['draft', 'rejected'], true)): $adAction = 'ts_delete'; $adId = $id; $adBack = 'timesheets'; $adConfirm = t('ts.delete_confirm_admin', ['no' => $t['ts_no']]); $adNote = t('ts.delete_note'); require __DIR__ . '/_admin_delete.php'; endif; ?>
 <?php layout_foot(); ?>

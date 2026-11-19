@@ -84,13 +84,13 @@ layout_head($title, 'tasks');
   <?php endif; ?>
 </div>
 <?php if ($t): ?>
-<div class="card card--tight">
-  <h3 class="ac-h" style="margin-top:0;"><?= tt('td.history') ?></h3>
+<details class="card card--details card--tight">
+  <summary><h3 class="ac-h" style="margin-top:0;"><?= tt('td.history') ?></h3></summary>
   <p class="hint" style="margin:0 0 8px;"><?= e(t('td.created_by', ['n' => $t['owner'] ?: '—', 'd' => fmt_datetime($t['created_at'])])) ?><?= $t['status'] === 'done' ? ' · ' . e(t('td.done_on', ['d' => fmt_datetime($t['done_at'])])) : '' ?></p>
   <?php if (!$log): ?><p class="hint"><?= tt('vh.none') ?></p><?php else: ?>
   <ul class="td-log"><?php foreach ($log as $l): ?><li><time><?= e(fmt_datetime($l['at'])) ?></time> <b><?= e(t('td.ev_' . $l['event'])) ?></b><?= $l['due_at'] ? ' · ' . e(fmt_datetime($l['due_at'])) : '' ?><?= $l['full_name'] ? ' · ' . e($l['full_name']) : '' ?></li><?php endforeach; ?></ul>
   <?php endif; ?>
-</div>
+</details>
 <?php endif; ?>
 </div>
 <script nonce="<?= csp_nonce() ?>">

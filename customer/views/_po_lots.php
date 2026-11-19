@@ -1,5 +1,5 @@
 <?php /* GAS-CP-R97-146 — delivery lots of a purchase order (included by purchase_order.php; needs $o, $id, $self, $lines, $admin) */
-if (!function_exists('pol_has') || !pol_has() || !$o || $o['kind'] !== 'po' || $o['status'] === 'draft') return;
+if (!function_exists('pol_has') || !pol_has() || !$o || $o['kind'] !== 'po') return;   /* R97-148: also on a draft, so the deliveries can be planned before the order is sent */
 $lots = pol_of([$id])[$id] ?? []; $polCan = pol_can($o); if (!$lots && !$polCan) return;
 $live = array_values(array_filter($lines, fn($l) => $l['status'] !== 'cancelled')); $noLot = count(array_filter($live, fn($l) => empty($l['lot_id'])));
 $di = fn(string $n, ?string $v, string $f) => '<input type="date" name="' . $n . '" value="' . e((string)$v) . '" form="' . $f . '" style="width:9.6em;">';

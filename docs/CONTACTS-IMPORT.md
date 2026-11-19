@@ -3659,3 +3659,10 @@ The single functions read the batch first and fall back to their own statement, 
 **Database.** `install/migrate_cp_r97_147_perf_index.sql`. State key `r98x`.
 
 **Cybersecurity.** Read paths only; the batches use integer-cast ids and the same scope rules (the list of projects is still selected by the user's scope before anything is read); no new access; nothing kept between requests or users.
+
+## §432 v1.198.2 (R97-148) — Folded logs; delivery lots on a draft order
+
+- **Logs folded:** the log card of 16 document pages is a folded section (`<details class="card card--details">`): purchase order, requisition, BOM, payable, payment request, production order, system budget, ISO / IT record, assessment flow, job order, offer, ticket, timesheet, activity report, recruitment application, task. Field service and inspection reports already worked this way. Open with a click on the title.
+- **Lots on a draft:** the card "Delivery lots" is shown on a draft purchase order too; the proposal counts lead times from today while the order is not sent.
+- **Why the lots were missing:** they were shown only on sent orders (R97-146).
+- Cybersecurity: display only; rights unchanged; no database change.

@@ -90,6 +90,6 @@ if (function_exists('em_card_html') && em_has()) {
   <button class="btn btn--gold"><?= tt('btn.save') ?></button>
   <?php if ($a['hired_person_id']): ?><p class="hint">→ <a href="<?= url('hr_person', ['id' => (int)$a['hired_person_id']]) ?>"><?= tt('rc.person_card') ?></a></p><?php endif; ?>
 </form>
-<div class="card"><h2><?= tt('rc.log') ?></h2><ul class="log"><?php foreach ($log as $l): ?><li><span class="hint"><?= e(fmt_datetime($l['created_at'])) ?> · <?= e((string)($l['by_name'] ?: 'Website')) ?></span><br><b><?= e($l['action']) ?></b> <?= e((string)$l['detail']) ?></li><?php endforeach; ?></ul></div>
+<details class="card card--details"><summary><h2><?= tt('rc.log') ?></h2></summary><ul class="log"><?php foreach ($log as $l): ?><li><span class="hint"><?= e(fmt_datetime($l['created_at'])) ?> · <?= e((string)($l['by_name'] ?: 'Website')) ?></span><br><b><?= e($l['action']) ?></b> <?= e((string)$l['detail']) ?></li><?php endforeach; ?></ul></details>
 </div></div>
 <?php layout_foot();

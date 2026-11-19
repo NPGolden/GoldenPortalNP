@@ -993,7 +993,7 @@ html[data-theme="dark"] a.attrow, html[data-theme="dark"] a.evrow, html[data-the
 .kpi a.stat { text-decoration: none; color: inherit; } .kpi a.stat:hover { border-color: var(--gold); }
 .card--details > summary { cursor: pointer; list-style: none; display: flex; align-items: center; gap: 10px; }
 .card--details > summary::-webkit-details-marker { display: none; }
-.card--details > summary h2 { margin: 0; } .card--details > summary::after { content: '+'; margin-left: auto; font-size: 20px; color: var(--gold-text); font-weight: 300; }
+.card--details > summary h2 { margin: 0; } .card--details > summary h3 { margin: 0; }   /* R97-148: the log of every document is folded until it is opened */ .card--details > summary::after { content: '+'; margin-left: auto; font-size: 20px; color: var(--gold-text); font-weight: 300; }
 .card--details[open] > summary::after { content: '–'; } .card--details[open] > summary { margin-bottom: 14px; }
 .fltbar--au { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
 .fltbar--au .field:first-child { grid-column: span 2; } .fltbar--au .fltbar-actions { grid-column: span 2; }

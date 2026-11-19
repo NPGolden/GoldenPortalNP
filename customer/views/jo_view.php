@@ -79,14 +79,14 @@ layout_head($j['jo_no'], $staff ? 'projects' : 'joborders');
   </div>
 </div>
 
-<div class="card">
-  <h2><?= tt('fsr.trail') ?></h2>
+<details class="card card--details">
+  <summary><h2><?= tt('fsr.trail') ?></h2></summary>
   <div class="table-scroll"><table>
     <thead><tr><th><?= tt('ll.when') ?></th><th><?= tt('fsr.event') ?></th><th><?= tt('ll.who') ?></th><th><?= tt('ll.ip') ?></th><th><?= tt('th.remarks') ?></th></tr></thead>
     <tbody><?php foreach (array_reverse($j['events']) as $ev): ?>
       <tr><td class="date"><?= e(fmt_datetime($ev['created_at'])) ?></td><td><?= pill($tone[$ev['event']] ?? 'mute', t('jo.ev_' . $ev['event'])) ?></td><td><?= e($ev['user_name'] ?: '—') ?></td><td class="num"><?= e($ev['ip'] ?: '—') ?></td><td><?= e($ev['note'] ?: '') ?></td></tr>
     <?php endforeach; ?></tbody>
   </table></div>
-</div>
+</details>
 <?php $adAction = 'jo_delete'; $adId = $id; $adBack = 'joborders'; $adConfirm = t('jo.delete_confirm', ['no' => $j['jo_no']]); $adNote = t('jo.delete_note'); require __DIR__ . '/_admin_delete.php'; ?>
 <?php layout_foot(); ?>

@@ -144,12 +144,12 @@ layout_head($o['offer_no'] . ' · ' . $o['title'], 'offers');
   </div>
   <?php endif; ?>
 
-  <div class="card">
-    <h2><?= tt('fsr.trail') ?></h2>
+  <details class="card card--details">
+    <summary><h2><?= tt('fsr.trail') ?></h2></summary>
     <ul class="trail"><?php foreach ($o['events'] as $x): ?>
       <li><b><?= e($ev[$x['event']] ?? $x['event']) ?></b> — <?= e($x['user_name'] ?: '') ?> · <?= e(fmt_datetime($x['created_at'])) ?><?= $x['ip'] ? ' · IP ' . e($x['ip']) : '' ?><?= $x['note'] ? '<br><span class="hint">' . e(fin_visible() ? mb_substr($x['note'], 0, 300) : preg_replace('/\d[\d.,]*\s?(EUR|USD|GBP|€|\$|£)/u', fin_masked(), mb_substr($x['note'], 0, 300))) . '</span>' : '' ?></li>
     <?php endforeach; ?></ul>
-  </div>
+  </details>
 </div>
 <?php if ($staff && function_exists('pi_can_view') && pi_can_view()) require __DIR__ . '/_offer_proformas.php'; ?>
 <?php require __DIR__ . '/_offer_builder.php'; ?>

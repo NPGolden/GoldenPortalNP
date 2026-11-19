@@ -233,12 +233,12 @@ layout_head(sb_label($B) . ' · ' . $B['title'], 'system_budgets');
     <div class="btn-row"><button class="btn btn--sm" type="submit"><?= tt('sb.comment_add') ?></button></div>
   </form>
 </div>
-<div class="card" id="history">
-  <h2>🕘 <?= tt('sb.history') ?></h2>
+<details class="card card--details" id="history">
+  <summary><h2>🕘 <?= tt('sb.history') ?></h2></summary>
   <div class="table-scroll"><table class="tbl" data-nosort><tbody>
   <?php foreach ($ev as $v): ?><tr><td class="date hint"><?= e(fmt_datetime((string)$v['created_at'])) ?></td><td><?= e((string)$v['full_name']) ?></td><td><?= tt('sb.ev_' . $v['kind']) ?><?= $v['note'] !== null && $v['note'] !== '' ? ' <span class="hint">· ' . e((string)$v['note']) . '</span>' : '' ?></td></tr><?php endforeach; ?>
   </tbody></table></div>
   <p class="hint" style="margin:8px 0 0;"><?= e(t('sb.created_by', ['n' => (string)$B['created_name'], 'd' => fmt_date(substr((string)$B['created_at'], 0, 10))])) ?></p>
-</div>
+</details>
 </div>
 <?php layout_foot(); ?>

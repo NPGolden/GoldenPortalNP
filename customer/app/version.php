@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.198.1';
+const CP_VERSION = '1.198.2';
 const CP_BUILD   = '2026-11-18';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-148', 'version' => '1.198.2', 'date' => '2026-11-19', 'title' => 'Documents: the log / history / audit trail card of every document is folded by default and opens with a click; delivery lots can also be defined on a draft purchase order (lead times counted from today until the order is sent).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-147', 'version' => '1.198.1', 'date' => '2026-11-19', 'title' => 'Performance: the figures of all sub-projects (budget, hours, costs, KPIs) are read in batches instead of 13 statements per sub-project — Dashboard, KPIs, KPI report, Cash flow and the projects list ask a fraction of the statements; HR pages read the people list once; index for the last movement of inventory items.', 'db' => 'install/migrate_cp_r97_147_perf_index.sql', 'check' => 'r98x'],
         ['ref' => 'GAS-CP-R97-146', 'version' => '1.198.0', 'date' => '2026-11-19', 'title' => 'Purchase orders: delivery lots — an order that arrives in several deliveries is divided into lots with their own planned date, transport steps, carrier and lines; lots proposed from the delivery dates of the lines; the step Delivered follows the latest lot; shown per lot on the order, in the lists, on the pipeline and in the sub-project.', 'db' => 'install/migrate_cp_r97_146_po_lots.sql', 'check' => 'r98w'],
         ['ref' => 'GAS-CP-R97-145', 'version' => '1.197.0', 'date' => '2026-11-19', 'title' => 'Goods receipt of a purchase order: a received line can be split — the quantity typed next to Project goes to the project on the delivery note, the rest of the accepted quantity stays in the warehouse as free stock.', 'db' => 'install/migrate_cp_r97_145_receipt_split.sql', 'check' => 'r98v'],
