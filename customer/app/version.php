@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.195.0';
+const CP_VERSION = '1.195.1';
 const CP_BUILD   = '2026-11-18';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-138', 'version' => '1.195.1', 'date' => '2026-11-19', 'title' => 'Production › Subcontracting: whoever may edit a production order (production users, the order manager, the project manager) enters and sees the agreed amount of its subcontracts, also without the right to see financial data; lists, totals and PDFs stay under that right.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-137', 'version' => '1.195.0', 'date' => '2026-11-19', 'title' => 'BOM and requisition: the Unit price of the BOM file is kept as the BOM price of each line; the estimate is taken by choice from the BOM price or from the last buying price; the BOM prices of an existing BOM or requisition are read from its file; the choice follows into the requisition and the purchase order.', 'db' => 'install/migrate_cp_r97_137_bom_price.sql', 'check' => 'r98u'],
         ['ref' => 'GAS-CP-R97-136', 'version' => '1.194.0', 'date' => '2026-11-19', 'title' => 'Purchasing: the vessel of the project is shown with every purchase order and request for quotation (list, pipeline board, lines to buy, order page) and the orders can be filtered and searched by vessel.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-135', 'version' => '1.193.2', 'date' => '2026-11-19', 'title' => 'Payables: an invoice, proforma or payment request that comes from a purchase order keeps the order and takes its project and sub-project (an edit of a saved invoice was removing them); project fields on the invoice; link of a saved or paid invoice to its order and project; payment requests show the project; one-time repair.', 'db' => null, 'check' => null],

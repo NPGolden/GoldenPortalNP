@@ -3553,3 +3553,10 @@ The page on screen stays the internal version for staff.
 **Database.** `install/migrate_cp_r97_137_bom_price.sql` — `bom_price` on `bom_lines`, `bom_import_rows`, `pr_lines`; `price_src` on `bom_revisions`, `pr_requests` (default `last`). State key `r98u`.
 
 **Cybersecurity.** Upload limited to .xlsx up to 8 MB, read with the existing reader and not stored; actions check the right on the document server-side; values are bound parameters; the BOM file content is not sent to the assistant by this function.
+
+## §422 v1.195.1 (R97-138) — Production: the engineer enters the amount of a subcontract
+
+- **Before:** Amount / currency of a subcontracting line only for positions with "sees financial data".
+- **Now:** on the page of a production order, anyone who may edit that order (production user, order manager, project manager, administrator) has the fields and sees the amounts of that order's subcontracts.
+- **Unchanged:** Production › Subcontracting (list over all orders), its total and the PDFs show amounts only with the financial right; users marked "no financial data" are excluded everywhere.
+- **Cybersecurity:** the rule is checked on the server when saving (`ps_amount_can`), not only by hiding the field; a user without it keeps the stored amount unchanged.

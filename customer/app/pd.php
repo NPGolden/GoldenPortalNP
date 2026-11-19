@@ -212,7 +212,9 @@ function pd_feed_orders(int $sid): array { return pd_has() && is_staff() ? all("
 /* ------------------------------------------------------------------ subcontracting (R41-003) */
 function ps_has(): bool { static $h = null; if ($h === null) { try { $h = pd_has() && (bool) scalar("SHOW TABLES LIKE 'production_subs'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function ps_status_pill(string $st): string { return pill(PS_TONE[$st] ?? 'mute', t('ps.s_' . $st)); }
-function ps_money(?float $v, string $cur = 'EUR'): string { if ($v === null) return '—'; if (!fin_visible()) return fin_masked(); return number_format($v, 2, ',', '.') . ' ' . $cur; }
+/** R97-138: the agreed amount of a subcontract is entered and read by whoever may edit the production order (production users, the order's manager, the PM) — also without the right to see financial data; never by a user marked "no financial data". */
+function ps_amount_can(?array $o): bool { if (fin_visible()) return true; if (function_exists('fin_blocked') && fin_blocked()) return false; return $o !== null && pd_can_edit($o); }
+function ps_money(?float $v, string $cur = 'EUR', bool $show = false): string { if ($v === null) return '—'; if (!$show && !fin_visible()) return fin_masked(); return number_format($v, 2, ',', '.') . ' ' . $cur; }
 const PS_SELECT = "SELECT ps.*, o.po_no AS order_no, o.title AS order_title, o.status AS order_status, o.project_id, o.subproject_id, o.vessel_id, o.manager_user_id, p.project_code, p.pm_user_id, v.name AS vessel, e.serial_no, e.model, cu.full_name AS manager,
                    (SELECT COUNT(*) FROM production_files f WHERE f.order_id = ps.order_id AND f.phase = 'subcontract' AND (f.unit_id IS NULL OR f.unit_id = ps.unit_id)) AS n_files
             FROM production_subs ps JOIN production_orders o ON o.id = ps.order_id JOIN projects p ON p.id = o.project_id LEFT JOIN vessels v ON v.id = o.vessel_id
@@ -248,7 +250,7 @@ function ps_save_from_post(): int {
     $scope = $s('scope', 200) ?: ($whole ? t('ps.whole_equipment') : ''); if ($scope === '') throw new RuntimeException(t('ps.need_scope'));
     $st = in_array($_POST['status'] ?? '', PS_STATUSES, true) ? $_POST['status'] : ($old['status'] ?? 'planned');
     $pctIn = trim((string)($_POST['pct'] ?? '')); $pct = $pctIn === '' ? max((int)($old['pct'] ?? 0) * ($st === ($old['status'] ?? '') ? 1 : 0), PS_PCT[$st]) : max(0, min(100, (int)$pctIn)); if ($st === 'accepted') $pct = 100;
-    $amount = fin_visible() ? (trim((string)($_POST['amount'] ?? '')) === '' ? null : (function_exists('of_parse_amount') ? of_parse_amount((string)$_POST['amount']) : (float) str_replace(',', '.', (string)$_POST['amount']))) : ($old['amount'] ?? null);
+    $amount = ps_amount_can($o) ? (trim((string)($_POST['amount'] ?? '')) === '' ? null : (function_exists('of_parse_amount') ? of_parse_amount((string)$_POST['amount']) : (float) str_replace(',', '.', (string)$_POST['amount']))) : ($old['amount'] ?? null);
     $cur = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', (string)($_POST['currency'] ?? ($old['currency'] ?? 'EUR'))), 0, 3)) ?: 'EUR';
     $ordered = $d('ordered_at') ?? ($st !== 'planned' && !$old ? date('Y-m-d') : ($old['ordered_at'] ?? null)); $due = $d('due_at'); $deliv = $d('delivered_at') ?? (in_array($st, ['delivered', 'inspected', 'accepted'], true) ? ($old['delivered_at'] ?? date('Y-m-d')) : null);
     $insp = $s('inspection_note', 500) ?: null; $note = $s('note', 500) ?: null;

@@ -106,7 +106,7 @@ layout_head($o['po_no'] . ' · ' . $o['title'], 'equipment');
   <?php endif; ?>
 </div>
 
-<?php if (function_exists('ps_has') && ps_has()): $subs = $o['subs']; $eps = (int)($_GET['sub'] ?? 0); $ep = null; foreach ($subs as $x) if ((int)$x['id'] === $eps) $ep = $x; $fin = fin_visible(); $cos = $can && function_exists('co_all') && co_has() ? co_all() : []; ?>
+<?php if (function_exists('ps_has') && ps_has()): $subs = $o['subs']; $eps = (int)($_GET['sub'] ?? 0); $ep = null; foreach ($subs as $x) if ((int)$x['id'] === $eps) $ep = $x; $fin = ps_amount_can($o); $cos = $can && function_exists('co_all') && co_has() ? co_all() : []; ?>
 <div class="card" id="subs">
   <div class="card-head"><h2>🔗 <?= tt('ps.title') ?> <span class="hint">(<?= count($subs) ?>)</span></h2><span class="hint"><?= tt('ps.hint') ?></span></div>
   <?php if (!$subs): ?><p class="hint"><?= tt('ps.none_order') ?></p><?php else: ?>
@@ -116,7 +116,7 @@ layout_head($o['po_no'] . ' · ' . $o['title'], 'equipment');
       <td class="mono"><?= $ps['serial_no'] ? e($ps['serial_no']) : '<span class="hint">' . tt('pd.all_units') . '</span>' ?></td><td class="mono"><?= e($ps['po_no'] ?: '—') ?></td>
       <td class="hint" style="white-space:nowrap;"><?= $ps['ordered_at'] ? tt('ps.ordered') . ' ' . e(fmt_date($ps['ordered_at'])) . '<br>' : '' ?><?= $ps['due_at'] ? '<span' . ($late ? ' class="is-late"' : '') . '>' . tt('ps.due') . ' ' . e(fmt_date($ps['due_at'])) . ($late ? ' ' . pill('bad', t('pd.late')) : '') . '</span><br>' : '' ?><?= $ps['delivered_at'] ? tt('ps.delivered') . ' ' . e(fmt_date($ps['delivered_at'])) : '' ?></td>
       <td><?= ps_status_pill($ps['status']) ?></td><td class="num"><b><?= (int)$ps['pct'] ?> %</b><?= pd_pct_bar((int)$ps['pct']) ?></td>
-      <?php if ($fin): ?><td class="num"><?= e(ps_money($ps['amount'] !== null ? (float)$ps['amount'] : null, $ps['currency'])) ?></td><?php endif; ?>
+      <?php if ($fin): ?><td class="num"><?= e(ps_money($ps['amount'] !== null ? (float)$ps['amount'] : null, $ps['currency'], $fin)) ?></td><?php endif; ?>
       <td class="hint"><?= e((string)$ps['inspection_note']) ?><?= (int)$ps['n_files'] ? ' <a href="#docs">📎 ' . (int)$ps['n_files'] . '</a>' : '' ?></td>
       <?php if ($can): ?><td class="row-actions stack"><a class="btn btn--ghost btn--sm" href="<?= url('production_order', ['id' => $id, 'sub' => (int)$ps['id']]) ?>#ps-form">✎</a><form method="post" action="<?= $backTo ?>#subs" class="inline" data-lock data-confirm="<?= tt('ps.delete_confirm') ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('btn.delete') ?>" data-confirm-cancel="<?= tt('btn.cancel') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="ps_delete"><input type="hidden" name="ps_id" value="<?= (int)$ps['id'] ?>"><button class="btn btn--ghost btn--sm" type="submit">×</button></form></td><?php endif; ?></tr>
   <?php endforeach; ?>
