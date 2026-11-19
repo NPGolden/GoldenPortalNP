@@ -3451,3 +3451,19 @@ The page on screen stays the internal version for staff.
 **Tests (sandbox)**: requisition with four lines (item without buying price, free text, item with last price, no estimate) pulled into an order → 55 and 12 as estimates, 100 from the item card, the fourth empty; prices cleared → button "(3 lines)" → three filled, totals recalculated, button gone; staff without Procurement refused. Sandbox restored. Error log clean.
 
 **Security review**: no new data leaves or enters — the estimate was already visible to the same people on the requisition; the action checks the same rights as the price fields. No proposal.
+
+## §415 v1.191.0 (R97-131) — Support: process flow from the offer to the delivery (portrait page)
+
+**Asked**: the process flow drawn in Figma earlier — portrait, fitted to a dedicated page of Support so the users know the Sales / Purchasing flow, with the inventory interactions and the delivery notes.
+
+**Change** — new view `views/process_flow.php` (page `process_flow`, staff; in `$views`, `HR_PAGES`, `PA_PAGES`, `EMP_PAGES`), card on `views/support.php`. Built in HTML and CSS, not as an image: one column of twelve steps in five phases, each row `quantities — step — money` joined by straight lines, steps joined by a vertical arrow; texts from 80 language keys (`pf.*`, English / Greek / Italian), so it follows the language of the user, wraps on a phone (one column) and prints (`@media print`, button Print). Each step links to its page. Two lists below: what changes the stock; delivery notes.
+
+**Checked in the code before writing each sentence**: reservation at the approval of a requisition (`prq_approve_apply()`, `inv_stock.qty_reserved`); `pr_lines.qty_ordered` when an order is sent; receipt (`po_lines.qty_received / accepted / rejected`, `stk_move('in')` at the order price, reservation for the requisition, `pr_lines.qty_received`); issue (`prq_issue()`, `stk_move('out')` with project and price, reservation released); delivery notes (`DN_KINDS`, `dn_create()` — requisition line → `prq_issue_dn()`, other item line → `stk_move('out')`; `dn_cancel()` books back and re-reserves); supplier invoice against `po_lines.qty_invoiced`; budget of the sub-project from the offers (`bg_prefill_from_offers()`), budget figures on the requisition; proforma per payment term of an approved offer (`pi_create()`); other movements (`fsr.php`, manual, transfer, adjustment, opening).
+
+**Figma**: a portrait FigJam board "Golden A/S Portal - Sales and Purchasing process flow (portrait)" with the same twelve steps and the stock node was generated for editing; the page in the portal is the reference.
+
+**Tests (sandbox)**: page opened as administrator, staff and HR (200), no untranslated key on the page, screenshot looked at, language key counts equal. Error log clean.
+
+**Not tested**: printing on paper from a browser (print styles written, not printed); the Greek and Italian texts were written with the page, not reviewed by a native reader of the trade terms.
+
+**Security review**: the page holds no data of the company — no amounts, names or documents — and reads nothing from the database; staff only. No proposal.
