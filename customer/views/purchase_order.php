@@ -244,7 +244,7 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
   <table class="tbl tbl--wrap"><thead><tr><th><?= tt('po.milestone') ?></th><th><?= tt('po.planned') ?></th><th><?= tt('po.actual') ?></th><th><?= tt('po.details') ?></th><th></th></tr></thead><tbody>
   <?php foreach ($timeline as $tl): $mm = $tl['m']; ?>
     <tr<?= $tl['actual'] ? ' style="background:var(--ok-soft,rgba(46,125,50,.06))"' : '' ?>>
-      <td><b><?= tt('po.m_' . $tl['kind']) ?></b><?= isset($tl['n']) && $tl['n'] ? ' <span class="pill pill--navy">' . (int)$tl['n'] . '</span>' : '' ?></td>
+      <td><b><?= tt('po.m_' . $tl['kind']) ?></b><?= isset($tl['n']) && $tl['n'] ? ' <span class="pill pill--navy">' . (int)$tl['n'] . '</span>' : '' ?><?php if ($tl['kind'] === 'delivered' && function_exists('pol_has') && pol_has() && ($nl_ = (int) scalar('SELECT COUNT(*) FROM po_lots WHERE order_id = ?', [$id])) > 0): ?> <a href="#lots" class="hint" title="<?= tt('pol.tl_hint') ?>">◐ <?= e(t('pol.n_lots', ['n' => $nl_])) ?></a><?php endif; ?></td>
       <td<?= $tl['late'] ? ' style="color:var(--red)"' : '' ?>><?= fmt_date($tl['planned']) ?><?= $tl['late'] ? ' <small>' . tt('po.late') . '</small>' : '' ?></td>
       <td><?= $tl['actual'] ? '<b>' . fmt_date($tl['actual']) . '</b>' : '—' ?></td>
       <td><?php if ($mm): ?><?= e(trim(implode(' · ', array_filter([$mm['carrier'], $mm['tracking'], $mm['ref'], $mm['packages'] ? $mm['packages'] . ' ' . t('po.packages') : '', $mm['weight_kg'] ? $mm['weight_kg'] . ' kg' : '', $mm['note']])))) ?><?= $mm['file_id'] ? ' <a href="' . url('file', ['id' => (int)$mm['file_id']]) . '" target="_blank">📎</a>' : '' ?><?php endif; ?></td>
@@ -271,6 +271,8 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
   <script nonce="<?= csp_nonce() ?>">document.querySelectorAll('[data-ms]').forEach(function(b){b.addEventListener('click',function(){var d=JSON.parse(b.getAttribute('data-ms'));var g=function(i,v){var el=document.getElementById(i);if(el)el.value=v==null?'':v;};g('ms-kind',d.kind);g('ms-planned',d.planned);g('ms-actual',d.actual);g('ms-carrier',d.carrier);g('ms-tracking',d.tracking);g('ms-ref',d.ref);g('ms-packages',d.packages);g('ms-weight',d.weight);g('ms-note',d.note);document.getElementById('ms-form').scrollIntoView({behavior:'smooth',block:'center'});});});</script>
   <?php endif; ?>
 </div>
+
+<?php include __DIR__ . '/_po_lots.php';   // R97-146: delivery lots ?>
 
 <div class="card" id="costs">
   <h2>🧾 <?= tt('po.lcosts') ?></h2><p class="hint"><?= tt('po.lcosts_lede') ?></p>

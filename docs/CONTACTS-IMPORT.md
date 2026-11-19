@@ -3616,3 +3616,18 @@ The page on screen stays the internal version for staff.
 - Refused when the quantity is above the accepted quantity of the line.
 - Database: `install/migrate_cp_r97_145_receipt_split.sql` — `po_receipt_lines.dest_qty`. State key `r98v`.
 - Cybersecurity: same right as booking a receipt (warehouse / procurement), quantities validated on the server, no new access.
+
+## §430 v1.198.0 (R97-146) — Purchase orders: delivery lots
+
+**Purpose.** Partial deliveries: which lines arrive when, and where each consignment is.
+
+1. **Card "Delivery lots"** on the order page (orders that are sent; not on drafts / RFQs). Columns: Lot, Planned, Shipped, Arrived, Delivered, Carrier / tracking, Note, Lines (received / total), Status. Each row is saved with 💾; ✕ deletes the lot (its lines stay on the order, without a lot).
+2. **Propose from the line dates:** one lot per date — promised date of the line, else sent / confirmed date + lead time. Lines without a date stay without a lot. Replaces the existing lots; refused once a lot has shipped / arrived / delivered dates or a tracking number.
+3. **By hand:** row "new lot" (planned date mandatory), then "Lines in the lots" → choose the lot per line → "Save the lots of the lines". Up to 40 lots per order.
+4. **Status of a lot:** Delivered (delivered date typed, or all its lines received — date of the last goods receipt), Late (planned date passed), Arrived, Shipped, Planned.
+5. **Timeline:** the planned date of "Delivered" = the latest planned lot (set automatically at every change); the expected date of the order follows it, plus lines in no lot.
+6. **Lists:** Delivery cell with one line per lot in Purchase orders, Sub-project › Procurement; Pipeline cards show "◐ n lots · d delivered · next <date>".
+
+**Database.** `install/migrate_cp_r97_146_po_lots.sql` — table `po_lots`, column `po_lines.lot_id`. State key `r98w`.
+
+**Cybersecurity.** Lots are changed only with the Procurement right (checked on the server for every action and every lot / line against its order); read with the order; all changes in the order log; no file upload, no new external access.

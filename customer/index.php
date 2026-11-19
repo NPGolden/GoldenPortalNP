@@ -73,6 +73,7 @@ require __DIR__ . '/app/jd.php';     // R97-121 HR job descriptions
 require __DIR__ . '/app/hry.php';    // R97-122 the HR year
 require __DIR__ . '/app/hre.php';    // R97-124 equipment issued to employees, handover
 require __DIR__ . '/app/hrf.php';    // R97-125 process flow of a person: onboarding, handover
+require __DIR__ . '/app/pol.php';    // R97-146 delivery lots of a purchase order
 require __DIR__ . '/app/rcr_actions.php';
 require __DIR__ . '/app/mailer.php'; // R91-003 outgoing mail (SMTP)
 require __DIR__ . '/app/web.php';    // R90-001 website statistics feed
@@ -174,6 +175,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (function_exists('jd_handle_action') && jd_handle_action($action)) exit;   // R97-121
         if (function_exists('hry_handle_action') && hry_handle_action($action)) exit;   // R97-122
         if (function_exists('hre_handle_action') && hre_handle_action($action)) exit;   // R97-124
+        if (function_exists('pol_handle_action') && pol_handle_action($action)) exit;   // R97-146
         if (function_exists('rcr_handle_action') && rcr_handle_action($action)) exit;
         if (function_exists('mi_handle_action') && mi_handle_action($action)) exit;   // R97-027
         if (function_exists('nl_handle_action') && nl_handle_action($action)) exit;   // R97-039

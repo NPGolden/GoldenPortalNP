@@ -478,7 +478,9 @@ function po_line_expected(array $o, array $l): ?string {
 function po_expected_update(int $oid): ?string {
     $o = po_load($oid); if (!$o) return null; $max = $o['delivery_date'];
     try { $pl = scalar("SELECT planned_date FROM po_milestones WHERE order_id = ? AND kind = 'delivered' AND planned_date IS NOT NULL", [$oid]); if ($pl && (!$max || $pl > $max)) $max = $pl; } catch (Throwable $e) {}   // R97-144: the planned date of the step Delivered counts
-    foreach (all("SELECT * FROM po_lines WHERE order_id = ? AND status IN ('open','partial')", [$oid]) as $l) { $e = po_line_expected($o, $l); if ($e && (!$max || $e > $max)) $max = $e; }
+    $lotMax = function_exists('pol_has') && pol_has() ? scalar('SELECT MAX(planned_date) FROM po_lots WHERE order_id = ?', [$oid]) : null;   // R97-146: with delivery lots the order is expected with its latest lot (and with the lines that are in no lot)
+    if ($lotMax) $max = $lotMax;
+    foreach (all("SELECT * FROM po_lines WHERE order_id = ? AND status IN ('open','partial')" . ($lotMax ? ' AND lot_id IS NULL' : ''), [$oid]) as $l) { $e = po_line_expected($o, $l); if ($lotMax && $e === $o['delivery_date']) continue; if ($e && (!$max || $e > $max)) $max = $e; }
     q('UPDATE po_orders SET expected_date = ? WHERE id = ?', [$max, $oid]); return $max;
 }
 /** R97-144: once — orders whose step Delivered has a planned date but whose expected / delivery date is empty get it, so the lists show it. */
