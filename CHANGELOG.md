@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.198.2** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.198.3** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.198.3 | GAS-CP-R97-149 | 2026-11-19 | Purchase order and delivery note documents (PDF): when the table continues on a new page the column headers are printed again and the first line is in the normal text colour (it was gold). | — |
 | 1.198.2 | GAS-CP-R97-148 | 2026-11-19 | Documents: the log / history / audit trail card of every document is folded by default and opens with a click; delivery lots can also be defined on a draft purchase order (lead times counted from today until the order is sent). | — |
 | 1.198.1 | GAS-CP-R97-147 | 2026-11-19 | Performance: the figures of all sub-projects (budget, hours, costs, KPIs) are read in batches instead of 13 statements per sub-project — Dashboard, KPIs, KPI report, Cash flow and the projects list ask a fraction of the statements; HR pages read the people list once; index for the last movement of inventory items. | `install/migrate_cp_r97_147_perf_index.sql` |
 | 1.198.0 | GAS-CP-R97-146 | 2026-11-19 | Purchase orders: delivery lots — an order that arrives in several deliveries is divided into lots with their own planned date, transport steps, carrier and lines; lots proposed from the delivery dates of the lines; the step Delivered follows the latest lot; shown per lot on the order, in the lists, on the pipeline and in the sub-project. | `install/migrate_cp_r97_146_po_lots.sql` |

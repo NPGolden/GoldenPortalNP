@@ -3666,3 +3666,9 @@ The single functions read the batch first and fall back to their own statement, 
 - **Lots on a draft:** the card "Delivery lots" is shown on a draft purchase order too; the proposal counts lead times from today while the order is not sent.
 - **Why the lots were missing:** they were shown only on sent orders (R97-146).
 - Cybersecurity: display only; rights unchanged; no database change.
+
+## §433 v1.198.3 (R97-149) — PDF of purchase order / RFQ / delivery note: table over several pages
+
+- Column headers are printed again at the top of every continuation page.
+- The first line of a continuation page is in the body colour and size (the page header left the gold colour active).
+- `po_pdf()` in `app/po.php`, delivery note PDF in `app/dn.php`. No database change. Cybersecurity: document layout only.

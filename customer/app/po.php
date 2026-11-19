@@ -442,7 +442,9 @@ function po_pdf(array $o): string {
     foreach ($L as $l) {
         if ($l['status'] === 'cancelled') continue;
         $desc = $l['description'] . (($l['maker'] || $l['part_no']) ? ' — ' . trim(($l['maker'] ?? '') . ' ' . ($l['part_no'] ?? '')) : '') . ($l['alt_of_code'] ? ' (' . $T('po.pdf_alt_of', ['c' => $l['alt_of_code']]) . ')' : '') . ($l['note'] ? ' · ' . $l['note'] : '');
-        $dw = $cols[2][1] - 3; $lines = $pdf->wrap($desc, $dw); $h = max(5.5, count($lines) * 3.8 + 1.8); $need($h + 2);
+        $dw = $cols[2][1] - 3; $pdf->setFont('R', 8); $lines = $pdf->wrap($desc, $dw); $h = max(5.5, count($lines) * 3.8 + 1.8);
+        if ($y + $h + 2 > 272) { $need($h + 8); $hrow(); }   // R97-149: on a new page the column headers are printed again
+        $pdf->setFont('R', 8); $pdf->setColor($ink);   // … and the text is back to the body colour (the page header leaves gold)
         $x = $Lm; $cells = $isRfq ? [(string)$l['seq'], (string)($l['item_code'] ?: ($l['part_no'] ?: '')), null, stk_qty((float)$l['qty']) . ' ' . $l['unit'], ''] : [(string)$l['seq'], (string)($l['item_code'] ?: ''), null, stk_qty((float)$l['qty']) . ' ' . $l['unit'], $m($l['unit_price'] !== null ? (float)$l['unit_price'] : null) . ((float)$l['discount_pct'] > 0 ? ' −' . rtrim(rtrim(number_format((float)$l['discount_pct'], 2, '.', ''), '0'), '.') . '%' : ''), $m($l['line_total'] !== null ? (float)$l['line_total'] : null)];
         if ($hasDlv) array_splice($cells, 4, 0, [$dlv($l)]);
         foreach ($cols as $i => [$hh, $w, $al]) { if ($cells[$i] === null) { $yy = $y + 3.8; foreach ($lines as $ln) { $pdf->text($x + 1.5, $yy, $ln); $yy += 3.8; } } else $pdf->text($al === 'R' ? $x + $w - 1.5 : $x + 1.5, $y + 3.8, mb_substr($cells[$i], 0, 30), $al); $x += $w; }
