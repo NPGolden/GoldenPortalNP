@@ -82,7 +82,7 @@ if editable:
     ver = editable[0]
     if ver["attributes"]["versionString"] != version_string and ver["attributes"]["appStoreState"] in ("PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED", "METADATA_REJECTED", "INVALID_BINARY"):
         req("PATCH", f"/appStoreVersions/{ver['id']}", json={"data": {"type": "appStoreVersions", "id": ver["id"], "attributes": {"versionString": version_string}}})
-    req("PATCH", f"/appStoreVersions/{ver['id']}", json={"data": {"type": "appStoreVersions", "id": ver["id"], "attributes": {"releaseType": META.get("releaseType", "MANUAL")}}})
+    req("PATCH", f"/appStoreVersions/{ver['id']}", json={"data": {"type": "appStoreVersions", "id": ver["id"], "attributes": {"releaseType": META.get("releaseType", "MANUAL"), "copyright": META.get("copyright", "2026 Golden A/S")}}})
 else:
     ver = req("POST", "/appStoreVersions", json={"data": {"type": "appStoreVersions", "attributes": {"platform": "IOS", "versionString": version_string, "releaseType": META.get("releaseType", "MANUAL")}, "relationships": {"app": rel("apps", aid)}}})["data"]
 vid = ver["id"]; log("version", version_string, ver["attributes"]["appStoreState"], vid)
