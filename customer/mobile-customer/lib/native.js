@@ -30,7 +30,7 @@ window.Native = (function () {
       const challenge = crypto.getRandomValues(new Uint8Array(32));
       let credId = null; try { credId = localStorage.getItem("gcu.webauthn"); } catch (e) {}
       if (!credId) {
-        const cred = await navigator.credentials.create({ publicKey: { challenge, rp: { name: "Golden A/S Portal" }, user: { id: new TextEncoder().encode(await deviceId()), name: "customer", displayName: "Customer" }, pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }], authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" }, timeout: 60000 } });
+        const cred = await navigator.credentials.create({ publicKey: { challenge, rp: { name: "Golden A/S Customer" }, user: { id: new TextEncoder().encode(await deviceId()), name: "customer", displayName: "Customer" }, pubKeyCredParams: [{ type: "public-key", alg: -7 }, { type: "public-key", alg: -257 }], authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" }, timeout: 60000 } });
         credId = btoa(String.fromCharCode(...new Uint8Array(cred.rawId))); try { localStorage.setItem("gcu.webauthn", credId); } catch (e) {}
         return true;
       }

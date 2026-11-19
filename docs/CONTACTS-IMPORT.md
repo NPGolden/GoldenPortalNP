@@ -3679,3 +3679,10 @@ The single functions read the batch first and fall back to their own statement, 
 - Client version 1.0.7 (`lib/api.js`, cache name in `sw.js`) so installed web apps fetch the new icon; the Android / iOS shells take the launcher icon from `icon-1024.png` at the next store build.
 - Google Play listing of `gr.goldenas.customer` uses the same icon and a feature graphic with the logo.
 - No database change. Cybersecurity: image files only; no code path, right or data changed.
+
+## §435 v1.198.5 (R97-151) — Customer app named Golden A/S Customer; dependency alerts closed
+
+- Name: `mobile-native/apps.json` appName (launcher label of the Android / iOS shells), `manifest.webmanifest` name, page title, `app.name` in the three languages, passkey relying-party display name. Client 1.0.8.
+- Cybersecurity: GitHub showed 2 critical Dependabot alerts. Source: `docs-R68/capacitor-customer/package.json`, an archived prototype pinned to `@capacitor/android` / `@capacitor/ios` 6.1.2 (advisory: remote content can be loaded at the app origin through the internal HTTP proxy path). The store builds never used it — they are built from `mobile-native/` on Capacitor 8.6, where `npm audit` reports 0 vulnerabilities. The archive file is renamed `package.R68-archive.json.txt` so it is no longer read as a manifest.
+- Test tooling of the customer client: `@playwright/test` ^1.56.0 (the pinned 1.47.2 had a high advisory on browser download without certificate verification; development machines only).
+- No database change; no effect on performance.
