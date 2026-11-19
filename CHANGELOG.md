@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.196.0** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.196.1** (build 2026-11-18). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.196.1 | GAS-CP-R97-143 | 2026-11-19 | Purchase order document (PDF): a column Delivery per line — the date promised by the supplier, else the lead time in days, else the date the line is needed; shown when at least one line has it. | — |
 | 1.196.0 | GAS-CP-R97-142 | 2026-11-19 | Purchase orders: a cancelled order or request for quotation can be restored by Procurement, with a reason — it returns to the state it had (draft, sent or confirmed), its lines open again and the requisition lines are booked as ordered again; refused when a line was meanwhile ordered on another order. | — |
 | 1.195.4 | GAS-CP-R97-141 | 2026-11-19 | Purchase orders and requisitions: the filters are remembered — coming back to the list from an order, the menu or another tab shows the previous selection; supplier, vessel, purpose and search follow between the tabs; a Clear button returns to the defaults. | — |
 | 1.195.3 | GAS-CP-R97-140 | 2026-11-19 | Filters: every drop-down of a filter bar with four or more entries is a type-to-search list (it was only from nine entries), so the Vessel and Supplier filters of the purchase orders accept typing; a list can be marked to be always searchable. | — |

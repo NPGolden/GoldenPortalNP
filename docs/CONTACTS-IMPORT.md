@@ -3591,3 +3591,9 @@ The page on screen stays the internal version for staff.
 - **Not covered:** an order whose balance was cancelled after a partial receipt (status Received).
 - **Supplier:** not informed automatically.
 - **Cybersecurity:** same right as Cancel, checked on the server; reason and user are written to the order log; no database change.
+
+## §427 v1.196.1 (R97-143) — Purchase order PDF: delivery per line
+
+- Column **Delivery** on the purchase order PDF (`po_pdf`), between Qty and Unit price: promised date → lead time "N days" → needed date → empty.
+- Printed only when at least one line carries one of the three; the description column narrows from 78 to 56 mm.
+- RFQ document unchanged. No database change. Cybersecurity: the document shows only data already on the order page; no new access.

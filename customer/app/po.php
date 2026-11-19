@@ -433,6 +433,10 @@ function po_pdf(array $o): string {
     $y = $yy + 2;
     // lines
     $cols = $isRfq ? [['#', 8, 'L'], [$T('stk.code'), 30, 'L'], [$T('prq.desc'), 96, 'L'], [$T('prq.qty'), 22, 'R'], [$T('po.pdf_price'), 24, 'R']] : [['#', 8, 'L'], [$T('stk.code'), 28, 'L'], [$T('prq.desc'), 78, 'L'], [$T('prq.qty'), 20, 'R'], [$T('po.unit_price'), 22, 'R'], [$T('po.pdf_total'), 24, 'R']];
+    // R97-143: delivery time per line — the promised date, else the lead time in days, else the date the line is needed
+    $dlv = fn(array $l) => !empty($l['promised_date']) ? fmt_date($l['promised_date']) : ($l['lead_days'] !== null ? (int)$l['lead_days'] . ' ' . $T('po.days') : (!empty($l['need_date']) ? fmt_date($l['need_date']) : ''));
+    $hasDlv = !$isRfq && (bool) array_filter($L, fn($l) => $l['status'] !== 'cancelled' && $dlv($l) !== '');
+    if ($hasDlv) { $cols[2][1] = 56; array_splice($cols, 4, 0, [[$T('po.delivery'), 22, 'L']]); }
     $hrow = function () use ($pdf, $cols, $navy, $head, $Lm, &$y) { $pdf->setFont('B', 7.5); $pdf->setColor($head); $pdf->rect($Lm, $y, array_sum(array_column($cols, 1)), 6, 'F'); $pdf->setColor($navy); $x = $Lm; foreach ($cols as [$h, $w, $al]) { $pdf->text($al === 'R' ? $x + $w - 1.5 : $x + 1.5, $y + 4.2, $h, $al); $x += $w; } $y += 6; };
     $need(20); $hrow(); $pdf->setFont('R', 8); $pdf->setColor($ink);
     foreach ($L as $l) {
@@ -440,6 +444,7 @@ function po_pdf(array $o): string {
         $desc = $l['description'] . (($l['maker'] || $l['part_no']) ? ' — ' . trim(($l['maker'] ?? '') . ' ' . ($l['part_no'] ?? '')) : '') . ($l['alt_of_code'] ? ' (' . $T('po.pdf_alt_of', ['c' => $l['alt_of_code']]) . ')' : '') . ($l['note'] ? ' · ' . $l['note'] : '');
         $dw = $cols[2][1] - 3; $lines = $pdf->wrap($desc, $dw); $h = max(5.5, count($lines) * 3.8 + 1.8); $need($h + 2);
         $x = $Lm; $cells = $isRfq ? [(string)$l['seq'], (string)($l['item_code'] ?: ($l['part_no'] ?: '')), null, stk_qty((float)$l['qty']) . ' ' . $l['unit'], ''] : [(string)$l['seq'], (string)($l['item_code'] ?: ''), null, stk_qty((float)$l['qty']) . ' ' . $l['unit'], $m($l['unit_price'] !== null ? (float)$l['unit_price'] : null) . ((float)$l['discount_pct'] > 0 ? ' −' . rtrim(rtrim(number_format((float)$l['discount_pct'], 2, '.', ''), '0'), '.') . '%' : ''), $m($l['line_total'] !== null ? (float)$l['line_total'] : null)];
+        if ($hasDlv) array_splice($cells, 4, 0, [$dlv($l)]);
         foreach ($cols as $i => [$hh, $w, $al]) { if ($cells[$i] === null) { $yy = $y + 3.8; foreach ($lines as $ln) { $pdf->text($x + 1.5, $yy, $ln); $yy += 3.8; } } else $pdf->text($al === 'R' ? $x + $w - 1.5 : $x + 1.5, $y + 3.8, mb_substr($cells[$i], 0, 30), $al); $x += $w; }
         $y += $h; $pdf->setColor($line); $pdf->setLineWidth(0.2); $pdf->line($Lm, $y, $Lm + array_sum(array_column($cols, 1)), $y); $pdf->setColor($ink);
     }
