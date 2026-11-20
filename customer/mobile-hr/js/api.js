@@ -1,7 +1,7 @@
 /* Golden HR — API client for the portal module /customer/api/v1 (JWT access + rotating refresh), app "hr" (GAS-CP-R74-001).
  * Same transport as Golden PM (customer/mobile-pm/js/api.js); routes under /hr/app/*. No mock mode: HR data is never faked. */
 window.API = (() => {
-  const VERSION = "1.0.5";
+  const VERSION = "1.1.0";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   const tok = { get access() { try { return sessionStorage.getItem("ghr.at"); } catch (e) { return null; } }, set access(v) { try { v ? sessionStorage.setItem("ghr.at", v) : sessionStorage.removeItem("ghr.at"); } catch (e) {} },
     get refresh() { try { return localStorage.getItem("ghr.rt"); } catch (e) { return null; } }, set refresh(v) { try { v ? localStorage.setItem("ghr.rt", v) : localStorage.removeItem("ghr.rt"); } catch (e) {} } };
@@ -26,6 +26,13 @@ window.API = (() => {
       }
       throw e;
     }
+  }
+  /* R97-156: a binary document (the CV of a candidate) with the same token handling; the bytes stay in memory */
+  async function blob(path) {
+    const go = () => fetch(`${BASE}${path}`, { headers: { "X-App": "hr", "X-App-Version": VERSION, "X-Lang": I18N.get(), "Cache-Control": "no-store", Authorization: `Bearer ${tok.access}` }, cache: "no-store" });
+    let res = await go(); if (res.status === 401 && tok.refresh) { await refreshOnce(); res = await go(); }
+    if (!res.ok) { let data = {}; try { data = await res.json(); } catch (e) {} const err = new Error(data.error || `HTTP ${res.status}`); err.status = res.status; err.data = data; throw err; }
+    return res.blob();
   }
   /* passkeys — identical to Golden PM (R71-001 / R71-003) */
   const pkB64 = { enc: (buf) => btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, ""), dec: (s) => Uint8Array.from(atob(String(s).replace(/-/g, "+").replace(/_/g, "/") + "===".slice((String(s).length + 3) % 4)), (c) => c.charCodeAt(0)) };
@@ -59,6 +66,12 @@ window.API = (() => {
     inbox: () => call("GET", "/hr/app/inbox"), history: (year) => call("GET", `/hr/app/history?year=${year}`),
     people: () => call("GET", "/hr/app/people"), away: (from, to) => call("GET", `/hr/app/away?from=${from}&to=${to}`), balances: (year) => call("GET", `/hr/app/balances?year=${year}`),
     threads: () => call("GET", "/hr/app/threads"), thread: (pid) => call("GET", `/hr/app/thread/${pid}`), send: (pid, body) => call("POST", "/hr/app/send", { person_id: pid, body }),
+    /* R97-156 — live lists, not stored on the phone */
+    today: () => call("GET", "/hr/app/today"), recruiting: () => call("GET", "/hr/app/recruiting"), application: (id) => call("GET", `/hr/app/application/${id}`), cvBlob: (id) => blob(`/hr/app/cv/${id}`),
+    appStatus: (id, body) => call("POST", `/hr/app/application/${id}/status`, body), appEval: (id, body) => call("POST", `/hr/app/application/${id}/evaluation`, body), interviewStatus: (id, status) => call("POST", `/hr/app/interview/${id}/status`, { status }),
+    jds: () => call("GET", "/hr/app/jds"), jdDecide: (id, body) => call("POST", `/hr/app/jd/${id}/decide`, body), year: () => call("GET", "/hr/app/year"), yearTick: (body) => call("POST", "/hr/app/year/tick", body),
+    expiring: (days) => call("GET", `/hr/app/expiring?days=${days}`), equipment: () => call("GET", "/hr/app/equipment"), eqDoc: (id) => call("GET", `/hr/app/equipment/doc/${id}`),
+    eqReceive: (id, body) => call("POST", `/hr/app/equipment/doc/${id}/receive`, body), eqPaper: (id, body) => call("POST", `/hr/app/equipment/doc/${id}/paper`, body),
     sync: (ops) => call("POST", "/sync", { ops }), pushToken: (token, service) => call("POST", "/devices/push-token", { token, service }),
   };
 })();

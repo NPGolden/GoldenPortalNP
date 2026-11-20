@@ -31,7 +31,7 @@ final class PortalHR {
 
     public static function me(array $u): array {
         $m = Portal::me($u); $c = self::counts($u);
-        return array_replace($m, ['hr' => true, 'totp_enabled' => !empty($u['totp_enabled']), 'min_app_version' => api_setting('api_min_version_hr', API_APPS['hr']), 'counts' => $c]);
+        return array_replace($m, ['hr' => true, 'totp_enabled' => !empty($u['totp_enabled']), 'min_app_version' => api_setting('api_min_version_hr', API_APPS['hr']), 'counts' => $c, 'today' => class_exists('PortalHRMore') ? (function () use ($u, $c) { try { return PortalHRMore::today($u, $c); } catch (Throwable $e) { return null; } })() : null]);   // R97-156
     }
     public static function counts(array $u): array {
         $inbox = self::inbox($u);

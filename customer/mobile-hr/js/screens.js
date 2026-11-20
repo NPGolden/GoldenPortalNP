@@ -46,7 +46,7 @@ window.SCREENS = (() => {
     UI.chrome(false);
     return { html: `<div class="login"><img class="logo" src="img/logo.png" alt=""><h1 style="text-align:center">${t("lock.title")}</h1><p class="muted" style="text-align:center">${t("lock.lede")}</p>
       <button class="btn gold" id="unlock">${t("lock.unlock")}</button><button class="btn line" id="out">${t("lock.signout")}</button></div>`, bind(root) {
-      const go = async () => { if (await UI.biometric()) { UI.unlock(); location.hash = "#/inbox"; } };
+      const go = async () => { if (await UI.biometric()) { UI.unlock(); location.hash = "#/today"; } };
       root.querySelector("#unlock").onclick = go; root.querySelector("#out").onclick = () => UI.signOut();
       setTimeout(go, 300);
     } };

@@ -3716,3 +3716,30 @@ The single functions read the batch first and fall back to their own statement, 
 - `customer/views/payables.php`: tile «Awaiting my approval» (five tiles, `kpi--5`) and the option in the Status filter of the requests tab.
 - Language keys `si.k_mine`, `si.k_mine_hint`, `dash.pay_approve` in en, el, it, bg, uk — 12 426 keys each.
 - No database change (index `ix_sir_status` serves the query). Cybersecurity: read-only lists limited by the existing decision rights; the status list in the SQL comes from fixed values, not from the request; no new right, no new action.
+
+## §440 v1.201.0 (R97-156) — Golden HR 1.1.0: Today, recruiting, job descriptions, HR year, expiring documents, equipment
+
+**Server** — `customer/api/v1/lib/portal_hr_more.php` (`PortalHRMore`), loaded in `bootstrap.php`; the modules `mailer`, `pmt`, `rcr`, `jd`, `hry`, `hre` are loaded on first use only (the other apps do not load them). Gate unchanged: `PortalHR::allowed()` on every request (HR scope, Owner, CEO).
+
+| Route | What |
+|---|---|
+| `GET /hr/app/today` (also `today` in `GET /me`) | counts only |
+| `GET /hr/app/recruiting` | open vacancies with counts per stage, candidates in process (max 300), planned interviews, evaluation criteria, labels |
+| `GET /hr/app/application/{id}` | candidate card: contact, cover note, HR notes, evaluations, interviews |
+| `GET /hr/app/cv/{id}` | the CV streamed (`rcr_cv_stream`), `no-store`, logged as `cv_view` in `rc_log`, 60 / minute |
+| `POST /hr/app/application/{id}/status` | shortlisted · interview · offer · rejected (reason required); `from` guards against a change made in the portal (409); step-up; `rcr_application_decide()` |
+| `POST /hr/app/application/{id}/evaluation` | `rcr_eval_save()` |
+| `POST /hr/app/interview/{id}/status` | done · no_show · cancelled; `rcr_interview_status()` |
+| `GET /hr/app/jds`, `POST /hr/app/jd/{id}/decide` | job descriptions in review with steps and content; `jd_approve()` / `jd_reject()`; step-up |
+| `GET /hr/app/year`, `POST /hr/app/year/tick` | `hry_cycle()`, `hry_tick_from_post()` |
+| `GET /hr/app/expiring?days=30..120` | contracts, training certificates, work permits, equipment |
+| `GET /hr/app/equipment`, `GET /hr/app/equipment/doc/{id}` | `hre_waiting()`, list with lines |
+| `POST /hr/app/equipment/doc/{id}/receive`, `/paper` | `hre_receive_from_post()`, `hre_accept($id, $paperName)`; step-up |
+
+Not sent to the app: screening answers, IP / user agent of a candidate, CV path, salary or payroll data. «Hired» is portal-only (it creates the employee card).
+
+**Client** — `customer/mobile-hr` 1.1.0: `js/more.js` (`HRX`: today, recruiting, candidate, cv, jds, jd, year, expiring, equipment, eqdoc), `js/pdfview.js` + `vendor/pdf.min.js`, `vendor/pdf.worker.min.js` (pdf.js 4.4.168, Apache 2.0, served from this origin — the app's CSP `script-src 'self'` / `worker-src 'self'` is unchanged, no CDN). Tabs: Today · Inbox · Recruiting · Messages · More; screens without a tab (People, Calendar, Balances…) get the back button. The live lists are kept in memory only (45 s) and are dropped when the app locks; nothing new is written to IndexedDB except the Today counts inside `me`. Texts: EN, EL, IT (128 keys); UK / BG fall back to EN.
+
+No database change. No push notifications yet: the portal stores the device token but has no sender (needs an Apple push key).
+
+Cybersecurity: every write goes through the portal's own functions (rights, logs, retention clock unchanged); decisions on candidates, job descriptions and equipment use the authenticator step-up; rate limits per user; CV views logged; candidate data not persisted on the device. Proposal: make the authenticator (or a passkey) mandatory for accounts that use Golden HR, because without one the step-up is skipped.

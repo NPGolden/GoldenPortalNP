@@ -71,6 +71,23 @@ try {
         case $method === 'GET' && $path === '/hr/app/threads': Response::json(PortalHR::threads());
         case $method === 'GET' && preg_match('#^/hr/app/thread/(\d+)$#', $path, $mm): Response::json(PortalHR::thread((int)$mm[1]));
         case $method === 'POST' && $path === '/hr/app/send': RateLimit::check('sync', 'u' . $u['id'], 60); Response::json(PortalHR::send($u, $body), 201);
+        /* R97-156 Golden HR 1.1.0 — served live, nothing of it is kept on the phone */
+        case $method === 'GET' && $path === '/hr/app/today': Response::json(PortalHRMore::today($u));
+        case $method === 'GET' && $path === '/hr/app/recruiting': Response::json(PortalHRMore::recruiting());
+        case $method === 'GET' && preg_match('#^/hr/app/application/(\d+)$#', $path, $mm): Response::json(PortalHRMore::application((int)$mm[1]));
+        case $method === 'GET' && preg_match('#^/hr/app/cv/(\d+)$#', $path, $mm): RateLimit::check('api', 'cv' . $u['id'], 60); PortalHRMore::cv((int)$mm[1]);
+        case $method === 'POST' && preg_match('#^/hr/app/application/(\d+)/status$#', $path, $mm): RateLimit::check('decide', 'u' . $u['id'], 30); Response::json(PortalHRMore::appStatus($u, (int)$mm[1], $body));
+        case $method === 'POST' && preg_match('#^/hr/app/application/(\d+)/evaluation$#', $path, $mm): RateLimit::check('sync', 'u' . $u['id'], 60); Response::json(PortalHRMore::appEvaluation($u, (int)$mm[1], $body), 201);
+        case $method === 'POST' && preg_match('#^/hr/app/interview/(\d+)/status$#', $path, $mm): RateLimit::check('sync', 'u' . $u['id'], 60); Response::json(PortalHRMore::interviewStatus((int)$mm[1], $body));
+        case $method === 'GET' && $path === '/hr/app/jds': Response::json(PortalHRMore::jds());
+        case $method === 'POST' && preg_match('#^/hr/app/jd/(\d+)/decide$#', $path, $mm): RateLimit::check('decide', 'u' . $u['id'], 30); Response::json(PortalHRMore::jdDecide($u, (int)$mm[1], $body));
+        case $method === 'GET' && $path === '/hr/app/year': Response::json(PortalHRMore::year());
+        case $method === 'POST' && $path === '/hr/app/year/tick': RateLimit::check('sync', 'u' . $u['id'], 60); Response::json(PortalHRMore::yearTick($body));
+        case $method === 'GET' && $path === '/hr/app/expiring': Response::json(PortalHRMore::expiring((int)($_GET['days'] ?? 60)));
+        case $method === 'GET' && $path === '/hr/app/equipment': Response::json(PortalHRMore::equipment());
+        case $method === 'GET' && preg_match('#^/hr/app/equipment/doc/(\d+)$#', $path, $mm): Response::json(PortalHRMore::eqDoc((int)$mm[1]));
+        case $method === 'POST' && preg_match('#^/hr/app/equipment/doc/(\d+)/receive$#', $path, $mm): RateLimit::check('decide', 'u' . $u['id'], 30); Response::json(PortalHRMore::eqReceive($u, (int)$mm[1], $body));
+        case $method === 'POST' && preg_match('#^/hr/app/equipment/doc/(\d+)/paper$#', $path, $mm): RateLimit::check('decide', 'u' . $u['id'], 30); Response::json(PortalHRMore::eqPaper($u, (int)$mm[1], $body));
         case $method === 'GET' && $path === '/pm/projects': Response::json(PortalPM::projects($u));
         case $method === 'GET' && preg_match('#^/pm/subproject/(\d+)$#', $path, $m): Response::json(PortalPM::subproject($u, (int)$m[1]));
         case $method === 'GET' && $path === '/pm/drawings': Response::json(['items' => PortalPM::drawings(isset($_GET['project']) && $_GET['project'] !== '' ? (int)$_GET['project'] : null)]);

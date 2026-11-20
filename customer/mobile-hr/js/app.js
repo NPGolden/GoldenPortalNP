@@ -9,13 +9,14 @@ window.UI = (() => {
   function chrome(on, title, tab, back) {
     $("#hdr").classList.toggle("hidden", !on); $("#tabs").classList.toggle("hidden", !on); $("#sync").classList.toggle("hidden", !on);
     if (title) $("#title").textContent = title;
+    if (on && tab && !document.querySelector(`#tabs a[data-tab="${tab}"]`)) back = true;   // 1.1.0: People, Calendar and the other screens without a tab of their own are opened from Today
     $("#back").classList.toggle("show", !!back);
     document.querySelectorAll("#tabs a").forEach((a) => a.classList.toggle("on", a.dataset.tab === tab));
     const me = SCREENS.ctx.me || {}; $("#branch").textContent = me.home_branch || "HR"; badges();
   }
   function badges() {
     const c = ((SCREENS.ctx.me || {}).counts) || {}; const set = (id, n) => { const b = $(id); if (!b) return; b.textContent = n > 99 ? "99+" : String(n); b.classList.toggle("hidden", !n); };
-    set("#b-inbox", c.inbox || 0); set("#b-msg", c.unread || 0);
+    set("#b-inbox", c.inbox || 0); set("#b-msg", c.unread || 0); const td = (SCREENS.ctx.me || {}).today || {}; set("#b-rec", (td.recruiting && (td.recruiting.new + td.recruiting.interviews_today)) || 0); set("#b-today", ((td.jd && td.jd.mine) || 0) + ((td.year && td.year.late) || 0) + ((td.equipment && td.equipment.returns) || 0));
   }
   function toast(msg, ms) { const tst = $("#toast"); tst.textContent = msg; tst.classList.remove("hidden"); clearTimeout(tst._t); tst._t = setTimeout(() => tst.classList.add("hidden"), ms || 2200); }
   const goLinks = (root) => root.querySelectorAll("[data-go]").forEach((el) => el.onclick = (e) => { e.preventDefault(); e.stopPropagation(); location.hash = el.dataset.go; });
@@ -38,7 +39,7 @@ window.UI = (() => {
 
   // ---- lock (mandatory)
   const isLocked = () => { try { return localStorage.getItem("ghr.locked") !== "0"; } catch (e) { return true; } };
-  const lockNow = () => { try { localStorage.setItem("ghr.locked", "1"); } catch (e) {} };
+  const lockNow = () => { try { localStorage.setItem("ghr.locked", "1"); } catch (e) {} if (window.HRX) HRX.wipe(); };   // 1.1.0: the live lists (candidates) leave the memory when the app locks
   const unlock = () => { try { localStorage.setItem("ghr.locked", "0"); } catch (e) {} lastActive = Date.now(); };
   async function biometricAvailable() { try { if (window.Capacitor && Capacitor.Plugins && Capacitor.Plugins.BiometricAuth) return true; return !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable()); } catch (e) { return false; } }
   async function biometric() {
@@ -52,7 +53,7 @@ window.UI = (() => {
     } catch (e) { toast(I18N.t("lock.cancelled")); return false; }
     toast(I18N.t("lock.need_bio"), 4000); return false;   // no platform authenticator at all: the app cannot be used (HR data)
   }
-  async function afterSignIn() { await SYNC.run(); unlock(); location.hash = "#/inbox"; }
+  async function afterSignIn() { await SYNC.run(); unlock(); location.hash = "#/today"; }
   async function signOut() { await API.logout(); await DB.wipe(); lockNow(); location.hash = "#/login"; }
   const touch = () => { lastActive = Date.now(); };
   ["click", "keydown", "touchstart", "scroll"].forEach((ev) => document.addEventListener(ev, touch, { passive: true }));
@@ -76,13 +77,15 @@ window.UI = (() => {
     [/^#\/inbox(\?.*)?$/, (m, q) => SCREENS.inbox(q)], [/^#\/people$/, () => SCREENS.people()], [/^#\/person\/(\d+)$/, (m) => SCREENS.person(m[1])],
     [/^#\/messages$/, () => SCREENS.messages()], [/^#\/thread\/(\d+)$/, (m) => SCREENS.thread(m[1])],
     [/^#\/calendar(\?.*)?$/, (m, q) => SCREENS.calendar(q)], [/^#\/balances$/, () => SCREENS.balances()], [/^#\/more$/, () => SCREENS.more()],
+    [/^#\/today$/, () => HRX.today()], [/^#\/recruiting(\?.*)?$/, (m, q) => HRX.recruiting(q)], [/^#\/candidate\/(\d+)$/, (m) => HRX.candidate(m[1])], [/^#\/cv\/(\d+)$/, (m) => HRX.cv(m[1])],   // R97-156
+    [/^#\/jds$/, () => HRX.jds()], [/^#\/jd\/(\d+)$/, (m) => HRX.jd(m[1])], [/^#\/year$/, () => HRX.year()], [/^#\/expiring$/, () => HRX.expiring()], [/^#\/equipment$/, () => HRX.equipment()], [/^#\/eqdoc\/(\d+)$/, (m) => HRX.eqdoc(m[1])],
     [/^#\/parts$/, () => PARTS.list({})], [/^#\/parts\?(.*)$/, (m) => PARTS.list(query("#/parts?" + m[1]))], [/^#\/parts\/new$/, () => PARTS.create()], [/^#\/parts\/(\d+)$/, (m) => PARTS.one(+m[1])],   // R82-003
   ];
   const query = (h) => { const q = {}; const i = h.indexOf("?"); if (i < 0) return q; new URLSearchParams(h.slice(i + 1)).forEach((v, k) => { q[k] = v; }); return q; };
   async function render() {
     if (rendering) { pending = true; return; } rendering = true;
     try {
-      let h = location.hash || "#/inbox";
+      let h = location.hash || "#/today";
       if (!API.signedIn && h !== "#/login") { location.hash = "#/login"; return; }
       if (API.signedIn && h !== "#/lock" && h !== "#/login" && isLocked()) { location.hash = "#/lock"; return; }
       await SCREENS.load();
@@ -92,7 +95,7 @@ window.UI = (() => {
     } finally { rendering = false; if (pending) { pending = false; render(); } }
   }
   window.addEventListener("hashchange", render);
-  $("#back").onclick = () => history.length > 1 ? history.back() : (location.hash = "#/inbox");
+  $("#back").onclick = () => history.length > 1 ? history.back() : (location.hash = "#/today");
   (async () => {
     if ("serviceWorker" in navigator && location.protocol !== "file:") { try { UPD.init(await navigator.serviceWorker.register("sw.js")); } catch (e) {} }
     await DB.open(); I18N.apply(); await SYNC.refreshCount();

@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.200.0';
+const CP_VERSION = '1.201.0';
 const CP_BUILD   = '2026-11-20';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-156', 'version' => '1.201.0', 'date' => '2026-11-20', 'title' => 'Golden HR 1.1.0 (iPhone app for the HR role, Owner and CEO): new opening screen Today with everything that waits; Recruiting (candidates by stage, CV reader, move or reject with reason, evaluations with scores, interviews); job-description approvals (department manager, General Manager, CEO); the HR year with delays; documents that expire in 30 / 60 / 90 days (contracts, training certificates, work permits, equipment); equipment handover and issue lists. Candidates are read live and never stored on the phone; decisions are confirmed with the authenticator code.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-155', 'version' => '1.200.0', 'date' => '2026-11-20', 'title' => 'Payables: payment requests waiting for your approval are shown so that none is forgotten — a line each in «Needs your attention» on the home page, a red counter on Payables in the side menu, and a tile and filter «Awaiting my approval» on the Payables page (Management: with Management and with Accounting; Accounting: with Accounting).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-154', 'version' => '1.199.1', 'date' => '2026-11-20', 'title' => 'Sign-in page: under «Need access?» a link «Request portal access» opens the Customer Portal access page of the website (goldenas.com.gr/portal-access.html).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-153', 'version' => '1.199.0', 'date' => '2026-11-20', 'title' => 'Mobile apps on the home page and the sign-in page: QR codes and store links of the Golden A/S apps for Android (Google Play) and iPhone (App Store, shown as in review at Apple until released), with the link to each web app. Customers see Golden A/S Customer; personnel also see Service, PM and HR (HR as web app).', 'db' => null, 'check' => null],

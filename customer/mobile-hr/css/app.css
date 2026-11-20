@@ -231,3 +231,22 @@ table.week { width: 100%; border-collapse: collapse; } .week tr { border-bottom:
 input[type=search] { margin-bottom: 8px; }
 .row2 > .btn.sm { flex: 1; }
 .c-navy { --c: var(--navy); }
+
+/* 1.1.0 (R97-156) — Today tiles, recruiting, job descriptions, CV reader */
+.tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 8px 0 14px; }
+.tile { position: relative; border: 1px solid var(--line); border-radius: 12px; padding: 12px 12px 10px; background: #fff; min-height: 96px; cursor: pointer; border-top: 4px solid var(--navy); display: flex; flex-direction: column; }
+.tile:active { background: var(--light); }
+.tile .ico { font-size: 18px; line-height: 1; }
+.tile .n { position: absolute; right: 12px; top: 8px; font-size: 26px; color: var(--navy); font-weight: 800; }
+.tile .l { font-weight: 700; color: var(--navy); margin-top: 8px; font-size: 14px; }
+.tile small { color: var(--grey); font-size: 11px; line-height: 1.35; margin-top: 2px; }
+.tile.t-gold { border-top-color: var(--gold); } .tile.t-gold .n { color: #8A6D12; }
+.tile.t-red { border-top-color: var(--red); } .tile.t-red .n { color: var(--red); }
+.tabs a i.g-msg { width: 20px; height: 14px; background: none; border: 2.5px solid var(--grey); border-radius: 3px; border-top-width: 5px; }
+.tabs a.on i.g-msg { border-color: var(--navy); }
+p.pre { white-space: pre-wrap; font-size: 14px; margin: 4px 0 10px; }
+ul.lines { margin: 4px 0 10px; padding-left: 18px; font-size: 14px; } ul.lines li { margin: 3px 0; }
+.pdfbox { background: #E9ECF1; border-radius: 10px; padding: 6px; min-height: 60vh; } .pdfbox canvas { display: block; background: #fff; margin: 0 0 6px; border-radius: 4px; }
+label.check { display: flex; align-items: center; gap: 8px; font-size: 14px; margin: 10px 0; } label.check input { width: auto; margin: 0; }
+.seg.sc button { border: 1px solid var(--line); margin: 0 2px; background: #fff; } .seg.sc button.on { background: var(--gold); color: var(--navy); border-color: var(--gold); }
+.card.c-navy { --c: var(--navy); }
