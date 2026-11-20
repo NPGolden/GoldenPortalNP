@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.206.0';
+const CP_VERSION = '1.206.1';
 const CP_BUILD   = '2026-11-20';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-165', 'version' => '1.206.1', 'date' => '2026-11-20', 'title' => 'Sub-project › Process: the production flow of every production order of the sub-project is shown below the stage percentages', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-164', 'version' => '1.206.0', 'date' => '2026-11-20', 'title' => 'Production: process flow indicator on the list and on the order, as on the purchase orders — design, production, subcontracting, FAT, delivered, HAT, commissioning, SAT, closed, with units, documents and late warnings per step', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-163', 'version' => '1.205.1', 'date' => '2026-11-20', 'title' => 'Production › Subcontracting: the counter on the tab and the four figures count only lines of existing orders — deleting a production order removes its subcontract lines', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-162', 'version' => '1.205.0', 'date' => '2026-11-20', 'title' => 'Projects: filter by open issues (with open issues, status Open, status In progress, overdue, high priority) and the list of open issues inside every project of the list, beside Offers and Tasks, without opening the project', 'db' => null, 'check' => null],

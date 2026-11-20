@@ -138,6 +138,12 @@ layout_head($sp['code'] . ' · ' . $sp['name'], 'projects');
           </div>
         <?php endforeach; ?>
       </div>
+      <?php if (function_exists('pd_flow') && function_exists('hrf_html') && pd_has()): try { $pfO = all("SELECT o.* FROM production_orders o WHERE o.subproject_id = ? AND o.status <> 'cancelled' ORDER BY o.id", [$id]); } catch (Throwable $e) { $pfO = []; } if ($pfO): $pfD = pd_flow_data(array_column($pfO, 'id')); /* R97-165: the production flow of the orders of this sub-project */ ?>
+      <div id="sp-pd-flow" style="margin-top:16px;border-top:1px solid var(--cp-line,#E3E7EC);padding-top:12px;">
+        <h3 style="margin:0 0 8px;">🏭 <?= tt('pd.flow_title') ?></h3>
+        <?php foreach ($pfO as $po_): ?><p style="margin:10px 0 6px;"><a class="mono" href="<?= url('production_order', ['id' => (int)$po_['id']]) ?>"><b><?= e($po_['po_no']) ?></b></a> <?= e((string)$po_['title']) ?> <?= pd_status_pill((string)$po_['status']) ?> <span class="hint"><?= (int)$po_['pct'] ?> %</span></p><?= hrf_html(pd_flow($po_, $pfD[(int)$po_['id']] ?? null)) ?><?php endforeach; ?>
+      </div>
+      <?php endif; endif; ?>
       <div class="grid grid-2" style="margin-top:16px;">
         <div class="field"><label for="sp_status"><?= tt('th.status') ?></label>
           <select id="sp_status" name="status">

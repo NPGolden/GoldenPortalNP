@@ -12743,4 +12743,5 @@ Cordiali saluti,
 'pdf.n_sub' => '{n} righe · {o} fuori · {a} accettate',
 'pdf.n_rejected' => '{n} respinte al controllo',
 'pdf.n_sub_late' => '{n} in ritardo dal fornitore',
+'pd.flow_title' => 'Flusso di produzione',
 ];

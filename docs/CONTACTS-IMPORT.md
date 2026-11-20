@@ -3808,3 +3808,9 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Language keys: 8 `pdf.n_*` in en, el, it, bg, uk — 12 559 keys each. No database change.
 - Cybersecurity: read-only, staff only (the views already require it), ids cast to integers, no amounts in the indicator. Performance: three queries per list page, independent of the number of orders.
 
+## §449 Sub-project › Process — production flow of its production orders (GAS-CP-R97-165, v1.206.1)
+
+- `views/subproject.php`: block `#sp-pd-flow` below the stage editor — for every production order of the sub-project that is not cancelled: number, title, status, % and `hrf_html(pd_flow())` in full; evidence through `pd_flow_data()` (three queries for all orders). Staff only (inside the staff branch of Process).
+- Language key `pd.flow_title` in en, el, it, bg, uk — 12 560 keys each. No database change.
+- Cybersecurity: read-only, parameterised query, no amounts.
+

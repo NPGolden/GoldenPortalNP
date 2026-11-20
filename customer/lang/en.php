@@ -12743,4 +12743,5 @@ Best regards,
 'pdf.n_sub' => '{n} lines · {o} out · {a} accepted',
 'pdf.n_rejected' => '{n} rejected at inspection',
 'pdf.n_sub_late' => '{n} late at the supplier',
+'pd.flow_title' => 'Production flow',
 ];
