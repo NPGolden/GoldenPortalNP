@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.205.0';
+const CP_VERSION = '1.205.1';
 const CP_BUILD   = '2026-11-20';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-163', 'version' => '1.205.1', 'date' => '2026-11-20', 'title' => 'Production › Subcontracting: the counter on the tab and the four figures count only lines of existing orders — deleting a production order removes its subcontract lines', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-162', 'version' => '1.205.0', 'date' => '2026-11-20', 'title' => 'Projects: filter by open issues (with open issues, status Open, status In progress, overdue, high priority) and the list of open issues inside every project of the list, beside Offers and Tasks, without opening the project', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-161', 'version' => '1.204.0', 'date' => '2026-11-20', 'title' => 'My approvals: one register per member of staff over every approval process — what waits for my decision (leave, timesheets, training, requisitions, supplier payments, engineering extra hours, BOMs, job descriptions, newsletters, equipment lists, HR assistant flows, portal change requests) and where my own requests stand; menu item with counter. Recruiting: HR adds a CV to the talent pool by hand (GEN number, CV kept with the pool, assignable to a vacancy)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-160', 'version' => '1.203.0', 'date' => '2026-11-20', 'title' => 'HR newsletters: HR › Newsletters prepares newsletters for schools and recruiting partners with the newsletter module of Web Sales (same template, mailbox, daily ceiling and approval by CEO / General Manager), with the results of every issue; a register of schools and recruiting partners with their contact persons; five new organisation types. HR issues and sales issues are kept apart.', 'db' => 'install/migrate_cp_r97_160_nl_dept.sql', 'check' => 'r98y'],

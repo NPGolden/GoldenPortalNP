@@ -1,8 +1,8 @@
 {
     "name": "Golden A/S Customer Portal",
-    "version": "1.205.0",
+    "version": "1.205.1",
     "build": "2026-11-20",
-    "generated_at": "2026-11-20T09:00:28+00:00",
+    "generated_at": "2026-11-20T11:54:18+00:00",
     "count": 914,
     "files": {
         ".htaccess": {
@@ -10,8 +10,8 @@
             "size": 181
         },
         "CHANGELOG.md": {
-            "sha256": "5899f5fa9df5b36b398c56f319aa3c5ceb72994038e964199e0cdbdb38435352",
-            "size": 198964
+            "sha256": "e9c45af0b2d031e292c58bb3a9b972348c1b57cd004d856ea565c974dfefd811",
+            "size": 199237
         },
         "README.md": {
             "sha256": "aaac31c2a33e616de5c3dc217d5e2f5b7803f116db21e3d4a01cfb1b96e4b974",
@@ -894,8 +894,8 @@
             "size": 8076
         },
         "customer/app/pd.php": {
-            "sha256": "0c63994de4d0e00b886dd678b003e1432a2094af2cb8ec7becc3370c8db55c1d",
-            "size": 60721
+            "sha256": "a7a73ef32100b674665c89dfbecc290f4a7f59d0d0bbf7e958f337969ac2e471",
+            "size": 61550
         },
         "customer/app/pdf.php": {
             "sha256": "d25050f7ea9576acf78ad5b0244686c4cebc557d0065f8ccc591b969e72426f4",
@@ -1054,8 +1054,8 @@
             "size": 6873
         },
         "customer/app/version.php": {
-            "sha256": "456a8ef573e53c363f95d8b377c1c1dc6e6f9951c5833b978b5d336e5c54a814",
-            "size": 258238
+            "sha256": "848963e20f069b34c1aaa54f26bd0b2822ac6edcaaed031c086f17099b79ab5d",
+            "size": 258541
         },
         "customer/app/vh.php": {
             "sha256": "06dc02b03a9840b99ce9860942ba8ccf34169b2141ab182a1c34c10716cd6321",
@@ -2518,8 +2518,8 @@
             "size": 39353
         },
         "customer/views/_manual_golden.php": {
-            "sha256": "74ef6f8a8987464e5c5a350725783f85f71d1c4a3650f6cbb33fda563674eab0",
-            "size": 415890
+            "sha256": "fd969149b4cc45cfd7ffce1402d518f419710122c903791d268e27f660b82d42",
+            "size": 416211
         },
         "customer/views/_manual_hr.php": {
             "sha256": "1d8c84004bc9f656d5d96374b79824e75b5a85ee01be9234f77b9b5b2a937f0e",

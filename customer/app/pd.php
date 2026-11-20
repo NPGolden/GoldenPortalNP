@@ -234,7 +234,10 @@ function ps_list(array $f = []): array {
     return all(PS_SELECT . ' WHERE ' . implode(' AND ', $w) . " ORDER BY FIELD(ps.status, 'rejected','delivered','inspected','in_production','ordered','planned','accepted','cancelled'), ps.due_at IS NULL, ps.due_at, ps.id", $a);
 }
 function ps_suppliers(): array { return ps_has() ? array_column(all('SELECT DISTINCT supplier FROM production_subs ORDER BY supplier'), 'supplier') : []; }
-function ps_counts(): array { $c = []; if (ps_has()) foreach (all('SELECT status, COUNT(*) n FROM production_subs GROUP BY status') as $r) $c[$r['status']] = (int)$r['n']; return $c; }
+/** Lines per status — counted over the same orders and projects as the list (R97-163: a line of a deleted order is never counted). */
+function ps_counts(): array { $c = []; if (ps_has() && is_staff()) { [$sc, $sa] = scope_sql('p'); foreach (all("SELECT ps.status, COUNT(*) n FROM production_subs ps JOIN production_orders o ON o.id = ps.order_id JOIN projects p ON p.id = o.project_id WHERE {$sc} GROUP BY ps.status", $sa) as $r) $c[$r['status']] = (int)$r['n']; } return $c; }
+/** Subcontract lines whose production order no longer exists (orders deleted before v1.205.1). */
+function ps_orphans_purge(): int { if (!ps_has()) return 0; try { return q('DELETE ps FROM production_subs ps LEFT JOIN production_orders o ON o.id = ps.order_id WHERE o.id IS NULL')->rowCount(); } catch (Throwable $e) { return 0; } }
 /** Create / update a subcontract line from the order page. */
 function ps_save_from_post(): int {
     if (!ps_has()) throw new RuntimeException(t('ps.need_db'));
@@ -481,6 +484,8 @@ function pd_file_remove(int $pfId): int {
 }
 function pd_delete(int $id): void {
     require_cp_admin(); $o = pd_get($id); if (!$o) throw new RuntimeException(t('err.notfound'));
+    if (ps_has()) q('DELETE FROM production_subs WHERE order_id = ?', [$id]);   // R97-163: the subcontract lines go with the order (and any line left by an earlier deletion)
+    ps_orphans_purge();
     q('DELETE FROM production_files WHERE order_id = ?', [$id]); q('DELETE FROM production_units WHERE order_id = ?', [$id]); q('DELETE FROM production_log WHERE order_id = ?', [$id]); q('DELETE FROM production_orders WHERE id = ?', [$id]);
 }
 /** Candidate drawings of the project to link (Files tab, kind drawing) not yet on the order. */

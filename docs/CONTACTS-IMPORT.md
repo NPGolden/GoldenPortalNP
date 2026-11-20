@@ -3794,3 +3794,9 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Language keys: 10 `pr.f_iss_*` / `pr.iss_*` in en, el, it, bg, uk — 12 551 keys each. No database change.
 - Cybersecurity: the filter value is checked against a fixed list and never reaches SQL as text; project ids are cast to integers; a customer sees only issues marked external, in the filter as in the list. Performance: one extra query per page of projects.
 
+## §447 Production › Subcontracting — counter counted lines of deleted orders (GAS-CP-R97-163, v1.205.1)
+
+- Cause: `pd_delete()` removed the order, its units, files and log but left its rows in `production_subs`; `ps_counts()` counted the table alone while `ps_list()` joins orders and projects — tab pill and KPIs showed 1, the list 0.
+- Fix (`customer/app/pd.php`): `ps_counts()` counts over the same joins and project scope as the list; `pd_delete()` deletes the order's subcontract lines; `ps_orphans_purge()` removes lines left by earlier deletions (runs with the next order deletion). No database change, no new language keys.
+- Cybersecurity: the counter now respects the viewer's project scope like the list (it counted all projects before).
+

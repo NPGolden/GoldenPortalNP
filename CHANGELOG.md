@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.205.0** (build 2026-11-20). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.205.1** (build 2026-11-20). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.205.1 | GAS-CP-R97-163 | 2026-11-20 | Production › Subcontracting: the counter on the tab and the four figures count only lines of existing orders — deleting a production order removes its subcontract lines | — |
 | 1.205.0 | GAS-CP-R97-162 | 2026-11-20 | Projects: filter by open issues (with open issues, status Open, status In progress, overdue, high priority) and the list of open issues inside every project of the list, beside Offers and Tasks, without opening the project | — |
 | 1.204.0 | GAS-CP-R97-161 | 2026-11-20 | My approvals: one register per member of staff over every approval process — what waits for my decision (leave, timesheets, training, requisitions, supplier payments, engineering extra hours, BOMs, job descriptions, newsletters, equipment lists, HR assistant flows, portal change requests) and where my own requests stand; menu item with counter. Recruiting: HR adds a CV to the talent pool by hand (GEN number, CV kept with the pool, assignable to a vacancy) | — |
 | 1.203.0 | GAS-CP-R97-160 | 2026-11-20 | HR newsletters: HR › Newsletters prepares newsletters for schools and recruiting partners with the newsletter module of Web Sales (same template, mailbox, daily ceiling and approval by CEO / General Manager), with the results of every issue; a register of schools and recruiting partners with their contact persons; five new organisation types. HR issues and sales issues are kept apart. | `install/migrate_cp_r97_160_nl_dept.sql` |
