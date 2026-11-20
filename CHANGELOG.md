@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.208.0** (build 2026-11-20). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.209.0** (build 2026-11-20). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.209.0 | GAS-CP-R97-168 | 2026-11-20 | Administration › Users: tick accounts in the list (the selection is kept from page to page) and give them all the same starting password in one step — each must choose its own password at the next sign-in and is signed out of the portal and the apps; written in the sign-in log as Password given by administrator | `install/migrate_cp_r97_168_pw_reset_outcome.sql` |
 | 1.208.0 | GAS-CP-R97-167 | 2026-11-20 | First sign-in: an account marked "Must change password at next sign-in" (chosen per user by the administrator, ticked for new accounts) sets its own password before anything opens — portal and all four apps; password rules; apps ask once per device to turn on Face ID / fingerprint and show the safety habits (Service 0.7.1, PM 1.0.12, HR 1.1.2, Customer 1.0.9) | `install/migrate_cp_r97_167_must_change_pw.sql` |
 | 1.207.0 | GAS-CP-R97-166 | 2026-11-20 | Community: a post can carry a YouTube video — new kind Video for everybody and an optional video link on posts, polls and photos; the player loads only when Play is pressed (privacy-enhanced YouTube) | `install/migrate_cp_r97_166_soc_video.sql` |
 | 1.206.1 | GAS-CP-R97-165 | 2026-11-20 | Sub-project › Process: the production flow of every production order of the sub-project is shown below the stage percentages | — |

@@ -114,11 +114,23 @@ layout_head(t('au.title'), 'admin_users');
 
 <div class="card">
   <h2><?= tt('au.people') ?> <span class="hint" style="display:inline;margin-left:8px;"><?= e(t('au.showing', ['from' => $total ? ($page - 1) * $per + 1 : 0, 'to' => min($total, $page * $per), 'n' => $total])) ?></span> <span class="hint" style="display:inline;margin-left:8px;"><?= e(t('au.edit_hint')) ?></span></h2>
+  <?php $bulkPw = function_exists('pwc_has') && pwc_has(); if ($bulkPw && $users): /* R97-168: one starting password for the ticked accounts */ ?>
+  <form method="post" action="<?= url('admin_users', $qs) ?>" id="au-bulk" data-lock data-confirm="" data-confirm-tpl="<?= tt('pwc.bulk_confirm') ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('pwc.bulk_go') ?>" data-confirm-cancel="<?= tt('btn.cancel') ?>" autocomplete="off" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:10px 12px;margin:0 0 12px;border:1px solid var(--gold);border-radius:10px;background:var(--cp-gold-dim);">
+    <?= csrf_field() ?><input type="hidden" name="action" value="cu_bulk_pw"><input type="hidden" name="ids" value="">
+    <b style="color:var(--navy-text);">🔑 <?= tt('pwc.bulk_h') ?></b>
+    <span class="pill pill--gold" id="au-bulk-n" data-tpl="<?= tt('pwc.bulk_sel') ?>"><?= e(t('pwc.bulk_sel', ['n' => 0])) ?></span>
+    <div class="field" style="margin:0;width:190px;"><input name="password" type="password" required minlength="10" maxlength="200" autocomplete="new-password" placeholder="<?= tt('pwc.bulk_pass') ?>" aria-label="<?= tt('pwc.bulk_pass') ?>"></div>
+    <div class="field" style="margin:0;width:190px;"><input name="password2" type="password" required minlength="10" maxlength="200" autocomplete="new-password" placeholder="<?= tt('pwc.bulk_again') ?>" aria-label="<?= tt('pwc.bulk_again') ?>" data-mismatch="<?= tt('pwc.err_match') ?>"></div>
+    <button class="btn btn--sm" type="submit" id="au-bulk-go" disabled><?= tt('pwc.bulk_go') ?></button>
+    <button class="linkbtn" type="button" id="au-bulk-clear"><?= tt('pwc.bulk_clear') ?></button>
+    <span class="hint" style="flex-basis:100%;margin:0;"><?= tt('pwc.bulk_lede') ?></span>
+  </form>
+  <?php endif; ?>
   <div class="table-scroll"><table class="acct">
-    <thead><tr><th><?= tt('au.name') ?></th><th><?= tt('au.role') ?></th><th><?= tt('rp.customer') ?></th><th><?= tt('au.golden_role') ?></th><?php if ($discs): ?><th><?= tt('disc.one') ?> / <?= tt('au.manager') ?></th><?php endif; ?><th><?= tt('au.locale') ?></th><th><?= tt('au.newpass') ?></th><th><?= tt('au.twofa') ?></th><th><?= tt('th.status') ?></th><th></th></tr></thead>
+    <thead><tr><th><?php if (!empty($bulkPw)): ?><label class="chk" style="display:inline-flex;margin:0 8px 0 0;vertical-align:middle;" title="<?= tt('pwc.bulk_page') ?>"><input type="checkbox" id="au-bulk-all" aria-label="<?= tt('pwc.bulk_page') ?>"></label><?php endif; ?><?= tt('au.name') ?></th><th><?= tt('au.role') ?></th><th><?= tt('rp.customer') ?></th><th><?= tt('au.golden_role') ?></th><?php if ($discs): ?><th><?= tt('disc.one') ?> / <?= tt('au.manager') ?></th><?php endif; ?><th><?= tt('au.locale') ?></th><th><?= tt('au.newpass') ?></th><th><?= tt('au.twofa') ?></th><th><?= tt('th.status') ?></th><th></th></tr></thead>
     <tbody><?php foreach ($users as $x): $isMe = (int)$x['id'] === (int)$u['id']; $f = 'acct' . (int)$x['id']; $g = 'tog' . (int)$x['id']; ?>
       <tr>
-        <td><div style="display:flex;align-items:center;gap:8px;"><?= avatar_html((int)$x['id'], (string)$x['full_name'], 28) ?><input form="<?= $f ?>" name="full_name" value="<?= e($x['full_name']) ?>" maxlength="120" required></div><span class="hint"><?= e($x['email']) ?></span></td>
+        <td><div style="display:flex;align-items:center;gap:8px;"><?php if (!empty($bulkPw)): ?><label class="chk" style="margin:0;<?= $isMe ? 'visibility:hidden;' : '' ?>" title="<?= tt('pwc.bulk_pick') ?>"><input type="checkbox" class="js-bulk" value="<?= (int)$x['id'] ?>" aria-label="<?= tt('pwc.bulk_pick') ?>: <?= e($x['full_name']) ?>"<?= $isMe ? ' disabled' : '' ?>></label><?php endif; ?><?= avatar_html((int)$x['id'], (string)$x['full_name'], 28) ?><input form="<?= $f ?>" name="full_name" value="<?= e($x['full_name']) ?>" maxlength="120" required></div><span class="hint"><?= e($x['email']) ?></span></td>
         <td><?php if ($isMe): ?><?= $accessPill($x['role']) ?><input form="<?= $f ?>" type="hidden" name="role" value="admin"><?php else: ?>
             <select form="<?= $f ?>" name="role" data-nosearch><?php foreach (['customer', 'staff', 'admin'] as $r): ?><option value="<?= $r ?>"<?= $sel($r, $x['role']) ?>><?= e(t('role.' . $r)) ?></option><?php endforeach; ?></select><?php endif; ?></td>
         <td><select form="<?= $f ?>" name="customer_id" data-nosearch data-lazy="customers" data-empty="<?= tt('au.nocustomer') ?>"><?php $cv = (int)($x['customer_id'] ?? 0); ?><option value="<?= $cv ?: '' ?>"><?= $cv ? e($customersById[$cv] ?? '') : tt('au.nocustomer') ?></option></select></td>
@@ -187,6 +199,32 @@ layout_head(t('au.title'), 'admin_users');
     opts(sel.dataset.lazy).forEach(function (p) { if (String(p[0]) === self) return; var o = document.createElement('option'); o.value = p[0]; o.textContent = p[1]; if (String(p[0]) === cur) o.selected = true; frag.appendChild(o); });
     sel.innerHTML = ''; sel.appendChild(frag); if (cur !== '') sel.value = cur; }
   document.querySelectorAll('select[data-lazy]').forEach(function (sel) { ['mousedown', 'focus', 'keydown', 'touchstart'].forEach(function (ev) { sel.addEventListener(ev, function () { fill(sel); }, { passive: true }); }); });
+})();
+</script>
+<script nonce="<?= csp_nonce() ?>">
+(function () {   // R97-168: accounts ticked for one starting password — the selection is kept from page to page (this browser tab only)
+  var form = document.getElementById('au-bulk'); if (!form) return;
+  var KEY = 'gas.au.bulk', sel = [];
+  try { var a = JSON.parse(sessionStorage.getItem(KEY) || '[]'); if (Array.isArray(a)) sel = a.map(String).filter(function (s) { return /^\d+$/.test(s); }); } catch (e) {}
+  function keep() { try { sessionStorage.setItem(KEY, JSON.stringify(sel)); } catch (e) {} }
+  if (/[?&]bulk_done=1(&|$)/.test(location.search)) { sel = []; keep(); try { history.replaceState(null, '', location.href.replace(/([?&])bulk_done=1(&|$)/, '$1').replace(/[?&]$/, '')); } catch (e) {} }
+  var boxes = Array.prototype.slice.call(document.querySelectorAll('input.js-bulk:not([disabled])')), all = document.getElementById('au-bulk-all');
+  var n = document.getElementById('au-bulk-n'), go = document.getElementById('au-bulk-go'), ids = form.querySelector('input[name=ids]');
+  var p1 = form.querySelector('input[name=password]'), p2 = form.querySelector('input[name=password2]');
+  function paint() {
+    boxes.forEach(function (b) { b.checked = sel.indexOf(b.value) >= 0; });
+    if (all) all.checked = boxes.length > 0 && boxes.every(function (b) { return b.checked; });
+    n.textContent = n.dataset.tpl.replace('{n}', sel.length);
+    form.dataset.confirm = form.dataset.confirmTpl.replace('{n}', sel.length);
+    ids.value = sel.join(','); go.disabled = sel.length === 0;
+  }
+  function set(id, on) { var i = sel.indexOf(id); if (on && i < 0) sel.push(id); if (!on && i >= 0) sel.splice(i, 1); }
+  boxes.forEach(function (b) { b.addEventListener('change', function () { set(b.value, b.checked); keep(); paint(); }); });
+  if (all) all.addEventListener('change', function () { boxes.forEach(function (b) { set(b.value, all.checked); }); keep(); paint(); });
+  document.getElementById('au-bulk-clear').addEventListener('click', function () { sel = []; keep(); paint(); });
+  function same() { p2.setCustomValidity(p2.value !== '' && p1.value !== p2.value ? p2.dataset.mismatch : ''); }
+  p1.addEventListener('input', same); p2.addEventListener('input', same);
+  paint();
 })();
 </script>
 <?php layout_foot(); ?>

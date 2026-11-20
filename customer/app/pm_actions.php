@@ -1477,6 +1477,29 @@ function pm_handle_action(string $action, string $page): bool {
             cp_setting_set('sec_passkey_android_sha256', mb_substr(implode(',', $shaOut), 0, 400));
             flash('good', t('sec.saved')); redirect('admin_log', ['_r' => uniqid()]);
         }
+        case 'cu_bulk_pw': {   // R97-168: one starting password for the ticked accounts — each must choose its own at the next sign-in
+            $me = require_mgmt();
+            if (!function_exists('pwc_has') || !pwc_has()) throw new RuntimeException(t('err.noaccess'));
+            $ids = [];
+            foreach (explode(',', (string)($_POST['ids'] ?? '')) as $raw) { $i = (int)trim($raw); if ($i > 0 && $i !== (int)$me['id']) $ids[$i] = $i; }   // never the own account
+            if (!$ids) throw new RuntimeException(t('pwc.bulk_none'));
+            if (count($ids) > 300) throw new RuntimeException(t('pwc.bulk_max', ['n' => 300]));
+            $pass = (string)($_POST['password'] ?? '');
+            if (!hash_equals($pass, (string)($_POST['password2'] ?? ''))) throw new RuntimeException(t('pwc.err_match'));
+            if (strlen($pass) < 10 || strlen($pass) > 200) throw new RuntimeException(t('a.pass_len'));
+            if (!preg_match('/\p{L}/u', $pass) || !preg_match('/\d/', $pass)) throw new RuntimeException(t('pwc.err_mix'));
+            @set_time_limit(180);
+            $done = 0;
+            foreach (all('SELECT id, email FROM customer_users WHERE id IN (' . implode(',', array_map('intval', $ids)) . ')') as $x) {
+                q('UPDATE customer_users SET password_hash = ?, failed_logins = 0, locked_until = NULL, must_change_pw = 1 WHERE id = ?', [password_hash($pass, PASSWORD_DEFAULT), (int)$x['id']]);   // one salt per account
+                if (function_exists('sec_revoke_all')) sec_revoke_all((int)$x['id']);   // open browser sessions and app tokens end
+                login_log((int)$x['id'], (string)$x['email'], 'pw_reset');
+                $done++;
+            }
+            if (!$done) throw new RuntimeException(t('pwc.bulk_none'));
+            flash('good', t('pwc.bulk_done', ['n' => $done]));
+            redirect('admin_users', au_keep() + ['bulk_done' => 1, '_r' => uniqid()]);
+        }
         case 'cu_twofa_reset': {
             require_mgmt();
             $id = (int)$_POST['id'];
