@@ -18,12 +18,13 @@ if (!$st && empty($_GET['f'])) $st = array_values(array_intersect($allSt, ['acti
 $fCustomer = $staff ? (int)($_GET['customer'] ?? 0) : 0;
 $fVessel   = (int)($_GET['vessel'] ?? 0);
 $fPm       = trim((string)($_GET['pm'] ?? ''));
+$fIss      = function_exists('iss_has') && iss_has() && in_array($_GET['iss'] ?? '', ['any', 'open', 'in_progress', 'overdue', 'high'], true) ? (string)$_GET['iss'] : '';   // R97-162
 $openId    = (int)($_GET['open'] ?? 0);
 $fBranch   = $staff && br_has() && br_multi() ? (int)($_GET['branch'] ?? 0) : 0;
 $per       = per_page();
 $pageNo    = max(1, (int)($_GET['page'] ?? 1));
 
-$res   = project_tree_filtered(['status' => $st, 'customer' => $fCustomer, 'vessel' => $fVessel, 'pm' => $fPm, 'branch' => $fBranch, 'q' => $q], $per, ($pageNo - 1) * $per);
+$res   = project_tree_filtered(['status' => $st, 'customer' => $fCustomer, 'vessel' => $fVessel, 'pm' => $fPm, 'branch' => $fBranch, 'q' => $q, 'iss' => $fIss], $per, ($pageNo - 1) * $per);
 $tree  = $res['rows']; $total = $res['total'];
 $pmtC = ($staff && function_exists('pmt_can_view') && pmt_can_view() && $tree) ? pmt_project_counts(array_column($tree, 'id')) : [];   // R93-001 work permits per project
 if ($tree) { $ids_ = array_map('intval', array_column($tree, 'id'));   /* R97-147: per-project figures of the page in batches */
@@ -32,7 +33,8 @@ if ($tree) { $ids_ = array_map('intval', array_column($tree, 'id'));   /* R97-14
     if (function_exists('of_project_prime')) of_project_prime($ids_);
     if (function_exists('bg_prime')) bg_prime(array_merge([], ...array_values(array_map(fn($p_) => array_column($p_['subs'] ?? [], 'id'), $tree)))); }
 $tkOpen = []; if (function_exists('tk_has') && tk_has() && $tree) { [$tkScope, $tkArgs] = tk_scope(); foreach (all("SELECT t.project_id, COUNT(*) n FROM tickets t LEFT JOIN vessels v ON v.id = t.vessel_id WHERE {$tkScope} AND t.project_id IS NOT NULL AND t.status IN ('open','in_progress','waiting_customer') GROUP BY t.project_id", $tkArgs) as $r) $tkOpen[(int)$r['project_id']] = (int)$r['n']; }   // R30-003: open tickets per project
-$keep  = array_filter(['q' => $q, 'st' => $st, 'customer' => $fCustomer, 'vessel' => $fVessel, 'pm' => $fPm, 'branch' => $fBranch, 'per' => $per, 'f' => 1]);
+$keep  = array_filter(['q' => $q, 'st' => $st, 'customer' => $fCustomer, 'vessel' => $fVessel, 'pm' => $fPm, 'branch' => $fBranch, 'iss' => $fIss, 'per' => $per, 'f' => 1]);
+$issBy = $tree && function_exists('iss_open_by_project') ? iss_open_by_project(array_column($tree, 'id')) : [];   // R97-162: open issues of the page, one query
 
 /* option lists, scoped like the data */
 [$scope, $sargs] = scope_sql('p');
@@ -67,7 +69,7 @@ layout_head(t('pr.title'), 'projects');
 </div>
 
 <div class="card card--tight">
-  <form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1.4fr auto <?= $staff ? '1fr ' : '' ?>1fr 1fr <?= $fBranch || ($staff && br_has() && br_multi()) ? 'auto ' : '' ?>auto auto;">
+  <form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1.4fr auto <?= $staff ? '1fr ' : '' ?>1fr 1fr <?= $fBranch || ($staff && br_has() && br_multi()) ? 'auto ' : '' ?><?= function_exists('iss_has') && iss_has() ? 'auto ' : '' ?>auto auto;">
     <input type="hidden" name="p" value="projects"><input type="hidden" name="f" value="1">
     <div class="field">
       <label for="q"><?= tt('pr.search') ?></label>
@@ -105,6 +107,12 @@ layout_head(t('pr.title'), 'projects');
     <div class="field">
       <label for="branch"><?= tt('br.one') ?></label>
       <select id="branch" name="branch"><option value=""><?= tt('flt.any') ?></option><?= br_options($fBranch ?: null) ?></select>
+    </div>
+    <?php endif; ?>
+    <?php if (function_exists('iss_has') && iss_has()): ?>
+    <div class="field">
+      <label for="iss"><?= tt('iss.title') ?></label>
+      <select id="iss" name="iss"><option value=""><?= tt('flt.any') ?></option><?php foreach (['any' => 'pr.f_iss_any', 'open' => 'pr.f_iss_open', 'in_progress' => 'pr.f_iss_prog', 'overdue' => 'pr.f_iss_overdue', 'high' => 'pr.f_iss_high'] as $ik => $il): ?><option value="<?= $ik ?>"<?= $sel($ik, $fIss) ?>><?= tt($il) ?></option><?php endforeach; ?></select>
     </div>
     <?php endif; ?>
     <div class="field">
@@ -152,6 +160,18 @@ layout_head(t('pr.title'), 'projects');
       </summary>
       <div class="subs">
         <?php if ($pof && $pof['n'] && of_visible()): ?><details class="ot-tree fold" data-fold="offers-<?= (int)$p['id'] ?>"><summary class="fold-sum"><span class="fold-tw">▸</span> <?= tt('of.title') ?> <span class="count"><?= (int)$pof['n'] ?></span></summary><?php $otRows = of_list(['project' => (int)$p['id']]); $otShowSub = true; $otNewUrl = url('offer_edit', ['project' => $p['id']]); require __DIR__ . '/_offers_table.php'; ?></details><?php elseif (of_has() && is_staff() && of_visible()): ?><p class="hint ot-none"><?= tt('of.none_here') ?> <a href="<?= url('offer_edit', ['project' => $p['id']]) ?>">+ <?= tt('of.new') ?></a></p><?php endif; ?>
+        <?php if (!empty($issBy[(int)$p['id']])): $iR = $issBy[(int)$p['id']]; $iO = count(array_filter($iR, fn($x) => $x['status'] === 'open')); $iD = count(array_filter($iR, 'iss_overdue')); $iSub0 = (int)($p['subs'][0]['id'] ?? 0); /* R97-162 */ ?>
+        <details class="ot-tree fold"<?= $fIss ? ' open' : '' ?> data-fold="issues-<?= (int)$p['id'] ?>"><summary class="fold-sum"><span class="fold-tw">▸</span> <?= tt('iss.title') ?> <span class="count"><?= count($iR) ?></span> <span class="hint" style="font-weight:400;"><?= e(t('pr.iss_sum', ['o' => $iO, 'p' => count($iR) - $iO])) ?><?= $iD ? ' · <b style="color:#b3261e;">' . $iD . ' ' . tt('iss.overdue') . '</b>' : '' ?></span></summary>
+          <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('iss.no') ?></th><th><?= tt('pr.iss_issue') ?></th><th><?= tt('pr.iss_sub') ?></th><?php if (iss_has_cat()): ?><th><?= tt('iss.category') ?></th><?php endif; ?><th><?= tt('iss.side') ?></th><th><?= tt('pr.iss_assignee') ?></th><th><?= tt('iss.due') ?></th><th><?= tt('th.status') ?></th></tr></thead><tbody>
+          <?php foreach (array_slice($iR, 0, 15) as $ii): $iSid = (int)($ii['subproject_id'] ?: $iSub0); $iUrl = $iSid ? url('subproject', ['id' => $iSid, 'tab' => 'issues', 'ist' => '']) . '#iss-' . (int)$ii['id'] : ''; ?><tr>
+            <td class="mono" style="white-space:nowrap;"><?= $iUrl ? '<a href="' . e($iUrl) . '">' . e($ii['issue_no'] ?? '#' . $ii['id']) . '</a>' : e($ii['issue_no'] ?? '#' . $ii['id']) ?></td>
+            <td><?= e($ii['title']) ?> <?= iss_priority_pill((string)$ii['priority']) ?></td><td class="hint"><?= e(trim(($ii['sub_code'] ?? '') . ' ' . ($ii['sub_name'] ?? '')) ?: '—') ?></td>
+            <?php if (iss_has_cat()): ?><td><?= !empty($ii['category']) ? iss_cat_pill((string)$ii['category']) : '—' ?></td><?php endif; ?>
+            <td><?= e(iss_sides()[$ii['owner_side']] ?? '') ?></td><td><?= e((string)($ii['assignee'] ?? '') ?: '—') ?></td>
+            <td style="white-space:nowrap;<?= iss_overdue($ii) ? 'color:#b3261e;font-weight:700;' : '' ?>"><?= $ii['due_on'] ? e(fmt_date($ii['due_on'])) : '—' ?></td><td><?= iss_status_pill((string)$ii['status']) ?></td>
+          </tr><?php endforeach; ?></tbody></table></div>
+          <?php if (count($iR) > 15): ?><p class="hint"><?= e(t('pr.iss_more', ['n' => count($iR) - 15])) ?></p><?php endif; ?>
+        </details><?php endif; ?>
         <?php if (function_exists('td_card_html') && ($tdc = td_card_html(['project' => (int)$p['id']], url('task_edit', ['project' => $p['id']]), true, 6)) !== ''): ?><div class="ot-tree td-tree"><?= $tdc ?></div><?php endif; ?>
         <?php if (function_exists('tk_card_html') && !empty($tkOpen[(int)$p['id']]) && ($tkc = tk_card_html((int)$p['id'], url('ticket_edit', ['project' => $p['id']]), 6)) !== ''): ?><div class="ot-tree tk-tree"><?= $tkc ?></div><?php endif; ?>
         <?php if ($staff && function_exists('pmt_card_html') && !empty($pmtC[(int)$p['id']]) && ($pmc = pmt_card_html((int)$p['id'], pmt_can_edit((int)$p['id']) ? url('permit_edit', ['project' => $p['id']]) : null, 6)) !== ''): ?><div class="ot-tree tk-tree"><?= $pmc ?></div><?php endif; ?>

@@ -138,6 +138,10 @@ function project_tree_filtered(array $f, int $limit, int $offset): array {
     if (!empty($f['vessel']))   { $w[] = 'p.vessel_id = ?';   $args[] = (int)$f['vessel']; }
     if (!empty($f['pm']))       { $w[] = 'p.project_manager = ?'; $args[] = $f['pm']; }
     if (!empty($f['branch']) && function_exists('br_filter_sql')) { [$bs, $ba] = br_filter_sql('p', (int)$f['branch']); $w[] = $bs; array_push($args, ...$ba); }   // R24-003
+    if (!empty($f['iss']) && function_exists('iss_has') && iss_has()) {   // R97-162: projects by their open issues (the viewer's visibility applies)
+        $ic = ['any' => "ix.status <> 'closed'", 'open' => "ix.status = 'open'", 'in_progress' => "ix.status = 'in_progress'", 'overdue' => "ix.status <> 'closed' AND ix.due_on IS NOT NULL AND ix.due_on < CURDATE()", 'high' => "ix.status <> 'closed' AND ix.priority = 'high'"][$f['iss']] ?? null;
+        if ($ic) $w[] = "EXISTS (SELECT 1 FROM sp_issues ix WHERE ix.project_id = p.id AND {$ic} AND " . iss_vis_sql('ix') . ')';
+    }
     if (($f['q'] ?? '') !== '') {
         $like = '%' . $f['q'] . '%';
         $w[] = '(p.project_code LIKE ? OR p.erp_code LIKE ? OR p.name LIKE ? OR v.name LIKE ? OR c.name LIKE ? OR p.project_manager LIKE ?

@@ -3786,3 +3786,11 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Language keys: 49 `apr.*`, 19 `rc.man_*` in en, el, it, bg, uk — 12 541 keys each. No database change.
 - Cybersecurity: the register adds no decision path and shows only lines the module's own rights function lets the user decide (or his own requests); HR assistant flows are listed by number and type only, confidential flows never under My requests; SQL is parameterised, status lists are constants. The manual CV form requires the HR right, the consent confirmation and a real PDF / Word file. Proposal: a weekly e-mail digest of approvals waiting longer than 7 days, and an escalation to the deputy when the approver is on leave.
 
+## §446 Projects — filter by open issues and the list of open issues per project (GAS-CP-R97-162, v1.205.0)
+
+- `project_tree_filtered()` (`customer/app/pm.php`): filter `iss` = `any` | `open` | `in_progress` | `overdue` | `high` → `EXISTS` on `sp_issues` with the viewer's visibility (`iss_vis_sql('ix')`).
+- `iss_open_by_project(array $ids)` (`customer/app/iss.php`): the open issues of all projects of the page in one query, grouped per project.
+- `views/projects.php`: field Open issues in the filter bar (kept by paging and export links through `$keep`); block Open issues per project (fold `issues-<id>`, 15 lines, the rest by note) between Offers and Tasks; opens by itself when the filter is set.
+- Language keys: 10 `pr.f_iss_*` / `pr.iss_*` in en, el, it, bg, uk — 12 551 keys each. No database change.
+- Cybersecurity: the filter value is checked against a fixed list and never reaches SQL as text; project ids are cast to integers; a customer sees only issues marked external, in the filter as in the list. Performance: one extra query per page of projects.
+

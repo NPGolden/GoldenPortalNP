@@ -71,6 +71,15 @@ function iss_open_count(?int $projectId, ?int $subId): int {
     if (!iss_has()) return 0;
     return (int) scalar("SELECT COUNT(*) FROM sp_issues i WHERE i.status <> 'closed' AND " . iss_vis_sql() . ' AND ' . ($subId ? 'i.subproject_id = ?' : 'i.project_id = ?'), [$subId ?: $projectId]);
 }
+/** R97-162: the open issues of several projects in one query, grouped per project (Projects page). */
+function iss_open_by_project(array $projectIds): array {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $projectIds)))); if (!$ids || !iss_has()) return [];
+    $o = [];
+    try { foreach (all("SELECT i.*, s.code AS sub_code, s.name AS sub_name, u.full_name AS assignee FROM sp_issues i LEFT JOIN subprojects s ON s.id = i.subproject_id LEFT JOIN customer_users u ON u.id = i.assignee_id
+                        WHERE i.project_id IN (" . implode(',', $ids) . ") AND i.status <> 'closed' AND " . iss_vis_sql() . "
+                        ORDER BY FIELD(i.status,'open','in_progress'), FIELD(i.priority,'high','normal','low'), COALESCE(i.due_on, '9999-12-31'), i.raised_on, i.id") as $i) $o[(int)$i['project_id']][] = $i; } catch (Throwable $e) {}
+    return $o;
+}
 /** Manual entry: create or edit from the sub-project page form. */
 function iss_save(int $projectId, ?int $subId, int $id = 0): int {
     $u = require_login(); if (!iss_has()) throw new RuntimeException(t('iss.need_db'));
