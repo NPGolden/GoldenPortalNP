@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.202.1** (build 2026-11-20). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.203.0** (build 2026-11-20). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.203.0 | GAS-CP-R97-160 | 2026-11-20 | HR newsletters: HR › Newsletters prepares newsletters for schools and recruiting partners with the newsletter module of Web Sales (same template, mailbox, daily ceiling and approval by CEO / General Manager), with the results of every issue; a register of schools and recruiting partners with their contact persons; five new organisation types. HR issues and sales issues are kept apart. | `install/migrate_cp_r97_160_nl_dept.sql` |
 | 1.202.1 | GAS-CP-R97-159 | 2026-11-20 | All tab menus of the portal (Recruiting, Payables, HR, Inventory, Settings and the others) stand on the pale gold band with the gold base line and show the open tab in navy, as on the subproject page; pages whose open tab was not marked at all (for example Recruiting) now mark it. | — |
 | 1.202.0 | GAS-CP-R97-158 | 2026-11-20 | Recruiting: general applications — a CV sent from the website Careers page without a vacancy becomes an applicant record numbered GEN-YYYY-NNNN (CV mandatory, no screening), listed under «General applications» with the same card, evaluations, interviews and 6-month retention; «Assign to a vacancy» on the card moves the candidate into the pipeline of a vacancy and keeps the number. Golden HR 1.1.1 shows them under the filter General. | — |
 | 1.201.1 | GAS-CP-R97-157 | 2026-11-20 | Sign-in page: the sign-in card, the language selector, the «Need access?» line and the Mobile apps block are centred in one column of the same width (the longer access line had pushed the card to the left). | — |

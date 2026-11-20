@@ -3765,3 +3765,13 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 
 - `assets/portal.css`: the band of R97-152 moved from `.tabs.tabs-band` to `.tabs` (all 32 tab menus); the open tab is recognised as `.is-on`, `.on`, `.active` or `aria-current="page"` — `rcr_dashboard.php` and three other views use `.on`, which had no style at all. Dark theme the same way. The class `tabs-band` on the subproject menu is now redundant and harmless.
 - No database change, no view changed. Cybersecurity: style sheet only; nothing to report.
+
+## §444 v1.203.0 (R97-160) — HR newsletters: schools and recruiting partners
+
+- **Database step r98y** — `install/migrate_cp_r97_160_nl_dept.sql`: `nl_issues.dept` (`sales` default, `hr`). Without it the HR page answers "no access" and everything else works as before (`nl_dept_has()`).
+- `customer/app/nl.php`: `NL_HR_GROUPS` (`school`, `rp_agency`, `rp_public`, `rp_assoc`, `rp_training`), `nl_dept()`, `nl_hr_can()` (= `hr_can()`), `nl_can_dept()`, `nl_can_issue()`, `nl_list_url()`, `nl_hr_partners()`, `nl_hr_partner_add_from_post()`; `nl_groups($dept)`, `nl_audience($aud, $site, $dept)` (an HR issue ignores saved lists and website subscribers), `nl_issues($dept)`, `nl_create(…, $dept)`, `nl_copy()` keeps the department.
+- Rights: `nl_handle_action()` lets HR in, then checks every issue against its department (`nl_can_issue`); lists, subscribers, opt-outs and sending settings stay with sales / management (`nl_can()`); `nl_may_send()` uses the issue's department. Approval (`nl_appr_*`), mailbox (`nl_from`), batch, daily ceiling, tracking and unsubscribe are unchanged and shared.
+- `customer/app/ct.php` `co_kinds()`: five new organisation types (`companies.kind` is free text — no database change); labels `co.kind_*`.
+- Views: `hr_newsletters.php` (new; KPIs, create, issues with results, register of schools and partners with quick add), `newsletter.php` (HR issue: HR types as audience, no lists / website topics, breadcrumb to HR), `newsletters.php` (shows sales issues only). Menu: HR › Newsletters (also in the HR-only menu). Page `hr_newsletters` registered in `index.php`.
+- Language keys: 5 `co.kind_*`, 30 `nl.hr_*` in en, el, it, bg, uk — 12 473 keys each.
+- Cybersecurity: no new sending path — an HR issue cannot be sent without the existing approval (author never approves his own issue); HR cannot read sales issues, customer lists or website subscribers; the quick-add form writes through prepared statements and validates the e-mail; the HR audience is limited to the HR organisation types plus addresses typed by hand (visible to the approver, who sees the recipient count).

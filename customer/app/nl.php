@@ -19,6 +19,38 @@ const NL_MAX_RCPT = 5000;
 
 function nl_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'nl_issues'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function nl_can(): bool { return nl_has() && is_staff() && (is_cp_admin() || (function_exists('mgmt_can') && mgmt_can()) || (function_exists('pi_is_sales') && pi_is_sales())); }
+/* ---- R97-160: HR newsletters (schools and recruiting partners) — the same engine, mailbox and approval; an issue belongs to a department.
+ * Sales issues are prepared by sales, HR issues by HR; administrators and management see both. HR issues reach only the HR organisation types
+ * (and addresses typed by hand): never the customer lists or the website subscribers. */
+const NL_HR_GROUPS = ['school', 'rp_agency', 'rp_public', 'rp_assoc', 'rp_training'];
+function nl_dept_has(): bool { static $h = null; if ($h === null) { try { $h = nl_has() && (bool) one("SHOW COLUMNS FROM nl_issues LIKE 'dept'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function nl_dept(?array $I): string { return ($I['dept'] ?? 'sales') === 'hr' ? 'hr' : 'sales'; }
+function nl_hr_can(): bool { return nl_has() && nl_dept_has() && is_staff() && function_exists('hr_can') && hr_can(); }
+function nl_can_dept(string $d): bool { if (!nl_has() || !is_staff()) return false; if (is_cp_admin() || (function_exists('mgmt_can') && mgmt_can())) return true; return $d === 'hr' ? nl_hr_can() : (function_exists('pi_is_sales') && pi_is_sales()); }
+function nl_can_issue(array $I): bool { return nl_can_dept(nl_dept($I)); }
+function nl_list_url(?array $I = null): string { return url(nl_dept($I) === 'hr' ? 'hr_newsletters' : 'newsletters'); }
+/** Organisations of the HR types with their contact persons that have an e-mail — the audience of the HR newsletters. */
+function nl_hr_partners(): array {
+    if (!function_exists('co_has') || !co_has()) return []; $in = "'" . implode("','", NL_HR_GROUPS) . "'"; $roles = co_roles_has(); $out = [];
+    $w = 'co.kind IN (' . $in . ')'; if ($roles) foreach (NL_HR_GROUPS as $k) $w .= " OR FIND_IN_SET('" . $k . "', co.roles)";
+    foreach (all("SELECT co.id, co.name, co.kind, co.country, co.is_active FROM companies co WHERE ($w) ORDER BY co.kind, co.name LIMIT 1000") as $c) { $c['contacts'] = []; $out[(int)$c['id']] = $c; }
+    if ($out) foreach (all('SELECT ct.id, ct.company_id, ct.full_name, ct.position, ct.email FROM contacts ct WHERE ct.is_active = 1 AND ct.company_id IN (' . implode(',', array_keys($out)) . ') ORDER BY ct.full_name') as $p) $out[(int)$p['company_id']]['contacts'][] = $p;
+    return array_values($out);
+}
+/** HR adds a school / recruiting partner and its contact person without opening the contacts register. */
+function nl_hr_partner_add_from_post(): void {
+    if (!nl_hr_can() && !nl_can_dept('hr')) throw new RuntimeException(t('err.noaccess')); if (!function_exists('co_find') || !co_has()) throw new RuntimeException(t('err.noaccess'));
+    $s = fn(string $k, int $max) => mb_substr(trim((string)($_POST[$k] ?? '')), 0, $max);
+    $org = $s('org', 160); $kind = in_array($_POST['kind'] ?? '', NL_HR_GROUPS, true) ? (string)$_POST['kind'] : ''; $email = mb_strtolower($s('email', 190)); $name = $s('contact', 160);
+    if ($org === '' || $kind === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) throw new RuntimeException(t('nl.hr_p_need'));
+    $cid = co_find($org, $kind, true); if (!$cid) throw new RuntimeException(t('nl.hr_p_need'));
+    $co = one('SELECT kind, country' . (co_roles_has() ? ', roles' : '') . ' FROM companies WHERE id = ?', [$cid]);
+    if ($co && !in_array((string)$co['kind'], NL_HR_GROUPS, true) && co_roles_has() && !in_array($kind, explode(',', (string)($co['roles'] ?? '')), true)) q('UPDATE companies SET roles = TRIM(BOTH \',\' FROM CONCAT(COALESCE(roles, \'\'), \',\', ?)) WHERE id = ?', [$kind, $cid]);   // an existing organisation (a customer that is also a school) gets the role, its type stays
+    if ($co && trim((string)($co['country'] ?? '')) === '' && $s('country', 80) !== '') q('UPDATE companies SET country = ? WHERE id = ?', [$s('country', 80), $cid]);
+    if (one('SELECT id FROM contacts WHERE company_id = ? AND LOWER(email) = ?', [$cid, $email])) throw new RuntimeException(t('nl.hr_p_dup'));
+    $u = current_user();
+    q('INSERT INTO contacts (company_id, company, full_name, position, email, is_active, created_by) VALUES (?,?,?,?,?,1,?)', [$cid, $org, $name !== '' ? $name : $org, $s('position', 120) ?: null, $email, (int)($u['id'] ?? 0) ?: null]);
+}
 function nl_can_send(): bool { return nl_has() && is_staff() && (is_cp_admin() || (function_exists('mgmt_can') && mgmt_can())); }
 /* R97-050: two senders. The KYMA newsletter has its own mailbox (nl_from_kyma) and never falls back to the Golden A/S one. */
 function nl_mailbox(string $site = 'golden'): string {
@@ -41,7 +73,7 @@ function nl_token(): string { $a = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefgh
 function nl_base(): string { $b = trim((string) cfg('app.base_url', '')); if ($b === '' || str_contains($b, '127.0.0.1') || str_contains($b, 'localhost')) { $https = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'); $host = preg_replace('/[^A-Za-z0-9.\-:]/', '', (string)($_SERVER['HTTP_HOST'] ?? 'goldensas.com')); $dir = rtrim(dirname((string)($_SERVER['SCRIPT_NAME'] ?? '/customer/index.php')), '/'); $b = ($https ? 'https' : 'http') . '://' . $host . $dir; } return rtrim($b, '/'); }
 function nl_dir(): string { $d = dirname(__DIR__) . '/storage/nl'; if (!is_dir($d)) @mkdir($d, 0750, true); return $d; }
 function nl_pill(string $s): string { return pill(['draft' => 'mute', 'sending' => 'gold', 'sent' => 'green', 'cancelled' => 'bad'][$s] ?? 'mute', t('nl.s_' . $s)); }
-function nl_groups(): array { $g = []; foreach (['customer', 'yard', 'owner', 'management', 'supplier', 'class', 'consultant', 'broker', 'agent'] as $k) $g[$k] = $k === 'customer' ? t('co.role_customer') : t('co.kind_' . $k); return $g; }
+function nl_groups(string $dept = 'sales'): array { $g = []; if ($dept === 'hr') { foreach (NL_HR_GROUPS as $k) $g[$k] = t('co.kind_' . $k); return $g; } foreach (['customer', 'yard', 'owner', 'management', 'supplier', 'class', 'consultant', 'broker', 'agent'] as $k) $g[$k] = $k === 'customer' ? t('co.role_customer') : t('co.kind_' . $k); return $g; }
 function nl_url_ok(string $u): string { $u = trim($u); if ($u === '' || strlen($u) > 600 || !preg_match('#^https?://[^\s<>"\']+$#i', $u)) return ''; return $u; }
 
 /* ---------------------------------------------------------------- issues */
@@ -50,16 +82,19 @@ function nl_issue(int $id): ?array {
     $r['blocks'] = json_decode((string)($r['blocks'] ?? ''), true) ?: []; $r['audience'] = json_decode((string)($r['audience'] ?? ''), true) ?: [];
     return $r;
 }
-function nl_issues(): array {
+function nl_issues(?string $dept = null): array {
+    $w = $dept !== null && nl_dept_has() ? ' WHERE i.dept = ' . db()->quote($dept === 'hr' ? 'hr' : 'sales') : ($dept === 'hr' ? ' WHERE 1 = 0' : '');   // R97-160
     return nl_has() ? all("SELECT i.*, (SELECT COUNT(*) FROM nl_sends s WHERE s.issue_id = i.id) n_rcpt, (SELECT COUNT(*) FROM nl_sends s WHERE s.issue_id = i.id AND s.status = 'sent') n_sent,
         (SELECT COUNT(*) FROM nl_sends s WHERE s.issue_id = i.id AND s.opened_at IS NOT NULL) n_open, (SELECT COUNT(*) FROM nl_sends s WHERE s.issue_id = i.id AND s.clicked_at IS NOT NULL) n_click,
-        (SELECT COUNT(*) FROM nl_sends s WHERE s.issue_id = i.id AND s.unsub_at IS NOT NULL) n_unsub FROM nl_issues i ORDER BY i.id DESC LIMIT 200") : [];
+        (SELECT COUNT(*) FROM nl_sends s WHERE s.issue_id = i.id AND s.unsub_at IS NOT NULL) n_unsub FROM nl_issues i" . $w . " ORDER BY i.id DESC LIMIT 200") : [];
 }
-function nl_create(string $title, string $site = 'golden'): int {
+function nl_create(string $title, string $site = 'golden', string $dept = 'sales'): int {
     $title = mb_substr(trim($title), 0, 200); if ($title === '') throw new RuntimeException(t('nl.need_title')); $u = current_user(); $site = kym_has() ? kym_site($site) : 'golden';
-    $blocks = [['t' => 'h', 'text' => $title], ['t' => 'p', 'text' => ''], ['t' => 'btn', 'label' => t('nl.read_more'), 'url' => KYM_HOME[$site]]];
+    $dept = $dept === 'hr' && nl_dept_has() ? 'hr' : 'sales'; if ($dept === 'hr') $site = 'golden';
+    $blocks = [['t' => 'h', 'text' => $title], ['t' => 'p', 'text' => ''], ['t' => 'btn', 'label' => t($dept === 'hr' ? 'nl.hr_btn' : 'nl.read_more'), 'url' => $dept === 'hr' ? 'https://www.goldenas.com.gr/careers.html' : KYM_HOME[$site]]];
     q('INSERT INTO nl_issues (title, subject, lang, blocks, audience, created_by, created_name) VALUES (?,?,?,?,?,?,?)', [$title, $title, 'en', json_encode($blocks, JSON_UNESCAPED_UNICODE), json_encode(['groups' => [], 'topics' => []]), (int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? '')]);
     $nid = (int) db()->lastInsertId(); if (kym_has()) q('UPDATE nl_issues SET site = ? WHERE id = ?', [$site, $nid]);   // R97-050: an issue belongs to one website
+    if ($dept === 'hr') q("UPDATE nl_issues SET dept = 'hr' WHERE id = ?", [$nid]);
     return $nid;
 }
 function nl_editable(array $I): void { if ($I['status'] !== 'draft') throw new RuntimeException(t('nl.locked')); if (($I['appr_state'] ?? '') === 'pending') throw new RuntimeException(t('nl.ap_locked')); }
@@ -75,20 +110,20 @@ function nl_hash(array $I): string { return sha1((string) json_encode([(string)$
 function nl_appr_state(array $I): string { $s = (string)($I['appr_state'] ?? ''); if ($s === 'approved' && !hash_equals((string)($I['appr_hash'] ?? ''), nl_hash($I))) return ''; return in_array($s, ['pending', 'approved', 'returned'], true) ? $s : ''; }
 function nl_appr_ok(array $I): bool { return !nl_appr_on() || nl_approver() || nl_appr_state($I) === 'approved'; }
 /** May this account launch the issue? Administrators and management as before; with the rule on, also the author once the issue is approved. */
-function nl_may_send(array $I): bool { if (nl_can_send()) return true; $u = current_user(); $me = (int)($u['id'] ?? 0); return nl_can() && nl_appr_on() && nl_appr_state($I) === 'approved' && $me && ($me === (int)($I['created_by'] ?? 0) || $me === (int)($I['appr_req_by'] ?? 0)); }
+function nl_may_send(array $I): bool { if (nl_can_send()) return true; $u = current_user(); $me = (int)($u['id'] ?? 0); return nl_can_issue($I) && nl_appr_on() && nl_appr_state($I) === 'approved' && $me && ($me === (int)($I['created_by'] ?? 0) || $me === (int)($I['appr_req_by'] ?? 0)); }
 /** After a save: an approved issue that changed loses its approval. */
 function nl_appr_recheck(int $id): bool { if (!nl_appr_has()) return false; $I = nl_issue($id); if (!$I || ($I['appr_state'] ?? '') !== 'approved' || hash_equals((string)$I['appr_hash'], nl_hash($I))) return false; q("UPDATE nl_issues SET appr_state = NULL, appr_hash = NULL WHERE id = ?", [$id]); return true; }
 function nl_appr_pill(array $I): string { if (!nl_appr_has() || ($I['status'] ?? '') !== 'draft') return ''; $s = (string)($I['appr_state'] ?? ''); return $s === 'pending' ? ' ' . pill('gold', t('nl.ap_s_pending')) : ($s === 'approved' ? ' ' . pill('green', t('nl.ap_s_approved')) : ($s === 'returned' ? ' ' . pill('bad', t('nl.ap_s_returned')) : '')); }
 function nl_appr_request(int $id, string $note): void {
     if (!nl_appr_on()) throw new RuntimeException(t('nl.ap_off')); if (nl_approver()) throw new RuntimeException(t('nl.ap_self')); $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); nl_editable($I);
-    if (!$I['blocks'] || trim((string)$I['subject']) === '') throw new RuntimeException(t('nl.empty')); $n = count(nl_audience($I['audience'], nl_site_of($I))); if (!$n) throw new RuntimeException(t('nl.no_rcpt')); $u = current_user();
+    if (!$I['blocks'] || trim((string)$I['subject']) === '') throw new RuntimeException(t('nl.empty')); $n = count(nl_audience($I['audience'], nl_site_of($I), nl_dept($I))); if (!$n) throw new RuntimeException(t('nl.no_rcpt')); $u = current_user();
     q("UPDATE nl_issues SET appr_state = 'pending', appr_req_by = ?, appr_req_name = ?, appr_req_at = NOW(), appr_note = ?, appr_by = NULL, appr_name = NULL, appr_at = NULL, appr_reply = NULL, appr_hash = NULL, appr_n = ? WHERE id = ?", [(int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? ''), mb_substr(trim($note), 0, 300) ?: null, $n, $id]);
     try { if (function_exists('nf_push')) nf_push(nl_appr_ids(), 'nl:appr', 'nl:' . $id, t('nl.ap_nf_request', ['t' => (string)$I['title']]), mb_substr(t('nl.ap_nf_request_b', ['n' => $n, 'u' => (string)($u['full_name'] ?? '')]) . (trim($note) !== '' ? ' — ' . trim($note) : ''), 0, 300), url('newsletter', ['id' => $id]) . '#approval', (int)($u['id'] ?? 0), (string)($u['full_name'] ?? '')); } catch (Throwable $e) {}
 }
 function nl_appr_withdraw(int $id): void { $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); $u = current_user(); if (!nl_can_send() && (int)($u['id'] ?? 0) !== (int)($I['appr_req_by'] ?? 0)) throw new RuntimeException(t('err.noaccess')); q("UPDATE nl_issues SET appr_state = NULL WHERE id = ? AND appr_state = 'pending' AND status = 'draft'", [$id]); }
 function nl_appr_decide(int $id, bool $ok, string $reply): void {
     if (!nl_approver()) throw new RuntimeException(t('nl.ap_who')); $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); if ($I['status'] !== 'draft' || ($I['appr_state'] ?? '') !== 'pending') throw new RuntimeException(t('nl.ap_not_pending'));
-    $reply = mb_substr(trim($reply), 0, 500); if (!$ok && $reply === '') throw new RuntimeException(t('nl.ap_reply_req')); $u = current_user(); $n = count(nl_audience($I['audience'], nl_site_of($I)));
+    $reply = mb_substr(trim($reply), 0, 500); if (!$ok && $reply === '') throw new RuntimeException(t('nl.ap_reply_req')); $u = current_user(); $n = count(nl_audience($I['audience'], nl_site_of($I), nl_dept($I)));
     q("UPDATE nl_issues SET appr_state = ?, appr_by = ?, appr_name = ?, appr_at = NOW(), appr_reply = ?, appr_hash = ?, appr_n = ? WHERE id = ? AND appr_state = 'pending'", [$ok ? 'approved' : 'returned', (int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? ''), $reply ?: null, $ok ? nl_hash($I) : null, $n, $id]);
     try { $to = array_values(array_unique(array_filter([(int)($I['appr_req_by'] ?? 0), (int)($I['created_by'] ?? 0)]))); if (function_exists('nf_push') && $to) nf_push($to, 'nl:appr', 'nl:' . $id, t($ok ? 'nl.ap_nf_ok' : 'nl.ap_nf_back', ['t' => (string)$I['title']]), mb_substr((string)($u['full_name'] ?? '') . ($reply !== '' ? ' — ' . $reply : ''), 0, 300), url('newsletter', ['id' => $id]) . '#approval', (int)($u['id'] ?? 0), (string)($u['full_name'] ?? '')); } catch (Throwable $e) {}
 }
@@ -108,7 +143,8 @@ function nl_save_from_post(int $id): void {
     }
     usort($blocks, fn($a, $b) => $a['pos'] <=> $b['pos']); foreach ($blocks as &$x) unset($x['pos']); unset($x);
     $add = (string)($_POST['add'] ?? ''); if (in_array($add, NL_BLOCKS, true) && count($blocks) < NL_MAX_BLOCKS) $blocks[] = ['t' => $add];
-    $aud = ['lists' => array_values(array_filter(array_map('intval', (array)($_POST['lists'] ?? [])))), 'groups' => array_values(array_intersect(array_keys(nl_groups()), (array)($_POST['groups'] ?? []))), 'topics' => array_values(array_intersect(NL_TOPICS, (array)($_POST['topics'] ?? []))),
+    $dp = nl_dept($I);   // R97-160: an HR issue has no lists and no website subscribers
+    $aud = ['lists' => $dp === 'hr' ? [] : array_values(array_filter(array_map('intval', (array)($_POST['lists'] ?? [])))), 'groups' => array_values(array_intersect(array_keys(nl_groups($dp)), (array)($_POST['groups'] ?? []))), 'topics' => $dp === 'hr' ? [] : array_values(array_intersect(NL_TOPICS, (array)($_POST['topics'] ?? []))),
             'country' => $s('country', 80), 'extra' => $s('extra', 4000)];
     q('UPDATE nl_issues SET title = ?, subject = ?, preheader = ?, lang = ?, blocks = ?, audience = ? WHERE id = ?', [$title, $subject, $s('preheader', 200) ?: null, $lang, json_encode($blocks, JSON_UNESCAPED_UNICODE), json_encode($aud, JSON_UNESCAPED_UNICODE), $id]);
 }
@@ -120,18 +156,19 @@ function nl_image_store(int $issueId, string $tmp, int $size): string {
     q('INSERT INTO nl_images (issue_id, token, mime, file) VALUES (?,?,?,?)', [$issueId, $tok, $ext[1], $file]); return $tok;
 }
 function nl_delete(int $id): void { $I = nl_issue($id); if (!$I) return; if ($I['status'] !== 'draft') throw new RuntimeException(t('nl.locked')); foreach (all('SELECT file FROM nl_images WHERE issue_id = ?', [$id]) as $f) @unlink(nl_dir() . '/' . basename((string)$f['file'])); q('DELETE FROM nl_images WHERE issue_id = ?', [$id]); q('DELETE FROM nl_issues WHERE id = ?', [$id]); }
-function nl_copy(int $id): int { $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); $u = current_user(); q('INSERT INTO nl_issues (title, subject, preheader, lang, blocks, audience, created_by, created_name) VALUES (?,?,?,?,?,?,?,?)', [mb_substr($I['title'] . ' (copy)', 0, 200), $I['subject'], $I['preheader'], $I['lang'], json_encode($I['blocks'], JSON_UNESCAPED_UNICODE), json_encode($I['audience'], JSON_UNESCAPED_UNICODE), (int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? '')]); $nid = (int) db()->lastInsertId(); if (kym_has()) q('UPDATE nl_issues SET site = ? WHERE id = ?', [nl_site_of($I), $nid]); return $nid; }   // R97-050: a copy stays with its website
+function nl_copy(int $id): int { $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); $u = current_user(); q('INSERT INTO nl_issues (title, subject, preheader, lang, blocks, audience, created_by, created_name) VALUES (?,?,?,?,?,?,?,?)', [mb_substr($I['title'] . ' (copy)', 0, 200), $I['subject'], $I['preheader'], $I['lang'], json_encode($I['blocks'], JSON_UNESCAPED_UNICODE), json_encode($I['audience'], JSON_UNESCAPED_UNICODE), (int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? '')]); $nid = (int) db()->lastInsertId(); if (kym_has()) q('UPDATE nl_issues SET site = ? WHERE id = ?', [nl_site_of($I), $nid]); if (nl_dept($I) === 'hr' && nl_dept_has()) q("UPDATE nl_issues SET dept = 'hr' WHERE id = ?", [$nid]); return $nid; }   // R97-050: a copy stays with its website
 
 /* ---------------------------------------------------------------- audience */
 /** The recipients an audience resolves to: email => [email, name, contact_id, company_id, company, grp]. Opt-outs removed, one row per address. */
-function nl_audience(array $aud, string $site = 'golden'): array {
+function nl_audience(array $aud, string $site = 'golden', string $dept = 'sales'): array {
+    if ($dept === 'hr') { $aud['lists'] = []; $aud['topics'] = []; }   // R97-160
     /* R97-050: the audience of an issue is of its website only — its own opt-out list, its own subscribers, and contacts that carry its brand.
        A KYMA issue never reaches a Golden-only contact and the reverse; an address typed under "extra" is the only exception, because it is typed on purpose. */
     $site = kym_site($site); $ks = kym_has(); $brand = $ks ? ' AND FIND_IN_SET(' . db()->quote($site) . ', ct.brands)' : '';
     $out = []; $opt = []; $ob = []; foreach (all('SELECT LOWER(email) e FROM nl_optout WHERE 1=1' . nl_w($site, $ob), $ob) as $r) $opt[$r['e']] = 1;
     $put = function (string $email, string $name, ?int $cid, ?int $coid, string $co, string $grp) use (&$out, $opt) { $e = mb_strtolower(trim($email)); if ($e === '' || !filter_var($e, FILTER_VALIDATE_EMAIL) || isset($opt[$e]) || isset($out[$e]) || count($out) >= NL_MAX_RCPT) return; $out[$e] = ['email' => $e, 'name' => mb_substr(trim($name), 0, 160), 'contact_id' => $cid, 'company_id' => $coid, 'company' => mb_substr($co, 0, 160), 'grp' => $grp]; };
     foreach (array_map('intval', (array)($aud['lists'] ?? [])) as $lid) { $L = nl_list($lid); if ($L) foreach (nl_list_members($L, $ks ? $site : null) as $r) $put($r['email'], $r['name'], $r['contact_id'], $r['company_id'], $r['company'], $r['grp']); }   // R97-040 saved lists
-    $groups = array_values(array_intersect(array_keys(nl_groups()), (array)($aud['groups'] ?? []))); $country = trim((string)($aud['country'] ?? ''));
+    $groups = array_values(array_intersect(array_keys(nl_groups($dept)), (array)($aud['groups'] ?? []))); $country = trim((string)($aud['country'] ?? ''));
     if ($groups && function_exists('co_has') && co_has()) {
         $roles = co_roles_has(); $cc = function_exists('cc_has') && cc_has();
         foreach ($groups as $g) {
@@ -147,7 +184,7 @@ function nl_audience(array $aud, string $site = 'golden'): array {
     return $out;
 }
 function nl_audience_counts(array $rcpt): array { $c = []; foreach ($rcpt as $r) $c[$r['grp']] = ($c[$r['grp']] ?? 0) + 1; return $c; }
-function nl_group_label(string $g): string { if (str_starts_with($g, 'c:')) return function_exists('ct_categories') ? (ct_categories()[substr($g, 2)] ?? substr($g, 2)) : substr($g, 2); return $g === 'web' ? t('nl.g_web') : ($g === 'extra' ? t('nl.g_extra') : (nl_groups()[$g] ?? $g)); }
+function nl_group_label(string $g): string { if (str_starts_with($g, 'c:')) return function_exists('ct_categories') ? (ct_categories()[substr($g, 2)] ?? substr($g, 2)) : substr($g, 2); return $g === 'web' ? t('nl.g_web') : ($g === 'extra' ? t('nl.g_extra') : (nl_groups()[$g] ?? (nl_groups('hr')[$g] ?? $g))); }
 
 /* ---------------------------------------------------------------- template */
 /** Plain text of a block → safe HTML: escaped, paragraphs, **bold**, and http(s) addresses turned into links through $link(url). */
@@ -226,10 +263,10 @@ function nl_send_test(int $id): string {
 }
 /** Queue a draft: resolve the audience, register the links, create one row per recipient. From here the issue is locked. */
 function nl_queue(int $id): int {
-    $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); if (!nl_may_send($I)) throw new RuntimeException(t(nl_can() && nl_appr_on() ? 'nl.ap_needed' : 'err.noaccess')); if ($I['status'] !== 'draft') throw new RuntimeException(t('nl.locked'));
+    $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); if (!nl_may_send($I)) throw new RuntimeException(t(nl_can_issue($I) && nl_appr_on() ? 'nl.ap_needed' : 'err.noaccess')); if ($I['status'] !== 'draft') throw new RuntimeException(t('nl.locked'));
     if (!nl_appr_ok($I)) throw new RuntimeException(t('nl.ap_needed'));   /* R97-051 */
     $site = nl_site_of($I); if (!nl_ready($site)) throw new RuntimeException(t($site === 'kyma' ? 'nl.no_mailer_kyma' : 'nl.no_mailer')); if (!$I['blocks']) throw new RuntimeException(t('nl.empty'));
-    $rc = nl_audience($I['audience'], $site); if (!$rc) throw new RuntimeException(t('nl.no_rcpt')); $u = current_user();
+    $rc = nl_audience($I['audience'], $site, nl_dept($I)); if (!$rc) throw new RuntimeException(t('nl.no_rcpt')); $u = current_user();
     db()->beginTransaction();
     try {
         q('DELETE FROM nl_links WHERE issue_id = ?', [$id]); $n = 0; $seen = [];
@@ -436,8 +473,12 @@ function nl_ai_draft(int $id, string $brief, bool $news, bool $replace): int {
 
 /* ---------------------------------------------------------------- actions */
 function nl_handle_action(string $action): bool {
-    if (!str_starts_with($action, 'nl_')) return false; require_staff(); if (!nl_can()) throw new RuntimeException(t('err.noaccess'));
+    if (!str_starts_with($action, 'nl_')) return false; require_staff(); if (!nl_can() && !nl_hr_can()) throw new RuntimeException(t('err.noaccess'));
     $id = (int)($_POST['id'] ?? 0); $back = fn(string $a = '') => redirect('newsletter', ['id' => $id, '_r' => uniqid()], $a);
+    /* R97-160: an issue is touched only by those of its department; lists, subscribers and sending settings stay with sales / management */
+    $I0 = $id ? nl_issue($id) : null; if ($I0 && !nl_can_issue($I0)) throw new RuntimeException(t('err.noaccess'));
+    if (in_array($action, ['nl_list_save', 'nl_list_delete', 'nl_suball', 'nl_autocat', 'nl_settings', 'nl_optin'], true) && !nl_can()) throw new RuntimeException(t('err.noaccess'));
+    if (!in_array($action, ['nl_create', 'nl_hr_partner'], true) && !$I0 && !nl_can()) throw new RuntimeException(t('err.noaccess'));
     /* R97-051: an issue waiting for approval is locked — its form is not saved again; a change to an approved issue cancels the approval. */
     $sv = function () use ($id): void { $I = nl_issue($id); if ($I && ($I['appr_state'] ?? '') === 'pending') return; nl_save_from_post($id); if (nl_appr_recheck($id)) flash('info', t('nl.ap_reset')); };
     switch ($action) {
@@ -446,10 +487,11 @@ function nl_handle_action(string $action): bool {
         case 'nl_appr_approve': nl_appr_decide($id, true, (string)($_POST['appr_reply'] ?? '')); flash('good', t('nl.ap_approved')); $back('#approval');
         case 'nl_appr_approve_send': nl_appr_decide($id, true, (string)($_POST['appr_reply'] ?? '')); $n = nl_queue($id); flash('good', t('nl.queued', ['n' => $n])); $back('#stats');
         case 'nl_appr_return': nl_appr_decide($id, false, (string)($_POST['appr_reply'] ?? '')); flash('good', t('nl.ap_returned')); $back('#approval');
-        case 'nl_create': $id = nl_create((string)($_POST['title'] ?? ''), (string)($_POST['site'] ?? 'golden')); flash('good', t('nl.created')); redirect('newsletter', ['id' => $id]);
+        case 'nl_create': $nd = ($_POST['dept'] ?? '') === 'hr' ? 'hr' : 'sales'; if (!nl_can_dept($nd)) throw new RuntimeException(t('err.noaccess')); $id = nl_create((string)($_POST['title'] ?? ''), (string)($_POST['site'] ?? 'golden'), $nd); flash('good', t('nl.created')); redirect('newsletter', ['id' => $id]);
         case 'nl_save': nl_save_from_post($id); if (nl_appr_recheck($id)) flash('info', t('nl.ap_reset')); flash('good', t('nl.saved')); $back(!empty($_POST['add']) ? '#blocks' : '');
+        case 'nl_hr_partner': nl_hr_partner_add_from_post(); flash('good', t('nl.hr_p_added')); redirect('hr_newsletters', ['_r' => uniqid()], '#partners');
         case 'nl_copy': $id = nl_copy($id); flash('good', t('nl.copied')); redirect('newsletter', ['id' => $id]);
-        case 'nl_delete': nl_delete($id); flash('good', t('nl.deleted')); redirect('newsletters', ['_r' => uniqid()]);
+        case 'nl_delete': nl_delete($id); flash('good', t('nl.deleted')); redirect(nl_dept($I0) === 'hr' ? 'hr_newsletters' : 'newsletters', ['_r' => uniqid()]);
         case 'nl_ai': $sv(); $n = nl_ai_draft($id, (string)($_POST['brief'] ?? ''), !empty($_POST['news']), !empty($_POST['replace'])); flash('good', t('nl.ai_done', ['n' => $n])); $back('#blocks');
         case 'nl_test': $sv(); $to = nl_send_test($id); flash('good', t('nl.test_sent', ['e' => $to])); $back();
         case 'nl_queue': $sv(); $n = nl_queue($id); flash('good', t('nl.queued', ['n' => $n])); $back('#stats');

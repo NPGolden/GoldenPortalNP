@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.202.1';
+const CP_VERSION = '1.203.0';
 const CP_BUILD   = '2026-11-20';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-160', 'version' => '1.203.0', 'date' => '2026-11-20', 'title' => 'HR newsletters: HR › Newsletters prepares newsletters for schools and recruiting partners with the newsletter module of Web Sales (same template, mailbox, daily ceiling and approval by CEO / General Manager), with the results of every issue; a register of schools and recruiting partners with their contact persons; five new organisation types. HR issues and sales issues are kept apart.', 'db' => 'install/migrate_cp_r97_160_nl_dept.sql', 'check' => 'r98y'],
         ['ref' => 'GAS-CP-R97-159', 'version' => '1.202.1', 'date' => '2026-11-20', 'title' => 'All tab menus of the portal (Recruiting, Payables, HR, Inventory, Settings and the others) stand on the pale gold band with the gold base line and show the open tab in navy, as on the subproject page; pages whose open tab was not marked at all (for example Recruiting) now mark it.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-158', 'version' => '1.202.0', 'date' => '2026-11-20', 'title' => 'Recruiting: general applications — a CV sent from the website Careers page without a vacancy becomes an applicant record numbered GEN-YYYY-NNNN (CV mandatory, no screening), listed under «General applications» with the same card, evaluations, interviews and 6-month retention; «Assign to a vacancy» on the card moves the candidate into the pipeline of a vacancy and keeps the number. Golden HR 1.1.1 shows them under the filter General.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-157', 'version' => '1.201.1', 'date' => '2026-11-20', 'title' => 'Sign-in page: the sign-in card, the language selector, the «Need access?» line and the Mobile apps block are centred in one column of the same width (the longer access line had pushed the card to the left).', 'db' => null, 'check' => null],
@@ -604,6 +605,7 @@ function cp_migration_state(): array {
         'r97p' => $has("SHOW TABLES LIKE 'nl_issues'"),
         'r97q' => $has("SHOW TABLES LIKE 'nl_lists'"),
         'r97r' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'proc_state'") && $has("SHOW COLUMNS FROM sb_parts LIKE 'proc_at'"),
+        'r98y' => $has("SHOW COLUMNS FROM nl_issues LIKE 'dept'"),
         'r98x' => $has("SHOW INDEX FROM inv_moves WHERE Key_name = 'ix_invmv_item_kind_at'"),
         'r98w' => $has("SHOW TABLES LIKE 'po_lots'") && $has("SHOW COLUMNS FROM po_lines LIKE 'lot_id'"),
         'r98v' => $has("SHOW COLUMNS FROM po_receipt_lines LIKE 'dest_qty'"),

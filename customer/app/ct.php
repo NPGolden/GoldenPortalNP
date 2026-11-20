@@ -83,11 +83,11 @@ function co_has(): bool {
 }
 function co_kinds(): array {
     $out = [];
-    foreach (['owner', 'management', 'yard', 'class', 'supplier', 'consultant', 'broker', 'agent', 'other'] as $k) $out[$k] = t('co.kind_' . $k);
+    foreach (['owner', 'management', 'yard', 'class', 'supplier', 'consultant', 'broker', 'agent', 'school', 'rp_agency', 'rp_public', 'rp_assoc', 'rp_training', 'other'] as $k) $out[$k] = t('co.kind_' . $k);   // R97-160: schools and recruiting partners (HR newsletters)
     return $out;
 }
 function co_kind_pill(string $k): string {
-    $tone = ['owner' => 'gold', 'management' => 'navy', 'yard' => 'green', 'class' => 'green', 'supplier' => 'mute', 'consultant' => 'mute', 'broker' => 'blue', 'agent' => 'blue'][$k] ?? 'mute';
+    $tone = ['owner' => 'gold', 'management' => 'navy', 'yard' => 'green', 'class' => 'green', 'supplier' => 'mute', 'consultant' => 'mute', 'broker' => 'blue', 'agent' => 'blue', 'school' => 'green', 'rp_agency' => 'navy', 'rp_public' => 'navy', 'rp_assoc' => 'navy', 'rp_training' => 'navy'][$k] ?? 'mute';
     return pill($tone, co_kinds()[$k] ?? $k);
 }
 function co_norm_kind(string $v): ?string {
