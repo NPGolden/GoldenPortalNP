@@ -146,5 +146,13 @@ window.UI = (() => {
     document.addEventListener("visibilitychange", () => { if (!document.hidden) SYNC.run(); });
     setInterval(() => SYNC.run(false), 5 * 60 * 1000);
   })();
-  return { chrome, badge, badges, toast, goLinks, segs, sheet, closeSheet, totpField, totpValue, totpSheet, processLine, opill, photos, biometric, biometricAvailable, render, assistContext, openDocument };
+  // R97-167: once per device, right after the first sign-in — biometric unlock offered, plus the three habits that keep the account safe
+  function securityAsk() {
+    const K = "gpm.secasked"; try { if (API.mock || localStorage.getItem(K) === "1") return; localStorage.setItem(K, "1"); } catch (e) { return; }
+    setTimeout(async () => { const t = I18N.t; let on = false; try { on = localStorage.getItem("gpm.bio") === "1"; } catch (e) {} const can = await biometricAvailable();
+      sheet(`<h3>🔐 ${t("sec.title")}</h3><p>${t("sec.lede")}</p><ul class="muted" style="margin:0 0 12px 18px;padding:0"><li>${t("sec.tip1")}</li><li>${t("sec.tip2")}</li><li>${t("sec.tip3")}</li></ul>${can ? (on ? "" : `<button class="btn gold" id="ok">${t("sec.on")}</button>`) : `<p class="note">${t("sec.nobio")}</p>`}`,
+        async () => { if (await biometric()) { try { localStorage.setItem("gpm.bio", "1"); } catch (e) {} toast(t("sec.done")); } closeSheet(); },
+        (el) => { el.querySelector("#cancel").textContent = t("sec.later"); }); }, 900);
+  }
+  return { securityAsk, chrome, badge, badges, toast, goLinks, segs, sheet, closeSheet, totpField, totpValue, totpSheet, processLine, opill, photos, biometric, biometricAvailable, render, assistContext, openDocument };
 })();

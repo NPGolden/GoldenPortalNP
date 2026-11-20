@@ -103,5 +103,10 @@ window.UI = (() => {
     location.hash = API.signedIn ? "#/lock" : "#/login"; render();
     setInterval(() => SYNC.run(false), 5 * 60 * 1000);
   })();
-  return { chrome, badges, toast, goLinks, segs, sheet, closeSheet, totpField, totpValue, totpSheet, biometric, biometricAvailable, render, afterSignIn, signOut, lockNow, unlock };
+  // R97-167: once per device after the first sign-in — how this app is protected and the habits that keep the account safe
+  function securityAsk() {
+    const K = "ghr.secasked"; try { if (localStorage.getItem(K) === "1") return; localStorage.setItem(K, "1"); } catch (e) { return; }
+    setTimeout(() => { const t = I18N.t; sheet(`<h3>🔐 ${t("sec.title")}</h3><p>${t("sec.hr")}</p><ul class="muted" style="margin:0 0 12px 18px;padding:0"><li>${t("sec.tip1")}</li><li>${t("sec.tip2")}</li><li>${t("sec.tip3")}</li></ul>`, null, (el) => { el.querySelector("#cancel").textContent = "OK"; }); }, 900);
+  }
+  return { securityAsk, chrome, badges, toast, goLinks, segs, sheet, closeSheet, totpField, totpValue, totpSheet, biometric, biometricAvailable, render, afterSignIn, signOut, lockNow, unlock };
 })();

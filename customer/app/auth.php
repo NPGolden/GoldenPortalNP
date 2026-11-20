@@ -153,6 +153,7 @@ function online_users_compute(): array {
 function require_login(): array {
     $u = current_user();
     if (!$u) redirect('login');
+    if (pwc_must($u) && (string)($_GET['p'] ?? '') !== 'password_change' && !in_array((string)($_POST['action'] ?? ''), ['password_change', 'logout'], true)) redirect('password_change');   // R97-167: also for downloads and other direct addresses
     return $u;
 }
 
@@ -219,6 +220,26 @@ function sec_notify_locked(array $u): void {
     } catch (Throwable $e) { /* notifying must never block access */ }
 }
 
+/* ------------------------------------------------------------------ R97-167: password of the first sign-in
+ * An account that carries must_change_pw = 1 (a new account, or one whose password was given by an administrator) is asked for its own
+ * password right after signing in and sees nothing else until it has one. The columns arrive with migrate_cp_r97_167_must_change_pw.sql. */
+function pwc_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM customer_users LIKE 'must_change_pw'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function pwc_must(?array $u): bool { return $u !== null && !empty($u['must_change_pw']); }
+/** Why a new password is not accepted (null = fine): 10 characters, a letter and a digit, not the e-mail name, not the current one. */
+function pwc_error(string $new, array $u): ?string {
+    if (strlen($new) < 10 || strlen($new) > 200) return t('a.pass_len');
+    if (!preg_match('/\p{L}/u', $new) || !preg_match('/\d/', $new)) return t('pwc.err_mix');
+    $local = strtolower((string) strstr((string)($u['email'] ?? ''), '@', true)); if (strlen($local) >= 4 && str_contains(strtolower($new), $local)) return t('pwc.err_name');
+    if (!empty($u['password_hash']) && password_verify($new, (string)$u['password_hash'])) return t('pwc.err_same');
+    return null;
+}
+/** Store the user's own new password and lift the obligation. */
+function pwc_store(int $uid, string $new): void {
+    q('UPDATE customer_users SET password_hash = ? WHERE id = ?', [password_hash($new, PASSWORD_DEFAULT), $uid]);
+    if (pwc_has()) q('UPDATE customer_users SET must_change_pw = 0, pw_changed_at = NOW() WHERE id = ?', [$uid]);
+}
+/** Set by an administrator, per account. */
+function pwc_flag(int $uid, bool $on): void { if (pwc_has()) q('UPDATE customer_users SET must_change_pw = ? WHERE id = ?', [(int)$on, $uid]); }
 function attempt_login(string $email, string $pass): array {
     $email = strtolower(trim($email));
     $u = one('SELECT cu.*, c.is_active AS c_active FROM customer_users cu

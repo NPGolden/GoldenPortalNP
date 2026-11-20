@@ -2,7 +2,7 @@
  * and a MOCK mode (built-in sample data in the same shape the portal returns) for the demo and the UI tests.
  * Mock mode: localStorage gas.mock = "1", or ?mock=1 on the URL. */
 window.API = (() => {
-  const VERSION = "0.7.0";
+  const VERSION = "0.7.1";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   try { MOCK = localStorage.getItem("gas.mock") === "1" || /[?&]mock=1/.test(location.search); if (/[?&]mock=1/.test(location.search)) localStorage.setItem("gas.mock", "1"); } catch (e) {}
@@ -47,7 +47,7 @@ window.API = (() => {
     /* R97-060: customer acceptance of a service report — state, e-mail link, signing on this device (online only; never queued) */
     acceptance(id) { return call("GET", `/fsr/${id}/acceptance`); }, acceptLink(id, b) { return call("POST", `/fsr/${id}/accept-link`, b); },
     acceptCancel(id, lid) { return call("POST", `/fsr/${id}/accept-link/${lid}/cancel`, {}); }, signOnsite(id, b) { return call("POST", `/fsr/${id}/sign-onsite`, b); },
-    async login(email, password, totp) { const r = await call("POST", "/auth/login", { email, password, totp: totp || undefined, device: deviceInfo() }); tok.access = r.access_token; tok.refresh = r.refresh_token; return r; },
+    async login(email, password, totp, newPassword) { const r = await call("POST", "/auth/login", { email, password, totp: totp || undefined, new_password: newPassword || undefined, device: deviceInfo() }); tok.access = r.access_token; tok.refresh = r.refresh_token; return r; },
     async logout() { try { await call("POST", "/auth/logout", {}); } catch (e) {} tok.access = null; tok.refresh = null; },
     /* R71-001 passkeys — the browser / platform authenticator signs a server challenge; a passkey replaces password + authenticator code */
     get passkeyCapable() { return !MOCK && (!!pkNative() || !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.get)); },

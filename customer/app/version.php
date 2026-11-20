@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.207.0';
+const CP_VERSION = '1.208.0';
 const CP_BUILD   = '2026-11-20';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-167', 'version' => '1.208.0', 'date' => '2026-11-20', 'title' => 'First sign-in: an account marked "Must change password at next sign-in" (chosen per user by the administrator, ticked for new accounts) sets its own password before anything opens — portal and all four apps; password rules; apps ask once per device to turn on Face ID / fingerprint and show the safety habits (Service 0.7.1, PM 1.0.12, HR 1.1.2, Customer 1.0.9)', 'db' => 'install/migrate_cp_r97_167_must_change_pw.sql', 'check' => 'r99a'],
         ['ref' => 'GAS-CP-R97-166', 'version' => '1.207.0', 'date' => '2026-11-20', 'title' => 'Community: a post can carry a YouTube video — new kind Video for everybody and an optional video link on posts, polls and photos; the player loads only when Play is pressed (privacy-enhanced YouTube)', 'db' => 'install/migrate_cp_r97_166_soc_video.sql', 'check' => 'r98z'],
         ['ref' => 'GAS-CP-R97-165', 'version' => '1.206.1', 'date' => '2026-11-20', 'title' => 'Sub-project › Process: the production flow of every production order of the sub-project is shown below the stage percentages', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-164', 'version' => '1.206.0', 'date' => '2026-11-20', 'title' => 'Production: process flow indicator on the list and on the order, as on the purchase orders — design, production, subcontracting, FAT, delivered, HAT, commissioning, SAT, closed, with units, documents and late warnings per step', 'db' => null, 'check' => null],
@@ -613,6 +614,7 @@ function cp_migration_state(): array {
         'r97r' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'proc_state'") && $has("SHOW COLUMNS FROM sb_parts LIKE 'proc_at'"),
         'r98y' => $has("SHOW COLUMNS FROM nl_issues LIKE 'dept'"),
         'r98z' => $has("SHOW COLUMNS FROM soc_posts LIKE 'video_id'"),
+        'r99a' => $has("SHOW COLUMNS FROM customer_users LIKE 'must_change_pw'"),
         'r98x' => $has("SHOW INDEX FROM inv_moves WHERE Key_name = 'ix_invmv_item_kind_at'"),
         'r98w' => $has("SHOW TABLES LIKE 'po_lots'") && $has("SHOW COLUMNS FROM po_lines LIKE 'lot_id'"),
         'r98v' => $has("SHOW COLUMNS FROM po_receipt_lines LIKE 'dest_qty'"),

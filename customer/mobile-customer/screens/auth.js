@@ -11,6 +11,7 @@ window.Auth = (function () {
         <label class="field"><span data-i18n="login.email"></span><input name="email" type="email" inputmode="email" autocomplete="username" required></label>
         <label class="field"><span data-i18n="login.password"></span><input name="password" type="password" autocomplete="current-password" required></label>
         <label class="field" id="totp-field" ${needTotp ? "" : "hidden"}><span data-i18n="login.totp"></span><input name="totp" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="one-time-code"></label>
+        <div id="npw-field" hidden><label class="field"><span>${esc(t("pwc.new"))}</span><input name="npw" type="password" autocomplete="new-password" maxlength="200"></label><label class="field"><span>${esc(t("pwc.again"))}</span><input name="npw2" type="password" autocomplete="new-password" maxlength="200"></label><p class="meta">${esc(t("pwc.rules"))}</p></div>
         <div id="login-err" class="notice err" hidden></div>
         <button class="btn gold" type="submit" id="btn-login">${esc(t("login.btn"))}</button>
       </form>
@@ -24,9 +25,11 @@ window.Auth = (function () {
     const pkb = $("#btn-pk"); if (pkb) pkb.onclick = async () => { const err = $("#login-err"); err.hidden = true; UI.busy(pkb, true); try { await Api.passkeyLogin(); await App.afterLogin(); } catch (ex) { err.textContent = ex && ex.name === "NotAllowedError" ? t("pk.failed") : (ex.status === 403 ? t("login.notcustomer") : UI.errMsg(ex)); err.hidden = false; } finally { UI.busy(pkb, false); } };   // R71-001
     $("#f-login").onsubmit = async e => {
       e.preventDefault(); const f = e.target, btn = $("#btn-login"), err = $("#login-err"); err.hidden = true; UI.busy(btn, true);
-      try { await Api.login(f.email.value.trim(), f.password.value, f.totp.value.trim()); await App.afterLogin(); }
+      const npwOn = !$("#npw-field").hidden, npw = npwOn ? f.npw.value : ""; if (npw && npw !== f.npw2.value) { err.textContent = t("pwc.nomatch"); err.hidden = false; UI.busy(btn, false); return; }   // R97-167
+      try { await Api.login(f.email.value.trim(), f.password.value, f.totp.value.trim(), npw); await App.afterLogin(); }
       catch (ex) {
-        if (ex.code === "totp") { $("#totp-field").hidden = false; f.totp.focus(); err.textContent = t("login.totp_req"); }
+        if (ex.data && ex.data.password_change) { $("#npw-field").hidden = false; f.npw.focus(); err.textContent = ex.status === 422 && ex.data.error ? ex.data.error : t("pwc.hint"); }
+        else if (ex.code === "totp") { $("#totp-field").hidden = false; f.totp.focus(); err.textContent = t("login.totp_req"); }
         else err.textContent = ex.status === 429 ? t("login.locked") : (ex.status === 401 ? t("login.bad") : (ex.status === 403 ? t("login.notcustomer") : UI.errMsg(ex)));
         err.hidden = false;
       } finally { UI.busy(btn, false); }

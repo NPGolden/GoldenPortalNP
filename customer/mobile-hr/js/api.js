@@ -1,7 +1,7 @@
 /* Golden HR — API client for the portal module /customer/api/v1 (JWT access + rotating refresh), app "hr" (GAS-CP-R74-001).
  * Same transport as Golden PM (customer/mobile-pm/js/api.js); routes under /hr/app/*. No mock mode: HR data is never faked. */
 window.API = (() => {
-  const VERSION = "1.1.1";
+  const VERSION = "1.1.2";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   const tok = { get access() { try { return sessionStorage.getItem("ghr.at"); } catch (e) { return null; } }, set access(v) { try { v ? sessionStorage.setItem("ghr.at", v) : sessionStorage.removeItem("ghr.at"); } catch (e) {} },
     get refresh() { try { return localStorage.getItem("ghr.rt"); } catch (e) { return null; } }, set refresh(v) { try { v ? localStorage.setItem("ghr.rt", v) : localStorage.removeItem("ghr.rt"); } catch (e) {} } };
@@ -44,7 +44,7 @@ window.API = (() => {
   return {
     VERSION, mock: false,
     get signedIn() { return !!tok.refresh; },
-    async login(email, password, totp) { const r = await call("POST", "/auth/login", { email, password, totp: totp || undefined, device: deviceInfo() }); tok.access = r.access_token; tok.refresh = r.refresh_token; return r; },
+    async login(email, password, totp, newPassword) { const r = await call("POST", "/auth/login", { email, password, totp: totp || undefined, new_password: newPassword || undefined, device: deviceInfo() }); tok.access = r.access_token; tok.refresh = r.refresh_token; return r; },
     async logout() { try { await call("POST", "/auth/logout", {}); } catch (e) {} tok.access = null; tok.refresh = null; },
     get passkeyCapable() { return !!pkNative() || !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.get); },
     async passkeyLogin() {

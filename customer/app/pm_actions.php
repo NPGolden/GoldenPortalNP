@@ -1429,6 +1429,7 @@ function pm_handle_action(string $action, string $page): bool {
             if (array_key_exists('can_ai', $x)) q('UPDATE customer_users SET can_ai = ? WHERE id = ?', [$role === 'customer' ? 0 : (int)!empty($_POST['can_ai']), $id]);   // R50-001
             if (array_key_exists('can_accounting', $x)) q('UPDATE customer_users SET can_accounting = ?, is_accounting = ? WHERE id = ?', [$role === 'customer' ? 0 : (int)!empty($_POST['can_accounting']), $role === 'customer' ? 0 : (int)!empty($_POST['is_accounting']), $id]);   // R38-001
             if ($pass !== '') q('UPDATE customer_users SET password_hash = ?, failed_logins = 0, locked_until = NULL WHERE id = ?', [password_hash($pass, PASSWORD_DEFAULT), $id]);
+            if (function_exists('pwc_has') && pwc_has() && isset($_POST['pwc_present'])) pwc_flag($id, !empty($_POST['must_change_pw']));   // R97-167: chosen per account
             q('UPDATE projects SET project_manager = ? WHERE pm_user_id = ?', [$str('full_name', 120) ?: $x['full_name'], $id]);   // keep the denormalised name in step
             flash('good', t('au.updated'));
             redirect('admin_users', au_keep() + ['_r' => uniqid()]);
@@ -1450,6 +1451,7 @@ function pm_handle_action(string $action, string $page): bool {
                locale_valid($_POST['locale'] ?? null) ? $_POST['locale'] : 'en']);
             $newUid = (int) db()->lastInsertId();
             try { q('UPDATE customer_users SET twofa_required = ? WHERE id = ?', [(int)!empty($_POST['twofa_required']), $newUid]); } catch (Throwable $e) {}
+            if (function_exists('pwc_has') && pwc_has()) pwc_flag($newUid, !empty($_POST['must_change_pw']));   // R97-167
             cu_save_discipline($newUid, $role);
             $hrPid = (int)($_POST['hr_pid'] ?? 0);   // R60-005: created from the HR people list → link the person to the new account
             if ($hrPid && $role !== 'customer' && function_exists('hr2_has') && hr2_has()) { q('UPDATE hr_people SET user_id = ? WHERE id = ? AND user_id IS NULL', [$newUid, $hrPid]); if (function_exists('hr_audit')) hr_audit($hrPid, 'card', 'user_id', null, (string)$newUid, t('au.created')); flash('good', t('au.created') . ' · ' . t('au.linked_hr')); redirect('hr_person', ['id' => $hrPid, '_r' => uniqid()]); }

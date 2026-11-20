@@ -2,7 +2,7 @@
    Access JWT 15 min in sessionStorage; rotating refresh token in localStorage (Keychain / Keystore in the Capacitor build).
    Mock mode (?mock=1 or localStorage gcu.mock) serves mock/data.js in the shapes of the live contract — demo and UI tests only. */
 window.Api = (function () {
-  const APP_ID = "customer", APP_VERSION = "1.0.8";
+  const APP_ID = "customer", APP_VERSION = "1.0.9";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false; try { MOCK = localStorage.getItem("gcu.mock") === "1" || /[?&]mock=1/.test(location.search); if (/[?&]mock=1/.test(location.search)) localStorage.setItem("gcu.mock", "1"); } catch (e) {}
   const cfg = { base: BASE, get mock() { return MOCK; } };
@@ -44,8 +44,8 @@ window.Api = (function () {
       throw e;
     }
   }
-  async function login(email, password, totp) {
-    const d = await raw("POST", "/auth/login", { email, password, totp: totp || undefined, device: deviceInfo() }, { noAuth: true });
+  async function login(email, password, totp, newPassword) {
+    const d = await raw("POST", "/auth/login", { email, password, totp: totp || undefined, new_password: newPassword || undefined, device: deviceInfo() }, { noAuth: true });
     setAccess(d.access_token); await setRefresh(d.refresh_token); me = d.user; return d;
   }
   // R71-001 passkeys

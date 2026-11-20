@@ -598,7 +598,7 @@ function au_import(string $path, bool $dry): array {
             $activeRaw = $g($r, 'active'); $active = $activeRaw === '' ? null : ($yes($activeRaw) ? 1 : ($no($activeRaw) ? 0 : null));
             if ($x) {
                 q('UPDATE customer_users SET full_name = ?, role = ?, customer_id = ?, staff_role_id = ?, locale = ? WHERE id = ?', [$name ?: $x['full_name'], $role, $cid, $srole, $loc, $x['id']]);
-                if ($pass !== '') q('UPDATE customer_users SET password_hash = ?, failed_logins = 0, locked_until = NULL WHERE id = ?', [password_hash($pass, PASSWORD_DEFAULT), $x['id']]);
+                if ($pass !== '') q('UPDATE customer_users SET password_hash = ?, failed_logins = 0, locked_until = NULL WHERE id = ?', [password_hash($pass, PASSWORD_DEFAULT), $x['id']]); if ($pass !== '' && function_exists('pwc_flag')) pwc_flag((int)$x['id'], true);   /* R97-167 */
                 if ($active !== null) q('UPDATE customer_users SET is_active = ? WHERE id = ?', [$active, $x['id']]);
                 $uid = (int)$x['id']; $res['users_upd']++;
             } else {
@@ -606,6 +606,7 @@ function au_import(string $path, bool $dry): array {
                 if ($pass === '') { $pass = au_generate_password(); $generated = true; }
                 q('INSERT INTO customer_users (customer_id, role, staff_role_id, full_name, email, password_hash, locale, is_active) VALUES (?,?,?,?,?,?,?,?)', [$cid, $role, $srole, $name, $email, password_hash($pass, PASSWORD_DEFAULT), $loc, $active ?? 1]);
                 $uid = (int) db()->lastInsertId(); $res['users_new']++;
+                if (function_exists('pwc_flag')) pwc_flag($uid, true);   // R97-167: an imported account sets its own password at the first sign-in
                 if ($generated) $res['generated'][] = [$line, $name, $email, $pass];
                 if ($twofa === null) $twofa = 1;
             }

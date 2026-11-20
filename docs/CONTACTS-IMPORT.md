@@ -3823,3 +3823,14 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Language keys: 7 `soc.*` in en, el, it, bg, uk — 12 567 keys each.
 - Cybersecurity: the link is never stored or printed — only the validated 11-character id; no thumbnail or script is fetched from Google before the click, so opening the feed tells YouTube nothing; the frame is sandboxed and can be shown on one page only. No effect on page speed (no extra request until Play).
 
+## §451 First sign-in — own password; apps: protect this device (GAS-CP-R97-167, v1.208.0)
+
+- Migration `install/migrate_cp_r97_167_must_change_pw.sql` (check `r99a`): `customer_users.must_change_pw TINYINT(1) DEFAULT 0`, `customer_users.pw_changed_at DATETIME`, `login_log.outcome` gains `pw_changed`. Existing accounts stay 0.
+- `customer/app/auth.php`: `pwc_has()`, `pwc_must()`, `pwc_error()` (10–200 characters, a letter and a digit, not the local part of the e-mail when 4+ characters, not the current password), `pwc_store()` (hash, flag 0, `pw_changed_at`), `pwc_flag()`. `require_login()` sends a flagged account to `password_change` for every address except that page and the actions `password_change` / `logout`.
+- `customer/index.php`: POST gate before the action switch; page gate (`$page = 'password_change'`); action `password_change`; `account_save` uses `pwc_store()`. View `views/password_change.php` (stand-alone, like the authenticator step).
+- Administration › Users (`views/admin_users.php`, `au_update`, `cu_save` in `pm_actions.php`): checkbox `must_change_pw` per account (ticked on the create form), status under the password field. `ct.php`: accounts made or given a password by the contacts import are flagged.
+- API `POST /auth/login` (`api/v1/index.php`): a flagged account gets `403 {password_change: true}` and no token; the same call with `new_password` sets it (`422` with the reason when refused) and signs in. Clients: Service 0.7.1, PM 1.0.12, HR 1.1.2, Customer 1.0.9 — fields New password / Repeat on the sign-in screen.
+- Apps, once per device after sign-in (`UI.securityAsk()`, keys `gas.secasked`, `gpm.secasked`, `ghr.secasked`): Service and PM offer Face ID / fingerprint on open and show three safety habits; HR (biometrics already mandatory) shows the note.
+- Language keys: portal 21 (`pwc.*`, `ll.o_pw_changed`) — 12 588 each; apps 15 (`pwc.*`, `sec.*`) in en, el, it, uk, bg.
+- Cybersecurity: a default password can no longer stay in use — no session content and no API token before the own password exists; rule check on the server for portal and apps; the sign-in rate limit and lock-out apply unchanged; the event is logged. Proposed next: check new passwords against the list of leaked passwords (k-anonymity range query, no password leaves the server), and an expiry reminder for accounts whose password is older than 12 months.
+

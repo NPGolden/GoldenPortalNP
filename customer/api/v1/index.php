@@ -16,6 +16,10 @@ try {
     $me = function (array $u) use ($isPm, $isCu, $isHr): array { if ($isCu) return PortalCustomer::me($u); if ($isHr) return PortalHR::me($u); $m = Portal::me($u); return $isPm ? array_replace($m, PortalPM::meExtra($u)) : $m; };
     if ($path === '/auth/login' && $method === 'POST') { RateLimit::check('auth', RateLimit::ip(), 10);
         $u = Portal::login(trim((string)($body['email'] ?? '')), (string)($body['password'] ?? ''), isset($body['totp']) ? (string)$body['totp'] : null);
+        if (function_exists('pwc_must') && pwc_must($u)) {   // R97-167: the first sign-in sets the account's own password — no token before that
+            $np = isset($body['new_password']) ? (string)$body['new_password'] : ''; if ($np === '') Response::error(403, 'Choose your own password to continue.', ['password_change' => true]);
+            if (($pe = pwc_error($np, $u)) !== null) Response::error(422, $pe, ['password_change' => true]);
+            pwc_store((int)$u['id'], $np); if (function_exists('login_log')) login_log((int)$u['id'], (string)$u['email'], 'pw_changed'); }
         $dev = (array)($body['device'] ?? []); $u = api_act_as((int)$u['id']); if ($isPm) PortalPM::allowed($u); if ($isCu) PortalCustomer::allowed($u); if ($isHr) PortalHR::allowed($u);   // §0: who may sign in to each app (before the device is enrolled)
         $did = Jwt::registerDevice((int)$u['id'], $dev); $u['device_id'] = $did;
         Response::json(['access_token' => Jwt::issue($u, $did), 'refresh_token' => Jwt::issueRefresh($did, $dev['platform'] ?? 'web'), 'user' => $me($u)]); }

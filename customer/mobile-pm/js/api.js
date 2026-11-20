@@ -2,7 +2,7 @@
  * and a MOCK mode (built-in sample data in the shapes of the contract) for the demo and the UI tests.
  * Mock mode: localStorage gpm.mock = "1", or ?mock=1 on the URL. */
 window.API = (() => {
-  const VERSION = "1.0.11";
+  const VERSION = "1.0.12";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   try { MOCK = localStorage.getItem("gpm.mock") === "1" || /[?&]mock=1/.test(location.search); if (/[?&]mock=1/.test(location.search)) localStorage.setItem("gpm.mock", "1"); } catch (e) {}
@@ -44,7 +44,7 @@ window.API = (() => {
   const api = {
     VERSION, get mock() { return MOCK; }, setMock(v) { MOCK = !!v; try { localStorage.setItem("gpm.mock", v ? "1" : "0"); } catch (e) {} },
     get signedIn() { return !!(tok.refresh || (MOCK && mockState.user)); },
-    async login(email, password, totp) { const r = await call("POST", "/auth/login", { email, password, totp: totp || undefined, device: deviceInfo() }); tok.access = r.access_token; tok.refresh = r.refresh_token; return r; },
+    async login(email, password, totp, newPassword) { const r = await call("POST", "/auth/login", { email, password, totp: totp || undefined, new_password: newPassword || undefined, device: deviceInfo() }); tok.access = r.access_token; tok.refresh = r.refresh_token; return r; },
     async logout() { try { await call("POST", "/auth/logout", {}); } catch (e) {} tok.access = null; tok.refresh = null; },
     /* R71-001 passkeys — the browser / platform authenticator signs a server challenge; a passkey replaces password + authenticator code */
     get passkeyCapable() { return !MOCK && (!!pkNative() || !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.get)); },

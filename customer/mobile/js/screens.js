@@ -36,6 +36,7 @@ window.SCREENS = (() => {
       <label>${t("login.portal")}</label><input readonly value="goldensas.com/customer${API.mock ? " (demo data)" : ""}">
       <label>${t("login.email")}</label><input id="email" type="email" autocomplete="username" value="${API.mock ? "engineer@goldenas.com.gr" : ""}">
       <label>${t("login.password")}</label><input id="pw" type="password" autocomplete="current-password" value="${API.mock ? "demo" : ""}">
+      <div id="npwrow" class="hidden"><label>${t("pwc.new")}</label><input id="npw" type="password" autocomplete="new-password" maxlength="200"><label>${t("pwc.again")}</label><input id="npw2" type="password" autocomplete="new-password" maxlength="200"><p class="muted">${t("pwc.rules")}</p></div>
       <div id="totprow" class="hidden"><label>${t("login.totp")}</label><input id="totp" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></div>
       <p id="err" class="note red hidden"></p>
       <button class="btn gold" id="go">${t("login.signin")}</button>
@@ -46,8 +47,10 @@ window.SCREENS = (() => {
       root.querySelectorAll(".lang button").forEach((b) => b.onclick = () => { I18N.set(b.dataset.l); UI.render(); });
       root.querySelector("#go").onclick = async () => {
         const b = root.querySelector("#go"); b.disabled = true; const er = root.querySelector("#err");
-        try { await API.login(root.querySelector("#email").value.trim(), root.querySelector("#pw").value, root.querySelector("#totp").value.trim()); await SYNC.run(); location.hash = "#/home"; }
+        const nrow = root.querySelector("#npwrow"), npw = nrow.classList.contains("hidden") ? "" : root.querySelector("#npw").value; if (npw && npw !== root.querySelector("#npw2").value) { er.textContent = t("pwc.nomatch"); er.classList.remove("hidden"); b.disabled = false; return; }
+        try { await API.login(root.querySelector("#email").value.trim(), root.querySelector("#pw").value, root.querySelector("#totp").value.trim(), npw); await SYNC.run(); location.hash = "#/home"; UI.securityAsk(); }
         catch (e) { const d = e.data || {}; const totp = d.totp === true || d.code === "totp_required";
+          if (d.password_change) { root.querySelector("#npwrow").classList.remove("hidden"); er.textContent = e.status === 422 && d.error ? d.error : t("pwc.hint"); er.classList.remove("hidden"); root.querySelector("#npw").focus(); b.disabled = false; return; }
           if (totp) { root.querySelector("#totprow").classList.remove("hidden"); er.textContent = root.querySelector("#totp").value ? t("login.totpbad") : t("login.totphint"); root.querySelector("#totp").focus(); }
           else er.textContent = e.status === 402 ? t("login.nolicence") : e.status === 403 ? (d.error || t("login.staffonly")) : e.status === 423 ? t("login.locked") : e.status === 426 ? t("login.update") : e.status === 429 ? t("login.ratelimit") : e.status === 401 ? t("login.failed") : `${t("login.failed")} (${e.status || "offline"})`; er.classList.remove("hidden"); b.disabled = false; }
       };

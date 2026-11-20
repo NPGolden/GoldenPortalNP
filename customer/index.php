@@ -169,6 +169,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (function_exists('cache_forget') && ($cuPost = current_user())) cache_forget('badges:' . (int)$cuPost['id']);   // R69-002: an action may change what waits for me
     $action = (string)($_POST['action'] ?? '');
     try {
+        if (pwc_must(current_user()) && !in_array($action, ['password_change', 'logout'], true)) redirect('password_change');   // R97-167: first the own password
         if (function_exists('hr_only') && hr_only() && !in_array($action, HR_ACTIONS, true)) throw new RuntimeException(t('err.noaccess'));   // R51-001: HR scope
         if (function_exists('emp_only') && emp_only() && !in_array($action, EMP_ACTIONS, true)) throw new RuntimeException(t('err.noaccess'));   // R54-001: employee scope
         if (function_exists('pa_only') && pa_only() && !in_array($action, PA_ACTIONS, true)) throw new RuntimeException(t('err.noaccess'));     // R75-005: assistant scope
@@ -433,6 +434,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $u = require_login(); sec_revoke_all((int)$u['id']); login_log((int)$u['id'], (string)$u['email'], 'revoked');
                 session_unset(); session_destroy(); header('Location: index.php?p=login'); exit;
             }
+            case 'password_change': {   // R97-167: the password of the first sign-in
+                $u = require_login(); $np = (string)($_POST['password'] ?? '');
+                if ($np !== (string)($_POST['password2'] ?? '')) { flash('bad', t('pwc.err_match')); redirect('password_change'); }
+                if (($er = pwc_error($np, $u)) !== null) { flash('bad', $er); redirect('password_change'); }
+                pwc_store((int)$u['id'], $np); login_log((int)$u['id'], (string)$u['email'], 'pw_changed');
+                flash('good', t('pwc.done')); redirect('dashboard');
+            }
             case 'account_save':
                 $u = require_login();
                 $loc  = locale_valid((string)($_POST['locale'] ?? '')) ? (string)$_POST['locale'] : locale();
@@ -440,8 +448,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 if ($pass !== '' && strlen($pass) < 10) { flash('bad', t('a.pass_len')); redirect('account'); }
                 q('UPDATE customer_users SET locale = ? WHERE id = ?', [$loc, $u['id']]);
                 if (isset($_POST['theme'])) theme_set((string)$_POST['theme']);
-                if ($pass !== '') q('UPDATE customer_users SET password_hash = ? WHERE id = ?',
-                                    [password_hash($pass, PASSWORD_DEFAULT), $u['id']]);
+                if ($pass !== '') { pwc_store((int)$u['id'], $pass); login_log((int)$u['id'], (string)$u['email'], 'pw_changed'); }   // R97-167: also lifts "must change"
                 $_SESSION['locale'] = $loc; locale($loc);
                 flash('good', t('a.saved'));
                 redirect('account');
@@ -463,6 +470,7 @@ $public = ['login', 'twofa', 'privacy'];   // R72-001: privacy policy is public 
 if (!in_array($page, $public, true) && !current_user()) $page = 'login';
 if ($page === 'twofa' && !pending_twofa_user()) $page = 'login';
 if (in_array($page, $public, true) && $page !== 'privacy' && current_user()) $page = 'dashboard';
+if (pwc_must(current_user())) $page = 'password_change'; elseif ($page === 'password_change') $page = 'dashboard';   // R97-167: nothing else until the account has its own password
 if (current_user() && lic_locked() && !in_array($page, LIC_OPEN_PAGES, true)) $page = 'license';     // R22-001: no licence, no portal
 if (current_user() && function_exists('fin_blocked') && fin_blocked() && in_array($page, FIN_PAGES, true)) { flash('warn', t('fin.blocked')); redirect('dashboard'); }   // R97-086: the QHSE role has no financial pages
 
@@ -517,7 +525,7 @@ if ($page === 'hr_pdoc') { require_staff(); hr_pdoc_stream((int)($_GET['id'] ?? 
 if ($page === 'hra_doc') { require_staff(); hra_doc_stream((int)($_GET['id'] ?? 0)); }       // R67-001                                                   // R51-001: HR scope → Planning only
 flt_apply($page);                                                                               // R29-008: remembered list filters
 if ($page === 'vessel' && function_exists('vm_has') && vm_has() && ($mi = scalar('SELECT merged_into FROM vessels WHERE id = ?', [(int)($_GET['id'] ?? 0)]))) redirect('vessel', ['id' => vm_resolve((int)$mi)] + array_diff_key($_GET, ['p' => 1, 'id' => 1]));   // R30-001: a retired duplicate opens its master
-$views = ['login','twofa','privacy','dashboard','vessels','projects','pipeline','report_fin','collections','statement','inventory','inventory_item','inventory_import','suppliers','admin_procurement','requisitions','requisition','prq_items','bom','purchase_orders','purchase_order','delivery_notes','delivery_note','warehouse_ready','payables','payable','suppliers_import','documents','reports','cyber','support','account',
+$views = ['login','twofa','password_change','privacy','dashboard','vessels','projects','pipeline','report_fin','collections','statement','inventory','inventory_item','inventory_import','suppliers','admin_procurement','requisitions','requisition','prq_items','bom','purchase_orders','purchase_order','delivery_notes','delivery_note','warehouse_ready','payables','payable','suppliers_import','documents','reports','cyber','support','account',
           'subproject','drawings','overlay','weekly','monthly','project_ms','report_sp','system_budgets','system_budget','system_budget_import','system_budget_bom','system_budget_convert','system_budget_feed','system_budget_checks','system_budget_proc','system_budgets_proc','companies_yards','sign_onsite',
           'project_new','subproject_new','project_edit','subproject_edit','vessel_new','vessel_edit','vessels_import','marine_intel','newsletters','newsletter','hr_newsletters','import',
           'admin_health','admin_numbering','admin_offer_classes','proformas','proforma','cashflow','report_cf','eng_requests','admin_engineering','admin_ai','admin_hr','hr_person','hr_dashboard','hr_jds','hr_jd','my_jd','my_equipment', 'my_approvals','hr_equipment','eq_prepare','process_flow','my_leave','hr_requests','isms','isms_rec','isms_report','mcs','qhse','qhse_lib','data_doubles','hr_tests','hr_test','hr_test_take','hr_test_result','hra','hra_flow','production','production_order','production_edit','admin_systems','admin_users','admin_roles','admin_log','settings','approvals','approval','timesheets','timesheet','timesheet_edit','manhours','report_ts','admin_disciplines','admin_about','tickets','permits','permit_edit','ticket','ticket_edit','vessel','report_vessel','offers','offer','offer_edit','weekly_vessel','report_weekly','fsr','fsr_edit','fsr_list','isr','isr_edit','isr_list','jo','jo_edit','jo_list','joborders','contacts','contact','contact_edit','companies','admin_offer_statuses','notifications','admin_customers','manual','kb','kb_q','requests','request','hr_leaves','hr_training','hr_eval','hr_targets','community','license','tasks','task_edit','admin_task_kinds','admin_file_kinds','admin_calendars','admin_branches','planning','equipment','equipment_view','equipment_edit','fd_import','admin_issue_cats','admin_vessel_merge','rs','rs_edit','wf','vessel_decks','admin_email_templates','admin_rate_cards','admin_offer_texts','cost_control','work','myworks','workload','acc_register','acc_reports','acc_report','acc_vessel','dn_invoicing','fsr_ext','kpis','risks','admin_kpis','report_kpi','sales','report_sales','admin_sales', 'fc', 'fc_edit', 'utilization', 'contacts_json', 'organisations', 'rcr_dashboard', 'rcr_vacancy', 'rcr_event', 'rcr_application', 'rcr_sets', 'rcr_cv', 'rcr_settings', 'admin_website', 'web_inbox', 'web_stats', 'invoice_new'];

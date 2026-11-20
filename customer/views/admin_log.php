@@ -10,7 +10,7 @@ $u = require_cp_admin();
 
 $q       = trim((string)($_GET['q'] ?? ''));
 $outcome = (string)($_GET['outcome'] ?? '');
-$outs    = ['success', 'failed', 'locked', 'disabled', 'logout', 'twofa_failed', 'twofa_enrolled', 'expired', 'device', 'revoked', 'closed'];   // R49-001
+$outs    = ['success', 'failed', 'locked', 'disabled', 'logout', 'twofa_failed', 'twofa_enrolled', 'expired', 'device', 'revoked', 'closed', 'pw_changed'];   // R49-001
 if (!in_array($outcome, $outs, true)) $outcome = '';
 $from    = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['from'] ?? '')) ? $_GET['from'] : '';
 $to      = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['to'] ?? '')) ? $_GET['to'] : '';
