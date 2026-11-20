@@ -7,7 +7,7 @@ on:
       app:
         description: 'Which app'
         type: choice
-        options: [engineer, pm, customer]
+        options: [engineer, pm, customer, hr]
         default: pm
 jobs:
   status:

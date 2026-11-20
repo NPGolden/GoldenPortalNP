@@ -9,7 +9,7 @@ on:
       app:
         description: 'Which app'
         type: choice
-        options: [engineer, pm, customer]
+        options: [engineer, pm, customer, hr]
         default: customer
       submit:
         description: 'Submit for review (otherwise only prepare)'
@@ -28,7 +28,8 @@ jobs:
         run: |
           case "$APP" in engineer) echo "u=ASC_DEMO_USER_ENGINEER" >> "$GITHUB_OUTPUT"; echo "p=ASC_DEMO_PASS_ENGINEER" >> "$GITHUB_OUTPUT";;
                          pm)       echo "u=ASC_DEMO_USER_PM" >> "$GITHUB_OUTPUT";       echo "p=ASC_DEMO_PASS_PM" >> "$GITHUB_OUTPUT";;
-                         customer) echo "u=ASC_DEMO_USER_CUSTOMER" >> "$GITHUB_OUTPUT"; echo "p=ASC_DEMO_PASS_CUSTOMER" >> "$GITHUB_OUTPUT";; esac
+                         customer) echo "u=ASC_DEMO_USER_CUSTOMER" >> "$GITHUB_OUTPUT"; echo "p=ASC_DEMO_PASS_CUSTOMER" >> "$GITHUB_OUTPUT";;
+                         hr)       echo "u=ASC_DEMO_USER_HR" >> "$GITHUB_OUTPUT";       echo "p=ASC_DEMO_PASS_HR" >> "$GITHUB_OUTPUT";; esac
       - name: Prepare / submit
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
