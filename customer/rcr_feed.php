@@ -3,7 +3,7 @@
  * Public recruiting feed for goldenas.com.gr/careers — GAS-CP-R89-001.
  *   GET  rcr_feed.php?r=vacancies&lang=en        GET rcr_feed.php?r=events        GET rcr_feed.php?r=set&code=ENG-STD-7
  *   POST rcr_feed.php?r=apply   (json)           POST rcr_feed.php?r=cv&app=APP-…  (multipart, Authorization: Bearer <token>)
- *   POST rcr_feed.php?r=register&event=EVT-…     POST rcr_feed.php?r=request
+ *   POST rcr_feed.php?r=register&event=EVT-…     POST rcr_feed.php?r=request      POST rcr_feed.php?r=general (multipart: name, email, phone, department_interest, cover_note, consent_gdpr, cv)
  * Reads need only the allowed Origin; writes need X-Site-Key = settings.rc_site_key (empty key = feed switched off).
  * Never returns option scores, join links, HR notes or anything about other candidates.
  */
@@ -35,6 +35,7 @@ try {
     if ($r === 'apply') $out(rcr_pub_apply($body, $ip, (string) ($_SERVER['HTTP_USER_AGENT'] ?? '')), 201);
     if ($r === 'cv') { rcr_pub_cv((string) ($_GET['app'] ?? ''), trim(str_ireplace('Bearer', '', (string) ($_SERVER['HTTP_AUTHORIZATION'] ?? ''))), $_FILES['cv'] ?? [], $_POST); $out(['status' => 'received']); }
     if ($r === 'register') { rcr_pub_register((string) ($_GET['event'] ?? ''), $body, $ip); $out(['status' => 'registered'], 201); }
+    if ($r === 'general') $out(rcr_pub_general($_POST, $_FILES['cv'] ?? [], $ip, (string) ($_SERVER['HTTP_USER_AGENT'] ?? '')), 201);   // R97-158: CV without a vacancy (multipart)
     if ($r === 'request') { rcr_pub_request($body); $out(['status' => 'received'], 201); }
     $out(['error' => 'not found'], 404);
 } catch (RuntimeException $e) { $c = (int) $e->getCode(); if ($c >= 400 && $c < 600 && !($e instanceof PDOException)) $out(['error' => $e->getMessage()], $c); error_log('[rcr_feed] ' . $e->getMessage()); $out(['error' => 'server error'], 500); }

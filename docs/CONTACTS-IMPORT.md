@@ -3748,3 +3748,15 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 
 - `assets/portal.css`: `.gate > div { width: 100%; max-width: 420px; }` — the column of the sign-in and two-factor pages is 420 px wide and centred; before, the widest line under the card (the access line with its link since v1.199.1) set the column width and the 420 px card stood at its left.
 - No database change. Cybersecurity: style sheet only; nothing to report.
+
+## §442 v1.202.0 (R97-158) — Recruiting: general applications (CV without a vacancy), assign to a vacancy
+
+- `customer/app/rcr.php`: `RCR_GENERAL_CODE` (`VAC-GENERAL`), `rcr_general_vacancy()` (the internal vacancy, created on first use: status open, `publish_web = 0`, first screening set only because the column requires one), `rcr_is_general()` (code starts with `GEN-`), `rcr_pub_general()` (website, one multipart step), `rcr_assign_vacancy()`. The internal vacancy is excluded from the website feed and from `rcr_pub_apply()` even if someone ticks «web» on it.
+- `customer/rcr_feed.php`: `POST ?r=general` (multipart: name, email, phone, department_interest, cover_note, lang, consent_gdpr, cv) — site key and the write rate limit as the other writes; 201 with `application_id` GEN-…, 409 when the address already has a general application, 415 / 422 for the file, 503 when no screening set exists yet.
+- The CV is checked by content (PDF, DOC, DOCX; size limit `rc_cv_max_mb`) and stored in `storage/rc` under the GEN number, as for vacancy applications. The row: `passed = 1`, `score` NULL, status `cv_received`, consent version and time.
+- Views: `rcr_dashboard.php` (button «General applications (n)», label «General», no screening pill), `rcr_application.php` (card «Assign to a vacancy», screening card replaced by a note), action `rcr_assign` in `rcr_actions.php` (HR only; refuses when the person already applied to the target vacancy; logged as `assigned`).
+- Retention unchanged: `rcr_retention_run()` treats GEN rows like every application.
+- Golden HR 1.1.1: `general` in the candidate rows, filter chip «General», label on the card.
+- Language keys `rc.general*`, `rc.assign_*` (12) in en, el, it, bg, uk — 12 438 keys each.
+- Website (`goldenas-website`): `careers.html` section `#general` «Send us your CV», `hr/careers-b.js` `submitGeneral()`, proxy `api/hr.php` `r=general` (honeypot, checks, site key stays on the server).
+- No database change. Cybersecurity: the public route accepts a file only with the site key (held by the website server), is rate-limited per address, checks the real file type and size, stores outside the web root and never echoes data about other candidates; duplicate check answers 409 only for the same address on the same list (as vacancy applications do).

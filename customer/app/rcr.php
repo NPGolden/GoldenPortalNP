@@ -161,7 +161,7 @@ function rcr_cv_stream(int $id): void {
 
 /* ------------------------------------------------------------------ public website feed (called by rc_feed.php) */
 function rcr_pub_vacancies(string $lang): array {
-    $rows = all('SELECT v.code AS id, v.title, d.name AS department, v.location, b.name AS branch, v.emp_type, v.seniority, v.summary, v.description_html, v.requirements, v.tags, s.code AS screening_set, v.published_at, v.closes_at FROM rc_vacancies v LEFT JOIN disciplines d ON d.id = v.department_id LEFT JOIN branches b ON b.id = v.branch_id JOIN rc_screening_sets s ON s.id = v.screening_set_id WHERE v.status = "open" AND v.publish_web = 1 AND (v.closes_at IS NULL OR v.closes_at >= CURDATE()) ORDER BY v.published_at DESC');
+    $rows = all('SELECT v.code AS id, v.title, d.name AS department, v.location, b.name AS branch, v.emp_type, v.seniority, v.summary, v.description_html, v.requirements, v.tags, s.code AS screening_set, v.published_at, v.closes_at FROM rc_vacancies v LEFT JOIN disciplines d ON d.id = v.department_id LEFT JOIN branches b ON b.id = v.branch_id JOIN rc_screening_sets s ON s.id = v.screening_set_id WHERE v.status = "open" AND v.publish_web = 1 AND v.code <> "VAC-GENERAL" AND (v.closes_at IS NULL OR v.closes_at >= CURDATE()) ORDER BY v.published_at DESC');
     $type = ['full_time' => 'Full-time', 'part_time' => 'Part-time', 'contract' => 'Contract', 'internship' => 'Internship'];
     foreach ($rows as &$r) { $r['type'] = $type[$r['emp_type']] ?? $r['emp_type']; unset($r['emp_type']); $r['seniority'] = ucfirst((string) $r['seniority']); $r['requirements'] = json_decode((string) $r['requirements']) ?: []; $r['tags'] = json_decode((string) $r['tags']) ?: []; }
     return $rows;
@@ -174,7 +174,7 @@ function rcr_pub_events(): array {
 /** Website step 1. Returns the created application (passed / score / cv token) or throws RuntimeException with an HTTP-like code in getCode(). */
 function rcr_pub_apply(array $in, string $ip, string $ua): array {
     $email = strtolower(trim((string) ($in['email'] ?? ''))); if (!filter_var($email, FILTER_VALIDATE_EMAIL) || empty($in['consent_gdpr'])) throw new RuntimeException('validation', 422);
-    $v = one('SELECT * FROM rc_vacancies WHERE code = ? AND status = "open" AND publish_web = 1', [(string) ($in['vacancy_id'] ?? '')]); if (!$v) throw new RuntimeException('vacancy closed', 410);
+    $v = one('SELECT * FROM rc_vacancies WHERE code = ? AND status = "open" AND publish_web = 1', [(string) ($in['vacancy_id'] ?? '')]); if (!$v || $v['code'] === RCR_GENERAL_CODE) throw new RuntimeException('vacancy closed', 410);
     $s = rcr_set((int) $v['screening_set_id']); if (!$s) throw new RuntimeException('no screening set', 500);
     try { $r = rcr_score($s, (array) ($in['answers'] ?? [])); } catch (RuntimeException $e) { throw new RuntimeException($e->getMessage(), 422); }
     $tok = bin2hex(random_bytes(24)); $code = rcr_code('APP', 'rc_applications');
@@ -193,6 +193,45 @@ function rcr_pub_cv(string $appCode, string $token, array $file, array $post): v
     $dest = rcr_dir() . '/' . $a['code'] . '_' . bin2hex(random_bytes(6)) . '.' . $ext; if (!move_uploaded_file($file['tmp_name'], $dest)) throw new RuntimeException('store', 500);
     q('UPDATE rc_applications SET cv_path = ?, cv_name = ?, cover_note = ?, department_interest = ?, status = "cv_received", cv_token_hash = NULL, status_changed_at = NOW() WHERE id = ?', [$dest, mb_substr((string) $file['name'], 0, 190), mb_substr(trim((string) ($post['cover_note'] ?? '')), 0, 4000) ?: null, mb_substr(trim((string) ($post['department_interest'] ?? '')), 0, 120) ?: null, (int) $a['id']]);
     rcr_log('cv_received', ['application_id' => (int) $a['id'], 'vacancy_id' => (int) $a['vacancy_id']], (string) $file['name']);
+}
+/* ---- R97-158: general applications — a CV sent from the website without a vacancy ----
+ * They are ordinary applicant records (card, CV, notes, evaluations, interviews, retention) numbered GEN-YYYY-NNNN and kept under one
+ * internal vacancy (code VAC-GENERAL, never shown on the website) until HR assigns them to a real vacancy; the GEN number stays. */
+const RCR_GENERAL_CODE = 'VAC-GENERAL';
+function rcr_general_vacancy(bool $create = true): ?array {
+    static $v = null; if ($v) return $v; if (!rcr_has()) return null;
+    $v = one('SELECT * FROM rc_vacancies WHERE code = ?', [RCR_GENERAL_CODE]) ?: null; if ($v || !$create) return $v;
+    $set = one('SELECT id FROM rc_screening_sets ORDER BY is_active DESC, id LIMIT 1'); if (!$set) return null;   // the table requires a screening set; general applications are not screened
+    q('INSERT INTO rc_vacancies (code, title, summary, screening_set_id, status, publish_web, published_at) VALUES (?,?,?,?,?,0,CURDATE())', [RCR_GENERAL_CODE, 'General applications', 'CVs sent from the website without a vacancy. Assign a candidate to a vacancy from his / her card.', (int) $set['id'], 'open']);
+    return $v = one('SELECT * FROM rc_vacancies WHERE code = ?', [RCR_GENERAL_CODE]) ?: null;
+}
+function rcr_is_general(array $a): bool { return str_starts_with((string) ($a['code'] ?? ''), 'GEN-'); }
+/** Website: general application in one step — name, e-mail, consent and the CV are mandatory. Returns the GEN number. */
+function rcr_pub_general(array $in, array $file, string $ip, string $ua): array {
+    $email = strtolower(trim((string) ($in['email'] ?? ''))); $name = mb_substr(trim((string) ($in['name'] ?? '')), 0, 120);
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $name === '' || empty($in['consent_gdpr'])) throw new RuntimeException('validation', 422);
+    if (($file['error'] ?? 1) !== UPLOAD_ERR_OK || empty($file['tmp_name']) || $file['size'] > (int) cp_setting('rc_cv_max_mb', '8') * 1048576) throw new RuntimeException('file', 422);
+    $mime = (string) mime_content_type($file['tmp_name']); $ext = ['application/pdf' => 'pdf', 'application/msword' => 'doc', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx'][$mime] ?? null; if (!$ext) throw new RuntimeException('type', 415);
+    $v = rcr_general_vacancy(); if (!$v) throw new RuntimeException('not available', 503);
+    if (one('SELECT id FROM rc_applications WHERE vacancy_id = ? AND email = ?', [(int) $v['id'], $email])) throw new RuntimeException('already applied', 409);
+    $code = rcr_code('GEN', 'rc_applications'); $dest = rcr_dir() . '/' . $code . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+    if (!move_uploaded_file($file['tmp_name'], $dest)) throw new RuntimeException('store', 500);
+    try { q('INSERT INTO rc_applications (code, vacancy_id, email, name, phone, passed, knockout_ok, status, cv_path, cv_name, cover_note, department_interest, lang, ip, user_agent, consent_version, consent_at, status_changed_at) VALUES (?,?,?,?,?,1,1,"cv_received",?,?,?,?,?,?,?,?,NOW(),NOW())',
+        [$code, (int) $v['id'], $email, $name, mb_substr(trim((string) ($in['phone'] ?? '')), 0, 40) ?: null, $dest, mb_substr((string) $file['name'], 0, 190), mb_substr(trim((string) ($in['cover_note'] ?? '')), 0, 4000) ?: null, mb_substr(trim((string) ($in['department_interest'] ?? '')), 0, 120) ?: null,
+         in_array((string) ($in['lang'] ?? 'en'), ['en', 'el', 'it', 'nl'], true) ? (string) $in['lang'] : 'en', $ip, mb_substr($ua, 0, 255), '2026-11']); }
+    catch (Throwable $e) { @unlink($dest); if ($e instanceof PDOException && $e->getCode() === '23000') throw new RuntimeException('already applied', 409); throw $e; }
+    $id = (int) db()->lastInsertId(); rcr_log('applied', ['application_id' => $id, 'vacancy_id' => (int) $v['id']], 'General application · ' . (string) $file['name']);
+    rcr_notify_hr('📄 General application — ' . $name, $code . (trim((string) ($in['department_interest'] ?? '')) !== '' ? ' · ' . mb_substr(trim((string) $in['department_interest']), 0, 120) : ''), url('rcr_application', ['id' => $id]));
+    return ['application_id' => $code, 'status' => 'received'];
+}
+/** HR moves an applicant (a general application, or one sent to the wrong vacancy) into the pipeline of a vacancy. The number does not change. */
+function rcr_assign_vacancy(int $appId, int $vacId): void {
+    if (!rcr_can()) throw new RuntimeException(t('err.noaccess'));
+    $a = rcr_application($appId); $v = rcr_vacancy($vacId); if (!$a || !$v) throw new RuntimeException(t('err.notfound'));
+    if ((int) $a['vacancy_id'] === $vacId) return;
+    if (one('SELECT id FROM rc_applications WHERE vacancy_id = ? AND email = ? AND id <> ?', [$vacId, (string) $a['email'], $appId])) throw new RuntimeException(t('rc.assign_dup'));
+    q('UPDATE rc_applications SET vacancy_id = ?, status_changed_at = NOW() WHERE id = ?', [$vacId, $appId]);
+    rcr_log('assigned', ['application_id' => $appId, 'vacancy_id' => $vacId], $a['vacancy_code'] . ' → ' . $v['code']);
 }
 function rcr_pub_register(string $evtCode, array $in, string $ip): void {
     $email = strtolower(trim((string) ($in['email'] ?? ''))); if (!filter_var($email, FILTER_VALIDATE_EMAIL) || empty($in['consent_gdpr'])) throw new RuntimeException('validation', 422);

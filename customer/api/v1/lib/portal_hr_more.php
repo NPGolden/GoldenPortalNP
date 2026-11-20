@@ -50,7 +50,7 @@ final class PortalHRMore {
     private static function shapeApp(array $a): array {
         $ext = strtolower(pathinfo((string)($a['cv_name'] ?? ''), PATHINFO_EXTENSION));
         return ['id' => (int)$a['id'], 'code' => (string)$a['code'], 'name' => (string)($a['name'] ?: $a['email']), 'vacancy_id' => (int)$a['vacancy_id'], 'vacancy' => (string)($a['vacancy'] ?? ''), 'vacancy_code' => (string)($a['vacancy_code'] ?? ''),
-            'status' => (string)$a['status'], 'status_label' => t('rc.st_' . $a['status']), 'passed' => !empty($a['passed']), 'score' => $a['score'] !== null ? (int)$a['score'] : null, 'max_score' => $a['max_score'] !== null ? (int)$a['max_score'] : null,
+            'general' => function_exists('rcr_is_general') && rcr_is_general($a), 'status' => (string)$a['status'], 'status_label' => t('rc.st_' . $a['status']), 'passed' => !empty($a['passed']), 'score' => $a['score'] !== null ? (int)$a['score'] : null, 'max_score' => $a['max_score'] !== null ? (int)$a['max_score'] : null,
             'eval_avg' => isset($a['eval_avg']) && $a['eval_avg'] !== null ? round((float)$a['eval_avg'], 1) : null, 'eval_count' => (int)($a['eval_count'] ?? 0), 'rating' => $a['rating'] !== null ? (int)$a['rating'] : null,
             'has_cv' => !empty($a['cv_path']), 'cv_pdf' => !empty($a['cv_path']) && $ext === 'pdf', 'cv_name' => (string)($a['cv_name'] ?? ''), 'applied' => self::d((string)$a['created_at']), 'since' => self::d((string)($a['status_changed_at'] ?: $a['created_at'])), 'days' => self::days((string)($a['status_changed_at'] ?: $a['created_at']))];
     }
