@@ -233,6 +233,29 @@ function rcr_assign_vacancy(int $appId, int $vacId): void {
     q('UPDATE rc_applications SET vacancy_id = ?, status_changed_at = NOW() WHERE id = ?', [$vacId, $appId]);
     rcr_log('assigned', ['application_id' => $appId, 'vacancy_id' => $vacId], $a['vacancy_code'] . ' → ' . $v['code']);
 }
+/** R97-161: HR files a CV by hand (received by e-mail, at a fair, from a school or a recruiting partner). It becomes a general application (GEN-…, with the CV, evaluation,
+ *  interviews, "assign to a vacancy") and an entry of the talent pool, kept for the retention of the pool. HR confirms that the candidate was informed and agreed. */
+function rcr_manual_add(array $in, array $file): int {
+    if (!rcr_can()) throw new RuntimeException(t('err.noaccess'));
+    $email = strtolower(trim((string) ($in['email'] ?? ''))); $name = mb_substr(trim(preg_replace('/\s+/u', ' ', (string) ($in['name'] ?? ''))), 0, 120);
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL) || $name === '') throw new RuntimeException(t('rc.man_err_fields'));
+    if (empty($in['informed'])) throw new RuntimeException(t('rc.man_err_consent'));
+    if (($file['error'] ?? 1) !== UPLOAD_ERR_OK || empty($file['tmp_name']) || !is_uploaded_file($file['tmp_name']) || $file['size'] > (int) cp_setting('rc_cv_max_mb', '8') * 1048576) throw new RuntimeException(t('rc.man_err_file'));
+    $mime = (string) mime_content_type($file['tmp_name']); $ext = ['application/pdf' => 'pdf', 'application/msword' => 'doc', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' => 'docx'][$mime] ?? null; if (!$ext) throw new RuntimeException(t('rc.man_err_file'));
+    $v = rcr_general_vacancy(); if (!$v) throw new RuntimeException(t('err.notfound'));
+    if (one('SELECT id FROM rc_applications WHERE vacancy_id = ? AND email = ?', [(int) $v['id'], $email])) throw new RuntimeException(t('rc.man_err_dup'));
+    $u = current_user(); $area = mb_substr(trim((string) ($in['area'] ?? '')), 0, 120); $src = mb_substr(trim((string) ($in['source'] ?? '')), 0, 120); $note = mb_substr(trim((string) ($in['note'] ?? '')), 0, 3000);
+    $months = max(1, (int) cp_setting('rc_pool_retention_months', '24')); $cover = trim(t('rc.man_cover', ['u' => (string) ($u['full_name'] ?? ''), 's' => $src !== '' ? $src : '—']) . ($note !== '' ? "\n" . $note : ''));
+    $code = rcr_code('GEN', 'rc_applications'); $dest = rcr_dir() . '/' . $code . '_' . bin2hex(random_bytes(6)) . '.' . $ext;
+    if (!move_uploaded_file($file['tmp_name'], $dest)) throw new RuntimeException(t('rc.man_err_file'));
+    try { q('INSERT INTO rc_applications (code, vacancy_id, email, name, phone, passed, knockout_ok, status, cv_path, cv_name, cover_note, department_interest, lang, source, user_agent, consent_version, consent_at, status_changed_at, keep_until, keep_reason, keep_by, pool_consent_at) VALUES (?,?,?,?,?,1,1,"cv_received",?,?,?,?,?,"hr",?,?,NOW(),NOW(),DATE_ADD(CURDATE(), INTERVAL ? MONTH),?,?,NOW())',
+        [$code, (int) $v['id'], $email, $name, mb_substr(trim((string) ($in['phone'] ?? '')), 0, 40) ?: null, $dest, mb_substr(basename((string) $file['name']), 0, 190), $cover, $area ?: null, 'en', 'HR entry', 'hr-manual', $months, mb_substr(t('rc.man_keep'), 0, 190), (int) ($u['id'] ?? 0)]); }
+    catch (Throwable $e) { @unlink($dest); if ($e instanceof PDOException && $e->getCode() === '23000') throw new RuntimeException(t('rc.man_err_dup')); throw $e; }
+    $id = (int) db()->lastInsertId();
+    if (!one('SELECT id FROM rc_talent_pool WHERE email = ?', [$email])) q('INSERT INTO rc_talent_pool (email, name, area, message, source, consent_at) VALUES (?,?,?,?,?,NOW())', [$email, $name, $area ?: null, $src !== '' ? $src : null, 'hr']);
+    rcr_log('manual_cv', ['application_id' => $id, 'vacancy_id' => (int) $v['id']], 'Added by HR · ' . ($src !== '' ? $src : '—'));
+    return $id;
+}
 function rcr_pub_register(string $evtCode, array $in, string $ip): void {
     $email = strtolower(trim((string) ($in['email'] ?? ''))); if (!filter_var($email, FILTER_VALIDATE_EMAIL) || empty($in['consent_gdpr'])) throw new RuntimeException('validation', 422);
     $e = one('SELECT e.*, (e.capacity - (SELECT COUNT(*) FROM rc_event_registrations r WHERE r.event_id = e.id)) AS seats_left FROM rc_events e WHERE e.code = ? AND e.status = "upcoming" AND e.publish_web = 1', [$evtCode]);

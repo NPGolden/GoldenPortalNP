@@ -47,9 +47,26 @@ layout_head(t('rc.title'), 'rcr_dashboard');
 <tr><td><a href="<?= url('rcr_event', ['id' => (int)$ev['id']]) ?>"><b><?= e($ev['code']) ?></b></a></td><td><a href="<?= url('rcr_event', ['id' => (int)$ev['id']]) ?>"><?= e($ev['title']) ?></a><br><span class="hint"><?= e((string)$ev['platform']) ?> · <?= (int)$ev['duration_min'] ?> min</span></td><td><?= tt('rc.kind_' . $ev['kind']) ?></td><td><?= e(fmt_datetime($ev['starts_at'])) ?></td><td><?= $st($ev['status']) ?></td><td><?= $ev['publish_web'] ? '🌐' : '—' ?></td><td><b><?= (int)$ev['n_reg'] ?></b><?= $ev['capacity'] ? ' / ' . (int)$ev['capacity'] : '' ?> <span class="hint">· <?= (int)$ev['n_att'] ?> <?= tt('rc.attended') ?></span></td></tr>
 <?php endforeach; ?></tbody></table></div></div>
 
-<?php elseif ($tab === 'pool' && rcr_can()): $rows = all('SELECT * FROM rc_talent_pool ORDER BY created_at DESC LIMIT 500'); ?>
-<div class="card"><div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('rc.candidate') ?></th><th><?= tt('rc.area') ?></th><th><?= tt('rc.message') ?></th><th><?= tt('th.date') ?></th></tr></thead><tbody>
-<?php if (!$rows): ?><tr><td colspan="4" class="empty"><?= tt('rc.none') ?></td></tr><?php endif; foreach ($rows as $r): ?>
-<tr><td><b><?= e((string)($r['name'] ?: $r['email'])) ?></b><br><span class="hint"><?= e($r['email']) ?></span></td><td><?= e((string)$r['area']) ?></td><td><?= e(mb_substr((string)$r['message'], 0, 160)) ?></td><td><?= e(fmt_datetime($r['created_at'])) ?></td></tr>
+<?php elseif ($tab === 'pool' && rcr_can()): $rows = all('SELECT * FROM rc_talent_pool ORDER BY created_at DESC LIMIT 500');
+  $cvs = []; try { foreach (all('SELECT a.id, a.code, a.email FROM rc_applications a JOIN rc_talent_pool t ON t.email = a.email WHERE a.cv_path IS NOT NULL ORDER BY a.id') as $c) $cvs[strtolower((string)$c['email'])] = $c; } catch (Throwable $e) {} ?>
+<details class="card" style="margin-bottom:12px;"<?= !empty($_GET['add']) ? ' open' : '' ?>><summary style="cursor:pointer;font-weight:700;">➕ <?= tt('rc.man_title') ?></summary>
+  <p class="hint"><?= tt('rc.man_lede') ?></p>
+  <form method="post" action="<?= url('rcr_dashboard', ['tab' => 'pool', 'add' => 1]) ?>" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="rcr_manual_add">
+    <div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;">
+      <label><?= tt('rc.man_name') ?> *<input name="name" maxlength="120" required></label>
+      <label><?= tt('rc.man_email') ?> *<input name="email" type="email" maxlength="190" required></label>
+      <label><?= tt('rc.man_phone') ?><input name="phone" maxlength="40"></label>
+      <label><?= tt('rc.area') ?><input name="area" maxlength="120"></label>
+      <label><?= tt('rc.man_source') ?><input name="source" maxlength="120" placeholder="<?= tt('rc.man_source_ph') ?>"></label>
+      <label><?= tt('rc.man_cv') ?> *<input name="cv" type="file" accept=".pdf,.doc,.docx,application/pdf" required></label>
+    </div>
+    <label style="display:block;margin-top:10px;"><?= tt('rc.man_note') ?><textarea name="note" rows="2" maxlength="3000"></textarea></label>
+    <label style="display:block;margin:10px 0;"><input type="checkbox" name="informed" value="1" required> <?= tt('rc.man_informed') ?></label>
+    <button class="btn btn--gold" type="submit"><?= tt('rc.man_save') ?></button>
+  </form>
+</details>
+<div class="card"><div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('rc.candidate') ?></th><th><?= tt('rc.area') ?></th><th><?= tt('rc.message') ?></th><th><?= tt('rc.man_cv') ?></th><th><?= tt('th.date') ?></th></tr></thead><tbody>
+<?php if (!$rows): ?><tr><td colspan="5" class="empty"><?= tt('rc.none') ?></td></tr><?php endif; foreach ($rows as $r): $cv = $cvs[strtolower((string)$r['email'])] ?? null; ?>
+<tr><td><b><?= e((string)($r['name'] ?: $r['email'])) ?></b><?= ($r['source'] ?? '') === 'hr' ? ' ' . pill('mute', t('rc.man_by_hr')) : '' ?><br><span class="hint"><?= e($r['email']) ?></span></td><td><?= e((string)$r['area']) ?></td><td><?= e(mb_substr((string)$r['message'], 0, 160)) ?></td><td><?= $cv ? '<a href="' . url('rcr_application', ['id' => (int)$cv['id']]) . '" style="font-family:var(--mono);">📄 ' . e($cv['code']) . '</a>' : '<span class="hint">—</span>' ?></td><td><?= e(fmt_datetime($r['created_at'])) ?></td></tr>
 <?php endforeach; ?></tbody></table></div></div>
 <?php endif; layout_foot();

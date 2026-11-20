@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.203.0';
+const CP_VERSION = '1.204.0';
 const CP_BUILD   = '2026-11-20';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-161', 'version' => '1.204.0', 'date' => '2026-11-20', 'title' => 'My approvals: one register per member of staff over every approval process — what waits for my decision (leave, timesheets, training, requisitions, supplier payments, engineering extra hours, BOMs, job descriptions, newsletters, equipment lists, HR assistant flows, portal change requests) and where my own requests stand; menu item with counter. Recruiting: HR adds a CV to the talent pool by hand (GEN number, CV kept with the pool, assignable to a vacancy)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-160', 'version' => '1.203.0', 'date' => '2026-11-20', 'title' => 'HR newsletters: HR › Newsletters prepares newsletters for schools and recruiting partners with the newsletter module of Web Sales (same template, mailbox, daily ceiling and approval by CEO / General Manager), with the results of every issue; a register of schools and recruiting partners with their contact persons; five new organisation types. HR issues and sales issues are kept apart.', 'db' => 'install/migrate_cp_r97_160_nl_dept.sql', 'check' => 'r98y'],
         ['ref' => 'GAS-CP-R97-159', 'version' => '1.202.1', 'date' => '2026-11-20', 'title' => 'All tab menus of the portal (Recruiting, Payables, HR, Inventory, Settings and the others) stand on the pale gold band with the gold base line and show the open tab in navy, as on the subproject page; pages whose open tab was not marked at all (for example Recruiting) now mark it.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-158', 'version' => '1.202.0', 'date' => '2026-11-20', 'title' => 'Recruiting: general applications — a CV sent from the website Careers page without a vacancy becomes an applicant record numbered GEN-YYYY-NNNN (CV mandatory, no screening), listed under «General applications» with the same card, evaluations, interviews and 6-month retention; «Assign to a vacancy» on the card moves the candidate into the pipeline of a vacancy and keeps the number. Golden HR 1.1.1 shows them under the filter General.', 'db' => null, 'check' => null],
