@@ -3760,3 +3760,8 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Language keys `rc.general*`, `rc.assign_*` (12) in en, el, it, bg, uk — 12 438 keys each.
 - Website (`goldenas-website`): `careers.html` section `#general` «Send us your CV», `hr/careers-b.js` `submitGeneral()`, proxy `api/hr.php` `r=general` (honeypot, checks, site key stays on the server).
 - No database change. Cybersecurity: the public route accepts a file only with the site key (held by the website server), is rate-limited per address, checks the real file type and size, stores outside the web root and never echoes data about other candidates; duplicate check answers 409 only for the same address on the same list (as vacancy applications do).
+
+## §443 v1.202.1 (R97-159) — Every tab menu on the gold band
+
+- `assets/portal.css`: the band of R97-152 moved from `.tabs.tabs-band` to `.tabs` (all 32 tab menus); the open tab is recognised as `.is-on`, `.on`, `.active` or `aria-current="page"` — `rcr_dashboard.php` and three other views use `.on`, which had no style at all. Dark theme the same way. The class `tabs-band` on the subproject menu is now redundant and harmless.
+- No database change, no view changed. Cybersecurity: style sheet only; nothing to report.

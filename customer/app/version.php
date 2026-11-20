@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.202.0';
+const CP_VERSION = '1.202.1';
 const CP_BUILD   = '2026-11-20';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-159', 'version' => '1.202.1', 'date' => '2026-11-20', 'title' => 'All tab menus of the portal (Recruiting, Payables, HR, Inventory, Settings and the others) stand on the pale gold band with the gold base line and show the open tab in navy, as on the subproject page; pages whose open tab was not marked at all (for example Recruiting) now mark it.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-158', 'version' => '1.202.0', 'date' => '2026-11-20', 'title' => 'Recruiting: general applications — a CV sent from the website Careers page without a vacancy becomes an applicant record numbered GEN-YYYY-NNNN (CV mandatory, no screening), listed under «General applications» with the same card, evaluations, interviews and 6-month retention; «Assign to a vacancy» on the card moves the candidate into the pipeline of a vacancy and keeps the number. Golden HR 1.1.1 shows them under the filter General.', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-157', 'version' => '1.201.1', 'date' => '2026-11-20', 'title' => 'Sign-in page: the sign-in card, the language selector, the «Need access?» line and the Mobile apps block are centred in one column of the same width (the longer access line had pushed the card to the left).', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-156', 'version' => '1.201.0', 'date' => '2026-11-20', 'title' => 'Golden HR 1.1.0 (iPhone app for the HR role, Owner and CEO): new opening screen Today with everything that waits; Recruiting (candidates by stage, CV reader, move or reject with reason, evaluations with scores, interviews); job-description approvals (department manager, General Manager, CEO); the HR year with delays; documents that expire in 30 / 60 / 90 days (contracts, training certificates, work permits, equipment); equipment handover and issue lists. Candidates are read live and never stored on the phone; decisions are confirmed with the authenticator code.', 'db' => null, 'check' => null],
