@@ -17,6 +17,7 @@ layout_head($o['po_no'] . ' · ' . $o['title'], 'equipment');
   <div class="btn-row"><a class="btn btn--ghost" href="<?= url('production_pdf', ['id' => $id]) ?>" target="_blank">⤓ <?= tt('pd.card') ?> PDF</a><?php if ($can): ?><a class="btn btn--ghost" href="<?= url('production_edit', ['id' => $id]) ?>">✎ <?= tt('btn.edit') ?></a><?php endif; ?></div>
 </div>
 
+<?php if (function_exists('hrf_html')): ?><div class="card card--tight" id="pd-flow" style="margin-bottom:12px;"><?= hrf_html(pd_flow($o)) ?></div><?php endif; /* R97-164 */ ?>
 <div class="card card--tight pd-ms">
   <?php foreach (PD_OPEN as $i => $st): ?><div class="pd-ms__step pd-ms__step--<?= $ms[$st] ?>"><span class="pd-ms__dot"><?= $ms[$st] === 'done' ? '✓' : $i + 1 ?></span><span><?= e(pd_status_label($st)) ?></span></div><?php endforeach; ?>
   <div class="pd-ms__step pd-ms__step--<?= $o['status'] === 'closed' ? 'done' : ($o['status'] === 'cancelled' ? 'off' : 'todo') ?>"><span class="pd-ms__dot"><?= $o['status'] === 'closed' ? '✓' : '●' ?></span><span><?= e(pd_status_label($o['status'] === 'cancelled' ? 'cancelled' : 'closed')) ?></span></div>

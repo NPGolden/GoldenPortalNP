@@ -37,7 +37,8 @@ layout_head(t('pd.title'), 'equipment');
 </form>
 <div class="card">
   <?php if (!$rows): ?><p class="hint"><?= tt('pd.none') ?></p><?php else: ?>
-  <div class="table-scroll"><table class="tbl pd-tbl"><thead><tr><th><?= tt('pd.no') ?></th><th><?= tt('pd.order') ?></th><th><?= tt('th.vessel') ?></th><th><?= tt('pr.one') ?></th><th><?= tt('pd.units') ?></th><?php if ($psOk = function_exists('ps_has') && ps_has()): ?><th><?= tt('ps.short') ?></th><?php endif; ?><th><?= tt('pd.manager') ?></th><th><?= tt('pd.planned') ?></th><th><?= tt('th.status') ?></th><th class="num">%</th><th><?= tt('pd.last') ?></th></tr></thead><tbody>
+  <div class="table-scroll"><table class="tbl pd-tbl"><thead><tr><th><?= tt('pd.no') ?></th><th><?= tt('pd.order') ?></th><th><?= tt('th.vessel') ?></th><th><?= tt('pr.one') ?></th><th><?= tt('pd.units') ?></th><?php if ($psOk = function_exists('ps_has') && ps_has()): ?><th><?= tt('ps.short') ?></th><?php endif; ?><th><?= tt('pd.manager') ?></th><th><?= tt('pd.planned') ?></th><th><?= tt('th.status') ?></th><th><?= tt('pof.col') ?></th><th class="num">%</th><th><?= tt('pd.last') ?></th></tr></thead><tbody>
+  <?php $pdFlowD = function_exists('pd_flow_data') ? pd_flow_data(array_column($rows, 'id')) : [];   /* R97-164: the evidence of the page in three queries */ ?>
   <?php foreach ($rows as $o): $late = $o['planned_end'] && in_array($o['status'], PD_OPEN, true) && $o['planned_end'] < date('Y-m-d'); ?>
     <tr class="<?= in_array($o['status'], ['closed', 'cancelled'], true) ? 'is-muted' : '' ?>">
       <td class="mono"><a href="<?= url('production_order', ['id' => (int)$o['id']]) ?>"><b><?= e($o['po_no']) ?></b></a></td>
@@ -49,6 +50,7 @@ layout_head(t('pd.title'), 'equipment');
       <td><?= e($o['manager'] ?: '—') ?></td>
       <td class="hint<?= $late ? ' is-late' : '' ?>"><?= $o['planned_start'] ? e(fmt_date($o['planned_start'])) : '…' ?> – <?= $o['planned_end'] ? e(fmt_date($o['planned_end'])) : '…' ?><?= $late ? ' ' . pill('bad', t('pd.late')) : '' ?></td>
       <td><?= pd_status_pill($o['status']) ?></td>
+      <td><?= function_exists('pd_flow') && function_exists('hrf_html') ? hrf_html(pd_flow($o, $pdFlowD[(int)$o['id']] ?? null), true) : '' ?></td>
       <td class="num"><b><?= (int)$o['pct'] ?> %</b><?= pd_pct_bar((int)$o['pct']) ?></td>
       <td class="hint"><?= $o['last_event'] ? e(fmt_datetime($o['last_event'])) : '—' ?></td>
     </tr>

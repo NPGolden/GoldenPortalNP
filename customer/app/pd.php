@@ -21,6 +21,44 @@ const PD_UPCT     = ['pending' => 0, 'in_production' => 25, 'tested' => 60, 'del
 /** Document phases of an order — in the order of the life cycle. [sp_files kind, default visibility] */
 const PD_PHASES   = ['draft' => ['drawing', 'internal'], 'approved' => ['drawing', 'external'], 'asbuilt' => ['drawing', 'external'], 'fat' => ['fat', 'external'], 'photo' => ['photo', 'internal'],
                      'delivery' => ['other', 'external'], 'hat' => ['hat', 'external'], 'commissioning' => ['commissioning_report', 'external'], 'sat' => ['sat', 'external'], 'subcontract' => ['other', 'internal'], 'other' => ['other', 'internal']];
+/* ── Process flow of a production order (R97-164) — same indicator as the purchase orders (hrf_html) ── */
+/** Evidence of several orders in three queries: units per status with their average %, documents per phase, subcontract lines per status (and the late ones). */
+function pd_flow_data(array $ids): array {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids)))); $D = []; if (!$ids || !pd_has()) return $D; $in = implode(',', $ids);
+    foreach ($ids as $i) $D[$i] = ['u' => [], 'n' => 0, 'pct' => 0, 'f' => [], 's' => [], 's_late' => 0];
+    try {
+        foreach (all("SELECT order_id, status, COUNT(*) n, SUM(pct) p FROM production_units WHERE order_id IN ($in) AND status <> 'cancelled' GROUP BY order_id, status") as $r) { $o = (int)$r['order_id']; $D[$o]['u'][$r['status']] = (int)$r['n']; $D[$o]['n'] += (int)$r['n']; $D[$o]['pct'] += (int)$r['p']; }
+        foreach ($D as &$d) { $d['pct'] = $d['n'] ? (int) round($d['pct'] / $d['n']) : 0; } unset($d);
+        foreach (all("SELECT order_id, phase, COUNT(*) n FROM production_files WHERE order_id IN ($in) GROUP BY order_id, phase") as $r) $D[(int)$r['order_id']]['f'][$r['phase']] = (int)$r['n'];
+        if (ps_has()) foreach (all("SELECT order_id, status, COUNT(*) n, SUM(due_at IS NOT NULL AND due_at < CURDATE() AND status IN ('planned','ordered','in_production')) l FROM production_subs WHERE order_id IN ($in) AND status <> 'cancelled' GROUP BY order_id, status") as $r) { $D[(int)$r['order_id']]['s'][$r['status']] = (int)$r['n']; $D[(int)$r['order_id']]['s_late'] += (int)$r['l']; }
+    } catch (Throwable $e) {}
+    return $D;
+}
+/** The flow of one order: design → production → subcontracting → FAT → delivered → HAT → commissioning → SAT → closed.
+ *  Steps [key, label, state (done | run | todo | na | bad), note, url] — drawn by hrf_html(). No amounts. */
+function pd_flow(array $o, ?array $d = null): array {
+    $id = (int)$o['id']; $d = $d ?? (pd_flow_data([$id])[$id] ?? ['u' => [], 'n' => 0, 'pct' => 0, 'f' => [], 's' => [], 's_late' => 0]);
+    $st = (string)$o['status']; $self = url('production_order', ['id' => $id]); $cancel = $st === 'cancelled'; $closed = $st === 'closed';
+    $rank = array_flip(PD_OPEN); $cur = $closed ? 99 : ($rank[$st] ?? -1); $n = (int)$d['n']; $ur = array_flip(PD_USTATUSES);
+    $reached = function (string $min) use ($d, $ur): int { $c = 0; foreach ($d['u'] as $k => $v) if (($ur[$k] ?? 0) >= $ur[$min]) $c += $v; return $c; };
+    $late = !empty($o['planned_end']) && $o['planned_end'] < date('Y-m-d') && isset($rank[$st]);
+    $S = []; $add = function (string $k, string $label, string $state, string $note = '', string $anchor = '') use (&$S, $self, $cancel) { $S[] = ['key' => $k, 'label' => $label, 'state' => $cancel && $state !== 'done' ? 'na' : $state, 'note' => $note, 'url' => $self . $anchor]; };
+    $share = fn(int $a) => $n ? t('pdf.n_share', ['a' => $a, 'b' => $n]) : ''; $docs = fn(string $ph) => !empty($d['f'][$ph]) ? t('pdf.n_docs', ['n' => (int)$d['f'][$ph]]) : ''; $join = fn(string ...$x) => implode(' · ', array_filter($x, fn($v) => $v !== ''));
+    /* generic step of the life cycle: done once the order is past it, running (red when late) while it is there, running too when units already show it */
+    $step = function (string $k, int $done) use ($cur, $rank, $n, $late): string { $r = $rank[$k]; if ($cur > $r) return 'done'; if ($cur === $r) return $late ? 'bad' : 'run'; return $n && $done > 0 ? 'run' : 'todo'; };
+    $dr = (int)($d['f']['draft'] ?? 0); $ap = (int)($d['f']['approved'] ?? 0) + (int)($d['f']['asbuilt'] ?? 0);
+    $add('design', t('pd.s_design'), $step('design', $ap), $dr + $ap ? t('pdf.n_draw', ['a' => $dr, 'b' => $ap]) : '', '#docs');
+    $add('production', t('pd.s_production'), $step('production', $reached('in_production')), $join($n ? t('pdf.n_units', ['n' => $n, 'p' => (int)$d['pct']]) : '', $late && $cur <= $rank['production'] ? t('pdf.n_late', ['d' => fmt_date($o['planned_end'])]) : ''), '#units');
+    $sn = array_sum($d['s']); $sa = (int)($d['s']['accepted'] ?? 0); $so = (int)($d['s']['ordered'] ?? 0) + (int)($d['s']['in_production'] ?? 0); $sr = (int)($d['s']['rejected'] ?? 0);
+    $add('sub', t('ps.short'), !$sn ? 'na' : ($sr || $d['s_late'] ? 'bad' : ($sa >= $sn ? 'done' : ($sn - (int)($d['s']['planned'] ?? 0) > 0 ? 'run' : 'todo'))), $sn ? $join(t('pdf.n_sub', ['n' => $sn, 'o' => $so, 'a' => $sa]), $sr ? t('pdf.n_rejected', ['n' => $sr]) : '', $d['s_late'] ? t('pdf.n_sub_late', ['n' => (int)$d['s_late']]) : '') : '', '#subs');
+    $add('fat', t('pd.s_fat'), $step('fat', $reached('tested')), $join($share($reached('tested')), $docs('fat')), '#docs');
+    $add('delivered', t('pd.s_delivered'), $step('delivered', $reached('delivered')), $join($share($reached('delivered')), $docs('delivery')), '#units');
+    $add('hat', t('pd.s_hat'), $step('hat', $reached('installed')), $join($share($reached('installed')), $docs('hat')), '#docs');
+    $add('commissioning', t('pd.s_commissioning'), $step('commissioning', $reached('commissioned')), $join($share($reached('commissioned')), $docs('commissioning')), '#docs');
+    $add('sat', t('pd.s_sat'), $step('sat', $reached('accepted')), $join($share($reached('accepted')), $docs('sat')), '#docs');
+    $add('closed', t('pd.s_closed'), $closed ? 'done' : 'todo');
+    return $S;
+}
 /* Subcontracted / external production (R41-003): a scope line per order — the whole equipment of a unit or a part of the work. */
 const PS_STATUSES = ['planned', 'ordered', 'in_production', 'delivered', 'inspected', 'accepted', 'rejected', 'cancelled'];
 const PS_TONE     = ['planned' => 'mute', 'ordered' => 'navy', 'in_production' => 'gold', 'delivered' => 'blue', 'inspected' => 'navy', 'accepted' => 'green', 'rejected' => 'bad', 'cancelled' => 'mute'];

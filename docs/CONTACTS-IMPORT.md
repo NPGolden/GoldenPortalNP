@@ -3800,3 +3800,11 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Fix (`customer/app/pd.php`): `ps_counts()` counts over the same joins and project scope as the list; `pd_delete()` deletes the order's subcontract lines; `ps_orphans_purge()` removes lines left by earlier deletions (runs with the next order deletion). No database change, no new language keys.
 - Cybersecurity: the counter now respects the viewer's project scope like the list (it counted all projects before).
 
+## §448 Production — process flow indicator on the list and the order (GAS-CP-R97-164, v1.206.0)
+
+- `customer/app/pd.php`: `pd_flow_data(array $ids)` — evidence of all orders of the page in three queries (units per status with average %, documents per phase, subcontract lines per status and the late ones); `pd_flow(array $o, ?array $d)` — nine steps `design, production, sub, fat, delivered, hat, commissioning, sat, closed` in the format of `hrf_html()` (same drawing as `po_flow()`).
+- States: done = the order status is past the step; run = the order is at the step, or units already reached it; bad = at the step with `planned_end` passed, or subcontract line late / rejected; na = no subcontract lines, or order cancelled.
+- Views: `production.php` (column Progress, compact), `production_order.php` (full flow above the milestones, id `pd-flow`).
+- Language keys: 8 `pdf.n_*` in en, el, it, bg, uk — 12 559 keys each. No database change.
+- Cybersecurity: read-only, staff only (the views already require it), ids cast to integers, no amounts in the indicator. Performance: three queries per list page, independent of the number of orders.
+
