@@ -3743,3 +3743,8 @@ Not sent to the app: screening answers, IP / user agent of a candidate, CV path,
 No database change. No push notifications yet: the portal stores the device token but has no sender (needs an Apple push key).
 
 Cybersecurity: every write goes through the portal's own functions (rights, logs, retention clock unchanged); decisions on candidates, job descriptions and equipment use the authenticator step-up; rate limits per user; CV views logged; candidate data not persisted on the device. Proposal: make the authenticator (or a passkey) mandatory for accounts that use Golden HR, because without one the step-up is skipped.
+
+## §441 v1.201.1 (R97-157) — Sign-in page centred
+
+- `assets/portal.css`: `.gate > div { width: 100%; max-width: 420px; }` — the column of the sign-in and two-factor pages is 420 px wide and centred; before, the widest line under the card (the access line with its link since v1.199.1) set the column width and the 420 px card stood at its left.
+- No database change. Cybersecurity: style sheet only; nothing to report.

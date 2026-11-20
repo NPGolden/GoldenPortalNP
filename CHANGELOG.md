@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.201.0** (build 2026-11-20). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.201.1** (build 2026-11-20). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.201.1 | GAS-CP-R97-157 | 2026-11-20 | Sign-in page: the sign-in card, the language selector, the «Need access?» line and the Mobile apps block are centred in one column of the same width (the longer access line had pushed the card to the left). | — |
 | 1.201.0 | GAS-CP-R97-156 | 2026-11-20 | Golden HR 1.1.0 (iPhone app for the HR role, Owner and CEO): new opening screen Today with everything that waits; Recruiting (candidates by stage, CV reader, move or reject with reason, evaluations with scores, interviews); job-description approvals (department manager, General Manager, CEO); the HR year with delays; documents that expire in 30 / 60 / 90 days (contracts, training certificates, work permits, equipment); equipment handover and issue lists. Candidates are read live and never stored on the phone; decisions are confirmed with the authenticator code. | — |
 | 1.200.0 | GAS-CP-R97-155 | 2026-11-20 | Payables: payment requests waiting for your approval are shown so that none is forgotten — a line each in «Needs your attention» on the home page, a red counter on Payables in the side menu, and a tile and filter «Awaiting my approval» on the Payables page (Management: with Management and with Accounting; Accounting: with Accounting). | — |
 | 1.199.1 | GAS-CP-R97-154 | 2026-11-20 | Sign-in page: under «Need access?» a link «Request portal access» opens the Customer Portal access page of the website (goldenas.com.gr/portal-access.html). | — |

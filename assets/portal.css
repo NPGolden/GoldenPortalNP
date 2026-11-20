@@ -259,6 +259,7 @@ tr:last-child td { border-bottom: 0; }
   border-radius: 14px; padding: 34px 32px; box-shadow: 0 24px 60px rgba(0,0,0,.35);
 }
 .gate-card img.logo { width: 220px; display: block; margin: 0 auto 18px; }
+.gate > div { width: 100%; max-width: 420px; }   /* R97-157: one centred column — a long line under the card no longer widens it */
 .gate-foot { text-align: center; color: #8FA0AE; font-size: 12px; margin-top: 16px; }
 .gate-foot a { color: var(--gold); }
 
