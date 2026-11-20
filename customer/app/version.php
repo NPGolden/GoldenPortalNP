@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.206.1';
+const CP_VERSION = '1.207.0';
 const CP_BUILD   = '2026-11-20';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-166', 'version' => '1.207.0', 'date' => '2026-11-20', 'title' => 'Community: a post can carry a YouTube video — new kind Video for everybody and an optional video link on posts, polls and photos; the player loads only when Play is pressed (privacy-enhanced YouTube)', 'db' => 'install/migrate_cp_r97_166_soc_video.sql', 'check' => 'r98z'],
         ['ref' => 'GAS-CP-R97-165', 'version' => '1.206.1', 'date' => '2026-11-20', 'title' => 'Sub-project › Process: the production flow of every production order of the sub-project is shown below the stage percentages', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-164', 'version' => '1.206.0', 'date' => '2026-11-20', 'title' => 'Production: process flow indicator on the list and on the order, as on the purchase orders — design, production, subcontracting, FAT, delivered, HAT, commissioning, SAT, closed, with units, documents and late warnings per step', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-163', 'version' => '1.205.1', 'date' => '2026-11-20', 'title' => 'Production › Subcontracting: the counter on the tab and the four figures count only lines of existing orders — deleting a production order removes its subcontract lines', 'db' => null, 'check' => null],
@@ -611,6 +612,7 @@ function cp_migration_state(): array {
         'r97q' => $has("SHOW TABLES LIKE 'nl_lists'"),
         'r97r' => $has("SHOW COLUMNS FROM sb_budgets LIKE 'proc_state'") && $has("SHOW COLUMNS FROM sb_parts LIKE 'proc_at'"),
         'r98y' => $has("SHOW COLUMNS FROM nl_issues LIKE 'dept'"),
+        'r98z' => $has("SHOW COLUMNS FROM soc_posts LIKE 'video_id'"),
         'r98x' => $has("SHOW INDEX FROM inv_moves WHERE Key_name = 'ix_invmv_item_kind_at'"),
         'r98w' => $has("SHOW TABLES LIKE 'po_lots'") && $has("SHOW COLUMNS FROM po_lines LIKE 'lot_id'"),
         'r98v' => $has("SHOW COLUMNS FROM po_receipt_lines LIKE 'dest_qty'"),

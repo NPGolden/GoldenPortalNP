@@ -147,7 +147,7 @@ header('Referrer-Policy: same-origin');
  * Mode from Settings › Login history: on (default) | report (Content-Security-Policy-Report-Only, violations in storage/csp.log) | off. */
 $cspMode = function_exists('sec_csp_mode') ? sec_csp_mode() : 'on';
 if ($cspMode !== 'off') {
-    $csp = "default-src 'self'; script-src 'self' 'nonce-" . csp_nonce() . "'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.open-meteo.com; frame-src 'self'; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" . ($cspMode === 'report' ? '; report-uri index.php?p=csp_report' : '');
+    $csp = "default-src 'self'; script-src 'self' 'nonce-" . csp_nonce() . "'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' https://api.open-meteo.com; frame-src 'self'" . ((string)($_GET['p'] ?? '') === 'community' ? ' https://www.youtube-nocookie.com' : '') . "; frame-ancestors 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" . ($cspMode === 'report' ? '; report-uri index.php?p=csp_report' : '');
     header(($cspMode === 'report' ? 'Content-Security-Policy-Report-Only: ' : 'Content-Security-Policy: ') . $csp);
 }
 header('Permissions-Policy: camera=(self), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()');

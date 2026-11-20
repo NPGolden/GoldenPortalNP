@@ -70,12 +70,30 @@ function soc_kudos_top(string $from, string $to, int $n = 5): array { $skip = fu
     return soc_has() ? all('SELECT k.to_user_id uid, cu.full_name, COUNT(*) n FROM soc_kudos k JOIN customer_users cu ON cu.id = k.to_user_id WHERE k.created_at BETWEEN ? AND ?' . $ex . ' GROUP BY k.to_user_id, cu.full_name ORDER BY n DESC, cu.full_name LIMIT ' . (int)$n, [$from, $to . ' 23:59:59']) : []; }
 
 /* ------------------------------------------------------------------ noticeboard: posts, polls, photos */
+/** R97-166: YouTube videos in the feed. The column arrives with migrate_cp_r97_166_soc_video.sql; until then the field is not offered. */
+function soc_video_has(): bool { static $h = null; if ($h === null) { try { $h = soc_has() && (bool) scalar("SHOW COLUMNS FROM soc_posts LIKE 'video_id'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** The 11-character video id of a YouTube link (watch, youtu.be, shorts, live, embed) — null for anything else. Only the id is ever stored. */
+function soc_yt_id(string $url): ?string {
+    $url = trim($url); if ($url === '' || strlen($url) > 300) return null; if (!preg_match('~^https?://~i', $url)) $url = 'https://' . $url;
+    $u = parse_url($url); if (!$u || empty($u['host'])) return null; $h = strtolower(preg_replace('/^(www\.|m\.|music\.)/i', '', $u['host'])); $path = (string)($u['path'] ?? ''); $id = null;
+    if ($h === 'youtu.be') $id = ltrim($path, '/');
+    elseif ($h === 'youtube.com' || $h === 'youtube-nocookie.com') { if ($path === '/watch') { parse_str((string)($u['query'] ?? ''), $qs); $id = is_string($qs['v'] ?? null) ? $qs['v'] : null; } elseif (preg_match('~^/(?:shorts|embed|live|v)/([^/?#]+)~', $path, $m)) $id = $m[1]; }
+    return is_string($id) && preg_match('/^[A-Za-z0-9_-]{11}$/', $id) ? $id : null;
+}
+/** The video of a post: nothing is loaded from YouTube until the reader presses Play (community.php turns the button into the player). */
+function soc_video_html(?string $vid): string {
+    if (!$vid || !preg_match('/^[A-Za-z0-9_-]{11}$/', $vid)) return '';
+    return '<div class="soc-yt" data-yt="' . e($vid) . '" style="position:relative;max-width:640px;aspect-ratio:16/9;background:#1F3A5F;border-radius:8px;margin-bottom:8px;overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;">'
+         . '<button type="button" class="btn btn--gold soc-yt-play">▶ ' . e(t('soc.yt_play')) . '</button><span style="color:#fff;font-size:12px;opacity:.85;text-align:center;padding:0 12px;">' . e(t('soc.yt_note')) . '</span>'
+         . '<a href="https://www.youtube.com/watch?v=' . e($vid) . '" target="_blank" rel="noopener noreferrer" style="color:#E7C766;font-size:12px;">' . e(t('soc.yt_open')) . ' ↗</a></div>';
+}
 function soc_post_create(): int {
-    if (!soc_has()) throw new RuntimeException(t('err.notfound')); $kind = in_array($_POST['kind'] ?? '', ['post', 'poll', 'photo'], true) ? $_POST['kind'] : 'post';
-    if (($kind !== 'photo') && !soc_can_post()) throw new RuntimeException(t('err.noaccess'));   // everybody may share a photo; posts and polls come from HR, managers, PMs and administrators
+    if (!soc_has()) throw new RuntimeException(t('err.notfound')); $kind = in_array($_POST['kind'] ?? '', ['post', 'poll', 'photo', 'video'], true) ? $_POST['kind'] : 'post'; if ($kind === 'video' && !soc_video_has()) $kind = 'post';
+    if (($kind !== 'photo' && $kind !== 'video') && !soc_can_post()) throw new RuntimeException(t('err.noaccess'));   // everybody may share a photo; posts and polls come from HR, managers, PMs and administrators
     $title = mb_substr(trim((string)($_POST['title'] ?? '')), 0, 200); if ($title === '') throw new RuntimeException(t('soc.need_title'));
     $body = mb_substr(trim((string)($_POST['body'] ?? '')), 0, 8000) ?: null; $pin = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['pinned_until'] ?? '')) && soc_can_post() ? $_POST['pinned_until'] : null; $closes = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['closes_at'] ?? '')) ? $_POST['closes_at'] : null;
     $stored = null; $mime = null;
+    $vid = null; $vurl = trim((string)($_POST['video_url'] ?? '')); if (soc_video_has() && ($kind === 'video' || $vurl !== '')) { $vid = soc_yt_id($vurl); if (!$vid) throw new RuntimeException(t('soc.need_video')); }   // R97-166
     $f = $_FILES['photo'] ?? null; $hasFile = $f && ($f['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_NO_FILE;   // R70-002: a photo may accompany any post; it is required only for the photo kind
     if ($hasFile && ($f['error'] ?? 1) === UPLOAD_ERR_INI_SIZE) throw new RuntimeException(t('soc.photo_too_big'));
     if ($kind === 'photo' || $hasFile) { if (!$f || ($f['error'] ?? 1) !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name']) || $f['size'] > 12 * 1024 * 1024) throw new RuntimeException(t('soc.need_photo'));
@@ -83,8 +101,9 @@ function soc_post_create(): int {
         $mime = (string)(function_exists('mime_content_type') ? @mime_content_type($f['tmp_name']) : ''); if (!str_starts_with($mime, 'image/')) throw new RuntimeException(t('soc.need_photo'));
         $dir = cp_storage() . '/_soc'; if (!is_dir($dir)) @mkdir($dir, 0755, true); $stored = '_soc/' . date('Ymd') . '_' . bin2hex(random_bytes(6)) . '.' . $ext; if (!move_uploaded_file($f['tmp_name'], cp_storage() . '/' . $stored)) throw new RuntimeException(t('soc.need_photo')); }
     q('INSERT INTO soc_posts (user_id, kind, title, body, stored_name, mime_type, pinned_until, closes_at) VALUES (?,?,?,?,?,?,?,?)', [soc_me(), $kind, $title, $body, $stored, $mime, $pin, $closes]); $id = (int) db()->lastInsertId();
+    if ($vid) q('UPDATE soc_posts SET video_id = ? WHERE id = ?', [$vid, $id]);
     if ($kind === 'poll') { $opts = array_values(array_filter(array_map(fn($o) => mb_substr(trim((string)$o), 0, 120), (array)($_POST['options'] ?? [])), fn($o) => $o !== '')); if (count($opts) < 2) throw new RuntimeException(t('soc.need_options')); foreach (array_slice($opts, 0, 8) as $i => $o) q('INSERT INTO soc_post_options (post_id, idx, label) VALUES (?,?,?)', [$id, $i, $o]); }
-    if ($kind !== 'photo' || !empty($_POST['notify'])) soc_notify(array_keys(soc_staff()), 'soc:post', 'soc:post:' . $id, ($kind === 'poll' ? '🗳 ' : ($kind === 'photo' ? '📷 ' : '📌 ')) . $title, $body, url('community') . '#post' . $id);
+    if (($kind !== 'photo' && $kind !== 'video') || !empty($_POST['notify'])) soc_notify(array_keys(soc_staff()), 'soc:post', 'soc:post:' . $id, ($kind === 'poll' ? '🗳 ' : ($kind === 'video' ? '🎬 ' : ($kind === 'photo' ? '📷 ' : '📌 '))) . $title, $body, url('community') . '#post' . $id);
     return $id;
 }
 function soc_post_delete(int $id): void { $p = one('SELECT * FROM soc_posts WHERE id = ?', [$id]); if (!$p) return; if ((int)$p['user_id'] !== soc_me() && !is_cp_admin() && !(function_exists('hr_can') && hr_can())) throw new RuntimeException(t('err.noaccess')); if ($p['stored_name']) @unlink(cp_storage() . '/' . $p['stored_name']); foreach (['soc_post_options', 'soc_post_votes', 'soc_post_reactions', 'soc_post_comments'] as $tb) q("DELETE FROM $tb WHERE post_id = ?", [$id]); q('DELETE FROM soc_posts WHERE id = ?', [$id]); }

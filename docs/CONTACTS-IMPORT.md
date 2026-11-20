@@ -3814,3 +3814,12 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Language key `pd.flow_title` in en, el, it, bg, uk — 12 560 keys each. No database change.
 - Cybersecurity: read-only, parameterised query, no amounts.
 
+## §450 Community — YouTube videos in posts (GAS-CP-R97-166, v1.207.0)
+
+- Migration `install/migrate_cp_r97_166_soc_video.sql` (check `r98z`): `soc_posts.kind` gains `video`, new column `soc_posts.video_id VARCHAR(20)`.
+- `customer/app/soc.php`: `soc_video_has()` (column present), `soc_yt_id()` (accepts only hosts youtube.com / youtu.be / youtube-nocookie.com with or without www., m., music.; paths `/watch?v=`, `/shorts/`, `/live/`, `/embed/`, `/v/`; the id must match `[A-Za-z0-9_-]{11}`), `soc_video_html()`; `soc_post_create()` takes `video_url` (required for kind `video`, optional otherwise). Kind `video` may be posted by everybody, like a photo.
+- `views/community.php`: kind Video, field YouTube video link, feed tab Video, player placeholder; the page script (with nonce) builds the `iframe` to `https://www.youtube-nocookie.com/embed/<id>` only on the click of Play, with `sandbox` and `referrerpolicy="strict-origin-when-cross-origin"` (YouTube refuses an embed without referrer; the portal's own policy stays `same-origin`).
+- `index.php`: `frame-src` of the Content-Security-Policy adds `https://www.youtube-nocookie.com` on the page `community` only.
+- Language keys: 7 `soc.*` in en, el, it, bg, uk — 12 567 keys each.
+- Cybersecurity: the link is never stored or printed — only the validated 11-character id; no thumbnail or script is fetched from Google before the click, so opening the feed tells YouTube nothing; the frame is sandboxed and can be shown on one page only. No effect on page speed (no extra request until Play).
+
