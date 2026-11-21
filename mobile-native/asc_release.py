@@ -100,8 +100,13 @@ log("version localisation", LOC, "ok", "(what's new skipped: first release)" if 
 files = sorted(glob.glob(f"store/{APP}/screenshots/*.png"))
 locked = ver["attributes"]["appStoreState"] in ("READY_FOR_REVIEW", "WAITING_FOR_REVIEW")   # screenshots and the build cannot change while the version sits in a submission
 if locked: log("screenshots kept (version is", ver["attributes"]["appStoreState"] + ")")
-if files and not locked:
+same = False
+if files and not locked:   # unchanged screenshots stay: replacing them puts the version back into processing and a submission would be refused
     sets = req("GET", f"/appStoreVersionLocalizations/{vloc['id']}/appScreenshotSets", params={"include": "appScreenshots"})
+    have = sorted((x["attributes"].get("fileName"), x["attributes"].get("fileSize")) for x in sets.get("included", []) if x["type"] == "appScreenshots")
+    same = have == sorted((os.path.basename(f), os.path.getsize(f)) for f in files)
+    if same: log("screenshots unchanged —", len(files), "kept")
+if files and not locked and not same:
     sset = next((s for s in sets["data"] if s["attributes"]["screenshotDisplayType"] == "APP_IPHONE_67"), None)
     if sset:
         for sc in sets.get("included", []):
@@ -143,6 +148,7 @@ if afiles and rd:
     old = req("GET", f"/appStoreReviewDetails/{rd['id']}/appStoreReviewAttachments").get("data", [])
     for f in afiles:
         data = open(f, "rb").read(); name = os.path.basename(f)
+        if any(o["attributes"].get("fileName") == name and o["attributes"].get("fileSize") == len(data) for o in old): log("review attachment", name, "unchanged — kept"); continue
         for o in old:
             if o["attributes"].get("fileName") == name: req("DELETE", f"/appStoreReviewAttachments/{o['id']}")
         at = req("POST", "/appStoreReviewAttachments", json={"data": {"type": "appStoreReviewAttachments", "attributes": {"fileName": name, "fileSize": len(data)}, "relationships": {"appStoreReviewDetail": rel("appStoreReviewDetails", rd["id"])}}})["data"]
