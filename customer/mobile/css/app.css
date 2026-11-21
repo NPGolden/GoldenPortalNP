@@ -137,3 +137,4 @@ table.week { width: 100%; border-collapse: collapse; } .week tr { border-bottom:
 /* R97-182 In / Out */
 .io-now { text-align: center; padding: 18px 14px; } .io-state { font-size: 20px; font-weight: 700; color: var(--navy); } .io-state small { font-weight: 400; color: var(--grey); font-size: 13px; }
 .io-btn { width: 100%; font-size: 20px; padding: 18px; margin: 14px 0 8px; border-radius: 14px; } .card.c-green { border-left: 4px solid var(--green); }
+.io-notice { white-space: pre-line; font-size: 14px; line-height: 1.45; } .io-agree { display: flex; gap: 10px; align-items: flex-start; margin: 12px 0 4px; font-weight: 600; color: var(--navy); } .io-agree input { width: 22px; height: 22px; flex: 0 0 auto; margin-top: 1px; }

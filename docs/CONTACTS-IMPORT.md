@@ -3960,3 +3960,14 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Tested: 25 checks of the rules against a MariaDB test database (time zones, flags, uuid, overtime, cross-check, rights, network address); every tab of the page rendered on test data; both apps in a browser with and without a position. Not tested on the live portal or on a phone.
 - Cybersecurity: position is personal data — one fix per punch, no background tracking; statistics limited to three roles; map links are plain https links with `rel="noopener noreferrer"`; all queries parameterised, CSRF on every action; the portal punch cannot be made from an unregistered network. Open: the origin server should accept requests only from the firewall, otherwise a forwarded address could be forged; a written notice to staff and a retention period for positions should be agreed with the DPO.
 - Not yet: the same screen in Golden PM and Golden HR; approved leave taken off the working days in the statistics; an automatic close of a day without Out.
+
+## §466 In / Out — online acceptance, written to the HR log (GAS-CP-R97-183, v1.215.0)
+
+- Migration `install/migrate_cp_r97_183_inout_consent.sql` (check `r99e`): `io_consents` (user, version of the notice, language shown, source, address, device, time in UTC; one row per user and version).
+- `app/io.php`: `IO_CONSENT_VER` ('1'), `io_consent()`, `io_consent_ok()`, `io_consent_accept()` — stores the row and calls `hr_audit($pid, 'consent', …)` so the acceptance appears in HR card › Changes (new kind `hr.ck_consent`); `io_punch()` refuses without it. `io_consents_all()` for the list under Sites & rules. Raising `IO_CONSENT_VER` asks everybody again.
+- Portal: My In / Out shows the notice with a tick box (action `io_consent`) instead of the In / Out button until accepted.
+- API: `GET /inout` carries `consent {accepted, version, at, title, text, accept}` in the language of the app; `POST /inout/consent`; `POST /inout/punch` answers 409 `{consent: true}` without it; sync kinds `io_consent` and `io_punch` (the acceptance made without signal is sent first).
+- Apps: Employee 1.1.1 and Service 0.8.1 show the notice before the first punch (`js/io.js`); the demonstration data starts not accepted, so the flow can be shown.
+- 15 language keys × 5 languages (12 766 keys each). The notice text is `io.c_text`.
+- Tested: 29 checks on the test database (no punch and nothing stored before acceptance, one row per person, HR log entry, API block), the portal page with and without acceptance, both apps in a browser.
+- Cybersecurity / data protection: the acceptance is evidence that the notice was shown and accepted; it records address and device. Whether acceptance is the right legal basis for employees is for the DPO / lawyer — the notice can be reworded in the language files without code changes.

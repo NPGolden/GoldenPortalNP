@@ -56,6 +56,26 @@ function io_site_of_ip(string $ip): ?array {
     return null;
 }
 
+/* ---- acceptance of the notice (R97-183): asked once, the first time a person uses In / Out; a new version of the notice asks again ---- */
+const IO_CONSENT_VER = '1';
+function io_consent_has_table(): bool { static $v = null; if ($v === null) { try { $v = (bool) one("SHOW TABLES LIKE 'io_consents'"); } catch (Throwable $e) { $v = false; } } return $v; }
+function io_consent(int $uid): ?array { return io_consent_has_table() ? one('SELECT * FROM io_consents WHERE user_id = ? AND version = ?', [$uid, IO_CONSENT_VER]) : null; }
+/** True when the person may punch: accepted, or the acceptance table is not there yet (database update pending). */
+function io_consent_ok(int $uid): bool { return !io_consent_has_table() || io_consent($uid) !== null; }
+/** Store the acceptance and write it to the HR log of the person (Changes tab of the HR card). */
+function io_consent_accept(int $uid, string $source, ?string $at = null): array {
+    if (!io_consent_has_table()) throw new RuntimeException(t('io.need'));
+    if ($c = io_consent($uid)) return $c;
+    $ts = time(); if ($at && ($x = strtotime($at)) !== false && $x <= $ts + 300 && $x > $ts - 7 * 86400) $ts = $x;   // accepted on the phone without signal: the phone's time, up to a week back
+    $ip = io_client_ip(); $dev = mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 160); $loc = function_exists('locale') ? (string) locale() : 'en';
+    q('INSERT IGNORE INTO io_consents (user_id, version, locale, source, ip, device, accepted_at) VALUES (?,?,?,?,?,?,?)', [$uid, IO_CONSENT_VER, mb_substr($loc, 0, 5), mb_substr($source, 0, 12), $ip ?: null, $dev ?: null, gmdate('Y-m-d H:i:s', $ts)]);
+    $p = function_exists('hr_person_of_user') ? hr_person_of_user($uid) : null;
+    if ($p && function_exists('hr_audit')) { try { hr_audit((int)$p['id'], 'consent', t('io.title'), null, t('io.c_logged', ['v' => IO_CONSENT_VER]), t('io.src_' . (in_array($source, ['portal', 'employee', 'engineer', 'pm', 'hr'], true) ? $source : 'portal')) . ($ip !== '' ? ' · ' . $ip : '') . ' · ' . gmdate('Y-m-d H:i', $ts) . ' UTC'); } catch (Throwable $e) {} }
+    return io_consent($uid) ?? [];
+}
+/** Who has accepted (HR view): [uid => row]. */
+function io_consents_all(): array { $o = []; if (io_consent_has_table()) foreach (all('SELECT * FROM io_consents WHERE version = ? ORDER BY accepted_at', [IO_CONSENT_VER]) as $r) $o[(int)$r['user_id']] = $r; return $o; }
+
 /** State of a person now: 'in' when the last accepted or waiting punch of the last 20 hours is an In. */
 function io_state(int $uid, ?int $at = null): array {   // $at: the moment to look from (a punch sent later is judged at its own time)
     $ref = gmdate('Y-m-d H:i:s', $at ?? time());
@@ -66,6 +86,7 @@ function io_state(int $uid, ?int $at = null): array {   // $at: the moment to lo
 /** Register a punch. $in: kind, at (ISO time of the phone, optional), tz_min, lat, lng, acc, uuid, note, source, ip. Returns the stored row. */
 function io_punch(int $uid, array $in): array {
     if (!io_has()) throw new RuntimeException(t('io.need'));
+    if (!io_consent_ok($uid)) throw new RuntimeException(t('io.c_need'));   // R97-183: nothing is recorded before the person has accepted the notice
     $kind = ($in['kind'] ?? '') === 'out' ? 'out' : 'in';
     $uuid = preg_match('/^[0-9a-fA-F-]{36}$/', (string)($in['uuid'] ?? '')) ? strtolower((string)$in['uuid']) : null;
     if ($uuid && ($x = one('SELECT * FROM io_entries WHERE uuid = ?', [$uuid]))) return $x;   // the same punch sent twice
@@ -215,6 +236,8 @@ function io_stats(string $from, string $to): array {
     }
     return $out;
 }
+/** A stored UTC date-time shown in the company's time zone. */
+function io_fmt_utc(?string $utc): string { if (!$utc) return '—'; try { return (new DateTime($utc, new DateTimeZone('UTC')))->setTimezone(new DateTimeZone(tz_app()))->format('d/m/Y H:i'); } catch (Throwable $e) { return (string)$utc; } }
 function io_hm(int $min): string { return sprintf('%d:%02d', intdiv(max(0, $min), 60), max(0, $min) % 60); }
 /** Shape of a punch for the apps. */
 function io_row_api(array $r): array { return ['id' => (int)$r['id'], 'kind' => $r['kind'], 'at' => gmdate('c', strtotime($r['at_utc'] . ' UTC')), 'day' => $r['local_day'], 'time' => substr((string)$r['local_time'], 0, 5), 'lat' => $r['lat'] === null ? null : (float)$r['lat'], 'lng' => $r['lng'] === null ? null : (float)$r['lng'], 'acc' => $r['acc_m'] === null ? null : (int)$r['acc_m'],
@@ -224,7 +247,8 @@ function io_api_me(int $uid): array {
     $st = io_state($uid); $today = gmdate('Y-m-d', time() + (int) round((new DateTime('now', new DateTimeZone(tz_app())))->getOffset()));
     $cal = function_exists('wc_user_calendar') ? wc_user_calendar($uid) : 'GR'; $d = function_exists('wc_day') ? wc_day($cal, $today) : ['workday' => true, 'rule' => null];
     $rows = io_entries(['user' => $uid, 'from' => date('Y-m-d', strtotime('-14 days'))], 120);
-    return ['enabled' => io_has(), 'state' => $st['state'], 'since' => $st['last'] ? gmdate('c', strtotime($st['last']['at_utc'] . ' UTC')) : null,
+    $c = io_consent($uid);
+    return ['enabled' => io_has(), 'consent' => ['accepted' => io_consent_ok($uid), 'version' => IO_CONSENT_VER, 'at' => $c ? gmdate('c', strtotime($c['accepted_at'] . ' UTC')) : null, 'title' => t('io.c_title'), 'text' => t('io.c_text'), 'accept' => t('io.c_accept')], 'state' => $st['state'], 'since' => $st['last'] ? gmdate('c', strtotime($st['last']['at_utc'] . ' UTC')) : null,
         'schedule' => ['workday' => (bool)$d['workday'], 'start' => !empty($d['rule']['start_time']) ? substr((string)$d['rule']['start_time'], 0, 5) : null, 'end' => !empty($d['rule']['end_time']) ? substr((string)$d['rule']['end_time'], 0, 5) : null, 'tolerance_min' => io_tol()],
         'sites' => array_map(fn($s) => ['id' => (int)$s['id'], 'name' => $s['name'], 'lat' => (float)$s['lat'], 'lng' => (float)$s['lng'], 'radius_m' => (int)$s['radius_m']], io_sites()),
         'entries' => array_map('io_row_api', $rows)];

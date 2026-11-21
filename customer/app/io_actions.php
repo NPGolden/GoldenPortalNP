@@ -6,6 +6,7 @@ function io_handle_action(string $action): bool {
     if (!function_exists('io_has') || !io_has() || !is_staff()) throw new RuntimeException(t('err.noaccess'));
     $back = fn(string $tab, array $x = []) => redirect('inout', ['tab' => $tab, '_r' => uniqid()] + $x);
     switch ($action) {
+        case 'io_consent': if (empty($_POST['agree'])) throw new RuntimeException(t('io.c_tick')); io_consent_accept((int)current_user()['id'], 'portal'); flash('good', t('io.c_done')); $back('my');   // R97-183
         case 'io_punch': io_punch_portal((string)($_POST['kind'] ?? 'in')); flash('good', t(($_POST['kind'] ?? '') === 'out' ? 'io.done_out' : 'io.done_in')); $back('my');
         case 'io_decide': io_decide((int)$_POST['id'], (string)($_POST['status'] ?? ''), (string)($_POST['note'] ?? '')); flash('good', t('sys.saved')); $back('exc');
         case 'io_decide_all': { $n = 0; foreach ((array)($_POST['ids'] ?? []) as $id) { io_decide((int)$id, (string)($_POST['status'] ?? ''), (string)($_POST['note'] ?? '')); $n++; } flash('good', t('io.decided_n', ['n' => $n])); $back('exc'); }

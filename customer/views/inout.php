@@ -22,7 +22,10 @@ layout_head(t('io.title'), 'inout');
 <div class="page-head"><div><h1>⏱ <?= tt('io.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('io.lede') ?></p></div></div>
 <div class="tabs"><?php foreach ($tabs as $k => $lk): ?><a class="<?= $tab === $k ? 'on' : '' ?>" href="<?= url('inout', ['tab' => $k]) ?>"><?= tt($lk) ?><?= $k === 'exc' && $pend ? ' <span class="n">' . $pend . '</span>' : '' ?></a><?php endforeach; ?></div>
 
-<?php if ($tab === 'my'): $st = io_state($me); $ip = io_client_ip(); $site = io_site_of_ip($ip); $today = io_day($me, date('Y-m-d')); $mine = io_entries(['user' => $me, 'from' => date('Y-m-d', strtotime('-30 days'))], 200); ?>
+<?php if ($tab === 'my' && !io_consent_ok($me)): ?>
+<div class="card"><div class="card-head"><h2>📄 <?= tt('io.c_title') ?></h2></div><p style="white-space:pre-line;"><?= tt('io.c_text') ?></p>
+  <form method="post"><?= csrf_field() ?><input type="hidden" name="action" value="io_consent"><label class="chk"><input type="checkbox" name="agree" value="1" required> <?= tt('io.c_accept') ?></label><div class="btn-row" style="margin-top:10px;"><button class="btn btn--gold" type="submit"><?= tt('io.c_btn') ?></button></div></form></div>
+<?php elseif ($tab === 'my'): $st = io_state($me); $cons = io_consent($me); $ip = io_client_ip(); $site = io_site_of_ip($ip); $today = io_day($me, date('Y-m-d')); $mine = io_entries(['user' => $me, 'from' => date('Y-m-d', strtotime('-30 days'))], 200); ?>
 <div class="card">
   <div class="card-head"><h2><?= $st['state'] === 'in' ? '🟢 ' . tt('io.you_in') : '⚪ ' . tt('io.you_out') ?></h2><span class="hint"><?= tt('io.today_worked') ?>: <b><?= io_hm($today['net_min']) ?></b><?= $today['sched_min'] ? ' / ' . io_hm($today['sched_min']) : '' ?></span></div>
   <?php if ($site): ?>
@@ -30,6 +33,7 @@ layout_head(t('io.title'), 'inout');
       <button class="btn btn--gold" type="submit"><?= $st['state'] === 'in' ? '■ ' . tt('io.btn_out') : '▶ ' . tt('io.btn_in') ?></button><span class="hint"><?= tt('io.portal_at', ['site' => (string)$site['name']]) ?></span></form>
   <?php else: ?><p class="hint"><?= tt('io.portal_no', ['ip' => $ip !== '' ? $ip : '—']) ?></p><?php endif; ?>
 </div>
+<?php if (!empty($cons)): ?><p class="hint">📄 <?= tt('io.c_mine', ['d' => io_fmt_utc($cons['accepted_at'])]) ?></p><?php endif; ?>
 <div class="card"><div class="card-head"><h2><?= tt('io.my_last') ?></h2></div>
 <?php if (!$mine): ?><p class="hint"><?= tt('io.none') ?></p><?php else: ?><div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('th.date') ?></th><th><?= tt('io.th_time') ?></th><th></th><th><?= tt('io.th_where') ?></th><th><?= tt('io.th_map') ?></th><th><?= tt('th.status') ?></th></tr></thead><tbody>
 <?php foreach ($mine as $r): ?><tr><td><?= e(fmt_date($r['local_day'])) ?></td><td style="font-family:var(--mono);"><?= e(substr((string)$r['local_time'], 0, 5)) ?></td><td><?= $KIND($r['kind']) ?></td><td><?= $WHERE($r) ?></td><td><?= $MAP($r) ?></td><td><?= $ST($r['status']) ?> <?= $FL((string)$r['flags']) ?><?= $r['decide_note'] ? '<br><span class="hint">' . e((string)$r['decide_note']) . '</span>' : '' ?></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?></div>
@@ -83,6 +87,10 @@ layout_head(t('io.title'), 'inout');
   <label><?= tt('io.site_ips') ?><input type="text" name="ips" maxlength="400" placeholder="203.0.113.25, 198.51.100.*" value="<?= e((string)($cur['ips'] ?? '')) ?>"><span class="hint"><?= tt('io.site_ips_hint', ['ip' => io_client_ip() !== '' ? io_client_ip() : '—']) ?></span></label>
   <label class="chk"><input type="checkbox" name="is_active" value="1" <?= !$cur || $cur['is_active'] ? 'checked' : '' ?>> <?= tt('io.active') ?></label>
   <div class="btn-row"><button class="btn btn--gold" type="submit"><?= $cur ? tt('btn.save') : tt('io.site_add') ?></button><?php if ($cur): ?><a class="btn btn--ghost" href="<?= url('inout', ['tab' => 'sites']) ?>"><?= tt('io.cancel') ?></a><?php endif; ?></div></form></div>
+<?php $ca = io_consents_all(); $miss = array_diff_key($names, $ca); ?>
+<div class="card"><div class="card-head"><h2>📄 <?= tt('io.c_list') ?></h2><span class="hint"><?= tt('io.c_count', ['n' => count(array_intersect_key($ca, $names)), 'm' => count($names)]) ?></span></div><p class="hint"><?= tt('io.c_list_lede') ?></p>
+<?php if ($ca): ?><div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('io.th_person') ?></th><th><?= tt('io.c_when') ?></th><th><?= tt('io.th_src') ?></th></tr></thead><tbody><?php foreach ($ca as $uid => $c): ?><tr><td><?= e($names[$uid] ?? ('#' . $uid)) ?></td><td><?= e(io_fmt_utc($c['accepted_at'])) ?></td><td class="hint"><?= e(t('io.src_' . (in_array($c['source'], ['portal', 'employee', 'engineer', 'pm', 'hr'], true) ? $c['source'] : 'portal'))) ?><?= $c['ip'] ? ' · ' . e((string)$c['ip']) : '' ?></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
+<?php if ($miss): ?><p class="hint" style="margin-top:8px;"><b><?= tt('io.c_missing') ?>:</b> <?= e(implode(', ', $miss)) ?></p><?php endif; ?></div>
 <div class="card"><div class="card-head"><h2>⚙ <?= tt('io.rules') ?></h2></div><p class="hint"><?= tt('io.rules_lede') ?></p>
 <form method="post" class="form-grid"><?= csrf_field() ?><input type="hidden" name="action" value="io_settings_save">
   <label><?= tt('io.r_tol') ?><input type="number" name="io_tolerance_min" min="0" max="120" value="<?= io_tol() ?>"></label>

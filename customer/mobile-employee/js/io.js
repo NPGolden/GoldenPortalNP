@@ -27,6 +27,18 @@ window.IO = (() => {
     const { io, q, state, since } = await model(); const sc = io.schedule || {};
     UI.chrome(true, t("io.title"), "io", false);
     if (io.enabled === false) return { html: `<div class="card"><p class="muted">${t("io.disabled")}</p></div>` };
+    // R97-183: the notice is accepted once, before the first punch; the portal writes the acceptance to the person's HR log
+    const cq = (await DB.outbox()).some((o) => o.kind === "io_consent" && o.status !== "rejected");
+    if (io.consent && io.consent.accepted === false && !cq) return { html: `<div class="card"><h2>📄 ${esc(io.consent.title)}</h2><p class="io-notice">${esc(io.consent.text)}</p>
+        <label class="io-agree"><input type="checkbox" id="agree"> <span>${esc(io.consent.accept)}</span></label>
+        <button class="btn gold io-btn" id="accept" disabled>${t("io.c_btn")}</button></div>`,
+      bind(root) {
+        const b = root.querySelector("#accept"); root.querySelector("#agree").onchange = (e) => { b.disabled = !e.target.checked; };
+        b.onclick = async () => { b.disabled = true; const at = new Date().toISOString(); let sent = false;
+          if (navigator.onLine || API.mock) { try { const r = await API.inoutConsent({ at }); const cur = (await DB.get("meta", "io")) || io; cur.consent = r.consent; await DB.put("meta", { id: "io", ...cur }); sent = true; UI.toast(t("io.c_done")); } catch (e) { if (e && e.status) { UI.toast(e.message || "Error"); b.disabled = false; return; } } }
+          if (!sent) { await DB.enqueue("io_consent", { at }); SYNC.run(false); UI.toast(t("io.c_queued")); }
+          UI.render(); };
+      } };
     const rows = q.slice().reverse().map((o) => `<div class="card"><div class="t">${o.payload.kind === "in" ? "▶ " + t("io.in") : "■ " + t("io.out")} <small>${hhmm(o.payload.at)}</small> <span class="chip amber">${t("io.waiting")}</span></div><div class="s muted">${fmt(o.payload.at)}${o.payload.lat == null ? " • " + t("io.f_nogps") : ""}</div></div>`).join("")
       + (io.entries || []).map((e) => `<div class="card"><div class="t">${e.kind === "in" ? "▶ " + t("io.in") : "■ " + t("io.out")} <small>${esc(e.time)}</small> ${chip(e.status)} ${flags(e.flags)}</div>
         <div class="s muted">${fmt(e.day)}${e.site ? " • " + esc(e.site) + (e.dist != null ? " · " + e.dist + " m" : "") : (e.lat != null ? " • " + t("io.no_site") : "")}${e.acc != null && e.lat != null ? " (±" + e.acc + " m)" : ""}${e.late_sync ? " • ⏳" : ""}</div>

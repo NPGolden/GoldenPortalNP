@@ -9,7 +9,7 @@ function sync_ops(array $u, array $b): void {
         if (!preg_match('/^[0-9a-f-]{36}$/', $uuid)) { $results[] = ['uuid' => $uuid, 'status' => 'rejected', 'error' => 'bad uuid']; continue; }
         if ($seen = one('SELECT status, result_id, result_no FROM sync_ops WHERE uuid = ?', [$uuid])) { $results[] = ['uuid' => $uuid, 'status' => $seen['status'], 'id' => $seen['result_id'], 'number' => $seen['result_no']]; continue; }
         $res = null;
-        if (api_app() === 'employee' && !in_array($kind, ['hr_request', 'hr_cancel', 'hr_period_join', 'hr_training_apply', 'hr_eval_ack', 'hr_message', 'hr_seen', 'io_punch'], true)) { $results[] = ['uuid' => $uuid, 'status' => 'rejected', 'error' => 'Not available in Golden A/S Employee']; continue; }   // R97-180
+        if (api_app() === 'employee' && !in_array($kind, ['hr_request', 'hr_cancel', 'hr_period_join', 'hr_training_apply', 'hr_eval_ack', 'hr_message', 'hr_seen', 'io_punch', 'io_consent'], true)) { $results[] = ['uuid' => $uuid, 'status' => 'rejected', 'error' => 'Not available in Golden A/S Employee']; continue; }   // R97-180
         try {
             switch ($kind) {
                 case 'assignment_accept': $res = ['id' => Portal::acceptAssignment($u, $p)]; break;
@@ -29,7 +29,8 @@ function sync_ops(array $u, array $b): void {
                 case 'hr_eval_ack':       $res = Portal::hrEvalAck($u, $p); break;
                 case 'hr_message':        $res = Portal::hrMessage($u, $p); break;
                 case 'hr_seen':           $res = Portal::hrSeen($u); break;
-                case 'io_punch':          if (api_app() === 'customer') throw new ApiException(403, 'Staff only'); $r = io_punch((int)$u['id'], ['source' => api_app(), 'ip' => io_client_ip(), 'uuid' => $uuid] + (array)$p); $res = ['id' => (int)$r['id'], 'status' => $r['status']]; break;   // R97-182: a punch made without signal
+                case 'io_consent':        if (api_app() === 'customer') throw new ApiException(403, 'Staff only'); io_consent_accept((int)$u['id'], api_app(), isset($p['at']) ? (string)$p['at'] : null); $res = ['id' => 'IOC' . (int)$u['id'], 'status' => 'accepted']; break;   // R97-183: accepted on the phone without signal
+                case 'io_punch':          if (api_app() === 'customer') throw new ApiException(403, 'Staff only'); if (!io_consent_ok((int)$u['id'])) throw new ApiException(409, 'Accept the In / Out notice first'); throw new ApiException(403, 'Staff only'); $r = io_punch((int)$u['id'], ['source' => api_app(), 'ip' => io_client_ip(), 'uuid' => $uuid] + (array)$p); $res = ['id' => (int)$r['id'], 'status' => $r['status']]; break;   // R97-182: a punch made without signal
                 /* R66-001 — Golden PM app only (api_app() === 'pm'); the Service Engineer app keeps its 403s */
                 case 'sp_stages':      $res = $pm ? PortalPM::setStages($u, $p) : throw new ApiException(403, 'Stage changes are for project managers (Golden PM app)'); break;
                 case 'sp_comment':     $res = $pm ? PortalPM::comment($u, $uuid, $p) : throw new ApiException(403, 'Comments are for project managers (Golden PM app)'); break;
