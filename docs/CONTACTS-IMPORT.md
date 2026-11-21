@@ -3971,3 +3971,16 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - 15 language keys × 5 languages (12 766 keys each). The notice text is `io.c_text`.
 - Tested: 29 checks on the test database (no punch and nothing stored before acceptance, one row per person, HR log entry, API block), the portal page with and without acceptance, both apps in a browser.
 - Cybersecurity / data protection: the acceptance is evidence that the notice was shown and accepted; it records address and device. Whether acceptance is the right legal basis for employees is for the DPO / lawyer — the notice can be reworded in the language files without code changes.
+
+## §467 Working hours — several calendars per branch, per department and per person (GAS-CP-R97-184, v1.216.0)
+
+- Migration `install/migrate_cp_r97_184_calendar_assign.sql` (check `r99f`): `work_calendars.holidays_from`, `.branch_id`, `.note`; `hr_departments.work_calendar`.
+- `wc_user_calendar_src($uid)` (and `wc_user_calendar`): the person's own calendar (`customer_users.work_calendar`), else the department's (`hr_people.user_id` → `hr_departments.work_calendar`), else the branch's (`customer_users.branch_id` → `branches.work_calendar`, a field that existed but was not read), else GR. Returns the source for display.
+- `wc_holiday()` reads the holidays of `wc_holiday_code($code)` — the calendar named in `holidays_from` (one level; the country is taken from it).
+- `wc_calendar_save()`: holidays from, hours copied from an existing calendar, branch, note. `wc_assign_save()` (action `wc_assign_save`, administrators): calendar per department, option to clear the personal calendar of its people, calendar per person. `wc_departments()`, `wc_people()`.
+- `views/admin_calendars.php`: new fields on + Add calendar; notice on the holidays card of a calendar that shares holidays; card "Who follows which calendar". `views/admin_users.php`: the calendar select has the option "department / branch" and no longer writes GR to an account that had none when its row is saved.
+- `app/acc.php`: report hours use the inherited calendar.
+- 23 language keys × 5 languages (12 789 keys each).
+- Tested on the test database: 17 checks — default, branch, department over branch, own over department, "apply to all", holiday of the parent calendar, and In / Out late / early for an office calendar and a site calendar at the same clock times; the page rendered with and without the new-calendar form.
+- Behaviour change: an account without a calendar whose branch has one now follows the branch (before: GR).
+- Cybersecurity: administrators only, CSRF, parameterised queries; no new data leaves the portal.

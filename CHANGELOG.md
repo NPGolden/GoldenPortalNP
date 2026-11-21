@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.215.0** (build 2026-11-21). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.216.0** (build 2026-11-21). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.216.0 | GAS-CP-R97-184 | 2026-11-21 | Working hours: several calendars per branch (holidays shared, hours different), a calendar per department and per person — a person follows the own calendar, else the department, else the branch; In / Out and timesheets follow it | `install/migrate_cp_r97_184_calendar_assign.sql` |
 | 1.215.0 | GAS-CP-R97-183 | 2026-11-21 | In / Out: the employee accepts the notice on the recording of time and position online the first time In / Out is used (apps and portal); the acceptance is written to the HR log of the person (Employee 1.1.1, Service 0.8.1) | `install/migrate_cp_r97_183_inout_consent.sql` |
 | 1.214.0 | GAS-CP-R97-182 | 2026-11-21 | In / Out: arrival and departure of the staff with time and position from the apps (Employee 1.1.0, Service 0.8.0) and from the portal on a registered network address; known sites, exceptions to decide, overtime beside timesheet and service reports, statistics for HR, CEO and General Manager | `install/migrate_cp_r97_182_inout.sql` |
 | 1.213.0 | GAS-CP-R97-180 | 2026-11-21 | Golden A/S Employee 1.0.0 — a simplified app for every employee: My HR only (leave balances, leave requests, leave periods, training, evaluations, HR messages); Service app 0.7.5: the leave request form of My HR works again | — |

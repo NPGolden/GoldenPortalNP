@@ -238,6 +238,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: index.php?p=login'); exit;
 
             case 'wc_hours_save': { wc_hours_save((string)($_POST['cal'] ?? '')); flash('good', t('wc.saved')); redirect('admin_calendars', ['cal' => $_POST['cal'] ?? '', 'year' => (int)($_GET['year'] ?? date('Y')), '_r' => uniqid()]); }
+            case 'wc_assign_save': { wc_assign_save(); flash('good', t('wc.saved')); redirect('admin_calendars', ['cal' => $_POST['cal'] ?? '', '_r' => uniqid()], '#assign'); }   // R97-184
             case 'wc_cal_save': { wc_calendar_save(); flash('good', t('wc.saved')); redirect('admin_calendars', ['cal' => strtoupper((string)($_POST['code'] ?? '')), '_r' => uniqid()]); }
             case 'wc_generate': { $n = wc_generate((string)($_POST['cal'] ?? ''), (int)($_POST['year'] ?? date('Y'))); flash('good', t('wc.generated', ['n' => $n])); redirect('admin_calendars', ['cal' => $_POST['cal'] ?? '', 'year' => (int)($_POST['year'] ?? date('Y')), '_r' => uniqid()]); }
             case 'wc_holiday_add': { wc_holiday_add((string)($_POST['cal'] ?? ''), (string)($_POST['date'] ?? ''), (string)($_POST['name'] ?? '')); flash('good', t('wc.saved')); redirect('admin_calendars', ['cal' => $_POST['cal'] ?? '', 'year' => (int) substr((string)($_POST['date'] ?? ''), 0, 4), '_r' => uniqid()]); }

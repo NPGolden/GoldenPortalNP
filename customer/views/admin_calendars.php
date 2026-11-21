@@ -11,27 +11,35 @@ $hours = $cal ? wc_hours($cal) : []; $hol = $cal ? wc_holidays($cal, $year) : []
 $wd = td_weekdays(); $keep = ['cal' => $cal, 'year' => $year];
 $nUsers = $ok ? array_column(all("SELECT COALESCE(work_calendar, 'GR') c, COUNT(*) n FROM customer_users WHERE role IN ('staff','admin') AND is_active = 1 GROUP BY c"), 'n', 'c') : [];
 $res = $_SESSION['cp_import_result'] ?? null; if ($res && ($res['kind'] ?? '') === 'holidays') unset($_SESSION['cp_import_result']); else $res = null;
+$asg = $ok && wc_assign_has(); $brs = function_exists('br_all') ? br_all(true) : []; $brName = []; foreach ($brs as $b) $brName[(int)$b['id']] = (string)$b['code'];
 layout_head(t('wc.title'), 'admin_calendars');
 ?>
 <?php settings_tabs('admin_calendars'); ?>
 <h2 class="settings-h"><?= tt('wc.title') ?></h2>
 <p class="lede"><?= tt('wc.lede') ?></p>
+<?php if (!empty($asg)): ?><p class="hint"><?= tt('wc.lede2') ?> <a href="#assign"><?= tt('wc.assign') ?> ↓</a></p><?php endif; ?>
 <?php if (!$ok): ?><div class="flash flash--warn"><?= tt('wc.need_db') ?></div><?php else: ?>
 
 <nav class="tabs" aria-label="<?= tt('wc.calendars') ?>">
-  <?php foreach ($cals as $c => $row): ?><a class="<?= $cal === $c ? 'is-on' : '' ?>" href="<?= url('admin_calendars', ['cal' => $c, 'year' => $year]) ?>"><?= e($row['code']) ?> · <?= e($row['name']) ?><?= isset($nUsers[$c]) ? ' <span class="n">' . (int)$nUsers[$c] . '</span>' : '' ?></a><?php endforeach; ?>
+  <?php foreach ($cals as $c => $row): ?><a class="<?= $cal === $c ? 'is-on' : '' ?>" href="<?= url('admin_calendars', ['cal' => $c, 'year' => $year]) ?>"><?= e($row['code']) ?> · <?= e($row['name']) ?><?= !empty($row['branch_id']) && isset($brName[(int)$row['branch_id']]) ? ' <span class="hint">(' . e($brName[(int)$row['branch_id']]) . ')</span>' : '' ?><?= isset($nUsers[$c]) ? ' <span class="n">' . (int)$nUsers[$c] . '</span>' : '' ?></a><?php endforeach; ?>
   <a class="<?= isset($_GET['new']) ? 'is-on' : '' ?>" href="<?= url('admin_calendars', $keep + ['new' => 1]) ?>#newcal">+ <?= tt('wc.add_cal') ?></a>
 </nav>
 
 <?php if (isset($_GET['new'])): ?>
 <div class="card" id="newcal">
   <h2><?= tt('wc.add_cal') ?></h2>
-  <form method="post" action="<?= url('admin_calendars', $keep) ?>" class="fltbar" style="grid-template-columns: 120px 2fr 120px auto;" data-lock>
+  <form method="post" action="<?= url('admin_calendars', $keep) ?>" class="form-grid" data-lock>
     <?= csrf_field() ?><input type="hidden" name="action" value="wc_cal_save">
-    <div class="field"><label><?= tt('wc.code') ?></label><input name="code" required maxlength="8" placeholder="NL" style="text-transform:uppercase;"></div>
-    <div class="field"><label><?= tt('wc.name') ?></label><input name="name" required maxlength="80" placeholder="Netherlands"></div>
-    <div class="field"><label><?= tt('wc.country') ?></label><input name="country" maxlength="2" placeholder="NL" style="text-transform:uppercase;"></div>
-    <div class="fltbar-actions"><button class="btn" type="submit"><?= tt('btn.save') ?></button></div>
+    <div class="field"><label><?= tt('wc.code') ?></label><input name="code" required maxlength="8" placeholder="GRSITE" style="text-transform:uppercase;"></div>
+    <div class="field"><label><?= tt('wc.name') ?></label><input name="name" required maxlength="80" placeholder="Greece — site teams 07:00–15:30"></div>
+    <?php if ($asg): ?>
+    <div class="field"><label><?= tt('wc.hol_from') ?></label><select name="holidays_from"><option value=""><?= tt('wc.hol_own') ?></option><?php foreach ($cals as $c => $row): if (!empty($row['holidays_from'])) continue; ?><option value="<?= e($c) ?>"><?= e($row['code'] . ' · ' . $row['name']) ?></option><?php endforeach; ?></select></div>
+    <div class="field"><label><?= tt('wc.hours_from') ?></label><select name="hours_from"><option value="">08:30–17:00</option><?php foreach ($cals as $c => $row): ?><option value="<?= e($c) ?>"><?= e($row['code'] . ' · ' . $row['name']) ?></option><?php endforeach; ?></select></div>
+    <?php if ($brs): ?><div class="field"><label><?= tt('wc.branch') ?></label><select name="branch_id"><option value="0">—</option><?php foreach ($brs as $b): ?><option value="<?= (int)$b['id'] ?>"><?= e($b['code'] . ' · ' . $b['name']) ?></option><?php endforeach; ?></select></div><?php endif; ?>
+    <div class="field"><label><?= tt('wc.note') ?></label><input name="note" maxlength="160"></div>
+    <?php endif; ?>
+    <div class="field"><label><?= tt('wc.country') ?></label><input name="country" maxlength="2" placeholder="GR" style="text-transform:uppercase;"></div>
+    <div class="btn-row"><button class="btn" type="submit"><?= tt('btn.save') ?></button></div>
   </form>
   <p class="hint" style="margin:8px 0 0;"><?= tt('wc.add_cal_hint') ?></p>
 </div>
@@ -63,6 +71,7 @@ layout_head(t('wc.title'), 'admin_calendars');
 </div>
 
 <div class="card">
+  <?php $hfrom = $asg ? wc_holiday_code($cal) : $cal; if ($hfrom !== $cal): $hol = wc_holidays($hfrom, $year); ?><div class="flash flash--warn" style="margin-bottom:10px;"><?= tt('wc.hol_from_note', ['c' => $cals[$hfrom]['code'] . ' · ' . $cals[$hfrom]['name']]) ?> <a href="<?= url('admin_calendars', ['cal' => $hfrom, 'year' => $year]) ?>"><?= tt('wc.hol_open') ?></a></div><?php endif; ?>
   <div class="page-head" style="margin-bottom:6px;"><h2 style="margin:0;"><?= tt('wc.holidays_title', ['c' => $cals[$cal]['name'], 'y' => $year]) ?></h2>
     <div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('admin_calendars', ['cal' => $cal, 'year' => $year - 1]) ?>">‹ <?= $year - 1 ?></a><a class="btn btn--ghost btn--sm" href="<?= url('admin_calendars', ['cal' => $cal, 'year' => $year + 1]) ?>"><?= $year + 1 ?> ›</a></div></div>
   <form method="post" action="<?= url('admin_calendars', $keep) ?>" style="margin-bottom:10px;" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="wc_generate"><input type="hidden" name="cal" value="<?= e($cal) ?>"><input type="hidden" name="year" value="<?= $year ?>">
@@ -95,6 +104,22 @@ layout_head(t('wc.title'), 'admin_calendars');
     <?php if ($res['skipped']): ?><ul class="hint" style="margin:6px 0 0 18px;"><?php foreach (array_slice($res['skipped'], 0, 20) as [$ln, $why]): ?><li><?= e(t('im.line', ['n' => $ln])) ?>: <?= e($why) ?></li><?php endforeach; ?></ul><?php endif; ?></div><?php endif; ?>
 </div>
 </div>
+<?php if ($asg): $deps = wc_departments(); $ppl = wc_people(); $opt = function (?string $cur) use ($cals) { $o = '<option value="">' . tt('wc.inherit') . '</option>'; foreach ($cals as $c => $row) $o .= '<option value="' . e($c) . '"' . ((string)$cur === (string)$c ? ' selected' : '') . '>' . e($row['code'] . ' · ' . $row['name']) . '</option>'; return $o; }; ?>
+<div class="card" id="assign">
+  <h2>👥 <?= tt('wc.assign') ?></h2>
+  <p class="hint"><?= tt('wc.assign_lede') ?></p>
+  <form method="post" action="<?= url('admin_calendars', $keep) ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="wc_assign_save"><input type="hidden" name="cal" value="<?= e($cal) ?>">
+  <?php if ($deps): ?><h3 class="ac-h"><?= tt('wc.dept') ?></h3>
+  <div class="table-scroll"><table class="sys-table"><thead><tr><th><?= tt('wc.dept') ?></th><th><?= tt('wc.people_n') ?></th><th><?= tt('wc.one') ?></th><th><?= tt('wc.dept_apply') ?></th></tr></thead><tbody>
+  <?php foreach ($deps as $d): ?><tr><td><b><?= e($d['name']) ?></b></td><td><?= (int)$d['n'] ?></td><td><select name="dept[<?= (int)$d['id'] ?>]" aria-label="<?= e($d['name']) ?>"><?= $opt($d['work_calendar']) ?></select></td><td style="text-align:center;"><input type="checkbox" name="dept_apply[<?= (int)$d['id'] ?>]" value="1" aria-label="<?= tt('wc.dept_apply') ?>" style="width:18px;height:18px;"></td></tr><?php endforeach; ?></tbody></table></div>
+  <p class="hint"><?= tt('wc.dept_apply_hint') ?></p><?php endif; ?>
+  <h3 class="ac-h"><?= tt('wc.people') ?></h3>
+  <div class="table-scroll"><table class="sys-table"><thead><tr><th><?= tt('wc.person') ?></th><th><?= tt('wc.dept') ?></th><th><?= tt('wc.person_cal') ?></th><th><?= tt('wc.follows') ?></th></tr></thead><tbody>
+  <?php foreach ($ppl as $x): $ef = $x['eff']; ?><tr><td><?= e($x['full_name']) ?></td><td class="hint"><?= e((string)($x['dept'] ?? '—')) ?></td><td><select name="person[<?= (int)$x['id'] ?>]" aria-label="<?= e($x['full_name']) ?>"><?= $opt(isset($cals[(string)$x['work_calendar']]) ? (string)$x['work_calendar'] : null) ?></select></td><td><b><?= e($ef['code']) ?></b> <span class="hint">· <?= tt('wc.src_' . $ef['src']) ?></span></td></tr><?php endforeach; ?></tbody></table></div>
+  <div class="btn-row" style="margin-top:10px;"><button class="btn btn--gold" type="submit"><?= tt('btn.save') ?></button></div>
+  </form>
+</div>
+<?php endif; ?>
 <style>.sys-table td input, .sys-table td select { min-width:0; width:100%; padding:7px 9px; border:1px solid var(--line); border-radius:7px; font:inherit; background:var(--field-bg); } .wc-table tr.is-off td { opacity:.75; } .wc-table td input[type=number] { width:80px; } .wc-cols { grid-template-columns: 1fr; } .wc-table th, .wc-table td { padding: 6px 6px; } .wc-table td input[type=time] { padding: 6px 6px; } .wc-table td input[type=number] { width: 64px; }</style>
 <?php endif; ?>
 <?php layout_foot(); ?>

@@ -40,15 +40,38 @@ function wc_hours(string $code): array {
     }
     return $c[$code];
 }
-function wc_user_calendar(int $uid): string {
-    $code = null;
-    try { if (wc_has()) $code = scalar('SELECT work_calendar FROM customer_users WHERE id = ?', [$uid]); } catch (Throwable $e) {}
-    $code = (string)$code; $cals = wc_calendars();
-    if ($code === '' || !isset($cals[$code])) $code = isset($cals['GR']) ? 'GR' : (string) array_key_first($cals);
-    return $code;
+function wc_user_calendar(int $uid): string { return wc_user_calendar_src($uid)['code']; }
+/** R97-184: which calendar a person follows and why — the person's own, else the department's, else the branch's, else GR.
+ *  ['code' => …, 'src' => own|dept|branch|default, 'dept' => name|null] */
+function wc_user_calendar_src(int $uid): array {
+    static $memo = []; $get = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET'; if ($get && isset($memo[$uid])) return $memo[$uid];
+    $cals = wc_calendars(); $ok = fn($c) => $c !== null && $c !== '' && isset($cals[(string)$c]); $own = null; $bid = 0;
+    try { if (wc_has() && ($r = one('SELECT * FROM customer_users WHERE id = ?', [$uid]))) { $own = $r['work_calendar'] ?? null; $bid = (int)($r['branch_id'] ?? 0); } } catch (Throwable $e) {}
+    if ($ok($own)) return $memo[$uid] = ['code' => (string)$own, 'src' => 'own', 'dept' => null];
+    if (wc_assign_has()) { try { $d = one('SELECT dp.name, dp.work_calendar FROM hr_people p JOIN hr_departments dp ON dp.id = p.department_id WHERE p.user_id = ? ORDER BY p.is_active DESC LIMIT 1', [$uid]); if ($d && $ok($d['work_calendar'])) return $memo[$uid] = ['code' => (string)$d['work_calendar'], 'src' => 'dept', 'dept' => (string)$d['name']]; } catch (Throwable $e) {}
+        if ($bid) { try { $b = scalar('SELECT work_calendar FROM branches WHERE id = ?', [$bid]); if ($ok($b)) return $memo[$uid] = ['code' => (string)$b, 'src' => 'branch', 'dept' => null]; } catch (Throwable $e) {} } }
+    return $memo[$uid] = ['code' => isset($cals['GR']) ? 'GR' : (string) array_key_first($cals), 'src' => 'default', 'dept' => null];
+}
+function wc_assign_has(): bool { static $h = null; if ($h === null) { try { $h = wc_has() && (bool) scalar("SHOW COLUMNS FROM work_calendars LIKE 'holidays_from'") && (bool) scalar("SHOW COLUMNS FROM hr_departments LIKE 'work_calendar'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** The calendar whose holidays this one uses (itself when none is set). */
+function wc_holiday_code(string $code): string { $c = wc_calendars()[$code] ?? null; $p = (string)($c['holidays_from'] ?? ''); return $p !== '' && $p !== $code && isset(wc_calendars()[$p]) ? $p : $code; }
+/** Department → calendar, and the people of the portal with the calendar each follows. */
+function wc_departments(): array { try { return wc_assign_has() ? all('SELECT d.id, d.name, d.work_calendar, (SELECT COUNT(*) FROM hr_people p WHERE p.department_id = d.id AND p.is_active = 1 AND p.user_id IS NOT NULL) AS n FROM hr_departments d WHERE d.is_active = 1 ORDER BY d.sort_order, d.name') : []; } catch (Throwable $e) { return []; } }
+function wc_people(): array {
+    $out = []; try { $rows = all("SELECT cu.id, cu.full_name, cu.work_calendar, dp.name AS dept FROM customer_users cu LEFT JOIN hr_people p ON p.user_id = cu.id AND p.is_active = 1 LEFT JOIN hr_departments dp ON dp.id = p.department_id WHERE cu.role IN ('staff','admin') AND cu.is_active = 1 GROUP BY cu.id ORDER BY cu.full_name"); } catch (Throwable $e) { $rows = []; }
+    foreach ($rows as $r) $out[] = $r + ['eff' => wc_user_calendar_src((int)$r['id'])];
+    return $out;
+}
+function wc_assign_save(): void {
+    require_cp_admin(); if (!wc_assign_has()) throw new RuntimeException(t('wc.need_db'));
+    $cals = wc_calendars(); $val = fn($v) => isset($cals[(string)$v]) ? (string)$v : null;
+    foreach ((array)($_POST['dept'] ?? []) as $id => $c) { q('UPDATE hr_departments SET work_calendar = ? WHERE id = ?', [$val($c), (int)$id]);
+        if (!empty($_POST['dept_apply'][$id])) q('UPDATE customer_users cu JOIN hr_people p ON p.user_id = cu.id SET cu.work_calendar = NULL WHERE p.department_id = ?', [(int)$id]); }   // the people of the department follow it from now on
+    foreach ((array)($_POST['person'] ?? []) as $id => $c) q("UPDATE customer_users SET work_calendar = ? WHERE id = ? AND role IN ('staff','admin')", [$val($c), (int)$id]);
 }
 function wc_holiday(string $code, string $date): ?string {
     static $c = [];
+    $code = wc_holiday_code($code);   // R97-184: a working-hours calendar may take its holidays from another calendar
     $y = substr($date, 0, 4);
     if (!isset($c[$code][$y])) { $c[$code][$y] = []; foreach (all('SELECT hdate, name FROM work_holidays WHERE calendar_code = ? AND YEAR(hdate) = ?', [$code, (int)$y]) as $r) $c[$code][$y][$r['hdate']] = $r['name'];
         if (!$c[$code][$y]) { $cal = wc_calendars()[$code] ?? null; $c[$code][$y] = wc_standard((string)($cal['country'] ?? $code), (int)$y); } }   // R62-003: a year nobody generated yet falls back to the country's public holidays
@@ -152,9 +175,16 @@ function wc_calendar_save(): void {
     $code = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', (string)($_POST['code'] ?? '')), 0, 8)); $name = mb_substr(trim((string)($_POST['name'] ?? '')), 0, 80);
     $country = strtoupper(substr(preg_replace('/[^A-Za-z]/', '', (string)($_POST['country'] ?? $code)), 0, 2)) ?: $code;
     if ($code === '' || $name === '') throw new RuntimeException(t('wc.need_code'));
-    q('INSERT INTO work_calendars (code, name, country, sort_order) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE name = VALUES(name), country = VALUES(country), is_active = 1', [$code, $name, $country, 10 + 10 * count(wc_calendars())]);
-    if (!scalar('SELECT COUNT(*) FROM work_hours WHERE calendar_code = ?', [$code]))
-        for ($d = 1; $d <= 7; $d++) q('INSERT INTO work_hours (calendar_code, dow, is_workday, start_time, end_time, break_min, off_type) VALUES (?,?,?,?,?,?,?)', [$code, $d, (int)($d <= 5), $d <= 5 ? '08:30' : null, $d <= 5 ? '17:00' : null, $d <= 5 ? 30 : 0, $d === 7 ? 'holiday' : 'overtime']);
+    $cals = wc_calendars(); $new = !isset($cals[$code]);
+    $hf = strtoupper((string)($_POST['holidays_from'] ?? '')); if (!isset($cals[$hf]) || $hf === $code || (string)($cals[$hf]['holidays_from'] ?? '') !== '') $hf = '';   // one level only: holidays come from a calendar that has its own
+    if ($hf !== '') $country = (string)$cals[$hf]['country'];
+    q('INSERT INTO work_calendars (code, name, country, sort_order) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE name = VALUES(name), country = VALUES(country), is_active = 1', [$code, $name, $country, 10 + 10 * count($cals)]);
+    if (wc_assign_has()) q('UPDATE work_calendars SET holidays_from = ?, branch_id = ?, note = ? WHERE code = ?', [$hf ?: null, (int)($_POST['branch_id'] ?? 0) ?: null, mb_substr(trim((string)($_POST['note'] ?? '')), 0, 160) ?: null, $code]);
+    if (!scalar('SELECT COUNT(*) FROM work_hours WHERE calendar_code = ?', [$code])) {
+        $from = strtoupper((string)($_POST['hours_from'] ?? '')); if ($from === '' && $hf !== '') $from = $hf;
+        if ($new && isset($cals[$from]) && scalar('SELECT COUNT(*) FROM work_hours WHERE calendar_code = ?', [$from])) q('INSERT INTO work_hours (calendar_code, dow, is_workday, start_time, end_time, break_min, off_type) SELECT ?, dow, is_workday, start_time, end_time, break_min, off_type FROM work_hours WHERE calendar_code = ?', [$code, $from]);   // start from the hours of an existing calendar
+        else for ($d = 1; $d <= 7; $d++) q('INSERT INTO work_hours (calendar_code, dow, is_workday, start_time, end_time, break_min, off_type) VALUES (?,?,?,?,?,?,?)', [$code, $d, (int)($d <= 5), $d <= 5 ? '08:30' : null, $d <= 5 ? '17:00' : null, $d <= 5 ? 30 : 0, $d === 7 ? 'holiday' : 'overtime']);
+    }
 }
 
 /** Excel import of holidays: columns Calendar / Country (GR, IT), Date, Name. */

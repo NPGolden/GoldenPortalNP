@@ -165,7 +165,7 @@ function acc_sync(): int {
         }
         if ($r['time_type'] === 'TT') $parts['travel'] = $h;
         else {
-            $cal = (string)($u['work_calendar'] ?? 'GR'); $day = function_exists('wc_has') && wc_has() ? wc_day($cal, (string)$r['report_date']) : ['workday' => (int)date('N', strtotime((string)$r['report_date'])) < 6, 'normal' => 8.0, 'off_type' => 'overtime'];
+            $cal = function_exists('wc_user_calendar') && !empty($u['id']) ? wc_user_calendar((int)$u['id']) : (string)($u['work_calendar'] ?? 'GR');   /* R97-184: department / branch calendar when the person has none */ $day = function_exists('wc_has') && wc_has() ? wc_day($cal, (string)$r['report_date']) : ['workday' => (int)date('N', strtotime((string)$r['report_date'])) < 6, 'normal' => 8.0, 'off_type' => 'overtime'];
             if (!$day['workday']) $parts[$day['off_type'] === 'holiday' ? 'holiday' : 'overtime'] = $h;
             else {
                 $k = ($u['id'] ?? $r['engineer']) . '|' . $r['report_date']; $used = $usedNormal[$k] ?? (float) scalar("SELECT COALESCE(SUM(hours),0) FROM acc_lines WHERE source = 'fsr' AND hour_type = 'normal' AND (exclude_reason IS NULL OR exclude_reason NOT LIKE 'NC %') AND work_date = ? AND " . ($u ? 'user_id = ?' : 'user_name = ?'), [$r['report_date'], $u ? (int)$u['id'] : (string)$r['engineer']]);
