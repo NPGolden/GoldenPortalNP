@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.213.0';
+const CP_VERSION = '1.214.0';
 const CP_BUILD   = '2026-11-21';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-182', 'version' => '1.214.0', 'date' => '2026-11-21', 'title' => 'In / Out: arrival and departure of the staff with time and position from the apps (Employee 1.1.0, Service 0.8.0) and from the portal on a registered network address; known sites, exceptions to decide, overtime beside timesheet and service reports, statistics for HR, CEO and General Manager', 'db' => 'install/migrate_cp_r97_182_inout.sql', 'check' => 'r99d'],
         ['ref' => 'GAS-CP-R97-180', 'version' => '1.213.0', 'date' => '2026-11-21', 'title' => 'Golden A/S Employee 1.0.0 — a simplified app for every employee: My HR only (leave balances, leave requests, leave periods, training, evaluations, HR messages); Service app 0.7.5: the leave request form of My HR works again', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-179', 'version' => '1.212.3', 'date' => '2026-11-21', 'title' => 'Mobile apps: the four apps are on the App Store — App Store links and QR codes switched on, Golden HR with its App Store tile, tiles with the new icons', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-178', 'version' => '1.212.2', 'date' => '2026-11-21', 'title' => 'Contacts import, category only: the record of previous categories is written (it failed with an error after the update in 1.212.1)', 'db' => null, 'check' => null],
@@ -630,6 +631,7 @@ function cp_migration_state(): array {
         'r99a' => $has("SHOW COLUMNS FROM customer_users LIKE 'must_change_pw'"),
         'r99b' => $has("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_log' AND COLUMN_NAME = 'outcome' AND COLUMN_TYPE LIKE '%pw\\_reset%'"),
         'r99c' => $has("SHOW COLUMNS FROM customer_users LIKE 'is_demo'"),
+        'r99d' => $has("SHOW TABLES LIKE 'io_entries'"),
         'r99d' => $has("SHOW COLUMNS FROM nl_issues LIKE 'web_slug'"),
         'r98x' => $has("SHOW INDEX FROM inv_moves WHERE Key_name = 'ix_invmv_item_kind_at'"),
         'r98w' => $has("SHOW TABLES LIKE 'po_lots'") && $has("SHOW COLUMNS FROM po_lines LIKE 'lot_id'"),

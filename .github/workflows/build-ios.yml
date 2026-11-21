@@ -89,6 +89,7 @@ jobs:
                     "NSPhotoLibraryUsageDescription=Photos from your library can be attached to reports, tickets and posts; nothing else is read." \
                     "NSPhotoLibraryAddUsageDescription=Photos you take in the app can be saved to your library." \
                     "NSFaceIDUsageDescription=Face ID unlocks the app and signs you in with your passkey." \
+                    "NSLocationWhenInUseUsageDescription=Your position is recorded once, at the moment you clock in or out, so the company knows at which site you started and ended work. It is not tracked in between." \
                     "ITSAppUsesNonExemptEncryption=NO"; do k="${kv%%=*}"; v="${kv#*=}"; /usr/libexec/PlistBuddy -c "Delete :$k" App/Info.plist 2>/dev/null || true; if [ "$k" = ITSAppUsesNonExemptEncryption ]; then /usr/libexec/PlistBuddy -c "Add :$k bool false" App/Info.plist; else /usr/libexec/PlistBuddy -c "Add :$k string $v" App/Info.plist; fi; done
           /usr/libexec/PlistBuddy -c "Print" App/Info.plist | grep -E "UsageDescription|NonExempt"
           sed "s/__TEAM_ID__/$TEAM/; s/__APP_ID__/$APPID/; s/__PROFILE_NAME__/$PROFILE/" ../../ExportOptions.plist > ExportOptions.plist

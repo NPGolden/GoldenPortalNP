@@ -2,7 +2,7 @@
  * and a MOCK mode (built-in sample data in the same shape the portal returns) for the demo and the UI tests.
  * Mock mode: localStorage gas.mock = "1", or ?mock=1 on the URL. */
 window.API = (() => {
-  const VERSION = "1.0.0";
+  const VERSION = "1.1.0";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   const demoOn = () => { try { return localStorage.getItem("gem.demo") === "1"; } catch (e) { return false; } };   // R97-169
@@ -79,6 +79,7 @@ window.API = (() => {
    // R82-001: inventory lookup for the parts of a report
     hr: (year) => call("GET", `/hr?year=${year || new Date().getFullYear()}`),
     hrRequest: (p, file) => { const f = new FormData(); Object.keys(p).forEach((k) => f.append(k, p[k] == null ? "" : p[k])); if (file) f.append("doc", file, file.name); return call("POST", "/hr/request", f, true); },
+    inout: () => call("GET", "/inout"), inoutPunch: (p) => call("POST", "/inout/punch", p),   // R97-182 In / Out
     hrRequestDoc: (id, file) => { const fd = new FormData(); fd.append("request_id", String(id)); fd.append("doc", file, file.name); return call("POST", "/hr/request/doc", fd, true); },   // R77-007
     hrDocUrl: (id) => `${BASE}/hr/doc/${id}`,
     documentUrl: (id) => `${BASE}/documents/${id}`,
@@ -162,6 +163,14 @@ window.API = (() => {
     const lists = { "/me": M.me, "/tickets": { items: M.tickets }, "/assignments": { items: M.assignments }, "/projects": { items: M.projects }, "/vessels": { items: M.vessels }, "/equipment": { items: M.equipment }, "/budgets": { items: M.budgets }, "/master": M.master, "/documents": { items: M.documents }, "/accounting/status": { items: M.status }, "/fsr": { items: M.fsr }, "/timesheets": { items: M.timesheets }, "/notes": { items: M.notes } };
     if (lists[p]) return delay(lists[p]);
     if (p === "/hr") return delay(M.hr);
+    if (p === "/inout") { if (!M.io) { const dd = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10); const site = { id: 1, name: "Perama yard", lat: 37.965, lng: 23.573, radius_m: 300 };
+        const mk = (id, kind, n, time, extra) => Object.assign({ id, kind, at: dd(n) + "T" + time + ":00.000Z", day: dd(n), time, lat: 37.9651, lng: 23.5732, acc: 12, site: "Perama yard", dist: 21, flags: [], status: "auto", map: "https://www.google.com/maps?q=37.9651,23.5732", note: null, late_sync: false }, extra || {});
+        M.io = { enabled: true, state: "out", since: null, schedule: { workday: true, start: "08:30", end: "17:00", tolerance_min: 10 }, sites: [site, { id: 2, name: "Head office Keratsini", lat: 37.962, lng: 23.619, radius_m: 150 }],
+          entries: [mk(904, "out", -1, "17:05"), mk(903, "in", -1, "08:27"), mk(902, "out", -2, "18:40"), mk(901, "in", -2, "09:02", { flags: ["late"], status: "approved", note: "Traffic on the bridge — agreed" })] }; } return delay(M.io); }
+    if (p === "/inout/punch") { const now = new Date(body.at || Date.now()); const pad = (n) => String(n).padStart(2, "0"); const best = body.lat == null ? null : M.io.sites.map((s) => ({ s, m: Math.round(111320 * Math.hypot(body.lat - s.lat, (body.lng - s.lng) * Math.cos(s.lat * Math.PI / 180))) })).sort((a, b) => a.m - b.m)[0];
+      const fl = []; if (body.lat == null) fl.push("nogps"); else if (best && best.m > best.s.radius_m) fl.push("outside");
+      const e = { id: 950 + (++mockState.nTs), kind: body.kind, at: now.toISOString(), day: now.toISOString().slice(0, 10), time: pad(now.getHours()) + ":" + pad(now.getMinutes()), lat: body.lat, lng: body.lng, acc: body.acc, site: best ? best.s.name : null, dist: best ? best.m : null, flags: fl, status: fl.length ? "pending" : "auto", map: body.lat == null ? "" : `https://www.google.com/maps?q=${body.lat},${body.lng}`, note: null, late_sync: false };
+      M.io.entries.unshift(e); M.io.state = body.kind === "in" ? "in" : "out"; M.io.since = e.at; return delay({ status: "accepted", entry: e, state: M.io.state }); }
     if (p === "/hr/request") { const r = { id: "HR" + (50 + mockState.nTs), request_id: 50 + mockState.nTs, status: "accepted", record_status: "pending_mgr" }; M.hr.requests.unshift({ id: r.request_id, type_id: 2, code: "SICK", type: "Sick leave", unit: "day", date_from: today, date_to: today, days: 1, status: "pending_hr", counted: true, doc: { name: "doc" }, cancellable: true, reason: "" }); return delay(r); }
     if (p === "/files/photo") return delay({ file_id: Math.floor(Math.random() * 9000) + 1000 });
     if (p === "/devices/push-token") return delay({});
@@ -202,6 +211,7 @@ window.API = (() => {
           case "hr_training_apply": { const tr = M.hr.trainings.open.find((x) => x.id === pl.training_id); if (tr) { tr.mine = "applied"; tr.n_in++; } return { uuid: op.id, status: "accepted", id: "TR" + pl.training_id }; }
           case "hr_eval_ack": { const e = M.hr.evaluations.find((x) => x.year === pl.year); if (e) { e.status = "acknowledged"; e.employee_comment = pl.comment; e.acknowledged_at = today; } return { uuid: op.id, status: "accepted", id: "EV" + pl.year }; }
           case "hr_message": { M.hr.messages.push({ id: 90 + (++mockState.nTs), from_hr: false, from: "Dimitris Papadakis", body: pl.text, at: today + " 10:00", seen: true }); return { uuid: op.id, status: "accepted", id: "HM" + mockState.nTs }; }
+          case "io_punch": { return { uuid: op.id, status: "accepted", id: "IO" + (++mockState.nTs) }; }
           case "hr_seen": { M.hr.messages.forEach((m) => { m.seen = true; }); M.hr.unread = 0; return { uuid: op.id, status: "accepted", id: "HM0" }; }
           default: return { uuid: op.id, status: "rejected", error: "unknown kind" };
         } });

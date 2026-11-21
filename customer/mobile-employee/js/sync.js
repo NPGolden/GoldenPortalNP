@@ -7,6 +7,7 @@ window.SYNC = (() => {
 
   async function pull() {   // Employee app: the account and its own HR record — nothing else is requested from the portal
     const me = await API.me(); await DB.put("meta", { ...me, uid: me.id, id: "me" });
+    try { const io = await API.inout(); await DB.put("meta", { id: "io", ...io }); } catch (e) { /* In / Out not switched on, or no signal */ }   // R97-182
     try { const hr = await API.hr(); await DB.put("meta", { id: "hr", ...hr }); await DB.put("meta", { id: "hr" + hr.year, ...hr }); } catch (e) { /* no HR record: the page says so */ }
   }
 

@@ -98,13 +98,13 @@ window.UI = (() => {
 
   // router
   const routes = [
-    [/^#\/login$/, () => SCREENS.login()], [/^#\/lock$/, () => SCREENS.lock()], [/^#\/more$/, () => SCREENS.more()], [/^#\/hr(\?.*)?$/, (m, q) => HR.page(q)],
+    [/^#\/login$/, () => SCREENS.login()], [/^#\/lock$/, () => SCREENS.lock()], [/^#\/more$/, () => SCREENS.more()], [/^#\/hr(\?.*)?$/, (m, q) => HR.page(q)], [/^#\/io$/, () => IO.page()],
   ];
   const query = (h) => { const q = {}; const i = h.indexOf("?"); if (i < 0) return q; new URLSearchParams(h.slice(i + 1)).forEach((v, k) => { q[k] = v; }); return q; };
   async function render() {
     if (rendering) { pending = true; return; } rendering = true; assistCtx = null;
     try {
-      let h = location.hash || "#/hr"; if (!/^#\/(login|lock|more|hr)/.test(h)) { location.hash = "#/hr"; return; }   // the app has only these screens
+      let h = location.hash || "#/hr"; if (!/^#\/(login|lock|more|hr|io)/.test(h)) { location.hash = "#/hr"; return; }   // the app has only these screens
       if (!API.signedIn && h !== "#/login") { location.hash = "#/login"; return; }
       if (API.signedIn && h !== "#/lock" && h !== "#/login" && isLocked()) { location.hash = "#/lock"; return; }   // R70-005
       await SCREENS.load();

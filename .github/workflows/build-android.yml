@@ -51,6 +51,8 @@ jobs:
           set -e; npx cap add android
           SPLASH="${{ steps.prep.outputs.splash }}" npx @capacitor/assets generate --android --iconBackgroundColor '#FFFFFF' --iconBackgroundColorDark '#1F3A5F' --splashBackgroundColor "$SPLASH" --splashBackgroundColorDark "$SPLASH" || echo "assets: default icons kept"
           npx cap sync android
+          # R97-182 In / Out: one position fix at clock in / out — the WebView asks for the permission only when it is declared here (the customer app has no In / Out)
+          if [ "${{ github.event.inputs.app }}" != "customer" ]; then M=android/app/src/main/AndroidManifest.xml; grep -q ACCESS_FINE_LOCATION "$M" || sed -i 's#<application#<uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />\n    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />\n    <uses-feature android:name="android.hardware.location.gps" android:required="false" />\n\n    <application#' "$M"; grep -c "ACCESS_FINE_LOCATION" "$M"; fi
           # safety net: without the adaptive layers the v26 launcher XML would not link — fall back to the legacy icons
           [ -f android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_background.png ] || [ -f android/app/src/main/res/values/ic_launcher_background.xml ] || { echo "adaptive icon layers missing — legacy icons only"; rm -rf android/app/src/main/res/mipmap-anydpi-v26; }
       - name: Version, signing and push configuration

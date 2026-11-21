@@ -9,6 +9,7 @@ window.SYNC = (() => {
     const [me, tk, as, pr, ve, eq, bu, ma, dc, st, fs, ts, no] = await Promise.all([
       API.me(), API.tickets(), API.assignments(), API.projects(), API.vessels(), API.equipment(), API.budgets(), API.master(), API.documents(), API.status(), API.fsrList(), API.timesheets(), API.notes()]);
     await DB.put("meta", { ...me, uid: me.id, id: "me" });
+    try { const io = await API.inout(); await DB.put("meta", { id: "io", ...io }); } catch (e) { /* In / Out not switched on, or no signal: the page keeps what it has */ }   // R97-182
     if (me.hr !== false) { try { const hr = await API.hr(); await DB.put("meta", { id: "hr", ...hr }); await DB.put("meta", { id: "hr" + hr.year, ...hr }); } catch (e) { /* no HR module / no person card: the HR page says so */ } }
     await DB.put("meta", { id: "master", ...ma });
     await DB.putAll("tickets", tk.items); await DB.putAll("assignments", as.items); await DB.putAll("projects", pr.items);

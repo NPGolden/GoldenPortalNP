@@ -133,3 +133,7 @@ table.week { width: 100%; border-collapse: collapse; } .week tr { border-bottom:
 .cust .sigbox canvas { height: 180px; }
 .custdone { text-align: center; padding: 30px 10px; } .custdone .tick { width: 72px; height: 72px; line-height: 72px; border-radius: 50%; background: var(--green); color: #fff; font-size: 40px; margin: 0 auto 12px; } .custdone .tick.amber { background: var(--amber); }
 #accbox .card .t { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; word-break: break-all; }
+
+/* R97-182 In / Out */
+.io-now { text-align: center; padding: 18px 14px; } .io-state { font-size: 20px; font-weight: 700; color: var(--navy); } .io-state small { font-weight: 400; color: var(--grey); font-size: 13px; }
+.io-btn { width: 100%; font-size: 20px; padding: 18px; margin: 14px 0 8px; border-radius: 14px; } .card.c-green { border-left: 4px solid var(--green); }
