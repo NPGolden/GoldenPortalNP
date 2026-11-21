@@ -134,15 +134,34 @@ c = META["contact"]
 rattrs = {"contactFirstName": c["firstName"], "contactLastName": c["lastName"], "contactPhone": c["phone"], "contactEmail": c["email"], "notes": META["reviewNotes"],
           "demoAccountRequired": bool(os.environ.get("DEMO_USER")), "demoAccountName": os.environ.get("DEMO_USER", ""), "demoAccountPassword": os.environ.get("DEMO_PASS", "")}
 if rd: req("PATCH", f"/appStoreReviewDetails/{rd['id']}", json={"data": {"type": "appStoreReviewDetails", "id": rd["id"], "attributes": rattrs}})
-else: req("POST", "/appStoreReviewDetails", json={"data": {"type": "appStoreReviewDetails", "attributes": rattrs, "relationships": {"appStoreVersion": rel("appStoreVersions", vid)}}})
+else: rd = req("POST", "/appStoreReviewDetails", json={"data": {"type": "appStoreReviewDetails", "attributes": rattrs, "relationships": {"appStoreVersion": rel("appStoreVersions", vid)}}})["data"]
 log("review details ok; demo account", "set" if os.environ.get("DEMO_USER") else "MISSING — set secrets ASC_DEMO_USER_*/ASC_DEMO_PASS_*")
+
+# ---- review attachments: store/<app>/review/* (the screen recording App Review asks for) replace the ones of the same name ----
+afiles = sorted(glob.glob(f"store/{APP}/review/*"))
+if afiles and rd:
+    old = req("GET", f"/appStoreReviewDetails/{rd['id']}/appStoreReviewAttachments").get("data", [])
+    for f in afiles:
+        data = open(f, "rb").read(); name = os.path.basename(f)
+        for o in old:
+            if o["attributes"].get("fileName") == name: req("DELETE", f"/appStoreReviewAttachments/{o['id']}")
+        at = req("POST", "/appStoreReviewAttachments", json={"data": {"type": "appStoreReviewAttachments", "attributes": {"fileName": name, "fileSize": len(data)}, "relationships": {"appStoreReviewDetail": rel("appStoreReviewDetails", rd["id"])}}})["data"]
+        for op in at["attributes"]["uploadOperations"]:
+            h = {x["name"]: x["value"] for x in op["requestHeaders"]}
+            r = requests.request(op["method"], op["url"], headers=h, data=data[op["offset"]:op["offset"] + op["length"]], timeout=300); r.raise_for_status()
+        req("PATCH", f"/appStoreReviewAttachments/{at['id']}", json={"data": {"type": "appStoreReviewAttachments", "id": at["id"], "attributes": {"uploaded": True, "sourceFileChecksum": hashlib.md5(data).hexdigest()}}})
+        log("review attachment", name, f"{len(data)//1024} KB")
 
 # ---- submit ----
 if SUBMIT:
     if not build: raise SystemExit("cannot submit without a build")
     if not os.environ.get("DEMO_USER"): raise SystemExit("cannot submit without the demo account")
-    rs = req("POST", "/reviewSubmissions", json={"data": {"type": "reviewSubmissions", "attributes": {"platform": "IOS"}, "relationships": {"app": rel("apps", aid)}}})["data"]
-    req("POST", "/reviewSubmissionItems", json={"data": {"type": "reviewSubmissionItems", "relationships": {"reviewSubmission": rel("reviewSubmissions", rs["id"]), "appStoreVersion": rel("appStoreVersions", vid)}}})
+    openrs = [x for x in req("GET", f"/apps/{aid}/reviewSubmissions", params={"filter[platform]": "IOS", "filter[state]": "READY_FOR_REVIEW,UNRESOLVED_ISSUES"}).get("data", [])]
+    if openrs:   # the version already sits in a submission (returned by App Review, or added but not sent): send that one again
+        rs = openrs[0]; log("review submission", rs["id"], rs["attributes"]["state"], "— resubmitting")
+    else:
+        rs = req("POST", "/reviewSubmissions", json={"data": {"type": "reviewSubmissions", "attributes": {"platform": "IOS"}, "relationships": {"app": rel("apps", aid)}}})["data"]
+        req("POST", "/reviewSubmissionItems", json={"data": {"type": "reviewSubmissionItems", "relationships": {"reviewSubmission": rel("reviewSubmissions", rs["id"]), "appStoreVersion": rel("appStoreVersions", vid)}}})
     req("PATCH", f"/reviewSubmissions/{rs['id']}", json={"data": {"type": "reviewSubmissions", "id": rs["id"], "attributes": {"submitted": True}}})
     log("SUBMITTED for review", rs["id"])
 else:
