@@ -3876,3 +3876,10 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - The built-in data set no longer prints sign-in details on the sign-in screen; its fixture password was replaced.
 - Tested in a browser against a local emulation of the API: sign-in → invented fleet, Home / Sign / Offers / Tickets / More filled, reload keeps the session, sign-out resets, no data request reaches the server.
 - Cybersecurity: a review or presentation account can no longer read a real customer's documents. The web portal refuses demonstration accounts. No effect on performance (one flag already read with the user row).
+
+## §457 App icons with the app name (GAS-CP-R97-173, v1.210.4)
+
+- `customer/mobile/icons`, `customer/mobile-pm/icons`, `customer/mobile-customer/icons`: `icon-1024/512/192(/180).png` redrawn — same navy field, Golden A/S logo and gold band, plus a gold tab at the lower right with SERVICE, PM or CUSTOMER (navy lettering), matching the HR tab of Golden HR.
+- Client versions raised so the service workers drop the cached icons: Service 0.7.3, PM 1.0.15, Customer 1.0.12.
+- Native apps: the icon is part of the binary — new builds by `build-ios.yml` / `build-android.yml`; the Play store listing icon (512 px) is changed in the Play Console.
+- Cybersecurity: images only, no code path changed.
