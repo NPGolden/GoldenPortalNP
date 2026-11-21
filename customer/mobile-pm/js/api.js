@@ -2,7 +2,7 @@
  * and a MOCK mode (built-in sample data in the shapes of the contract) for the demo and the UI tests.
  * Mock mode: localStorage gpm.mock = "1", or ?mock=1 on the URL. */
 window.API = (() => {
-  const VERSION = "1.0.15";
+  const VERSION = "1.0.16";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   const demoOn = () => { try { return localStorage.getItem("gpm.demo") === "1"; } catch (e) { return false; } };   // R97-169
@@ -70,6 +70,7 @@ window.API = (() => {
     team: (year) => call("GET", `/pm/hr/team?year=${year || new Date().getFullYear()}`),
     absences: (project, from, to) => call("GET", `/pm/absences?project=${project}&from=${from}&to=${to}`),
     inbox: (since) => call("GET", `/pm/inbox${since ? `?since=${Math.floor(+since)}` : ""}`),   // since = unix seconds
+    inout: () => call("GET", "/inout"), inoutPunch: (p) => call("POST", "/inout/punch", p), inoutConsent: (p) => call("POST", "/inout/consent", p),   // R97-186 In / Out
     sync: (ops) => call("POST", "/sync", { ops }),
     photo: (recordId, blob, name, task, caption) => { const f = new FormData(); f.append("record_id", recordId); f.append("task", String(task || 1)); if (caption) f.append("caption", caption); f.append("photo", blob, name || "photo.jpg"); return call("POST", "/files/photo", f, true); },
     pushToken: (token, service) => call("POST", "/devices/push-token", { token, service }),
@@ -243,6 +244,15 @@ window.API = (() => {
     if (p === "/assist") { const txt = (body.prompt || "").trim(); const f = (body.fields || []).map((x) => `${x.label || x.name}: ${x.value || "—"}`).join("; ");
       const map = { write: `(house style) ${txt.replace(/^improve[^:]*:\s*/i, "").replace(/^./, (c) => c.toUpperCase())}`, translate: `(translation) ${txt}`, ask: `From ${body.page}: ${f.slice(0, 160) || "no fields"}. ${txt.slice(0, 80)} — in the live portal this comes from Claude.` };
       return delay({ text: map[body.kind] || map.ask, tokens: 120 }); }
+    if (p === "/inout") { if (!M.io) { const dd = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10); const site = { id: 1, name: "Perama yard", lat: 37.965, lng: 23.573, radius_m: 300 };
+        const mk = (id, kind, n, time, extra) => Object.assign({ id, kind, at: dd(n) + "T" + time + ":00.000Z", day: dd(n), time, lat: 37.9651, lng: 23.5732, acc: 12, site: "Perama yard", dist: 21, flags: [], status: "auto", map: "https://www.google.com/maps?q=37.9651,23.5732", note: null, late_sync: false }, extra || {});
+        M.io = { enabled: true, consent: { accepted: false, version: "1", at: null, title: "In / Out — recording of time and position", text: "Golden A/S records the time and the position of your phone at the moment you clock in and at the moment you clock out, together with the nearest company site, the accuracy of the position and the app or computer used. Your position is not followed between the two.\n\nThe data is used to confirm presence at the place of work, working time and overtime. It is compared with your timesheet and your service reports and is taken into account in the personnel evaluation (consistency and accuracy).\n\nYour entries are seen by HR, the management, your manager and the project managers; the statistics only by HR, the CEO and the General Manager. You see your own entries in the app and on the portal.\n\nPrivacy policy: https://www.goldenas.com.gr/privacy.html", accept: "I have read this notice and I accept the recording of the time and position of my In / Out." }, state: "out", since: null, schedule: { workday: true, start: "08:30", end: "17:00", tolerance_min: 10 }, sites: [site, { id: 2, name: "Head office Keratsini", lat: 37.962, lng: 23.619, radius_m: 150 }],
+          entries: [mk(904, "out", -1, "17:05"), mk(903, "in", -1, "08:27"), mk(902, "out", -2, "18:40"), mk(901, "in", -2, "09:02", { flags: ["late"], status: "approved", note: "Traffic on the bridge — agreed" })] }; } return delay(M.io); }
+    if (p === "/inout/consent") { M.io.consent.accepted = true; M.io.consent.at = new Date().toISOString(); return delay({ status: "accepted", consent: M.io.consent }); }
+    if (p === "/inout/punch") { const now = new Date(body.at || Date.now()); const pad = (n) => String(n).padStart(2, "0"); const best = body.lat == null ? null : M.io.sites.map((s) => ({ s, m: Math.round(111320 * Math.hypot(body.lat - s.lat, (body.lng - s.lng) * Math.cos(s.lat * Math.PI / 180))) })).sort((a, b) => a.m - b.m)[0];
+      const fl = []; if (body.lat == null) fl.push("nogps"); else if (best && best.m > best.s.radius_m) fl.push("outside");
+      const e = { id: 950 + (++mockState.n), kind: body.kind, at: now.toISOString(), day: now.toISOString().slice(0, 10), time: pad(now.getHours()) + ":" + pad(now.getMinutes()), lat: body.lat, lng: body.lng, acc: body.acc, site: best ? best.s.name : null, dist: best ? best.m : null, flags: fl, status: fl.length ? "pending" : "auto", map: body.lat == null ? "" : `https://www.google.com/maps?q=${body.lat},${body.lng}`, note: null, late_sync: false };
+      M.io.entries.unshift(e); M.io.state = body.kind === "in" ? "in" : "out"; M.io.since = e.at; return delay({ status: "accepted", entry: e, state: M.io.state }); }
     if (p === "/sync") {
       const results = body.ops.map((op) => { const pl = op.payload || {};
         const findSub = (id) => { for (const x of M.projects) { const s = x.subprojects.find((y) => y.id === +id); if (s) return s; } return null; };
@@ -273,6 +283,8 @@ window.API = (() => {
           case "hr_message": { M.hr.messages.push({ id: 90 + (++mockState.n), from_hr: false, from: M.me.name, body: pl.text, at: today + " 10:00", seen: true }); return { uuid: op.id, status: "accepted", id: "HM" + mockState.n }; }
           case "hr_seen": { M.hr.messages.forEach((m) => { m.seen = true; }); M.hr.unread = 0; return { uuid: op.id, status: "accepted", id: "HM0" }; }
           case "approve": case "reject": case "issue": case "eng_decide": return { uuid: op.id, status: "rejected", code: 403, error: "Decided in the portal" };
+          case "io_consent": { if (M.io) M.io.consent.accepted = true; return { uuid: op.id, status: "accepted", id: "IOC" }; }
+          case "io_punch": { return { uuid: op.id, status: "accepted", id: "IO" + (++mockState.n) }; }
           default: return { uuid: op.id, status: "rejected", error: "unknown kind" };
         } });
       return delay({ results });

@@ -12,6 +12,7 @@ window.SYNC = (() => {
   async function pull() {
     const me = await API.me();
     await DB.put("meta", { ...me, uid: me.id, id: "me" });
+    try { const io = await API.inout(); await DB.put("meta", { id: "io", ...io }); } catch (e) { /* In / Out not switched on, or no signal: the page keeps what it has */ }   // R97-186
     const [pr, dr, sm, dc, nb, no] = await Promise.all([API.projects(), API.drawings(), API.submittals(), API.documents(), API.inbox().catch(() => ({ items: [] })), API.notes().catch(() => ({ items: [] }))]);
     await DB.put("meta", { id: "stages", list: pr.stages || STAGES }); await DB.put("meta", { id: "staff", list: pr.staff || [] });
     // local optimistic stage edits still queued are kept over the server copy until the server answers

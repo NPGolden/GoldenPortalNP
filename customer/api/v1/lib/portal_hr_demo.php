@@ -242,6 +242,28 @@ final class PortalHRDemo {
         return ['id' => (int)$u['id'], 'name' => (string)$u['full_name'], 'email' => (string)$u['email'], 'role' => (string)$u['role'], 'discipline' => '', 'discipline_id' => 0, 'section_id' => 0, 'home_branch' => 'GR', 'branch_scope' => ['GR'], 'languages' => array_keys(LOCALES),
             'ai' => false, 'team_restricted' => false, 'calendar' => 'GR', 'hr' => true, 'hr_unread' => 0, 'totp_enabled' => false, 'min_app_version' => api_setting('api_min_version_hr', API_APPS['hr']), 'counts' => self::counts($u), 'today' => self::today($u), 'demo' => true];
     }
+    /* R97-186: In / Out for the demonstration account. Two invented sites, two invented days; what the reviewer registers is kept in the demonstration file only. */
+    private static function ioSites(): array { return [['id' => 1, 'name' => 'Perama yard', 'lat' => 37.965, 'lng' => 23.573, 'radius_m' => 300], ['id' => 2, 'name' => 'Head office Keratsini', 'lat' => 37.962, 'lng' => 23.619, 'radius_m' => 150]]; }
+    private static function io(array $u): array {
+        $st = self::state($u); $io = (array)($st['io'] ?? []); $mine = array_reverse((array)($io['entries'] ?? []));
+        $mk = fn(int $id, string $kind, int $n, string $time, array $x = []) => $x + ['id' => $id, 'kind' => $kind, 'at' => self::day($n) . 'T' . $time . ':00Z', 'day' => self::day($n), 'time' => $time, 'lat' => 37.9651, 'lng' => 23.5732, 'acc' => 12, 'site' => 'Perama yard', 'dist' => 21, 'flags' => [], 'status' => 'auto', 'map' => 'https://www.google.com/maps?q=37.9651,23.5732', 'note' => null, 'late_sync' => false];
+        $last = $mine[0] ?? null;
+        return ['enabled' => true, 'consent' => ['accepted' => !empty($io['consent']), 'version' => '1', 'at' => $io['consent'] ?? null, 'title' => t('io.c_title'), 'text' => t('io.c_text'), 'accept' => t('io.c_accept')],
+            'state' => $last ? ($last['kind'] === 'in' ? 'in' : 'out') : 'out', 'since' => $last['at'] ?? null, 'schedule' => ['workday' => true, 'start' => '08:30', 'end' => '17:00', 'tolerance_min' => 10], 'sites' => self::ioSites(),
+            'entries' => array_merge($mine, [$mk(904, 'out', -1, '17:05'), $mk(903, 'in', -1, '08:27'), $mk(902, 'out', -2, '18:40'), $mk(901, 'in', -2, '09:02', ['flags' => ['late'], 'status' => 'approved', 'note' => 'Traffic on the bridge — agreed'])])];
+    }
+    private static function ioPunch(array $u, array $b): array {
+        $st = self::state($u); if (empty($st['io']['consent'])) Response::error(409, 'Accept the In / Out notice first', ['consent' => true]);
+        $kind = ($b['kind'] ?? '') === 'out' ? 'out' : 'in'; $ts = strtotime((string)($b['at'] ?? '')) ?: time(); $tz = max(-720, min(840, (int)($b['tz_min'] ?? 0))); $loc = $ts + $tz * 60;
+        $lat = isset($b['lat']) && is_numeric($b['lat']) ? max(-90.0, min(90.0, (float)$b['lat'])) : null; $lng = isset($b['lng']) && is_numeric($b['lng']) ? max(-180.0, min(180.0, (float)$b['lng'])) : null; if ($lat === null || $lng === null) { $lat = $lng = null; }
+        $best = null; if ($lat !== null) foreach (self::ioSites() as $site) { $m = (int) round(111320 * hypot($lat - $site['lat'], ($lng - $site['lng']) * cos(deg2rad($site['lat'])))); if (!$best || $m < $best['m']) $best = ['s' => $site, 'm' => $m]; }
+        $fl = []; if ($lat === null) $fl[] = 'nogps'; elseif ($best && $best['m'] > $best['s']['radius_m']) $fl[] = 'outside';
+        $n = count((array)($st['io']['entries'] ?? []));
+        $e = ['id' => 950 + $n, 'kind' => $kind, 'at' => gmdate('c', $ts), 'day' => gmdate('Y-m-d', $loc), 'time' => gmdate('H:i', $loc), 'lat' => $lat, 'lng' => $lng, 'acc' => isset($b['acc']) ? max(0, min(100000, (int)$b['acc'])) : null,
+            'site' => $best ? $best['s']['name'] : null, 'dist' => $best ? $best['m'] : null, 'flags' => $fl, 'status' => $fl ? 'pending' : 'auto', 'map' => $lat !== null ? 'https://www.google.com/maps?q=' . round($lat, 6) . ',' . round($lng, 6) : null, 'note' => null, 'late_sync' => false];
+        if ($n < 40) { $st['io']['entries'][] = $e; self::save($u, $st); }
+        return ['status' => 'accepted', 'state' => $kind, 'entry' => $e];
+    }
     private static function sync(array $u, array $body): array {
         $s = self::state($u); $res = [];
         foreach (array_slice((array)($body['ops'] ?? []), 0, 50) as $op) { $pl = (array)($op['payload'] ?? []); $ok = true;
@@ -249,6 +271,8 @@ final class PortalHRDemo {
                 case 'hr_app_decide': $s['req'][(int)($pl['request_id'] ?? 0)] = !empty($pl['approve']) ? 'approved' : 'rejected'; break;
                 case 'hr_app_training': $s['trn'][(int)($pl['member_id'] ?? 0)] = 1; break;
                 case 'hr_app_ts': $s['ts'][(int)($pl['ts_id'] ?? 0)] = 1; break;
+                case 'io_consent': $s['io']['consent'] = gmdate('c'); break;   // R97-186
+                case 'io_punch': break;
                 default: $ok = false; }
             $res[] = $ok ? ['uuid' => (string)($op['id'] ?? ''), 'status' => 'accepted', 'id' => 'DEMO'] : ['uuid' => (string)($op['id'] ?? ''), 'status' => 'rejected', 'code' => 422, 'error' => 'Not available in the demonstration'];
         }
@@ -261,6 +285,9 @@ final class PortalHRDemo {
         if ($path === '/auth/logout') return;                                   // the real sign-out (device token) runs as usual
         if ($g && $path === '/me') Response::json(self::me($u));
         if ($p && $path === '/sync') Response::json(self::sync($u, $body));
+        if ($g && $path === '/inout') Response::json(self::io($u));                                   // R97-186: In / Out of the demonstration — invented entries, nothing reaches the company records
+        if ($p && $path === '/inout/consent') { $st = self::state($u); $st['io']['consent'] = gmdate('c'); self::save($u, $st); Response::json(['status' => 'accepted', 'consent' => self::io($u)['consent']]); }
+        if ($p && $path === '/inout/punch') Response::json(self::ioPunch($u, $body), 201);
         if ($path === '/devices/push-token') Response::json([]);
         if ($g && $path === '/me/passkeys') Response::json(['items' => []]);
         if (str_starts_with($path, '/me/passkeys')) Response::error(403, 'Passkeys are not available for a demonstration account');

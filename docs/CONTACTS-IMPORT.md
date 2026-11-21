@@ -3990,3 +3990,11 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - `cp_migration_state()` had two entries with the key `r99d` (newsletters `web_slug`, and In / Out `io_entries`). In a PHP array the later one wins, so the check of R97-182 was always true and `migrate_cp_r97_182_inout.sql` was never run: `io_entries`, `io_sites`, `io_overtime` did not exist, `io_has()` was false, the menu entry was hidden and `GET /inout` answered `enabled: false`. (`io_consents`, key `r99e`, was created.)
 - The check of R97-182 is now `r99g`. The self-check line uses the same name.
 - Lesson: take the migration key from the highest key present in `version.php` at commit time (another session also adds keys), and after a deploy read the "migrations" step of the updater report for the file name.
+
+## §469 In / Out in Golden PM and Golden HR (GAS-CP-R97-186, v1.217.0)
+
+- `customer/mobile-pm/js/io.js` and `customer/mobile-hr/js/io.js` are the same module as in the Service and Employee apps (route `#/io`, card under More, 39 keys `io.*` in five languages, styles `.io-*`). Client versions: Golden PM 1.0.16, Golden HR 1.2.0.
+- API: the Golden HR whitelist in `api/v1/index.php` now includes `/inout`, `/inout/punch`, `/inout/consent`. Golden PM had no path whitelist. The source of an entry is the app id (`pm`, `hr`).
+- Demonstration accounts: Golden PM answers from the data set built into the app; Golden HR is answered by `PortalHRDemo::io()` / `ioPunch()` (two invented sites, entries kept in the demonstration file only, at most 40, coordinates clamped). Nothing of a demonstration account reaches `io_entries` or the HR log.
+- Golden A/S Customer has no In / Out: `/inout*` answers 403 "Staff only" for customer accounts (unchanged).
+- Security review: no new table, no new right; the new routes for the HR app go through the same consent check, rate limit and staff-only check as the other apps; values of the demonstration punch are cast and bounded before they are stored or returned.

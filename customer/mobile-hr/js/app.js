@@ -76,7 +76,7 @@ window.UI = (() => {
     [/^#\/login$/, () => SCREENS.login()], [/^#\/lock$/, () => SCREENS.lock()],
     [/^#\/inbox(\?.*)?$/, (m, q) => SCREENS.inbox(q)], [/^#\/people$/, () => SCREENS.people()], [/^#\/person\/(\d+)$/, (m) => SCREENS.person(m[1])],
     [/^#\/messages$/, () => SCREENS.messages()], [/^#\/thread\/(\d+)$/, (m) => SCREENS.thread(m[1])],
-    [/^#\/calendar(\?.*)?$/, (m, q) => SCREENS.calendar(q)], [/^#\/balances$/, () => SCREENS.balances()], [/^#\/more$/, () => SCREENS.more()],
+    [/^#\/calendar(\?.*)?$/, (m, q) => SCREENS.calendar(q)], [/^#\/balances$/, () => SCREENS.balances()], [/^#\/more$/, () => SCREENS.more()], [/^#\/io$/, () => IO.page()],
     [/^#\/today$/, () => HRX.today()], [/^#\/recruiting(\?.*)?$/, (m, q) => HRX.recruiting(q)], [/^#\/candidate\/(\d+)$/, (m) => HRX.candidate(m[1])], [/^#\/cv\/(\d+)$/, (m) => HRX.cv(m[1])],   // R97-156
     [/^#\/jds$/, () => HRX.jds()], [/^#\/jd\/(\d+)$/, (m) => HRX.jd(m[1])], [/^#\/year$/, () => HRX.year()], [/^#\/expiring$/, () => HRX.expiring()], [/^#\/equipment$/, () => HRX.equipment()], [/^#\/eqdoc\/(\d+)$/, (m) => HRX.eqdoc(m[1])],
     [/^#\/parts$/, () => PARTS.list({})], [/^#\/parts\?(.*)$/, (m) => PARTS.list(query("#/parts?" + m[1]))], [/^#\/parts\/new$/, () => PARTS.create()], [/^#\/parts\/(\d+)$/, (m) => PARTS.one(+m[1])],   // R82-003

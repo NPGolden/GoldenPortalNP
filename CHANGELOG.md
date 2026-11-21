@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.216.1** (build 2026-11-21). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.217.0** (build 2026-11-21). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.217.0 | GAS-CP-R97-186 | 2026-11-21 | In / Out in Golden PM (1.0.16) and Golden HR (1.2.0): the same clock in / clock out with position and the same acceptance at first use, under More | — |
 | 1.216.1 | GAS-CP-R97-185 | 2026-11-21 | In / Out: the database tables of version 1.214.0 are created now (their update had been skipped), so the menu entry Work › In / Out appears | — |
 | 1.216.0 | GAS-CP-R97-184 | 2026-11-21 | Working hours: several calendars per branch (holidays shared, hours different), a calendar per department and per person — a person follows the own calendar, else the department, else the branch; In / Out and timesheets follow it | `install/migrate_cp_r97_184_calendar_assign.sql` |
 | 1.215.0 | GAS-CP-R97-183 | 2026-11-21 | In / Out: the employee accepts the notice on the recording of time and position online the first time In / Out is used (apps and portal); the acceptance is written to the HR log of the person (Employee 1.1.1, Service 0.8.1) | `install/migrate_cp_r97_183_inout_consent.sql` |

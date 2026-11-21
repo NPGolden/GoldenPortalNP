@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.216.1';
+const CP_VERSION = '1.217.0';
 const CP_BUILD   = '2026-11-21';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-186', 'version' => '1.217.0', 'date' => '2026-11-21', 'title' => 'In / Out in Golden PM (1.0.16) and Golden HR (1.2.0): the same clock in / clock out with position and the same acceptance at first use, under More', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-185', 'version' => '1.216.1', 'date' => '2026-11-21', 'title' => 'In / Out: the database tables of version 1.214.0 are created now (their update had been skipped), so the menu entry Work › In / Out appears', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-184', 'version' => '1.216.0', 'date' => '2026-11-21', 'title' => 'Working hours: several calendars per branch (holidays shared, hours different), a calendar per department and per person — a person follows the own calendar, else the department, else the branch; In / Out and timesheets follow it', 'db' => 'install/migrate_cp_r97_184_calendar_assign.sql', 'check' => 'r99f'],
         ['ref' => 'GAS-CP-R97-183', 'version' => '1.215.0', 'date' => '2026-11-21', 'title' => 'In / Out: the employee accepts the notice on the recording of time and position online the first time In / Out is used (apps and portal); the acceptance is written to the HR log of the person (Employee 1.1.1, Service 0.8.1)', 'db' => 'install/migrate_cp_r97_183_inout_consent.sql', 'check' => 'r99e'],

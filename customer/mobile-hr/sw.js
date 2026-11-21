@@ -2,14 +2,14 @@
  * Precache the shell; never cache the API (Cache-Control: no-store on the server as well).
  * Bump VERSION with every portal release: the old cache is dropped on activate.
  */
-const VERSION = "1.1.2";
+const VERSION = "1.2.0";
 const SHELL = `gas-hr-v${VERSION}`;
 const IMAGES = "gas-hr-images";
 const ASSETS = [
   "./", "./index.html", "./manifest.webmanifest",
   `./css/app.css?v=${VERSION}`,
   `./js/i18n.js?v=${VERSION}`, `./js/db.js?v=${VERSION}`, `./js/api.js?v=${VERSION}`,
-  `./js/sync.js?v=${VERSION}`, `./js/screens.js?v=${VERSION}`, `./js/pdfview.js?v=${VERSION}`, `./js/more.js?v=${VERSION}`, `./js/parts.js?v=${VERSION}`, `./js/upd.js?v=${VERSION}`, `./js/pick.js?v=${VERSION}`, `./js/app.js?v=${VERSION}`,
+  `./js/sync.js?v=${VERSION}`, `./js/screens.js?v=${VERSION}`, `./js/io.js?v=${VERSION}`, `./js/pdfview.js?v=${VERSION}`, `./js/more.js?v=${VERSION}`, `./js/parts.js?v=${VERSION}`, `./js/upd.js?v=${VERSION}`, `./js/pick.js?v=${VERSION}`, `./js/app.js?v=${VERSION}`,
   "./img/logo.png", "./img/logo-white.png", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/icon-180.png",
 ];
 

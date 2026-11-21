@@ -10,6 +10,7 @@ window.SYNC = (() => {
 
   async function pull() {
     const me = await API.me(); await DB.put("meta", { ...me, uid: me.id, id: "me" });
+    try { const io = await API.inout(); await DB.put("meta", { id: "io", ...io }); } catch (e) { /* In / Out not switched on, or no signal */ }   // R97-186
     const year = new Date().getFullYear();
     const [ib, pp, aw, th] = await Promise.all([API.inbox(), API.people(), API.away(plus(-7), plus(35)), API.threads().catch(() => ({ threads: [] }))]);
     const ob = await DB.outbox();
