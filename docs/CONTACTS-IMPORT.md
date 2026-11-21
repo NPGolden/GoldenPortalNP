@@ -3984,3 +3984,9 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Tested on the test database: 17 checks — default, branch, department over branch, own over department, "apply to all", holiday of the parent calendar, and In / Out late / early for an office calendar and a site calendar at the same clock times; the page rendered with and without the new-calendar form.
 - Behaviour change: an account without a calendar whose branch has one now follows the branch (before: GR).
 - Cybersecurity: administrators only, CSRF, parameterised queries; no new data leaves the portal.
+
+## §468 In / Out — tables created (GAS-CP-R97-185, v1.216.1)
+
+- `cp_migration_state()` had two entries with the key `r99d` (newsletters `web_slug`, and In / Out `io_entries`). In a PHP array the later one wins, so the check of R97-182 was always true and `migrate_cp_r97_182_inout.sql` was never run: `io_entries`, `io_sites`, `io_overtime` did not exist, `io_has()` was false, the menu entry was hidden and `GET /inout` answered `enabled: false`. (`io_consents`, key `r99e`, was created.)
+- The check of R97-182 is now `r99g`. The self-check line uses the same name.
+- Lesson: take the migration key from the highest key present in `version.php` at commit time (another session also adds keys), and after a deploy read the "migrations" step of the updater report for the file name.
