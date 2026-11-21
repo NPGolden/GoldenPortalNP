@@ -7,6 +7,7 @@ $ks = function_exists('kym_has') && kym_has(); $fsite = $ks && in_array($_GET['s
 $rows = $tab === 'issues' ? nl_issues(nl_dept_has() ? 'sales' : null) : [];   /* R97-160: HR issues are on HR › Newsletters */ $lists = $tab === 'lists' ? nl_lists() : []; $LE = $tab === 'lists' && !empty($_GET['edit']) ? nl_list((int)$_GET['edit']) : null; $lnew = $tab === 'lists' && !empty($_GET['new']); $subs = $tab === 'subs' ? nl_subs($fsite) : []; $opt = $tab === 'optout' ? nl_optouts($fsite) : [];
 $siteTabs = function (string $tab) use ($ks, $fsite): string { if (!$ks) return ''; $o = '<div class="ws-per" style="display:flex;gap:6px;margin:0 0 10px;">'; foreach ([null => t('kym.all_sites'), 'golden' => 'Golden A/S', 'kyma' => 'KYMA'] as $k => $l) { $k = $k === '' ? null : $k; $o .= '<a class="btn btn--sm' . ($k === $fsite ? ' btn--gold' : ' btn--ghost') . '" href="' . url('newsletters', ['tab' => $tab] + ($k ? ['site' => $k] : [])) . '">' . e($l) . '</a>'; } return $o . '</div>'; };
 $nSub = (int) scalar("SELECT COUNT(*) FROM nl_subs WHERE status = 'confirmed'"); $nOpt = (int) scalar('SELECT COUNT(*) FROM nl_optout'); $today = (int) scalar("SELECT COUNT(*) FROM nl_sends WHERE status = 'sent' AND sent_at >= CURDATE()");
+if (!empty($_GET['sample'])) nl_md_sample_send();   // R97-175: the example block sheet of the import
 layout_head(t('nl.title'), 'web_sales');
 web_sales_tabs('newsletters');
 ?>
@@ -22,6 +23,16 @@ web_sales_tabs('newsletters');
     <div class="field"><label>&nbsp;</label><button class="btn btn--gold btn--sm" type="submit">+ <?= tt('nl.create') ?></button></div>
   </form>
 </div>
+<div class="card" id="import"><details><summary><b>⇪ <?= tt('nl.imp_title') ?></b></summary>
+  <form method="post" action="<?= $self ?>" enctype="multipart/form-data" class="filters" data-lock style="margin-top:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="nl_import">
+    <div class="field"><label><?= tt('nl.imp_md') ?></label><input type="file" name="md" accept=".md,.markdown,.txt,text/markdown,text/plain" required></div>
+    <div class="field"><label><?= tt('nl.imp_dir') ?></label><input type="file" name="picdir[]" webkitdirectory multiple></div>
+    <div class="field"><label><?= tt('nl.imp_pics') ?></label><input type="file" name="pics[]" accept="image/jpeg,image/png,image/gif" multiple></div>
+    <?php if ($ks): ?><div class="field"><label><?= tt('kym.site') ?></label><select name="site" data-nosearch><?php foreach (KYM_SITES as $sk => $sl): ?><option value="<?= $sk ?>"><?= e($sl) ?></option><?php endforeach; ?></select></div><?php endif; ?>
+    <div class="field"><label>&nbsp;</label><button class="btn btn--gold btn--sm" type="submit">⇪ <?= tt('nl.imp_btn') ?></button></div>
+  </form>
+  <p class="hint" style="margin:8px 0 0;"><?= tt('nl.imp_hint') ?> <a href="<?= url('newsletters', ['sample' => 1]) ?>"><?= tt('nl.imp_sample') ?> ↓</a></p>
+</details></div>
 <div class="card">
   <div class="card-head"><h2><?= tt('nl.t_issues') ?> <span class="count"><?= count($rows) ?></span></h2><span class="hint"><?= e(t('nl.today', ['n' => $today, 'm' => nl_daily()])) ?></span></div>
   <?php if (!$rows): ?><p class="hint"><?= tt('nl.none') ?></p><?php else: ?>

@@ -186,6 +186,91 @@ function nl_audience(array $aud, string $site = 'golden', string $dept = 'sales'
 function nl_audience_counts(array $rcpt): array { $c = []; foreach ($rcpt as $r) $c[$r['grp']] = ($c[$r['grp']] ?? 0) + 1; return $c; }
 function nl_group_label(string $g): string { if (str_starts_with($g, 'c:')) return function_exists('ct_categories') ? (ct_categories()[substr($g, 2)] ?? substr($g, 2)) : substr($g, 2); return $g === 'web' ? t('nl.g_web') : ($g === 'extra' ? t('nl.g_extra') : (nl_groups()[$g] ?? (nl_groups('hr')[$g] ?? $g))); }
 
+/* ---------------------------------------------------------------- import from a block sheet (GAS-CP-R97-175) */
+const NL_IMPORT_MAX_MD = 200000;   // bytes of the block sheet
+const NL_IMPORT_MAX_PICS = 20;
+/** A block sheet (.md, UTF-8) → head and blocks of an issue. Nothing is stored here.
+ *  Head between two lines of ---: title, subject, preheader, lang (en / el / it).
+ *  Body: # heading · text paragraphs (blank line between them, **bold**, lines starting with - as a list) · ![description](picture.jpg) ·
+ *  a line that is only [label](https://…) = button · --- = divider · lines starting with > = one highlight (### title, text, picture, button).
+ *  A picture is named by its file name; the folder part of the path is ignored. Returns head, blocks (a picture block carries 'file'), files. */
+function nl_md_parse(string $md): array {
+    if (!mb_check_encoding($md, 'UTF-8')) throw new RuntimeException(t('nl.imp_utf8'));
+    $md = str_replace(["\r\n", "\r"], "\n", (string) preg_replace('/^\xEF\xBB\xBF/', '', $md)); $L = explode("\n", $md); $n = count($L); $i = 0;
+    $head = ['title' => '', 'subject' => '', 'preheader' => '', 'lang' => 'en'];
+    while ($i < $n && trim($L[$i]) === '') $i++;
+    if ($i < $n && trim($L[$i]) === '---') {
+        for ($i++; $i < $n && trim($L[$i]) !== '---'; $i++) if (preg_match('/^\s*([A-Za-z_ ]+?)\s*:\s*(.*)$/', $L[$i], $m)) {
+            $k = strtolower(trim($m[1])); $k = ['preview' => 'preheader', 'preview line' => 'preheader', 'language' => 'lang', 'name' => 'title'][$k] ?? $k; $v = trim($m[2]);
+            if (strlen($v) > 1 && ($v[0] === '"' || $v[0] === "'") && substr($v, -1) === $v[0]) $v = substr($v, 1, -1);
+            if (isset($head[$k])) $head[$k] = trim($v);
+        }
+        $i++;
+    }
+    $reImg = '/^(?:\[\s*)?!\[([^\]]*)\]\(\s*([^)\s]+)\s*\)(?:\s*\]\(\s*(https?:\/\/[^)\s]+)\s*\))?$/'; $reBtn = '/^\[([^\]]+)\]\(\s*(https?:\/\/[^)\s]+)\s*\)$/';
+    $fkey = fn(string $p): string => mb_strtolower(basename(str_replace('\\', '/', rawurldecode($p))));
+    $isLi = fn(string $s): bool => (bool) preg_match('/^(?:[-*•]|\d{1,2}[.)])\s+/u', $s); $li = fn(string $s): string => (string) preg_replace('/^[-*]\s+/', '• ', $s);
+    /* lines of running text → paragraphs: wrapped lines are joined, list lines keep their own line */
+    $text = function (array $lines) use ($isLi, $li): string { $out = []; $cur = '';
+        foreach ($lines as $s) { $s = trim($s); if ($s === '') { if ($cur !== '') { $out[] = $cur; $cur = ''; } continue; } $cur = $cur === '' ? $li($s) : $cur . ($isLi($s) ? "\n" . $li($s) : ' ' . $s); }
+        if ($cur !== '') $out[] = $cur; return implode("\n\n", $out); };
+    $blocks = []; $files = []; $para = []; $card = null;
+    $cut = fn(string $s, int $max): string => mb_substr(trim($s), 0, $max);
+    $flushP = function () use (&$para, &$blocks, $text, $cut): void { $x = $text($para); $para = []; if ($x !== '') $blocks[] = ['t' => 'p', 'text' => $cut($x, 6000)]; };
+    $flushC = function () use (&$card, &$blocks, &$files, $text, $cut, $reImg, $reBtn, $fkey): void { if ($card === null) return; $b = ['t' => 'card']; $tx = [];
+        foreach ($card as $s) { $s2 = trim($s);
+            if (preg_match('/^#{1,6}\s+(.+?)\s*#*$/', $s2, $m) && !isset($b['title'])) $b['title'] = $cut($m[1], 200);
+            elseif (preg_match($reImg, $s2, $m) && !isset($b['file'])) { $b['file'] = $fkey($m[2]); $files[$b['file']] = 1; }
+            elseif (preg_match($reBtn, $s2, $m) && !isset($b['label'])) { $b['label'] = $cut($m[1], 80); $b['url'] = nl_url_ok($m[2]); }
+            else $tx[] = $s; }
+        $b['text'] = $cut($text($tx), 6000); $card = null; if ($b['text'] !== '' || !empty($b['title'])) $blocks[] = $b; };
+    for (; $i < $n; $i++) { $raw = rtrim($L[$i]); $s = trim($raw);
+        if (preg_match('/^>\s?(.*)$/', $s, $m)) { $flushP(); $card ??= []; $card[] = $m[1]; continue; }
+        $flushC();
+        if ($s === '') { $para[] = ''; continue; }
+        if (preg_match('/^<!--.*-->$/', $s)) continue;   // a comment line of the author is not part of the issue
+        if (preg_match('/^#{1,6}\s+(.+?)\s*#*$/', $s, $m)) { $flushP(); $blocks[] = ['t' => 'h', 'text' => $cut($m[1], 6000)]; continue; }
+        if (preg_match('/^(?:-{3,}|\*{3,}|_{3,})$/', $s)) { $flushP(); $blocks[] = ['t' => 'hr']; continue; }
+        if (preg_match($reImg, $s, $m)) { $flushP(); $k = $fkey($m[2]); $files[$k] = 1; $blocks[] = ['t' => 'img', 'title' => $cut($m[1], 200), 'url' => nl_url_ok((string)($m[3] ?? '')), 'file' => $k]; continue; }
+        if (preg_match($reBtn, $s, $m)) { $flushP(); $blocks[] = ['t' => 'btn', 'label' => $cut($m[1], 80), 'url' => nl_url_ok($m[2])]; continue; }
+        $para[] = $s;
+    }
+    $flushC(); $flushP();
+    return ['head' => $head, 'blocks' => $blocks, 'files' => array_keys($files)];
+}
+/** The block sheet and its pictures, as uploaded, become a new draft issue. Everything is checked before anything is stored; a failure
+ *  while storing removes the half-made draft. The draft then follows the usual way: preview, audience, approval, sending. Returns [id, blocks, pictures]. */
+function nl_import_from_post(string $dept, string $site): array {
+    $f = $_FILES['md'] ?? null; if (!is_array($f) || is_array($f['name'] ?? null) || (int)($f['error'] ?? 4) !== UPLOAD_ERR_OK || !is_uploaded_file((string)$f['tmp_name'])) throw new RuntimeException(t('nl.imp_need'));
+    if ((int)$f['size'] <= 0 || (int)$f['size'] > NL_IMPORT_MAX_MD || !preg_match('/\.(md|markdown|txt)$/i', (string)$f['name'])) throw new RuntimeException(t('nl.imp_md_bad'));
+    $P = nl_md_parse((string) file_get_contents((string)$f['tmp_name'])); $H = $P['head'];
+    if (!$P['blocks']) throw new RuntimeException(t('nl.imp_empty'));
+    if (count($P['blocks']) > NL_MAX_BLOCKS) throw new RuntimeException(t('nl.imp_many', ['n' => count($P['blocks']), 'm' => NL_MAX_BLOCKS]));
+    if (count($P['files']) > NL_IMPORT_MAX_PICS) throw new RuntimeException(t('nl.imp_pic_many', ['m' => NL_IMPORT_MAX_PICS]));
+    $have = []; $show = fn(string $s): string => mb_substr((string) preg_replace('/[^\p{L}\p{N}._\- ]/u', '?', $s), 0, 80);
+    foreach (['picdir', 'pics'] as $fld) { $F = $_FILES[$fld] ?? null; if (!is_array($F) || !is_array($F['name'] ?? null)) continue;
+        foreach ($F['name'] as $k => $nm) { if ((int)($F['error'][$k] ?? 4) !== UPLOAD_ERR_OK || !is_uploaded_file((string)$F['tmp_name'][$k])) continue; $key = mb_strtolower(basename(str_replace('\\', '/', (string)$nm))); if (!isset($have[$key])) $have[$key] = [(string)$F['tmp_name'][$k], (int)$F['size'][$k]]; } }
+    $miss = array_values(array_diff($P['files'], array_keys($have))); if ($miss) throw new RuntimeException(t('nl.imp_missing', ['f' => implode(', ', array_map($show, array_slice($miss, 0, 10)))]));
+    foreach ($P['files'] as $k) { [$tmp, $size] = $have[$k]; $info = @getimagesize($tmp); if ($size <= 0 || $size > 2 * 1024 * 1024 || !in_array($info[2] ?? 0, [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_GIF], true)) throw new RuntimeException(t('nl.imp_pic_bad', ['f' => $show($k)])); }
+    $subject = mb_substr(trim((string) preg_replace('/[\r\n]+/', ' ', $H['subject'])), 0, 200); $title = mb_substr($H['title'] !== '' ? $H['title'] : ($subject !== '' ? $subject : (string) preg_replace('/\.[A-Za-z]+$/', '', basename((string)$f['name']))), 0, 200);
+    $lang = in_array($H['lang'], ['en', 'el', 'it'], true) ? $H['lang'] : 'en';
+    $id = nl_create($title, $site, $dept);
+    try {
+        $tok = []; foreach ($P['files'] as $k) $tok[$k] = nl_image_store($id, $have[$k][0], $have[$k][1]);
+        $blocks = []; foreach ($P['blocks'] as $b) { if (isset($b['file'])) { $b['img'] = $tok[$b['file']] ?? ''; unset($b['file']); } $blocks[] = $b; }
+        q('UPDATE nl_issues SET subject = ?, preheader = ?, lang = ?, blocks = ? WHERE id = ?', [$subject !== '' ? $subject : $title, mb_substr($H['preheader'], 0, 200) ?: null, $lang, json_encode($blocks, JSON_UNESCAPED_UNICODE), $id]);
+    } catch (Throwable $e) { try { nl_delete($id); } catch (Throwable $x) {} throw $e; }
+    return [$id, count($P['blocks']), count($P['files'])];
+}
+/** The example block sheet offered on the import card (plain text, no data of the portal). */
+function nl_md_sample(): string {
+    return "---\ntitle: 2026-12 Example issue\nsubject: The subject line of the e-mail, under 60 characters\npreheader: The preview line shown after the subject in the inbox, 80 to 110 characters long.\nlang: en\n---\n\n"
+         . "# The headline of the issue\n\nThe lead: who the issue is for and what it gives them. A blank line starts a new paragraph. **Bold** is kept.\n\n"
+         . "[Label of the main button](https://www.goldenas.com.gr/)\n\n![Description of the picture](01-picture.jpg)\n\n---\n\n# A second section\n\nText of the section.\n\n- A list line\n- Another list line\n\n"
+         . "> ### Title of a highlight\n> Text of the highlight, in a framed box.\n> [Button of the highlight](https://www.goldenas.com.gr/contact.html)\n\n[Read the full article](https://www.goldenas.com.gr/newsletter.html)\n";
+}
+function nl_md_sample_send(): void { header('Content-Type: text/markdown; charset=utf-8'); header('Content-Disposition: attachment; filename="GAS-newsletter-block-sheet-example.md"'); header('X-Content-Type-Options: nosniff'); echo nl_md_sample(); exit; }
+
 /* ---------------------------------------------------------------- template */
 /** Plain text of a block → safe HTML: escaped, paragraphs, **bold**, and http(s) addresses turned into links through $link(url). */
 function nl_text_html(string $s, callable $link): string {
@@ -478,7 +563,7 @@ function nl_handle_action(string $action): bool {
     /* R97-160: an issue is touched only by those of its department; lists, subscribers and sending settings stay with sales / management */
     $I0 = $id ? nl_issue($id) : null; if ($I0 && !nl_can_issue($I0)) throw new RuntimeException(t('err.noaccess'));
     if (in_array($action, ['nl_list_save', 'nl_list_delete', 'nl_suball', 'nl_autocat', 'nl_settings', 'nl_optin'], true) && !nl_can()) throw new RuntimeException(t('err.noaccess'));
-    if (!in_array($action, ['nl_create', 'nl_hr_partner'], true) && !$I0 && !nl_can()) throw new RuntimeException(t('err.noaccess'));
+    if (!in_array($action, ['nl_create', 'nl_import', 'nl_hr_partner'], true) && !$I0 && !nl_can()) throw new RuntimeException(t('err.noaccess'));
     /* R97-051: an issue waiting for approval is locked — its form is not saved again; a change to an approved issue cancels the approval. */
     $sv = function () use ($id): void { $I = nl_issue($id); if ($I && ($I['appr_state'] ?? '') === 'pending') return; nl_save_from_post($id); if (nl_appr_recheck($id)) flash('info', t('nl.ap_reset')); };
     switch ($action) {
@@ -488,6 +573,7 @@ function nl_handle_action(string $action): bool {
         case 'nl_appr_approve_send': nl_appr_decide($id, true, (string)($_POST['appr_reply'] ?? '')); $n = nl_queue($id); flash('good', t('nl.queued', ['n' => $n])); $back('#stats');
         case 'nl_appr_return': nl_appr_decide($id, false, (string)($_POST['appr_reply'] ?? '')); flash('good', t('nl.ap_returned')); $back('#approval');
         case 'nl_create': $nd = ($_POST['dept'] ?? '') === 'hr' ? 'hr' : 'sales'; if (!nl_can_dept($nd)) throw new RuntimeException(t('err.noaccess')); $id = nl_create((string)($_POST['title'] ?? ''), (string)($_POST['site'] ?? 'golden'), $nd); flash('good', t('nl.created')); redirect('newsletter', ['id' => $id]);
+        case 'nl_import': $nd = ($_POST['dept'] ?? '') === 'hr' ? 'hr' : 'sales'; if (!nl_can_dept($nd)) throw new RuntimeException(t('err.noaccess')); [$id, $nb, $np] = nl_import_from_post($nd, (string)($_POST['site'] ?? 'golden')); flash('good', t('nl.imp_done', ['b' => $nb, 'p' => $np])); redirect('newsletter', ['id' => $id]);   // R97-175
         case 'nl_save': nl_save_from_post($id); if (nl_appr_recheck($id)) flash('info', t('nl.ap_reset')); flash('good', t('nl.saved')); $back(!empty($_POST['add']) ? '#blocks' : '');
         case 'nl_hr_partner': nl_hr_partner_add_from_post(); flash('good', t('nl.hr_p_added')); redirect('hr_newsletters', ['_r' => uniqid()], '#partners');
         case 'nl_copy': $id = nl_copy($id); flash('good', t('nl.copied')); redirect('newsletter', ['id' => $id]);

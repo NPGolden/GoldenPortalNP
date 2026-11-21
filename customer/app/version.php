@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.210.5';
+const CP_VERSION = '1.211.0';
 const CP_BUILD   = '2026-11-21';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-175', 'version' => '1.211.0', 'date' => '2026-11-21', 'title' => 'Newsletters: import an issue from a block sheet — a Markdown file (.md) with subject, preview line and blocks, plus the folder or files of its pictures, becomes a draft issue in Web Sales › Newsletters and HR › Newsletters; example block sheet on the import card', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-174', 'version' => '1.210.5', 'date' => '2026-11-21', 'title' => 'Service app 0.7.4: the bottom menu shows real icons (Home, Tickets, Reports, Hours, More) instead of grey blocks', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-173', 'version' => '1.210.4', 'date' => '2026-11-21', 'title' => 'App icons: Service, PM and Customer carry their name on a gold tab like Golden HR, so the four Golden A/S apps are told apart on the phone (Service 0.7.3, PM 1.0.15, Customer 1.0.12)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-172', 'version' => '1.210.3', 'date' => '2026-11-21', 'title' => 'Customer app 1.0.11: demonstration accounts for customer users — the app shows an invented fleet with reports to sign, offers, tickets and documents, and nothing of a real customer', 'db' => null, 'check' => null],

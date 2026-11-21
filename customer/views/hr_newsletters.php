@@ -6,6 +6,7 @@ $u = require_staff(); if (!function_exists('nl_can_dept') || !nl_dept_has() || !
 $rows = nl_issues('hr'); $self = url('hr_newsletters'); $partners = nl_hr_partners(); $groups = nl_groups('hr');
 $sent = array_filter($rows, fn($r) => (int)$r['n_sent'] > 0); $tS = array_sum(array_map(fn($r) => (int)$r['n_sent'], $rows)); $tO = array_sum(array_map(fn($r) => (int)$r['n_open'], $rows)); $tC = array_sum(array_map(fn($r) => (int)$r['n_click'], $rows)); $tU = array_sum(array_map(fn($r) => (int)$r['n_unsub'], $rows));
 $aud = nl_audience(['groups' => NL_HR_GROUPS], 'golden', 'hr'); $audBy = nl_audience_counts($aud);
+if (!empty($_GET['sample'])) nl_md_sample_send();   // R97-175
 layout_head(t('nl.hr_title'), 'hr_newsletters');
 ?>
 <div class="page-head"><div><h1>✉ <?= tt('nl.hr_title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('nl.hr_lede') ?></p></div></div>
@@ -24,6 +25,15 @@ layout_head(t('nl.hr_title'), 'hr_newsletters');
   </form>
   <p class="hint" style="margin:8px 0 0;"><?= tt('nl.hr_appr_hint') ?></p>
 </div>
+<div class="card" id="import"><details><summary><b>⇪ <?= tt('nl.imp_title') ?></b></summary>
+  <form method="post" action="<?= $self ?>" enctype="multipart/form-data" class="filters" data-lock style="margin-top:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="nl_import"><input type="hidden" name="dept" value="hr">
+    <div class="field"><label><?= tt('nl.imp_md') ?></label><input type="file" name="md" accept=".md,.markdown,.txt,text/markdown,text/plain" required></div>
+    <div class="field"><label><?= tt('nl.imp_dir') ?></label><input type="file" name="picdir[]" webkitdirectory multiple></div>
+    <div class="field"><label><?= tt('nl.imp_pics') ?></label><input type="file" name="pics[]" accept="image/jpeg,image/png,image/gif" multiple></div>
+    <div class="field"><label>&nbsp;</label><button class="btn btn--gold btn--sm" type="submit">⇪ <?= tt('nl.imp_btn') ?></button></div>
+  </form>
+  <p class="hint" style="margin:8px 0 0;"><?= tt('nl.imp_hint') ?> <a href="<?= url('hr_newsletters', ['sample' => 1]) ?>"><?= tt('nl.imp_sample') ?> ↓</a></p>
+</details></div>
 <div class="card">
   <div class="card-head"><h2><?= tt('nl.t_issues') ?> <span class="count"><?= count($rows) ?></span></h2></div>
   <?php if (!$rows): ?><p class="hint"><?= tt('nl.none') ?></p><?php else: ?>
