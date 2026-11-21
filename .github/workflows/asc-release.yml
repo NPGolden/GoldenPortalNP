@@ -29,14 +29,15 @@ jobs:
           case "$APP" in engineer) echo "u=ASC_DEMO_USER_ENGINEER" >> "$GITHUB_OUTPUT"; echo "p=ASC_DEMO_PASS_ENGINEER" >> "$GITHUB_OUTPUT";;
                          pm)       echo "u=ASC_DEMO_USER_PM" >> "$GITHUB_OUTPUT";       echo "p=ASC_DEMO_PASS_PM" >> "$GITHUB_OUTPUT";;
                          customer) echo "u=ASC_DEMO_USER_CUSTOMER" >> "$GITHUB_OUTPUT"; echo "p=ASC_DEMO_PASS_CUSTOMER" >> "$GITHUB_OUTPUT";;
-                         hr)       echo "u=ASC_DEMO_USER_HR" >> "$GITHUB_OUTPUT";       echo "p=ASC_DEMO_PASS_HR" >> "$GITHUB_OUTPUT";; esac
+                         hr)       echo "u=ASC_DEMO_USER_HR" >> "$GITHUB_OUTPUT";       echo "p=ASC_DEMO_PASS_HR" >> "$GITHUB_OUTPUT";;
+                         employee) echo "u=ASC_DEMO_USER_EMPLOYEE" >> "$GITHUB_OUTPUT"; echo "p=ASC_DEMO_PASS_EMPLOYEE" >> "$GITHUB_OUTPUT";; esac   # R97-181: until its own secrets exist the Service demonstration account is used
       - name: Prepare / submit
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
           K: ${{ secrets.ASC_KEY_P8_B64 }}
-          DEMO_USER: ${{ secrets[steps.demo.outputs.u] }}
-          DEMO_PASS: ${{ secrets[steps.demo.outputs.p] }}
+          DEMO_USER: ${{ secrets[steps.demo.outputs.u] || (github.event.inputs.app == 'employee' && secrets.ASC_DEMO_USER_ENGINEER) || '' }}
+          DEMO_PASS: ${{ secrets[steps.demo.outputs.p] || (github.event.inputs.app == 'employee' && secrets.ASC_DEMO_PASS_ENGINEER) || '' }}
           APP: ${{ github.event.inputs.app }}
           SUBMIT: ${{ github.event.inputs.submit }}
         run: |

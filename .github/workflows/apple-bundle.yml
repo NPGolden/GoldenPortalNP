@@ -1,0 +1,28 @@
+# Apple Developer — register the bundle id and the App Store provisioning profile of a Golden A/S app.   GAS-CP-R97-181
+# Uses the App Store Connect API key of the other workflows (secrets ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8_B64).
+name: Apple bundle id and profile
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'Which app'
+        type: choice
+        options: [employee, engineer, pm, customer, hr]
+        default: employee
+permissions: { contents: read }
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: mobile-native } }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Register
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          K: ${{ secrets.ASC_KEY_P8_B64 }}
+          APP: ${{ github.event.inputs.app }}
+        run: |
+          set -e; pip -q install pyjwt cryptography requests >/dev/null
+          echo "$K" | base64 -d > "$RUNNER_TEMP/AuthKey.p8"; export ASC_KEY_P8="$RUNNER_TEMP/AuthKey.p8"
+          python3 asc_bundle.py "$APP"; rm -f "$RUNNER_TEMP/AuthKey.p8"
