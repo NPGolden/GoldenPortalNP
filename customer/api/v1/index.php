@@ -43,6 +43,7 @@ try {
     if (str_starts_with($path, '/pm/') && !$isPm) Response::error(403, 'Golden PM app only');
     if (str_starts_with($path, '/cu/') && !$isCu) Response::error(403, 'Customer app only');
     if (str_starts_with($path, '/hr/app/') && !$isHr) Response::error(403, 'Golden HR app only');
+    if ($app === 'employee' && !in_array($path, ['/me', '/auth/logout', '/devices/push-token', '/me/passkeys', '/me/passkeys/options', '/sync', '/hr', '/hr/request', '/hr/request/doc'], true) && !preg_match('#^/me/passkeys/\d+$#', $path) && !preg_match('#^/hr/doc/\d+$#', $path)) Response::error(403, 'Not available in Golden A/S Employee');   // R97-180: the employee app reaches the account and its own HR record, nothing else
     if ($isHr) { PortalHR::allowed($u); if (!str_starts_with($path, '/hr/app/') && !str_starts_with($path, '/requisitions') && $path !== '/items' && !in_array($path, ['/me', '/auth/logout', '/devices/push-token', '/me/passkeys', '/me/passkeys/options', '/sync'], true) && !preg_match('#^/me/passkeys/\d+$#', $path)) Response::error(403, 'Not available in Golden HR'); }   // R82-003: part ordering is open to every staff app   // R74-001: the HR app sees only its own routes
     if (!empty($u['is_demo'])) {   // R97-169 (customer app too: R97-172): demonstration account — Golden HR is answered from the invented company; Service and PM show the data set built into the app and get nothing from the portal
         if ($isHr) PortalHRDemo::handle($method, $path, $body, $u);

@@ -11,7 +11,7 @@ define('API_ROOT', __DIR__);
 define('CP_ROOT', dirname(__DIR__, 2));                 // customer/
 const API_VERSION = '0.5.0';
 const API_APP_ID  = 'engineer';                          // default app (kept for compatibility); per request see api_app()
-const API_APPS    = ['engineer' => '0.5.0', 'pm' => '1.0.0', 'customer' => '1.0.0', 'hr' => '1.0.0'];   // R74-001 Golden HR   // app id → default minimum version (R66-001 Golden PM, R68-001 customer app)
+const API_APPS    = ['engineer' => '0.5.0', 'pm' => '1.0.0', 'customer' => '1.0.0', 'hr' => '1.0.0', 'employee' => '1.0.0'];   // R97-180 Golden A/S Employee (My HR only)   // R74-001 Golden HR   // app id → default minimum version (R66-001 Golden PM, R68-001 customer app)
 /** The client application of this request from X-App (CS-01): 'pm', 'engineer' or 'customer'; anything else falls back to 'engineer' and fails the "Wrong application" check in index.php. */
 function api_app(): string { $a = strtolower(trim((string)($_SERVER['HTTP_X_APP'] ?? API_APP_ID))); return isset(API_APPS[$a]) ? $a : API_APP_ID; }
 
@@ -43,7 +43,7 @@ function api_act_as(int $uid): array {
     if (api_app() === 'customer') { if (($u['role'] ?? 'customer') !== 'customer' || empty($u['customer_id'])) throw new ApiException(403, 'Customer account required'); }   // R68-001: the customer app is for owner accounts only
     else {
         if (!in_array($u['role'] ?? '', ['staff', 'admin'], true)) throw new ApiException(403, 'Staff account required');
-        if (api_app() !== 'hr' && function_exists('hr_only') && hr_only()) throw new ApiException(403, 'HR accounts use the web portal');   // R51 HR scope: no app access except Golden HR (R74-001)
+        if (!in_array(api_app(), ['hr', 'employee'], true) && function_exists('hr_only') && hr_only()) throw new ApiException(403, 'HR accounts use the web portal');   // R51 HR scope: no app access except Golden HR (R74-001)
     }
     $loc = (string)($_SERVER['HTTP_X_LANG'] ?? $u['locale'] ?? 'en'); locale(locale_valid($loc) ? $loc : 'en');
     return $u;

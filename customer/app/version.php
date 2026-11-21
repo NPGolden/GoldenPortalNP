@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.212.3';
+const CP_VERSION = '1.213.0';
 const CP_BUILD   = '2026-11-21';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-180', 'version' => '1.213.0', 'date' => '2026-11-21', 'title' => 'Golden A/S Employee 1.0.0 — a simplified app for every employee: My HR only (leave balances, leave requests, leave periods, training, evaluations, HR messages); Service app 0.7.5: the leave request form of My HR works again', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-179', 'version' => '1.212.3', 'date' => '2026-11-21', 'title' => 'Mobile apps: the four apps are on the App Store — App Store links and QR codes switched on, Golden HR with its App Store tile, tiles with the new icons', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-178', 'version' => '1.212.2', 'date' => '2026-11-21', 'title' => 'Contacts import, category only: the record of previous categories is written (it failed with an error after the update in 1.212.1)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-177', 'version' => '1.212.1', 'date' => '2026-11-21', 'title' => 'Contacts import: category-only update — existing contacts take the category of the file, nothing else changes, with a preview of every change', 'db' => null, 'check' => null],

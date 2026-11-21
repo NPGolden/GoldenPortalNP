@@ -286,6 +286,7 @@ function cp_store_apps(): array {
         'customer' => ['name' => 'Golden A/S Customer', 'play' => $play . 'gr.goldenas.customer', 'ios' => $ios . '6829433786', 'ios_live' => true, 'web' => 'mobile-customer/'],
         'service'  => ['name' => 'Golden A/S Service',  'play' => $play . 'gr.goldenas.service',  'ios' => $ios . '6829433629', 'ios_live' => true, 'web' => 'mobile/'],
         'pm'       => ['name' => 'Golden PM',           'play' => $play . 'gr.goldenas.pm',       'ios' => $ios . '6829433663', 'ios_live' => true, 'web' => 'mobile-pm/'],
+        'employee' => ['name' => 'Golden A/S Employee', 'play' => null, 'ios' => null, 'ios_live' => false, 'web' => 'mobile-employee/'],   // R97-180: every employee's own HR; store links are added when the stores release it
         'hr'       => ['name' => 'Golden HR',           'play' => null, 'ios' => $ios . '6837033425', 'ios_live' => true, 'web' => 'mobile-hr/'],
     ];
 }

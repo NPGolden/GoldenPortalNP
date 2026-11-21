@@ -3934,3 +3934,15 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - `cp_store_apps()`: `ios_live` true for all; Golden HR has an `ios` link. `store_apps_html()`: an app without Google Play but with the App Store shows the web app in the first tile and the App Store in the second.
 - `assets/apps/qr-hr-ios.png` new; `icon-service|pm|customer.png` redrawn with the name tab.
 - Cybersecurity: fixed https links to apps.apple.com with `rel="noopener"`; no script.
+
+## §464 Golden A/S Employee 1.0.0 — My HR for every employee (GAS-CP-R97-180, v1.213.0)
+
+- New web shell `customer/mobile-employee/` (bundle `gr.goldenas.employee`, X-App `employee`), built from the Service shell: `i18n.js`, `db.js`, `api.js`, `sync.js`, `hr.js`, `upd.js` taken over; `screens.js` reduced to sign-in, lock and More; `app.js` with four routes (login, lock, hr, more) — any other address goes to My HR. No reports, tickets, hours, parts or assistant code is shipped. Own storage keys (`gem.*`, IndexedDB `gas-employee`) because the web apps share one origin.
+- The read model is `GET /me` and `GET /hr` only (`sync.js` `pull()`).
+- API: `API_APPS['employee']`; `api_act_as()` lets HR-only accounts in as well; `index.php` answers the employee app only on `/me`, `/auth/logout`, `/devices/push-token`, `/me/passkeys*`, `/sync`, `/hr`, `/hr/request`, `/hr/request/doc`, `/hr/doc/<id>` — everything else 403; `endpoints/sync.php` accepts from it only the kinds `hr_request`, `hr_cancel`, `hr_period_join`, `hr_training_apply`, `hr_eval_ack`, `hr_message`, `hr_seen`. No database change (`mob_devices.app_id` is free text).
+- Demonstration account (§453): as Service — the app switches to its built-in data and the portal gives nothing.
+- Portal: `cp_store_apps()['employee']` (web app tile with QR until the stores release it), shown first for staff on the home and sign-in pages; `assets/apps/icon-employee.png`, `qr-employee-web.png`; key `apps.d.employee` in five languages (12 644 keys).
+- Native: `mobile-native/apps.json`, association file, `store/employee/` (listing, review notes, six screenshots 1320 × 2868), workflows `build-ios`, `build-android`, `asc-release` take `employee`; iOS needs the variable `IOS_PROFILE_EMPLOYEE`.
+- Service app 0.7.5: `hr.js` — the leave form called `classList` on `#rreq`, an element removed in R77-007 (v1.87.0); the error stopped the wiring of Send request, Join, Cancel, document links and Apply on the Leave tab. Guarded; the same file serves the Employee app. The name of a real-looking person in the demonstration data was replaced.
+- Tested in a browser on the demonstration data: sign-in, four My HR tabs, a leave request sent (Requests 3 → 4), More, sign-out, unknown address → My HR, no script error. Not tested against the live API with a real account.
+- Cybersecurity: least data — a stolen Employee token cannot read tickets, reports, projects or prices; the token is bound to the app id (`Token issued for another application`).

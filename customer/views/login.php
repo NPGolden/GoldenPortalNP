@@ -55,7 +55,7 @@
       <?= store_apps_html(['customer']) ?>
       <details>
         <summary><?= tt('apps.personnel') ?></summary>
-        <?= store_apps_html(['service', 'pm', 'hr']) ?>
+        <?= store_apps_html(['employee', 'service', 'pm', 'hr']) ?>
       </details>
     </div>
   </div>

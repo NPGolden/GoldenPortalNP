@@ -2,7 +2,7 @@
  * and a MOCK mode (built-in sample data in the same shape the portal returns) for the demo and the UI tests.
  * Mock mode: localStorage gas.mock = "1", or ?mock=1 on the URL. */
 window.API = (() => {
-  const VERSION = "0.7.4";
+  const VERSION = "0.7.5";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   const demoOn = () => { try { return localStorage.getItem("gas.demo") === "1"; } catch (e) { return false; } };   // R97-169
@@ -153,7 +153,7 @@ window.API = (() => {
     requests: [{ id: 41, type_id: 1, code: "ANN", type: "Annual leave", unit: "day", date_from: d(-30), date_to: d(-26), time_from: null, time_to: null, hours: null, days: 5, reason: "", status: "approved", counted: true, period_id: null, doc: null, manager: { name: "Konstantinos Nikolaou", at: d(-35), note: "" }, hr: { at: d(-34), note: "" }, cancellable: false }, { id: 42, type_id: 1, code: "ANN", type: "Annual leave", unit: "day", date_from: d(20), date_to: d(21), time_from: null, time_to: null, hours: null, days: 2, reason: "Family", status: "pending_mgr", counted: true, period_id: null, doc: null, manager: null, hr: null, cancellable: true }, { id: 40, type_id: 2, code: "SICK", type: "Sick leave", unit: "day", date_from: d(-60), date_to: d(-60), time_from: null, time_to: null, hours: null, days: 1, reason: "", status: "approved", counted: true, period_id: null, doc: { name: "medical-note.pdf" }, manager: null, hr: { at: d(-59), note: "" }, cancellable: false }],
     trainings: { open: [{ id: 1, kind: "external", title: "Siemens S7-1500 service training", provider: "Siemens Hellas", location: "Athens", date_from: "2026-11-20", date_to: "2026-11-21", hours: 16, description: "TIA Portal diagnostics for AMS systems", deadline: "2026-11-10", certificate: true, n_in: 2, capacity: 6, mine: null, full: false, late: false }], mine: [{ id: 5, training_id: 3, kind: "internal", title: "Portal — Service Engineer app", provider: "Golden A/S", date_from: d(-20), hours: 2, status: "attended", score: "", cert_no: "", cert_expiry: null }] },
     evaluations: [{ year: 2026, date: "2026-10-15", evaluator: "Konstantinos Nikolaou", overall: 4.1, status: "final", scores: [{ criterion: "quality", label: "Quality of work", score: 4 }, { criterion: "reliability", label: "Reliability", score: 5 }, { criterion: "teamwork", label: "Teamwork", score: 4 }, { criterion: "safety", label: "Safety", score: 5 }], strengths: "Reliable on site, excellent safety record", improvements: "Reporting detail", goals: "Lead AMS commissioning on next refit", training_needs: "S7-1500 diagnostics", comments: "", employee_comment: "", acknowledged_at: null }],
-    messages: [{ id: 1, from_hr: true, from: "HR — Margarita Polykandrioti", body: "Please send the renewed STCW certificate by 15 November.", at: d(-2) + " 09:22", seen: false }], unread: 1 };
+    messages: [{ id: 1, from_hr: true, from: "HR — Eleni Georgiou", body: "Please send the renewed STCW certificate by 15 November.", at: d(-2) + " 09:22", seen: false }], unread: 1 };
   function mock(method, path, body) {
     const p = path.split("?")[0]; const delay = (v) => new Promise((r) => setTimeout(() => r(JSON.parse(JSON.stringify(v))), 120));
     if (p === "/auth/login") { if (!body.email || !body.password) { const e = new Error("Invalid credentials"); e.status = 401; throw e; } mockState.user = M.me; return delay({ access_token: "mock", refresh_token: "mock-refresh", user: M.me }); }

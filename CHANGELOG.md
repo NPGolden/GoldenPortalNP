@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.212.3** (build 2026-11-21). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.213.0** (build 2026-11-21). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.213.0 | GAS-CP-R97-180 | 2026-11-21 | Golden A/S Employee 1.0.0 — a simplified app for every employee: My HR only (leave balances, leave requests, leave periods, training, evaluations, HR messages); Service app 0.7.5: the leave request form of My HR works again | — |
 | 1.212.3 | GAS-CP-R97-179 | 2026-11-21 | Mobile apps: the four apps are on the App Store — App Store links and QR codes switched on, Golden HR with its App Store tile, tiles with the new icons | — |
 | 1.212.2 | GAS-CP-R97-178 | 2026-11-21 | Contacts import, category only: the record of previous categories is written (it failed with an error after the update in 1.212.1) | — |
 | 1.212.1 | GAS-CP-R97-177 | 2026-11-21 | Contacts import: category-only update — existing contacts take the category of the file, nothing else changes, with a preview of every change | — |

@@ -1,0 +1,17 @@
+{
+  "name": "Golden A/S Employee",
+  "short_name": "GAS Employee",
+  "description": "Golden A/S Employee application — my leave, requests, training and HR messages.",
+  "id": "/customer/mobile-employee/",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#FFFFFF",
+  "theme_color": "#1F3A5F",
+  "lang": "en",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

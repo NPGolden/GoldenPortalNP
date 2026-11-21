@@ -9,7 +9,7 @@ on:
       app:
         description: 'Which app'
         type: choice
-        options: [engineer, pm, customer, hr]
+        options: [engineer, pm, customer, hr, employee]
         default: customer
       submit:
         description: 'Submit for review (otherwise only prepare)'

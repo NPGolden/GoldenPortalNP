@@ -4,7 +4,8 @@
       "DM7FPRYAWG.gr.goldenas.service",
       "DM7FPRYAWG.gr.goldenas.pm",
       "DM7FPRYAWG.gr.goldenas.customer",
-      "DM7FPRYAWG.gr.goldenas.hr"
+      "DM7FPRYAWG.gr.goldenas.hr",
+      "DM7FPRYAWG.gr.goldenas.employee"
     ]
   }
 }

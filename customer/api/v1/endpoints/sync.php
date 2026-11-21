@@ -9,6 +9,7 @@ function sync_ops(array $u, array $b): void {
         if (!preg_match('/^[0-9a-f-]{36}$/', $uuid)) { $results[] = ['uuid' => $uuid, 'status' => 'rejected', 'error' => 'bad uuid']; continue; }
         if ($seen = one('SELECT status, result_id, result_no FROM sync_ops WHERE uuid = ?', [$uuid])) { $results[] = ['uuid' => $uuid, 'status' => $seen['status'], 'id' => $seen['result_id'], 'number' => $seen['result_no']]; continue; }
         $res = null;
+        if (api_app() === 'employee' && !in_array($kind, ['hr_request', 'hr_cancel', 'hr_period_join', 'hr_training_apply', 'hr_eval_ack', 'hr_message', 'hr_seen'], true)) { $results[] = ['uuid' => $uuid, 'status' => 'rejected', 'error' => 'Not available in Golden A/S Employee']; continue; }   // R97-180
         try {
             switch ($kind) {
                 case 'assignment_accept': $res = ['id' => Portal::acceptAssignment($u, $p)]; break;
