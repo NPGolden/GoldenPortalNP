@@ -23,16 +23,18 @@ b = bundle(BID)
 if not b:
     b = req("POST", "/bundleIds", json={"data": {"type": "bundleIds", "attributes": {"identifier": BID, "name": NAME.replace("/", " "), "platform": "IOS"}}})["data"]; log("bundle id registered", BID)
 else: log("bundle id exists", BID)
-ref = bundle(APPS[REF]["appId"])
+ref = bundle(APPS[REF]["appId"]); added = 0
 if ref:
     have = {c["attributes"]["capabilityType"] for c in req("GET", f"/bundleIds/{b['id']}/bundleIdCapabilities")["data"]}
     for c in req("GET", f"/bundleIds/{ref['id']}/bundleIdCapabilities")["data"]:
         t = c["attributes"]["capabilityType"]
         if t in have or t in ("IN_APP_PURCHASE", "GAME_CENTER"): continue
-        r = req("POST", "/bundleIdCapabilities", ok=(400, 409), json={"data": {"type": "bundleIdCapabilities", "attributes": {"capabilityType": t, "settings": c["attributes"].get("settings") or []}, "relationships": {"bundleId": {"data": {"type": "bundleIds", "id": b["id"]}}}}})
+        r = req("POST", "/bundleIdCapabilities", ok=(400, 409), json={"data": {"type": "bundleIdCapabilities", "attributes": {"capabilityType": t}, "relationships": {"bundleId": {"data": {"type": "bundleIds", "id": b["id"]}}}}})   # no settings: the API refuses the ones it returns itself
+        if "data" in r: added += 1
         log("capability", t, "added" if "data" in r else "not added: " + json.dumps(r)[:200])
 profs = req("GET", "/profiles", params={"filter[name]": PROFILE, "limit": 200})["data"]
 p = next((x for x in profs if x["attributes"]["name"] == PROFILE and x["attributes"]["profileState"] == "ACTIVE"), None)
+if p and added: req("DELETE", f"/profiles/{p['id']}"); log("profile removed — it was made before the capabilities changed"); p = None
 if p: log("profile exists", PROFILE, "expires", p["attributes"]["expirationDate"][:10])
 else:
     certs = [c for c in req("GET", "/certificates", params={"limit": 200})["data"] if c["attributes"]["certificateType"] in ("DISTRIBUTION", "IOS_DISTRIBUTION")]
