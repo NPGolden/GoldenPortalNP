@@ -1,0 +1,43 @@
+# Uploads mobile-native/well-known/apple-app-site-association to public_html/.well-known/ on goldensas.com with the deploy
+# account (same secrets as "Deploy to goldensas.com"), then reads it back from the live site.   GAS-CP-R97-169
+# The file binds the bundle ids of the four iOS apps to the domain: without an app's id, iOS refuses passkeys and the
+# Face ID check of the web view for that app. It holds no secret. assetlinks.json (Android) is not touched.
+name: Upload association file
+on:
+  workflow_dispatch: {}
+concurrency: { group: wellknown, cancel-in-progress: false }
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the file
+        run: |
+          set -e; F=mobile-native/well-known/apple-app-site-association
+          python3 -c "import json,sys; d=json.load(open('$F')); a=d['webcredentials']['apps']; assert len(a)>=4 and all(x.count('.')>=3 for x in a); print(len(a),'apps')"
+      - name: Upload to .well-known/
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PROTO: ${{ secrets.DEPLOY_PROTOCOL }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          PASS: ${{ secrets.DEPLOY_PASSWORD }}
+          KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DPATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -e; F=mobile-native/well-known/apple-app-site-association; DEST="${DPATH%/}/.well-known/apple-app-site-association"
+          if [ "$PROTO" = "sftp" ]; then
+            if [ -n "$KEY" ]; then echo "$KEY" > /tmp/key; chmod 600 /tmp/key; curl -sS --fail -T "$F" "sftp://$HOST$DEST" -u "$USER:" --key /tmp/key --pubkey "" -k; rm -f /tmp/key
+            else curl -sS --fail -T "$F" "sftp://$HOST$DEST" -u "$USER:$PASS" -k; fi
+          else
+            curl -sS --fail --ssl-reqd -T "$F" "ftp://$HOST$DEST" -u "$USER:$PASS" --ftp-create-dirs
+          fi
+          echo "uploaded"
+      - name: Read it back from the live site
+        env:
+          ORIGIN: ${{ secrets.ORIGIN_IP }}
+        run: |
+          R=(); [ -n "$ORIGIN" ] && R=(--resolve "goldensas.com:443:$ORIGIN" --resolve "www.goldensas.com:443:$ORIGIN")
+          for h in goldensas.com www.goldensas.com; do
+            echo "== $h (origin)"; curl -sS -m 30 "${R[@]}" -A "GAS-deploy/1.0" -D - "https://$h/.well-known/apple-app-site-association" | grep -iE "^HTTP|content-type|goldenas" || true
+            echo "== $h (public)"; curl -sS -m 30 -D - "https://$h/.well-known/apple-app-site-association" | grep -iE "^HTTP|content-type|goldenas" || true
+          done
