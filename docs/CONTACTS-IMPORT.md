@@ -3853,3 +3853,9 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Language keys: 4 `demo.*` in en, el, it, bg, uk.
 - Cybersecurity: before this change the accounts given to the app stores read real personnel, project and customer data. Now the data is unreachable for them on the server (not only hidden in the app), and the portal is closed to them. Proposed: an expiry date on demonstration accounts, and a mark in the sign-in log for demonstration sign-ins.
 
+## §454 Golden PM 1.0.14 — demonstration data without step-up code (GAS-CP-R97-170, v1.210.1)
+
+- `customer/mobile-pm/js/api.js`: the profile of the built-in demonstration data set has `totp_enabled: false`, so the decision sheets show no authenticator field (the store reviewer has no authenticator for the demonstration account). Real accounts are served by the portal and keep the step-up.
+- Also in the repository: `mobile-native/well-known/apple-app-site-association` with the four bundle ids and the workflow `wellknown.yml` that uploads it to `public_html/.well-known/` with the deploy account. Without the id of an app iOS refuses passkeys and the Face ID check of its web view (Golden HR showed "not available on this device").
+- Cybersecurity: no change for real accounts; the demonstration account still reads nothing from the portal.
+

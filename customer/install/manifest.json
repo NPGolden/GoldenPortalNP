@@ -1,8 +1,8 @@
 {
     "name": "Golden A/S Customer Portal",
-    "version": "1.210.0",
+    "version": "1.210.1",
     "build": "2026-11-20",
-    "generated_at": "2026-11-21T01:12:32+00:00",
+    "generated_at": "2026-11-21T01:58:49+00:00",
     "count": 920,
     "files": {
         ".htaccess": {
@@ -10,8 +10,8 @@
             "size": 181
         },
         "CHANGELOG.md": {
-            "sha256": "570a1632629a2f6715b134773722105432d67c2dc6bc7463e1cfb5e3d349947f",
-            "size": 201078
+            "sha256": "758bea31197240a9e8c902b940eb3e0c8b66f16c85e8baf630000999b2c86c6b",
+            "size": 201434
         },
         "README.md": {
             "sha256": "aaac31c2a33e616de5c3dc217d5e2f5b7803f116db21e3d4a01cfb1b96e4b974",
@@ -1058,8 +1058,8 @@
             "size": 6873
         },
         "customer/app/version.php": {
-            "sha256": "9152113743bdd0dd9aa97deeaeb595492129d7ace6fb139aae8ebfb5141a1b78",
-            "size": 261420
+            "sha256": "49c49f33cbdcb994b0c5693486127d2e67a752b19204dbc5bf36da45f7fe05f2",
+            "size": 261649
         },
         "customer/app/vh.php": {
             "sha256": "06dc02b03a9840b99ce9860942ba8ccf34169b2141ab182a1c34c10716cd6321",
@@ -2310,8 +2310,8 @@
             "size": 27435
         },
         "customer/mobile-pm/js/api.js": {
-            "sha256": "fb973e05b136f1c0d30eeece47bbe20c96727719b9dc6f1fcced9fa3fbf06fe0",
-            "size": 46487
+            "sha256": "061928191dfc3a1fb6f74a8b69ad05bfcdae251e120b3a9ce1568bafa68fd3db",
+            "size": 46488
         },
         "customer/mobile-pm/js/app.js": {
             "sha256": "a728b3ac1edc400a1d3e8fca100632173e0ebe89baf97ac9b195be59d2dbf294",
@@ -2354,7 +2354,7 @@
             "size": 1916
         },
         "customer/mobile-pm/sw.js": {
-            "sha256": "6d53209d46c367ce7033f85f7d5b2fb63382c5f17c0f176197b8e2ad9eb5df7f",
+            "sha256": "1612b3d4070abfa571da0ac0ffbe48f1d6e1ce72912987e2e722b449b1721241",
             "size": 3020
         },
         "customer/mobile-pm/tests/package.json": {
@@ -2538,8 +2538,8 @@
             "size": 40063
         },
         "customer/views/_manual_golden.php": {
-            "sha256": "49be2954fd0b222a06c91a849c006e58e4540af84480263ea4f7ba4a319a9369",
-            "size": 422394
+            "sha256": "4424a9b8e158a0df9a784ed8fce1d647f20b34a00e360a411c2171f9fadf24bb",
+            "size": 422758
         },
         "customer/views/_manual_hr.php": {
             "sha256": "1d8c84004bc9f656d5d96374b79824e75b5a85ee01be9234f77b9b5b2a937f0e",

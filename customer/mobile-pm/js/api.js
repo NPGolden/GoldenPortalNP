@@ -2,7 +2,7 @@
  * and a MOCK mode (built-in sample data in the shapes of the contract) for the demo and the UI tests.
  * Mock mode: localStorage gpm.mock = "1", or ?mock=1 on the URL. */
 window.API = (() => {
-  const VERSION = "1.0.13";
+  const VERSION = "1.0.14";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   const demoOn = () => { try { return localStorage.getItem("gpm.demo") === "1"; } catch (e) { return false; } };   // R97-169
@@ -91,7 +91,7 @@ window.API = (() => {
   const overall = (st) => { const v = STAGES.map((k) => st[k]).filter((x) => x !== -1 && x != null); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0; };
   const mockState = { user: null, n: 0 };
   const ME = { id: 2, name: "Alex Demo", email: "demo.pm@example.com", role: "staff", discipline: "Management", discipline_id: 9, section_id: null, home_branch: "GR", branch_scope: ["GR", "GIT"], languages: ["en", "el", "it", "uk", "bg"], min_app_version: "1.0.6", ai: true, calendar: "GR", hr: true,
-    pm: true, hr_manager: true, ts_approver: true, totp_enabled: true, counts: { hr_pending: 2, ts_pending: 2, drawings_overdue: 2, submittals_open: 5, hr_unread: 1 } };
+    pm: true, hr_manager: true, ts_approver: true, totp_enabled: false, counts: { hr_pending: 2, ts_pending: 2, drawings_overdue: 2, submittals_open: 5, hr_unread: 1 } };
   const STAFF = [
     { id: 2, name: "Alex Demo", discipline: "Management", discipline_id: 9, person_id: 1 },
     { id: 7, name: "Dimitris Papadakis", discipline: "Electrical", discipline_id: 1, person_id: 3 },

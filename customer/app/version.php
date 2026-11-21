@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.210.0';
+const CP_VERSION = '1.210.1';
 const CP_BUILD   = '2026-11-20';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-170', 'version' => '1.210.1', 'date' => '2026-11-21', 'title' => 'Golden PM 1.0.14: the demonstration data set no longer asks for an authenticator code on decisions', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-169', 'version' => '1.210.0', 'date' => '2026-11-21', 'title' => 'Demonstration accounts: an account marked "Demonstration account" sees an invented company in Golden HR, Golden PM and Service and nothing of the real data, and cannot open the portal — for the store review, training and presentations (Service 0.7.2, PM 1.0.13)', 'db' => 'install/migrate_cp_r97_169_demo_account.sql', 'check' => 'r99c'],
         ['ref' => 'GAS-CP-R97-168', 'version' => '1.209.0', 'date' => '2026-11-20', 'title' => 'Administration › Users: tick accounts in the list (the selection is kept from page to page) and give them all the same starting password in one step — each must choose its own password at the next sign-in and is signed out of the portal and the apps; written in the sign-in log as Password given by administrator', 'db' => 'install/migrate_cp_r97_168_pw_reset_outcome.sql', 'check' => 'r99b'],
         ['ref' => 'GAS-CP-R97-167', 'version' => '1.208.0', 'date' => '2026-11-20', 'title' => 'First sign-in: an account marked "Must change password at next sign-in" (chosen per user by the administrator, ticked for new accounts) sets its own password before anything opens — portal and all four apps; password rules; apps ask once per device to turn on Face ID / fingerprint and show the safety habits (Service 0.7.1, PM 1.0.12, HR 1.1.2, Customer 1.0.9)', 'db' => 'install/migrate_cp_r97_167_must_change_pw.sql', 'check' => 'r99a'],
