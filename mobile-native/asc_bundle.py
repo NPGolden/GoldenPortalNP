@@ -33,8 +33,8 @@ if ref:
         if "data" in r: added += 1
         log("capability", t, "added" if "data" in r else "not added: " + json.dumps(r)[:200])
 profs = req("GET", "/profiles", params={"filter[name]": PROFILE, "limit": 200})["data"]
-p = next((x for x in profs if x["attributes"]["name"] == PROFILE and x["attributes"]["profileState"] == "ACTIVE"), None)
-if p and added: req("DELETE", f"/profiles/{p['id']}"); log("profile removed — it was made before the capabilities changed"); p = None
+p = next((x for x in profs if x["attributes"]["name"] == PROFILE), None)
+if p and (added or p["attributes"]["profileState"] != "ACTIVE"): req("DELETE", f"/profiles/{p['id']}"); log("profile removed — it was made before the capabilities changed"); p = None
 if p: log("profile exists", PROFILE, "expires", p["attributes"]["expirationDate"][:10])
 else:
     certs = [c for c in req("GET", "/certificates", params={"limit": 200})["data"] if c["attributes"]["certificateType"] in ("DISTRIBUTION", "IOS_DISTRIBUTION")]
