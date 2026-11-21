@@ -41,8 +41,10 @@ info = next((i for i in infos if i["attributes"].get("appStoreState") not in ("R
 locs = req("GET", f"/appInfos/{info['id']}/appInfoLocalizations")["data"]
 loc = next((l for l in locs if l["attributes"]["locale"] == LOC), None)
 attrs = {"name": META["name"], "subtitle": META["subtitle"], "privacyPolicyUrl": META["privacyPolicyUrl"]}
-if loc: req("PATCH", f"/appInfoLocalizations/{loc['id']}", json={"data": {"type": "appInfoLocalizations", "id": loc["id"], "attributes": attrs}})
-else: req("POST", "/appInfoLocalizations", json={"data": {"type": "appInfoLocalizations", "attributes": {**attrs, "locale": LOC}, "relationships": {"appInfo": rel("appInfos", info["id"])}}})
+try:   # a released app with no new version yet refuses changes to name / subtitle: the listing stays as it is
+    if loc: req("PATCH", f"/appInfoLocalizations/{loc['id']}", json={"data": {"type": "appInfoLocalizations", "id": loc["id"], "attributes": attrs}})
+    else: req("POST", "/appInfoLocalizations", json={"data": {"type": "appInfoLocalizations", "attributes": {**attrs, "locale": LOC}, "relationships": {"appInfo": rel("appInfos", info["id"])}}})
+except SystemExit as e: log("app info localisation not changed (released app):", " ".join(str(e).split())[:200])
 log("app info localisation", LOC, "ok")
 try:
     req("PATCH", f"/appInfos/{info['id']}", json={"data": {"type": "appInfos", "id": info["id"], "relationships": {"primaryCategory": rel("appCategories", META["primaryCategory"]), "secondaryCategory": rel("appCategories", META["secondaryCategory"])}}})
