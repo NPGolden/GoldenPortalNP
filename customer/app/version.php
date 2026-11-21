@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.212.0';
+const CP_VERSION = '1.212.1';
 const CP_BUILD   = '2026-11-21';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-177', 'version' => '1.212.1', 'date' => '2026-11-21', 'title' => 'Contacts import: category-only update — existing contacts take the category of the file, nothing else changes, with a preview of every change', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-176', 'version' => '1.212.0', 'date' => '2026-11-21', 'title' => 'Newsletters on the website: an issue ticked «Also publish on the website» appears as an article on the News page of goldenas.com.gr when sending starts — the website reads the published issues through its site key; a sent issue can be published or removed afterwards; the block sheet of the import carries web and slug', 'db' => 'install/migrate_cp_r97_176_nl_web.sql', 'check' => 'r99d'],
         ['ref' => 'GAS-CP-R97-175', 'version' => '1.211.0', 'date' => '2026-11-21', 'title' => 'Newsletters: import an issue from a block sheet — a Markdown file (.md) with subject, preview line and blocks, plus the folder or files of its pictures, becomes a draft issue in Web Sales › Newsletters and HR › Newsletters; example block sheet on the import card', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-174', 'version' => '1.210.5', 'date' => '2026-11-21', 'title' => 'Service app 0.7.4: the bottom menu shows real icons (Home, Tickets, Reports, Hours, More) instead of grey blocks', 'db' => null, 'check' => null],

@@ -106,6 +106,7 @@ layout_head(t('im.title'), 'import');
       <div class="field"><label><?= tt('im.file') ?></label><input name="xlsx" type="file" accept=".xlsx" required></div>
       <label class="chk"><input type="checkbox" name="dry" value="1" checked> <?= tt('im.dry') ?></label>
       <label class="chk"><input type="checkbox" name="fill_only" value="1" checked> <?= tt('ct.im_fill_only') ?></label>
+      <label class="chk"><input type="checkbox" name="cat_only" value="1"> <?= tt('ct.im_cat_only') ?></label>
       <label class="chk"><input type="checkbox" name="create_new" value="1"> <?= tt('im.create_new') ?></label>
       <button class="btn" type="submit"><?= tt('im.run') ?></button>
     </form>

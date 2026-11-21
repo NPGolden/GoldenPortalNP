@@ -3911,3 +3911,13 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Language keys `nl.web*` (8) and `nl.imp_how` / `nl.imp_s*` (9) in the five files. Help: manuals golden / pm / staff.
 - Cybersecurity: the feed returns only content already sent to readers (subject, preview line, blocks, picture addresses by random token) — no recipients, lists, statistics or drafts; slug validated on both sides (`[a-z0-9-]`, 80); site key compared in constant time and rate limit unchanged; the website never passes a browser's request to the portal unvalidated and draws the article with text nodes only (no markup from the feed is executed), links limited to http / https, pictures limited to the portal's picture address; publishing is covered by the approval fingerprint; taking an issue off the website is immediate in the portal and reaches the website within the cache time. Performance: the website calls the feed at most once per 10 minutes per list / article; portal pages unaffected.
 - Limits: an article drawn from blocks is one column (no rows of pictures, no diagrams); it is drawn in the browser, so search engines see it later than a hand-built page and it is not in the sitemap; the website has no Italian text for it beyond the fixed labels.
+
+## §461 Contacts import — category-only update (GAS-CP-R97-177, v1.212.1)
+
+- `ct_import_categories()` in `app/ct.php`, reached from the Contacts card of Settings › Import with the tick box `cat_only` (action `ct_import`). Header row: any column whose title contains "mail" plus a column "Category"; a "Person"/"Name" column is used only for the messages.
+- Per row: contact found by e-mail → `UPDATE contacts SET category` when the category differs; nothing else is written, no contact or organisation is created. A repeated e-mail counts once. Empty category = no change. A category `ct_norm_category()` does not know = no change, listed. E-mail not in the portal = listed, not created.
+- Result: `contacts_upd`, `contacts_same`, the list of changes ("Name: old → new") and the list of rows left out. Preview runs inside a rolled-back transaction.
+- A real run writes `storage/private/ct_category_<date>_<time>.json` (contact id, previous category, new category, user id) for a reversal; the folder is not served by the web server.
+- New aliases in `ct_norm_category()`: "Ownner Representative", "Owner Rep.", "Technical Staff", "Technical Department".
+- Language keys `ct.im_cat_only`, `ct.im_cat_change`, `ct.im_cat_unknown`, `ct.im_cat_notfound` in en, el, it, bg, uk (12 643 keys each).
+- Cybersecurity: staff only, CSRF as the other imports, parameterised queries; the contact list is uploaded in the portal and is not stored in the repository.

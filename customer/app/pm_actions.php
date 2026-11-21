@@ -1368,7 +1368,7 @@ function pm_handle_action(string $action, string $page): bool {
                 'vessel_import' => pm_import_vessels($_FILES['xlsx']['tmp_name'], $dry),
                 'sys_import'    => pm_import_systems($_FILES['xlsx']['tmp_name'], $dry),
                 'of_import'     => of_import($_FILES['xlsx']['tmp_name'], $dry),
-                'ct_import'     => ct_import($_FILES['xlsx']['tmp_name'], $dry),
+                'ct_import'     => !empty($_POST['cat_only']) ? ct_import_categories($_FILES['xlsx']['tmp_name'], $dry) : ct_import($_FILES['xlsx']['tmp_name'], $dry),   // R97-177 category-only update
                 'au_import'     => au_import($_FILES['xlsx']['tmp_name'], $dry),
                 'co_import'     => co_import($_FILES['xlsx']['tmp_name'], $dry),
                 'cu_import'     => cu_import($_FILES['xlsx']['tmp_name'], $dry),

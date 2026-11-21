@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.212.0** (build 2026-11-21). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.212.1** (build 2026-11-21). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.212.1 | GAS-CP-R97-177 | 2026-11-21 | Contacts import: category-only update — existing contacts take the category of the file, nothing else changes, with a preview of every change | — |
 | 1.212.0 | GAS-CP-R97-176 | 2026-11-21 | Newsletters on the website: an issue ticked «Also publish on the website» appears as an article on the News page of goldenas.com.gr when sending starts — the website reads the published issues through its site key; a sent issue can be published or removed afterwards; the block sheet of the import carries web and slug | `install/migrate_cp_r97_176_nl_web.sql` |
 | 1.211.0 | GAS-CP-R97-175 | 2026-11-21 | Newsletters: import an issue from a block sheet — a Markdown file (.md) with subject, preview line and blocks, plus the folder or files of its pictures, becomes a draft issue in Web Sales › Newsletters and HR › Newsletters; example block sheet on the import card | — |
 | 1.210.5 | GAS-CP-R97-174 | 2026-11-21 | Service app 0.7.4: the bottom menu shows real icons (Home, Tickets, Reports, Hours, More) instead of grey blocks | — |

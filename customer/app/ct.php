@@ -71,7 +71,7 @@ function ct_norm_category(string $v): ?string {
     $n = mb_strtolower(trim($v)); if ($n === '') return 'other';
     foreach (ct_categories() as $k => $l) if ($n === $k || $n === mb_strtolower($l) || $n === str_replace('_', ' ', $k)) return $k;
     foreach (['en', 'el', 'it', 'uk', 'bg'] as $loc) { $tbl = lang_table($loc); foreach (array_keys(ct_categories()) as $k) if (isset($tbl['ct.cat_' . $k]) && mb_strtolower($tbl['ct.cat_' . $k]) === $n) return $k; }
-    $alias = ['owners rep' => 'owner_rep', 'owner representative' => 'owner_rep', "owner's representative" => 'owner_rep', 'representative' => 'owner_rep', 'master' => 'captain', 'chief engineer' => 'chief_eng', 'chief' => 'chief_eng', 'ceng' => 'chief_eng', 'electro-technical officer' => 'eto', 'management company' => 'management', 'manager' => 'management', 'shipyard' => 'yard', 'classification' => 'class', 'class society' => 'class', 'vendor' => 'supplier', 'surveyor' => 'class'];
+    $alias = ['owners rep' => 'owner_rep', 'owner representative' => 'owner_rep', "owner's representative" => 'owner_rep', 'representative' => 'owner_rep', 'master' => 'captain', 'chief engineer' => 'chief_eng', 'chief' => 'chief_eng', 'ceng' => 'chief_eng', 'electro-technical officer' => 'eto', 'management company' => 'management', 'manager' => 'management', 'shipyard' => 'yard', 'classification' => 'class', 'class society' => 'class', 'vendor' => 'supplier', 'surveyor' => 'class', 'ownner representative' => 'owner_rep', 'owner rep.' => 'owner_rep', 'technical staff' => 'technical', 'technical department' => 'technical'];   // R97-177: spellings met in contact lists
     return $alias[$n] ?? null;
 }
 
@@ -472,6 +472,47 @@ function ct_find_vessel(string $name): ?int {
 }
 
 /* ------------------------------------------------------------ Excel import: contacts */
+/** R97-177: category-only update. Contacts that exist (matched by e-mail) get the category of the file; nothing else is touched, no contact is created.
+ *  A category the portal does not know leaves the contact as it is. Each change is listed, and a real run keeps the previous values in storage/private for a reversal. */
+function ct_import_categories(string $path, bool $dry): array {
+    if (!ct_has()) throw new RuntimeException(t('ct.need_r17'));
+    $rows = xlsx_rows($path);
+    $res = ['rows' => 0, 'contacts_upd' => 0, 'contacts_same' => 0, 'skipped' => [], 'warnings' => []];
+    $hi = null; $ce = null; $cc = null; $cn = null;
+    foreach (array_slice($rows, 0, 15, true) as $i => $r) {
+        $e = $c = $n = null;
+        foreach ($r as $k => $v) { $h = mb_strtolower(trim((string)$v)); if ($h === '') continue;
+            if ($e === null && (str_contains($h, 'mail'))) $e = $k;
+            if ($c === null && in_array($h, ['category', 'κατηγορία', 'categoria'], true)) $c = $k;
+            if ($n === null && in_array($h, ['person', 'name', 'full name', 'contact', 'nome', 'όνομα'], true)) $n = $k; }
+        if ($e !== null && $c !== null) { $hi = $i; $ce = $e; $cc = $c; $cn = $n; break; }
+    }
+    if ($hi === null) throw new RuntimeException(t('im.no_header', ['cols' => 'E-mail, Category']));
+    $cats = ct_categories(); $undo = [];
+    $out = pm_import_tx($dry, function () use ($rows, $hi, $ce, $cc, $cn, $cats, &$res, &$undo) {
+        $seen = [];
+        foreach (array_slice($rows, $hi + 1, null, true) as $i => $r) {
+            if (!array_filter($r, fn($c) => trim((string)$c) !== '')) continue;
+            $res['rows']++; $line = $i + 1;
+            $email = strtolower(trim((string)($r[$ce] ?? ''))); $raw = trim((string)($r[$cc] ?? '')); $label = $cn !== null ? mb_substr(trim((string)($r[$cn] ?? '')), 0, 80) : '';
+            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) { $res['skipped'][] = [$line, t('ct.im_bademail', ['v' => $label !== '' ? $label : '—'])]; continue; }
+            if (isset($seen[$email])) continue; $seen[$email] = 1;
+            if ($raw === '') { $res['contacts_same']++; continue; }
+            $cat = ct_norm_category($raw);
+            if ($cat === null) { $res['skipped'][] = [$line, t('ct.im_cat_unknown', ['v' => $raw, 'n' => $label])]; continue; }
+            $c = one('SELECT id, full_name, category FROM contacts WHERE email = ? LIMIT 1', [$email]);
+            if (!$c) { $res['skipped'][] = [$line, t('ct.im_cat_notfound', ['n' => $label !== '' ? $label : '—'])]; continue; }
+            if ((string)$c['category'] === $cat) { $res['contacts_same']++; continue; }
+            q('UPDATE contacts SET category = ? WHERE id = ?', [$cat, $c['id']]);
+            $undo[] = [(int)$c['id'], (string)$c['category'], $cat];
+            $res['contacts_upd']++; $res['warnings'][] = [$line, t('ct.im_cat_change', ['n' => (string)$c['full_name'], 'a' => $cats[$c['category']] ?? (string)$c['category'], 'b' => $cats[$cat]])];
+        }
+        return $res;
+    });
+    if (!$dry && $undo) { $d = CP_ROOT . '/storage/private'; if (!is_dir($d)) @mkdir($d, 0700, true); @file_put_contents($d . '/ct_category_' . date('Ymd_His') . '.json', json_encode(['by' => (int)(current_user()['id'] ?? 0), 'changes' => $undo])); }
+    return $out;
+}
+
 function ct_import(string $path, bool $dry): array {
     if (!ct_has()) throw new RuntimeException(t('ct.need_r17'));
     $rows = xlsx_rows($path);
