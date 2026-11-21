@@ -1,24 +1,24 @@
 {
- "privacyPolicyUrl": "https://www.goldenas.com.gr/privacy.html",
- "supportUrl": "https://www.goldenas.com.gr/contact.html",
- "marketingUrl": "https://www.goldenas.com.gr/",
- "primaryCategory": "BUSINESS",
- "secondaryCategory": "PRODUCTIVITY",
- "locale": "en-US",
- "releaseType": "MANUAL",
- "contact": {
-  "firstName": "Nikos",
-  "lastName": "Polykandriotis",
-  "email": "np@goldenas.com.gr",
-  "phone": "+302104018000"
- },
- "distribution": "unlisted",
- "name": "Golden HR",
- "subtitle": "HR office of Golden A/S",
- "promotionalText": "Leave approvals, recruiting, job descriptions, the HR year and messages — the HR office of the Golden A/S portal on the phone.",
- "description": "Golden HR is the application of the Human Resources office of Golden Automation Systems (Golden A/S), the marine electrical, automation and navigation systems integrator based in Keratsini, Greece, with branches in Italy and the Netherlands.\n\nAn account issued by Golden A/S with the HR role is required. The app is a companion to the Golden A/S portal and is not intended for the general public.\n\nWith it the HR manager can:\n• see on one page everything that waits for a decision\n• approve or reject leave requests, training applications and timesheets\n• follow recruiting: candidates by stage, CV reader, evaluations and interviews\n• approve job descriptions\n• follow the steps of the HR year and what is late\n• see contracts, certificates and permits that expire soon\n• accept equipment handover lists\n• read and answer messages from employees\n• see who is away and the leave balances\n\nThe app always opens with Face ID or Touch ID and locks after 15 minutes. Decisions are confirmed with an authenticator code. Payroll and other confidential personal data never leave the portal.",
- "keywords": "human resources,leave,recruiting,approvals,marine,automation,staff",
- "whatsNew": "First App Store release of Golden HR: Today, leave and training approvals, recruiting with CV reader and evaluations, job descriptions, the HR year, expiring documents, equipment handovers, messages.",
- "reviewNotes": "This is the Human Resources application for employees of Golden Automation Systems (Golden A/S); it is distributed unlisted to our HR staff and requires an account issued by the company.\n\nPlease sign in with the demo account provided (an HR user with demo data only; no real employees or candidates). No authenticator code is needed for this account. The app asks for Face ID / Touch ID or the device passcode when it opens. After sign-in: Today shows the counts of what waits; Inbox lists leave requests; Recruiting lists demo candidates and vacancies; Messages shows HR message threads; More holds the settings.",
- "bundleId": "gr.goldenas.hr"
+  "privacyPolicyUrl": "https://www.goldenas.com.gr/privacy.html",
+  "supportUrl": "https://www.goldenas.com.gr/contact.html",
+  "marketingUrl": "https://www.goldenas.com.gr/",
+  "primaryCategory": "BUSINESS",
+  "secondaryCategory": "PRODUCTIVITY",
+  "locale": "en-US",
+  "releaseType": "MANUAL",
+  "contact": {
+    "firstName": "Nikos",
+    "lastName": "Polykandriotis",
+    "email": "np@goldenas.com.gr",
+    "phone": "+302104018000"
+  },
+  "distribution": "unlisted",
+  "name": "Golden HR",
+  "subtitle": "HR office of Golden A/S",
+  "promotionalText": "Leave approvals, recruiting, job descriptions, the HR year and messages — the HR office of the Golden A/S portal on the phone.",
+  "description": "Golden HR is the application of the Human Resources office of Golden Automation Systems (Golden A/S), the marine electrical, automation and navigation systems integrator based in Keratsini, Greece, with branches in Italy and the Netherlands.\n\nAn account issued by Golden A/S with the HR role is required. The app is a companion to the Golden A/S portal and is not intended for the general public.\n\nWith it the HR manager can:\n• see on one page everything that waits for a decision\n• approve or reject leave requests, training applications and timesheets\n• follow recruiting: candidates by stage, CV reader, evaluations and interviews\n• approve job descriptions\n• follow the steps of the HR year and what is late\n• see contracts, certificates and permits that expire soon\n• accept equipment handover lists\n• read and answer messages from employees\n• see who is away and the leave balances\n\nThe app always opens with Face ID or Touch ID and locks after 15 minutes. Decisions are confirmed with an authenticator code. Payroll and other confidential personal data never leave the portal.",
+  "keywords": "human resources,leave,recruiting,approvals,marine,automation,staff",
+  "whatsNew": "First App Store release of Golden HR: Today, leave and training approvals, recruiting with CV reader and evaluations, job descriptions, the HR year, expiring documents, equipment handovers, messages.",
+  "reviewNotes": "1. SCREEN RECORDING\nAttached to our reply to this submission in App Review. Recorded on a physical iPhone; it shows: launch, sign-in, Face ID unlock, Today, Inbox (a leave request approved), Recruiting (a candidate and the CV opened), Messages, More, sign-out.\n\n2. PURPOSE AND AUDIENCE\nGolden HR is the internal human-resources app of Golden A/S (Golden Automation Systems), a marine electrical and automation company based in Piraeus, Greece. It is used only by the company's HR manager and management. It lets them handle, away from the desk, the HR work that otherwise needs the company web portal: approve or reject leave requests, follow recruiting (vacancies, candidates, CVs, interviews), approve job descriptions, follow the yearly HR plan and expiring documents, confirm equipment hand-overs, and exchange messages with staff. It is not intended for the general public.\n\n3. ACCESS\nSign in with the demo account given in the App Review Information section (HR role, demo data only, no authenticator code needed). After sign-in the app asks for Face ID / Touch ID; this is required because the app shows personnel data. Tabs: Today, Inbox, Recruiting, Messages, More. The app has no account registration: accounts are created by the company administrator in the company portal, so there is no in-app account creation or deletion. An employee's account is closed by the administrator when employment ends.\n\n4. EXTERNAL SERVICES\nThe app talks only to Golden A/S's own server (https://www.goldensas.com) over HTTPS. No third-party analytics, advertising, payment, AI or data-provider service is used. Sign-in uses the company's own accounts, with optional authenticator (TOTP) and passkeys. Face ID / Touch ID is used on the device only.\n\n5. REGIONS\nThe app works the same in all regions. Languages: English, Greek, Italian.\n\n6. REGULATED CONTENT\nNone. The app contains no third-party protected material, no purchases and no paid content. Personnel data belongs to Golden A/S and is processed under its privacy policy: https://www.goldenas.com.gr/privacy.html\n\nUSER CONTENT\nMessages are exchanged only between signed-in employees of the company; there is no public content.\n\nDISTRIBUTION\nThe app is for the company's own staff. We will request unlisted distribution for it once approved, so that it is not discoverable on the App Store.",
+  "bundleId": "gr.goldenas.hr"
 }
