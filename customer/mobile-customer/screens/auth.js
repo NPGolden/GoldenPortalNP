@@ -17,7 +17,7 @@ window.Auth = (function () {
       </form>
       ${Api.passkeyCapable() ? `<button class="btn line" id="btn-pk" style="margin-top:10px">🔑 ${esc(t("login.passkey"))}</button>` : ""}
       <p class="meta" style="text-align:center;margin-top:14px">${esc(t("login.help"))}</p>
-      ${Api.cfg.mock ? `<div class="notice" style="margin-top:14px">Demo: <b>captain@demo-fleet.com</b> / <b>GoldenDemo2026!</b> — authenticator code <b>123456</b></div>` : ""}
+      ${Api.cfg.mock ? `<div class="notice" style="margin-top:14px">Demonstration mode — invented data.</div>` : ""}
       <div class="langs">${I18N.LANGS.map(([c, n]) => `<button type="button" data-lang="${c}" class="${I18N.get() === c ? "on" : ""}">${n}</button>`).join("")}</div>
     </div>`, "");
     I18N.apply(v);

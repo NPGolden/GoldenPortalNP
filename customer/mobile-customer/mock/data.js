@@ -1,6 +1,6 @@
 /* mock/data.js — demo data in the shapes of PortalCustomer (install/seed_demo.sql content: MY ALPHA / MY OCEAN / MY AURORA). Used only with ?mock=1. */
 window.MOCK_DATA = {
-  password: "GoldenDemo2026!",
+  password: "demo-demo-12",
   user: { id: 1, name: "Demo Captain", first_name: "Demo", email: "captain@demo-fleet.com", company: "Demo Fleet Management", title: "Captain", locale: "en", totp_enabled: true }, features: { tickets: true, offers: true, approvals: true, reports: true, offer_2fa: true },
   branch: { code: "GAS", name: "Golden A/S — Keratsini" },
   vessels: [{ id: 1, name: "MY ALPHA", yard: "Palumbo, Ancona", imo: "9812345", type: "" }, { id: 2, name: "MY OCEAN", yard: "TISG, La Spezia", imo: "9823456", type: "" }, { id: 3, name: "MY AURORA", yard: "Perini Navi", imo: "9834567", type: "" }],

@@ -3867,3 +3867,12 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Tested in a browser with the demo data of the app: 12-megapixel photo attached, page reloaded, draft restored, ticket created. Not reproduced on an iPhone.
 - Cybersecurity: the draft holds only what the user typed, on the phone, and is removed at sign-out. Finding: the sign-in screen of the demo mode of the customer app (`?mock=1`) prints demo credentials that are readable in the public app code — the real review account must not use the same password.
 
+
+## §456 Customer app 1.0.11 — demonstration accounts for customer users (GAS-CP-R97-172, v1.210.3)
+
+- The demonstration flag of §453 (`customer_users.is_demo`) now also applies to customer accounts: the tick box 🎭 is shown on every row of Administration › Users.
+- `api/v1/index.php`: for a demonstration account the customer app gets `demo: true` at sign-in and at `GET /me` and HTTP 403 on every other route, exactly as Service and PM — no report, offer, ticket, document or vessel of a real customer leaves the portal.
+- `customer/mobile-customer/lib/api.js`: on `user.demo` the app closes the server session, switches to its built-in data set (`gcu.demo`, `gcu.mock`), stays signed in over a reload and returns to the real server at sign-out (`logoutLocal()`). The authenticator step of the data set is off in the demonstration. `sw.js` cache `gas-customer-1.0.11`.
+- The built-in data set no longer prints sign-in details on the sign-in screen; its fixture password was replaced.
+- Tested in a browser against a local emulation of the API: sign-in → invented fleet, Home / Sign / Offers / Tickets / More filled, reload keeps the session, sign-out resets, no data request reaches the server.
+- Cybersecurity: a review or presentation account can no longer read a real customer's documents. The web portal refuses demonstration accounts. No effect on performance (one flag already read with the user row).

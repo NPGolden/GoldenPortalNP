@@ -20,7 +20,7 @@ const code = () => target === "mock" ? "123456" : totpCode(SECRET); // both acco
   async function draw(sel) { const c = await p.$(sel); await c.scrollIntoViewIfNeeded(); await wait(200); const box = await c.boundingBox(); const y0 = box.y + 70; await p.mouse.move(box.x + 20, y0); await p.mouse.down(); for (let i = 1; i <= 10; i++) await p.mouse.move(box.x + 20 + i * 25, y0 - 20 + (i % 2) * 40); await p.mouse.up(); await wait(200); }
   test("login (+ skip biometrics) → home counters", async () => {
     await p.goto(base); await wait(500); if (target === "mock") { await p.evaluate(() => { sessionStorage.clear(); localStorage.removeItem("gcu.bio_asked"); }); await p.reload(); await wait(500); }
-    await p.fill("input[name=email]", "captain@demo-fleet.com"); await p.fill("input[name=password]", "GoldenDemo2026!"); await p.click("#btn-login"); await wait(1200); if (await p.$("#totp-field:not([hidden])")) { await p.fill("input[name=totp]", code()); await p.click("#btn-login"); await wait(1200); }
+    await p.fill("input[name=email]", "captain@demo-fleet.com"); await p.fill("input[name=password]", "demo-demo-12"); await p.click("#btn-login"); await wait(1200); if (await p.$("#totp-field:not([hidden])")) { await p.fill("input[name=totp]", code()); await p.click("#btn-login"); await wait(1200); }
     if (await p.$("#bio-no")) { await p.click("#bio-no"); await wait(800); }
     await p.waitForSelector("#stats .stat"); const n = await p.$$eval("#stats .stat .n", e => e.map(x => x.textContent)); assert.equal(n[0], "2"); assert.equal(n[1], "2"); assert.equal(n[2], target === "mock" ? "1" : "2");
   });

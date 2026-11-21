@@ -2,15 +2,16 @@
    Access JWT 15 min in sessionStorage; rotating refresh token in localStorage (Keychain / Keystore in the Capacitor build).
    Mock mode (?mock=1 or localStorage gcu.mock) serves mock/data.js in the shapes of the live contract — demo and UI tests only. */
 window.Api = (function () {
-  const APP_ID = "customer", APP_VERSION = "1.0.10";
+  const APP_ID = "customer", APP_VERSION = "1.0.11";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false; try { MOCK = localStorage.getItem("gcu.mock") === "1" || /[?&]mock=1/.test(location.search); if (/[?&]mock=1/.test(location.search)) localStorage.setItem("gcu.mock", "1"); } catch (e) {}
   const cfg = { base: BASE, get mock() { return MOCK; } };
+  const demoOn = () => { try { return localStorage.getItem("gcu.demo") === "1"; } catch (e) { return false; } };   // R97-172
   let access = null, me = null, deviceId = null, onAuthLost = () => {};
   try { access = sessionStorage.getItem("gcu.at"); } catch (e) {}
   const setAccess = (v) => { access = v; try { v ? sessionStorage.setItem("gcu.at", v) : sessionStorage.removeItem("gcu.at"); } catch (e) {} };
   let refresh = null;
-  async function init() { deviceId = await Native.deviceId(); refresh = await Native.secureGet("refresh"); if (MOCK) Mock.load(); }
+  async function init() { deviceId = await Native.deviceId(); refresh = await Native.secureGet("refresh"); if (MOCK) { Mock.load(); if (demoOn() && !Mock.signedIn()) Mock.demo(); } }   // R97-172: a demonstration account stays in the demonstration after a restart
   function setRefresh(t) { refresh = t; return t ? Native.secureSet("refresh", t) : Native.secureDel("refresh"); }
   const hasSession = () => !!refresh || (MOCK && Mock.signedIn());
   const online = () => navigator.onLine !== false;
@@ -46,6 +47,10 @@ window.Api = (function () {
   }
   async function login(email, password, totp, newPassword) {
     const d = await raw("POST", "/auth/login", { email, password, totp: totp || undefined, new_password: newPassword || undefined, device: deviceInfo() }, { noAuth: true });
+    if (d.user && d.user.demo && !MOCK) {   // R97-172: demonstration account — the portal gives it no data; the app shows its built-in demonstration fleet and drops the real session
+      try { setAccess(d.access_token); await raw("POST", "/auth/logout", {}, {}); } catch (e) {} setAccess(null);
+      MOCK = true; try { localStorage.setItem("gcu.mock", "1"); localStorage.setItem("gcu.demo", "1"); } catch (e) {} Mock.reset(); Mock.load(); me = Mock.demo(); return { user: me };
+    }
     setAccess(d.access_token); await setRefresh(d.refresh_token); me = d.user; return d;
   }
   // R71-001 passkeys
@@ -70,7 +75,7 @@ window.Api = (function () {
     else { const pk = o.options; pk.challenge = pkB64.dec(pk.challenge); pk.user.id = pkB64.dec(pk.user.id); pk.excludeCredentials = (pk.excludeCredentials || []).map((c) => ({ type: c.type, id: pkB64.dec(c.id) })); cred = pkToJSON(await navigator.credentials.create({ publicKey: pk })); }
     return call("POST", "/me/passkeys", { challenge_id: o.challenge_id, credential: cred, name });
   }
-  async function logoutLocal() { setAccess(null); me = null; await setRefresh(null); await Store.clear(); try { localStorage.removeItem("gas.cu.tkdraft"); } catch (e) {} if (MOCK) Mock.signOut(); }
+  async function logoutLocal() { setAccess(null); me = null; await setRefresh(null); await Store.clear(); try { localStorage.removeItem("gas.cu.tkdraft"); } catch (e) {} if (MOCK) Mock.signOut(); if (demoOn()) { MOCK = false; Mock.reset(); try { localStorage.setItem("gcu.mock", "0"); localStorage.removeItem("gcu.demo"); } catch (e) {} } }
   async function logout() { try { await call("POST", "/auth/logout", {}); } catch (e) {} await logoutLocal(); }
   async function cached(path) {
     const key = "GET " + path;
@@ -171,5 +176,5 @@ window.Mock = (function () {
     out += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n` + offs.map(o => String(o).padStart(10, "0") + " 00000 n \n").join("") + `trailer\n<< /Size ${objs.length + 1} /Root ${cat} 0 R >>\nstartxref\n${xref}\n%%EOF`;
     return new Blob([out], { type: "application/pdf" });
   }
-  return { load, handle, pdf, signedIn: () => { if (!data) load(); return !!user; }, signOut: () => { user = null; persist(); }, reset: () => { try { sessionStorage.removeItem("gcu.mockdb"); } catch (e) {} data = null; user = null; } };
+  return { load, handle, pdf, signedIn: () => { if (!data) load(); return !!user; }, signOut: () => { user = null; persist(); }, demo: () => { if (!data) load(); data.user.totp_enabled = false; if (data.features) data.features.offer_2fa = false; user = data.user.email; persist(); return meShape(); },   /* the reviewer has no authenticator: the demonstration asks for no code */ reset: () => { try { sessionStorage.removeItem("gcu.mockdb"); } catch (e) {} data = null; user = null; } };
 })();

@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.210.2** (build 2026-11-20). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.210.3** (build 2026-11-21). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.210.3 | GAS-CP-R97-172 | 2026-11-21 | Customer app 1.0.11: demonstration accounts for customer users — the app shows an invented fleet with reports to sign, offers, tickets and documents, and nothing of a real customer | — |
 | 1.210.2 | GAS-CP-R97-171 | 2026-11-21 | Customer app 1.0.10: a photo taken for a ticket no longer stops the app on iOS — system picker (camera, photo library, files), large photos reduced safely, and the ticket being written is kept on the phone until it is sent | — |
 | 1.210.1 | GAS-CP-R97-170 | 2026-11-21 | Golden PM 1.0.14: the demonstration data set no longer asks for an authenticator code on decisions | — |
 | 1.210.0 | GAS-CP-R97-169 | 2026-11-21 | Demonstration accounts: an account marked "Demonstration account" sees an invented company in Golden HR, Golden PM and Service and nothing of the real data, and cannot open the portal — for the store review, training and presentations (Service 0.7.2, PM 1.0.13) | `install/migrate_cp_r97_169_demo_account.sql` |
