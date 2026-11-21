@@ -3921,3 +3921,9 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - New aliases in `ct_norm_category()`: "Ownner Representative", "Owner Rep.", "Technical Staff", "Technical Department".
 - Language keys `ct.im_cat_only`, `ct.im_cat_change`, `ct.im_cat_unknown`, `ct.im_cat_notfound` in en, el, it, bg, uk (12 643 keys each).
 - Cybersecurity: staff only, CSRF as the other imports, parameterised queries; the contact list is uploaded in the portal and is not stored in the repository.
+
+## §462 Contacts import, category only — reversal record written (GAS-CP-R97-178, v1.212.2)
+
+- `ct_import_categories()` used the constant `CP_ROOT`, which only the API defines; in the web portal the real run committed the update and then threw "Undefined constant" before the reversal file and the result page. Path now `dirname(__DIR__) . '/storage/private'`.
+- The first real run (21/11/2026, list of 1 091 rows, about 1 055 contacts) therefore has no reversal record.
+- Lesson: the local test defined CP_ROOT itself, so it could not catch this; test web-side functions without API constants.

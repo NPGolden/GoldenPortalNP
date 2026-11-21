@@ -509,7 +509,7 @@ function ct_import_categories(string $path, bool $dry): array {
         }
         return $res;
     });
-    if (!$dry && $undo) { $d = CP_ROOT . '/storage/private'; if (!is_dir($d)) @mkdir($d, 0700, true); @file_put_contents($d . '/ct_category_' . date('Ymd_His') . '.json', json_encode(['by' => (int)(current_user()['id'] ?? 0), 'changes' => $undo])); }
+    if (!$dry && $undo) { $d = dirname(__DIR__) . '/storage/private';   /* R97-178: CP_ROOT exists only in the API */ if (!is_dir($d)) @mkdir($d, 0700, true); @file_put_contents($d . '/ct_category_' . date('Ymd_His') . '.json', json_encode(['by' => (int)(current_user()['id'] ?? 0), 'changes' => $undo])); }
     return $out;
 }
 
