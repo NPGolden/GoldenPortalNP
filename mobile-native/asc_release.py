@@ -70,7 +70,7 @@ except SystemExit as e: log("age rating not changed (answer the questionnaire in
 # ---- version ----
 version_string = open("APP_VERSION").read().strip() if os.path.exists("APP_VERSION") else None
 vers = req("GET", f"/apps/{aid}/appStoreVersions", params={"filter[platform]": "IOS", "limit": 10})["data"]
-editable = [v for v in vers if v["attributes"]["appStoreState"] in ("PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED", "METADATA_REJECTED", "INVALID_BINARY", "WAITING_FOR_REVIEW")]
+editable = [v for v in vers if v["attributes"]["appStoreState"] in ("PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED", "METADATA_REJECTED", "INVALID_BINARY", "WAITING_FOR_REVIEW", "READY_FOR_REVIEW")]
 live = [v for v in vers if v["attributes"]["appStoreState"] in ("READY_FOR_SALE", "READY_FOR_DISTRIBUTION", "PENDING_DEVELOPER_RELEASE", "PROCESSING_FOR_DISTRIBUTION")]
 # latest valid build decides the version string when APP_VERSION is absent
 builds = req("GET", "/builds", params={"filter[app]": aid, "filter[processingState]": "VALID", "sort": "-uploadedDate", "limit": 1})
