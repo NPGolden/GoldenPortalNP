@@ -3927,3 +3927,10 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - `ct_import_categories()` used the constant `CP_ROOT`, which only the API defines; in the web portal the real run committed the update and then threw "Undefined constant" before the reversal file and the result page. Path now `dirname(__DIR__) . '/storage/private'`.
 - The first real run (21/11/2026, list of 1 091 rows, about 1 055 contacts) therefore has no reversal record.
 - Lesson: the local test defined CP_ROOT itself, so it could not catch this; test web-side functions without API constants.
+
+## §463 Mobile apps released on the App Store — links and QR codes (GAS-CP-R97-179, v1.212.3)
+
+- All four iOS apps released on 21/11/2026: Service 0.7.3, Customer 1.0.8, PM 1.0.11, HR 1.1.0 (App Store ids 6829433629, 6829433786, 6829433663, 6837033425).
+- `cp_store_apps()`: `ios_live` true for all; Golden HR has an `ios` link. `store_apps_html()`: an app without Google Play but with the App Store shows the web app in the first tile and the App Store in the second.
+- `assets/apps/qr-hr-ios.png` new; `icon-service|pm|customer.png` redrawn with the name tab.
+- Cybersecurity: fixed https links to apps.apple.com with `rel="noopener"`; no script.
