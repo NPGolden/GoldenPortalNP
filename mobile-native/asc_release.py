@@ -98,7 +98,9 @@ log("version localisation", LOC, "ok", "(what's new skipped: first release)" if 
 
 # ---- screenshots: replace the 6.7"/6.9" iPhone set ----
 files = sorted(glob.glob(f"store/{APP}/screenshots/*.png"))
-if files:
+locked = ver["attributes"]["appStoreState"] in ("READY_FOR_REVIEW", "WAITING_FOR_REVIEW")   # screenshots and the build cannot change while the version sits in a submission
+if locked: log("screenshots kept (version is", ver["attributes"]["appStoreState"] + ")")
+if files and not locked:
     sets = req("GET", f"/appStoreVersionLocalizations/{vloc['id']}/appScreenshotSets", params={"include": "appScreenshots"})
     sset = next((s for s in sets["data"] if s["attributes"]["screenshotDisplayType"] == "APP_IPHONE_67"), None)
     if sset:
@@ -118,7 +120,8 @@ if files:
     req("PATCH", f"/appScreenshotSets/{sset['id']}/relationships/appScreenshots", json={"data": [{"type": "appScreenshots", "id": i} for i in ids]})
 
 # ---- build ----
-if build:
+if build and locked: log("build kept")
+elif build:
     req("PATCH", f"/appStoreVersions/{vid}/relationships/build", json=rel("builds", build["id"]))
     log("build attached", build["attributes"]["version"], build["attributes"]["uploadedDate"])
 else: log("WARNING: no VALID build — upload one with Build iOS app first")
