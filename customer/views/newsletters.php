@@ -24,6 +24,8 @@ web_sales_tabs('newsletters');
   </form>
 </div>
 <div class="card" id="import"><details><summary><b>⇪ <?= tt('nl.imp_title') ?></b></summary>
+  <div style="margin:10px 0 4px;padding:12px 16px;background:#FBF7EC;border-left:3px solid #C9A227;border-radius:6px;"><b><?= tt('nl.imp_how') ?></b>
+    <ol style="margin:8px 0 0 20px;line-height:1.65;"><?php for ($si = 1; $si <= 8; $si++): if ($si === 7 && (false || !nl_web_has())) { echo '<li>' . e(preg_replace('/\s*[^.]*«[^»]*»[^.]*\.$/u', '', t('nl.imp_s7'))) . '</li>'; continue; } ?><li><?= tt('nl.imp_s' . $si) ?></li><?php endfor; ?></ol></div>
   <form method="post" action="<?= $self ?>" enctype="multipart/form-data" class="filters" data-lock style="margin-top:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="nl_import">
     <div class="field"><label><?= tt('nl.imp_md') ?></label><input type="file" name="md" accept=".md,.markdown,.txt,text/markdown,text/plain" required></div>
     <div class="field"><label><?= tt('nl.imp_dir') ?></label><input type="file" name="picdir[]" webkitdirectory multiple></div>

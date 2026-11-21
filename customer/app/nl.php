@@ -106,7 +106,7 @@ function nl_appr_ids(): array { static $c = null; if ($c === null) { try { $c = 
 /** The rule is on by default; it rests while no approver account exists, so sending can never be locked out. */
 function nl_appr_on(): bool { return nl_appr_has() && (string) cp_setting('nl_approval', '1') === '1' && nl_appr_ids(); }
 /** Fingerprint of what the readers get and who gets it: an approval is valid for exactly this. */
-function nl_hash(array $I): string { return sha1((string) json_encode([(string)$I['subject'], (string)($I['preheader'] ?? ''), (string)$I['lang'], $I['blocks'], $I['audience'], (string)($I['site'] ?? 'golden')], JSON_UNESCAPED_UNICODE)); }
+function nl_hash(array $I): string { $a = [(string)$I['subject'], (string)($I['preheader'] ?? ''), (string)$I['lang'], $I['blocks'], $I['audience'], (string)($I['site'] ?? 'golden')]; if (!empty($I['web_publish'])) $a[] = 'web:' . (string)($I['web_slug'] ?? '');   /* R97-176: publishing on the website is part of what is approved; issues without it keep their fingerprint */ return sha1((string) json_encode($a, JSON_UNESCAPED_UNICODE)); }
 function nl_appr_state(array $I): string { $s = (string)($I['appr_state'] ?? ''); if ($s === 'approved' && !hash_equals((string)($I['appr_hash'] ?? ''), nl_hash($I))) return ''; return in_array($s, ['pending', 'approved', 'returned'], true) ? $s : ''; }
 function nl_appr_ok(array $I): bool { return !nl_appr_on() || nl_approver() || nl_appr_state($I) === 'approved'; }
 /** May this account launch the issue? Administrators and management as before; with the rule on, also the author once the issue is approved. */
@@ -147,6 +147,7 @@ function nl_save_from_post(int $id): void {
     $aud = ['lists' => $dp === 'hr' ? [] : array_values(array_filter(array_map('intval', (array)($_POST['lists'] ?? [])))), 'groups' => array_values(array_intersect(array_keys(nl_groups($dp)), (array)($_POST['groups'] ?? []))), 'topics' => $dp === 'hr' ? [] : array_values(array_intersect(NL_TOPICS, (array)($_POST['topics'] ?? []))),
             'country' => $s('country', 80), 'extra' => $s('extra', 4000)];
     q('UPDATE nl_issues SET title = ?, subject = ?, preheader = ?, lang = ?, blocks = ?, audience = ? WHERE id = ?', [$title, $subject, $s('preheader', 200) ?: null, $lang, json_encode($blocks, JSON_UNESCAPED_UNICODE), json_encode($aud, JSON_UNESCAPED_UNICODE), $id]);
+    if (nl_web_has() && $dp !== 'hr') { $wp = !empty($_POST['web_publish']) && nl_site_of($I) === 'golden' ? 1 : 0; $raw = $s('web_slug', 80); $slug = $raw !== '' || $wp ? nl_slug_free($raw !== '' ? $raw : $title, $id) : ''; q('UPDATE nl_issues SET web_publish = ?, web_slug = ? WHERE id = ?', [$wp, $slug !== '' ? $slug : null, $id]); }   // R97-176
 }
 /** An uploaded picture: JPEG / PNG / GIF up to 2 MB, checked by its content, stored outside the web root, served by token. */
 function nl_image_store(int $issueId, string $tmp, int $size): string {
@@ -186,18 +187,51 @@ function nl_audience(array $aud, string $site = 'golden', string $dept = 'sales'
 function nl_audience_counts(array $rcpt): array { $c = []; foreach ($rcpt as $r) $c[$r['grp']] = ($c[$r['grp']] ?? 0) + 1; return $c; }
 function nl_group_label(string $g): string { if (str_starts_with($g, 'c:')) return function_exists('ct_categories') ? (ct_categories()[substr($g, 2)] ?? substr($g, 2)) : substr($g, 2); return $g === 'web' ? t('nl.g_web') : ($g === 'extra' ? t('nl.g_extra') : (nl_groups()[$g] ?? (nl_groups('hr')[$g] ?? $g))); }
 
+/* ---------------------------------------------------------------- publishing on the website (GAS-CP-R97-176) */
+function nl_web_has(): bool { static $h = null; if ($h === null) { try { $h = nl_has() && (bool) one("SHOW COLUMNS FROM nl_issues LIKE 'web_slug'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** The part of the article address after news.html?a= : small letters, digits and hyphens. */
+function nl_slug(string $s): string { $s = strtolower(trim($s)); $s = (string) preg_replace('/[^a-z0-9]+/', '-', $s); return trim(substr($s, 0, 80), '-'); }
+/** A slug no other issue uses; a title without Latin letters or digits gives issue-<id>. */
+function nl_slug_free(string $raw, int $id): string { $s = nl_slug($raw); if ($s === '') $s = 'issue-' . $id; if (one('SELECT id FROM nl_issues WHERE web_slug = ? AND id <> ?', [$s, $id])) $s = trim(substr($s, 0, 80 - strlen((string)$id) - 1), '-') . '-' . $id; return $s; }
+/** An issue that is being sent or was sent is put on, or taken off, the News page of the website (management / administrators). */
+function nl_web_toggle(int $id): bool {
+    if (!nl_can_send() || !nl_web_has()) throw new RuntimeException(t('err.noaccess')); $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound'));
+    if (nl_dept($I) === 'hr' || nl_site_of($I) !== 'golden' || !in_array($I['status'], ['sending', 'sent'], true)) throw new RuntimeException(t('nl.locked'));
+    if (!empty($I['web_publish'])) { q('UPDATE nl_issues SET web_publish = 0 WHERE id = ?', [$id]); return false; }
+    q('UPDATE nl_issues SET web_publish = 1, web_slug = ?, web_at = COALESCE(web_at, NOW()) WHERE id = ?', [nl_slug_free((string)($I['web_slug'] ?? '') !== '' ? (string)$I['web_slug'] : (string)$I['title'], $id), $id]); return true;
+}
+/** What the website may read through web_feed.php?r=news (site key): the issues published on the website — the list, or one issue with its blocks.
+ *  Only the content already sent to the readers: subject, preview line, date, blocks, addresses of the pictures. Nothing about recipients or results. */
+function nl_pub_news(string $site, string $slug = ''): array {
+    if (!nl_web_has() || kym_site($site) !== 'golden') return $slug === '' ? ['items' => []] : throw new RuntimeException('not found', 404);
+    $w = "web_publish = 1 AND web_at IS NOT NULL AND web_slug IS NOT NULL AND status IN ('sending','sent')" . (nl_dept_has() ? " AND dept = 'sales'" : '') . (kym_has() ? " AND site = 'golden'" : '');
+    $base = nl_base(); $img = fn($t): string => is_string($t) && preg_match('/^[A-Za-z0-9]{24}$/', $t) ? $base . '/nl.php?i=' . $t : '';
+    $head = function (array $r) use ($img): array { $first = ''; foreach ((json_decode((string)$r['blocks'], true) ?: []) as $b) if (is_array($b) && ($first = $img($b['img'] ?? '')) !== '') break;
+        return ['slug' => (string)$r['web_slug'], 'title' => (string)$r['subject'], 'summary' => (string)($r['preheader'] ?? ''), 'date' => substr((string)$r['web_at'], 0, 10), 'lang' => (string)$r['lang'], 'img' => $first]; };
+    $cols = 'web_slug, subject, preheader, web_at, lang, blocks';
+    if ($slug !== '') {
+        $r = preg_match('/^[a-z0-9][a-z0-9-]{0,79}$/', $slug) ? one("SELECT $cols FROM nl_issues WHERE $w AND web_slug = ?", [$slug]) : null; if (!$r) throw new RuntimeException('not found', 404);
+        $o = $head($r); $o['blocks'] = [];
+        foreach ((json_decode((string)$r['blocks'], true) ?: []) as $b) { if (!is_array($b) || !in_array($b['t'] ?? '', NL_BLOCKS, true)) continue; $x = ['t' => (string)$b['t']];
+            foreach (['text', 'title', 'label'] as $k) if (isset($b[$k]) && is_string($b[$k]) && $b[$k] !== '') $x[$k] = $b[$k];
+            if (!empty($b['url']) && is_string($b['url']) && nl_url_ok($b['url']) !== '') $x['url'] = $b['url']; if (($u = $img($b['img'] ?? '')) !== '') $x['img'] = $u; $o['blocks'][] = $x; }
+        return ['item' => $o];
+    }
+    return ['items' => array_map($head, all("SELECT $cols FROM nl_issues WHERE $w ORDER BY web_at DESC, id DESC LIMIT 50"))];
+}
+
 /* ---------------------------------------------------------------- import from a block sheet (GAS-CP-R97-175) */
 const NL_IMPORT_MAX_MD = 200000;   // bytes of the block sheet
 const NL_IMPORT_MAX_PICS = 20;
 /** A block sheet (.md, UTF-8) → head and blocks of an issue. Nothing is stored here.
- *  Head between two lines of ---: title, subject, preheader, lang (en / el / it).
+ *  Head between two lines of ---: title, subject, preheader, lang (en / el / it), and for the website web (yes / no) and slug (R97-176).
  *  Body: # heading · text paragraphs (blank line between them, **bold**, lines starting with - as a list) · ![description](picture.jpg) ·
  *  a line that is only [label](https://…) = button · --- = divider · lines starting with > = one highlight (### title, text, picture, button).
  *  A picture is named by its file name; the folder part of the path is ignored. Returns head, blocks (a picture block carries 'file'), files. */
 function nl_md_parse(string $md): array {
     if (!mb_check_encoding($md, 'UTF-8')) throw new RuntimeException(t('nl.imp_utf8'));
     $md = str_replace(["\r\n", "\r"], "\n", (string) preg_replace('/^\xEF\xBB\xBF/', '', $md)); $L = explode("\n", $md); $n = count($L); $i = 0;
-    $head = ['title' => '', 'subject' => '', 'preheader' => '', 'lang' => 'en'];
+    $head = ['title' => '', 'subject' => '', 'preheader' => '', 'lang' => 'en', 'web' => '', 'slug' => ''];
     while ($i < $n && trim($L[$i]) === '') $i++;
     if ($i < $n && trim($L[$i]) === '---') {
         for ($i++; $i < $n && trim($L[$i]) !== '---'; $i++) if (preg_match('/^\s*([A-Za-z_ ]+?)\s*:\s*(.*)$/', $L[$i], $m)) {
@@ -259,12 +293,13 @@ function nl_import_from_post(string $dept, string $site): array {
         $tok = []; foreach ($P['files'] as $k) $tok[$k] = nl_image_store($id, $have[$k][0], $have[$k][1]);
         $blocks = []; foreach ($P['blocks'] as $b) { if (isset($b['file'])) { $b['img'] = $tok[$b['file']] ?? ''; unset($b['file']); } $blocks[] = $b; }
         q('UPDATE nl_issues SET subject = ?, preheader = ?, lang = ?, blocks = ? WHERE id = ?', [$subject !== '' ? $subject : $title, mb_substr($H['preheader'], 0, 200) ?: null, $lang, json_encode($blocks, JSON_UNESCAPED_UNICODE), $id]);
+        if (nl_web_has() && $dept !== 'hr' && ($H['slug'] !== '' || in_array(strtolower($H['web']), ['yes', 'true', '1', 'on'], true))) q('UPDATE nl_issues SET web_publish = ?, web_slug = ? WHERE id = ?', [in_array(strtolower($H['web']), ['yes', 'true', '1', 'on'], true) ? 1 : 0, nl_slug_free($H['slug'] !== '' ? $H['slug'] : $title, $id), $id]);   // R97-176
     } catch (Throwable $e) { try { nl_delete($id); } catch (Throwable $x) {} throw $e; }
     return [$id, count($P['blocks']), count($P['files'])];
 }
 /** The example block sheet offered on the import card (plain text, no data of the portal). */
 function nl_md_sample(): string {
-    return "---\ntitle: 2026-12 Example issue\nsubject: The subject line of the e-mail, under 60 characters\npreheader: The preview line shown after the subject in the inbox, 80 to 110 characters long.\nlang: en\n---\n\n"
+    return "---\ntitle: 2026-12 Example issue\nsubject: The subject line of the e-mail, under 60 characters\npreheader: The preview line shown after the subject in the inbox, 80 to 110 characters long.\nlang: en\nweb: no\nslug: 2026-12-example-issue\n---\n\n"
          . "# The headline of the issue\n\nThe lead: who the issue is for and what it gives them. A blank line starts a new paragraph. **Bold** is kept.\n\n"
          . "[Label of the main button](https://www.goldenas.com.gr/)\n\n![Description of the picture](01-picture.jpg)\n\n---\n\n# A second section\n\nText of the section.\n\n- A list line\n- Another list line\n\n"
          . "> ### Title of a highlight\n> Text of the highlight, in a framed box.\n> [Button of the highlight](https://www.goldenas.com.gr/contact.html)\n\n[Read the full article](https://www.goldenas.com.gr/newsletter.html)\n";
@@ -359,6 +394,7 @@ function nl_queue(int $id): int {
         $ins = db()->prepare('INSERT IGNORE INTO nl_sends (issue_id, email, name, contact_id, company_id, company, grp, token) VALUES (?,?,?,?,?,?,?,?)');
         foreach ($rc as $r) $ins->execute([$id, $r['email'], $r['name'] ?: null, $r['contact_id'], $r['company_id'], $r['company'] ?: null, $r['grp'], nl_token()]);
         q("UPDATE nl_issues SET status = 'sending', n_total = ?, queued_by = ?, queued_name = ?, queued_at = NOW() WHERE id = ?", [count($rc), (int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? ''), $id]);
+        if (nl_web_has()) q('UPDATE nl_issues SET web_at = COALESCE(web_at, NOW()) WHERE id = ? AND web_publish = 1 AND web_slug IS NOT NULL', [$id]);   // R97-176: the article appears on the website when sending starts
         db()->commit();
     } catch (Throwable $e) { db()->rollBack(); throw $e; }
     return count($rc);
@@ -574,6 +610,7 @@ function nl_handle_action(string $action): bool {
         case 'nl_appr_return': nl_appr_decide($id, false, (string)($_POST['appr_reply'] ?? '')); flash('good', t('nl.ap_returned')); $back('#approval');
         case 'nl_create': $nd = ($_POST['dept'] ?? '') === 'hr' ? 'hr' : 'sales'; if (!nl_can_dept($nd)) throw new RuntimeException(t('err.noaccess')); $id = nl_create((string)($_POST['title'] ?? ''), (string)($_POST['site'] ?? 'golden'), $nd); flash('good', t('nl.created')); redirect('newsletter', ['id' => $id]);
         case 'nl_import': $nd = ($_POST['dept'] ?? '') === 'hr' ? 'hr' : 'sales'; if (!nl_can_dept($nd)) throw new RuntimeException(t('err.noaccess')); [$id, $nb, $np] = nl_import_from_post($nd, (string)($_POST['site'] ?? 'golden')); flash('good', t('nl.imp_done', ['b' => $nb, 'p' => $np])); redirect('newsletter', ['id' => $id]);   // R97-175
+        case 'nl_web': $on = nl_web_toggle($id); flash('good', t($on ? 'nl.web_done_on' : 'nl.web_done_off')); $back();   // R97-176
         case 'nl_save': nl_save_from_post($id); if (nl_appr_recheck($id)) flash('info', t('nl.ap_reset')); flash('good', t('nl.saved')); $back(!empty($_POST['add']) ? '#blocks' : '');
         case 'nl_hr_partner': nl_hr_partner_add_from_post(); flash('good', t('nl.hr_p_added')); redirect('hr_newsletters', ['_r' => uniqid()], '#partners');
         case 'nl_copy': $id = nl_copy($id); flash('good', t('nl.copied')); redirect('newsletter', ['id' => $id]);

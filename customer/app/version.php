@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.211.0';
+const CP_VERSION = '1.212.0';
 const CP_BUILD   = '2026-11-21';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-176', 'version' => '1.212.0', 'date' => '2026-11-21', 'title' => 'Newsletters on the website: an issue ticked «Also publish on the website» appears as an article on the News page of goldenas.com.gr when sending starts — the website reads the published issues through its site key; a sent issue can be published or removed afterwards; the block sheet of the import carries web and slug', 'db' => 'install/migrate_cp_r97_176_nl_web.sql', 'check' => 'r99d'],
         ['ref' => 'GAS-CP-R97-175', 'version' => '1.211.0', 'date' => '2026-11-21', 'title' => 'Newsletters: import an issue from a block sheet — a Markdown file (.md) with subject, preview line and blocks, plus the folder or files of its pictures, becomes a draft issue in Web Sales › Newsletters and HR › Newsletters; example block sheet on the import card', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-174', 'version' => '1.210.5', 'date' => '2026-11-21', 'title' => 'Service app 0.7.4: the bottom menu shows real icons (Home, Tickets, Reports, Hours, More) instead of grey blocks', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-173', 'version' => '1.210.4', 'date' => '2026-11-21', 'title' => 'App icons: Service, PM and Customer carry their name on a gold tab like Golden HR, so the four Golden A/S apps are told apart on the phone (Service 0.7.3, PM 1.0.15, Customer 1.0.12)', 'db' => null, 'check' => null],
@@ -625,6 +626,7 @@ function cp_migration_state(): array {
         'r99a' => $has("SHOW COLUMNS FROM customer_users LIKE 'must_change_pw'"),
         'r99b' => $has("SELECT 1 FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'login_log' AND COLUMN_NAME = 'outcome' AND COLUMN_TYPE LIKE '%pw\\_reset%'"),
         'r99c' => $has("SHOW COLUMNS FROM customer_users LIKE 'is_demo'"),
+        'r99d' => $has("SHOW COLUMNS FROM nl_issues LIKE 'web_slug'"),
         'r98x' => $has("SHOW INDEX FROM inv_moves WHERE Key_name = 'ix_invmv_item_kind_at'"),
         'r98w' => $has("SHOW TABLES LIKE 'po_lots'") && $has("SHOW COLUMNS FROM po_lines LIKE 'lot_id'"),
         'r98v' => $has("SHOW COLUMNS FROM po_receipt_lines LIKE 'dest_qty'"),

@@ -12,6 +12,7 @@ layout_head($I['title'] . ' · ' . t($isHr ? 'nl.hr_title' : 'nl.title'), $isHr 
 <div class="page-head"><div><h1>✉ <?= e($I['title']) ?> <?= nl_pill((string)$I['status']) ?><?= nl_appr_pill($I) ?><?= $ks ? ' ' . kym_pill($site) : '' ?></h1><p class="lede" style="margin-bottom:0;"><?= e((string)$I['created_name']) ?> · <?= e(fmt_date(substr((string)$I['created_at'], 0, 10))) ?><?= $I['queued_at'] ? ' · ' . e(t('nl.queued_by', ['n' => (string)$I['queued_name'], 'd' => fmt_datetime($I['queued_at'])])) : '' ?></p></div>
   <div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('newsletter', ['id' => $id, 'preview' => 1]) ?>" target="_blank" rel="noopener">👁 <?= tt('nl.preview') ?></a>
     <form method="post" action="<?= $self ?>" class="inline"><?= csrf_field() ?><input type="hidden" name="action" value="nl_copy"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost btn--sm" type="submit">⧉ <?= tt('nl.copy') ?></button></form>
+    <?php if (!$draft && $send && nl_web_has() && !$isHr && $site === 'golden' && in_array($I['status'], ['sending', 'sent'], true)): $wp0 = !empty($I['web_publish']); ?><form method="post" action="<?= $self ?>" class="inline"<?= $wp0 ? ' data-confirm="' . tt('nl.web_off_q') . '"' : '' ?>><?= csrf_field() ?><input type="hidden" name="action" value="nl_web"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost btn--sm" type="submit">🌐 <?= tt($wp0 ? 'nl.web_off' : 'nl.web_on') ?></button></form><?php endif; ?>
     <?php if ($draft): ?><form method="post" action="<?= $self ?>" class="inline" data-confirm="<?= tt('nl.delete_q') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="nl_delete"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost btn--sm" type="submit">🗑 <?= tt('btn.delete') ?></button></form><?php endif; ?></div></div>
 <?php if ($S): $T = $S['tot']; ?>
 <div class="kpi" style="margin-bottom:14px;" id="stats">
@@ -48,6 +49,12 @@ layout_head($I['title'] . ' · ' . t($isHr ? 'nl.hr_title' : 'nl.title'), $isHr 
     <div class="field"><label><?= tt('nl.lang') ?></label><select name="lang" data-nosearch<?= $dis ?>><?php foreach (['en' => 'English', 'el' => 'Ελληνικά', 'it' => 'Italiano'] as $k => $l): ?><option value="<?= $k ?>"<?= $I['lang'] === $k ? ' selected' : '' ?>><?= $l ?></option><?php endforeach; ?></select><p class="hint"><?= tt('nl.lang_hint') ?></p></div>
   </div>
   <div class="field"><label><?= tt('nl.preheader') ?></label><input name="preheader" maxlength="200" value="<?= e((string)$I['preheader']) ?>"<?= $ro ?>><p class="hint"><?= tt('nl.preheader_hint') ?></p></div>
+<?php if (nl_web_has() && !$isHr && $site === 'golden'): $wp = !empty($I['web_publish']); $ws = (string)($I['web_slug'] ?? ''); ?>
+  <div class="field"><label><?= tt('nl.web') ?></label>
+    <label style="display:flex;gap:8px;align-items:center;font-weight:400;"><input type="checkbox" name="web_publish" value="1"<?= $wp ? ' checked' : '' ?><?= $dis ?> style="width:auto;"> <?= tt('nl.web_tick') ?></label>
+    <input name="web_slug" maxlength="80" pattern="[A-Za-z0-9\- ]*" value="<?= e($ws) ?>" placeholder="2026-12-topic"<?= $ro ?> style="margin-top:6px;max-width:360px;">
+    <p class="hint"><?= tt('nl.web_hint') ?><?php if ($wp && $ws !== ''): ?> <a href="https://www.goldenas.com.gr/news.html?a=<?= e(rawurlencode($ws)) ?>" target="_blank" rel="noopener">goldenas.com.gr/news.html?a=<?= e($ws) ?></a><?php endif; ?></p></div>
+<?php endif; ?>
 </div>
 <?php if ($draft && nl_ai_on()): ?>
 <div class="card" id="ai"><h2>✨ <?= tt('nl.ai_title') ?></h2><p class="hint"><?= tt('nl.ai_hint') ?></p>
