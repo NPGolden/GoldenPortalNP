@@ -12786,4 +12786,8 @@ Cordiali saluti,
 'pwc.bulk_none' => 'Seleziona almeno un account (il tuo non può essere incluso).',
 'pwc.bulk_max' => 'Al massimo {n} account per volta.',
 'pwc.bulk_done' => 'Password iniziale impostata per {n} account — ognuno dovrà scegliere la propria password al prossimo accesso.',
+'demo.web' => 'Questo è un account dimostrativo per le app. Non può aprire il portale.',
+'demo.au_flag' => 'Account dimostrativo (le app mostrano dati inventati)',
+'demo.au_hint' => 'Per la revisione degli store, formazione e presentazioni: Golden HR, Golden PM e Service mostrano un’azienda inventata; l’account non legge dati reali e non apre il portale.',
+'demo.au_on' => 'dimostrativo',
 ];

@@ -36,7 +36,7 @@ window.SCREENS = (() => {
       <img src="img/logo.png" alt="Golden A/S">
       <h2>${t("login.title")} — Golden PM</h2>
       <label>${t("login.portal")}</label><input readonly value="goldensas.com/customer${API.mock ? " (demo data)" : ""}">
-      <label>${t("login.email")}</label><input id="email" type="email" autocomplete="username" value="${API.mock ? "np@goldenas.com.gr" : ""}">
+      <label>${t("login.email")}</label><input id="email" type="email" autocomplete="username" value="${API.mock ? "demo.pm@example.com" : ""}">
       <label>${t("login.password")}</label><input id="pw" type="password" autocomplete="current-password" value="${API.mock ? "demo" : ""}">
       <div id="npwrow" class="hidden"><label>${t("pwc.new")}</label><input id="npw" type="password" autocomplete="new-password" maxlength="200"><label>${t("pwc.again")}</label><input id="npw2" type="password" autocomplete="new-password" maxlength="200"><p class="muted">${t("pwc.rules")}</p></div>
       <div id="totprow" class="hidden"><label>${t("login.totp")}</label><input id="totp" inputmode="numeric" autocomplete="one-time-code" maxlength="6"></div>

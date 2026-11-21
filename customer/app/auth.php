@@ -153,6 +153,7 @@ function online_users_compute(): array {
 function require_login(): array {
     $u = current_user();
     if (!$u) redirect('login');
+    if (!empty($u['is_demo']) && !defined('API_ROOT')) { $_SESSION = []; flash('bad', t('demo.web')); redirect('login'); }   // R97-169: also a session opened before the account was marked, or by passkey
     if (pwc_must($u) && (string)($_GET['p'] ?? '') !== 'password_change' && !in_array((string)($_POST['action'] ?? ''), ['password_change', 'logout'], true)) redirect('password_change');   // R97-167: also for downloads and other direct addresses
     return $u;
 }
@@ -247,6 +248,7 @@ function attempt_login(string $email, string $pass): array {
     // Staff/admin have no customer; a customer account needs an active customer.
     if (!$u || ($u['customer_id'] !== null && !$u['c_active'])) { login_log($u['id'] ?? null, $email, 'failed'); return ['ok' => false, 'error' => t('login.bad')]; }
     if (!$u['is_active'])       { login_log((int)$u['id'], $email, 'disabled'); return ['ok' => false, 'error' => t('login.disabled')]; }
+    if (!empty($u['is_demo']) && !defined('API_ROOT')) { login_log((int)$u['id'], $email, 'disabled'); return ['ok' => false, 'error' => t('demo.web')]; }   // R97-169: a demonstration account opens the apps' demonstration only, never the portal
 
     if ($u['locked_until'] && strtotime($u['locked_until']) > time()) {
         $mins = (int)ceil((strtotime($u['locked_until']) - time()) / 60);

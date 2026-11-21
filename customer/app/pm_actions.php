@@ -1430,6 +1430,7 @@ function pm_handle_action(string $action, string $page): bool {
             if (array_key_exists('can_accounting', $x)) q('UPDATE customer_users SET can_accounting = ?, is_accounting = ? WHERE id = ?', [$role === 'customer' ? 0 : (int)!empty($_POST['can_accounting']), $role === 'customer' ? 0 : (int)!empty($_POST['is_accounting']), $id]);   // R38-001
             if ($pass !== '') q('UPDATE customer_users SET password_hash = ?, failed_logins = 0, locked_until = NULL WHERE id = ?', [password_hash($pass, PASSWORD_DEFAULT), $id]);
             if (function_exists('pwc_has') && pwc_has() && isset($_POST['pwc_present'])) pwc_flag($id, !empty($_POST['must_change_pw']));   // R97-167: chosen per account
+            if (isset($_POST['demo_present']) && array_key_exists('is_demo', $x)) { $dm = (int)!empty($_POST['is_demo']); if ($dm !== (int)$x['is_demo']) { q('UPDATE customer_users SET is_demo = ?, session_epoch = session_epoch + 1 WHERE id = ?', [$dm, $id]); } }   // R97-169
             q('UPDATE projects SET project_manager = ? WHERE pm_user_id = ?', [$str('full_name', 120) ?: $x['full_name'], $id]);   // keep the denormalised name in step
             flash('good', t('au.updated'));
             redirect('admin_users', au_keep() + ['_r' => uniqid()]);

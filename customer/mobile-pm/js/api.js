@@ -2,9 +2,10 @@
  * and a MOCK mode (built-in sample data in the shapes of the contract) for the demo and the UI tests.
  * Mock mode: localStorage gpm.mock = "1", or ?mock=1 on the URL. */
 window.API = (() => {
-  const VERSION = "1.0.12";
+  const VERSION = "1.0.13";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
+  const demoOn = () => { try { return localStorage.getItem("gpm.demo") === "1"; } catch (e) { return false; } };   // R97-169
   try { MOCK = localStorage.getItem("gpm.mock") === "1" || /[?&]mock=1/.test(location.search); if (/[?&]mock=1/.test(location.search)) localStorage.setItem("gpm.mock", "1"); } catch (e) {}
   const tok = { get access() { try { return sessionStorage.getItem("gpm.at"); } catch (e) { return null; } }, set access(v) { try { v ? sessionStorage.setItem("gpm.at", v) : sessionStorage.removeItem("gpm.at"); } catch (e) {} },
     get refresh() { try { return localStorage.getItem("gpm.rt"); } catch (e) { return null; } }, set refresh(v) { try { v ? localStorage.setItem("gpm.rt", v) : localStorage.removeItem("gpm.rt"); } catch (e) {} } };
@@ -43,9 +44,12 @@ window.API = (() => {
 
   const api = {
     VERSION, get mock() { return MOCK; }, setMock(v) { MOCK = !!v; try { localStorage.setItem("gpm.mock", v ? "1" : "0"); } catch (e) {} },
-    get signedIn() { return !!(tok.refresh || (MOCK && mockState.user)); },
-    async login(email, password, totp, newPassword) { const r = await call("POST", "/auth/login", { email, password, totp: totp || undefined, new_password: newPassword || undefined, device: deviceInfo() }); tok.access = r.access_token; tok.refresh = r.refresh_token; return r; },
-    async logout() { try { await call("POST", "/auth/logout", {}); } catch (e) {} tok.access = null; tok.refresh = null; },
+    get signedIn() { if (MOCK && !mockState.user && demoOn()) mockState.user = M.me; return !!(tok.refresh || (MOCK && mockState.user)); },   // R97-169: a demonstration account stays signed in to the demonstration data
+    async login(email, password, totp, newPassword) { const r = await call("POST", "/auth/login", { email, password, totp: totp || undefined, new_password: newPassword || undefined, device: deviceInfo() }); tok.access = r.access_token; tok.refresh = r.refresh_token;
+      if (r.user && r.user.demo && !MOCK) {   // R97-169: demonstration account — the portal gives it no data; the app shows its built-in demonstration data set and drops the real session
+        try { await call("POST", "/auth/logout", {}); } catch (e) {} tok.access = null; tok.refresh = null; MOCK = true; try { localStorage.setItem("gpm.mock", "1"); localStorage.setItem("gpm.demo", "1"); } catch (e) {} mockState.user = M.me; return { ...r, user: M.me }; }
+      return r; },
+    async logout() { try { await call("POST", "/auth/logout", {}); } catch (e) {} tok.access = null; tok.refresh = null; if (demoOn()) { MOCK = false; mockState.user = null; try { localStorage.setItem("gpm.mock", "0"); localStorage.removeItem("gpm.demo"); } catch (e) {} } },
     /* R71-001 passkeys — the browser / platform authenticator signs a server challenge; a passkey replaces password + authenticator code */
     get passkeyCapable() { return !MOCK && (!!pkNative() || !!(window.PublicKeyCredential && navigator.credentials && navigator.credentials.get)); },
     async passkeyLogin() {
@@ -86,10 +90,10 @@ window.API = (() => {
   const STAGES = ["engineering", "procurement", "production", "fat", "installation", "sathat", "commissioning"];
   const overall = (st) => { const v = STAGES.map((k) => st[k]).filter((x) => x !== -1 && x != null); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0; };
   const mockState = { user: null, n: 0 };
-  const ME = { id: 2, name: "Nikos Polykandriotis", email: "np@goldenas.com.gr", role: "staff", discipline: "Management", discipline_id: 9, section_id: null, home_branch: "GR", branch_scope: ["GR", "GIT"], languages: ["en", "el", "it", "uk", "bg"], min_app_version: "1.0.6", ai: true, calendar: "GR", hr: true,
+  const ME = { id: 2, name: "Alex Demo", email: "demo.pm@example.com", role: "staff", discipline: "Management", discipline_id: 9, section_id: null, home_branch: "GR", branch_scope: ["GR", "GIT"], languages: ["en", "el", "it", "uk", "bg"], min_app_version: "1.0.6", ai: true, calendar: "GR", hr: true,
     pm: true, hr_manager: true, ts_approver: true, totp_enabled: true, counts: { hr_pending: 2, ts_pending: 2, drawings_overdue: 2, submittals_open: 5, hr_unread: 1 } };
   const STAFF = [
-    { id: 2, name: "Nikos Polykandriotis", discipline: "Management", discipline_id: 9, person_id: 1 },
+    { id: 2, name: "Alex Demo", discipline: "Management", discipline_id: 9, person_id: 1 },
     { id: 7, name: "Dimitris Papadakis", discipline: "Electrical", discipline_id: 1, person_id: 3 },
     { id: 8, name: "Giorgos Antoniou", discipline: "Electrical", discipline_id: 1, person_id: 4 },
     { id: 9, name: "Marco Rossi", discipline: "Automation", discipline_id: 2, person_id: 5 },
@@ -101,7 +105,7 @@ window.API = (() => {
   const M = {
     me: ME, staff: STAFF, stages: STAGES,
     projects: [
-      { id: 154, code: "PRJ.000154", name: "M/Y OCEANIA 80 m — electrical & automation", vessel: "M/Y OCEANIA", vessel_id: 41, yard: "Heesen Yachts, Oss", customer: "OCEANIA YACHTING LTD", branch: "GR", status: "active", pm: "Nikos Polykandriotis", pm_id: 2, mine: true,
+      { id: 154, code: "PRJ.000154", name: "M/Y OCEANIA 80 m — electrical & automation", vessel: "M/Y OCEANIA", vessel_id: 41, yard: "North Sea Yachts, NL", customer: "OCEANIA YACHTING LTD", branch: "GR", status: "active", pm: "Alex Demo", pm_id: 2, mine: true,
         subprojects: [
           sp(1541, "Y.01", "Alarm & monitoring system", "ALARM AND MONITORING SYSTEM", [100, 100, 60, 0, 0, 0, 0], { fed: ["production"], team: [7, 9, 11], issues_open: 2, deadline: d(45) }),
           sp(1542, "Y.01.1", "AMS — bridge consoles", "ALARM AND MONITORING SYSTEM", [100, 75, 25, 0, 0, 0, 0], { team: [9, 11], deadline: d(60) }),
@@ -110,7 +114,7 @@ window.API = (() => {
           sp(1545, "Y.03", "Shore connection", "SHORE CONNECTION", [75, 25, 0, -1, 0, 0, 0], { team: [7], deadline: d(90) }),
           sp(1546, "Y.04", "Navigation lights", "NAVIGATION LIGHTS", [100, 100, -1, -1, 100, 100, 100], { team: [10], status: "completed" }),
         ] },
-      { id: 161, code: "PRJ.000161", name: "M/Y ALTAIR refit — navigation & bridge", vessel: "M/Y ALTAIR", vessel_id: 42, yard: "Perini Navi, La Spezia", customer: "ALTAIR MARINE SRL", branch: "GIT", status: "active", pm: "Nikos Polykandriotis", pm_id: 2, mine: true,
+      { id: 161, code: "PRJ.000161", name: "M/Y ALTAIR refit — navigation & bridge", vessel: "M/Y ALTAIR", vessel_id: 42, yard: "Riviera Yachts, IT", customer: "ALTAIR MARINE SRL", branch: "GIT", status: "active", pm: "Alex Demo", pm_id: 2, mine: true,
         subprojects: [
           sp(1611, "Y.01", "NAVCOM renewal", "RADAR", [100, 50, -1, -1, 0, 0, 0], { team: [9, 10], issues_open: 1, deadline: d(30) }),
           sp(1612, "Y.02", "Bridge dimmers", "LIGHTING DISTRIBUTION SYSTEM", [100, 100, 100, -1, 100, 50, 0], { team: [9] }),
@@ -124,14 +128,14 @@ window.API = (() => {
         ] },
     ],
     drawings: [
-      { id: 901, project_id: 154, subproject_id: 1541, kind: "equipment", seq_no: 1, title: "AMS cabinet GA — ER control room", system: "AMS", location: "ER control room", location_status: "confirmed", responsible: "Heesen — J. de Vries", request_sent: d(-30), expected_at: d(-9), received_at: null, status: "pending", overdue_days: 9, remarks: "", file_id: null },
-      { id: 902, project_id: 154, subproject_id: 1543, kind: "principal", seq_no: 2, title: "MSB single line diagram R2", system: "MSB", location: "Main switchboard room", location_status: "confirmed", responsible: "Heesen — J. de Vries", request_sent: d(-21), expected_at: d(-3), received_at: null, status: "pending", overdue_days: 3, remarks: "Reminder sent", file_id: null },
-      { id: 903, project_id: 154, subproject_id: 1545, kind: "equipment", seq_no: 3, title: "Shore converter foundation", system: "SHC", location: "Aft technical space", location_status: "tbc", responsible: "Heesen — P. Smit", request_sent: d(-10), expected_at: d(12), received_at: null, status: "pending", overdue_days: 0, remarks: "", file_id: null },
-      { id: 904, project_id: 154, subproject_id: 1542, kind: "equipment", seq_no: 4, title: "Bridge console cut-outs", system: "AMS", location: "Wheelhouse", location_status: "confirmed", responsible: "Heesen — J. de Vries", request_sent: d(-40), expected_at: d(-20), received_at: d(-18), status: "received", overdue_days: 0, remarks: "", file_id: 777 },
-      { id: 905, project_id: 154, subproject_id: 1546, kind: "equipment", seq_no: 5, title: "Navigation light positions", system: "NAVL", location: "Mast", location_status: "confirmed", responsible: "Heesen — P. Smit", request_sent: d(-90), expected_at: d(-70), received_at: d(-72), status: "received", overdue_days: 0, remarks: "", file_id: 778 },
-      { id: 906, project_id: 161, subproject_id: 1611, kind: "equipment", seq_no: 1, title: "Radar pedestal arrangement", system: "RADAR", location: "Mast platform", location_status: "confirmed", responsible: "Perini — L. Bianchi", request_sent: d(-14), expected_at: d(7), received_at: null, status: "pending", overdue_days: 0, remarks: "", file_id: null },
-      { id: 907, project_id: 161, subproject_id: 1612, kind: "principal", seq_no: 2, title: "Bridge lighting circuit list", system: "LDS", location: "Wheelhouse", location_status: "confirmed", responsible: "Perini — L. Bianchi", request_sent: d(-50), expected_at: d(-30), received_at: null, status: "not_required", overdue_days: 0, remarks: "Existing drawing reused", file_id: null },
-      { id: 908, project_id: 161, subproject_id: 1613, kind: "equipment", seq_no: 3, title: "ECDIS console interface list", system: "ECDIS", location: "Wheelhouse", location_status: "tbc", responsible: "Perini — L. Bianchi", request_sent: d(-5), expected_at: d(20), received_at: null, status: "pending", overdue_days: 0, remarks: "", file_id: null },
+      { id: 901, project_id: 154, subproject_id: 1541, kind: "equipment", seq_no: 1, title: "AMS cabinet GA — ER control room", system: "AMS", location: "ER control room", location_status: "confirmed", responsible: "North Sea Yachts —J. de Vries", request_sent: d(-30), expected_at: d(-9), received_at: null, status: "pending", overdue_days: 9, remarks: "", file_id: null },
+      { id: 902, project_id: 154, subproject_id: 1543, kind: "principal", seq_no: 2, title: "MSB single line diagram R2", system: "MSB", location: "Main switchboard room", location_status: "confirmed", responsible: "North Sea Yachts —J. de Vries", request_sent: d(-21), expected_at: d(-3), received_at: null, status: "pending", overdue_days: 3, remarks: "Reminder sent", file_id: null },
+      { id: 903, project_id: 154, subproject_id: 1545, kind: "equipment", seq_no: 3, title: "Shore converter foundation", system: "SHC", location: "Aft technical space", location_status: "tbc", responsible: "North Sea Yachts —P. Smit", request_sent: d(-10), expected_at: d(12), received_at: null, status: "pending", overdue_days: 0, remarks: "", file_id: null },
+      { id: 904, project_id: 154, subproject_id: 1542, kind: "equipment", seq_no: 4, title: "Bridge console cut-outs", system: "AMS", location: "Wheelhouse", location_status: "confirmed", responsible: "North Sea Yachts —J. de Vries", request_sent: d(-40), expected_at: d(-20), received_at: d(-18), status: "received", overdue_days: 0, remarks: "", file_id: 777 },
+      { id: 905, project_id: 154, subproject_id: 1546, kind: "equipment", seq_no: 5, title: "Navigation light positions", system: "NAVL", location: "Mast", location_status: "confirmed", responsible: "North Sea Yachts —P. Smit", request_sent: d(-90), expected_at: d(-70), received_at: d(-72), status: "received", overdue_days: 0, remarks: "", file_id: 778 },
+      { id: 906, project_id: 161, subproject_id: 1611, kind: "equipment", seq_no: 1, title: "Radar pedestal arrangement", system: "RADAR", location: "Mast platform", location_status: "confirmed", responsible: "Riviera Yachts —L. Bianchi", request_sent: d(-14), expected_at: d(7), received_at: null, status: "pending", overdue_days: 0, remarks: "", file_id: null },
+      { id: 907, project_id: 161, subproject_id: 1612, kind: "principal", seq_no: 2, title: "Bridge lighting circuit list", system: "LDS", location: "Wheelhouse", location_status: "confirmed", responsible: "Riviera Yachts —L. Bianchi", request_sent: d(-50), expected_at: d(-30), received_at: null, status: "not_required", overdue_days: 0, remarks: "Existing drawing reused", file_id: null },
+      { id: 908, project_id: 161, subproject_id: 1613, kind: "equipment", seq_no: 3, title: "ECDIS console interface list", system: "ECDIS", location: "Wheelhouse", location_status: "tbc", responsible: "Riviera Yachts —L. Bianchi", request_sent: d(-5), expected_at: d(20), received_at: null, status: "pending", overdue_days: 0, remarks: "", file_id: null },
     ],
     submittals: [
       { id: 501, kind: "owner", project_id: 154, subproject_id: 1541, doc_no: "OA-154-007", title: "AMS alarm list R1", revision: "R1", society: null, class_ref: null, submitted_at: d(-12), due_at: d(-2), decided_at: null, status: "submitted", open: true, overdue_days: 2, comments: "", file_id: 801 },
@@ -158,12 +162,12 @@ window.API = (() => {
     notes: [
       { id: "N201", date: d(-2), iso_week: "", project_id: 154, subproject_id: 1543, author: "Dimitris Papadakis", visibility: "external", text: "Busbar torque check completed on all sections; mimic panel wiring 80 %.", photos: 3 },
       { id: "N202", date: d(-6), iso_week: "", project_id: 154, subproject_id: 1541, author: "Marco Rossi", visibility: "internal", text: "AMS I/O list frozen with the yard; waiting for the bilge sensor type confirmation.", photos: 0 },
-      { id: "N203", date: d(-9), iso_week: "", project_id: 161, subproject_id: 1611, author: "Elena Markou", visibility: "external", text: "Radar pedestal foundation inspected; cable route via mast agreed with Perini.", photos: 5 },
-      { id: "N204", date: d(-16), iso_week: "", project_id: 154, subproject_id: 1545, author: "Nikos Polykandriotis", visibility: "internal", text: "Shore converter supplier confirms FAT at factory not applicable — tested at installation.", photos: 0 },
+      { id: "N203", date: d(-9), iso_week: "", project_id: 161, subproject_id: 1611, author: "Elena Markou", visibility: "external", text: "Radar pedestal foundation inspected; cable route via mast agreed with the yard.", photos: 5 },
+      { id: "N204", date: d(-16), iso_week: "", project_id: 154, subproject_id: 1545, author: "Alex Demo", visibility: "internal", text: "Shore converter supplier confirms FAT at factory not applicable — tested at installation.", photos: 0 },
       { id: "N205", date: d(-30), iso_week: "", project_id: 154, subproject_id: 1542, author: "Oleksandr Bondarenko", visibility: "external", text: "Bridge console mock-up approved by the captain on board.", photos: 2 },
     ],
     issues: {
-      1541: [{ id: 71, title: "Bilge sensor type not confirmed", body: "Yard has not confirmed the float switch model for the bilge wells.", raised_on: d(-12), raised_by: "Marco Rossi", owner_side: "yard", assignee: "Nikos Polykandriotis", due_on: d(-2), priority: "high", status: "open" },
+      1541: [{ id: 71, title: "Bilge sensor type not confirmed", body: "Yard has not confirmed the float switch model for the bilge wells.", raised_on: d(-12), raised_by: "Marco Rossi", owner_side: "yard", assignee: "Alex Demo", due_on: d(-2), priority: "high", status: "open" },
         { id: 72, title: "AMS server rack ventilation", body: "Rack ventilation 2 × 80 mm fans — yard to confirm duct.", raised_on: d(-5), raised_by: "Dimitris Papadakis", owner_side: "gas", assignee: "Marco Rossi", due_on: d(10), priority: "normal", status: "in_progress" }],
       1543: [{ id: 73, title: "Generator breaker interlock logic", body: "Owner asks for manual override of the shore/generator interlock.", raised_on: d(-8), raised_by: "Owner — ETO", owner_side: "owner", assignee: "Giorgos Antoniou", due_on: d(5), priority: "normal", status: "open" }],
       1611: [{ id: 74, title: "Radar cable length exceeds 60 m", body: "Pedestal to display route is 68 m — check repeater.", raised_on: d(-3), raised_by: "Elena Markou", owner_side: "gas", assignee: "Elena Markou", due_on: d(7), priority: "high", status: "open" }],
@@ -199,13 +203,13 @@ window.API = (() => {
     return { from: d(0), to: d(28), days, rows: people.map((p) => { const cells = {}; (plan[p.person_id] || []).forEach(([a, b, code, status]) => { for (let i = a; i <= b; i++) cells[d(i)] = { code, status }; }); return { person_id: p.person_id, user_id: p.user_id, name: p.name, cells }; }) };
   }
   const peopleByUsers = (ids) => STAFF.filter((s) => ids.includes(s.id)).map((s) => ({ person_id: s.person_id, user_id: s.id, name: s.name }));
-  M.hr = { year: new Date().getFullYear(), years: [new Date().getFullYear() - 1, new Date().getFullYear()], person: { id: 1, name: "Nikos Polykandriotis", department: "Management", hire_date: "2005-01-10", service: "21 y 9 m", contractor: false, jurisdiction: "GR" }, manager: null, hours_per_day: 8,
+  M.hr = { year: new Date().getFullYear(), years: [new Date().getFullYear() - 1, new Date().getFullYear()], person: { id: 1, name: "Alex Demo", department: "Management", hire_date: "2005-01-10", service: "21 y 9 m", contractor: false, jurisdiction: "GR" }, manager: null, hours_per_day: 8,
     balances: [{ type_id: 1, code: "ANN", name: "Annual leave", unit: "day", consumes_annual: false, entitled: 26, taken: 12, pending: 0, available: 14, via_annual: false }, { type_id: 2, code: "SICK", name: "Sick leave", unit: "day", consumes_annual: false, entitled: 26, taken: 0, pending: 0, available: 26, via_annual: false }, { type_id: 12, code: "EARLY", name: "Early leave / late arrival", unit: "hour", consumes_annual: true, entitled: null, taken: 0, pending: 0, available: 112, via_annual: true }],
     types: [{ id: 1, code: "ANN", name: "Annual leave", unit: "day", needs_reason: false, needs_doc: false, hr_only: false }, { id: 2, code: "SICK", name: "Sick leave", unit: "day", needs_reason: false, needs_doc: true, hr_only: true }, { id: 5, code: "UNP", name: "Unpaid leave", unit: "day", needs_reason: true, needs_doc: false, hr_only: false }, { id: 12, code: "EARLY", name: "Early leave / late arrival", unit: "hour", needs_reason: true, needs_doc: false, hr_only: false }],
     periods: [{ id: 1, name: "Christmas 2026", type_id: 1, code: "ANN", type: "Annual leave", date_from: "2026-12-24", date_to: "2027-01-04", note: "Company closure — join with your dates", mandatory: false, n_approved: 3, max_people: null, full: false, joined: null }],
     requests: [{ id: 31, type_id: 1, code: "ANN", type: "Annual leave", unit: "day", date_from: d(-50), date_to: d(-41), time_from: null, time_to: null, hours: null, days: 8, reason: "", status: "approved", counted: true, period_id: null, doc: null, manager: null, hr: { at: d(-55), note: "" }, cancellable: false }],
     trainings: { open: [{ id: 1, kind: "external", title: "Lloyd's Register — electrical rules update", provider: "LR Piraeus", location: "Piraeus", date_from: "2026-11-27", date_to: "2026-11-27", hours: 8, description: "Rules for electrical installations 2026", deadline: "2026-11-15", certificate: true, n_in: 4, capacity: 12, mine: null, full: false, late: false }], mine: [] },
-    evaluations: [], messages: [{ id: 1, from_hr: true, from: "HR — Margarita Polykandrioti", body: "Please confirm the Christmas closure dates for your team by 15 November.", at: d(-2) + " 09:22", seen: false }], unread: 1 };
+    evaluations: [], messages: [{ id: 1, from_hr: true, from: "HR — Elena Markou", body: "Please confirm the Christmas closure dates for your team by 15 November.", at: d(-2) + " 09:22", seen: false }], unread: 1 };
 
   function mock(method, path, body) {
     if (!navigator.onLine) { const e = new Error("offline"); e.offline = true; throw e; }   // the demo behaves like the network: nothing reaches the mock portal while offline

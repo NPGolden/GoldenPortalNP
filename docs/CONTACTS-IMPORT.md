@@ -3842,3 +3842,14 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - `views/admin_log.php`: outcome filter gains `pw_reset`.
 - Language keys: 14 (`pwc.bulk_*`, `ll.o_pw_reset`) in en, el, it, bg, uk — 12 602 each.
 - Cybersecurity: the action cannot be used by anybody below management and never on the own account; the password is never stored, logged or shown in clear and is not kept in the browser (only the ids of the selection are); the accounts cannot work until they have chosen an own password (R97-167), and their open sessions end at once. Remaining exposure: a starting password known to several people is valid for each account until its first sign-in, and passkey sign-in in the apps is not stopped by the flag. Proposed next (no effect on speed): a validity period for a starting password (the account is blocked when it was not replaced within N days); refuse a starting password that is on the leaked-password list; an option to generate a different starting password per account and hand them over as a list.
+
+## §453 Demonstration accounts — invented data in the apps, portal closed (GAS-CP-R97-169, v1.210.0)
+
+- Migration `install/migrate_cp_r97_169_demo_account.sql` (check `r99c`): `customer_users.is_demo TINYINT(1) DEFAULT 0`. Set per staff account in Administration › Users (`au_update`; the change raises `session_epoch`, so open sessions end).
+- Portal: `attempt_login()` and `require_login()` refuse a demonstration account outside the API (`demo.web`).
+- API (`api/v1/index.php`): for a demonstration account in the staff apps `GET /me` and the sign-in answer carry `demo: true`; every other route answers 403 `demo` — except in Golden HR, where `PortalHRDemo::handle()` (`api/v1/lib/portal_hr_demo.php`) answers all routes of the app from an invented company in the shapes of `PortalHR` / `PortalHRMore` (inbox, history, people, calendar, balances, messages, today, recruiting with a generated sample CV, job descriptions, HR year, expiring documents, equipment, sync). Decisions are kept per account in `storage/demo/hr_<id>.json` and reset at sign-in; no database read or write, no e-mail.
+- Service 0.7.2 and Golden PM 1.0.13: on `user.demo` the app drops the real session and switches to its built-in demonstration data set (`gas.demo` / `gpm.demo`), stays so across restarts and returns to normal at sign-out. The built-in sets no longer carry real names (user, yards, vessel).
+- The customer app is not affected by the flag.
+- Language keys: 4 `demo.*` in en, el, it, bg, uk.
+- Cybersecurity: before this change the accounts given to the app stores read real personnel, project and customer data. Now the data is unreachable for them on the server (not only hidden in the app), and the portal is closed to them. Proposed: an expiry date on demonstration accounts, and a mark in the sign-in log for demonstration sign-ins.
+

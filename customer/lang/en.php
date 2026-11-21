@@ -12786,4 +12786,8 @@ Best regards,
 'pwc.bulk_none' => 'Select at least one account (your own account cannot be included).',
 'pwc.bulk_max' => 'At most {n} accounts at a time.',
 'pwc.bulk_done' => 'Starting password set for {n} accounts — each must choose its own password at the next sign-in.',
+'demo.web' => 'This is a demonstration account for the mobile apps. It cannot open the portal.',
+'demo.au_flag' => 'Demonstration account (apps show invented data)',
+'demo.au_hint' => 'For the store review, training and presentations: Golden HR, Golden PM and Service show an invented company to this account; it reads nothing of the real data and cannot open the portal.',
+'demo.au_on' => 'demonstration',
 ];

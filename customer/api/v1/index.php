@@ -13,7 +13,8 @@ try {
     $min = api_setting('api_min_version_' . $app, API_APPS[$app]); $ver = $_SERVER['HTTP_X_APP_VERSION'] ?? '0.0.0';
     if (version_compare($ver, $min, '<')) Response::error(426, 'Update required', ['min_version' => $min]);
     /** GET /me: the SE shape, plus the PM fields for app pm (§1). */
-    $me = function (array $u) use ($isPm, $isCu, $isHr): array { if ($isCu) return PortalCustomer::me($u); if ($isHr) return PortalHR::me($u); $m = Portal::me($u); return $isPm ? array_replace($m, PortalPM::meExtra($u)) : $m; };
+    $me = function (array $u) use ($isPm, $isCu, $isHr): array { if (!$isCu && !empty($u['is_demo'])) return $isHr ? PortalHRDemo::me($u) : ['id' => (int)$u['id'], 'name' => (string)$u['full_name'], 'email' => (string)$u['email'], 'role' => (string)$u['role'], 'demo' => true];   // R97-169: no real data for a demonstration account
+        if ($isCu) return PortalCustomer::me($u); if ($isHr) return PortalHR::me($u); $m = Portal::me($u); return $isPm ? array_replace($m, PortalPM::meExtra($u)) : $m; };
     if ($path === '/auth/login' && $method === 'POST') { RateLimit::check('auth', RateLimit::ip(), 10);
         $u = Portal::login(trim((string)($body['email'] ?? '')), (string)($body['password'] ?? ''), isset($body['totp']) ? (string)$body['totp'] : null);
         if (function_exists('pwc_must') && pwc_must($u)) {   // R97-167: the first sign-in sets the account's own password — no token before that
@@ -21,6 +22,7 @@ try {
             if (($pe = pwc_error($np, $u)) !== null) Response::error(422, $pe, ['password_change' => true]);
             pwc_store((int)$u['id'], $np); if (function_exists('login_log')) login_log((int)$u['id'], (string)$u['email'], 'pw_changed'); }
         $dev = (array)($body['device'] ?? []); $u = api_act_as((int)$u['id']); if ($isPm) PortalPM::allowed($u); if ($isCu) PortalCustomer::allowed($u); if ($isHr) PortalHR::allowed($u);   // §0: who may sign in to each app (before the device is enrolled)
+        if ($isHr && !empty($u['is_demo'])) PortalHRDemo::reset($u);   // R97-169: the demonstration starts again at every sign-in
         $did = Jwt::registerDevice((int)$u['id'], $dev); $u['device_id'] = $did;
         Response::json(['access_token' => Jwt::issue($u, $did), 'refresh_token' => Jwt::issueRefresh($did, $dev['platform'] ?? 'web'), 'user' => $me($u)]); }
     /* R71-001: passkey sign-in — challenge kept server-side (5 min, single use); the assertion is verified in app/pk.php; a verified passkey satisfies the authenticator step */
@@ -42,6 +44,11 @@ try {
     if (str_starts_with($path, '/cu/') && !$isCu) Response::error(403, 'Customer app only');
     if (str_starts_with($path, '/hr/app/') && !$isHr) Response::error(403, 'Golden HR app only');
     if ($isHr) { PortalHR::allowed($u); if (!str_starts_with($path, '/hr/app/') && !str_starts_with($path, '/requisitions') && $path !== '/items' && !in_array($path, ['/me', '/auth/logout', '/devices/push-token', '/me/passkeys', '/me/passkeys/options', '/sync'], true) && !preg_match('#^/me/passkeys/\d+$#', $path)) Response::error(403, 'Not available in Golden HR'); }   // R82-003: part ordering is open to every staff app   // R74-001: the HR app sees only its own routes
+    if (!$isCu && !empty($u['is_demo'])) {   // R97-169: demonstration account — Golden HR is answered from the invented company; Service and PM show the data set built into the app and get nothing from the portal
+        if ($isHr) PortalHRDemo::handle($method, $path, $body, $u);
+        if ($path === '/me' && $method === 'GET') Response::json($me($u));
+        if ($path !== '/auth/logout') Response::error(403, 'Demonstration account: the portal data is not available', ['demo' => true]);
+    }
     if ($isCu) { PortalCustomer::allowed($u); if (!str_starts_with($path, '/cu/') && !in_array($path, ['/me', '/auth/logout', '/devices/push-token', '/me/passkeys', '/me/passkeys/options'], true) && !preg_match('#^/me/passkeys/\d+$#', $path)) Response::error(403, 'Not available in the customer app'); }   // CS-03: staff routes never serve a customer token
     if ($isCu && !str_starts_with($path, '/me/passkeys')) { $u['device_id'] = (int)$u['device_id']; require __DIR__ . '/endpoints/customer.php'; customer_routes($u, $method, $path, $body); }
     if ($isPm) PortalPM::allowed($u);                                                                                            // rights may change while a token lives
