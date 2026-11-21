@@ -20,7 +20,7 @@ on:
       app:
         description: 'Which app'
         type: choice
-        options: [engineer, pm, customer, employee]
+        options: [engineer, pm, customer, hr, employee]
         default: engineer
       track:
         description: 'Play Console track to upload to (none = artifact only)'
