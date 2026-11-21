@@ -78,7 +78,8 @@ textarea { min-height: 84px; resize: vertical; }
 .tabs { position: fixed; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid var(--line); display: flex; padding-bottom: var(--sab); z-index: 10; }
 .tabs a { flex: 1; text-align: center; text-decoration: none; color: var(--grey); font-size: 10px; padding: 8px 0 6px; }
 .tabs a i { display: block; width: 20px; height: 14px; border-radius: 3px; background: var(--grey); margin: 0 auto 4px; }
-.tabs a.on { color: var(--navy); font-weight: 700; } .tabs a.on i { background: var(--navy); }
+.tabs a svg { display: block; width: 22px; height: 22px; margin: 0 auto 3px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.tabs a.on { color: var(--navy); font-weight: 700; } .tabs a.on svg { stroke: var(--gold, #C9A227); } .tabs a.on i { background: var(--navy); }
 
 .login { padding-top: 24px; } .login img { width: 200px; display: block; margin: 10px auto 24px; }
 .lang { display: flex; gap: 6px; } .lang button { flex: 1; border: 0; background: var(--light); color: var(--navy); font-weight: 700; padding: 8px 0; border-radius: 14px; font: inherit; font-size: 13px; }

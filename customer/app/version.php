@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.210.4';
+const CP_VERSION = '1.210.5';
 const CP_BUILD   = '2026-11-21';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-174', 'version' => '1.210.5', 'date' => '2026-11-21', 'title' => 'Service app 0.7.4: the bottom menu shows real icons (Home, Tickets, Reports, Hours, More) instead of grey blocks', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-173', 'version' => '1.210.4', 'date' => '2026-11-21', 'title' => 'App icons: Service, PM and Customer carry their name on a gold tab like Golden HR, so the four Golden A/S apps are told apart on the phone (Service 0.7.3, PM 1.0.15, Customer 1.0.12)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-172', 'version' => '1.210.3', 'date' => '2026-11-21', 'title' => 'Customer app 1.0.11: demonstration accounts for customer users — the app shows an invented fleet with reports to sign, offers, tickets and documents, and nothing of a real customer', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-171', 'version' => '1.210.2', 'date' => '2026-11-21', 'title' => 'Customer app 1.0.10: a photo taken for a ticket no longer stops the app on iOS — system picker (camera, photo library, files), large photos reduced safely, and the ticket being written is kept on the phone until it is sent', 'db' => null, 'check' => null],

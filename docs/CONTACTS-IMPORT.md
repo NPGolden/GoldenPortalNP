@@ -3883,3 +3883,9 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Client versions raised so the service workers drop the cached icons: Service 0.7.3, PM 1.0.15, Customer 1.0.12.
 - Native apps: the icon is part of the binary — new builds by `build-ios.yml` / `build-android.yml`; the Play store listing icon (512 px) is changed in the Play Console.
 - Cybersecurity: images only, no code path changed.
+
+## §458 Service app 0.7.4 — icons in the bottom menu (GAS-CP-R97-174, v1.210.5)
+
+- `customer/mobile/index.html`: the empty `<i>` of each tab replaced by an inline SVG (24 px view box, drawn with `currentColor`); `css/app.css`: `.tabs a svg`, gold stroke on the open tab. No script, no external file (CSP unchanged).
+- `?v=` of the page assets brought to the client version (Service 0.7.4, PM 1.0.15) — they had stayed one version behind in §457, so a browser could keep the older script.
+- Cybersecurity: markup and style only.
