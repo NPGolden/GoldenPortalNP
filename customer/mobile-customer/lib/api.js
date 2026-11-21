@@ -2,7 +2,7 @@
    Access JWT 15 min in sessionStorage; rotating refresh token in localStorage (Keychain / Keystore in the Capacitor build).
    Mock mode (?mock=1 or localStorage gcu.mock) serves mock/data.js in the shapes of the live contract — demo and UI tests only. */
 window.Api = (function () {
-  const APP_ID = "customer", APP_VERSION = "1.0.9";
+  const APP_ID = "customer", APP_VERSION = "1.0.10";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false; try { MOCK = localStorage.getItem("gcu.mock") === "1" || /[?&]mock=1/.test(location.search); if (/[?&]mock=1/.test(location.search)) localStorage.setItem("gcu.mock", "1"); } catch (e) {}
   const cfg = { base: BASE, get mock() { return MOCK; } };
@@ -70,7 +70,7 @@ window.Api = (function () {
     else { const pk = o.options; pk.challenge = pkB64.dec(pk.challenge); pk.user.id = pkB64.dec(pk.user.id); pk.excludeCredentials = (pk.excludeCredentials || []).map((c) => ({ type: c.type, id: pkB64.dec(c.id) })); cred = pkToJSON(await navigator.credentials.create({ publicKey: pk })); }
     return call("POST", "/me/passkeys", { challenge_id: o.challenge_id, credential: cred, name });
   }
-  async function logoutLocal() { setAccess(null); me = null; await setRefresh(null); await Store.clear(); if (MOCK) Mock.signOut(); }
+  async function logoutLocal() { setAccess(null); me = null; await setRefresh(null); await Store.clear(); try { localStorage.removeItem("gas.cu.tkdraft"); } catch (e) {} if (MOCK) Mock.signOut(); }
   async function logout() { try { await call("POST", "/auth/logout", {}); } catch (e) {} await logoutLocal(); }
   async function cached(path) {
     const key = "GET " + path;

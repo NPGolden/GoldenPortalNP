@@ -43,16 +43,28 @@ window.Native = (function () {
     try { const perm = await P().PushNotifications.requestPermissions(); if (perm.receive !== "granted") return null; await P().PushNotifications.register(); } catch (e) {}
     return null; // token arrives through the 'registration' listener in native-bridge.js → Api.call('POST','/push/register')
   }
-  async function pickPhoto() {
-    if (isNative() && P().Camera) { try { const p = await P().Camera.getPhoto({ quality: 80, width: 1600, resultType: "uri", source: "PROMPT" }); const b = await (await fetch(p.webPath)).blob(); return compress(b); } catch (e) { return null; } }
-    return new Promise(res => { const i = document.createElement("input"); i.type = "file"; i.accept = "image/*"; i.capture = "environment"; i.onchange = async () => res(i.files[0] ? await compress(i.files[0]) : null); i.click(); });
+  /* R97-171: photo and file are picked with the system picker of the web view (camera · photo library · files), as in the Service app.
+     The Camera plug-in is no longer used here: on iOS the app stopped when the photo was confirmed and the ticket was lost.
+     The input stays in the page until it answers — iOS drops the answer of an input that is not in the document. */
+  function pickWith(accept, capture) {
+    return new Promise(res => { const i = document.createElement("input"); i.type = "file"; if (accept) i.accept = accept; if (capture) i.capture = capture;
+      i.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0"; document.body.appendChild(i); let done = false;
+      const end = (f) => { if (done) return; done = true; setTimeout(() => i.remove(), 0); res(f || null); };
+      i.onchange = () => end(i.files && i.files[0]); i.addEventListener("cancel", () => end(null)); i.click(); });
   }
-  function pickFile() { return new Promise(res => { const i = document.createElement("input"); i.type = "file"; i.onchange = () => res(i.files[0] ? { blob: i.files[0], name: i.files[0].name } : null); i.click(); }); }
+  async function pickPhoto() { const f = await pickWith("image/*", ""); /* no capture attribute: iOS offers Take Photo · Photo Library · Choose File */ if (!f) return null; try { return await compress(f); } catch (e) { return { blob: f, name: f.name || "photo.jpg" }; } }
+  async function pickFile() { const f = await pickWith("", ""); return f ? { blob: f, name: f.name } : null; }
   // Compress ≤1600 px long side, JPEG q0.8; re-encoding through canvas strips EXIF (location) on the device.
-  function compress(file) {
+  // The picture is decoded already reduced where the browser can (createImageBitmap), so a 48-megapixel photo does not exhaust the memory of the web view.
+  async function compress(file) {
+    const MAX = 1600, out = (c) => new Promise(r => c.toBlob(b => r(b ? { blob: b, name: "photo-" + Date.now() + ".jpg" } : { blob: file, name: file.name || "photo.jpg" }), "image/jpeg", 0.8));
+    if (window.createImageBitmap) { try {
+      const bm = await createImageBitmap(file, { resizeWidth: MAX, resizeQuality: "medium" }); let w = bm.width, h = bm.height; if (h > MAX) { w = Math.round(w * MAX / h); h = MAX; }
+      const c = document.createElement("canvas"); c.width = w; c.height = h; c.getContext("2d").drawImage(bm, 0, 0, w, h); if (bm.close) bm.close(); return await out(c);
+    } catch (e) {} }
     return new Promise(res => { const img = new Image(); const url = URL.createObjectURL(file);
-      img.onload = () => { const s = Math.min(1, 1600 / Math.max(img.width, img.height)); const c = document.createElement("canvas"); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s); c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); c.toBlob(b => { URL.revokeObjectURL(url); res({ blob: b, name: "photo-" + Date.now() + ".jpg" }); }, "image/jpeg", 0.8); };
-      img.onerror = () => res({ blob: file, name: file.name || "photo.jpg" }); img.src = url; });
+      img.onload = () => { const s = Math.min(1, MAX / Math.max(img.width, img.height)); const c = document.createElement("canvas"); c.width = Math.round(img.width * s); c.height = Math.round(img.height * s); c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url); out(c).then(res); };
+      img.onerror = () => { URL.revokeObjectURL(url); res({ blob: file, name: file.name || "photo.jpg" }); }; img.src = url; });
   }
   function onResume(fn) { if (isNative() && P().App) { P().App.addListener("resume", fn); } document.addEventListener("visibilitychange", () => { if (!document.hidden) fn(); }); }
   return { isNative, deviceId, deviceInfo, secureGet, secureSet, secureDel, biometricAvailable, biometricVerify, pushRegister, pickPhoto, pickFile, onResume };

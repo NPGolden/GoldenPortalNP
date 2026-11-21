@@ -3859,3 +3859,11 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Also in the repository: `mobile-native/well-known/apple-app-site-association` with the four bundle ids and the workflow `wellknown.yml` that uploads it to `public_html/.well-known/` with the deploy account. Without the id of an app iOS refuses passkeys and the Face ID check of its web view (Golden HR showed "not available on this device").
 - Cybersecurity: no change for real accounts; the demonstration account still reads nothing from the portal.
 
+## §455 Customer app 1.0.10 — photo on a ticket stopped the app on iOS (GAS-CP-R97-171, v1.210.2)
+
+- Report: on iOS, New ticket › photo taken › confirmed → the app stopped and the ticket was never created.
+- `customer/mobile-customer/lib/native.js`: `pickPhoto()` / `pickFile()` use the file input of the web view through `pickWith()` (input kept in the document until it answers, `cancel` handled); the Capacitor Camera plug-in is no longer called (the Service app has always used the system picker). `compress()` decodes the picture already reduced with `createImageBitmap(…, {resizeWidth: 1600})` and falls back to the canvas path — a 48-megapixel photo no longer needs its full bitmap in the memory of the web view.
+- `customer/mobile-customer/screens/tickets.js`: draft of the new ticket in `localStorage` (`gas.cu.tkdraft`, text fields only, 6 hours), restored when the form opens, removed on send and on sign-out (`logoutLocal()`); 20 MB limit also on files of a new ticket.
+- Tested in a browser with the demo data of the app: 12-megapixel photo attached, page reloaded, draft restored, ticket created. Not reproduced on an iPhone.
+- Cybersecurity: the draft holds only what the user typed, on the phone, and is removed at sign-out. Finding: the sign-in screen of the demo mode of the customer app (`?mock=1`) prints demo credentials that are readable in the public app code — the real review account must not use the same password.
+

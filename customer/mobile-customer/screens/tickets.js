@@ -41,9 +41,13 @@ window.Tickets = (function () {
       <label class="field"><span data-i18n="tk.subject"></span><input name="subject" maxlength="160" required></label><label class="field"><span data-i18n="tk.body"></span><textarea name="body" maxlength="8000" required></textarea></label><div class="thumbs" id="thumbs"></div><div class="row" style="margin-bottom:10px"><button type="button" class="iconbtn" id="tk-photo">&#x1F4F7;</button><button type="button" class="iconbtn" id="tk-file">&#x1F4CE;</button></div><button class="btn gold" type="submit" id="tk-create">${esc(t("tk.create"))}</button></form>`, t("tab.tickets"));
     I18N.apply($("#view"));
     const files = []; const drawThumbs = () => { $("#thumbs").innerHTML = files.map(f => /image/.test(f.blob.type) ? `<img src="${URL.createObjectURL(f.blob)}" alt="">` : `<span class="pill grey">${esc(f.name)}</span>`).join(""); };
-    $("#tk-photo").onclick = async () => { const f = await Native.pickPhoto(); if (f) { files.push(f); drawThumbs(); } };
-    $("#tk-file").onclick = async () => { const f = await Native.pickFile(); if (f) { files.push(f); drawThumbs(); } };
-    $("#f-tk").onsubmit = async e => { e.preventDefault(); const f = e.target; UI.busy($("#tk-create"), true); try { const x = await Api.upload("/cu/tickets", { vessel_id: f.vessel_id.value, category: f.category.value, priority: f.priority.value, subject: f.subject.value.trim(), body: f.body.value.trim() }, files); UI.toast(t("tk.created")); App.go("#/tickets/" + x.id); } catch (ex) { UI.toast(UI.errMsg(ex)); UI.busy($("#tk-create"), false); } };
+    /* R97-171: what is typed is kept on the phone until the ticket is sent, so nothing is lost if iOS restarts the app while the camera is open */
+    const DK = "gas.cu.tkdraft", ff = $("#f-tk"), keep = () => { try { localStorage.setItem(DK, JSON.stringify({ at: Date.now(), vessel_id: ff.vessel_id.value, category: ff.category.value, priority: ff.priority.value, subject: ff.subject.value, body: ff.body.value })); } catch (e) {} };
+    try { const d = JSON.parse(localStorage.getItem(DK) || "null"); if (d && Date.now() - d.at < 6 * 3600 * 1000) ["vessel_id", "category", "priority", "subject", "body"].forEach(k => { if (d[k] != null && d[k] !== "" && ff[k]) { ff[k].value = d[k]; } }); } catch (e) {}
+    ff.addEventListener("input", keep); ff.addEventListener("change", keep);
+    $("#tk-photo").onclick = async () => { keep(); const f = await Native.pickPhoto(); if (f) { files.push(f); drawThumbs(); } };
+    $("#tk-file").onclick = async () => { keep(); const f = await Native.pickFile(); if (f) { if (f.blob.size > 20 * 1024 * 1024) return UI.toast("≤ 20 MB"); files.push(f); drawThumbs(); } };
+    $("#f-tk").onsubmit = async e => { e.preventDefault(); const f = e.target; UI.busy($("#tk-create"), true); try { const x = await Api.upload("/cu/tickets", { vessel_id: f.vessel_id.value, category: f.category.value, priority: f.priority.value, subject: f.subject.value.trim(), body: f.body.value.trim() }, files); try { localStorage.removeItem(DK); } catch (e) {} UI.toast(t("tk.created")); App.go("#/tickets/" + x.id); } catch (ex) { UI.toast(UI.errMsg(ex)); UI.busy($("#tk-create"), false); } };
   }
   return { list, thread, create };
 })();

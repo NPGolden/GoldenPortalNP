@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.210.1';
+const CP_VERSION = '1.210.2';
 const CP_BUILD   = '2026-11-20';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-171', 'version' => '1.210.2', 'date' => '2026-11-21', 'title' => 'Customer app 1.0.10: a photo taken for a ticket no longer stops the app on iOS — system picker (camera, photo library, files), large photos reduced safely, and the ticket being written is kept on the phone until it is sent', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-170', 'version' => '1.210.1', 'date' => '2026-11-21', 'title' => 'Golden PM 1.0.14: the demonstration data set no longer asks for an authenticator code on decisions', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-169', 'version' => '1.210.0', 'date' => '2026-11-21', 'title' => 'Demonstration accounts: an account marked "Demonstration account" sees an invented company in Golden HR, Golden PM and Service and nothing of the real data, and cannot open the portal — for the store review, training and presentations (Service 0.7.2, PM 1.0.13)', 'db' => 'install/migrate_cp_r97_169_demo_account.sql', 'check' => 'r99c'],
         ['ref' => 'GAS-CP-R97-168', 'version' => '1.209.0', 'date' => '2026-11-20', 'title' => 'Administration › Users: tick accounts in the list (the selection is kept from page to page) and give them all the same starting password in one step — each must choose its own password at the next sign-in and is signed out of the portal and the apps; written in the sign-in log as Password given by administrator', 'db' => 'install/migrate_cp_r97_168_pw_reset_outcome.sql', 'check' => 'r99b'],
