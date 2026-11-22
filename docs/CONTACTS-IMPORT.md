@@ -4125,3 +4125,12 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - `?p=admin_push`: card "Versions in the stores" (table, last asked, e-mail switch `sv_mail`, `sv_now`).
 - API bootstrap now loads `wl`, `pn`, `sv`: `nf_push()` called inside an API request reaches `pn_from_nf()`, and the planning hooks work from the apps.
 - Language keys +13 (13 108 per language).
+
+## §484 Community: title list, posts in several languages, editing (GAS-CP-R97-201, v1.227.0)
+
+- Migration `install/migrate_cp_r97_201_soc_lang.sql` (check `r99j`): `soc_posts.lang` (language the post was written in, NULL for older posts) and `soc_post_tr (post_id, lang, title, body)`. Without it the page works as before, with the title list but no language fields (`soc_tr_has()`).
+- `app/soc.php`: `soc_lang_from_post()` (a key of `LOCALES`, else the writer's language), `soc_tr_from_post()` (`tr[<lang>][title|body]`; unknown codes, the base language and versions without a title are dropped; 200 / 8000 characters), `soc_tr_save()`, `soc_tr_of()`, `soc_post_can_edit()` (writer, HR, administrators — the same rule as deleting), `soc_post_update()` (action `soc_post_edit`: title, text, language, other languages; kind, photo, video, poll untouched), `soc_notify_post()` (recipients grouped by `customer_users.locale`; one notification per person, same `ref_key`).
+- `soc_feed()` adds `tr`, `vers` (language → [title, text], in the order of `LOCALES`, older posts under the key `''`) and `show` (the reader's language when the post has it, else the base).
+- `views/community.php`: each post is `<details class="card soc-post" id="post<N>">`; the summary carries the title (one `<span data-soc-lang>` per language), writer, date, pills and counters; open at load when pinned, an open poll, or being edited. Script (nonce): `#post<N>` in the address opens that post (redirects after reacting, commenting, voting and notification links), `data-soc-all` opens / closes all, `data-soc-pick` switches the language inside one post. `?p=community&edit=<id>` turns the form into the editor.
+- `soc_post_edit` and `soc_post_delete` added to the action lists of the scoped roles (`HR_ACTIONS`, `PA_ACTIONS`, `EMP_ACTIONS`) — until now a scoped employee could not delete an own post.
+- Language keys +8 (13 116 per language). The mobile apps do not show Community.

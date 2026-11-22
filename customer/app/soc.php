@@ -87,6 +87,35 @@ function soc_video_html(?string $vid): string {
          . '<button type="button" class="btn btn--gold soc-yt-play">▶ ' . e(t('soc.yt_play')) . '</button><span style="color:#fff;font-size:12px;opacity:.85;text-align:center;padding:0 12px;">' . e(t('soc.yt_note')) . '</span>'
          . '<a href="https://www.youtube.com/watch?v=' . e($vid) . '" target="_blank" rel="noopener noreferrer" style="color:#E7C766;font-size:12px;">' . e(t('soc.yt_open')) . ' ↗</a></div>';
 }
+/* ---- R97-201: one post in several languages ---- */
+function soc_tr_has(): bool { static $h = null; if ($h === null) { try { $h = soc_has() && (bool) scalar("SHOW TABLES LIKE 'soc_post_tr'") && (bool) scalar("SHOW COLUMNS FROM soc_posts LIKE 'lang'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** The language the text of the form is written in: one of the portal languages, else the language of the writer. */
+function soc_lang_from_post(): string { $l = (string)($_POST['lang'] ?? ''); return locale_valid($l) ? $l : locale(); }
+/** The other languages sent with the form — tr[<lang>][title|body]. The language of the post itself and versions without a title are left out. */
+function soc_tr_from_post(string $base): array {
+    $out = []; foreach ((array)($_POST['tr'] ?? []) as $l => $v) { $l = (string)$l; if (!locale_valid($l) || $l === $base || !is_array($v)) continue;
+        $ti = mb_substr(trim((string)($v['title'] ?? '')), 0, 200); $bo = mb_substr(trim((string)($v['body'] ?? '')), 0, 8000); if ($ti === '') continue; $out[$l] = [$ti, $bo !== '' ? $bo : null]; }
+    return $out;
+}
+function soc_tr_save(int $id, array $tr): void { q('DELETE FROM soc_post_tr WHERE post_id = ?', [$id]); foreach ($tr as $l => $v) q('INSERT INTO soc_post_tr (post_id, lang, title, body) VALUES (?,?,?,?)', [$id, (string)$l, $v[0], $v[1]]); }
+/** [lang => [title, body]] of a post, without the language it was written in. */
+function soc_tr_of(int $id): array { $o = []; if (soc_tr_has()) foreach (all('SELECT lang, title, body FROM soc_post_tr WHERE post_id = ?', [$id]) as $r) if (locale_valid((string)$r['lang'])) $o[(string)$r['lang']] = [(string)$r['title'], $r['body'] !== null ? (string)$r['body'] : null]; return $o; }
+function soc_post_can_edit(array $p): bool { return (int)$p['user_id'] === soc_me() || is_cp_admin() || (function_exists('hr_can') && hr_can()); }
+/** The announcement of a post, to each person in the language of the portal they use when the post has it. */
+function soc_notify_post(int $id, string $icon, string $title, ?string $body, array $tr): void {
+    $ids = array_keys(soc_staff()); if (!$ids) return; $loc = [];
+    if ($tr) { try { foreach (all('SELECT id, locale FROM customer_users WHERE id IN (' . implode(',', array_map('intval', $ids)) . ')') as $r) $loc[(int)$r['id']] = (string)($r['locale'] ?? ''); } catch (Throwable $e) { $loc = []; } }
+    $by = []; foreach ($ids as $uid) { $l = $loc[$uid] ?? ''; $by[isset($tr[$l]) ? $l : ''][] = $uid; }
+    foreach ($by as $l => $to) soc_notify($to, 'soc:post', 'soc:post:' . $id, $icon . ($l === '' ? $title : $tr[$l][0]), $l === '' ? $body : $tr[$l][1], url('community') . '#post' . $id);
+}
+/** Title, text, language and the other languages of an existing post — its writer, HR and administrators. Kind, photo, video and poll stay as published. */
+function soc_post_update(int $id): void {
+    if (!soc_tr_has()) throw new RuntimeException(t('err.notfound')); $p = one('SELECT * FROM soc_posts WHERE id = ?', [$id]); if (!$p) throw new RuntimeException(t('err.notfound'));
+    if (!soc_post_can_edit($p)) throw new RuntimeException(t('err.noaccess'));
+    $title = mb_substr(trim((string)($_POST['title'] ?? '')), 0, 200); if ($title === '') throw new RuntimeException(t('soc.need_title'));
+    $body = mb_substr(trim((string)($_POST['body'] ?? '')), 0, 8000) ?: null; $lang = soc_lang_from_post();
+    q('UPDATE soc_posts SET title = ?, body = ?, lang = ? WHERE id = ?', [$title, $body, $lang, $id]); soc_tr_save($id, soc_tr_from_post($lang));
+}
 function soc_post_create(): int {
     if (!soc_has()) throw new RuntimeException(t('err.notfound')); $kind = in_array($_POST['kind'] ?? '', ['post', 'poll', 'photo', 'video'], true) ? $_POST['kind'] : 'post'; if ($kind === 'video' && !soc_video_has()) $kind = 'post';
     if (($kind !== 'photo' && $kind !== 'video') && !soc_can_post()) throw new RuntimeException(t('err.noaccess'));   // everybody may share a photo; posts and polls come from HR, managers, PMs and administrators
@@ -102,11 +131,12 @@ function soc_post_create(): int {
         $dir = cp_storage() . '/_soc'; if (!is_dir($dir)) @mkdir($dir, 0755, true); $stored = '_soc/' . date('Ymd') . '_' . bin2hex(random_bytes(6)) . '.' . $ext; if (!move_uploaded_file($f['tmp_name'], cp_storage() . '/' . $stored)) throw new RuntimeException(t('soc.need_photo')); }
     q('INSERT INTO soc_posts (user_id, kind, title, body, stored_name, mime_type, pinned_until, closes_at) VALUES (?,?,?,?,?,?,?,?)', [soc_me(), $kind, $title, $body, $stored, $mime, $pin, $closes]); $id = (int) db()->lastInsertId();
     if ($vid) q('UPDATE soc_posts SET video_id = ? WHERE id = ?', [$vid, $id]);
+    $tr = []; if (soc_tr_has()) { $lang = soc_lang_from_post(); $tr = soc_tr_from_post($lang); q('UPDATE soc_posts SET lang = ? WHERE id = ?', [$lang, $id]); if ($tr) soc_tr_save($id, $tr); }   // R97-201
     if ($kind === 'poll') { $opts = array_values(array_filter(array_map(fn($o) => mb_substr(trim((string)$o), 0, 120), (array)($_POST['options'] ?? [])), fn($o) => $o !== '')); if (count($opts) < 2) throw new RuntimeException(t('soc.need_options')); foreach (array_slice($opts, 0, 8) as $i => $o) q('INSERT INTO soc_post_options (post_id, idx, label) VALUES (?,?,?)', [$id, $i, $o]); }
-    if (($kind !== 'photo' && $kind !== 'video') || !empty($_POST['notify'])) soc_notify(array_keys(soc_staff()), 'soc:post', 'soc:post:' . $id, ($kind === 'poll' ? '🗳 ' : ($kind === 'video' ? '🎬 ' : ($kind === 'photo' ? '📷 ' : '📌 '))) . $title, $body, url('community') . '#post' . $id);
+    if (($kind !== 'photo' && $kind !== 'video') || !empty($_POST['notify'])) soc_notify_post($id, $kind === 'poll' ? '🗳 ' : ($kind === 'video' ? '🎬 ' : ($kind === 'photo' ? '📷 ' : '📌 ')), $title, $body, $tr);
     return $id;
 }
-function soc_post_delete(int $id): void { $p = one('SELECT * FROM soc_posts WHERE id = ?', [$id]); if (!$p) return; if ((int)$p['user_id'] !== soc_me() && !is_cp_admin() && !(function_exists('hr_can') && hr_can())) throw new RuntimeException(t('err.noaccess')); if ($p['stored_name']) @unlink(cp_storage() . '/' . $p['stored_name']); foreach (['soc_post_options', 'soc_post_votes', 'soc_post_reactions', 'soc_post_comments'] as $tb) q("DELETE FROM $tb WHERE post_id = ?", [$id]); q('DELETE FROM soc_posts WHERE id = ?', [$id]); }
+function soc_post_delete(int $id): void { $p = one('SELECT * FROM soc_posts WHERE id = ?', [$id]); if (!$p) return; if ((int)$p['user_id'] !== soc_me() && !is_cp_admin() && !(function_exists('hr_can') && hr_can())) throw new RuntimeException(t('err.noaccess')); if ($p['stored_name']) @unlink(cp_storage() . '/' . $p['stored_name']); foreach (['soc_post_options', 'soc_post_votes', 'soc_post_reactions', 'soc_post_comments'] as $tb) q("DELETE FROM $tb WHERE post_id = ?", [$id]); if (soc_tr_has()) q('DELETE FROM soc_post_tr WHERE post_id = ?', [$id]); q('DELETE FROM soc_posts WHERE id = ?', [$id]); }
 function soc_post_react(int $id, string $emoji): void { if (!in_array($emoji, SOC_REACTIONS, true)) $emoji = SOC_REACTIONS[0]; $cur = scalar('SELECT emoji FROM soc_post_reactions WHERE post_id = ? AND user_id = ?', [$id, soc_me()]); if ($cur === $emoji) q('DELETE FROM soc_post_reactions WHERE post_id = ? AND user_id = ?', [$id, soc_me()]); else q('INSERT INTO soc_post_reactions (post_id, user_id, emoji) VALUES (?,?,?) ON DUPLICATE KEY UPDATE emoji = VALUES(emoji)', [$id, soc_me(), $emoji]); }
 function soc_post_comment(int $id): void { $b = mb_substr(trim((string)($_POST['body'] ?? '')), 0, 1000); if ($b === '') return; $p = one('SELECT user_id, title FROM soc_posts WHERE id = ?', [$id]); if (!$p) return; q('INSERT INTO soc_post_comments (post_id, user_id, body) VALUES (?,?,?)', [$id, soc_me(), $b]); $cid = (int) db()->lastInsertId(); $mentioned = function_exists('mt_parse') ? mt_parse($b) : []; soc_notify(array_diff([(int)$p['user_id']], $mentioned), 'soc:comment', 'soc:comment:' . $cid, '💬 ' . t('soc.nf_comment', ['u' => (string)(current_user()['full_name'] ?? ''), 't' => (string)$p['title']]), $b, url('community') . '#post' . $id);
     if ($mentioned && function_exists('mt_notify')) mt_notify($b, t('soc.title') . ' · ' . (string)$p['title'], url('community') . '#post' . $id, 'soc:' . $cid); }   // R70-003: @mentions in post comments
@@ -114,9 +144,10 @@ function soc_poll_vote(int $id, int $idx): void { $p = one('SELECT * FROM soc_po
 /** Feed: pinned first, then newest; each with options/votes, reactions, comments. */
 function soc_feed(int $limit = 30, ?string $kind = null): array {
     if (!soc_has()) return []; $w = $kind ? ' WHERE p.kind = ' . db()->quote($kind) : '';
-    $rows = all('SELECT p.*, cu.full_name FROM soc_posts p JOIN customer_users cu ON cu.id = p.user_id' . $w . ' ORDER BY (p.pinned_until IS NOT NULL AND p.pinned_until >= CURDATE()) DESC, p.created_at DESC LIMIT ' . (int)$limit); $me = soc_me();
+    $rows = all('SELECT p.*, cu.full_name FROM soc_posts p JOIN customer_users cu ON cu.id = p.user_id' . $w . ' ORDER BY (p.pinned_until IS NOT NULL AND p.pinned_until >= CURDATE()) DESC, p.created_at DESC LIMIT ' . (int)$limit); $me = soc_me(); $trOk = soc_tr_has();
     foreach ($rows as &$p) {
         $p['reactions'] = all('SELECT emoji, COUNT(*) n, SUM(user_id = ?) mine FROM soc_post_reactions WHERE post_id = ? GROUP BY emoji ORDER BY n DESC', [$me, (int)$p['id']]);
+        $p['tr'] = $trOk ? soc_tr_of((int)$p['id']) : []; $base = locale_valid((string)($p['lang'] ?? '')) ? (string)$p['lang'] : ''; $all = [$base => [(string)$p['title'], $p['body'] !== null ? (string)$p['body'] : null]] + $p['tr']; $p['vers'] = []; foreach (array_merge([''], array_keys(LOCALES)) as $lk) if (isset($all[$lk])) $p['vers'][$lk] = $all[$lk]; $p['show'] = isset($p['vers'][locale()]) ? locale() : $base;   // R97-201
         $p['comments'] = all('SELECT c.*, cu.full_name FROM soc_post_comments c JOIN customer_users cu ON cu.id = c.user_id WHERE c.post_id = ? ORDER BY c.created_at', [(int)$p['id']]);
         if ($p['kind'] === 'poll') { $p['options'] = all('SELECT o.idx, o.label, (SELECT COUNT(*) FROM soc_post_votes v WHERE v.post_id = o.post_id AND v.idx = o.idx) n FROM soc_post_options o WHERE o.post_id = ? ORDER BY o.idx', [(int)$p['id']]); $p['votes'] = array_sum(array_column($p['options'], 'n')); $mv = scalar('SELECT idx FROM soc_post_votes WHERE post_id = ? AND user_id = ?', [(int)$p['id'], $me]); $p['my_vote'] = ($mv === null || $mv === false) ? null : (int)$mv; $p['closed'] = $p['closes_at'] && $p['closes_at'] < date('Y-m-d'); }
     } unset($p); return $rows;

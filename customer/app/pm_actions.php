@@ -160,6 +160,7 @@ function pm_handle_action(string $action, string $page): bool {
         case 'soc_wish': { require_staff(); soc_wish_send(); flash('good', t('soc.wish_sent')); redirect(in_array($page, ['community', 'my_leave'], true) ? $page : 'dashboard', ['_r' => uniqid()], '#celebrations'); }   // R63-001
         case 'soc_kudos': { require_staff(); soc_kudos_give(); flash('good', t('soc.kudos_sent')); redirect(in_array($page, ['community', 'my_leave'], true) ? $page : 'dashboard', ['_r' => uniqid()], '#kudos'); }
         case 'soc_post': { require_staff(); $id = soc_post_create(); flash('good', t('soc.published')); redirect('community', ['_r' => uniqid()], '#post' . $id); }
+        case 'soc_post_edit': { require_staff(); $id = (int)($_POST['id'] ?? 0); soc_post_update($id); flash('good', t('soc.updated')); redirect('community', ['_r' => uniqid()], '#post' . $id); }   // R97-201
         case 'soc_post_delete': { require_staff(); soc_post_delete((int)($_POST['id'] ?? 0)); flash('good', t('soc.deleted')); redirect('community', ['_r' => uniqid()]); }
         case 'soc_react': { require_staff(); soc_post_react((int)($_POST['id'] ?? 0), (string)($_POST['emoji'] ?? '')); redirect('community', ['_r' => uniqid()], '#post' . (int)($_POST['id'] ?? 0)); }
         case 'soc_comment': { require_staff(); soc_post_comment((int)($_POST['id'] ?? 0)); redirect('community', ['_r' => uniqid()], '#post' . (int)($_POST['id'] ?? 0)); }
