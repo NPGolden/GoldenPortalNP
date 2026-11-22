@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.219.0';
+const CP_VERSION = '1.219.1';
 const CP_BUILD   = '2026-11-22';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-191', 'version' => '1.219.1', 'date' => '2026-11-22', 'title' => 'Newsletters: an issue published on the website appears within about three minutes (was up to fifteen); the confirmation says so', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-190', 'version' => '1.219.0', 'date' => '2026-11-22', 'title' => 'Recycle bin: removed files are kept 30 days and can be restored; delete one or all in project files, drawings, offers, tickets, requests, knowledge base and payables; supporting documents on system budgets with a choice at the conversion to an offer', 'db' => 'install/migrate_cp_r97_190_file_trash.sql', 'check' => 'r99h'],
         ['ref' => 'GAS-CP-R97-189', 'version' => '1.218.0', 'date' => '2026-11-22', 'title' => 'In / Out: new tab Process with the procedure as a flow of nine steps; the In / Out figures of the year are shown in the yearly evaluation beside Attendance & consistency (shown, not scored)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-188', 'version' => '1.217.2', 'date' => '2026-11-22', 'title' => 'Manual: the In / Out procedure for employees and for managers, with the cross-check against timesheets and field service reports', 'db' => null, 'check' => null],

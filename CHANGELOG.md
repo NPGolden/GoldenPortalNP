@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.219.0** (build 2026-11-22). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.219.1** (build 2026-11-22). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.219.1 | GAS-CP-R97-191 | 2026-11-22 | Newsletters: an issue published on the website appears within about three minutes (was up to fifteen); the confirmation says so | — |
 | 1.219.0 | GAS-CP-R97-190 | 2026-11-22 | Recycle bin: removed files are kept 30 days and can be restored; delete one or all in project files, drawings, offers, tickets, requests, knowledge base and payables; supporting documents on system budgets with a choice at the conversion to an offer | `install/migrate_cp_r97_190_file_trash.sql` |
 | 1.218.0 | GAS-CP-R97-189 | 2026-11-22 | In / Out: new tab Process with the procedure as a flow of nine steps; the In / Out figures of the year are shown in the yearly evaluation beside Attendance & consistency (shown, not scored) | — |
 | 1.217.2 | GAS-CP-R97-188 | 2026-11-22 | Manual: the In / Out procedure for employees and for managers, with the cross-check against timesheets and field service reports | — |

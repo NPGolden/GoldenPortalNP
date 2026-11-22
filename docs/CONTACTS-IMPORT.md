@@ -4034,3 +4034,10 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - 84 language keys `ft.*`, `sb.doc_*`, `sb.ev_file_*` in en, el, it, bg, uk (12 916 keys each).
 - Security review: every action is a POST with the CSRF token; table names come from a fixed list and are checked against `^[a-z0-9_]+$`; no path from the request is used; purge refuses paths outside the storage; restore and purge are administrators only; uploads of budget documents check extension, size and, for pictures and PDF, the real content type; downloads send `X-Content-Type-Options: nosniff`.
 
+## §474 Newsletters on the website — delay shortened (GAS-CP-R97-191, v1.219.1)
+
+- Report: "the button to publish on the website did not work". Finding: the portal had published the issue (`web_feed.php?r=news` listed it); the website kept its previous answer — `api/news.php` asked the portal once per 10 minutes and sent `Cache-Control: max-age=300`, which the host cache also honours, so the News page could stay unchanged for about 15 minutes.
+- Website (goldenas-website): `NEWS_TTL` 600 → 120 s, `max-age` 300 → 60 s. The portal feed limit (10 GET per address per minute) is not reached: one list and one article call per two minutes each.
+- Portal: text `nl.web_done_on` in five languages now states the delay. No program change.
+- Security review: no new input or route; the shorter cache adds at most a few requests per minute to the feed, inside its limit.
+
