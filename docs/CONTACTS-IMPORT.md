@@ -3998,3 +3998,9 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Demonstration accounts: Golden PM answers from the data set built into the app; Golden HR is answered by `PortalHRDemo::io()` / `ioPunch()` (two invented sites, entries kept in the demonstration file only, at most 40, coordinates clamped). Nothing of a demonstration account reaches `io_entries` or the HR log.
 - Golden A/S Customer has no In / Out: `/inout*` answers 403 "Staff only" for customer accounts (unchanged).
 - Security review: no new table, no new right; the new routes for the HR app go through the same consent check, rate limit and staff-only check as the other apps; values of the demonstration punch are cast and bounded before they are stored or returned.
+
+## §470 Golden A/S Employee on Google Play — link and QR code (GAS-CP-R97-187, v1.217.1)
+
+- `cp_store_apps()` in `customer/app/helpers.php`: `employee` now has `play` (package `gr.goldenas.employee`) and `ios` (App Store id 6837805575) with `ios_live => false`. The card therefore shows the Google Play tile and the App Store tile as coming soon. When Apple releases the app, set `ios_live => true`.
+- New images `assets/apps/qr-employee-play.png` and `assets/apps/qr-employee-ios.png` (296 px, same colours as the others). `qr-employee-web.png` stays for the web app link.
+- Security review: static links and images only; no new input, route or right.
