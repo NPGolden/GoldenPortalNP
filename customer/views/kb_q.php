@@ -20,6 +20,7 @@ layout_head($q['title'], 'kb');
 <div class="card kb-q">
   <?php if ($q['body']): ?><div class="kb-body"><?= rt_html($q['body']) ?></div><?php else: ?><p class="hint"><?= tt('kb.no_body') ?></p><?php endif; ?>
   <?= kb_files_html($F['q']) ?>
+  <?php if (function_exists('ft_all_btn') && ($allK = ft_all_btn('kb_files', array_merge($F['q'], ...array_values($F['a']))))): ?><p style="margin:8px 0 0;"><?= $allK ?></p><?php endif; /* R97-192: every file of the question and its answers */ ?>
 </div>
 
 <div class="card">

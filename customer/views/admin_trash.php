@@ -1,13 +1,13 @@
 <?php
 /** Settings › Recycle bin (GAS-CP-R97-190): files removed by users in the last 30 days — restore, or remove for good.  ?p=admin_trash[&tab=open|restored|purged] */
 require __DIR__ . '/_layout.php';
-$u = require_cp_admin();
+$u = require_staff(); if (!ft_bin_can()) { http_response_code(403); exit(t('err.noaccess')); }   // R97-192: administrators (all files except personnel documents) and HR (personnel documents)
 $tab = in_array($_GET['tab'] ?? '', ['open', 'restored', 'purged'], true) ? (string)$_GET['tab'] : 'open';
 $rows = ft_has() ? ft_list($tab) : []; $nOpen = ft_open_count(); $sum = 0; foreach ($rows as $r) $sum += (int)$r['size_bytes'];
 $TBL = fn(string $t) => t('ft.tb_' . $t) === 'ft.tb_' . $t ? $t : t('ft.tb_' . $t);
 layout_head(t('ft.title'), 'admin_trash');
 ?>
-<?php settings_tabs('admin_trash'); ?>
+<?php if (is_cp_admin()) settings_tabs('admin_trash'); ?>
 <div class="page-head"><div><h1>🗑 <?= tt('ft.title') ?></h1><p class="lede" style="margin-bottom:0;text-align:justify;"><?= e(t('ft.lede', ['d' => FT_DAYS])) ?></p></div></div>
 <?php if (!ft_has()): ?><div class="card"><p class="hint"><?= tt('ft.need') ?></p></div><?php layout_foot(); return; endif; ?>
 <div class="tabs"><?php foreach (['open' => 'ft.t_open', 'restored' => 'ft.t_restored', 'purged' => 'ft.t_purged'] as $k => $lk): ?><a class="<?= $tab === $k ? 'on' : '' ?>" href="<?= url('admin_trash', ['tab' => $k]) ?>"><?= tt($lk) ?><?= $k === 'open' && $nOpen ? ' <span class="n">' . $nOpen . '</span>' : '' ?></a><?php endforeach; ?></div>
@@ -27,5 +27,5 @@ layout_head(t('ft.title'), 'admin_trash');
   </tr><?php endforeach; ?></tbody></table></div>
   <?php endif; ?>
 </div>
-<div class="card"><h3 class="ac-h"><?= tt('ft.rules_h') ?></h3><ul class="hint" style="padding-left:18px;margin:0;"><li><?= e(t('ft.rule_1', ['d' => FT_DAYS])) ?></li><li><?= tt('ft.rule_2') ?></li><li><?= tt('ft.rule_3') ?></li><li><?= tt('ft.rule_4') ?></li></ul></div>
+<div class="card"><h3 class="ac-h"><?= tt('ft.rules_h') ?></h3><ul class="hint" style="padding-left:18px;margin:0;"><li><?= e(t('ft.rule_1', ['d' => FT_DAYS])) ?></li><li><?= tt('ft.rule_2') ?></li><li><?= tt('ft.rule_3') ?></li><li><?= tt('ft.rule_4') ?></li><li><?= tt('ft.rule_5') ?></li></ul></div>
 <?php layout_foot();

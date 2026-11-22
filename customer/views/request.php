@@ -22,7 +22,7 @@ layout_head(cr_no($id) . ' · ' . $r['title'], 'requests');
 <div class="cols" style="grid-template-columns: 2fr 1fr;">
 <div>
 <div class="card">
-  <div class="msg msg--golden"><p class="who"><?= avatar_html((int)($r['user_id'] ?? 0), (string)$r['author'], 22, 'ava--inline') ?> <b><?= e((string)$r['author']) ?></b> · <?= e(fmt_datetime($r['created_at'])) ?></p><div class="body"><?= nl2br(e((string)$r['body'])) ?></div><?= cr_files_html($filesBy[0] ?? []) ?></div>
+  <div class="msg msg--golden"><p class="who"><?= avatar_html((int)($r['user_id'] ?? 0), (string)$r['author'], 22, 'ava--inline') ?> <b><?= e((string)$r['author']) ?></b> · <?= e(fmt_datetime($r['created_at'])) ?></p><div class="body"><?= nl2br(e((string)$r['body'])) ?></div><?= cr_files_html($filesBy[0] ?? []) . (function_exists('ft_all_btn') && ($allR = ft_all_btn('cp_request_files', (array)($r['files'] ?? []))) ? '<p style="margin:8px 0 0;">' . $allR . '</p>' : '') ?></div>
   <?php foreach ($r['comments'] as $c): ?>
     <?php if ($c['kind'] === 'status'): ?><div class="timeline-line hint" style="margin:8px 0 8px 10px;">⟶ <b><?= e($c['body']) ?></b> · <?= e((string)$c['author']) ?> · <?= e(fmt_datetime($c['created_at'])) ?></div>
     <?php else: ?><div class="msg msg--golden depth-1" id="c<?= (int)$c['id'] ?>"><p class="who"><?= avatar_html((int)($c['user_id'] ?? 0), (string)$c['author'], 22, 'ava--inline') ?> <b><?= e((string)$c['author']) ?></b><?= (int)$c['user_id'] === cr_dev_id() ? ' ' . pill('gold', t('cr.dev')) : '' ?> · <?= e(fmt_datetime($c['created_at'])) ?></p><div class="body"><?= nl2br(e($c['body'])) ?></div><?= cr_files_html($filesBy[(int)$c['id']] ?? []) ?></div><?php endif; ?>

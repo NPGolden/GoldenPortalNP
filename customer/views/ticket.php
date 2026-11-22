@@ -39,6 +39,7 @@ layout_head($t['ticket_no'] . ' · ' . $t['title'], 'tickets');
       </div>
       <?php if ($t['description']): ?><div class="tk-desc"><?= rt_html($t['description']) ?></div><?php endif; ?>
       <?php if (!empty($filesByComment[0])): ?><div class="tk-files"><?php foreach ($filesByComment[0] as $f) echo $fileRow($f); ?></div><?php endif; ?>
+      <?php if (function_exists('ft_all_btn') && ($allT = ft_all_btn('ticket_files', $t['files']))): ?><p style="margin:8px 0 0;"><?= $allT ?></p><?php endif; /* R97-192 */ ?>
     </div>
 
     <?php if ($t['resolution']): ?>

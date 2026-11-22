@@ -4041,3 +4041,13 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Portal: text `nl.web_done_on` in five languages now states the delay. No program change.
 - Security review: no new input or route; the shorter cache adds at most a few requests per minute to the feed, inside its limit.
 
+## §475 Recycle bin for personnel documents (HR only); Delete all on tickets, requests, knowledge base (GAS-CP-R97-192, v1.220.0)
+
+- `hr_doc_delete()` (`app/hr3.php`) and `hra_doc_delete()` (`app/hra.php`) pass through `ft_trash_row()` (tables `hr_docs`, `hr_flow_docs`; bytes stay under `storage/hr`). Their own rights are unchanged.
+- `app/ft.php`: `FT_HR_TABLES`, `ft_hr()` (`hr_can()` and `hr_files_can()`), `ft_scope()` filters `ft_list()`, `ft_open_count()` and `ft_empty`; `ft_entry_can()` guards `ft_restore()` and `ft_purge()` — HR entries for HR only, all others for administrators only.
+- `views/admin_trash.php` opens for administrators and HR (`ft_bin_can()`); `admin_trash` added to `HR_PAGES`, the `ft_*` actions to `HR_ACTIONS`; link on `views/hr_person.php` (Documents tab).
+- `ft_all_btn()` on `views/ticket.php` (all files of the ticket), `views/request.php`, `views/kb_q.php` (question and answers). Not on payables (decision).
+- Evaluation: no change — the computed score of Attendance & consistency stays as it is (decision).
+- Language keys `ft.tb_hr_docs`, `ft.tb_hr_flow_docs`, `ft.rule_5`, `ft.hr_link` × 5 (12 920 each).
+- Security review: personnel documents are never listed to administrators; the daily purge still destroys them after 30 days; no new input.
+

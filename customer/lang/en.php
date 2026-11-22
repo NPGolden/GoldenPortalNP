@@ -13100,4 +13100,8 @@ Best regards,
 'sb.ev_file_added' => 'Supporting document added',
 'sb.ev_file_removed' => 'Supporting document removed',
 'sb.ev_files_offer' => 'Supporting documents copied to the offer',
+'ft.tb_hr_docs' => 'Personnel document',
+'ft.tb_hr_flow_docs' => 'Onboarding document',
+'ft.rule_5' => 'Personnel and onboarding documents removed by HR also wait here for 30 days, but only HR sees, restores or removes them; administrators do not see them.',
+'ft.hr_link' => 'Recycle bin of personnel documents (30 days)',
 ];

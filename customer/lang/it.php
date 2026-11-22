@@ -13100,4 +13100,8 @@ Cordiali saluti,
 'sb.ev_file_added' => 'Documento di supporto aggiunto',
 'sb.ev_file_removed' => 'Documento di supporto rimosso',
 'sb.ev_files_offer' => 'Documenti di supporto copiati nell\'offerta',
+'ft.tb_hr_docs' => 'Documento del personale',
+'ft.tb_hr_flow_docs' => 'Documento di inserimento',
+'ft.rule_5' => 'Anche i documenti del personale e di inserimento rimossi da HR attendono qui per 30 giorni, ma solo HR li vede, li ripristina o li rimuove; gli amministratori non li vedono.',
+'ft.hr_link' => 'Cestino dei documenti del personale (30 giorni)',
 ];

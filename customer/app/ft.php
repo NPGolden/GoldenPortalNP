@@ -18,6 +18,14 @@ const FT_PROTECTED_KINDS = ['issued', 'offer', 'fsr_doc', 'fsr_sign', 'isr_doc',
 function ft_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'file_trash'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function ft_me(): int { return (int)(current_user()['id'] ?? 0); }
 function ft_admin(): bool { return function_exists('is_cp_admin') && is_cp_admin(); }
+/* R97-192: personnel documents pass through the bin too, but only HR sees, restores or destroys them — administrators do not. */
+const FT_HR_TABLES = ['hr_docs', 'hr_flow_docs'];
+function ft_hr(): bool { return function_exists('hr_can') && hr_can() && (!function_exists('hr_files_can') || hr_files_can()); }
+function ft_bin_can(): bool { return function_exists('is_staff') && is_staff() && (ft_admin() || ft_hr()); }
+/** May the current user see / restore / destroy this entry of the bin? */
+function ft_entry_can(array $x): bool { return in_array((string)$x['tbl'], FT_HR_TABLES, true) ? ft_hr() : ft_admin(); }
+/** SQL condition that keeps the entries the current user may see. */
+function ft_scope(): string { $in = "tbl IN ('" . implode("','", FT_HR_TABLES) . "')"; return ft_admin() && ft_hr() ? '1=1' : (ft_hr() ? $in : (ft_admin() ? 'NOT ' . $in : '1=0')); }
 
 /** The tables the generic buttons work on: [absolute path of the bytes, label]. */
 function ft_types(): array {
@@ -120,11 +128,11 @@ function cp_trash_file(?int $fileId, string $reason = ''): void {
 /* ------------------------------------------------------------------ the bin (administrators) */
 function ft_list(string $state = 'open', int $limit = 500): array {
     if (!ft_has()) return []; $w = ['open' => 'purged_at IS NULL AND restored_at IS NULL', 'restored' => 'restored_at IS NOT NULL', 'purged' => 'purged_at IS NOT NULL'][$state] ?? '1=1';
-    return all("SELECT id, tbl, row_id, path, label, context, size_bytes, protected, reason, deleted_name, deleted_at, purge_after, restored_at, purged_at FROM file_trash WHERE $w ORDER BY id DESC LIMIT " . max(1, min(2000, $limit)));
+    return all("SELECT id, tbl, row_id, path, label, context, size_bytes, protected, reason, deleted_name, deleted_at, purge_after, restored_at, purged_at FROM file_trash WHERE $w AND " . ft_scope() . " ORDER BY id DESC LIMIT " . max(1, min(2000, $limit)));
 }
-function ft_open_count(): int { try { return ft_has() ? (int) scalar('SELECT COUNT(*) FROM file_trash WHERE purged_at IS NULL AND restored_at IS NULL') : 0; } catch (Throwable $e) { return 0; } }
+function ft_open_count(): int { try { return ft_has() ? (int) scalar('SELECT COUNT(*) FROM file_trash WHERE purged_at IS NULL AND restored_at IS NULL AND ' . ft_scope()) : 0; } catch (Throwable $e) { return 0; } }
 function ft_restore(int $tid): string {
-    require_cp_admin(); $x = one('SELECT * FROM file_trash WHERE id = ? AND purged_at IS NULL AND restored_at IS NULL', [$tid]); if (!$x) throw new RuntimeException(t('err.notfound'));
+    $x = one('SELECT * FROM file_trash WHERE id = ? AND purged_at IS NULL AND restored_at IS NULL', [$tid]); if (!$x) throw new RuntimeException(t('err.notfound')); if (!ft_entry_can($x)) throw new RuntimeException(t('err.noaccess'));
     $tbl = (string)$x['tbl']; if (!preg_match('/^[a-z0-9_]+$/', $tbl)) throw new RuntimeException(t('err.notfound'));
     if (!is_file((string)$x['path'])) throw new RuntimeException(t('ft.e_bytes'));
     $row = json_decode((string)$x['row_json'], true); if (!is_array($row)) throw new RuntimeException(t('err.notfound'));
@@ -144,7 +152,7 @@ function ft_purge_row(array $x): bool {
     $p = (string)$x['path']; if ($p !== '' && is_file($p)) { if (!ft_inside($p)) return false; @unlink($p); }
     q("UPDATE file_trash SET purged_at = NOW(), row_json = '{}', refs_json = NULL WHERE id = ?", [(int)$x['id']]); return true;
 }
-function ft_purge(int $tid): string { require_cp_admin(); $x = one('SELECT * FROM file_trash WHERE id = ? AND purged_at IS NULL AND restored_at IS NULL', [$tid]); if (!$x) throw new RuntimeException(t('err.notfound')); if (!ft_purge_row($x)) throw new RuntimeException(t('ft.e_path')); return (string)$x['label']; }
+function ft_purge(int $tid): string { $x = one('SELECT * FROM file_trash WHERE id = ? AND purged_at IS NULL AND restored_at IS NULL', [$tid]); if (!$x) throw new RuntimeException(t('err.notfound')); if (!ft_entry_can($x)) throw new RuntimeException(t('err.noaccess')); if (!ft_purge_row($x)) throw new RuntimeException(t('ft.e_path')); return (string)$x['label']; }
 /** Daily: what has been in the bin longer than FT_DAYS days. */
 function ft_daily(): string {
     if (!ft_has()) return 'bin —'; $n = 0;
@@ -190,7 +198,7 @@ function ft_handle_action(string $action): bool {
         }
         elseif ($action === 'ft_restore') { flash('good', t('ft.restored', ['name' => ft_restore((int)($_POST['id'] ?? 0))])); $back = 'index.php?p=admin_trash'; }
         elseif ($action === 'ft_purge') { flash('good', t('ft.purged', ['name' => ft_purge((int)($_POST['id'] ?? 0))])); $back = 'index.php?p=admin_trash'; }
-        elseif ($action === 'ft_empty') { require_cp_admin(); $n = 0; foreach (all('SELECT id, path FROM file_trash WHERE purged_at IS NULL AND restored_at IS NULL ORDER BY id LIMIT 2000') as $x) if (ft_purge_row($x)) $n++; flash('good', t('ft.emptied', ['n' => $n])); $back = 'index.php?p=admin_trash'; }
+        elseif ($action === 'ft_empty') { if (!ft_bin_can()) throw new RuntimeException(t('err.noaccess')); $n = 0; foreach (all('SELECT id, path FROM file_trash WHERE purged_at IS NULL AND restored_at IS NULL AND ' . ft_scope() . ' ORDER BY id LIMIT 2000') as $x) if (ft_purge_row($x)) $n++; flash('good', t('ft.emptied', ['n' => $n])); $back = 'index.php?p=admin_trash'; }
     } catch (RuntimeException $e) { flash('bad', $e->getMessage()); }
     header('Location: ' . $back); exit;
 }
