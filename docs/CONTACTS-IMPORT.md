@@ -4051,3 +4051,12 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Language keys `ft.tb_hr_docs`, `ft.tb_hr_flow_docs`, `ft.rule_5`, `ft.hr_link` × 5 (12 920 each).
 - Security review: personnel documents are never listed to administrators; the daily purge still destroys them after 30 days; no new input.
 
+## §476 Evaluation — In / Out consistency in the computed grade (GAS-CP-R97-193, v1.221.0)
+
+- `app/io.php`: `io_year_figures($uid, $year, $pid)` now returns `excused` (working days inside an approved day-type `hr_requests` row without an entry, `io_excused_days()`), `expected` = working days from the first entry of the year to today − excused, `consistency` on the expected days, `scored` (expected ≥ `IO_EV_MIN_DAYS` = 20) and `pen` = `min(3, ceil((io_ev_ok() − consistency) / 10))` when below `io_ev_ok()` (setting `io_ev_ok`, default 90, 50–100, saved by `io_settings_save()`; field on Sites & rules).
+- `app/hr7.php` `hr_eval_attendance_auto()`: adds `pen` to the existing deductions and returns the figures as `io`; score still `max(1, 5 − deductions)`. `hr_evaluation_save_from_post()` stores the computed score as before, so an evaluation saved earlier keeps its stored grade until it is saved again; the form always shows the live figure.
+- Views `_hr_eval.php` and `my_leave.php` read `$a['io']` (one calculation). Texts: `io.ev_txt` (with the result), `io.ev_s_*`, `io.r_ev`, `io.fl_9s`, `io.fl_p9`, `io.fl_ev_p1..3`, `hr.ecd_attendance_auto` (rule added) in five languages (12 924 keys each).
+- The statistics tab (`io_stats()`) is unchanged: its consistency still uses all working days of the period.
+- Security review: no new input except the bounded setting; figures visible where the evaluation is visible.
+- Notice: the acceptance text already states that In / Out is taken into account in the evaluation (consistency and accuracy); accuracy is shown, not scored.
+

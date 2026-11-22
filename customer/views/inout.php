@@ -97,6 +97,7 @@ layout_head(t('io.title'), 'inout');
   <label><?= tt('io.r_weak') ?><input type="number" name="io_weak_gps_m" min="20" max="5000" value="<?= io_weak() ?>"></label>
   <label><?= tt('io.r_ot') ?><input type="number" name="io_ot_min" min="0" max="240" value="<?= io_ot_min() ?>"></label>
   <label><?= tt('io.r_diff') ?><input type="number" name="io_diff_min" min="0" max="240" value="<?= io_diff_min() ?>"></label>
+  <label><?= tt('io.r_ev') ?><input type="number" name="io_ev_ok" min="50" max="100" value="<?= io_ev_ok() ?>"></label>
   <div class="btn-row"><button class="btn btn--gold" type="submit"><?= tt('btn.save') ?></button></div></form></div>
 
 <?php elseif ($tab === 'stats'): $rows = io_stats($from, $to); $pc = fn($v) => $v === null ? '—' : $v . ' %'; ?>

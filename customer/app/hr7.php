@@ -43,13 +43,15 @@ function hr_eval_training_auto(int $pid, int $year): array {
 }
 /** Attendance consistency of a year: early leaves / late arrivals (hours), unplanned absences (days), sick days (shown, not scored), last-moment requests (asked less than 2 days ahead). */
 function hr_eval_attendance_auto(int $pid, int $year): array {
-    $out = ['score' => 5, 'early_h' => 0.0, 'absent_d' => 0.0, 'sick_d' => 0.0, 'late_req' => 0, 'req' => 0];
+    $out = ['score' => 5, 'early_h' => 0.0, 'absent_d' => 0.0, 'sick_d' => 0.0, 'late_req' => 0, 'req' => 0, 'io' => null];
     if (!function_exists('hr2_has') || !hr2_has()) return $out; $y0 = "$year-01-01"; $y1 = "$year-12-31";
     $r = one('SELECT COALESCE(SUM(CASE WHEN t.code = "EARLY" THEN r.hours END), 0) eh, COALESCE(SUM(CASE WHEN t.code IN ("UNP","ABS") THEN r.days END), 0) ad, COALESCE(SUM(CASE WHEN t.kind = "sick" THEN r.days END), 0) sd FROM hr_requests r JOIN hr_leave_types t ON t.id = r.type_id WHERE r.person_id = ? AND r.status = "approved" AND r.date_from BETWEEN ? AND ?', [$pid, $y0, $y1]) ?: [];
     $out['early_h'] = (float)($r['eh'] ?? 0); $out['absent_d'] = (float)($r['ad'] ?? 0); $out['sick_d'] = (float)($r['sd'] ?? 0);
     $l = one('SELECT COUNT(*) n, SUM(DATEDIFF(r.date_from, DATE(r.created_at)) < 2) late FROM hr_requests r JOIN hr_leave_types t ON t.id = r.type_id WHERE r.person_id = ? AND r.status IN ("approved","pending_mgr","pending_hr") AND t.unit = "day" AND t.hr_only = 0 AND t.kind = "leave" AND r.period_id IS NULL AND r.created_by = COALESCE(r.user_id, -1) AND r.date_from BETWEEN ? AND ?', [$pid, $y0, $y1]) ?: [];
     $out['req'] = (int)($l['n'] ?? 0); $out['late_req'] = (int)($l['late'] ?? 0);
     $pen = (int) floor($out['early_h'] / 16) + (int) floor($out['absent_d'] / 3) + (int) floor($out['late_req'] / 3);
+    $out['io'] = null;   // R97-193: consistency of In / Out is part of the computed grade
+    try { if (function_exists('io_year_figures') && ($pp = hr_person($pid)) && ($io = io_year_figures((int)($pp['user_id'] ?? 0), $year, $pid))) { $out['io'] = $io; $pen += (int)$io['pen']; } } catch (Throwable $e) { $out['io'] = null; }
     $out['score'] = max(1, 5 - $pen);
     return $out;
 }

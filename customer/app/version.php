@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.220.0';
+const CP_VERSION = '1.221.0';
 const CP_BUILD   = '2026-11-22';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-193', 'version' => '1.221.0', 'date' => '2026-11-22', 'title' => 'Evaluation: the In / Out consistency of the year counts in the computed grade Attendance & consistency (approved leave left out; below 90 % one point per ten percentage points, at most three; scored from 20 expected days)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-192', 'version' => '1.220.0', 'date' => '2026-11-22', 'title' => 'Recycle bin: personnel and onboarding documents wait 30 days, seen by HR only; Delete all on tickets, requests and knowledge base questions', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-191', 'version' => '1.219.1', 'date' => '2026-11-22', 'title' => 'Newsletters: an issue published on the website appears within about three minutes (was up to fifteen); the confirmation says so', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-190', 'version' => '1.219.0', 'date' => '2026-11-22', 'title' => 'Recycle bin: removed files are kept 30 days and can be restored; delete one or all in project files, drawings, offers, tickets, requests, knowledge base and payables; supporting documents on system budgets with a choice at the conversion to an offer', 'db' => 'install/migrate_cp_r97_190_file_trash.sql', 'check' => 'r99h'],

@@ -149,7 +149,7 @@ function io_site_save(array $in): void {
 }
 function io_settings_save(array $in): void {
     if (!io_sites_can()) throw new RuntimeException(t('err.noaccess'));
-    foreach (['io_tolerance_min' => [0, 120], 'io_weak_gps_m' => [20, 5000], 'io_ot_min' => [0, 240], 'io_diff_min' => [0, 240]] as $k => [$lo, $hi]) if (isset($in[$k])) cp_setting_set($k, (string) max($lo, min($hi, (int)$in[$k])));
+    foreach (['io_tolerance_min' => [0, 120], 'io_weak_gps_m' => [20, 5000], 'io_ot_min' => [0, 240], 'io_diff_min' => [0, 240], 'io_ev_ok' => [50, 100]] as $k => [$lo, $hi]) if (isset($in[$k])) cp_setting_set($k, (string) max($lo, min($hi, (int)$in[$k])));
 }
 
 function io_entries(array $f, int $limit = 400): array {
@@ -227,14 +227,35 @@ function io_stats_calc(int $uid, array $days, string $from, string $end, string 
     return ['workdays' => $wd, 'present' => $present, 'complete' => $complete, 'punches' => $punch, 'clean' => $clean, 'flags' => $f, 'ins' => $ins, 'ontime' => $ontime, 'late_avg' => ($ins - $ontime) > 0 ? (int) round($lateMin / ($ins - $ontime)) : 0, 'rejected' => $rej,
         'consistency' => $wd ? (int) round(100 * min($complete, $wd) / $wd) : null, 'accuracy' => $punch ? (int) round(100 * $clean / $punch) : null, 'punctual' => $ins ? (int) round(100 * $ontime / $ins) : null];
 }
-/** In / Out of one person in a year, for the yearly evaluation (R97-189): shown beside the attendance criterion, not scored. Null when the person has no punches in that year. */
-function io_year_figures(int $uid, int $year): ?array {
+/* ---- In / Out in the yearly evaluation (R97-189 shown · R97-193 scored) ---- */
+const IO_EV_MIN_DAYS = 20;                                                   // fewer expected working days than this: shown, not yet scored
+function io_ev_ok(): int { return max(50, min(100, io_set('io_ev_ok', 90))); }   // consistency from which nothing is deducted (%)
+/** Working days of $uid between two dates that are covered by an approved day-type HR request (leave, sick, absence …) and have no In / Out — they are not expected days. */
+function io_excused_days(int $uid, int $pid, string $from, string $to, array $days): int {
+    if ($pid <= 0 || !function_exists('hr2_has') || !hr2_has()) return 0; $cal = function_exists('wc_user_calendar') ? wc_user_calendar($uid) : 'GR'; $seen = [];
+    try { $rq = all('SELECT r.date_from, r.date_to FROM hr_requests r JOIN hr_leave_types t ON t.id = r.type_id WHERE r.person_id = ? AND r.status = "approved" AND t.unit = "day" AND r.date_to >= ? AND r.date_from <= ?', [$pid, $from, $to]); } catch (Throwable $e) { return 0; }
+    foreach ($rq as $r) for ($t = strtotime(max((string)$r['date_from'], $from)); $t <= strtotime(min((string)$r['date_to'], $to)); $t += 86400) { $d = date('Y-m-d', $t); if (isset($seen[$d]) || isset($days[$d])) continue;
+        if (function_exists('wc_day') ? wc_day($cal, $d)['workday'] : (date('N', $t) < 6)) $seen[$d] = 1; }
+    return count($seen);
+}
+/** In / Out of one person in a year for the yearly evaluation. Null when the person has no entries in that year.
+ *  Expected days = working days from the first entry of the year to today, less the days of approved leave / sick / absence without an entry.
+ *  Consistency = days with a complete In and Out ÷ expected days. Below io_ev_ok() it costs one point of «Attendance & consistency» per started
+ *  ten percentage points, at most three; with fewer than IO_EV_MIN_DAYS expected days it is shown and not scored. */
+function io_year_figures(int $uid, int $year, int $pid = 0): ?array {
     if (!io_has() || $uid <= 0) return null; $from = "$year-01-01"; $to = "$year-12-31"; $today = date('Y-m-d');
     $first = (string) scalar('SELECT MIN(local_day) FROM io_entries WHERE user_id = ? AND local_day BETWEEN ? AND ?', [$uid, $from, $to]); if ($first === '') return null;
     $days = []; foreach (all('SELECT * FROM io_entries WHERE user_id = ? AND local_day BETWEEN ? AND ? ORDER BY at_utc, id', [$uid, $from, $to]) as $r) $days[(string)$r['local_day']][] = $r;
-    return io_stats_calc($uid, $days, $first, min($to, $today), $today) + ['since' => $first];   // working days are counted from the person's first punch of the year
+    $end = min($to, $today); $c = io_stats_calc($uid, $days, $first, $end, $today) + ['since' => $first];
+    $c['excused'] = min($c['workdays'], io_excused_days($uid, $pid, $first, $end, $days)); $c['expected'] = $c['workdays'] - $c['excused'];
+    $c['consistency'] = $c['expected'] ? (int) round(100 * min($c['complete'], $c['expected']) / $c['expected']) : null;
+    $c['scored'] = $c['expected'] >= IO_EV_MIN_DAYS && $c['consistency'] !== null; $ok = io_ev_ok();
+    $c['pen'] = $c['scored'] && $c['consistency'] < $ok ? min(3, (int) ceil(($ok - $c['consistency']) / 10)) : 0;
+    return $c;
 }
-function io_year_text(array $a): string { $pc = fn($v) => $v === null ? '—' : $v . ' %'; return t('io.ev_txt', ['c' => $pc($a['consistency']), 'a' => $pc($a['accuracy']), 'p' => $pc($a['punctual']), 'd' => $a['present'], 'w' => $a['workdays']]); }
+function io_year_text(array $a): string { $pc = fn($v) => $v === null ? '—' : $v . ' %';
+    $s = !$a['scored'] ? t('io.ev_s_wait', ['n' => IO_EV_MIN_DAYS]) : ($a['pen'] ? t('io.ev_s_pen', ['n' => $a['pen']]) : t('io.ev_s_ok', ['p' => io_ev_ok()]));
+    return t('io.ev_txt', ['c' => $pc($a['consistency']), 'a' => $pc($a['accuracy']), 'p' => $pc($a['punctual']), 'd' => min($a['complete'], $a['expected']), 'w' => $a['expected'], 'x' => $a['excused'], 's' => $s]); }
 /** Statistics per person for a period (HR, CEO, General Manager). */
 function io_stats(string $from, string $to): array {
     if (!io_stats_can()) throw new RuntimeException(t('err.noaccess'));
