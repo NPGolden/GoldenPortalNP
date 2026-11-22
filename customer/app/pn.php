@@ -225,6 +225,7 @@ function pn_tick(): array {
     if (!pn_has()) return ['off' => 1]; $o = ['io' => 0];
     try { $o['io'] = pn_io_tick(); } catch (Throwable $e) { $o['io_err'] = mb_substr($e->getMessage(), 0, 80); }
     try { $o['plan'] = pn_plan_tick(); } catch (Throwable $e) { $o['plan_err'] = mb_substr($e->getMessage(), 0, 80); }
+    if (function_exists('sv_refresh') && PHP_SAPI === 'cli') { try { $o['stores'] = sv_refresh()['changed']; } catch (Throwable $e) { $o['sv_err'] = mb_substr($e->getMessage(), 0, 80); } }   // R97-200: only from the clock job — never while a visitor's page is being finished
     try { $o += pn_flush(); } catch (Throwable $e) { $o['flush_err'] = mb_substr($e->getMessage(), 0, 80); }
     cp_setting_set('pn_last_tick', date('Y-m-d H:i:s')); return $o;
 }

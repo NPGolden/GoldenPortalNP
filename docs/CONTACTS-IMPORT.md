@@ -4115,3 +4115,13 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Per person: `wl_prefs.plan` (default on), option on `?p=wellness`; the general `push` switch still applies in `pn_enqueue()`.
 - `POST /auth/logout` (staff and customer routes) clears `mob_devices.push_token` of the device.
 - Language keys (+8, 13 095 per language): `pn.pl_t`, `pn.plc_t`, `pn.plc_none`, `pn.pl_today`, `pn.pl_tomorrow`, `pn.pl_car`, `wl.o_plan`, `wl.d_plan`.
+
+## §483 Versions in the stores: update band and announcement (GAS-CP-R97-200, v1.226.0)
+
+- `app/sv.php`. `SV_APPS`: API app id → App Store id, Play package, name. `sv_refresh()` (called by `pn_tick()` only under the command line, i.e. the clock job; at most every `SV_EVERY` = 3 h, `cp_settings.sv_at` written first) asks `itunes.apple.com/lookup?id=…&country=gr` (`results[0].version`) and the public Play page of the package (pattern `[[["x.y.z"]]`); HTTPS only, no redirects, 10 s. A valid, not lower version replaces the stored one in `cp_settings.sv_versions` (JSON); no answer or an unreadable page changes nothing.
+- `sv_announce()` runs when a stored version rises (never on the first reading): people with a non-revoked `mob_devices` row of that app and platform seen in the last 120 days, active, not demonstration; `nf_push()` kind `app:update`, ref `app:<app>:<platform>`, link to the dashboard; `cp_mail()` with the store link unless `cp_settings.sv_mail = 0`. Texts `sv.n_t`, `sv.n_b`, `sv.m_b` in the language of the person (`\n` in the text = line break).
+- `GET /api/v1/store?platform=ios|android` — before sign-in, rate-limited per address (30 / minute), answers `{version, url}` of the calling app (`X-App`). Public facts only.
+- Apps: `push.js` reads the installed build from the `App` plug-in, asks `/store`, and when the installed version is lower shows the band `#gas-upd` (text in en / el / it / bg / uk; Update = link to `apps.apple.com` or `play.google.com` only; Later = `localStorage gas.upd.later`, one day). `PUSH.label()` adds "version x is in the store". Screens versions: Service 0.8.4, PM 1.0.19, HR 1.2.3, Employee 1.1.4, Customer 1.0.15.
+- `?p=admin_push`: card "Versions in the stores" (table, last asked, e-mail switch `sv_mail`, `sv_now`).
+- API bootstrap now loads `wl`, `pn`, `sv`: `nf_push()` called inside an API request reaches `pn_from_nf()`, and the planning hooks work from the apps.
+- Language keys +13 (13 108 per language).

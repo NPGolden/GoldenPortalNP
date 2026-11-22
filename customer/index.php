@@ -80,6 +80,7 @@ require __DIR__ . '/app/io_actions.php';
 require __DIR__ . '/app/ft.php';         // R97-190 recycle bin for uploaded files
 require __DIR__ . '/app/wl.php';         // R97-194 wellness
 require __DIR__ . '/app/pn.php';         // R97-196 push notifications to the phones
+require __DIR__ . '/app/sv.php';         // R97-200 versions in the stores: update banner in the apps, announcement
 require __DIR__ . '/app/mailer.php'; // R91-003 outgoing mail (SMTP)
 require __DIR__ . '/app/web.php';    // R90-001 website statistics feed
 require __DIR__ . '/app/nl.php';         // R97-039 Web Sales › Newsletters
@@ -189,6 +190,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (function_exists('ft_handle_action') && ft_handle_action($action)) exit;   // R97-190
         if (function_exists('wl_handle_action') && wl_handle_action($action)) exit;   // R97-194
         if (function_exists('pn_handle_action') && pn_handle_action($action)) exit;   // R97-196
+        if (function_exists('sv_handle_action') && sv_handle_action($action)) exit;   // R97-200
         if (function_exists('mi_handle_action') && mi_handle_action($action)) exit;   // R97-027
         if (function_exists('nl_handle_action') && nl_handle_action($action)) exit;   // R97-039
         if (function_exists('yd_handle_action') && yd_handle_action($action)) exit;   // R97-052

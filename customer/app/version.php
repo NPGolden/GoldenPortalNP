@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.225.0';
+const CP_VERSION = '1.226.0';
 const CP_BUILD   = '2026-11-22';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-200', 'version' => '1.226.0', 'date' => '2026-11-23', 'title' => 'Store updates: the portal reads the versions in the App Store and Google Play; older installed apps show «A new version is available» with a button to the store; notification and e-mail to the users of an app when its new version is published; notifications raised through the apps also reach the phones', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-199', 'version' => '1.225.0', 'date' => '2026-11-23', 'title' => 'Planning notices on the phone: at 18:00 the planning of the next day (Sunday for Monday), at once a change of today or tomorrow; switch per person; a signed-out phone receives no push', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-198', 'version' => '1.224.1', 'date' => '2026-11-23', 'title' => 'Apps show the installed store build and the state of notifications beside the version (Service 0.8.3, PM 1.0.18, HR 1.2.2, Employee 1.1.3, Customer 1.0.14)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-197', 'version' => '1.224.0', 'date' => '2026-11-23', 'title' => 'Push notifications, app side: the five apps register the phone after sign-in (Service 0.8.2, PM 1.0.17, HR 1.2.1, Employee 1.1.2, Customer 1.0.13), store builds with the push entitlement, one phone per token, clock-job time shown in the company zone', 'db' => null, 'check' => null],

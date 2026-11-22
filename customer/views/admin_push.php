@@ -45,6 +45,19 @@ layout_head(t('pn.title'), 'admin_push');
     <?php foreach ($S['devices'] as $d): ?><tr><td><?= e($APP[$d['app_id']] ?? (string)$d['app_id']) ?></td><td><?= e(['ios' => 'iPhone / iPad', 'android' => 'Android', 'web' => 'Web'][$d['platform']] ?? (string)$d['platform']) ?></td><td class="num"><?= (int)$d['n'] ?></td><td class="num"><b><?= (int)$d['p'] ?></b></td></tr><?php endforeach; ?>
     </tbody></table><p class="hint" style="margin:8px 0 0;"><?= tt('pn.dev_d') ?></p><?php endif; ?>
   </div>
+  <?php if (function_exists('sv_all')): $SV = sv_all(); $svAt = (int) cp_setting('sv_at', '0'); ?>
+  <div class="card"><div class="card-head"><h2>🏬 <?= tt('sv.title') ?></h2></div>
+    <p class="hint" style="margin:0 0 8px;text-align:justify;"><?= tt('sv.hint') ?></p>
+    <table class="tbl" data-nosort><thead><tr><th><?= tt('sv.th_app') ?></th><th>App Store</th><th>Google Play</th></tr></thead><tbody>
+    <?php foreach (SV_APPS as $k => $a): ?><tr><td><?= e($a['name']) ?></td><td><?= e($SV[$k]['ios'] ?? '—') ?></td><td><?= e($a['android'] ? ($SV[$k]['android'] ?? '—') : t('sv.none')) ?></td></tr><?php endforeach; ?>
+    </tbody></table>
+    <p class="hint" style="margin:8px 0;"><?= e($svAt ? t('sv.at', ['t' => date('j M Y H:i', $svAt) . ' ' . tz_abbr()]) : t('sv.never')) ?></p>
+    <div class="btn-row">
+      <form method="post" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sv_mail"><label style="display:inline-flex;gap:8px;align-items:center;margin-right:10px;"><input type="checkbox" name="on" value="1"<?= (string) cp_setting('sv_mail', '1') !== '0' ? ' checked' : '' ?>> <?= tt('sv.mail') ?></label><button class="btn btn--sm btn--ghost" type="submit"><?= tt('btn.save') ?></button></form>
+      <form method="post" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sv_now"><button class="btn btn--sm btn--ghost" type="submit">↻ <?= tt('sv.now') ?></button></form>
+    </div>
+  </div>
+  <?php endif; ?>
   <div class="card"><div class="card-head"><h2>📤 <?= tt('pn.s_queue') ?></h2></div>
     <p><?= e(t('pn.q_line', ['p' => $S['pending'], 's' => $S['sent24'], 'f' => $S['fail24']])) ?></p>
     <?php if ($S['errors']): ?><table class="tbl" data-nosort><thead><tr><th><?= tt('pn.th_err') ?></th><th class="num">#</th><th><?= tt('pn.th_last') ?></th></tr></thead><tbody>

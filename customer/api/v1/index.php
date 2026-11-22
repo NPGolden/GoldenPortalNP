@@ -12,6 +12,8 @@ try {
     if (!isset(API_APPS[strtolower(trim((string)($_SERVER['HTTP_X_APP'] ?? API_APP_ID)))])) Response::error(403, 'Wrong application');
     $min = api_setting('api_min_version_' . $app, API_APPS[$app]); $ver = $_SERVER['HTTP_X_APP_VERSION'] ?? '0.0.0';
     if (version_compare($ver, $min, '<')) Response::error(426, 'Update required', ['min_version' => $min]);
+    /* R97-200: the version of this app in its store — public facts, no sign-in; the installed build compares and offers the update */
+    if ($path === '/store' && $method === 'GET') { RateLimit::check('store', RateLimit::ip(), 30); Response::json(function_exists('sv_for') ? sv_for($app, (string)($_GET['platform'] ?? '')) : ['version' => null, 'url' => null]); }
     /** GET /me: the SE shape, plus the PM fields for app pm (§1). */
     $me = function (array $u) use ($isPm, $isCu, $isHr): array { if (!empty($u['is_demo'])) return $isHr ? PortalHRDemo::me($u) : ['id' => (int)$u['id'], 'name' => (string)$u['full_name'], 'email' => (string)$u['email'], 'role' => (string)$u['role'], 'demo' => true];   // R97-169: no real data for a demonstration account
         if ($isCu) return PortalCustomer::me($u); if ($isHr) return PortalHR::me($u); $m = Portal::me($u); return $isPm ? array_replace($m, PortalPM::meExtra($u)) : $m; };

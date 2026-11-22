@@ -2,7 +2,7 @@
  * and a MOCK mode (built-in sample data in the same shape the portal returns) for the demo and the UI tests.
  * Mock mode: localStorage gas.mock = "1", or ?mock=1 on the URL. */
 window.API = (() => {
-  const VERSION = "0.8.3";
+  const VERSION = "0.8.4";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   const demoOn = () => { try { return localStorage.getItem("gas.demo") === "1"; } catch (e) { return false; } };   // R97-169
