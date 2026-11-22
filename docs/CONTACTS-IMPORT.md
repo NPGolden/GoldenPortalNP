@@ -4071,3 +4071,10 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Not done: push to phones. The apps register a push token, but the server has no sender, no notification keys (Firebase service account, Apple APNs key) and no clock job; see the summary for the steps.
 - Security review: posts carry the CSRF token; settings limited to known keys and ranges; the page data is a JSON block (no inline script), script tag with nonce; texts are written as text nodes; the anonymous answer cannot be joined to a person in the database; no personal data leaves the browser for the counters. Performance: one cached state per minute and user (four small queries), script deferred.
 
+## §478 Golden A/S Employee on the App Store (GAS-CP-R97-195, v1.222.1)
+
+- Employee 1.1.0 released on 22/11/2026 (availability set to all 175 countries, then "Release This Version"); Customer 1.0.12 released the same evening. `https://apps.apple.com/app/id6837805575` answers.
+- `cp_store_apps()`: `ios_live => true` for `employee`; `assets/apps/qr-employee-ios.png` already encoded that address (checked by decoding).
+- Website `apps.html`: the "Coming soon" tile of the Employee card is now the App Store link.
+- Security review: no program change.
+
