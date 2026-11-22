@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.224.1** (build 2026-11-22). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.225.0** (build 2026-11-22). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.225.0 | GAS-CP-R97-199 | 2026-11-23 | Planning notices on the phone: at 18:00 the planning of the next day (Sunday for Monday), at once a change of today or tomorrow; switch per person; a signed-out phone receives no push | — |
 | 1.224.1 | GAS-CP-R97-198 | 2026-11-23 | Apps show the installed store build and the state of notifications beside the version (Service 0.8.3, PM 1.0.18, HR 1.2.2, Employee 1.1.3, Customer 1.0.14) | — |
 | 1.224.0 | GAS-CP-R97-197 | 2026-11-23 | Push notifications, app side: the five apps register the phone after sign-in (Service 0.8.2, PM 1.0.17, HR 1.2.1, Employee 1.1.2, Customer 1.0.13), store builds with the push entitlement, one phone per token, clock-job time shown in the company zone | — |
 | 1.223.0 | GAS-CP-R97-196 | 2026-11-22 | Push notifications, portal side: sender for Android (Firebase) and iPhone (Apple), portal notifications and In / Out reminders to the phones, Settings › Push notifications with keys, clock job, phones and queue | — |

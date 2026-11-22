@@ -54,7 +54,7 @@ try {
     if ($isCu && !str_starts_with($path, '/me/passkeys')) { $u['device_id'] = (int)$u['device_id']; require __DIR__ . '/endpoints/customer.php'; customer_routes($u, $method, $path, $body); }
     if ($isPm) PortalPM::allowed($u);                                                                                            // rights may change while a token lives
     switch (true) {
-        case $method === 'POST' && $path === '/auth/logout': q('UPDATE mob_refresh_tokens SET revoked_at = NOW() WHERE device_id = ? AND revoked_at IS NULL', [$u['device_id']]); Response::json([], 204);
+        case $method === 'POST' && $path === '/auth/logout': q('UPDATE mob_refresh_tokens SET revoked_at = NOW() WHERE device_id = ? AND revoked_at IS NULL', [$u['device_id']]); q('UPDATE mob_devices SET push_token = NULL WHERE id = ?', [$u['device_id']]);   /* R97-199: a signed-out phone receives nothing */ Response::json([], 204);
         case $method === 'GET' && $path === '/me': Response::json($me($u));
         /* R82-003: part ordering from the apps — requisitions (app/prq.php rules) */
         case $method === 'GET' && $path === '/requisitions': Response::json(PortalParts::list((string)($_GET['status'] ?? 'open')));

@@ -87,6 +87,73 @@ function pn_io_tick(int $win = 20): int {
     return $n;
 }
 
+/* ------------------------------------------------------------------ planning notices (R97-199) */
+const PN_PLAN_HOUR = 18;                                           // the evening notice: 18:00 of the day before (Sunday evening for Monday)
+const PN_PLAN_SKIP = ['leave', 'sick', 'parental', 'strike'];      // absences are not announced — nobody is disturbed about a day off
+/** The planning of one day, [user_id => ['lang' => .., 'rows' => [entries]]] — active staff only, absences left out. */
+function pn_plan_rows(string $date, ?int $uid = null): array {
+    if (!function_exists('pl_has') || !pl_has()) return []; $o = [];
+    $skip = "'" . implode("','", PN_PLAN_SKIP) . "'";
+    foreach (all("SELECT e.user_id, e.kind, e.note, u.locale, p.project_code, s.code AS sub_code, s.name AS sub_name, COALESCE(v.name, pv.name) AS vessel, COALESCE(v.yard, pv.yard) AS yard, c.name AS car
+                  FROM plan_entries e JOIN customer_users u ON u.id = e.user_id AND u.is_active = 1 AND u.role IN ('staff','admin')
+                  LEFT JOIN projects p ON p.id = e.project_id LEFT JOIN subprojects s ON s.id = e.subproject_id LEFT JOIN vessels v ON v.id = e.vessel_id LEFT JOIN vessels pv ON pv.id = p.vessel_id LEFT JOIN plan_cars c ON c.id = e.car_id
+                  WHERE e.plan_date = ? AND e.kind NOT IN ({$skip})" . ($uid ? ' AND e.user_id = ?' : '') . ' ORDER BY e.user_id, e.id', $uid ? [$date, $uid] : [$date]) as $r) {
+        $o[(int)$r['user_id']]['lang'] = (string)($r['locale'] ?: 'en'); $o[(int)$r['user_id']]['rows'][] = $r;
+    }
+    return $o;
+}
+/** One line per assignment: "AMBROSIA Y.02 · Wheelhouse — Yard · car Van 2 · note" / "Training · note". */
+function pn_plan_text(array $rows, string $lang): string {
+    $L = [];
+    foreach ($rows as $e) {
+        $P = [];
+        if ($e['kind'] === 'work') {
+            $l = trim(((string)($e['vessel'] ?? '') !== '' ? (string)$e['vessel'] : (string)($e['project_code'] ?? '')) . ((string)($e['sub_code'] ?? '') !== '' ? ' ' . $e['sub_code'] : ''));
+            $l = $l !== '' ? $l : pn_t($lang, 'pl.k_work');
+            if ((string)($e['sub_name'] ?? '') !== '') $l .= ' · ' . $e['sub_name'];
+            if ((string)($e['yard'] ?? '') !== '') $l .= ' — ' . $e['yard'];
+            $P[] = $l;
+        } elseif (!($e['kind'] === 'other' && (string)($e['note'] ?? '') !== '')) $P[] = pn_t($lang, 'pl.k_' . $e['kind']);
+        if ((string)($e['note'] ?? '') !== '') $P[] = (string)$e['note'];
+        if ((string)($e['car'] ?? '') !== '') $P[] = pn_t($lang, 'pn.pl_car', ['c' => $e['car']]);
+        $l = implode(' · ', $P); if ($l !== '' && !in_array($l, $L, true)) $L[] = $l;
+    }
+    return mb_substr(implode("\n", $L), 0, 400);
+}
+function pn_plan_on(int $uid): bool { return !(function_exists('wl_has') && wl_has()) || !empty(wl_prefs($uid)['plan']); }
+/** Called by the planning board when a planner changes somebody's day. Only today and tomorrow matter; the notice itself is written by the clock job, so several edits in a row give one push with the final state. */
+function pn_plan_touch(int $uid, string $date): void {
+    try {
+        if (!pn_has() || $uid <= 0 || ($date !== date('Y-m-d') && $date !== date('Y-m-d', strtotime('+1 day')))) return;
+        if ((int)(current_user()['id'] ?? 0) === $uid) return;     // one's own edit needs no notice
+        q('INSERT INTO cp_settings (k, v) VALUES (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)', ["pn_pd:$uid:$date", (string) time()]);
+    } catch (Throwable $e) { /* a notice must never break the planning */ }
+}
+/** The evening notice for tomorrow (once a day, from PN_PLAN_HOUR) and the notices of late changes. */
+function pn_plan_tick(): int {
+    if (!pn_has() || !function_exists('pl_has') || !pl_has()) return 0; $n = 0;
+    $today = date('Y-m-d'); $tom = date('Y-m-d', strtotime('+1 day')); $h = (int) date('G'); $d = fn(string $x) => date('d/m', strtotime($x));
+    $sent = (string) scalar("SELECT v FROM cp_settings WHERE k = 'pn_plan_sent'");
+    if ($h >= PN_PLAN_HOUR && $h < PN_PLAN_HOUR + 4 && $sent !== $tom) {
+        cp_setting_set('pn_plan_sent', $tom); $sent = $tom;        // marked first: a failure half-way must not send the evening notice twice
+        foreach (pn_plan_rows($tom) as $uid => $x) { if (!pn_plan_on($uid)) continue; $b = pn_plan_text($x['rows'], $x['lang']); if ($b === '') continue;
+            $n += (int) pn_enqueue($uid, 'plan:day', "plan:$tom", pn_t($x['lang'], 'pn.pl_t', ['d' => $d($tom)]), $b); }
+        q("DELETE FROM cp_settings WHERE k LIKE ?", ["pn\\_pd:%:$tom"]);   // changes made before the evening notice are in it
+    }
+    foreach (all("SELECT k, v FROM cp_settings WHERE k LIKE 'pn\\_pd:%'") as $r) {
+        [, $uid, $date] = explode(':', (string)$r['k']) + [null, 0, '']; $uid = (int)$uid;
+        if ($date >= $today && (int)$r['v'] > time() - 120) continue;          // the planner may still be editing
+        q('DELETE FROM cp_settings WHERE k = ? AND v = ?', [$r['k'], $r['v']]);
+        if ($date !== $today && !($date === $tom && $sent === $tom)) continue;  // past days; tomorrow before the evening notice
+        if (!pn_plan_on($uid)) continue;
+        $usr = one("SELECT locale FROM customer_users WHERE id = ? AND is_active = 1 AND role IN ('staff','admin')", [$uid]); if (!$usr) continue; $lang = (string)($usr['locale'] ?: 'en');
+        $x = pn_plan_rows($date, $uid)[$uid] ?? null; $b = $x ? pn_plan_text($x['rows'], $lang) : '';
+        if ($b === '' && scalar("SELECT COUNT(*) FROM plan_entries WHERE user_id = ? AND plan_date = ?", [$uid, $date])) continue;   // the day is now an absence — HR tells that in its own way
+        $n += (int) pn_enqueue($uid, 'plan:chg', "planc:$date:" . (int)$r['v'], pn_t($lang, 'pn.plc_t', ['w' => pn_t($lang, $date === $today ? 'pn.pl_today' : 'pn.pl_tomorrow'), 'd' => $d($date)]), $b !== '' ? $b : pn_t($lang, 'pn.plc_none'));
+    }
+    return $n;
+}
+
 /* ------------------------------------------------------------------ sending */
 function pn_curl(string $url, array $headers, string $body, bool $h2 = false): array {
     $c = curl_init($url); curl_setopt_array($c, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => $body, CURLOPT_HTTPHEADER => $headers, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 12, CURLOPT_CONNECTTIMEOUT => 6]);
@@ -157,6 +224,7 @@ function pn_flush(int $max = 80): array {
 function pn_tick(): array {
     if (!pn_has()) return ['off' => 1]; $o = ['io' => 0];
     try { $o['io'] = pn_io_tick(); } catch (Throwable $e) { $o['io_err'] = mb_substr($e->getMessage(), 0, 80); }
+    try { $o['plan'] = pn_plan_tick(); } catch (Throwable $e) { $o['plan_err'] = mb_substr($e->getMessage(), 0, 80); }
     try { $o += pn_flush(); } catch (Throwable $e) { $o['flush_err'] = mb_substr($e->getMessage(), 0, 80); }
     cp_setting_set('pn_last_tick', date('Y-m-d H:i:s')); return $o;
 }

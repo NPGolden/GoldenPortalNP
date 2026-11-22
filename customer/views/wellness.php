@@ -13,7 +13,7 @@ layout_head(t('wl.title'), 'wellness');
   <div class="card"><h2><?= tt('wl.s_remind') ?></h2>
     <?= $opt('breaks') ?>
     <label class="wl-num"><?= tt('wl.o_break_min') ?> <input type="number" name="break_min" min="20" max="120" value="<?= (int)$P['break_min'] ?>"></label>
-    <?= $opt('eyes') . $opt('hydrate') . $opt('posture') . $opt('eod') . $opt('io_remind') . $opt('mood') ?>
+    <?= $opt('eyes') . $opt('hydrate') . $opt('posture') . $opt('eod') . $opt('io_remind') . $opt('plan') . $opt('mood') ?>
     <?php if ($T['leave']): ?><p class="flash flash--info" style="margin:10px 0 0;"><?= tt('wl.on_leave') ?></p><?php endif; ?>
   </div>
   <div>

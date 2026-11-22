@@ -108,7 +108,7 @@ function pl_assign(array $in): int {
         else q('DELETE FROM plan_entries WHERE user_id = ? AND plan_date = ? AND kind = ? AND COALESCE(project_id, 0) = ? AND COALESCE(subproject_id, 0) = ?', [$uid, $date, $kind, (int)$pid, (int)$sid]);
         if ($hrCols) q('INSERT INTO plan_entries (user_id, plan_date, kind, project_id, subproject_id, vessel_id, car_id, note, created_by, leave_type_id, reason) VALUES (?,?,?,?,?,?,?,?,?,?,?)', [$uid, $date, $kind, $pid, $sid, $vid, $car, $note, (int)($me['id'] ?? 0) ?: null, $ltype, $reason]);
         else q('INSERT INTO plan_entries (user_id, plan_date, kind, project_id, subproject_id, vessel_id, car_id, note, created_by) VALUES (?,?,?,?,?,?,?,?,?)', [$uid, $date, $kind, $pid, $sid, $vid, $car, $note, (int)($me['id'] ?? 0) ?: null]);
-        $n++;
+        $n++; if (function_exists('pn_plan_touch')) pn_plan_touch($uid, $date);   // R97-199
     }
     if ($kind === 'work' && $sid && function_exists('tm_has') && tm_has()) q('INSERT IGNORE INTO sp_team (subproject_id, user_id, added_by) VALUES (?,?,?)', [$sid, $uid, (int)($me['id'] ?? 0) ?: null]);   // the plan feeds the team
     return $n;
@@ -116,13 +116,17 @@ function pl_assign(array $in): int {
 function pl_delete(int $id): void {
     require_staff(); if (!pl_can_edit()) throw new RuntimeException(t('err.noaccess'));
     if (hr_only() && (string) scalar('SELECT kind FROM plan_entries WHERE id = ?', [$id]) === 'work') throw new RuntimeException(t('hr.no_work'));   // R51-001
+    $was = one('SELECT user_id, plan_date FROM plan_entries WHERE id = ?', [$id]);
     q('DELETE FROM plan_entries WHERE id = ?', [$id]);
+    if ($was && function_exists('pn_plan_touch')) pn_plan_touch((int)$was['user_id'], (string)$was['plan_date']);   // R97-199
 }
 /** R35-004: remove every planning entry of a work package (and stop the package from rewriting them). */
 function pl_delete_work(int $workId): int {
     require_staff(); if (!pl_can_edit() || hr_only()) throw new RuntimeException(t('err.noaccess'));
     $n = (int) scalar('SELECT COUNT(*) FROM plan_entries WHERE work_id = ?', [$workId]);
+    $was = function_exists('pn_plan_touch') ? all('SELECT DISTINCT user_id, plan_date FROM plan_entries WHERE work_id = ? AND plan_date BETWEEN CURDATE() AND CURDATE() + INTERVAL 1 DAY', [$workId]) : [];
     q('DELETE FROM plan_entries WHERE work_id = ?', [$workId]);
+    foreach ($was as $x) pn_plan_touch((int)$x['user_id'], (string)$x['plan_date']);   // R97-199
     try { q('UPDATE sp_works SET auto_plan = 0 WHERE id = ?', [$workId]); } catch (Throwable $e) {}
     return $n;
 }
@@ -133,6 +137,7 @@ function pl_clear(int $uid, string $from, string $to): int {
     $w = hr_only() ? " AND kind <> 'work'" : '';   // R51-001: HR clears absences only
     $n = (int) scalar('SELECT COUNT(*) FROM plan_entries WHERE user_id = ? AND plan_date BETWEEN ? AND ?' . $w, [$uid, $from, $to]);
     q('DELETE FROM plan_entries WHERE user_id = ? AND plan_date BETWEEN ? AND ?' . $w, [$uid, $from, $to]);
+    if ($n && function_exists('pn_plan_touch')) foreach ([date('Y-m-d'), date('Y-m-d', strtotime('+1 day'))] as $x) if ($x >= $from && $x <= $to) pn_plan_touch($uid, $x);   // R97-199
     return $n;
 }
 function pl_car_save(): void {
