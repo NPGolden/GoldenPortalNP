@@ -4134,3 +4134,8 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - `views/community.php`: each post is `<details class="card soc-post" id="post<N>">`; the summary carries the title (one `<span data-soc-lang>` per language), writer, date, pills and counters; open at load when pinned, an open poll, or being edited. Script (nonce): `#post<N>` in the address opens that post (redirects after reacting, commenting, voting and notification links), `data-soc-all` opens / closes all, `data-soc-pick` switches the language inside one post. `?p=community&edit=<id>` turns the form into the editor.
 - `soc_post_edit` and `soc_post_delete` added to the action lists of the scoped roles (`HR_ACTIONS`, `PA_ACTIONS`, `EMP_ACTIONS`) — until now a scoped employee could not delete an own post.
 - Language keys +8 (13 116 per language). The mobile apps do not show Community.
+
+## §485 Community: pin an existing post (GAS-CP-R97-202, v1.227.1)
+
+- `soc_post_update()`: when the form carries `pinned_until` and the user passes `soc_can_post()`, the date (`YYYY-MM-DD`) is stored, anything else stores NULL (unpinned). Without the field the pin is left as it is, so an edit by a writer who may not pin never removes a pin.
+- `views/community.php`: the edit form shows «Pin until» (prefilled) for `$canPost`. No database step, no new language key. The staff handbook is unchanged: employees cannot pin.

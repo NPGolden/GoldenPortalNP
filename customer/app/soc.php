@@ -108,13 +108,14 @@ function soc_notify_post(int $id, string $icon, string $title, ?string $body, ar
     $by = []; foreach ($ids as $uid) { $l = $loc[$uid] ?? ''; $by[isset($tr[$l]) ? $l : ''][] = $uid; }
     foreach ($by as $l => $to) soc_notify($to, 'soc:post', 'soc:post:' . $id, $icon . ($l === '' ? $title : $tr[$l][0]), $l === '' ? $body : $tr[$l][1], url('community') . '#post' . $id);
 }
-/** Title, text, language and the other languages of an existing post — its writer, HR and administrators. Kind, photo, video and poll stay as published. */
+/** Title, text, language and the other languages of an existing post — its writer, HR and administrators. Kind, photo, video and poll stay as published; the pin date can be set, changed or emptied by those who may pin (R97-202). */
 function soc_post_update(int $id): void {
     if (!soc_tr_has()) throw new RuntimeException(t('err.notfound')); $p = one('SELECT * FROM soc_posts WHERE id = ?', [$id]); if (!$p) throw new RuntimeException(t('err.notfound'));
     if (!soc_post_can_edit($p)) throw new RuntimeException(t('err.noaccess'));
     $title = mb_substr(trim((string)($_POST['title'] ?? '')), 0, 200); if ($title === '') throw new RuntimeException(t('soc.need_title'));
     $body = mb_substr(trim((string)($_POST['body'] ?? '')), 0, 8000) ?: null; $lang = soc_lang_from_post();
     q('UPDATE soc_posts SET title = ?, body = ?, lang = ? WHERE id = ?', [$title, $body, $lang, $id]); soc_tr_save($id, soc_tr_from_post($lang));
+    if (array_key_exists('pinned_until', $_POST) && soc_can_post()) { $pin = (string)$_POST['pinned_until']; q('UPDATE soc_posts SET pinned_until = ? WHERE id = ?', [preg_match('/^\d{4}-\d{2}-\d{2}$/', $pin) ? $pin : null, $id]); }   // R97-202: pin, change the date or unpin (empty) an existing post — the same people who may pin a new one
 }
 function soc_post_create(): int {
     if (!soc_has()) throw new RuntimeException(t('err.notfound')); $kind = in_array($_POST['kind'] ?? '', ['post', 'poll', 'photo', 'video'], true) ? $_POST['kind'] : 'post'; if ($kind === 'video' && !soc_video_has()) $kind = 'post';

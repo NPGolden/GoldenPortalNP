@@ -49,6 +49,7 @@ layout_head(t('soc.title'), 'community');
       </div><?php endforeach; ?>
     </details>
     <?php endif; ?>
+    <?php if ($edit && $canPost): ?><div class="grid grid-3"><div class="field"><label><?= tt('soc.pin_until') ?> <span class="hint"><?= tt('soc.photo_optional') ?></span></label><input type="date" name="pinned_until" value="<?= e((string)($edit['pinned_until'] ?? '')) ?>"></div></div><?php endif; ?>
     <?php if (!$edit): ?>
     <div class="grid grid-3 soc-poll" style="display:none;"><?php for ($i = 0; $i < 6; $i++): ?><div class="field"><label><?= tt('soc.option') ?> <?= $i + 1 ?></label><input name="options[]" maxlength="120"></div><?php endfor; ?><div class="field"><label><?= tt('soc.closes_at') ?></label><input type="date" name="closes_at"></div></div>
     <?php if ($vidOk): ?><div class="field soc-video"><label><?= tt('soc.video_url') ?> <span class="hint soc-video-opt"><?= tt('soc.photo_optional') ?></span></label><input type="url" name="video_url" maxlength="300" placeholder="https://www.youtube.com/watch?v=…"><p class="hint" style="margin:2px 0 0;"><?= tt('soc.video_hint') ?></p></div><?php endif; ?>

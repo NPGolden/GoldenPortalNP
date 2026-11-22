@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.227.0';
+const CP_VERSION = '1.227.1';
 const CP_BUILD   = '2026-11-23';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-202', 'version' => '1.227.1', 'date' => '2026-11-23', 'title' => 'Community: an existing post can be pinned — ✎ Edit shows «Pin until»; a date pins the post, another date changes it, an empty field unpins it', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-201', 'version' => '1.227.0', 'date' => '2026-11-23', 'title' => 'Community: the noticeboard is a list of titles that open on click (Expand all / Collapse all; pinned posts and open polls start open); one post can carry its text in the five languages — each person sees the language of the portal they use and can switch; the writer, HR and administrators can edit a post', 'db' => 'install/migrate_cp_r97_201_soc_lang.sql', 'check' => 'r99j'],
         ['ref' => 'GAS-CP-R97-200', 'version' => '1.226.0', 'date' => '2026-11-23', 'title' => 'Store updates: the portal reads the versions in the App Store and Google Play; older installed apps show «A new version is available» with a button to the store; notification and e-mail to the users of an app when its new version is published; notifications raised through the apps also reach the phones', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-199', 'version' => '1.225.0', 'date' => '2026-11-23', 'title' => 'Planning notices on the phone: at 18:00 the planning of the next day (Sunday for Monday), at once a change of today or tomorrow; switch per person; a signed-out phone receives no push', 'db' => null, 'check' => null],
