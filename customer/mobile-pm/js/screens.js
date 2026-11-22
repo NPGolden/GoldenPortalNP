@@ -289,7 +289,7 @@ window.SCREENS = (() => {
       <div class="card tap c-gold" id="ai"><div class="t">✦ ${t("ai.title")}</div><div class="s muted">${ctx.me.ai || API.mock ? t("ai.help") : t("ai.disabled")}</div></div>
       <h2>${t("more.settings")}</h2>
       <div class="kv"><b>${t("set.account")}</b><span class="v">${esc(ctx.me.name)} • ${esc(ctx.me.discipline || "")}</span></div><div class="kv"><b>${t("set.branch")}</b><span class="v">${esc(ctx.me.home_branch || "")} ${ctx.me.home_branch === "GIT" ? "— GOLDEN AS ITALIAN" : "— Golden A/S Keratsini"}</span></div>
-      <div class="kv"><b>${t("set.version")}</b><span class="v">Golden PM ${API.VERSION}${API.mock ? " (demo)" : ""}${ctx.me.min_app_version ? ` • portal min ${esc(ctx.me.min_app_version)}` : ""}</span></div>
+      <div class="kv"><b>${t("set.version")}</b><span class="v">Golden PM ${API.VERSION}${API.mock ? " (demo)" : ""}${ctx.me.min_app_version ? ` • portal min ${esc(ctx.me.min_app_version)}` : ""}${window.PUSH && PUSH.label() ? `<br><small>${esc(PUSH.label())}</small>` : ""}</span></div>
       <label>${t("more.lang")}</label><div class="lang">${I18N.LANGS.map(([c, l]) => `<button data-l="${c}" class="${I18N.get() === c ? "on" : ""}">${l}</button>`).join("")}</div>
       <label>${t("more.bio")}</label><div class="seg" data-k="bio"><button data-v="1" class="${bio ? "on" : ""}">${t("more.bio_on")}</button><button data-v="0" class="${bio ? "" : "on"}">${t("more.bio_off")}</button></div>
       <h2>${t("more.about")}</h2><p class="muted">${t("more.about_txt")}</p>

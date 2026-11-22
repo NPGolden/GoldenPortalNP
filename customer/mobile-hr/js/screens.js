@@ -165,7 +165,7 @@ window.SCREENS = (() => {
     UI.chrome(true, t("tab.more"), "more"); const ob = await DB.outbox();
     return { html: `<div class="card tap c-gold" data-go="#/io"><div class="t">⏱ ${t("io.title")}</div><div class="s muted">${t("io.hint")}</div></div>
       <div class="kv"><b>${t("set.account")}</b><span class="v">${esc(ctx.me.name)} • ${esc(ctx.me.discipline || "")}</span></div><div class="kv"><b>${t("set.branch")}</b><span class="v">${esc(ctx.me.home_branch || "")}</span></div>
-      <div class="kv"><b>${t("set.version")}</b><span class="v">Golden HR ${API.VERSION}${ctx.me.min_app_version ? ` • portal min ${esc(ctx.me.min_app_version)}` : ""}</span></div>
+      <div class="kv"><b>${t("set.version")}</b><span class="v">Golden HR ${API.VERSION}${ctx.me.min_app_version ? ` • portal min ${esc(ctx.me.min_app_version)}` : ""}${window.PUSH && PUSH.label() ? `<br><small>${esc(PUSH.label())}</small>` : ""}</span></div>
       <div class="kv"><b>${t("more.outbox")}</b><span class="v">${ob.length} ${t("sync.queued")}${ob.filter((o) => o.status === "rejected").length ? ` • ${ob.filter((o) => o.status === "rejected").length} ${t("sync.rejected")}` : ""}</span></div>
       <label>${t("more.lang")}</label><div class="lang">${I18N.LANGS.map(([c, l]) => `<button data-l="${c}" class="${I18N.get() === c ? "on" : ""}">${l}</button>`).join("")}</div>
       <h2>🔒 ${t("more.security")}</h2><p class="muted">${t("more.security_txt")}</p>

@@ -41,6 +41,6 @@ window.More = (function () {
     const lk = $("#lockapp"); if (lk) lk.onclick = async () => { if (!(await Auth.unlockGate())) return; App.go("#/home"); };   // R70-005: lock = the same gate as on open; the session stays on the device
   }
   function help() { render(`${UI.back("#/more")}<h1>${esc(t("help.title"))}</h1><div class="card"><p>${esc(t("about.text"))}</p><p><a href="../?p=manual" target="_blank" rel="noopener">${esc(t("help.manual"))}</a></p><p class="meta">support@goldenas.com.gr</p></div>`, t("more.help")); }
-  function about() { render(`${UI.back("#/more")}<h1>${esc(t("app.name"))}</h1><div class="card"><img src="img/logo.png" style="width:200px;display:block;margin:0 auto 12px" alt=""><p>${esc(t("about.text"))}</p><dl class="kv"><dt>${esc(t("acc.version"))}</dt><dd>${Api.APP_VERSION}</dd><dt>API</dt><dd>${esc(Api.cfg.mock ? "demo (mock)" : Api.cfg.base)}</dd></dl></div>`, t("more.about")); }
+  function about() { render(`${UI.back("#/more")}<h1>${esc(t("app.name"))}</h1><div class="card"><img src="img/logo.png" style="width:200px;display:block;margin:0 auto 12px" alt=""><p>${esc(t("about.text"))}</p><dl class="kv"><dt>${esc(t("acc.version"))}</dt><dd>${Api.APP_VERSION}${window.PUSH && PUSH.label() ? `<br><small>${esc(PUSH.label())}</small>` : ""}</dd><dt>API</dt><dd>${esc(Api.cfg.mock ? "demo (mock)" : Api.cfg.base)}</dd></dl></div>`, t("more.about")); }
   return { menu, vessels, projects, documents, account, help, about };
 })();

@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.224.0** (build 2026-11-22). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.224.1** (build 2026-11-22). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.224.1 | GAS-CP-R97-198 | 2026-11-23 | Apps show the installed store build and the state of notifications beside the version (Service 0.8.3, PM 1.0.18, HR 1.2.2, Employee 1.1.3, Customer 1.0.14) | — |
 | 1.224.0 | GAS-CP-R97-197 | 2026-11-23 | Push notifications, app side: the five apps register the phone after sign-in (Service 0.8.2, PM 1.0.17, HR 1.2.1, Employee 1.1.2, Customer 1.0.13), store builds with the push entitlement, one phone per token, clock-job time shown in the company zone | — |
 | 1.223.0 | GAS-CP-R97-196 | 2026-11-22 | Push notifications, portal side: sender for Android (Firebase) and iPhone (Apple), portal notifications and In / Out reminders to the phones, Settings › Push notifications with keys, clock job, phones and queue | — |
 | 1.222.1 | GAS-CP-R97-195 | 2026-11-22 | Golden A/S Employee is on the App Store: link and QR code active on the home and sign-in pages | — |

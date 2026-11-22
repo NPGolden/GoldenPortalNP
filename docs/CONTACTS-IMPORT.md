@@ -4100,3 +4100,9 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - API: `api_push_token()` in `api/v1/bootstrap.php` (both routes). Token shape checked (Apple: 64–200 hex; Google: 20–255 URL-safe characters) → 422 otherwise; the same token is removed from every other device row before it is stored.
 - `?p=admin_push`: `pn_last_tick` is stored in the company zone, so it is printed with `date()` and `tz_abbr()` (not `fmt_datetime()`, which converts from the database zone).
 - App versions: Service 0.8.2, PM 1.0.17, HR 1.2.1, Employee 1.1.2, Customer 1.0.13.
+
+## §481 Notification state shown in the apps (GAS-CP-R97-198, v1.224.1)
+
+- `push.js` sets `window.PUSH` in every client: `PUSH.label()` = "store build <version> (<build>)" from the `App` plug-in (`getInfo()`), then "notifications: <state>". States: `after sign-in`, `asking permission`, `registering`, `sending token`, `on`, `not allowed …`, `not in this build …` (no `GASPush/1` mark), `plug-in missing`, `registration refused (<reason>)` (new `registrationError` listener), `token not accepted by the portal (<status>)`. Empty in a browser.
+- Printed under the version: `set.version` row of Service, PM, HR and Employee; About of Customer. Text only, escaped; no token or identifier is shown.
+- App versions: Service 0.8.3, PM 1.0.18, HR 1.2.2, Employee 1.1.3, Customer 1.0.14 (screens only; the store builds of R97-197 stay valid).
