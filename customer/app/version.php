@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.217.2';
-const CP_BUILD   = '2026-11-21';
+const CP_VERSION = '1.218.0';
+const CP_BUILD   = '2026-11-22';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-189', 'version' => '1.218.0', 'date' => '2026-11-22', 'title' => 'In / Out: new tab Process with the procedure as a flow of nine steps; the In / Out figures of the year are shown in the yearly evaluation beside Attendance & consistency (shown, not scored)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-188', 'version' => '1.217.2', 'date' => '2026-11-22', 'title' => 'Manual: the In / Out procedure for employees and for managers, with the cross-check against timesheets and field service reports', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-187', 'version' => '1.217.1', 'date' => '2026-11-22', 'title' => 'Golden A/S Employee on Google Play: link and QR code on the home page and the sign-in page; App Store shown as coming soon', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-186', 'version' => '1.217.0', 'date' => '2026-11-21', 'title' => 'In / Out in Golden PM (1.0.16) and Golden HR (1.2.0): the same clock in / clock out with position and the same acceptance at first use, under More', 'db' => null, 'check' => null],

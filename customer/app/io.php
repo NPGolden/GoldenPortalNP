@@ -212,6 +212,29 @@ function io_board(string $day): array {
         $lastK = $rows ? $rows[count($rows) - 1]['kind'] : null; $out[] = ['uid' => $uid, 'name' => $name, 'in' => $in, 'out' => $lastK === 'out' ? $o : null, 'state' => $lastK === 'in' ? 'in' : ($rows ? 'out' : 'none'), 'n' => count($rows)]; }
     return $out;
 }
+/** The In / Out figures of one person for a period (shared by the statistics and the yearly evaluation). $days: [day => punches]. */
+function io_stats_calc(int $uid, array $days, string $from, string $end, string $today): array {
+    $cal = function_exists('wc_user_calendar') ? wc_user_calendar($uid) : 'GR'; $wd = 0;
+    for ($t = strtotime($from); $t <= strtotime($end); $t += 86400) { $d = date('Y-m-d', $t); if (function_exists('wc_day') ? wc_day($cal, $d)['workday'] : (date('N', $t) < 6)) $wd++; }
+    $present = 0; $complete = 0; $punch = 0; $clean = 0; $f = array_fill_keys(IO_FLAGS, 0); $lateMin = 0; $ins = 0; $ontime = 0; $rej = 0;
+    foreach ($days as $d => $list) {
+        $has = false; $open = false; $firstIn = true;
+        foreach ($list as $r) { if ($r['status'] === 'rejected') { $rej++; continue; } $has = true; $punch++; $fl = array_filter(explode(',', (string)$r['flags'])); if (!array_intersect($fl, IO_EXC)) $clean++; foreach ($fl as $x) if (isset($f[$x])) $f[$x]++;
+            if ($r['kind'] === 'in') { $open = true; if ($firstIn) { $firstIn = false; $ins++; if (!in_array('late', $fl, true)) $ontime++; else { $c = function_exists('wc_day') ? wc_day($cal, $d) : null; if ($c && !empty($c['rule']['start_time'])) $lateMin += max(0, (int) round((strtotime('1970-01-01 ' . $r['local_time']) - strtotime('1970-01-01 ' . $c['rule']['start_time'])) / 60)); } } }
+            else $open = false; }
+        if ($has) { $present++; if (!$open || $d === $today) $complete++; }
+    }
+    return ['workdays' => $wd, 'present' => $present, 'complete' => $complete, 'punches' => $punch, 'clean' => $clean, 'flags' => $f, 'ins' => $ins, 'ontime' => $ontime, 'late_avg' => ($ins - $ontime) > 0 ? (int) round($lateMin / ($ins - $ontime)) : 0, 'rejected' => $rej,
+        'consistency' => $wd ? (int) round(100 * min($complete, $wd) / $wd) : null, 'accuracy' => $punch ? (int) round(100 * $clean / $punch) : null, 'punctual' => $ins ? (int) round(100 * $ontime / $ins) : null];
+}
+/** In / Out of one person in a year, for the yearly evaluation (R97-189): shown beside the attendance criterion, not scored. Null when the person has no punches in that year. */
+function io_year_figures(int $uid, int $year): ?array {
+    if (!io_has() || $uid <= 0) return null; $from = "$year-01-01"; $to = "$year-12-31"; $today = date('Y-m-d');
+    $first = (string) scalar('SELECT MIN(local_day) FROM io_entries WHERE user_id = ? AND local_day BETWEEN ? AND ?', [$uid, $from, $to]); if ($first === '') return null;
+    $days = []; foreach (all('SELECT * FROM io_entries WHERE user_id = ? AND local_day BETWEEN ? AND ? ORDER BY at_utc, id', [$uid, $from, $to]) as $r) $days[(string)$r['local_day']][] = $r;
+    return io_stats_calc($uid, $days, $first, min($to, $today), $today) + ['since' => $first];   // working days are counted from the person's first punch of the year
+}
+function io_year_text(array $a): string { $pc = fn($v) => $v === null ? '—' : $v . ' %'; return t('io.ev_txt', ['c' => $pc($a['consistency']), 'a' => $pc($a['accuracy']), 'p' => $pc($a['punctual']), 'd' => $a['present'], 'w' => $a['workdays']]); }
 /** Statistics per person for a period (HR, CEO, General Manager). */
 function io_stats(string $from, string $to): array {
     if (!io_stats_can()) throw new RuntimeException(t('err.noaccess'));
@@ -220,19 +243,9 @@ function io_stats(string $from, string $to): array {
     $ot = []; foreach (all('SELECT user_id, status, SUM(minutes) m FROM io_overtime WHERE day BETWEEN ? AND ? GROUP BY user_id, status', [$from, $to]) as $r) $ot[(int)$r['user_id']][$r['status']] = (int)$r['m'];
     $today = date('Y-m-d'); $end = min($to, $today); $out = [];
     foreach (io_staff() as $uid => $name) {
-        $cal = function_exists('wc_user_calendar') ? wc_user_calendar($uid) : 'GR'; $wd = 0;
-        for ($t = strtotime($from); $t <= strtotime($end); $t += 86400) { $d = date('Y-m-d', $t); if (function_exists('wc_day') ? wc_day($cal, $d)['workday'] : (date('N', $t) < 6)) $wd++; }
-        $days = $by[$uid] ?? []; $present = 0; $complete = 0; $punch = 0; $clean = 0; $f = array_fill_keys(IO_FLAGS, 0); $lateMin = 0; $ins = 0; $ontime = 0; $rej = 0;
-        foreach ($days as $d => $list) {
-            $has = false; $open = false; $firstIn = true;
-            foreach ($list as $r) { if ($r['status'] === 'rejected') { $rej++; continue; } $has = true; $punch++; $fl = array_filter(explode(',', (string)$r['flags'])); if (!array_intersect($fl, IO_EXC)) $clean++; foreach ($fl as $x) if (isset($f[$x])) $f[$x]++;
-                if ($r['kind'] === 'in') { $open = true; if ($firstIn) { $firstIn = false; $ins++; if (!in_array('late', $fl, true)) $ontime++; else { $c = function_exists('wc_day') ? wc_day($cal, $d) : null; if ($c && !empty($c['rule']['start_time'])) $lateMin += max(0, (int) round((strtotime('1970-01-01 ' . $r['local_time']) - strtotime('1970-01-01 ' . $c['rule']['start_time'])) / 60)); } } }
-                else $open = false; }
-            if ($has) { $present++; if (!$open || $d === $today) $complete++; }
-        }
-        if (!$punch && !$wd) continue;
-        $out[] = ['uid' => $uid, 'name' => $name, 'workdays' => $wd, 'present' => $present, 'complete' => $complete, 'punches' => $punch, 'clean' => $clean, 'flags' => $f, 'ins' => $ins, 'ontime' => $ontime, 'late_avg' => ($ins - $ontime) > 0 ? (int) round($lateMin / ($ins - $ontime)) : 0, 'rejected' => $rej,
-            'consistency' => $wd ? (int) round(100 * min($complete, $wd) / $wd) : null, 'accuracy' => $punch ? (int) round(100 * $clean / $punch) : null, 'punctual' => $ins ? (int) round(100 * $ontime / $ins) : null, 'ot_ok' => $ot[$uid]['approved'] ?? 0, 'ot_no' => $ot[$uid]['rejected'] ?? 0];
+        $c = io_stats_calc($uid, $by[$uid] ?? [], $from, $end, $today);
+        if (!$c['punches'] && !$c['workdays']) continue;
+        $out[] = ['uid' => $uid, 'name' => $name] + $c + ['ot_ok' => $ot[$uid]['approved'] ?? 0, 'ot_no' => $ot[$uid]['rejected'] ?? 0];
     }
     return $out;
 }

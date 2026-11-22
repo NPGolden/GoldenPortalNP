@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.217.2** (build 2026-11-21). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.218.0** (build 2026-11-22). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.218.0 | GAS-CP-R97-189 | 2026-11-22 | In / Out: new tab Process with the procedure as a flow of nine steps; the In / Out figures of the year are shown in the yearly evaluation beside Attendance & consistency (shown, not scored) | — |
 | 1.217.2 | GAS-CP-R97-188 | 2026-11-22 | Manual: the In / Out procedure for employees and for managers, with the cross-check against timesheets and field service reports | — |
 | 1.217.1 | GAS-CP-R97-187 | 2026-11-22 | Golden A/S Employee on Google Play: link and QR code on the home page and the sign-in page; App Store shown as coming soon | — |
 | 1.217.0 | GAS-CP-R97-186 | 2026-11-21 | In / Out in Golden PM (1.0.16) and Golden HR (1.2.0): the same clock in / clock out with position and the same acceptance at first use, under More | — |

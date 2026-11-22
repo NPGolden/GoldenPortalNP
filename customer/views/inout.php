@@ -1,5 +1,5 @@
 <?php
-/** In / Out (GAS-CP-R97-182): attendance punches with position.  ?p=inout[&tab=my|today|exc|ot|list|sites|stats]
+/** In / Out (GAS-CP-R97-182): attendance punches with position.  ?p=inout[&tab=my|today|exc|ot|list|sites|stats|flow]
  *  my — own punches and In / Out from a registered network address; today — who is in; exc — punches waiting for a decision;
  *  ot — overtime beside timesheet and service reports; list — every punch with its map link; sites — known sites and rules;
  *  stats — consistency and accuracy per person (HR, CEO, General Manager only). */
@@ -7,7 +7,7 @@ require __DIR__ . '/_layout.php';
 $u = require_staff(); $me = (int)$u['id'];
 if (!io_has()) { layout_head(t('io.title'), 'inout'); echo '<div class="card"><p class="hint">' . tt('io.need') . '</p></div>'; layout_foot(); return; }
 $team = io_team_ids(); $lead = $team === null || $team; $all = $team === null;
-$tabs = ['my' => 'io.t_my']; if ($lead) $tabs += ['today' => 'io.t_today', 'exc' => 'io.t_exc', 'ot' => 'io.t_ot', 'list' => 'io.t_list']; if (io_sites_can()) $tabs['sites'] = 'io.t_sites'; if (io_stats_can()) $tabs['stats'] = 'io.t_stats';
+$tabs = ['my' => 'io.t_my']; if ($lead) $tabs += ['today' => 'io.t_today', 'exc' => 'io.t_exc', 'ot' => 'io.t_ot', 'list' => 'io.t_list']; if (io_sites_can()) $tabs['sites'] = 'io.t_sites'; if (io_stats_can()) $tabs['stats'] = 'io.t_stats'; $tabs['flow'] = 'io.t_flow';   // R97-189: the process, for everyone
 $tab = (string)($_GET['tab'] ?? ($lead ? 'today' : 'my')); if (!isset($tabs[$tab])) $tab = 'my';
 $dOk = fn($v, $def) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$v) ? (string)$v : $def;
 $from = $dOk($_GET['from'] ?? '', date('Y-m-01')); $to = $dOk($_GET['to'] ?? '', date('Y-m-d')); if ($to < $from) $to = $from;
@@ -106,4 +106,5 @@ layout_head(t('io.title'), 'inout');
 <?php foreach ($rows as $r): $tone = fn($v) => $v === null ? 'mute' : ($v >= 90 ? 'green' : ($v >= 70 ? 'gold' : 'bad')); ?><tr><td><a href="<?= url('inout', ['tab' => 'list', 'user' => $r['uid'], 'from' => $from, 'to' => $to]) ?>"><?= e($r['name']) ?></a></td><td><?= $r['present'] ?> / <?= $r['workdays'] ?></td><td><?= pill($tone($r['consistency']), $pc($r['consistency'])) ?></td><td><?= pill($tone($r['accuracy']), $pc($r['accuracy'])) ?></td><td><?= pill($tone($r['punctual']), $pc($r['punctual'])) ?></td>
   <td><?= $r['flags']['late'] ?><?= $r['late_avg'] ? ' <span class="hint">(⌀ ' . $r['late_avg'] . ' min)</span>' : '' ?></td><td><?= $r['flags']['outside'] ?></td><td><?= $r['flags']['early'] ?></td><td><?= max(0, $r['present'] - $r['complete']) ?></td><td><?= $r['rejected'] ?></td><td><?= io_hm($r['ot_ok']) ?><?= $r['ot_no'] ? ' <span class="hint">(✕ ' . io_hm($r['ot_no']) . ')</span>' : '' ?></td></tr><?php endforeach; ?></tbody></table></div><p class="hint"><?= tt('io.stats_foot') ?></p><?php endif; ?></div>
 <?php endif; ?>
+<?php if ($tab === 'flow') require __DIR__ . '/_inout_flow.php'; ?>
 <?php layout_foot();

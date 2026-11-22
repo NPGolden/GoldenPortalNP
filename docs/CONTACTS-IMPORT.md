@@ -4010,3 +4010,13 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - New section `inout` in `views/_manual_golden.php` (employee steps and manager steps), `views/_manual_pm.php` (same, under the approvals) and `views/_manual_staff.php` (employee steps only).
 - The text follows the code in `app/io.php`: remarks and statuses from `io_punch()`, worked time / break / overtime from `io_day()`, the cross-check from `io_booked()` (timesheet lines of the date, all hour types; field service report lines of type WT of the reports the person created for the date) and the statistics from `io_stats()`.
 - No program change. Security review: text only.
+
+## §472 In / Out — the process as a flow, and the figures in the evaluation (GAS-CP-R97-189, v1.218.0)
+
+- New tab `flow` on `?p=inout` for every member of staff: `views/_inout_flow.php` draws nine steps as an inline SVG (centre line, two symmetric branches at steps 3 and 6, orthogonal connectors; box texts are wrapped HTML in `foreignObject` so every language fits) and lists the steps in words. The minutes in the text come from `io_tol()`, `io_ot_min()` and `io_diff_min()`.
+- `app/io.php`: the per-person calculation of `io_stats()` moved to `io_stats_calc()` (same figures). New `io_year_figures($uid, $year)` (working days counted from the person's first entry of the year to today) and `io_year_text()`.
+- Evaluation: `views/_hr_eval.php` shows the line under the computed criterion `attendance_auto`; `views/my_leave.php` shows the employee's own line under "How we evaluate you". The score of `hr_eval_attendance_auto()` is unchanged; the figures are not passed to the AI draft context.
+- 43 language keys `io.t_flow`, `io.fl_*`, `io.ev_txt` in en, el, it, bg, uk (12 832 keys each).
+- Security review: no new input, route or write. The year figures are visible only where the evaluation of that person is already visible (evaluator, HR, the person), which matches the notice the staff accepted. The style block carries the CSP nonce; no script.
+- Open: approved leave is not yet deducted from the working days of the consistency figure.
+
