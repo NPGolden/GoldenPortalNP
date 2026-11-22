@@ -737,7 +737,7 @@ function pm_handle_action(string $action, string $page): bool {
             $body = $str('body', 8000); if ($body === null || $body === '') throw new RuntimeException(t('wk.note_empty'));
             q('UPDATE sp_notes SET note_date = ?, iso_week = ?, visibility = ?, body = ? WHERE id = ?', [$d, iso_week($d), $vis, $body, $nid]);
             q("UPDATE sp_files SET visibility = ? WHERE note_id = ? AND kind = 'photo'", [$vis, $nid]);
-            foreach ((array)($_POST['del_photo'] ?? []) as $fid) { $fid = (int)$fid; if ($fid && scalar("SELECT COUNT(*) FROM sp_files WHERE id = ? AND note_id = ? AND kind = 'photo'", [$fid, $nid])) cp_delete_file($fid); }
+            foreach ((array)($_POST['del_photo'] ?? []) as $fid) { $fid = (int)$fid; if ($fid && scalar("SELECT COUNT(*) FROM sp_files WHERE id = ? AND note_id = ? AND kind = 'photo'", [$fid, $nid])) cp_trash_file($fid); }   // R97-190
             $k = 0; foreach (files_list('photos') as $f) { if (cp_store_file($f, (int)$n['project_id'], (int)$n['subproject_id'], 'photo', $vis, null, $nid)) $k++; }
             flash('good', t('wk.updated', ['n' => $k]));
             $back();
@@ -798,7 +798,7 @@ function pm_handle_action(string $action, string $page): bool {
             $fid = (int)($_POST['id'] ?? 0); $f = one("SELECT id, kind, title, original_name FROM sp_files WHERE id = ? AND project_id = ?", [$fid, (int)$_POST['project_id']]);
             if (!$f) throw new RuntimeException(t('err.notfound'));
             if (in_array((string)$f['kind'], ['photo', 'fsr_photo', 'ga'], true)) throw new RuntimeException(t('fl.delete_linked'));   // belongs to a note / report / GA overlay — delete it there
-            cp_delete_file($fid); if (function_exists('sp_log')) try { sp_log((int)($_POST['subproject_id'] ?? 0), 'file_deleted', $f['title'] ?: $f['original_name']); } catch (Throwable $e) {}
+            cp_trash_file($fid); if (function_exists('sp_log')) try { sp_log((int)($_POST['subproject_id'] ?? 0), 'file_deleted', $f['title'] ?: $f['original_name']); } catch (Throwable $e) {}
             flash('good', t('fl.deleted', ['name' => $f['title'] ?: $f['original_name']]));
             $back();
         }
@@ -931,7 +931,7 @@ function pm_handle_action(string $action, string $page): bool {
             $id = (int)($_POST['id'] ?? 0) ?: null;
             if (!empty($_POST['del_photo'])) {                                   // remove one photo, stay on the form
                 $ph = one("SELECT id FROM sp_files WHERE id = ? AND kind = 'fsr_photo' AND fsr_id = ?", [(int)$_POST['del_photo'], $id]);
-                if ($ph) cp_delete_file((int)$ph['id']);
+                if ($ph) cp_trash_file((int)$ph['id']);   // R97-190
                 $id = fsr_save_from_post($id);
                 redirect('fsr_edit', ['id' => $id, '_r' => uniqid()]);
             }
@@ -1173,7 +1173,7 @@ function pm_handle_action(string $action, string $page): bool {
             $id = (int)($_POST['id'] ?? 0) ?: null;
             if (!empty($_POST['del_file'])) {                                    // remove one attachment, stay on the form
                 $ph = one("SELECT id FROM sp_files WHERE id = ? AND kind = 'isr_file' AND isr_id = ?", [(int)$_POST['del_file'], $id]);
-                if ($ph) cp_delete_file((int)$ph['id']);
+                if ($ph) cp_trash_file((int)$ph['id']);   // R97-190
                 $id = isr_save_from_post($id);
                 redirect('isr_edit', ['id' => $id, '_r' => uniqid()]);
             }

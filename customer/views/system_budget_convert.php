@@ -47,6 +47,15 @@ layout_head(t('sb.cv_title') . ' · ' . sb_label($B), 'system_budgets');
 </div>
 
 <form method="post" action="<?= url('system_budget_convert', ['id' => $id]) ?>" data-lock data-confirm="<?= tt('sb.cv_confirm') ?>" data-confirm-title="<?= tt('dlg.title') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="sb_convert"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="labour" value="<?= e($opt['labour']) ?>"><input type="hidden" name="parts" value="<?= e($opt['parts']) ?>"><input type="hidden" name="commission" value="<?= $opt['commission'] ? 1 : 0 ?>">
+<?php $docs = function_exists('sb_files') ? sb_files($id) : []; if ($docs): /* R97-190: which supporting documents go to the offer */ ?>
+<div class="card" id="docs">
+  <div class="card-head"><h2>📎 <?= tt('sb.doc_cv') ?> <span class="count"><?= count($docs) ?></span></h2><span class="hint"><?= tt('sb.doc_cv_hint') ?></span></div>
+  <div class="table-scroll"><table class="tbl" data-nosort style="max-width:900px;"><thead><tr><th style="width:70px;"><?= tt('sb.doc_take') ?></th><th><?= tt('sb.doc_file') ?></th><th class="num"><?= tt('th.size') ?></th><th><?= tt('th.by') ?></th></tr></thead><tbody>
+  <?php foreach ($docs as $d): ?><tr><td><input type="checkbox" name="files[]" value="<?= (int)$d['id'] ?>" checked aria-label="<?= e((string)$d['original_name']) ?>"></td><td><?= sb_file_is_image($d) ? '🖼' : '📄' ?> <a href="<?= url('sbfile', ['id' => (int)$d['id']]) ?>" target="_blank" rel="noopener"><?= e((string)(($d['title'] ?? '') ?: $d['original_name'])) ?></a></td><td class="num"><?= e(ft_size((int)$d['size_bytes'])) ?></td><td><?= e((string)($d['uploaded_name'] ?? '—')) ?></td></tr><?php endforeach; ?>
+  </tbody></table></div>
+  <div class="field" style="max-width:420px;margin-top:10px;"><label><?= tt('sb.doc_vis') ?></label><select name="files_vis" data-nosearch><option value="internal"><?= tt('sb.doc_vis_int') ?></option><option value="external"><?= tt('sb.doc_vis_ext') ?></option></select></div>
+</div>
+<?php endif; ?>
 <div class="card">
   <div class="card-head"><h2>€ <?= tt('sb.cv_bg') ?></h2><span class="hint"><?= tt('sb.cv_bg_hint') ?></span></div>
   <?php if (!$bgOn): ?><p class="hint"><?= tt('sb.cv_bg_off') ?></p><input type="hidden" name="budget" value="none"><?php else: ?>

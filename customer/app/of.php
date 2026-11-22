@@ -231,7 +231,7 @@ function of_att_store(int $offerId, int $pid, ?int $sid, string $vis): int {
 }
 function of_att_delete(int $offerId, int $fileId): void {
     require_staff(); $f = one("SELECT id FROM sp_files WHERE id = ? AND offer_id = ? AND kind = 'offer_att'", [$fileId, $offerId]); if (!$f) throw new RuntimeException(t('err.notfound'));
-    cp_delete_file($fileId); of_event($offerId, 'file_removed', null);
+    cp_trash_file($fileId); of_event($offerId, 'file_removed', null);   // R97-190: to the recycle bin
 }
 function of_delete(int $id): void { cache_bump_later('fs'); require_cp_admin(); $o = of_load($id); if (!$o) throw new RuntimeException(t('err.notfound')); foreach (of_attachments($id) as $af) cp_delete_file((int)$af['id']); q('DELETE FROM offers WHERE id = ?', [$id]); if (!empty($o['file_id'])) cp_delete_file((int)$o['file_id']); of_sync_project((int)$o['project_id']); }
 

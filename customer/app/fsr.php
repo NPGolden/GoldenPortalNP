@@ -252,7 +252,7 @@ function fsr_save_from_post(?int $id): int {
     if (function_exists('fsr_parts_issue')) fsr_parts_issue($id);   // R82-001
     // stored photos follow their task: removed tasks lose theirs, the rest are renumbered
     foreach (all("SELECT id, fsr_task FROM sp_files WHERE fsr_id = ? AND kind = 'fsr_photo'", [$id]) as $ph) {
-        if (!isset($keep[(int)$ph['fsr_task']])) cp_delete_file((int)$ph['id']);
+        if (!isset($keep[(int)$ph['fsr_task']])) cp_trash_file((int)$ph['id']);   // R97-190
     }
     foreach ($keep as $old => $new) q("UPDATE sp_files SET fsr_task = ? WHERE fsr_id = ? AND kind = 'fsr_photo' AND fsr_task = ?", [100 + $new, $id, $old]);   // two passes: no collisions
     q("UPDATE sp_files SET fsr_task = fsr_task - 100 WHERE fsr_id = ? AND kind = 'fsr_photo' AND fsr_task > 100", [$id]);

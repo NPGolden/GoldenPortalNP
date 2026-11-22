@@ -303,11 +303,12 @@ function ar_verify(bool $full = false, int $sample = 50): array {
     }
     if ($full) {
         foreach (all('SELECT stored_name FROM sp_files UNION SELECT stored_name FROM ticket_files') as $r) $known[$r['stored_name']] = true;
+        if (function_exists('ft_has') && ft_has()) foreach (all('SELECT path FROM file_trash WHERE purged_at IS NULL') as $r) { $pp = str_replace('\\', '/', (string)$r['path']); if (str_starts_with($pp, $root . '/')) $known[substr($pp, strlen($root) + 1)] = true; }   // R97-190: files waiting in the recycle bin
         $it = new RecursiveIteratorIterator(new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS));
         foreach ($it as $p) {
             if (!$p->isFile()) continue;
             $rel = ltrim(str_replace('\\', '/', substr($p->getPathname(), strlen($root))), '/');
-            if (str_starts_with($rel, 'avatars/') || str_starts_with($rel, '_exports/') || str_starts_with($rel, '_kb/') || str_starts_with($rel, '_manifest') || str_starts_with($rel, '.')) continue;
+            if (str_starts_with($rel, 'avatars/') || str_starts_with($rel, '_exports/') || str_starts_with($rel, '_kb/') || str_starts_with($rel, '_cr/') || str_starts_with($rel, 'sb/') || str_starts_with($rel, 'si/') || str_starts_with($rel, '_manifest') || str_starts_with($rel, '.')) continue;
             if (!isset($known[$rel])) $res['orphans'][] = $rel;
             if (count($res['orphans']) > 500) break;
         }

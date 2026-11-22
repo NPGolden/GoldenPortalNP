@@ -223,6 +223,25 @@ layout_head(sb_label($B) . ' · ' . $B['title'], 'system_budgets');
   </form>
 </div><?php endif; ?>
 
+<?php if (!$isRev && !$tpl && function_exists('sb_files_has') && sb_files_has()): $docs = sb_files($id); /* R97-190: supporting documents */ ?>
+<div class="card" id="docs">
+  <div class="card-head"><h2>📎 <?= tt('sb.doc_title') ?> <span class="count"><?= count($docs) ?></span></h2><span class="hint"><?= tt('sb.doc_hint') ?></span></div>
+  <?php if (!$docs): ?><p class="hint"><?= tt('sb.doc_empty') ?></p><?php else: ?>
+  <div class="table-scroll"><table class="tbl" data-nosort><thead><tr><th><?= tt('sb.doc_file') ?></th><th class="num"><?= tt('th.size') ?></th><th><?= tt('th.by') ?></th><th><?= tt('th.date') ?></th><th class="num"><?= ft_all_btn('sb_files', $docs, '#docs') ?></th></tr></thead><tbody>
+  <?php foreach ($docs as $d): ?><tr><td><?php if (sb_file_is_image($d)): ?><a href="<?= url('sbfile', ['id' => (int)$d['id']]) ?>" target="_blank" rel="noopener"><img src="<?= url('sbfile', ['id' => (int)$d['id']]) ?>" alt="" loading="lazy" style="height:44px;max-width:80px;object-fit:cover;border-radius:4px;vertical-align:middle;margin-right:8px;"></a><?php else: ?>📄 <?php endif; ?><a href="<?= url('sbfile', ['id' => (int)$d['id']]) ?>" target="_blank" rel="noopener"><?= e((string)(($d['title'] ?? '') ?: $d['original_name'])) ?></a><?= !empty($d['title']) ? '<br><span class="hint">' . e((string)$d['original_name']) . '</span>' : '' ?></td>
+    <td class="num"><?= e(ft_size((int)$d['size_bytes'])) ?></td><td><?= e((string)($d['uploaded_name'] ?? '—')) ?></td><td class="date"><?= e(fmt_datetime((string)$d['created_at'])) ?></td><td class="num"><?= ft_btn('sb_files', $d, '#docs') ?></td></tr><?php endforeach; ?>
+  </tbody></table></div>
+  <?php endif; ?>
+  <?php if ($B['status'] !== 'cancelled'): ?>
+  <form method="post" action="<?= $self ?>#docs" enctype="multipart/form-data" data-lock style="margin-top:12px;"><?= csrf_field() ?><input type="hidden" name="action" value="sb_doc_add"><input type="hidden" name="id" value="<?= $id ?>">
+    <div class="grid grid-2"><div class="field"><label><?= tt('sb.doc_pick') ?></label><input type="file" name="docs[]" multiple required accept=".pdf,.jpg,.jpeg,.png,.webp,.gif,.docx,.xlsx,.pptx,.dwg,.dxf,.txt,.csv,.zip"></div>
+      <div class="field"><label><?= tt('sb.doc_name') ?></label><input type="text" name="title" maxlength="200" placeholder="<?= tt('sb.doc_name_ph') ?>"></div></div>
+    <div class="btn-row"><button class="btn btn--sm" type="submit">⬆ <?= tt('sb.doc_upload') ?></button><span class="hint"><?= tt('sb.doc_rules') ?></span></div>
+  </form>
+  <?php endif; ?>
+</div>
+<?php endif; ?>
+
 <div class="grid grid-2" style="align-items:start;">
 <div class="card" id="comments">
   <h2>💬 <?= tt('sb.comments') ?> <span class="count"><?= count($com) ?></span></h2>

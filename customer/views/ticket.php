@@ -12,7 +12,7 @@ $assignees = $staff ? all("SELECT id, full_name FROM customer_users WHERE role I
 $filesByComment = []; foreach ($t['files'] as $f) $filesByComment[(int)($f['comment_id'] ?? 0)][] = $f;
 $fileRow = function (array $f): string {
     $img = str_starts_with($f['mime_type'], 'image/');
-    return '<a class="tk-file" href="' . url('tfile', ['id' => $f['id']]) . '" target="_blank">' . ($img ? '🖼' : '📎') . ' ' . e($f['original_name']) . ' <span class="hint">' . number_format((int)$f['size_bytes'] / 1024, 0) . ' KB</span></a>';
+    return '<a class="tk-file" href="' . url('tfile', ['id' => $f['id']]) . '" target="_blank">' . ($img ? '🖼' : '📎') . ' ' . e($f['original_name']) . ' <span class="hint">' . number_format((int)$f['size_bytes'] / 1024, 0) . ' KB</span></a>' . (function_exists('ft_btn') ? ' ' . ft_btn('ticket_files', $f) : '');   // R97-190
 };
 $ev = ['imported' => t('tk.ev_imported'), 'created' => t('tk.ev_created'), 'edited' => t('tk.ev_edited'), 'assigned' => t('tk.ev_assigned'), 'unassigned' => t('tk.ev_unassigned'), 'customer_replied' => t('tk.ev_customer_replied'),
        'status_open' => t('tk.ev_reopened'), 'status_in_progress' => t('tk.ev_started'), 'status_waiting_customer' => t('tk.ev_waiting'), 'status_resolved' => t('tk.ev_resolved'), 'status_closed' => t('tk.ev_closed'), 'jo_linked' => t('tk.ev_jo_linked'), 'fsr_linked' => t('tk.ev_fsr_linked'), 'project_set' => t('tk.ev_project_set'), 'vessel_set' => t('tk.ev_vessel_set'), 'rs_session' => t('rs.ev_session'), 'project_cleared' => t('tk.ev_project_cleared')];

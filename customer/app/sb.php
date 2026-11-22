@@ -329,7 +329,7 @@ function sb_set_status(int $id, string $to): void {
     sb_event($id, 'status', $from . ' → ' . $to);
 }
 function sb_comment_add(int $id, string $body): void { sb_guard(); if (!sb_get($id)) throw new RuntimeException(t('err.notfound')); $body = mb_substr(trim($body), 0, 4000); if ($body === '') throw new RuntimeException(t('sb.need_comment')); q('INSERT INTO sb_comments (budget_id, user_id, body) VALUES (?,?,?)', [$id, (int)(current_user()['id'] ?? 0) ?: null, $body]); }
-function sb_delete(int $id): void { require_cp_admin(); $B = sb_get($id); if (!$B) throw new RuntimeException(t('err.notfound')); if (!in_array($B['status'], ['draft', 'cancelled'], true)) throw new RuntimeException(t('sb.del_only_draft')); sb_event($id, 'deleted', sb_label($B) . ' · ' . mb_substr((string)$B['title'], 0, 200)); foreach (['sb_labour', 'sb_parts', 'sb_expenses', 'sb_comments'] as $tb) q("DELETE FROM $tb WHERE budget_id = ?", [$id]); if (function_exists('sb_r2') && sb_r2()) q('DELETE FROM sb_revisions WHERE budget_id = ?', [$id]); if (function_exists('sb_r3') && sb_r3()) q('DELETE FROM sb_import_rows WHERE budget_id = ?', [$id]); q('DELETE FROM sb_budgets WHERE id = ?', [$id]); }   // R97-005: the events stay as the audit trail
+function sb_delete(int $id): void { require_cp_admin(); $B = sb_get($id); if (!$B) throw new RuntimeException(t('err.notfound')); if (!in_array($B['status'], ['draft', 'cancelled'], true)) throw new RuntimeException(t('sb.del_only_draft')); sb_event($id, 'deleted', sb_label($B) . ' · ' . mb_substr((string)$B['title'], 0, 200)); foreach (['sb_labour', 'sb_parts', 'sb_expenses', 'sb_comments'] as $tb) q("DELETE FROM $tb WHERE budget_id = ?", [$id]); if (function_exists('sb_r2') && sb_r2()) q('DELETE FROM sb_revisions WHERE budget_id = ?', [$id]); if (function_exists('sb_r3') && sb_r3()) q('DELETE FROM sb_import_rows WHERE budget_id = ?', [$id]); if (function_exists('sb_files_has') && sb_files_has()) { foreach (sb_files($id) as $sf) { $sp = cp_storage() . '/' . $sf['stored_name']; if (is_file($sp)) @unlink($sp); } q('DELETE FROM sb_files WHERE budget_id = ?', [$id]); }   /* R97-190: the supporting documents go with the budget */ q('DELETE FROM sb_budgets WHERE id = ?', [$id]); }   // R97-005: the events stay as the audit trail
 
 /* ───────────── Import of the GLD-BUD budget working file (Excel built by the golden-budget-workfile skill) ───────────── */
 
@@ -925,4 +925,56 @@ function sb_feed_rest(int $id, array $as): float {
         $GLOBALS['_bg_cur'] = []; if (function_exists('eng_rows_reset')) eng_rows_reset(); cache_bump_later('eng'); cache_bump_later('fs');
         sb_event($id, 'fed', sb_h($hours) . ' h · R' . $rev); $pdo->commit(); return $hours;
     } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+}
+
+/* ───────────── R97-190: supporting documents (photos, datasheets, drawings) ───────────── */
+const SB_DOC_EXT = ['pdf' => 'application/pdf', 'jpg' => 'image/jpeg', 'jpeg' => 'image/jpeg', 'png' => 'image/png', 'webp' => 'image/webp', 'gif' => 'image/gif', 'docx' => '', 'xlsx' => '', 'pptx' => '', 'dwg' => '', 'dxf' => '', 'txt' => '', 'csv' => '', 'zip' => ''];
+const SB_DOC_MAX = 26214400;   // 25 MB a file
+const SB_DOC_PER_BUDGET = 100;
+
+function sb_files_has(): bool { static $h = null; if ($h === null) { try { $h = sb_has() && (bool) scalar("SHOW TABLES LIKE 'sb_files'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function sb_files(int $id): array { return sb_files_has() ? all('SELECT * FROM sb_files WHERE budget_id = ? ORDER BY id', [$id]) : []; }
+function sb_file_is_image(array $f): bool { return str_starts_with((string)$f['mime_type'], 'image/'); }
+/** Store the files of input docs[] on a budget (any status except cancelled; a template has none). Returns how many were stored. */
+function sb_files_add(int $id): int {
+    sb_guard(); if (!sb_files_has()) throw new RuntimeException(t('ft.need')); $B = sb_get($id); if (!$B) throw new RuntimeException(t('err.notfound'));
+    if ($B['status'] === 'cancelled') throw new RuntimeException(t('sb.doc_closed'));
+    $f = $_FILES['docs'] ?? null; if (!$f || !is_array($f['name'])) return 0; $u = current_user(); $n = 0; $names = [];
+    $have = (int) scalar('SELECT COUNT(*) FROM sb_files WHERE budget_id = ?', [$id]); $title = mb_substr(trim((string)($_POST['title'] ?? '')), 0, 200);
+    foreach (array_slice($f['name'], 0, 10, true) as $i => $name) {
+        if ($have + $n >= SB_DOC_PER_BUDGET) break;
+        if (($f['error'][$i] ?? 1) !== UPLOAD_ERR_OK || !is_uploaded_file($f['tmp_name'][$i]) || (int)$f['size'][$i] > SB_DOC_MAX || (int)$f['size'][$i] <= 0) continue;
+        $ext = strtolower(pathinfo((string)$name, PATHINFO_EXTENSION)); if (!isset(SB_DOC_EXT[$ext])) continue;
+        $mime = (string)(function_exists('mime_content_type') ? @mime_content_type($f['tmp_name'][$i]) : '') ?: 'application/octet-stream';
+        if (SB_DOC_EXT[$ext] !== '' && $mime !== SB_DOC_EXT[$ext]) continue;   // a picture or a PDF must be what its name says
+        $rel = 'sb/' . date('Y/m'); $dir = cp_storage() . '/' . $rel; if (!is_dir($dir)) @mkdir($dir, 0755, true);
+        $stored = $rel . '/' . bin2hex(random_bytes(12)) . '.' . $ext; if (!move_uploaded_file($f['tmp_name'][$i], cp_storage() . '/' . $stored)) continue;
+        $clean = mb_substr(preg_replace('/[^\p{L}\p{N} ._()\-]+/u', '_', basename((string)$name)), 0, 255);
+        q('INSERT INTO sb_files (budget_id, title, stored_name, original_name, mime_type, size_bytes, sha256, uploaded_by, uploaded_name) VALUES (?,?,?,?,?,?,?,?,?)',
+          [$id, $title !== '' && count($f['name']) === 1 ? $title : null, $stored, $clean, mb_substr($mime, 0, 120), (int)$f['size'][$i], (string) hash_file('sha256', cp_storage() . '/' . $stored), (int)($u['id'] ?? 0) ?: null, mb_substr((string)($u['full_name'] ?? ''), 0, 160) ?: null]);
+        $n++; $names[] = $clean;
+    }
+    if ($n) sb_event($id, 'file_added', mb_substr(implode(', ', $names), 0, 480));
+    return $n;
+}
+function sb_stream_file(int $id): void {
+    sb_require(); $f = sb_files_has() ? one('SELECT * FROM sb_files WHERE id = ?', [$id]) : null; if (!$f) { http_response_code(404); exit('Not found'); }
+    $path = cp_storage() . '/' . $f['stored_name']; if (!is_file($path)) { http_response_code(404); exit('File missing'); }
+    $inline = sb_file_is_image($f) || $f['mime_type'] === 'application/pdf';
+    header('Content-Type: ' . $f['mime_type']); header('X-Content-Type-Options: nosniff'); header('Content-Length: ' . filesize($path)); header('Cache-Control: private, max-age=600');
+    if ($f['mime_type'] === 'application/pdf') header("Content-Security-Policy: sandbox; default-src 'none'");
+    header('Content-Disposition: ' . ($inline ? 'inline' : 'attachment') . '; filename="' . rawurlencode((string)$f['original_name']) . '"');
+    readfile($path); exit;
+}
+/** Copy the chosen supporting documents of a budget to its offer as attachments ($vis internal | external). The budget keeps its own copies. Returns how many. */
+function sb_files_to_offer(int $budgetId, int $offerId, array $ids, string $vis): int {
+    if (!sb_files_has() || !$ids || !function_exists('of_att_has') || !of_att_has()) return 0;
+    $o = one('SELECT project_id, subproject_id, offer_no, revision FROM offers WHERE id = ?', [$offerId]); if (!$o) return 0; $n = 0; $ids = array_flip(array_map('intval', $ids));
+    foreach (sb_files($budgetId) as $f) {
+        if (!isset($ids[(int)$f['id']])) continue; $p = cp_storage() . '/' . $f['stored_name']; if (!is_file($p)) continue;
+        $fid = cp_store_bytes((string) file_get_contents($p), (string)$f['original_name'], (string)$f['mime_type'], (int)$o['project_id'], (int)$o['subproject_id'] ?: null, 'offer_att', $vis === 'external' ? 'external' : 'internal', null,
+                              trim($o['offer_no'] . ' ' . $o['revision']) . ' — ' . mb_substr((string)(($f['title'] ?? '') ?: $f['original_name']), 0, 120));
+        q('UPDATE sp_files SET offer_id = ? WHERE id = ?', [$offerId, $fid]); $n++;
+    }
+    return $n;
 }

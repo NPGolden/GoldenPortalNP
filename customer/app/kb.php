@@ -146,6 +146,7 @@ function kb_files_html(array $files): string {
         $img = str_starts_with((string)$f['mime_type'], 'image/'); $url = url('kbfile', ['id' => $f['id']]);
         $h .= $img ? '<a class="kb-thumb" href="' . $url . '" target="_blank" rel="noopener"><img src="' . $url . '" alt="' . e($f['original_name']) . '" loading="lazy"></a>'
                    : '<a class="kb-file" href="' . $url . '">📎 ' . e($f['original_name']) . ' <span class="hint">' . e(ar_fmt_bytes((int)$f['size_bytes'])) . '</span></a>';
+        if (function_exists('ft_btn')) $h .= ft_btn('kb_files', $f);   // R97-190
     }
     return $h . '</div>';
 }

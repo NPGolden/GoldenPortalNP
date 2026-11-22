@@ -152,7 +152,7 @@ function isr_save_from_post(?int $id): int {
           [$id, ++$seq, $sysId, $name, mb_substr($cond, 0, 8000) ?: null, $chk ? json_encode($chk, JSON_UNESCAPED_UNICODE) : null, mb_substr($regs, 0, 4000) ?: null, $lvl, mb_substr($risk, 0, 8000) ?: null, mb_substr($act, 0, 8000) ?: null]);
         $itemNo[$i] = $seq; if ($orig) $keep[$orig] = $seq;
     }
-    foreach (all("SELECT id, isr_item FROM sp_files WHERE isr_id = ? AND kind = 'isr_file'", [$id]) as $f) if (!isset($keep[(int)$f['isr_item']])) cp_delete_file((int)$f['id']);
+    foreach (all("SELECT id, isr_item FROM sp_files WHERE isr_id = ? AND kind = 'isr_file'", [$id]) as $f) if (!isset($keep[(int)$f['isr_item']])) cp_trash_file((int)$f['id']);   // R97-190
     foreach ($keep as $old => $new) q("UPDATE sp_files SET isr_item = ? WHERE isr_id = ? AND kind = 'isr_file' AND isr_item = ?", [1000 + $new, $id, $old]);
     q("UPDATE sp_files SET isr_item = isr_item - 1000 WHERE isr_id = ? AND kind = 'isr_file' AND isr_item > 1000", [$id]);
     foreach ((array)($_POST['file_caption'] ?? []) as $fid => $cap) q("UPDATE sp_files SET title = ? WHERE id = ? AND isr_id = ? AND kind = 'isr_file'", [mb_substr(trim((string)$cap), 0, 160) ?: null, (int)$fid, $id]);

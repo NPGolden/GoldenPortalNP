@@ -140,7 +140,7 @@ function cr_files_html(array $files): string {
     if (!$files) return '';
     $h = '<div class="kb-files">';
     foreach ($files as $f) { $img = str_starts_with((string)$f['mime_type'], 'image/'); $url = url('crfile', ['id' => $f['id']]);
-        $h .= $img ? '<a class="kb-thumb" href="' . $url . '" target="_blank" rel="noopener"><img src="' . $url . '" alt="' . e($f['original_name']) . '" loading="lazy"></a>' : '<a class="kb-file" href="' . $url . '">📎 ' . e($f['original_name']) . '</a>'; }
+        $h .= $img ? '<a class="kb-thumb" href="' . $url . '" target="_blank" rel="noopener"><img src="' . $url . '" alt="' . e($f['original_name']) . '" loading="lazy"></a>' : '<a class="kb-file" href="' . $url . '">📎 ' . e($f['original_name']) . '</a>'; if (function_exists('ft_btn')) $h .= ft_btn('cp_request_files', $f); }   // R97-190
     return $h . '</div>';
 }
 function cr_stream_file(int $id): void {
