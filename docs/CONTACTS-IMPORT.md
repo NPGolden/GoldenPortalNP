@@ -4004,3 +4004,9 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - `cp_store_apps()` in `customer/app/helpers.php`: `employee` now has `play` (package `gr.goldenas.employee`) and `ios` (App Store id 6837805575) with `ios_live => false`. The card therefore shows the Google Play tile and the App Store tile as coming soon. When Apple releases the app, set `ios_live => true`.
 - New images `assets/apps/qr-employee-play.png` and `assets/apps/qr-employee-ios.png` (296 px, same colours as the others). `qr-employee-web.png` stays for the web app link.
 - Security review: static links and images only; no new input, route or right.
+
+## §471 Manual — the In / Out procedure (GAS-CP-R97-188, v1.217.2)
+
+- New section `inout` in `views/_manual_golden.php` (employee steps and manager steps), `views/_manual_pm.php` (same, under the approvals) and `views/_manual_staff.php` (employee steps only).
+- The text follows the code in `app/io.php`: remarks and statuses from `io_punch()`, worked time / break / overtime from `io_day()`, the cross-check from `io_booked()` (timesheet lines of the date, all hour types; field service report lines of type WT of the reports the person created for the date) and the statistics from `io_stats()`.
+- No program change. Security review: text only.
