@@ -34,7 +34,7 @@ function customer_routes(array $u, string $method, string $path, array $body): v
         case $post() && $path === '/cu/locale': PortalCustomer::setLocale($u, (string)($in['locale'] ?? '')); Response::json([], 204);
         case $method === 'GET' && $path === '/me': Response::json(PortalCustomer::me($u));
         case $post() && $path === '/auth/logout': q('UPDATE mob_refresh_tokens SET revoked_at = NOW() WHERE device_id = ? AND revoked_at IS NULL', [$u['device_id']]); Response::json([], 204);
-        case $post() && $path === '/devices/push-token': q('UPDATE mob_devices SET push_token = ?, push_service = ? WHERE id = ?', [mb_substr((string)($in['token'] ?? ''), 0, 255), in_array($in['service'] ?? '', ['apns', 'fcm', 'webpush'], true) ? $in['service'] : 'fcm', $u['device_id']]); Response::json([], 204);
+        case $post() && $path === '/devices/push-token': api_push_token($in, $u);
         default: Response::error(404, 'Not found');
     }
 }

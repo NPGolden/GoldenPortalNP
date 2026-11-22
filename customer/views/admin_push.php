@@ -16,7 +16,7 @@ layout_head(t('pn.title'), 'admin_push');
       <tr><td><?= tt('pn.c_fcm') ?><br><span class="hint"><?= e($fcm ? t('pn.c_fcm_p', ['p' => (string) cp_setting('pn_fcm_project', '—')]) : t('pn.c_fcm_d')) ?></span></td><td class="num"><?= $yes($fcm, t('pn.loaded'), t('pn.missing')) ?></td></tr>
       <tr><td><?= tt('pn.c_apns') ?><br><span class="hint"><?= e($apns ? t('pn.c_apns_p', ['k' => (string) cp_setting('pn_apns_key_id', ''), 't' => (string) cp_setting('pn_apns_team_id', '')]) : t('pn.c_apns_d')) ?></span></td><td class="num"><?= $yes($apns, t('pn.loaded'), t('pn.missing')) ?></td></tr>
       <tr><td><?= tt('pn.c_h2') ?><br><span class="hint"><?= tt('pn.c_h2_d') ?></span></td><td class="num"><?= $yes((bool)$h2) ?></td></tr>
-      <tr><td><?= tt('pn.c_tick') ?><br><span class="hint"><?= e($last !== '' ? t('pn.c_tick_last', ['t' => fmt_datetime($last)]) : t('pn.c_tick_never')) ?></span></td><td class="num"><?= $yes($lastOk, t('pn.running'), t('pn.not_running')) ?></td></tr>
+      <tr><td><?= tt('pn.c_tick') ?><br><span class="hint"><?= e($last !== '' ? t('pn.c_tick_last', ['t' => date('j M Y H:i', strtotime($last)) . ' ' . tz_abbr()]) : t('pn.c_tick_never')) ?></span></td><td class="num"><?= $yes($lastOk, t('pn.running'), t('pn.not_running')) ?></td></tr>
     </tbody></table>
     <p class="hint" style="margin:10px 0 4px;"><?= tt('pn.cron_d') ?></p>
     <pre style="white-space:pre-wrap;word-break:break-all;margin:0;padding:8px 10px;border:1px solid var(--line);border-radius:8px;font-size:12px;">*/5 * * * *  php <?= e((string) realpath(dirname(__DIR__) . '/tick.php')) ?> &gt;/dev/null 2&gt;&amp;1</pre>

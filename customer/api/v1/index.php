@@ -127,7 +127,7 @@ try {
         case $method === 'POST' && $path === '/sync': RateLimit::check('sync', 'u' . $u['id'], 60); require __DIR__ . '/endpoints/sync.php'; sync_ops($u, $body);
         case $method === 'POST' && $path === '/files/photo': require __DIR__ . '/endpoints/files.php'; upload_photo($u);
         case $method === 'POST' && $path === '/assist': RateLimit::check('assist', 'u' . $u['id'], 30); Response::json(Portal::assist($u, $body));
-        case $method === 'POST' && $path === '/devices/push-token': q('UPDATE mob_devices SET push_token = ?, push_service = ? WHERE id = ?', [mb_substr((string)($body['token'] ?? ''), 0, 255), in_array($body['service'] ?? '', ['apns', 'fcm', 'webpush'], true) ? $body['service'] : 'fcm', $u['device_id']]); Response::json([], 204);
+        case $method === 'POST' && $path === '/devices/push-token': api_push_token($body, $u);
         /* R97-182 In / Out — every staff app (Employee, Service, PM, HR); never the customer app */
         case $method === 'GET' && $path === '/inout': if ($isCu) Response::error(403, 'Staff only'); Response::json(io_api_me((int)$u['id']));
         case $method === 'POST' && $path === '/inout/consent': if ($isCu) Response::error(403, 'Staff only'); io_consent_accept((int)$u['id'], $app, isset($body['at']) ? (string)$body['at'] : null); Response::json(['status' => 'accepted', 'consent' => io_api_me((int)$u['id'])['consent']]);   // R97-183

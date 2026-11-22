@@ -4,10 +4,7 @@
 (function () {
   if (!window.Capacitor || !Capacitor.isNativePlatform || !Capacitor.isNativePlatform()) return;
   var P = Capacitor.Plugins || {};
-  function pushToken(t) { try { if (window.API && API.pushToken) API.pushToken(t, Capacitor.getPlatform() === "ios" ? "apns" : "fcm"); } catch (e) {} }
-  try { if (P.PushNotifications) { P.PushNotifications.requestPermissions().then(function (r) { if (r.receive === "granted") P.PushNotifications.register(); });
-    P.PushNotifications.addListener("registration", function (t) { pushToken(t.value); });
-    P.PushNotifications.addListener("pushNotificationActionPerformed", function (n) { var r = n.notification && n.notification.data && n.notification.data.route; if (r) location.hash = r; }); } } catch (e) {}
+  // push-token registration: js/push.js (lib/push.js) of each client, since R97-197 — it also runs when the pages come from the portal
   try { if (P.App) P.App.addListener("appStateChange", function (s) { if (s.isActive && window.SYNC && SYNC.run) SYNC.run(); }); } catch (e) {}
   try { if (P.StatusBar) { P.StatusBar.setStyle({ style: "DARK" }); if (Capacitor.getPlatform() === "android") P.StatusBar.setBackgroundColor({ color: "#1F3A5F" }); } } catch (e) {}
   try { if (P.SplashScreen) setTimeout(function () { P.SplashScreen.hide(); }, 600); } catch (e) {}

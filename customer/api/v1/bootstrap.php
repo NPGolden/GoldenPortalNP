@@ -49,6 +49,14 @@ function api_act_as(int $uid): array {
     return $u;
 }
 /** Private storage for rate limits (never /tmp on shared hosting — see GAS-CP session notes). */
+/** R97-197: the push token of this device. Shape checked (Apple: hex; Google: URL-safe text); a token belongs to one device row only —
+ *  a phone handed to a colleague must not deliver the notifications of the person who used it before. */
+function api_push_token(array $in, array $u): void {
+    $svc = in_array($in['service'] ?? '', ['apns', 'fcm', 'webpush'], true) ? (string)$in['service'] : 'fcm'; $tok = trim((string)($in['token'] ?? ''));
+    if (!preg_match($svc === 'apns' ? '/^[0-9a-fA-F]{64,200}$/' : '/^[A-Za-z0-9_:.\-\/+=]{20,255}$/', $tok)) Response::error(422, 'Invalid token');
+    q('UPDATE mob_devices SET push_token = NULL WHERE push_token = ? AND id <> ?', [$tok, (int)$u['device_id']]);
+    q('UPDATE mob_devices SET push_token = ?, push_service = ? WHERE id = ?', [$tok, $svc, (int)$u['device_id']]); Response::json([], 204);
+}
 function api_private_dir(): string { $d = CP_ROOT . '/storage/private'; if (!is_dir($d)) @mkdir($d, 0700, true); return $d; }
 /** API settings live in cp_settings (Settings › Mobile apps) with config.php fallbacks. */
 function api_setting(string $k, string $def = ''): string { $v = function_exists('cp_setting') ? (string)(cp_setting($k, '') ?? '') : ''; return $v !== '' ? $v : (string)(cfg('api.' . substr($k, 4), $def) ?? $def); }

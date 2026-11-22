@@ -67,7 +67,11 @@ jobs:
           [ -n "$KS_B64" ] || { echo "ANDROID_KEYSTORE_B64 secret missing"; exit 1; }
           echo "$KS_B64" | base64 -d > app/golden-upload.keystore
           printf '\nandroid {\n  signingConfigs { release { storeFile file("golden-upload.keystore"); storePassword System.getenv("KS_PASS"); keyAlias System.getenv("KS_ALIAS"); keyPassword System.getenv("KEY_PASS") } }\n  buildTypes { release { signingConfig signingConfigs.release } }\n}\n' >> app/build.gradle
-          if [ -n "$GS_B64" ]; then echo "$GS_B64" | base64 -d > app/google-services.json; echo "push: google-services.json in place"; fi
+          if [ -n "$GS_B64" ]; then echo "$GS_B64" | base64 -d > app/google-services.json; echo "push: google-services.json in place"
+            AID=$(grep -oE 'applicationId "[^"]+"' app/build.gradle | cut -d'"' -f2); grep -q "\"$AID\"" app/google-services.json || { echo "google-services.json has no entry for $AID — register the app in the Firebase project and renew the secret"; exit 1; }
+            # the mark the app pages look for before they ask for the permission (builds without push never ask)   GAS-CP-R97-197
+            node -e "const f='app/src/main/assets/capacitor.config.json',fs=require('fs');const c=JSON.parse(fs.readFileSync(f,'utf8'));c.appendUserAgent=' GASPush/1';fs.writeFileSync(f,JSON.stringify(c,null,2));console.log('push mark:',c.appendUserAgent.trim())"
+          fi
           echo "upload-key SHA-256 (for assetlinks.json / portal setting — the Play app-signing key is in Play Console › App signing):"; keytool -list -v -keystore app/golden-upload.keystore -storepass "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" 2>/dev/null | grep -i "SHA256:" | head -1 || true
       - name: Build the App Bundle
         env:
