@@ -22,7 +22,7 @@ layout_head(t('wl.title'), 'wellness');
       <label class="wl-num"><?= tt('wl.o_tbreak') ?> <input type="number" name="timer_break" min="1" max="30" value="<?= (int)$P['timer_break'] ?>"></label>
       <p class="hint" style="margin-top:8px;"><?= tt('wl.theme_d') ?></p>
     </div>
-    <div class="card"><h2><?= tt('wl.s_desktop') ?></h2><?= $opt('desktop') ?>
+    <div class="card"><h2><?= tt('wl.s_desktop') ?></h2><?= $opt('push') . $opt('desktop') ?>
       <p style="margin:8px 0 0;"><button type="button" class="btn btn--ghost btn--sm" id="wl-ask" data-on="<?= tt('wl.ask_on') ?>" data-off="<?= tt('wl.ask_off') ?>" data-none="<?= tt('wl.ask_none') ?>"><?= tt('wl.ask_btn') ?></button> <span class="hint"></span></p>
     </div>
     <div class="card"><h2>🔒 <?= tt('wl.s_privacy') ?></h2><p class="hint" style="text-align:justify;"><?= tt('wl.privacy_1') ?></p><p class="hint" style="text-align:justify;margin-bottom:0;"><?= tt('wl.privacy_2') ?></p></div>

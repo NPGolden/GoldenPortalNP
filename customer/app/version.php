@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.222.1';
+const CP_VERSION = '1.223.0';
 const CP_BUILD   = '2026-11-22';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-196', 'version' => '1.223.0', 'date' => '2026-11-22', 'title' => 'Push notifications, portal side: sender for Android (Firebase) and iPhone (Apple), portal notifications and In / Out reminders to the phones, Settings › Push notifications with keys, clock job, phones and queue', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-195', 'version' => '1.222.1', 'date' => '2026-11-22', 'title' => 'Golden A/S Employee is on the App Store: link and QR code active on the home and sign-in pages', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-194', 'version' => '1.222.0', 'date' => '2026-11-22', 'title' => 'Wellness: focus sounds, focus timer, breathing minute, stretches and reminders (break, eyes, water, posture, end of day, In / Out, anonymous How was today?) — each a personal setting; no reminders on days off and approved leave', 'db' => 'install/migrate_cp_r97_194_wellness.sql', 'check' => 'r99i'],
         ['ref' => 'GAS-CP-R97-193', 'version' => '1.221.0', 'date' => '2026-11-22', 'title' => 'Evaluation: the In / Out consistency of the year counts in the computed grade Attendance & consistency (approved leave left out; below 90 % one point per ten percentage points, at most three; scored from 20 expected days)', 'db' => null, 'check' => null],

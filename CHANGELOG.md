@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.222.1** (build 2026-11-22). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.223.0** (build 2026-11-22). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.223.0 | GAS-CP-R97-196 | 2026-11-22 | Push notifications, portal side: sender for Android (Firebase) and iPhone (Apple), portal notifications and In / Out reminders to the phones, Settings › Push notifications with keys, clock job, phones and queue | — |
 | 1.222.1 | GAS-CP-R97-195 | 2026-11-22 | Golden A/S Employee is on the App Store: link and QR code active on the home and sign-in pages | — |
 | 1.222.0 | GAS-CP-R97-194 | 2026-11-22 | Wellness: focus sounds, focus timer, breathing minute, stretches and reminders (break, eyes, water, posture, end of day, In / Out, anonymous How was today?) — each a personal setting; no reminders on days off and approved leave | `install/migrate_cp_r97_194_wellness.sql` |
 | 1.221.0 | GAS-CP-R97-193 | 2026-11-22 | Evaluation: the In / Out consistency of the year counts in the computed grade Attendance & consistency (approved leave left out; below 90 % one point per ten percentage points, at most three; scored from 20 expected days) | — |

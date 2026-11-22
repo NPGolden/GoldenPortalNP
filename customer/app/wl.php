@@ -9,8 +9,8 @@
  * not what).
  */
 const WL_DEFAULTS = ['breaks' => 1, 'break_min' => 50, 'eyes' => 1, 'hydrate' => 1, 'posture' => 1, 'eod' => 1, 'io_remind' => 1, 'mood' => 1,
-                     'desktop' => 0, 'timer_focus' => 25, 'timer_break' => 5, 'sound' => 'rain', 'volume' => 40];
-const WL_BOOLS  = ['breaks', 'eyes', 'hydrate', 'posture', 'eod', 'io_remind', 'mood', 'desktop'];
+                     'desktop' => 0, 'push' => 1, 'timer_focus' => 25, 'timer_break' => 5, 'sound' => 'rain', 'volume' => 40];
+const WL_BOOLS  = ['breaks', 'eyes', 'hydrate', 'posture', 'eod', 'io_remind', 'mood', 'desktop', 'push'];
 const WL_INTS   = ['break_min' => [20, 120], 'timer_focus' => [5, 90], 'timer_break' => [1, 30], 'volume' => [0, 100]];
 const WL_SOUNDS = ['rain', 'sea', 'wind', 'brown', 'pink', 'white'];
 const WL_MOOD_MIN = 5;                                  // a week is shown to HR only with at least this many answers

@@ -53,6 +53,7 @@ function nf_sweep_detached(): void {
         $GLOBALS['nf_mode'] = (function_exists('fastcgi_finish_request') || function_exists('litespeed_finish_request')) ? 'after the page' : 'background call';
         ignore_user_abort(true); @set_time_limit(120);
         nf_sweep();
+        if (function_exists('pn_tick_due') && pn_tick_due()) pn_tick();   // R97-196: without the clock job the pushes ride on the page views
     } catch (Throwable $e) { error_log('[nf] ' . $e->getMessage()); }
 }
 function nf_sweep(int $every = 60, bool $force = false): int {
@@ -171,6 +172,7 @@ function nf_push(array $userIds, string $kind, string $refKey, string $title, ?s
         $ex = one('SELECT id, created_at FROM notifications WHERE user_id = ? AND read_at IS NULL AND ref_key = ? LIMIT 1', [$uid, $refKey]);
         if ($ex) { if (strtotime((string)$ex['created_at']) <= strtotime($at)) q('UPDATE notifications SET grp = ?, kind = ?, title = ?, body = ?, url = ?, actor_id = ?, actor_name = ?, created_at = ? WHERE id = ?', [$grp, $kind, $title, $body, $url, $actorId ?: null, $actorName, $at, $ex['id']]); }   // the newest event wins, whichever source is swept first
         else q('INSERT INTO notifications (user_id, grp, kind, ref_key, title, body, url, actor_id, actor_name, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)', [$uid, $grp, $kind, $refKey, $title, $body, $url, $actorId ?: null, $actorName, $at]);
+        if (function_exists('pn_from_nf')) pn_from_nf($uid, $kind, $refKey, $title, $body, $at);   // R97-196: the same news to the phone
         $n++;
     }
     return $n;
