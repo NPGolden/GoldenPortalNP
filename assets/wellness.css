@@ -1,0 +1,35 @@
+/* Wellness (GAS-CP-R97-194) — top-bar button, panel, reminders, breathing minute. Colours follow the portal variables, so both themes work. */
+.wlbtn { position: relative; width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--navy-3); background: transparent; color: #fff; font-size: 17px; cursor: pointer; line-height: 1; }
+.wlbtn:hover, .wlbtn[aria-expanded="true"] { border-color: var(--gold); }
+.wlbtn b { position: absolute; right: -6px; bottom: -6px; min-width: 34px; padding: 1px 4px; border-radius: 9px; background: var(--gold); color: #0A1B2E; font: 700 10px/1.4 system-ui, sans-serif; }
+.wl-panel { position: fixed; z-index: 1200; top: 62px; right: 12px; width: min(340px, calc(100vw - 24px)); max-height: calc(100vh - 80px); overflow: auto; background: var(--card); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 14px 40px rgba(0,0,0,.28); padding: 14px; }
+.wl-panel[hidden] { display: none; }
+.wl-panel h3 { margin: 0 0 8px; font-size: 13px; font-weight: 700; color: var(--ink-3); }
+.wl-sec { padding: 10px 0; border-top: 1px solid var(--line); }
+.wl-sec:first-of-type { border-top: 0; padding-top: 0; }
+.wl-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.wl-chip { border: 1px solid var(--line); background: transparent; color: var(--ink); border-radius: 999px; padding: 5px 11px; font-size: 13px; cursor: pointer; }
+.wl-chip:hover { border-color: var(--gold-deep); }
+.wl-chip.on { background: #1F3A5F; border-color: #1F3A5F; color: #fff; }
+.wl-vol { width: 100%; margin-top: 8px; accent-color: #C9A227; }
+.wl-time { font: 700 30px/1 system-ui, sans-serif; font-variant-numeric: tabular-nums; min-width: 96px; }
+.wl-phase { font-size: 12px; color: var(--ink-3); width: 100%; }
+.wl-foot { display: flex; justify-content: space-between; align-items: center; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; }
+.wl-toasts { position: fixed; z-index: 1300; right: 14px; bottom: 14px; display: flex; flex-direction: column; gap: 10px; width: min(340px, calc(100vw - 28px)); }
+.wl-toast { background: var(--card); color: var(--ink); border: 1px solid var(--line); border-left: 4px solid #C9A227; border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.25); padding: 12px 14px; animation: wl-in .25s ease-out; }
+.wl-toast.g { border-left-color: #2E7D32; }
+.wl-toast b { display: block; margin-bottom: 3px; }
+.wl-toast p { margin: 0 0 8px; font-size: 13px; color: var(--ink-2); }
+.wl-toast .wl-row { justify-content: flex-end; }
+.wl-faces { display: flex; justify-content: space-between; margin: 6px 0 8px; }
+.wl-faces button { font-size: 26px; background: transparent; border: 1px solid transparent; border-radius: 10px; padding: 4px 8px; cursor: pointer; }
+.wl-faces button:hover, .wl-faces button:focus-visible { border-color: var(--gold-deep); }
+.wl-anon { font-size: 11px !important; color: var(--ink-3) !important; }
+@keyframes wl-in { from { transform: translateY(10px); opacity: 0; } to { transform: none; opacity: 1; } }
+.wl-over { position: fixed; inset: 0; z-index: 1400; background: rgba(10,27,46,.86); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px; color: #fff; text-align: center; padding: 20px; }
+.wl-ball { width: 120px; height: 120px; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #E8D08A, #C9A227); transition: transform 4s ease-in-out; transform: scale(.7); }
+.wl-over .wl-say { font: 600 24px/1.2 system-ui, sans-serif; min-height: 30px; }
+.wl-over ol { text-align: left; max-width: 520px; line-height: 1.6; margin: 0; padding-left: 22px; }
+.wl-over button { border: 1px solid #fff; background: transparent; color: #fff; border-radius: 999px; padding: 8px 20px; cursor: pointer; font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { .wl-ball { transition: none; } .wl-toast { animation: none; } }
+@media print { .wl-panel, .wl-toasts, .wl-over, .wlbtn { display: none !important; } }

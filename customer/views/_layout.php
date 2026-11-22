@@ -205,6 +205,7 @@ function layout_head(string $title, string $active = ''): void {
     <?= avatar_html((int)($u['id'] ?? 0), (string)($u['full_name'] ?? ''), 32, 'avatar') ?>
     <span class="name"><?= tt('nav.myaccount') ?></span>
   </a>
+  <?= function_exists('wl_head_html') ? wl_head_html() : '' ?>
   <?= function_exists('nf_bell_html') ? nf_bell_html($active) : '' ?>
   <?= theme_toggle_html($active) ?>
   <a class="gear<?= is_settings_page($active) ? ' is-here' : '' ?>" href="<?= url('account') ?>" title="<?= tt('nav.settings') ?>" aria-label="<?= tt('nav.settings') ?>"><?= gear_svg() ?></a>
@@ -262,6 +263,7 @@ function layout_foot(): void { ?>
   </main>
 </div>
 <script nonce="<?= csp_nonce() ?>" src="../assets/portal.js?v=<?= @filemtime(__DIR__ . '/../../assets/portal.js') ?: 1 ?>"></script>
+<?= function_exists('wl_foot_html') ? wl_foot_html() : '' /* R97-194 */ ?>
 <?php if (function_exists('ai_can') && ai_can((string)($_GET['p'] ?? ''))): ?><script nonce="<?= csp_nonce() ?>">window.GASAI={page:<?= json_encode((string)($_GET['p'] ?? '')) ?>,csrf:<?= json_encode((string)($_SESSION['csrf'] ?? '')) ?>,t:<?= json_encode(['title' => t('ai.title'), 'fill' => t('ai.fill'), 'write' => t('ai.write'), 'translate' => t('ai.translate'), 'ask' => t('ai.ask'), 'ph_fill' => t('ai.ph_fill'), 'ph_write' => t('ai.ph_write'), 'ph_ask' => t('ai.ph_ask'), 'photo' => t('ai.photo'), 'go' => t('ai.go'), 'apply' => t('ai.apply'), 'apply_all' => t('ai.apply_all'), 'proposals' => t('ai.proposals'), 'none' => t('ai.none'), 'busy' => t('ai.busy'), 'improve' => t('ai.improve'), 'to_en' => t('ai.to_en'), 'field' => t('ai.field'), 'close' => t('btn.cancel'), 'review' => t('ai.review'), 'copy' => t('ai.copy'), 'replace' => t('ai.replace'), 'non_en' => t('ai.non_en')], JSON_UNESCAPED_UNICODE) ?>};</script><script nonce="<?= csp_nonce() ?>" src="../assets/ai.js?v=<?= @filemtime(__DIR__ . '/../../assets/ai.js') ?: 1 ?>"></script><?php endif; ?>
 </body>
 </html>

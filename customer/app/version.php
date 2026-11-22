@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.221.0';
+const CP_VERSION = '1.222.0';
 const CP_BUILD   = '2026-11-22';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-194', 'version' => '1.222.0', 'date' => '2026-11-22', 'title' => 'Wellness: focus sounds, focus timer, breathing minute, stretches and reminders (break, eyes, water, posture, end of day, In / Out, anonymous How was today?) — each a personal setting; no reminders on days off and approved leave', 'db' => 'install/migrate_cp_r97_194_wellness.sql', 'check' => 'r99i'],
         ['ref' => 'GAS-CP-R97-193', 'version' => '1.221.0', 'date' => '2026-11-22', 'title' => 'Evaluation: the In / Out consistency of the year counts in the computed grade Attendance & consistency (approved leave left out; below 90 % one point per ten percentage points, at most three; scored from 20 expected days)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-192', 'version' => '1.220.0', 'date' => '2026-11-22', 'title' => 'Recycle bin: personnel and onboarding documents wait 30 days, seen by HR only; Delete all on tickets, requests and knowledge base questions', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-191', 'version' => '1.219.1', 'date' => '2026-11-22', 'title' => 'Newsletters: an issue published on the website appears within about three minutes (was up to fifteen); the confirmation says so', 'db' => null, 'check' => null],
@@ -645,6 +646,7 @@ function cp_migration_state(): array {
         'r99e' => $has("SHOW TABLES LIKE 'io_consents'"),
         'r99f' => $has("SHOW COLUMNS FROM work_calendars LIKE 'holidays_from'"),
         'r99d' => $has("SHOW COLUMNS FROM nl_issues LIKE 'web_slug'"),
+        'r99i' => $has("SHOW TABLES LIKE 'wl_prefs'") && $has("SHOW TABLES LIKE 'wl_mood_seen'"),   // R97-194
         'r99h' => $has("SHOW TABLES LIKE 'file_trash'") && $has("SHOW TABLES LIKE 'sb_files'"),   // R97-190
         'r99g' => $has("SHOW TABLES LIKE 'io_entries'"),   // R97-185: was written as r99d, a key the newsletters update already used — the later entry won and the In / Out tables were never created
         'r98x' => $has("SHOW INDEX FROM inv_moves WHERE Key_name = 'ix_invmv_item_kind_at'"),

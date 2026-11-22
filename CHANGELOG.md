@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.221.0** (build 2026-11-22). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.222.0** (build 2026-11-22). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.222.0 | GAS-CP-R97-194 | 2026-11-22 | Wellness: focus sounds, focus timer, breathing minute, stretches and reminders (break, eyes, water, posture, end of day, In / Out, anonymous How was today?) — each a personal setting; no reminders on days off and approved leave | `install/migrate_cp_r97_194_wellness.sql` |
 | 1.221.0 | GAS-CP-R97-193 | 2026-11-22 | Evaluation: the In / Out consistency of the year counts in the computed grade Attendance & consistency (approved leave left out; below 90 % one point per ten percentage points, at most three; scored from 20 expected days) | — |
 | 1.220.0 | GAS-CP-R97-192 | 2026-11-22 | Recycle bin: personnel and onboarding documents wait 30 days, seen by HR only; Delete all on tickets, requests and knowledge base questions | — |
 | 1.219.1 | GAS-CP-R97-191 | 2026-11-22 | Newsletters: an issue published on the website appears within about three minutes (was up to fifteen); the confirmation says so | — |
