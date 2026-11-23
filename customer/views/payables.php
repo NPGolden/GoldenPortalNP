@@ -62,6 +62,8 @@ layout_head(t('si.title'), 'payables');
 <?= $pg ?>
 <div class="btn-row" style="margin-top:10px;"><button class="btn btn--gold btn--sm" type="submit" id="req-btn" disabled>✅ <?= tt('si.make_request') ?></button><input name="pay_by" type="date" title="<?= tt('si.pay_by') ?>"><input name="note" maxlength="600" placeholder="<?= tt('prq.note') ?>" style="min-width:16em;"><span class="hint"><?= e(t('si.request_hint', ['v' => si_money(si_threshold())])) ?> <?= tt('si.tick_why') ?></span></div>
 </form>
+<?php $dl = function_exists('si_deleted_log') && (si_can() || si_del_can()) ? si_deleted_log() : []; if ($dl): /* R97-206 */ ?><details style="margin-top:14px;"><summary class="hint" style="cursor:pointer;">🗑 <?= tt('si.del_log') ?> (<?= count($dl) ?>)</summary><p class="hint" style="text-align:justify;"><?= tt('si.del_log_hint') ?></p>
+<table class="tbl tbl--wrap" data-nosort><tbody><?php foreach ($dl as $d): ?><tr><td class="hint" style="white-space:nowrap;"><?= e(fmt_datetime($d['created_at'])) ?></td><td><?= e((string)$d['user_name']) ?></td><td><?= e((string)$d['note']) ?></td></tr><?php endforeach; ?></tbody></table></details><?php endif; ?>
 <script nonce="<?= csp_nonce() ?>">(function(){var cbs=document.querySelectorAll('input[name="inv[]"]'),btn=document.getElementById('req-btn');function upd(){var on=[].filter.call(cbs,function(c){return c.checked;});var sups={};on.forEach(function(c){sups[c.dataset.sup]=1;});btn.disabled=!on.length||Object.keys(sups).length>1;}cbs.forEach(function(c){c.addEventListener('change',upd);});})();</script>
 </div>
 

@@ -5,6 +5,7 @@ return [
   'lede'  => 'The working routine of a Golden A/S project manager in the portal: setting a project up, the daily round, the approvals you own, the weekly cycle, the project meeting, the monthly closing and the close-out — with checklists.',
   'sections' => [
     ['id' => 'role', 'title' => 'What the portal expects from the project manager', 'body' => [
+      'Payables (v1.229.0): a cancelled supplier invoice can be deleted by management, with a reason; the deletion is kept in the register «Deleted invoices» on the Payables page.',
       'Newsletter versions (v1.228.1): on a language version, ✨ beside a field translates that field from the original; «Translate the empty fields» does all empty fields in turn.',
       'Newsletters in seven languages (v1.228.0): a newsletter issue can have versions in English, Greek, Italian, Russian, Ukrainian, German and Dutch; each reader receives his language when that version is marked ready. The language of a person is set on the contact («Newsletter language»); empty means English.',
       'Community — pin an existing post (v1.227.1): open the post, press ✎ Edit and fill «Pin until» with the last day the post must stay at the top of the noticeboard, then «Save changes». A pinned post has a gold border, the mark 📌 and starts open. Change the date to pin it longer; empty the field and save to unpin. The field is shown to those who may publish posts — HR, managers, project managers and administrators.',

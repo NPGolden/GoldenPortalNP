@@ -265,6 +265,31 @@ function si_sp_cost_sync(int $iid): void {
     if ($i['order_id'] && function_exists('po_load')) { $o = po_load((int)$i['order_id']); if ($o && $o['cost_id']) { $inv = (float) scalar("SELECT COALESCE(SUM(IF(kind = 'credit', -net, net)),0) FROM si_invoices WHERE order_id = ? AND status IN ('checked','requested','approved','paid')", [(int)$o['id']]); if (si_lc_has()) $inv -= (float) scalar("SELECT COALESCE(SUM(sl.line_total),0) FROM si_lines sl JOIN si_invoices x ON x.id = sl.invoice_id WHERE x.order_id = ? AND x.kind <> 'credit' AND x.status IN ('checked','requested','approved','paid') AND sl.po_cost_id IS NOT NULL", [(int)$o['id']]);   /* the commitment is for the parts only */ q('UPDATE sp_costs SET amount = ? WHERE id = ?', [max(0.0, (float)$o['subtotal'] - $inv), (int)$o['cost_id']]); } }
     if (function_exists('eng_rows_reset')) eng_rows_reset();
 }
+/** R97-206: who may delete a cancelled invoice for good — administrators and management (CEO, General Manager, Managing Director). */
+function si_del_can(): bool { return is_staff() && si_has() && (is_cp_admin() || (function_exists('mgmt_can') && mgmt_can())); }
+/** Delete a CANCELLED supplier invoice, proforma or credit note that was never paid and is on no payment request. Lines and history go; its documents go to the
+ *  recycle bin; one line stays in the register of deleted invoices (who, when, number, supplier, amount, reason). The portal number is never given again. */
+function si_delete(int $iid, string $reason): string {
+    if (!si_del_can()) throw new RuntimeException(t('err.noaccess')); $i = si_load($iid); if (!$i) throw new RuntimeException(t('err.notfound'));
+    if ($i['status'] !== 'cancelled') throw new RuntimeException(t('si.del_only_cancelled')); $reason = trim($reason); if (mb_strlen($reason) < 5) throw new RuntimeException(t('si.del_reason'));
+    if ((float)$i['paid'] > 0.004 || (int) scalar('SELECT COUNT(*) FROM si_payments WHERE invoice_id = ?', [$iid]) || (int) scalar('SELECT COUNT(*) FROM si_request_items WHERE invoice_id = ?', [$iid]) || (int) scalar("SELECT COUNT(*) FROM si_invoices WHERE credit_of = ? AND status <> 'cancelled'", [$iid])) throw new RuntimeException(t('si.del_has_pay'));
+    q('UPDATE si_invoices SET credit_of = NULL WHERE credit_of = ?', [$iid]);   // a cancelled credit note of it stays, without the link
+    $no = (string)$i['si_no']; $what = $no . ' · ' . (string)($i['supplier'] ?? '') . ' · ' . trim((string)($i['inv_no'] ?? '') . ' ' . (string)($i['proforma_no'] ?? '')) . ' · ' . si_money((float)$i['gross'], (string)$i['currency']) . (!empty($i['po_no']) ? ' · ' . $i['po_no'] : '');
+    $pdo = db(); $pdo->beginTransaction();
+    try {
+        if (si_docs_has()) { $T = function_exists('ft_types') ? (ft_types()['si_docs'] ?? null) : null;
+            foreach (si_docs_of($iid) as $d) { $abs = cp_storage() . '/' . $d['stored_name'];
+                if ($T && function_exists('ft_trash_row')) ft_trash_row('si_docs', $d, $T[0]($d), $T[1]($d), $no . ' — ' . t('si.del_log'), true, $reason);
+                else { if (str_starts_with((string)$d['stored_name'], 'si/') && !str_contains((string)$d['stored_name'], '..') && is_file($abs)) @unlink($abs); q('DELETE FROM si_docs WHERE id = ?', [(int)$d['id']]); } } }
+        if (!empty($i['sp_cost_id'])) q('DELETE FROM sp_costs WHERE id = ?', [(int)$i['sp_cost_id']]);
+        q('DELETE FROM si_lines WHERE invoice_id = ?', [$iid]); q('DELETE FROM si_events WHERE invoice_id = ?', [$iid]); q('DELETE FROM si_invoices WHERE id = ? AND status = ?', [$iid, 'cancelled']);
+        si_event(null, null, 'delete', mb_substr($what . ' — ' . $reason, 0, 600));
+        $pdo->commit();
+    } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+    cache_bump_later('eng'); return $no;
+}
+/** The register of deleted invoices, newest first. */
+function si_deleted_log(int $limit = 100): array { return si_has() ? all("SELECT created_at, user_name, note FROM si_events WHERE event = 'delete' AND invoice_id IS NULL AND request_id IS NULL ORDER BY id DESC LIMIT " . max(1, min(500, $limit))) : []; }
 function si_cancel(int $iid, string $note): void {
     require_si(); $i = si_load($iid); if (!$i || in_array($i['status'], ['paid', 'cancelled'], true) || (float)$i['paid'] > 0) throw new RuntimeException(t('err.noaccess')); if ($note === '') throw new RuntimeException(t('prq.need_reason'));
     if (in_array($i['status'], ['checked', 'requested', 'approved'], true)) foreach (si_lines($iid) as $l) if ($l['po_line_id']) q('UPDATE po_lines SET qty_invoiced = GREATEST(0, qty_invoiced - ?) WHERE id = ?', [(float)$l['qty'] * ($i['kind'] === 'credit' ? -1 : 1), (int)$l['po_line_id']]);

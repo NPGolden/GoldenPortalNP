@@ -4168,3 +4168,12 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Added: `rcr_manual_add`, `rcr_assign`, `hr_gone_close`, `nf_read`, `nf_read_all`, `kb_vote`, `kb_accept`, `cr_decide`, `pk_remove`, `clocks_save`. Each handler keeps its own rights check (`rcr_can`, `hr_can`, owner of the question, approver of the request, own account).
 - Left out on purpose: administrator-only actions (`kb_delete_q`, `kb_delete_a`, `cr_delete`, `pl_car_save`, `pl_car_delete`), customer-only `support_send`, `support_status`, and `pl_delete_work` (refused to the HR scope inside the function).
 - `php tools/check-scopes.php` lists the form actions of the pages of each scoped role (HR, Employee, Assistant) that are not in its list; exit code 1 for HR and Employee, report only for Assistant. Run it when a button is added to a page of `HR_PAGES` / `EMP_PAGES`.
+
+## §489 Payables: deleting a cancelled supplier invoice (GAS-CP-R97-206, v1.229.0)
+
+- `si_del_can()`: administrator or `mgmt_can()`. `si_delete($id, $reason)` (action `si_delete`, button on `?p=payable` when status = cancelled): status must be `cancelled`; reason of five characters or more; refused with `paid > 0`, a row in `si_payments` or `si_request_items`, or a not-cancelled credit note with `credit_of` = the invoice.
+- In one transaction: documents (`si_docs`) through `ft_trash_row()` to the recycle bin as protected entries (30 days), `sp_costs` row if any, `si_lines`, `si_events` of the invoice, the `si_invoices` row (only while still `cancelled`); `credit_of` of cancelled credit notes is cleared; one `si_events` row with `event = 'delete'`, `invoice_id` and `request_id` NULL, note = number · supplier · supplier invoice / proforma number · gross · purchase order — reason.
+- `si_deleted_log()` reads those rows; shown as «Deleted invoices» under the list of `?p=payables` to Accounting and management. There is no action that edits or removes them.
+- Numbers come from `doc_sequences`, so a deleted number is not issued again.
+- No "delete all" for payables (decision of 22/11/2026 stands): one invoice at a time, cancelled first.
+- Language keys +8 (13 171 per language).

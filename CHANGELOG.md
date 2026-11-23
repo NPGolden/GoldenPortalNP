@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.228.2** (build 2026-11-23). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.229.0** (build 2026-11-23). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.229.0 | GAS-CP-R97-206 | 2026-11-23 | Payables: a cancelled supplier invoice, proforma or credit note can be deleted by management, with a reason; register of deleted invoices | — |
 | 1.228.2 | GAS-CP-R97-205 | 2026-11-23 | HR role: «Add a CV by hand» and «Assign to a vacancy» in Recruiting, mark notifications as read, and six more buttons no longer answer «no access» | — |
 | 1.228.1 | GAS-CP-R97-204 | 2026-11-23 | Newsletter versions: the assistant translates cell by cell — ✨ beside every field, «Translate the empty fields», the reason shown when it cannot answer | — |
 | 1.228.0 | GAS-CP-R97-203 | 2026-11-23 | Newsletters in seven languages (EN, GR, IT, RU, UA, DE, NL): one issue with a version per language, translation drafted by the assistant and read by a person, every reader receives his language, website article per language, language on the contact | `install/migrate_cp_r97_203_nl_languages.sql` |
