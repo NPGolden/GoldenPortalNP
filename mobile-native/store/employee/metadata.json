@@ -5,7 +5,7 @@
   "primaryCategory": "BUSINESS",
   "secondaryCategory": "PRODUCTIVITY",
   "locale": "en-US",
-  "releaseType": "MANUAL",
+  "releaseType": "AFTER_APPROVAL",
   "contact": {
     "firstName": "Nikos",
     "lastName": "Polykandriotis",
