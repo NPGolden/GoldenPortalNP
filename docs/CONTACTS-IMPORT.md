@@ -4203,3 +4203,8 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - `rcr_site_purge()` now retries once when the answer is 301/302/307/308 and the target is https on the same site (host equal apart from `www.`). The key is never sent to another host. Automatic redirect following stays off.
 - Result kept in `cp_settings.rc_site_purge_last` (`time|http code`), shown on `?p=rcr_settings` (texts `rc.purge_ok`, `rc.purge_bad`). Time budget 3 s; a failure never blocks the save.
 - Language keys +2 (13 200 per language).
+
+## §493 System budget: shortcut to the supporting documents (GAS-CP-R97-212, v1.231.2)
+
+- The card `#docs` (R97-190: `sb_files`, upload `sb_doc_add`, delete through `ft_btn` / `ft_all_btn` and the recycle bin) is unchanged. Users did not find it below labour, parts and expenses.
+- `views/system_budget.php`: first button of the head row links to `#docs` with `count(sb_files($id))`; same condition as the card (not a revision view, not a template, table present). No new language keys.
