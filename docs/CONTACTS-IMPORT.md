@@ -4196,3 +4196,10 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Actions `rcr_app_delete`, `rcr_cv_delete`, `rcr_pool_delete` in `rcr_actions.php`, added to `HR_ACTIONS` (checked with `tools/check-scopes.php`). CSRF and the one-submit lock as on every form; reason through `data-prompt`, no inline script.
 - Fix: `rcr_retention_run()` left the scorecards and interviews of the applications it deleted; it now uses `rcr_app_erase_rows()`.
 - Language keys +27 (13 198 per language).
+
+## §492 Careers feed: the purge call follows the www redirect (GAS-CP-R97-211, v1.231.1)
+
+- Cause: `rc_site_origin` holds the bare address; the website answers `POST /api/hr.php?r=purge` there with 301 to `www.`; `rcr_site_purge()` did not follow, so the website cache (2 min file cache + 30 s browser) was never cleared by a save.
+- `rcr_site_purge()` now retries once when the answer is 301/302/307/308 and the target is https on the same site (host equal apart from `www.`). The key is never sent to another host. Automatic redirect following stays off.
+- Result kept in `cp_settings.rc_site_purge_last` (`time|http code`), shown on `?p=rcr_settings` (texts `rc.purge_ok`, `rc.purge_bad`). Time budget 3 s; a failure never blocks the save.
+- Language keys +2 (13 200 per language).

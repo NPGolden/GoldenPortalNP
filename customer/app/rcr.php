@@ -487,10 +487,22 @@ function rcr_cv_to_person(int $appId): bool {
 function rcr_site_purge(): void {
     $origin = rtrim((string) cp_setting('rc_site_origin', ''), '/'); $key = (string) cp_setting('rc_site_key', '');
     if ($origin === '' || $key === '' || !preg_match('~^https://[a-z0-9.-]+$|^http://127\.0\.0\.1(:[0-9]+)?$~i', $origin) || !function_exists('curl_init')) return;
+    $code = 0;
     try {
-        $ch = curl_init($origin . '/api/hr.php?r=purge');
-        curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => '', CURLOPT_HTTPHEADER => ['X-Site-Key: ' . $key, 'Content-Length: 0'], CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 2, CURLOPT_CONNECTTIMEOUT => 2, CURLOPT_SSL_VERIFYPEER => true]);
-        curl_exec($ch); if (function_exists('perf_out')) perf_out($ch, 'Website careers'); curl_close($ch);
+        $post = function (string $base) use ($key): array {
+            $ch = curl_init($base . '/api/hr.php?r=purge'); $loc = '';
+            curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => '', CURLOPT_HTTPHEADER => ['X-Site-Key: ' . $key, 'Content-Length: 0'], CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 3, CURLOPT_CONNECTTIMEOUT => 2, CURLOPT_SSL_VERIFYPEER => true, CURLOPT_FOLLOWLOCATION => false,
+                CURLOPT_HEADERFUNCTION => function ($c, $h) use (&$loc) { if (stripos($h, 'Location:') === 0) $loc = trim(substr($h, 9)); return strlen($h); }]);
+            curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE); if (function_exists('perf_out')) perf_out($ch, 'Website careers'); curl_close($ch);
+            return [$code, $loc];
+        };
+        [$code, $loc] = $post($origin);
+        /* R97-211: the website answers its bare address with a redirect to www (or back); the purge then never arrived. One retry, only to the same site over https. */
+        if (in_array($code, [301, 302, 307, 308], true) && $loc !== '') {
+            $h0 = strtolower((string) parse_url($origin, PHP_URL_HOST)); $h1 = strtolower((string) parse_url($loc, PHP_URL_HOST));
+            if (parse_url($loc, PHP_URL_SCHEME) === 'https' && $h1 !== '' && ($h1 === 'www.' . $h0 || 'www.' . $h1 === $h0)) [$code] = $post('https://' . $h1);
+        }
     } catch (Throwable $e) {}
+    try { cp_setting_set('rc_site_purge_last', date('Y-m-d H:i:s') . '|' . $code); } catch (Throwable $e) {}
 }
 

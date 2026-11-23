@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.231.0';
+const CP_VERSION = '1.231.1';
 const CP_BUILD   = '2026-11-23';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-211', 'version' => '1.231.1', 'date' => '2026-11-23', 'title' => 'Careers on the website: a saved vacancy or event now reaches the website at once (the refresh call was lost in a redirect); Settings › Recruiting shows whether the website accepted it', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-209', 'version' => '1.231.0', 'date' => '2026-11-23', 'title' => 'Recruiting: HR deletes applications (one or several), a CV alone, or a talent-pool entry — with a reason and a register of deletions; the retention run now also clears scorecards and interviews', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-207', 'version' => '1.230.0', 'date' => '2026-11-23', 'title' => 'Golden PM 1.0.20: My approvals — everything that waits for my decision; supplier payment requests opened, approved or rejected in the app', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-206', 'version' => '1.229.0', 'date' => '2026-11-23', 'title' => 'Payables: a cancelled supplier invoice, proforma or credit note can be deleted by management, with a reason; register of deleted invoices', 'db' => null, 'check' => null],

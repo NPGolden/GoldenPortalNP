@@ -13382,4 +13382,6 @@ Best regards,
 'rc.del_k_app_delete' => 'Application',
 'rc.del_k_cv_delete' => 'CV',
 'rc.del_k_pool_delete' => 'Talent pool entry',
+'rc.purge_ok' => 'Website told to refresh its vacancies: {when}.',
+'rc.purge_bad' => 'The website did not accept the refresh on {when} (answer {code}); changes appear on Careers within 2 minutes. Check the website address and the key.',
 ];

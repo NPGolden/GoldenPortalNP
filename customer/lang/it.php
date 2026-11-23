@@ -13382,4 +13382,6 @@ Cordiali saluti,
 'rc.del_k_app_delete' => 'Candidatura',
 'rc.del_k_cv_delete' => 'CV',
 'rc.del_k_pool_delete' => 'Voce del bacino di talenti',
+'rc.purge_ok' => 'Sito avvisato di aggiornare le posizioni: {when}.',
+'rc.purge_bad' => 'Il sito non ha accettato il rinnovo il {when} (risposta {code}); le modifiche compaiono in Carriere entro 2 minuti. Controllare indirizzo del sito e chiave.',
 ];
