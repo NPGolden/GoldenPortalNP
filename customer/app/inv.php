@@ -137,13 +137,20 @@ function stk_item_save_from_post(int $id): int {
 function stk_stock_of(int $itemId): array { return all('SELECT s.*, w.code AS wh_code, w.name AS wh_name FROM inv_stock s JOIN inv_warehouses w ON w.id = s.warehouse_id WHERE s.item_id = ? ORDER BY w.is_default DESC, w.name', [$itemId]); }
 function stk_moves_of(int $itemId, int $limit = 100): array { return all('SELECT m.*, w.code AS wh_code, p.project_code, sp.code AS sub_code FROM inv_moves m JOIN inv_warehouses w ON w.id = m.warehouse_id LEFT JOIN projects p ON p.id = m.project_id LEFT JOIN subprojects sp ON sp.id = m.subproject_id WHERE m.item_id = ? ORDER BY m.id DESC LIMIT ' . (int)$limit, [$itemId]); }
 /** One stock movement. kind in|out|adj|opening (adj: qty is the signed difference). Returns the move id. */
+/** R97-215: everything a stock action writes is kept together — all of it is saved, or none of it. Safe to nest. */
+function stk_tx(callable $fn) {
+    $pdo = db(); if ($pdo->inTransaction()) return $fn();
+    $pdo->beginTransaction();
+    try { $r = $fn(); if ($pdo->inTransaction()) $pdo->commit(); return $r; }
+    catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+}
 function stk_move(int $itemId, int $whId, string $kind, float $qty, array $o = []): int {
     if (!in_array($kind, ['in', 'out', 'adj', 'opening', 'xfer_out', 'xfer_in'], true)) throw new RuntimeException('bad move kind');
     if ($qty == 0.0) throw new RuntimeException(t('stk.need_qty'));
     if (in_array($kind, ['in', 'out', 'xfer_in', 'xfer_out', 'opening'], true)) $qty = abs($qty);
     $delta = match ($kind) { 'in', 'xfer_in', 'opening' => $qty, 'out', 'xfer_out' => -$qty, 'adj' => $qty };
     q('INSERT INTO inv_stock (item_id, warehouse_id, qty_on_hand) VALUES (?,?,0) ON DUPLICATE KEY UPDATE item_id = item_id', [$itemId, $whId]);
-    $cur = (float) scalar('SELECT qty_on_hand FROM inv_stock WHERE item_id = ? AND warehouse_id = ?', [$itemId, $whId]);
+    $cur = (float) scalar('SELECT qty_on_hand FROM inv_stock WHERE item_id = ? AND warehouse_id = ? FOR UPDATE', [$itemId, $whId]);   // R97-215: the row is held until the action ends, so two people cannot take the same goods at the same moment
     if ($cur + $delta < -0.0005 && empty($o['allow_negative'])) throw new RuntimeException(t('stk.not_enough', ['q' => stk_qty($cur)]));
     if (in_array($kind, ['out', 'xfer_out'], true) && empty($o['allow_negative'])) {   // R97-213: goods reserved for a requisition cannot leave by another door; an issue of the requisition itself releases its reservation first
         $resv = (float) scalar('SELECT qty_reserved FROM inv_stock WHERE item_id = ? AND warehouse_id = ?', [$itemId, $whId]);
@@ -162,7 +169,8 @@ function stk_move(int $itemId, int $whId, string $kind, float $qty, array $o = [
     return $mid;
 }
 /** Manual movement from the item card: in (with price → history), out (to a sub-project), adj (stocktake / damaged …), xfer (between warehouses). */
-function stk_move_from_post(): void {
+function stk_move_from_post(): void { stk_tx(fn() => stk_move_from_post_x()); }
+function stk_move_from_post_x(): void {
     require_pr_wh(); $item = stk_item((int)($_POST['item_id'] ?? 0)); if (!$item) throw new RuntimeException(t('err.notfound'));
     $kind = (string)($_POST['kind'] ?? ''); $wh = (int)($_POST['warehouse_id'] ?? 0) ?: stk_default_wh(); $qty = (float) str_replace(',', '.', (string)($_POST['qty'] ?? '0')); $note = trim((string)($_POST['note'] ?? ''));
     $sid = (int)($_POST['subproject_id'] ?? 0) ?: null; $pid = $sid ? (int) scalar('SELECT project_id FROM subprojects WHERE id = ?', [$sid]) : ((int)($_POST['project_id'] ?? 0) ?: null);
@@ -351,7 +359,7 @@ function stk_import_apply(array $parsed, string $mode, int $whId, string $priceD
             if (in_array($mode, ['full', 'prices'], true) && $r['price'] !== null && $r['price'] >= 0) { $same = one("SELECT id FROM inv_prices WHERE item_id = ? AND source = 'erp' AND priced_at = ? AND unit_price = ?", [$it['id'], $priceDate, round($r['price'], 4)]); if (!$same) { stk_price_add((int)$it['id'], $r['price'], ['priced_at' => $priceDate, 'source' => 'erp', 'supplier_id' => $sup, 'note' => 'ERP']); $res['prices']++; } }
             if (in_array($mode, ['full', 'stock'], true) && $r['qty'] !== null) {
                 $cur = (float) scalar('SELECT COALESCE(qty_on_hand,0) FROM inv_stock WHERE item_id = ? AND warehouse_id = ?', [$it['id'], $whId]); $d = $r['qty'] - $cur;
-                if (abs($d) > 0.0005) { stk_move((int)$it['id'], $whId, $cur == 0.0 && $mode === 'full' ? 'opening' : 'adj', $cur == 0.0 && $mode === 'full' ? $r['qty'] : $d, ['reason' => 'stocktake', 'note' => 'ERP import', 'location' => $r['location'], 'allow_negative' => true]); $res['stock']++; }
+                if (abs($d) > 0.0005) { stk_move((int)$it['id'], $whId, $cur == 0.0 && $mode === 'full' && $r['qty'] > 0 ? 'opening' : 'adj', $cur == 0.0 && $mode === 'full' && $r['qty'] > 0 ? $r['qty'] : $d, ['reason' => 'stocktake', 'note' => 'ERP import', 'location' => $r['location'], 'allow_negative' => true]); $res['stock']++; }
                 elseif ($r['location']) q('UPDATE inv_stock SET location = ? WHERE item_id = ? AND warehouse_id = ?', [$r['location'], $it['id'], $whId]);
             }
         }

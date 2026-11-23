@@ -4223,3 +4223,15 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - `prq_reserve_daily()` called from `tick.php`: first tick after 07:00 of a day runs `prq_reserve_audit()`, stores `cp_settings.prq_rsv_last` = `date time|n`, and when n > 0 sends `nf_push` kind `work:prq_rsv`, key `prq:rsv:<date>` (one per day) to `prq_proc_ids()`, link `?p=stock_reservations`. Nothing is repaired automatically.
 - `prq_reservations(?int $pmUserId)`: with a user id, rows of projects where `projects.pm_user_id` is that user. `views/stock_reservations.php`: warehouse / procurement / management see everything; a PM (`prq_is_pm()`) sees the list of the own projects only, without check, repair or release. Link on `views/requisitions.php`.
 - Language keys +4 (13 231 per language).
+
+## §496 Inventory movements: atomic actions, row lock, reservations per warehouse, ledger check (GAS-CP-R97-215, v1.234.0, migration r99l)
+
+- Review of `stk_move` and every caller (manual form, import, `po_receive_from_post`, `prq_approve_apply`, `prq_issue`, `prq_cancel`, `dn_create`, `dn_cancel`, `po_cancel`, `po_restore`, service report parts).
+- Finding 1 — no transaction: these actions wrote 5–20 rows each without one. `stk_tx(callable)` (nest-safe) now wraps `stk_move_from_post`, `prq_decide`, `prq_mgmt_decide`, `prq_issue`, `prq_cancel`, `po_cancel`, `po_restore`, `po_receive_from_post`, `dn_create`, `dn_cancel` (body moved to `*_x`), so web and app API share it.
+- Finding 2 — read then write: `stk_move` reads the stock row `FOR UPDATE`; `prq_issue` and the receipt lock the requisition line.
+- Finding 3 — one warehouse per line: `pr_lines.warehouse_id` is single, but a receipt reserved in the receiving warehouse; the issue then took the goods from the line's warehouse. Table `pr_reservations (pr_line_id, item_id, warehouse_id, qty)`; `prq_rsv_of`, `prq_rsv_add`, `prq_rsv_take($l, $qty, $prefer, $single)`. Without the table (migration not applied) everything counts in the warehouse of the line, as before. `prq_issue` takes from the holding warehouses; from a delivery note `single` = one warehouse (the note's first), else error `prq.issue_split`. `dn_cancel` reserves again in the warehouse of the reversed movement.
+- Finding 4 — over-reservation: the receipt reserved the whole accepted quantity; now `min(accepted, qty - issued - reserved)`. A line that becomes `issued` releases what it still held.
+- Finding 5 — `stk_import_apply`: mode full with no stock and a negative file quantity created an `opening` of the absolute value; now an adjustment.
+- `prq_reserve_audit()` adds `ledger` (`inv_stock.qty_on_hand` against `SUM(inv_moves.qty)`, or below zero) and `split` (rows above the line total; repair rewrites them). Ledger differences are reported only.
+- Not changed: service report consumption keeps `allow_negative`; stocktake adjustment below the reserved quantity is accepted and reported.
+- Migration backfills the table from `pr_lines` (warehouse of the line). Language keys +7 (13 238 per language).

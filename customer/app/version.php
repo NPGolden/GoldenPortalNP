@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.233.0';
+const CP_VERSION = '1.234.0';
 const CP_BUILD   = '2026-11-23';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-215', 'version' => '1.234.0', 'date' => '2026-11-23', 'title' => 'Inventory movements reviewed: every stock action is saved whole or not at all, two people cannot take the same goods at once, reservations are kept per warehouse, goods received above the need stay free, and a check of quantity on hand against the movements', 'db' => 'install/migrate_cp_r97_215_reservations_per_warehouse.sql', 'check' => 'r99l'],
         ['ref' => 'GAS-CP-R97-214', 'version' => '1.233.0', 'date' => '2026-11-23', 'title' => 'Reservations: the check runs by itself every day and notifies Procurement when something does not agree; a project manager sees the reservations of the own projects', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-213', 'version' => '1.232.0', 'date' => '2026-11-23', 'title' => 'Inventory › Reservations: who holds reserved stock, release a reservation back to free stock, check of reserved quantities against the requisitions with repair; reserved goods cannot leave by a manual movement or transfer', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-212', 'version' => '1.231.2', 'date' => '2026-11-23', 'title' => 'System budget: button «Supporting documents» at the top of the budget, with the number of files, leading to the upload card', 'db' => null, 'check' => null],
@@ -664,6 +665,7 @@ function cp_migration_state(): array {
         'r99e' => $has("SHOW TABLES LIKE 'io_consents'"),
         'r99f' => $has("SHOW COLUMNS FROM work_calendars LIKE 'holidays_from'"),
         'r99d' => $has("SHOW COLUMNS FROM nl_issues LIKE 'web_slug'"),
+        'r99l' => $has("SHOW TABLES LIKE 'pr_reservations'"),   // R97-215
         'r99k' => $has("SHOW COLUMNS FROM nl_issues LIKE 'tr'") && $has("SHOW COLUMNS FROM nl_sends LIKE 'lang'") && $has("SHOW COLUMNS FROM contacts LIKE 'nl_lang'"),   // R97-203
         'r99j' => $has("SHOW TABLES LIKE 'soc_post_tr'") && $has("SHOW COLUMNS FROM soc_posts LIKE 'lang'"),   // R97-201
         'r99i' => $has("SHOW TABLES LIKE 'wl_prefs'") && $has("SHOW TABLES LIKE 'wl_mood_seen'"),   // R97-194

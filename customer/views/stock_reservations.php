@@ -4,7 +4,7 @@ require __DIR__ . '/_layout.php';
 $u = require_staff();
 $full = function_exists('pr_wh') && pr_wh(); $pmOnly = !$full && function_exists('prq_is_pm') && prq_is_pm();   // R97-214: a project manager sees the reservations of the own projects
 if (!function_exists('prq_reserve_audit') || !prq_has() || !($full || $pmOnly)) { http_response_code(403); layout_head(t('prq.rsv_title'), 'inventory'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
-$rows = prq_reservations($full ? null : (int)$u['id']); $a = $full ? prq_reserve_audit() : ['diff' => [], 'stale' => []]; $adm = $full && pr_admin(); $bad = count($a['diff']) + count($a['stale']); $lastRun = explode('|', (string)cp_setting('prq_rsv_last', ''));
+$rows = prq_reservations($full ? null : (int)$u['id']); $a = $full ? prq_reserve_audit() : ['diff' => [], 'stale' => [], 'ledger' => [], 'split' => []]; $adm = $full && pr_admin(); $bad = count($a['diff']) + count($a['stale']) + count($a['split']); $led = $a['ledger']; $lastRun = explode('|', (string)cp_setting('prq_rsv_last', ''));
 layout_head(t('prq.rsv_title'), 'inventory');
 ?>
 <p class="eyebrow"><a href="<?= url('inventory') ?>"><?= tt('stk.title') ?></a> › <?= tt('prq.rsv_title') ?></p>
@@ -19,6 +19,11 @@ layout_head(t('prq.rsv_title'), 'inventory');
   <?php if ($adm): ?><form method="post" action="<?= url('stock_reservations') ?>" data-lock data-confirm="<?= e(t('prq.rsv_repair_q')) ?>" style="margin-top:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="prq_reserve_repair"><button class="btn btn--gold btn--sm" type="submit">🛠 <?= tt('prq.rsv_repair') ?></button> <span class="hint"><?= tt('prq.rsv_repair_hint') ?></span></form><?php else: ?><p class="hint"><?= tt('prq.rsv_repair_who') ?></p><?php endif; ?>
 <?php endif; ?>
 <p class="hint" style="margin-top:10px;"><?= count($lastRun) === 2 ? e(t('prq.rsv_daily_last', ['when' => fmt_datetime($lastRun[0] . ':00'), 'n' => (int)$lastRun[1]])) : tt('prq.rsv_daily_none') ?></p></div><?php endif; ?>
+
+<?php if ($full): /* R97-215 */ ?><div class="card" id="ledger"><div class="card-head"><h2><?= $led ? '⚠' : '✓' ?> <?= tt('prq.led_title') ?></h2><span class="hint"><?= tt('prq.led_hint') ?></span></div>
+<?php if (!$led): ?><p><?= pill('green', t('prq.led_ok')) ?></p><?php else: ?><div class="table-scroll"><table class="tbl" data-nosort><thead><tr><th><?= tt('stk.code') ?></th><th><?= tt('stk.desc') ?></th><th><?= tt('stk.warehouse') ?></th><th class="num"><?= tt('stk.on_hand') ?></th><th class="num"><?= tt('prq.led_moves') ?></th><th class="num"><?= tt('prq.led_diff') ?></th></tr></thead><tbody>
+<?php foreach ($led as $d): ?><tr><td><a href="<?= url('inventory_item', ['id' => (int)$d['item_id']]) ?>"><b><?= e((string)$d['code']) ?></b></a></td><td><?= e(mb_substr((string)$d['description'], 0, 90)) ?></td><td><?= e((string)$d['wh_code']) ?></td><td class="num"><?= e(stk_qty((float)$d['qty_on_hand'])) ?> <?= e((string)$d['unit']) ?></td><td class="num"><?= e(stk_qty((float)$d['moves'])) ?></td><td class="num"><b><?= e(stk_qty((float)$d['qty_on_hand'] - (float)$d['moves'])) ?></b></td></tr><?php endforeach; ?>
+</tbody></table></div><p class="hint" style="margin-top:8px;"><?= tt('prq.led_what') ?></p><?php endif; ?></div><?php endif; ?>
 
 <div class="card"><div class="card-head"><h2><?= tt('prq.rsv_held') ?> <span class="count"><?= count($rows) ?></span></h2><span class="hint"><?= tt('prq.rsv_held_hint') ?></span></div>
 <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('stk.code') ?></th><th><?= tt('stk.desc') ?></th><th><?= tt('stk.warehouse') ?></th><th class="num"><?= tt('stk.reserved') ?></th><th><?= tt('prq.rsv_for') ?></th><th><?= tt('prq.project') ?></th><th><?= tt('th.status') ?></th><th></th></tr></thead><tbody>

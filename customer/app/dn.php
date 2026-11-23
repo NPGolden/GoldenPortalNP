@@ -44,7 +44,8 @@ function dn_kind_icon(string $k): string { return ['project' => '🏗', 'custome
 /** Create a delivery note and book the movements.
  *  $h: kind, warehouse_id, project_id, subproject_id, company_id, vessel_id, receipt_id, order_id, issued_at, address, attention, carrier, ref_no, note, allow_negative
  *  $L: [['item_id', 'description', 'unit', 'qty', 'po_line_id', 'pr_line_id', 'note', 'skip_move' (bool: the stock was never booked in, e.g. a free-text receipt line)], …] */
-function dn_create(array $h, array $L): int {
+function dn_create(array $h, array $L): int { return stk_tx(fn() => dn_create_x($h, $L)); }
+function dn_create_x(array $h, array $L): int {
     require_pr_wh(); if (!dn_has()) throw new RuntimeException(t('err.noaccess'));
     $kind = in_array($h['kind'] ?? '', DN_KINDS, true) ? $h['kind'] : 'project'; $u = current_user();
     $pid = (int)($h['project_id'] ?? 0) ?: null; $sid = (int)($h['subproject_id'] ?? 0) ?: null;
@@ -63,7 +64,7 @@ function dn_create(array $h, array $L): int {
     foreach ($lines as $l) { $seq++; $mid = null;
         if ($l['item_id'] && !$l['skip_move']) {
             $it = stk_item($l['item_id']);
-            if ($l['pr_line_id'] && function_exists('prq_issue_dn')) { $mid = prq_issue_dn((int)$l['pr_line_id'], $l['qty'], $no, $dnId, $cid); }
+            if ($l['pr_line_id'] && function_exists('prq_issue_dn')) { $mid = prq_issue_dn((int)$l['pr_line_id'], $l['qty'], $no, $dnId, $cid, $wh); }
             else { $mid = stk_move($l['item_id'], $wh, 'out', $l['qty'], ['unit_price' => $it['last_price'] ?? null, 'project_id' => $pid, 'subproject_id' => $sid, 'reason' => DN_REASON[$kind], 'ref_kind' => 'dn', 'ref_id' => $dnId, 'ref_no' => $no, 'company_id' => $cid, 'note' => $l['description'], 'allow_negative' => !empty($h['allow_negative']), 'item_consumable' => !empty($it['is_consumable'])]); }
         }
         q('INSERT INTO inv_dn_lines (dn_id, seq, item_id, po_line_id, pr_line_id, description, unit, qty, move_id, note) VALUES (?,?,?,?,?,?,?,?,?,?)', [$dnId, $seq, $l['item_id'], $l['po_line_id'], $l['pr_line_id'], $l['description'], $l['unit'], $l['qty'], $mid, $l['note']]);
@@ -76,14 +77,14 @@ function dn_create_from_post(): int {
     return dn_create(['kind' => (string)($_POST['kind'] ?? 'project'), 'warehouse_id' => (int)($_POST['warehouse_id'] ?? 0), 'project_id' => (int)($_POST['project_id'] ?? 0), 'subproject_id' => (int)($_POST['subproject_id'] ?? 0), 'company_id' => (int)($_POST['company_id'] ?? 0), 'vessel_id' => (int)($_POST['vessel_id'] ?? 0), 'issued_at' => (string)($_POST['issued_at'] ?? ''), 'address' => (string)($_POST['address'] ?? ''), 'attention' => (string)($_POST['attention'] ?? ''), 'carrier' => (string)($_POST['carrier'] ?? ''), 'ref_no' => (string)($_POST['ref_no'] ?? ''), 'note' => (string)($_POST['note'] ?? ''), 'allow_negative' => !empty($_POST['allow_negative'])], $L);
 }
 /** Cancel: the movements are reversed (goods back in the warehouse), requisition issues undone. */
-function dn_cancel(int $id, string $note): void {
+function dn_cancel(int $id, string $note): void { stk_tx(fn() => dn_cancel_x($id, $note)); }
+function dn_cancel_x(int $id, string $note): void {
     require_pr_wh(); $d = dn_load($id); if (!$d || $d['status'] !== 'issued') throw new RuntimeException(t('err.noaccess'));
     foreach (dn_lines($id) as $l) { if (!$l['item_id'] || !$l['move_id']) continue; $mv = one('SELECT * FROM inv_moves WHERE id = ?', [(int)$l['move_id']]); if (!$mv) continue;
         stk_move((int)$l['item_id'], (int)$mv['warehouse_id'], 'in', abs((float)$mv['qty']), ['unit_price' => $mv['unit_price'], 'project_id' => $mv['project_id'], 'subproject_id' => $mv['subproject_id'], 'reason' => $d['kind'] === 'customer' ? 'return_customer' : 'return_project', 'ref_kind' => 'dn', 'ref_id' => $id, 'ref_no' => $d['dn_no'], 'company_id' => $mv['company_id'], 'note' => t('dn.cancelled_note', ['no' => $d['dn_no']])]);
-        if ($l['pr_line_id']) q('UPDATE pr_lines SET qty_issued = GREATEST(0, qty_issued - ?), status = IF(status = \'issued\', \'received\', status) WHERE id = ?', [(float)$l['qty'], (int)$l['pr_line_id']]);
+        if ($l['pr_line_id']) q('UPDATE pr_lines SET qty_issued = GREATEST(0, qty_issued - ?), status = IF(status = \'issued\', \'received\', status) WHERE id = ?', [abs((float)$mv['qty']), (int)$l['pr_line_id']]);
         if ($l['pr_line_id']) {   // R97-109: the goods are back in the warehouse for the same requisition — reserved again, so they can go on another note
-            q('UPDATE pr_lines SET qty_reserved = qty_reserved + ?, warehouse_id = COALESCE(warehouse_id, ?) WHERE id = ?', [(float)$l['qty'], (int)$mv['warehouse_id'], (int)$l['pr_line_id']]);
-            q('UPDATE inv_stock SET qty_reserved = qty_reserved + ? WHERE item_id = ? AND warehouse_id = ?', [(float)$l['qty'], (int)$l['item_id'], (int)$mv['warehouse_id']]);
+            prq_rsv_add((int)$l['pr_line_id'], (int)$l['item_id'], (int)$mv['warehouse_id'], abs((float)$mv['qty']));   // R97-215: reserved in the warehouse the goods came back to
             q("UPDATE pr_requests r JOIN pr_lines pl ON pl.request_id = r.id SET r.status = 'approved' WHERE pl.id = ? AND r.status = 'closed'", [(int)$l['pr_line_id']]);
         }
     }

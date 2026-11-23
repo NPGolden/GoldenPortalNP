@@ -360,7 +360,8 @@ function po_confirm(int $oid, string $ref, ?string $date, string $note): void {
     q('UPDATE po_orders SET status = ?, confirmed_at = NOW(), supplier_ref = ?, delivery_date = COALESCE(?, delivery_date) WHERE id = ?', ['confirmed', mb_substr(trim($ref), 0, 80) ?: $o['supplier_ref'], $date, $oid]); po_event($oid, 'confirm', trim($ref . ' ' . $note) ?: null);
     if (function_exists('po_promised_from_post')) po_promised_from_post($oid);
 }
-function po_cancel(int $oid, string $note): void {
+function po_cancel(int $oid, string $note): void { stk_tx(fn() => po_cancel_x($oid, $note)); }
+function po_cancel_x(int $oid, string $note): void {
     $o = po_load($oid); if (!$o || !po_admin() || in_array($o['status'], ['received', 'closed', 'cancelled'], true)) throw new RuntimeException(t('err.noaccess'));
     if ($note === '') throw new RuntimeException(t('prq.need_reason'));
     if ($o['kind'] === 'po' && $o['status'] !== 'draft') foreach (all('SELECT * FROM po_lines WHERE order_id = ? AND pr_line_id IS NOT NULL', [$oid]) as $l) { $rem = (float)$l['qty'] - (float)$l['qty_received']; q('UPDATE pr_lines SET qty_ordered = GREATEST(0, qty_ordered - ?), status = IF(qty_ordered - ? <= 0.0005 AND qty_received <= 0.0005, \'to_buy\', status) WHERE id = ?', [$rem, $rem, (int)$l['pr_line_id']]); }
@@ -378,7 +379,8 @@ function po_cancel(int $oid, string $note): void {
 /** R97-142: bring a cancelled order back — to the state it had (draft, sent or confirmed); its lines open again and, for a sent order, the requisition lines are booked as ordered again.
  *  Refused when a requisition line of it was meanwhile ordered on another order (it would be ordered twice). */
 function po_restore_state(array $o): string { return $o['kind'] === 'po' && !empty($o['confirmed_at']) ? 'confirmed' : (!empty($o['sent_at']) ? 'sent' : 'draft'); }
-function po_restore(int $oid, string $note): string {
+function po_restore(int $oid, string $note): string { return stk_tx(fn() => po_restore_x($oid, $note)); }
+function po_restore_x(int $oid, string $note): string {
     $o = po_load($oid); if (!$o || !po_admin() || $o['status'] !== 'cancelled') throw new RuntimeException(t('err.noaccess'));
     if ($note === '') throw new RuntimeException(t('prq.need_reason'));
     $to = po_restore_state($o); $book = $o['kind'] === 'po' && $to !== 'draft';
@@ -548,7 +550,8 @@ function po_receipt_lines(int $rid): array { return all('SELECT rl.*, l.seq, l.d
 function po_ncr_open(int $oid): array { return all('SELECT rl.*, r.receipt_no, r.received_at, l.seq, l.description, l.unit, i.code AS item_code FROM po_receipt_lines rl JOIN po_receipts r ON r.id = rl.receipt_id JOIN po_lines l ON l.id = rl.po_line_id LEFT JOIN inv_items i ON i.id = l.item_id WHERE r.order_id = ? AND rl.ncr_status = \'open\' ORDER BY r.id, l.seq', [$oid]); }
 /** Receipt per line: received / accepted / rejected (+ reason and action). Accepted goods go into stock at the PO price (price record), reserved for the requisition they were bought for; the PO and its lines move to partial / received. */
 function po_split_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM po_receipt_lines LIKE 'dest_qty'"); } catch (Throwable $e) { $h = false; } } return $h; }
-function po_receive_from_post(): int {
+function po_receive_from_post(): int { return stk_tx(fn() => po_receive_from_post_x()); }
+function po_receive_from_post_x(): int {
     require_pr_wh(); $oid = (int)($_POST['id'] ?? 0); $o = po_load($oid); if (!$o || $o['kind'] !== 'po' || !in_array($o['status'], ['sent', 'confirmed', 'partial'], true)) throw new RuntimeException(t('err.noaccess'));
     $u = current_user(); $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['received_at'] ?? '')) ? $_POST['received_at'] : date('Y-m-d');
     $wh = (int)($_POST['warehouse_id'] ?? 0) ?: (int)($o['warehouse_id'] ?: stk_default_wh()); $dn = mb_substr(trim((string)($_POST['delivery_note'] ?? '')), 0, 80) ?: null; $note = mb_substr(trim((string)($_POST['note'] ?? '')), 0, 400) ?: null;
@@ -579,7 +582,12 @@ function po_receive_from_post(): int {
             stk_move((int)$l['item_id'], $wh, 'in', $qa, ['unit_price' => $price, 'project_id' => $o['project_id'] ? (int)$o['project_id'] : null, 'subproject_id' => $o['subproject_id'] ? (int)$o['subproject_id'] : null, 'ref_kind' => 'po', 'ref_id' => $oid, 'reason' => 'receipt', 'note' => $no . ($dn ? ' · ' . $dn : ''), 'location' => $loc]);
             if ($price !== null && $price > 0) stk_price_add((int)$l['item_id'], $price, ['priced_at' => $date, 'supplier_id' => (int)$o['supplier_id'], 'po_line_id' => (int)$l['id'], 'currency' => $o['currency'], 'qty' => $qa, 'source' => 'receipt', 'note' => $o['po_no']]);
             $qres = $split ? $qp : $qa;   // R97-145: on a split only the project part is kept for the requisition — the stock part is free
-            if ($l['pr_line_id']) { q('UPDATE inv_stock SET qty_reserved = qty_reserved + ? WHERE item_id = ? AND warehouse_id = ?', [$qres, (int)$l['item_id'], $wh]); q("UPDATE pr_lines SET qty_received = qty_received + ?, qty_reserved = qty_reserved + ?, warehouse_id = COALESCE(warehouse_id, ?), status = IF(status IN ('to_buy','ordered'), 'received', status) WHERE id = ?", [$qa, $qres, $wh, (int)$l['pr_line_id']]); }
+            if ($l['pr_line_id']) {   // R97-215: kept for the requisition only up to what the line still needs — goods received above the need are free stock
+                $pl = one('SELECT qty, qty_issued, qty_reserved, status FROM pr_lines WHERE id = ? FOR UPDATE', [(int)$l['pr_line_id']]);
+                $need = $pl && !in_array($pl['status'], ['issued', 'cancelled'], true) ? max(0.0, (float)$pl['qty'] - (float)$pl['qty_issued'] - (float)$pl['qty_reserved']) : 0.0; $qres = min($qres, $need);
+                q("UPDATE pr_lines SET qty_received = qty_received + ?, status = IF(status IN ('to_buy','ordered'), 'received', status) WHERE id = ?", [$qa, (int)$l['pr_line_id']]);
+                if (function_exists('prq_rsv_add')) prq_rsv_add((int)$l['pr_line_id'], (int)$l['item_id'], $wh, $qres);
+            }
         } elseif ($qa > 0 && $l['pr_line_id']) { q("UPDATE pr_lines SET qty_received = qty_received + ?, status = IF(status IN ('to_buy','ordered'), 'received', status) WHERE id = ?", [$qa, (int)$l['pr_line_id']]); }
         if ($qa > 0 && !$l['item_id'] && $dest === 'project') $dnL[] = ['rl_id' => $rlId, 'item_id' => null, 'description' => $l['description'], 'unit' => $l['unit'], 'qty' => $qp, 'po_line_id' => (int)$l['id'], 'skip_move' => true];   // free-text goods go on the note without a stock movement
     }
