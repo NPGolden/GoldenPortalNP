@@ -4217,3 +4217,9 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - `prq_reserve_audit()`: per item and warehouse, `inv_stock.qty_reserved` against the sum of the lines of approved requisitions; also reserved above on hand, and lines that hold a reservation on a requisition that is not approved. `prq_reserve_repair()` clears those lines and sets the stock total to the sum; `qty_on_hand` is never written.
 - Page `?p=stock_reservations` (warehouse and procurement read; procurement / management release and repair), linked from Inventory. Actions `prq_line_release`, `prq_reserve_repair` in `pm_actions.php`.
 - Language keys +27 (13 227 per language).
+
+## §495 Reservations: daily check with notification; project manager view (GAS-CP-R97-214, v1.233.0)
+
+- `prq_reserve_daily()` called from `tick.php`: first tick after 07:00 of a day runs `prq_reserve_audit()`, stores `cp_settings.prq_rsv_last` = `date time|n`, and when n > 0 sends `nf_push` kind `work:prq_rsv`, key `prq:rsv:<date>` (one per day) to `prq_proc_ids()`, link `?p=stock_reservations`. Nothing is repaired automatically.
+- `prq_reservations(?int $pmUserId)`: with a user id, rows of projects where `projects.pm_user_id` is that user. `views/stock_reservations.php`: warehouse / procurement / management see everything; a PM (`prq_is_pm()`) sees the list of the own projects only, without check, repair or release. Link on `views/requisitions.php`.
+- Language keys +4 (13 231 per language).

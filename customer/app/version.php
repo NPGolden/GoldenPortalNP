@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.232.0';
+const CP_VERSION = '1.233.0';
 const CP_BUILD   = '2026-11-23';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-214', 'version' => '1.233.0', 'date' => '2026-11-23', 'title' => 'Reservations: the check runs by itself every day and notifies Procurement when something does not agree; a project manager sees the reservations of the own projects', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-213', 'version' => '1.232.0', 'date' => '2026-11-23', 'title' => 'Inventory › Reservations: who holds reserved stock, release a reservation back to free stock, check of reserved quantities against the requisitions with repair; reserved goods cannot leave by a manual movement or transfer', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-212', 'version' => '1.231.2', 'date' => '2026-11-23', 'title' => 'System budget: button «Supporting documents» at the top of the budget, with the number of files, leading to the upload card', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-211', 'version' => '1.231.1', 'date' => '2026-11-23', 'title' => 'Careers on the website: a saved vacancy or event now reaches the website at once (the refresh call was lost in a redirect); Settings › Recruiting shows whether the website accepted it', 'db' => null, 'check' => null],

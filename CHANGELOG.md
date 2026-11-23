@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.232.0** (build 2026-11-23). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.233.0** (build 2026-11-23). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.233.0 | GAS-CP-R97-214 | 2026-11-23 | Reservations: the check runs by itself every day and notifies Procurement when something does not agree; a project manager sees the reservations of the own projects | — |
 | 1.232.0 | GAS-CP-R97-213 | 2026-11-23 | Inventory › Reservations: who holds reserved stock, release a reservation back to free stock, check of reserved quantities against the requisitions with repair; reserved goods cannot leave by a manual movement or transfer | — |
 | 1.231.2 | GAS-CP-R97-212 | 2026-11-23 | System budget: button «Supporting documents» at the top of the budget, with the number of files, leading to the upload card | — |
 | 1.231.1 | GAS-CP-R97-211 | 2026-11-23 | Careers on the website: a saved vacancy or event now reaches the website at once (the refresh call was lost in a redirect); Settings › Recruiting shows whether the website accepted it | — |

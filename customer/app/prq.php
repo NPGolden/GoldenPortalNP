@@ -276,10 +276,10 @@ function prq_line_release(int $rid, int $lid, string $note): float {
     cache_bump_later('inv'); cache_bump_later('eng'); return $qty;
 }
 /** Every reservation that is held now: which requisition holds how much of which item in which warehouse. */
-function prq_reservations(): array {
+function prq_reservations(?int $pmUserId = null): array {   // R97-214: with a user id, only the projects that user manages
     return all("SELECT l.id AS line_id, l.request_id, l.item_id, l.warehouse_id, l.qty, l.qty_reserved, l.qty_issued, l.qty_received, l.status, r.pr_no, r.status AS r_status, r.title, r.requester_name, r.created_at, i.code AS item_code, i.description AS item_desc, i.unit, w.code AS wh_code, p.project_code, s.code AS sub_code
                 FROM pr_lines l JOIN pr_requests r ON r.id = l.request_id LEFT JOIN inv_items i ON i.id = l.item_id LEFT JOIN inv_warehouses w ON w.id = l.warehouse_id LEFT JOIN projects p ON p.id = r.project_id LEFT JOIN subprojects s ON s.id = r.subproject_id
-                WHERE l.qty_reserved > 0.0005 ORDER BY i.code, r.pr_no LIMIT 2000");
+                WHERE l.qty_reserved > 0.0005" . ($pmUserId ? ' AND p.pm_user_id = ' . (int)$pmUserId : '') . " ORDER BY i.code, r.pr_no LIMIT 2000");
 }
 /** Compares the reserved quantity of the stock (inv_stock) with what the requisition lines hold. Returns the rows that disagree and the lines that hold a reservation on a requisition that is not approved. */
 function prq_reserve_audit(): array {
@@ -306,6 +306,18 @@ function prq_reserve_repair(): array {
     } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
     $u = current_user(); error_log('[prq] reservations repaired by user #' . (int)($u['id'] ?? 0) . ': stock rows ' . $n['stock'] . ', lines ' . $n['lines']);
     cache_bump_later('inv'); return $n;
+}
+
+/** R97-214: once a day (from 07:00, clock job) the check runs by itself; Procurement is told only when something does not agree. Returns null when it is not due. */
+function prq_reserve_daily(): ?int {
+    if (!prq_has() || !function_exists('cp_setting')) return null; $today = date('Y-m-d');
+    if ((int) date('G') < 7 || str_starts_with((string) cp_setting('prq_rsv_last', ''), $today)) return null;
+    $a = prq_reserve_audit(); $n = count($a['diff']) + count($a['stale']); cp_setting_set('prq_rsv_last', $today . ' ' . date('H:i') . '|' . $n);
+    if ($n && function_exists('nf_push') && ($ids = prq_proc_ids())) {
+        $codes = array_slice(array_values(array_unique(array_merge(array_column($a['diff'], 'code'), array_column($a['stale'], 'code')))), 0, 8);
+        try { nf_push($ids, 'work:prq_rsv', 'prq:rsv:' . $today, t('prq.rsv_nf', ['n' => $n]), implode(', ', array_filter(array_map('strval', $codes))) ?: null, url('stock_reservations'), null, null); } catch (Throwable $e) {}
+    }
+    return $n;
 }
 
 /** Cancel (requester on draft/submitted, procurement any open): reservations released. */

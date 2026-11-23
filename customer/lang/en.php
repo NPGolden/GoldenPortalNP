@@ -13411,4 +13411,8 @@ Best regards,
 'prq.rel_done' => '{q} released to free stock.',
 'prq.rel_on_order' => 'This line still has a quantity on a purchase order. Cancel the order (or its balance) first.',
 'prq.ev_release' => 'Reservation released',
+'prq.rsv_nf' => 'Reserved stock: {n} difference(s) found by the daily check',
+'prq.rsv_daily_last' => 'The check also runs by itself every day; last run {when}, differences found: {n}. Procurement is notified only when something does not agree.',
+'prq.rsv_daily_none' => 'The check also runs by itself every day after 07:00; it has not run yet.',
+'prq.rsv_lede_pm' => 'Stock held for the requisitions of the projects you manage.',
 ];

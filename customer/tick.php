@@ -14,4 +14,5 @@ require __DIR__ . '/index.php';
 $out = [];
 try { if (function_exists('nf_sweep')) $out['nf'] = nf_sweep(60, true); } catch (Throwable $e) { $out['nf_err'] = substr($e->getMessage(), 0, 80); }
 try { $out += pn_tick(); } catch (Throwable $e) { $out['pn_err'] = substr($e->getMessage(), 0, 80); }
+try { if (function_exists('prq_reserve_daily') && ($rv = prq_reserve_daily()) !== null) $out['rsv'] = $rv; } catch (Throwable $e) { $out['rsv_err'] = substr($e->getMessage(), 0, 80); }   // R97-214
 echo date('c') . ' tick ' . json_encode($out) . "\n";

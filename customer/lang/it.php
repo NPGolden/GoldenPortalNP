@@ -13411,4 +13411,8 @@ Cordiali saluti,
 'prq.rel_done' => '{q} liberato verso le scorte libere.',
 'prq.rel_on_order' => 'Questa riga ha ancora una quantità su un ordine di acquisto. Annullare prima l ordine (o il suo saldo).',
 'prq.ev_release' => 'Riserva liberata',
+'prq.rsv_nf' => 'Scorte riservate: {n} differenza/e rilevate dal controllo giornaliero',
+'prq.rsv_daily_last' => 'Il controllo viene eseguito anche automaticamente ogni giorno; ultima esecuzione {when}, differenze: {n}. Gli Acquisti sono avvisati solo se qualcosa non corrisponde.',
+'prq.rsv_daily_none' => 'Il controllo viene eseguito anche automaticamente ogni giorno dopo le 07:00; non è ancora stato eseguito.',
+'prq.rsv_lede_pm' => 'Scorte riservate per le richieste dei progetti che gestite.',
 ];

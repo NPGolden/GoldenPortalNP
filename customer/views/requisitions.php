@@ -11,7 +11,7 @@ layout_head(t('prq.title'), 'requisitions');
 ?>
 <div class="page-head">
   <div><h1>🧾 <?= tt('prq.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('prq.lede') ?></p></div>
-  <div class="btn-row"><a class="btn btn--gold btn--sm" href="<?= url('requisition', ['id' => 0]) ?>">+ <?= tt('prq.new') ?></a></div>
+  <div class="btn-row"><?php if (function_exists('prq_reserve_audit') && ((function_exists('pr_wh') && pr_wh()) || prq_is_pm())): ?><a class="btn btn--ghost btn--sm" href="<?= url('stock_reservations') ?>">■ <?= tt('prq.rsv_title') ?></a><?php endif; ?><a class="btn btn--gold btn--sm" href="<?= url('requisition', ['id' => 0]) ?>">+ <?= tt('prq.new') ?></a></div>
 </div>
 <div class="kpi kpi--4" style="margin-bottom:10px;">
   <a class="stat<?= $cnt['pending'] ? ' gold' : '' ?>" href="<?= url('requisitions', ['status' => 'pending']) ?>"><b><?= $cnt['pending'] ?></b><?= tt('prq.k_pending') ?><span class="s"><?= tt('prq.k_pending_hint') ?></span></a>
