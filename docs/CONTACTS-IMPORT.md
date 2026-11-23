@@ -4161,3 +4161,10 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Translator screen (`?p=newsletter&id=N&tl=<lang>`): ✨ per field posts `kind=translate_to`, `page=newsletter`, `prompt` = the original text of that field, to `index.php?p=ai` with the `X-CSRF` header (`window.GASAI.csrf`), and writes the answer into the field (single-line fields: line breaks removed, cut to `maxlength`). `#nl-tr-all` runs the empty fields in turn, `#nl-tr-again` all fields; progress in `#nl-tr-prog`; the reason of a failure is shown as text; two failures stop the run. `&auto=1` (link «Translate with the assistant» on the issue) starts the run on opening. Nothing is stored until `nl_tr_save`.
 - Without `nl_ai_on()` the screen says where to switch the assistant on.
 - Language keys +11 (13 163 per language).
+
+## §488 HR scope: actions missing from `HR_ACTIONS` (GAS-CP-R97-205, v1.228.2)
+
+- A role with scope `hr` may open the pages of `HR_PAGES` and post only the actions of `HR_ACTIONS` (`index.php`, before any handler). `rcr_manual_add` (R97-161) and `rcr_assign` (R97-158) were added to the recruiting pages but not to the list → `err.noaccess` on pressing the button.
+- Added: `rcr_manual_add`, `rcr_assign`, `hr_gone_close`, `nf_read`, `nf_read_all`, `kb_vote`, `kb_accept`, `cr_decide`, `pk_remove`, `clocks_save`. Each handler keeps its own rights check (`rcr_can`, `hr_can`, owner of the question, approver of the request, own account).
+- Left out on purpose: administrator-only actions (`kb_delete_q`, `kb_delete_a`, `cr_delete`, `pl_car_save`, `pl_car_delete`), customer-only `support_send`, `support_status`, and `pl_delete_work` (refused to the HR scope inside the function).
+- `php tools/check-scopes.php` lists the form actions of the pages of each scoped role (HR, Employee, Assistant) that are not in its list; exit code 1 for HR and Employee, report only for Assistant. Run it when a button is added to a page of `HR_PAGES` / `EMP_PAGES`.
