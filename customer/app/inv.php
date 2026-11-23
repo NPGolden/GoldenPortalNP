@@ -145,6 +145,10 @@ function stk_move(int $itemId, int $whId, string $kind, float $qty, array $o = [
     q('INSERT INTO inv_stock (item_id, warehouse_id, qty_on_hand) VALUES (?,?,0) ON DUPLICATE KEY UPDATE item_id = item_id', [$itemId, $whId]);
     $cur = (float) scalar('SELECT qty_on_hand FROM inv_stock WHERE item_id = ? AND warehouse_id = ?', [$itemId, $whId]);
     if ($cur + $delta < -0.0005 && empty($o['allow_negative'])) throw new RuntimeException(t('stk.not_enough', ['q' => stk_qty($cur)]));
+    if (in_array($kind, ['out', 'xfer_out'], true) && empty($o['allow_negative'])) {   // R97-213: goods reserved for a requisition cannot leave by another door; an issue of the requisition itself releases its reservation first
+        $resv = (float) scalar('SELECT qty_reserved FROM inv_stock WHERE item_id = ? AND warehouse_id = ?', [$itemId, $whId]);
+        if ($resv > 0.0005 && $cur + $delta < $resv - 0.0005) throw new RuntimeException(t('stk.not_free', ['q' => stk_qty(max(0.0, $cur - $resv)), 'r' => stk_qty($resv)]));
+    }
     q('UPDATE inv_stock SET qty_on_hand = qty_on_hand + ? WHERE item_id = ? AND warehouse_id = ?', [$delta, $itemId, $whId]);
     if (!empty($o['location'])) q('UPDATE inv_stock SET location = ? WHERE item_id = ? AND warehouse_id = ?', [mb_substr((string)$o['location'], 0, 60), $itemId, $whId]);
     $u = current_user();

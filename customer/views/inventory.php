@@ -16,7 +16,7 @@ layout_head(t('stk.title'), 'inventory');
 ?>
 <div class="page-head">
   <div><h1>📦 <?= tt('stk.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('stk.lede') ?></p></div>
-  <div class="btn-row">
+  <div class="btn-row"><?php if (function_exists('prq_reserve_audit') && pr_wh()): ?><a class="btn btn--ghost btn--sm" href="<?= url('stock_reservations') ?>">■ <?= tt('prq.rsv_title') ?></a><?php endif; ?>
     <?php if ($admin): ?><a class="btn btn--gold btn--sm" href="<?= url('inventory_item', ['id' => 0]) ?>">+ <?= tt('stk.new_item') ?></a><a class="btn btn--ghost btn--sm" href="<?= url('inventory_import') ?>">⤒ <?= tt('stk.import') ?></a><?php endif; ?>
     <a class="btn btn--ghost btn--sm" href="<?= url('inventory', $keep + ['format' => 'xlsx']) ?>">⤓ Excel</a>
     <?php if ($admin): ?><a class="btn btn--ghost btn--sm" href="<?= url('admin_procurement') ?>">⚙ <?= tt('stk.settings') ?></a><?php endif; ?>

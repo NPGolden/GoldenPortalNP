@@ -258,6 +258,56 @@ function prq_issue(int $rid, int $lid, float $qty, string $note = '', array $o =
 }
 /** Issue a requisition line against a delivery note (R88-001): the request id comes from the line. */
 function prq_issue_dn(int $lid, float $qty, string $dnNo, int $dnId, ?int $companyId = null): ?int { $rid = (int) scalar('SELECT request_id FROM pr_lines WHERE id = ?', [$lid]); if (!$rid) throw new RuntimeException(t('err.notfound')); return prq_issue($rid, $lid, $qty, $dnNo, ['ref_kind' => 'dn', 'ref_id' => $dnId, 'ref_no' => $dnNo, 'company_id' => $companyId]); }
+/* ------------------------------------------------------------------ reservations: release, list, check and repair (GAS-CP-R97-213) */
+/** Procurement gives the reserved quantity of a line back to free stock (the project no longer needs it). The line ends: issued when something was issued, cancelled otherwise; open "to buy" balance is dropped. */
+function prq_line_release(int $rid, int $lid, string $note): float {
+    $r = prq_load($rid); $l = one('SELECT * FROM pr_lines WHERE id = ? AND request_id = ?', [$lid, $rid]);
+    if (!$r || !$l || !pr_admin() || $r['status'] !== 'approved' || (float)$l['qty_reserved'] <= 0.0005) throw new RuntimeException(t('err.noaccess'));
+    $note = mb_substr(trim($note), 0, 200); if ($note === '') throw new RuntimeException(t('prq.need_reason'));
+    if ((float)$l['qty_ordered'] - (float)$l['qty_received'] > 0.0005) throw new RuntimeException(t('prq.rel_on_order'));   // still coming on a purchase order: cancel the order line first
+    $qty = (float)$l['qty_reserved']; $it = $l['item_id'] ? stk_item((int)$l['item_id']) : null; $pdo = db(); $own = !$pdo->inTransaction(); if ($own) $pdo->beginTransaction();
+    try {
+        if ($l['item_id'] && $l['warehouse_id']) q('UPDATE inv_stock SET qty_reserved = GREATEST(0, qty_reserved - ?) WHERE item_id = ? AND warehouse_id = ?', [$qty, (int)$l['item_id'], (int)$l['warehouse_id']]);
+        q('UPDATE pr_lines SET qty_reserved = 0, status = ? WHERE id = ?', [(float)$l['qty_issued'] > 0.0005 ? 'issued' : 'cancelled', $lid]);
+        prq_event($rid, 'release', ($it['code'] ?? $l['description']) . ' × ' . stk_qty($qty) . ' · ' . $note);
+        if (!(int) scalar("SELECT COUNT(*) FROM pr_lines WHERE request_id = ? AND status NOT IN ('issued','cancelled')", [$rid])) { q('UPDATE pr_requests SET status = ? WHERE id = ?', ['closed', $rid]); prq_event($rid, 'close'); }
+        if ($own) $pdo->commit();
+    } catch (Throwable $e) { if ($own) $pdo->rollBack(); throw $e; }
+    cache_bump_later('inv'); cache_bump_later('eng'); return $qty;
+}
+/** Every reservation that is held now: which requisition holds how much of which item in which warehouse. */
+function prq_reservations(): array {
+    return all("SELECT l.id AS line_id, l.request_id, l.item_id, l.warehouse_id, l.qty, l.qty_reserved, l.qty_issued, l.qty_received, l.status, r.pr_no, r.status AS r_status, r.title, r.requester_name, r.created_at, i.code AS item_code, i.description AS item_desc, i.unit, w.code AS wh_code, p.project_code, s.code AS sub_code
+                FROM pr_lines l JOIN pr_requests r ON r.id = l.request_id LEFT JOIN inv_items i ON i.id = l.item_id LEFT JOIN inv_warehouses w ON w.id = l.warehouse_id LEFT JOIN projects p ON p.id = r.project_id LEFT JOIN subprojects s ON s.id = r.subproject_id
+                WHERE l.qty_reserved > 0.0005 ORDER BY i.code, r.pr_no LIMIT 2000");
+}
+/** Compares the reserved quantity of the stock (inv_stock) with what the requisition lines hold. Returns the rows that disagree and the lines that hold a reservation on a requisition that is not approved. */
+function prq_reserve_audit(): array {
+    $want = []; foreach (all("SELECT l.item_id, l.warehouse_id, SUM(l.qty_reserved) AS q FROM pr_lines l JOIN pr_requests r ON r.id = l.request_id WHERE l.qty_reserved > 0.0005 AND r.status = 'approved' AND l.item_id IS NOT NULL AND l.warehouse_id IS NOT NULL GROUP BY l.item_id, l.warehouse_id") as $x) $want[(int)$x['item_id'] . ':' . (int)$x['warehouse_id']] = (float)$x['q'];
+    $diff = []; $seen = [];
+    foreach (all('SELECT s.item_id, s.warehouse_id, s.qty_on_hand, s.qty_reserved, i.code, i.description, i.unit, w.code AS wh_code FROM inv_stock s JOIN inv_items i ON i.id = s.item_id JOIN inv_warehouses w ON w.id = s.warehouse_id') as $s) {
+        $k = (int)$s['item_id'] . ':' . (int)$s['warehouse_id']; $seen[$k] = 1; $w = $want[$k] ?? 0.0; $h = (float)$s['qty_reserved'];
+        if (abs($w - $h) > 0.0005 || $h > (float)$s['qty_on_hand'] + 0.0005) $diff[] = ['item_id' => (int)$s['item_id'], 'warehouse_id' => (int)$s['warehouse_id'], 'code' => $s['code'], 'description' => $s['description'], 'unit' => $s['unit'], 'wh_code' => $s['wh_code'], 'on_hand' => (float)$s['qty_on_hand'], 'stock' => $h, 'lines' => $w, 'short' => $w > (float)$s['qty_on_hand'] + 0.0005];
+    }
+    foreach ($want as $k => $w) if (empty($seen[$k])) { [$i, $wh] = array_map('intval', explode(':', $k)); $it = one('SELECT code, description, unit FROM inv_items WHERE id = ?', [$i]) ?: ['code' => '#' . $i, 'description' => '', 'unit' => '']; $diff[] = ['item_id' => $i, 'warehouse_id' => $wh, 'code' => $it['code'], 'description' => $it['description'], 'unit' => $it['unit'], 'wh_code' => (string) scalar('SELECT code FROM inv_warehouses WHERE id = ?', [$wh]), 'on_hand' => 0.0, 'stock' => 0.0, 'lines' => $w, 'short' => true]; }
+    $stale = all("SELECT l.id AS line_id, l.request_id, l.qty_reserved, r.pr_no, r.status AS r_status, i.code FROM pr_lines l JOIN pr_requests r ON r.id = l.request_id LEFT JOIN inv_items i ON i.id = l.item_id WHERE l.qty_reserved > 0.0005 AND (r.status <> 'approved' OR l.item_id IS NULL OR l.warehouse_id IS NULL)");
+    return ['diff' => $diff, 'stale' => $stale];
+}
+/** Repair: reservations of requisitions that are not approved are cleared, and the reserved quantity of the stock is set to what the approved requisition lines hold. Quantities on hand are never changed. */
+function prq_reserve_repair(): array {
+    if (!pr_admin()) throw new RuntimeException(t('err.noaccess')); $a = prq_reserve_audit(); $n = ['stock' => 0, 'lines' => 0]; if (!$a['diff'] && !$a['stale']) return $n;
+    $pdo = db(); $pdo->beginTransaction();
+    try {
+        foreach ($a['stale'] as $x) { q('UPDATE pr_lines SET qty_reserved = 0 WHERE id = ?', [(int)$x['line_id']]); prq_event((int)$x['request_id'], 'release', t('prq.rsv_repair_ev', ['q' => stk_qty((float)$x['qty_reserved'])])); $n['lines']++; }
+        foreach (prq_reserve_audit()['diff'] as $d) { if (abs($d['lines'] - $d['stock']) <= 0.0005) continue;
+            q('INSERT INTO inv_stock (item_id, warehouse_id, qty_on_hand) VALUES (?,?,0) ON DUPLICATE KEY UPDATE item_id = item_id', [$d['item_id'], $d['warehouse_id']]);
+            q('UPDATE inv_stock SET qty_reserved = ? WHERE item_id = ? AND warehouse_id = ?', [$d['lines'], $d['item_id'], $d['warehouse_id']]); $n['stock']++; }
+        $pdo->commit();
+    } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+    $u = current_user(); error_log('[prq] reservations repaired by user #' . (int)($u['id'] ?? 0) . ': stock rows ' . $n['stock'] . ', lines ' . $n['lines']);
+    cache_bump_later('inv'); return $n;
+}
+
 /** Cancel (requester on draft/submitted, procurement any open): reservations released. */
 function prq_cancel(int $rid, string $note): void {
     require_prq(); $r = prq_load($rid); $u = current_user();
