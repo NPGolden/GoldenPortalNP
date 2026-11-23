@@ -18,7 +18,7 @@ function api_app(): string { $a = strtolower(trim((string)($_SERVER['HTTP_X_APP'
 $_SERVER['REQUEST_METHOD'] = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 ini_set('session.use_cookies', '0'); ini_set('session.use_only_cookies', '0'); ini_set('session.cache_limiter', '');
 
-foreach (['db', 'cache', 'i18n', 'helpers', 'auth', 'pi', 'col', 'totp', 'pm', 'pm_actions', 'inv', 'prq', 'bom', 'po', 'si', 'fsr', 'isr', 'br', 'tm', 'pl', 'eq', 'fd', 'iss', 'rc', 'flt', 'vm', 'rs', 'wf', 'mn', 'rt', 'acc', 'kpi', 'sales', 'pd', 'num', 'pi', 'cf', 'eng', 'ai', 'mt', 'bg', 'wp', 'rl', 'ob', 'et', 'em', 'jo', 'oa', 'ts', 'version', 'tk', 'vh', 'of', 'wk', 'pipe', 'avatar', 'theme', 'ct', 'export', 'nf', 'iv', 'ar', 'rp', 'kb', 'lic', 'td', 'fk', 'wc', 'hr', 'hr2', 'hr3', 'hr4', 'hr5', 'hr6', 'pk', 'sgn', 'dl', 'io', 'wl', 'pn', 'sv'] as $m) {   // R97-200: wl + pn so that notifications raised through the apps also reach the phones; sv = versions in the stores
+foreach (['db', 'cache', 'i18n', 'helpers', 'auth', 'pi', 'col', 'totp', 'pm', 'pm_actions', 'inv', 'prq', 'bom', 'po', 'si', 'fsr', 'isr', 'br', 'tm', 'pl', 'eq', 'fd', 'iss', 'rc', 'flt', 'vm', 'rs', 'wf', 'mn', 'rt', 'acc', 'kpi', 'sales', 'pd', 'num', 'pi', 'cf', 'eng', 'ai', 'mt', 'bg', 'wp', 'rl', 'ob', 'et', 'em', 'jo', 'oa', 'ts', 'version', 'tk', 'vh', 'of', 'wk', 'pipe', 'avatar', 'theme', 'ct', 'export', 'nf', 'iv', 'ar', 'rp', 'kb', 'lic', 'td', 'fk', 'wc', 'hr', 'hr2', 'hr3', 'hr4', 'hr5', 'hr6', 'pk', 'sgn', 'dl', 'io', 'wl', 'pn', 'sv', 'apr'] as $m) {   // R97-200: wl + pn so that notifications raised through the apps also reach the phones; sv = versions in the stores
     $f = CP_ROOT . '/app/' . $m . '.php'; if (is_file($f)) require_once $f;
 }
 date_default_timezone_set(tz_app());

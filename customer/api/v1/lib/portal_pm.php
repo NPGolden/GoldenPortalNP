@@ -45,7 +45,7 @@ final class PortalPM {
         $tsPending = function_exists('ts_to_approve') ? count(ts_to_approve()) : 0;
         $dr = count(array_filter(self::drawings(null), fn($d) => $d['overdue_days'] > 0)); $sb = count(array_filter(self::submittals(null), fn($s) => $s['open']));
         return ['pm' => pm_is_pm($me), 'hr_manager' => $hrm, 'ts_approver' => $tsa, 'admin' => is_cp_admin(), 'totp_enabled' => !empty($u['totp_enabled']), 'min_app_version' => api_setting('api_min_version_pm', '1.0.0'),
-            'counts' => ['hr_pending' => $hrPending, 'ts_pending' => $tsPending, 'drawings_overdue' => $dr, 'submittals_open' => $sb, 'hr_unread' => function_exists('hr_messages_unread') ? hr_messages_unread() : 0]];
+            'counts' => ['hr_pending' => $hrPending, 'ts_pending' => $tsPending, 'drawings_overdue' => $dr, 'submittals_open' => $sb, 'hr_unread' => function_exists('hr_messages_unread') ? hr_messages_unread() : 0, 'approvals' => function_exists('apr_waiting_count') ? apr_waiting_count() : 0]];
     }
 
     /* ------------------------------------------------------------------ §2 projects */
@@ -271,5 +271,42 @@ final class PortalPM {
         $approve = !empty($p['approve']); $note = mb_substr(trim((string)($p['note'] ?? '')), 0, 980); if (!$approve && $note === '') throw new ApiException(422, 'A note is required to reject');
         try { ts_decide($id, $approve, trim($note . ' (mobile app)')); } catch (RuntimeException $e) { throw new ApiException(422, $e->getMessage()); }
         return ['id' => 'TS' . $id, 'status' => $approve ? 'approved' : 'rejected'];
+    }
+
+    /* ------------------------------------------------------------------ My approvals (GAS-CP-R97-207) */
+    /** Everything that waits for the decision of the signed-in person — the register of ?p=my_approvals. "action" says where it is decided:
+     *  payment = in the app (payment / paymentDecide below), team = Team tab of the app (leave, timesheets), portal = on the page of the process in the portal. */
+    public static function approvals(): array {
+        if (!function_exists('apr_waiting')) return ['items' => [], 'count' => 0];
+        $K = apr_kinds(); $out = [];
+        foreach (apr_waiting() as $r) {
+            $id = preg_match('/[?&](?:amp;)?id=(\d+)/', (string)$r['url'], $m) ? (int)$m[1] : 0; $k = (string)$r['kind'];
+            $out[] = ['key' => $k . ':' . ($id ?: md5($r['ref'] . '|' . $r['title'] . '|' . $r['at'])), 'kind' => $k, 'icon' => $K[$k][0] ?? '•', 'label' => isset($K[$k]) ? t($K[$k][1]) : $k, 'id' => $id, 'ref' => (string)$r['ref'], 'title' => (string)$r['title'],
+                      'who' => (string)$r['who'], 'at' => $r['at'], 'age' => (int)$r['age'], 'with' => (string)$r['with'], 'late' => !empty($r['late']),
+                      'action' => $k === 'payment' && $id ? 'payment' : (in_array($k, ['leave', 'timesheet'], true) ? 'team' : 'portal')];
+        }
+        return ['items' => $out, 'count' => count($out)];
+    }
+    private static function payLoad(int $id): array {
+        if (!function_exists('si_request_load')) throw new ApiException(404, 'Not found');
+        $R = si_request_load($id); if (!$R) throw new ApiException(404, 'Not found');
+        if (!in_array((string)$R['status'], si_my_statuses(), true)) throw new ApiException(403, t('err.noaccess'));   // only a request that waits for THIS person
+        return $R;
+    }
+    /** One payment request that waits for me: supplier, amount, pay-by date, note and its invoices. */
+    public static function payment(int $id): array {
+        $R = self::payLoad($id); $f = fn($v) => $v === null ? null : round((float)$v, 2);
+        return ['id' => (int)$R['id'], 'req_no' => (string)$R['req_no'], 'supplier' => (string)$R['supplier'], 'amount' => $f($R['amount']), 'currency' => (string)$R['currency'], 'status' => (string)$R['status'],
+                'with' => t($R['status'] === 'mgmt' ? 'apr.w_mgmt' : 'apr.w_acc'), 'pay_by' => $R['pay_by'] ?? null, 'late' => !empty($R['pay_by']) && $R['pay_by'] < date('Y-m-d'), 'note' => (string)($R['note'] ?? ''),
+                'requested_by' => (string)($R['requested_name'] ?? ''), 'created_at' => $R['created_at'] ?? null,
+                'invoices' => array_map(fn($x) => ['si_no' => (string)$x['si_no'], 'inv_no' => (string)$x['inv_no'], 'credit' => $x['kind'] === 'credit', 'gross' => $f($x['gross']), 'amount' => $f($x['amount']), 'currency' => (string)$x['currency'],
+                                                   'due' => $x['due_date'], 'po_no' => (string)($x['po_no'] ?? ''), 'project' => trim((string)($x['project_code'] ?? '') . ' ' . (string)($x['sub_code'] ?? ''))], si_request_items($id))];
+    }
+    /** Approve or reject it — the portal's own function decides, with its own rights check, history line and notifications. */
+    public static function paymentDecide(int $id, array $b): array {
+        self::payLoad($id); $dec = ($b['decision'] ?? '') === 'reject' ? 'reject' : (($b['decision'] ?? '') === 'approve' ? 'approve' : ''); if ($dec === '') throw new ApiException(422, 'decision: approve or reject');
+        $note = mb_substr(trim((string)($b['note'] ?? '')), 0, 380); if ($dec === 'reject' && $note === '') throw new ApiException(422, t('prq.need_reason'));
+        try { si_request_decide($id, $dec, trim($note . ' (Golden PM app)')); } catch (ApiException $e) { throw $e; } catch (RuntimeException $e) { throw new ApiException(422, $e->getMessage()); }
+        return ['id' => $id, 'status' => $dec === 'reject' ? 'rejected' : 'approved'];   // the app reads the list again (the register is cached for the length of a request)
     }
 }

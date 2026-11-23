@@ -2,7 +2,7 @@
  * and a MOCK mode (built-in sample data in the shapes of the contract) for the demo and the UI tests.
  * Mock mode: localStorage gpm.mock = "1", or ?mock=1 on the URL. */
 window.API = (() => {
-  const VERSION = "1.0.19";
+  const VERSION = "1.0.20";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   const demoOn = () => { try { return localStorage.getItem("gpm.demo") === "1"; } catch (e) { return false; } };   // R97-169
@@ -69,7 +69,9 @@ window.API = (() => {
     drawings: (project) => call("GET", `/pm/drawings${project ? `?project=${project}` : ""}`), submittals: (project) => call("GET", `/pm/submittals${project ? `?project=${project}` : ""}`),
     team: (year) => call("GET", `/pm/hr/team?year=${year || new Date().getFullYear()}`),
     absences: (project, from, to) => call("GET", `/pm/absences?project=${project}&from=${from}&to=${to}`),
-    inbox: (since) => call("GET", `/pm/inbox${since ? `?since=${Math.floor(+since)}` : ""}`),   // since = unix seconds
+    inbox: (since) => call("GET", `/pm/inbox${since ? `?since=${Math.floor(+since)}` : ""}`),
+    /* R97-207 My approvals: what waits for my decision; a supplier payment request is opened and decided in the app */
+    myApprovals: () => call("GET", "/pm/approvals"), payment: (id) => call("GET", `/pm/approvals/payment/${+id}`), paymentDecide: (id, decision, note) => call("POST", `/pm/approvals/payment/${+id}/decide`, { decision, note: note || "" }),   // since = unix seconds
     inout: () => call("GET", "/inout"), inoutPunch: (p) => call("POST", "/inout/punch", p), inoutConsent: (p) => call("POST", "/inout/consent", p),   // R97-186 In / Out
     sync: (ops) => call("POST", "/sync", { ops }),
     photo: (recordId, blob, name, task, caption) => { const f = new FormData(); f.append("record_id", recordId); f.append("task", String(task || 1)); if (caption) f.append("caption", caption); f.append("photo", blob, name || "photo.jpg"); return call("POST", "/files/photo", f, true); },
@@ -91,6 +93,7 @@ window.API = (() => {
   const STAGES = ["engineering", "procurement", "production", "fat", "installation", "sathat", "commissioning"];
   const overall = (st) => { const v = STAGES.map((k) => st[k]).filter((x) => x !== -1 && x != null); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0; };
   const mockState = { user: null, n: 0 };
+  const aprRow = (x) => ({ key: x.kind + ":" + x.id, kind: x.kind, icon: x.icon, label: x.label, id: x.id, ref: x.ref, title: x.title, who: x.who, at: x.at, age: x.age, with: x.with, late: !!x.late, action: x.action });
   const ME = { id: 2, name: "Alex Demo", email: "demo.pm@example.com", role: "staff", discipline: "Management", discipline_id: 9, section_id: null, home_branch: "GR", branch_scope: ["GR", "GIT"], languages: ["en", "el", "it", "uk", "bg"], min_app_version: "1.0.6", ai: true, calendar: "GR", hr: true,
     pm: true, hr_manager: true, ts_approver: true, totp_enabled: false, counts: { hr_pending: 2, ts_pending: 2, drawings_overdue: 2, submittals_open: 5, hr_unread: 1 } };
   const STAFF = [
@@ -151,6 +154,15 @@ window.API = (() => {
       { id: 101, project_id: 154, subproject_id: 1543, name: "DRW-000154-E-012_R2 — MSB general arrangement", category: "drawing", size: "2.1 MB", mime: "application/pdf" },
       { id: 102, project_id: 154, subproject_id: 1541, name: "SPEC-000154-A-001_R1 — AMS functional description", category: "specification", size: "3.8 MB", mime: "application/pdf" },
       { id: 103, project_id: 161, subproject_id: 1611, name: "DRW-000161-N-003_R1 — Radar pedestal", category: "drawing", size: "0.9 MB", mime: "application/pdf" },
+    ],
+    approvals: [   // R97-207 demonstration data — invented suppliers and amounts
+      { kind: "payment", icon: "💶", label: "Supplier payment", id: 71, ref: "GAS-PAY-26-0071", title: "Aegean Marine Supplies Ltd · 4.860,00 EUR", who: "Maria Demo", at: d(-2) + " 10:20", age: 2, with: "Management", late: false, action: "payment",
+        detail: { id: 71, req_no: "GAS-PAY-26-0071", supplier: "Aegean Marine Supplies Ltd", amount: 4860, currency: "EUR", status: "mgmt", with: "Management", pay_by: d(3), late: false, note: "Cables and glands for the wheelhouse consoles.", requested_by: "Maria Demo", created_at: d(-2) + " 10:20",
+          invoices: [{ si_no: "GAS-SI-26-0412", inv_no: "AMS-20418", credit: false, gross: 3120, amount: 3120, currency: "EUR", due: d(3), po_no: "GAS-PO-26-0188", project: "PRJ.000154 Y.010" }, { si_no: "GAS-SI-26-0415", inv_no: "AMS-20431", credit: false, gross: 1740, amount: 1740, currency: "EUR", due: d(9), po_no: "GAS-PO-26-0191", project: "PRJ.000154 Y.020" }] } },
+      { kind: "payment", icon: "💶", label: "Supplier payment", id: 72, ref: "GAS-PAY-26-0072", title: "Nordlicht Automation GmbH · 12.400,00 EUR", who: "Maria Demo", at: d(-6) + " 09:05", age: 6, with: "Management", late: true, action: "payment",
+        detail: { id: 72, req_no: "GAS-PAY-26-0072", supplier: "Nordlicht Automation GmbH", amount: 12400, currency: "EUR", status: "mgmt", with: "Management", pay_by: d(-1), late: true, note: "", requested_by: "Maria Demo", created_at: d(-6) + " 09:05",
+          invoices: [{ si_no: "GAS-SI-26-0398", inv_no: "RE-2026-7741", credit: false, gross: 12900, amount: 12900, currency: "EUR", due: d(-1), po_no: "GAS-PO-26-0170", project: "PRJ.000161 Y.010" }, { si_no: "GAS-SCN-26-0007", inv_no: "GS-2026-0112", credit: true, gross: 500, amount: -500, currency: "EUR", due: null, po_no: "GAS-PO-26-0170", project: "PRJ.000161 Y.010" }] } },
+      { kind: "requisition", icon: "🛒", label: "Purchase requisition", id: 318, ref: "GAS-PR-26-0318", title: "Spare PLC cards — over budget", who: "Oleksandr Bondarenko", at: d(-1) + " 16:40", age: 1, with: "Management", late: false, action: "portal" },
     ],
     inbox: [
       { id: 9001, kind: "hrq", title: "Leave request — Dimitris Papadakis", body: `ANN ${I18N.date(d(20))} – ${I18N.date(d(21))}, 2 days — awaiting your decision`, url: "/customer/?p=hr&t=requests", created_at: d(-1) + " 09:12", read: false },
@@ -220,7 +232,7 @@ window.API = (() => {
       mockState.user = M.me; return delay({ access_token: "mock", refresh_token: "mock-refresh", user: M.me }); }
     if (p === "/auth/logout") { mockState.user = null; return delay({}); }
     if (p === "/auth/refresh") return delay({ access_token: "mock", refresh_token: "mock-refresh" });
-    const counts = () => ({ hr_pending: M.requests.filter((r) => r.status === "pending_mgr" && r.decidable).length, ts_pending: M.timesheets.length, drawings_overdue: M.drawings.filter((x) => x.status === "pending" && x.overdue_days > 0).length, submittals_open: M.submittals.filter((x) => x.open).length, hr_unread: M.hr.unread });
+    const counts = () => ({ hr_pending: M.requests.filter((r) => r.status === "pending_mgr" && r.decidable).length, ts_pending: M.timesheets.length, drawings_overdue: M.drawings.filter((x) => x.status === "pending" && x.overdue_days > 0).length, submittals_open: M.submittals.filter((x) => x.open).length, hr_unread: M.hr.unread, approvals: M.approvals.length });
     const projItems = () => M.projects.map((pr) => ({ ...pr, overall: Math.round(pr.subprojects.reduce((a, s) => a + s.overall, 0) / pr.subprojects.length), counts: { subprojects: pr.subprojects.length, drawings_overdue: M.drawings.filter((x) => x.project_id === pr.id && x.status === "pending" && x.overdue_days > 0).length, submittals_open: M.submittals.filter((x) => x.project_id === pr.id && x.open).length, issues_open: pr.subprojects.reduce((a, s) => a + s.issues_open, 0) } }));
     if (p === "/me") return delay({ ...M.me, counts: counts() });
     if (p === "/master") return delay({ stages: STAGES, engineers: STAFF });
@@ -229,6 +241,12 @@ window.API = (() => {
     if (p === "/pm/projects") return delay({ items: projItems(), stages: STAGES, staff: STAFF });
     if (p === "/pm/drawings") return delay({ items: M.drawings.filter((x) => !q.project || x.project_id === +q.project) });
     if (p === "/pm/submittals") return delay({ items: M.submittals.filter((x) => !q.project || x.project_id === +q.project) });
+    if (p === "/pm/approvals") return delay({ items: M.approvals.map(aprRow), count: M.approvals.length });   // R97-207 (invented data)
+    const pay_ = /^\/pm\/approvals\/payment\/(\d+)(\/decide)?$/.exec(p);
+    if (pay_) { const i = M.approvals.findIndex((x) => x.kind === "payment" && x.id === +pay_[1]); if (i < 0) { const e = new Error("Not found"); e.status = 404; throw e; }
+      if (!pay_[2]) return delay(M.approvals[i].detail);
+      if (body.decision === "reject" && !(body.note || "").trim()) { const e = new Error("Give the reason"); e.status = 422; e.data = { error: "Give the reason" }; throw e; }
+      M.approvals.splice(i, 1); return delay({ id: +pay_[1], status: body.decision === "reject" ? "rejected" : "approved" }); }
     if (p === "/pm/inbox") { const since = +q.since || 0; return delay({ items: M.inbox.filter((n) => !since || new Date(n.created_at.replace(" ", "T")).getTime() / 1000 > since).slice(0, 50) }); }
     if (p === "/pm/hr/team") return delay({ year: +q.year || new Date().getFullYear(), people: M.people, requests: M.requests, timesheets: M.timesheets, absences: matrix(M.people) });
     if (p === "/pm/absences") { const pr = M.projects.find((x) => x.id === +q.project); const ids = pr ? [...new Set(pr.subprojects.flatMap((s) => s.team).concat([pr.pm_id]))] : []; return delay(matrix(peopleByUsers(ids))); }

@@ -5,6 +5,7 @@ return [
   'lede'  => 'The working routine of a Golden A/S project manager in the portal: setting a project up, the daily round, the approvals you own, the weekly cycle, the project meeting, the monthly closing and the close-out — with checklists.',
   'sections' => [
     ['id' => 'role', 'title' => 'What the portal expects from the project manager', 'body' => [
+      'My approvals in Golden PM (v1.230.0, app 1.0.20): Home › «✅ My approvals» shows what waits for your decision. Tap a supplier payment to see its invoices and approve or reject it (a reason is needed to reject). Leave and timesheets are under Team; the rest is decided in the portal. A connection is needed.',
       'Payables (v1.229.0): a cancelled supplier invoice can be deleted by management, with a reason; the deletion is kept in the register «Deleted invoices» on the Payables page.',
       'Newsletter versions (v1.228.1): on a language version, ✨ beside a field translates that field from the original; «Translate the empty fields» does all empty fields in turn.',
       'Newsletters in seven languages (v1.228.0): a newsletter issue can have versions in English, Greek, Italian, Russian, Ukrainian, German and Dutch; each reader receives his language when that version is marked ready. The language of a person is set on the contact («Newsletter language»); empty means English.',

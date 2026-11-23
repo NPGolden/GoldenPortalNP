@@ -108,6 +108,9 @@ try {
         case $method === 'GET' && $path === '/pm/submittals': Response::json(['items' => PortalPM::submittals(isset($_GET['project']) && $_GET['project'] !== '' ? (int)$_GET['project'] : null)]);
         case $method === 'GET' && $path === '/pm/hr/team': Response::json(PortalPM::hrTeam($u, (int)($_GET['year'] ?? date('Y'))));
         case $method === 'GET' && $path === '/pm/absences': Response::json(PortalPM::absencesForProject((int)($_GET['project'] ?? 0), (string)($_GET['from'] ?? date('Y-m-d')), (string)($_GET['to'] ?? date('Y-m-d', strtotime('+28 days')))));
+        case $method === 'GET' && $path === '/pm/approvals': Response::json(PortalPM::approvals());   // R97-207: My approvals in Golden PM
+        case $method === 'GET' && preg_match('#^/pm/approvals/payment/(\d+)$#', $path, $m): Response::json(PortalPM::payment((int)$m[1]));
+        case $method === 'POST' && preg_match('#^/pm/approvals/payment/(\d+)/decide$#', $path, $m): RateLimit::check('decide', 'u' . $u['id'], 30); Response::json(PortalPM::paymentDecide((int)$m[1], $body));
         case $method === 'GET' && $path === '/pm/inbox': Response::json(['items' => PortalPM::inbox($u, (int)($_GET['since'] ?? 0))]);
         case $method === 'GET' && $path === '/tickets': Response::json(['items' => Portal::tickets($u)]);
         case $method === 'GET' && $path === '/assignments': Response::json(['items' => Portal::assignments($u)]);

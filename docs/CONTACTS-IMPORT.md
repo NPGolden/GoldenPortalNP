@@ -4177,3 +4177,11 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Numbers come from `doc_sequences`, so a deleted number is not issued again.
 - No "delete all" for payables (decision of 22/11/2026 stands): one invoice at a time, cancelled first.
 - Language keys +8 (13 171 per language).
+
+## §490 Golden PM: My approvals, supplier payments decided in the app (GAS-CP-R97-207, v1.230.0, app 1.0.20)
+
+- API bootstrap loads `apr`. `GET /pm/approvals` → `PortalPM::approvals()`: the rows of `apr_waiting()` with `action` = `payment` (decided in the app), `team` (leave, timesheets: Team tab) or `portal`. Only the processes whose modules the API loads appear (leave, timesheets, training, requisitions, payments, engineering hours, BOM).
+- `GET /pm/approvals/payment/{id}` → `PortalPM::payment()`: only a request whose status is in `si_my_statuses()` of the caller (403 otherwise); supplier, amount, pay-by, note, requester, invoices from `si_request_items()`.
+- `POST /pm/approvals/payment/{id}/decide` `{decision: approve|reject, note}` → `si_request_decide()` (its own rights check, history, notifications), note suffixed «(Golden PM app)»; rate limit `decide` 30. Reject needs a note. `/me` of the PM app carries `counts.approvals`.
+- App: routes `#/myappr`, `#/myappr/pay/{id}` (`SCREENS.myappr`, `SCREENS.mypay`); online only; demonstration data set `M.approvals` (invented) for the demonstration account. Texts `mya.*` in en / el / it / uk / bg.
+- Not done: invoice documents in the app; management step of requisitions; JD, newsletter, equipment, HR-flow and change-request approvals (their modules are not loaded by the API).

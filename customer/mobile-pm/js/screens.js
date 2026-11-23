@@ -77,6 +77,7 @@ window.SCREENS = (() => {
     return { html: `
       <div class="greet">${esc(t("home.hello", { name: firstName(me.name) }))}<small>${esc(t("home.sub", { n: nSub, p: ctx.projects.length }))} • ${fmt(today())}</small></div>
       <button class="btn line" data-go="#/parts">🧾 ${t("parts.title")}</button>
+      <button class="btn ${aprCount() ? "gold" : "line"}" data-go="#/myappr">✅ ${t("mya.title")}${aprCount() ? ` (${aprCount()})` : ""}</button>
       <div class="kpi">
         <div data-go="#/projects"><b>${nSub}</b><span>${t("home.kpi_sub")}</span></div>
         <div data-go="#/approvals?tab=drawings&f=overdue"><b class="${overdue.length ? "red" : ""}">${c.drawings_overdue != null ? c.drawings_overdue : overdue.length}</b><span>${t("home.kpi_dr")}</span></div>
@@ -254,6 +255,42 @@ window.SCREENS = (() => {
     return { html: `${unread.length ? `<button class="btn line sm" id="readall">${t("inbox.read_all")} (${unread.length})</button>` : ""}<div class="inbox">${all.map((n) => `<div class="card ${n.read ? "read" : "unread"}"><div class="t">${esc(n.title)} <small>${esc(String(n.created_at).slice(0, 16))}</small></div><div class="s">${esc(n.body || "")}</div><div class="s muted">${esc(n.kind || "")}</div></div>`).join("") || `<p class="list-empty">${t("inbox.none")}</p>`}</div>`,
       bind(root) { const b = root.querySelector("#readall"); if (b) b.onclick = async () => { for (const n of unread) await DB.put("inbox", { ...n, read: true }); await DB.enqueue("nf_read", { ids: unread.map((n) => n.id) }); UI.render(); SYNC.run(false); }; } };
   }
+  // ---------------------------------------------------------------- My approvals (R97-207): what waits for my decision; supplier payments are decided here
+  let aprN = null;   // the number last read from the portal in this session (the count of /me is as old as the last sync)
+  const aprCount = () => aprN != null ? aprN : ((ctx.me && ctx.me.counts || {}).approvals || 0);
+  const money = (v, cur) => v == null ? "" : `${Number(v).toLocaleString("el-GR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur || "EUR"}`;
+  async function myappr() {
+    UI.chrome(true, t("mya.title"), "more", true);
+    let d = null, err = ""; try { d = await API.myApprovals(); aprN = d.count; } catch (e) { err = e && e.offline ? t("mya.offline") : ((e.data && e.data.error) || e.message || t("mya.offline")); }
+    if (!d) return { html: `<p class="list-empty">${esc(err)}</p><button class="btn navy" id="again">${t("mya.again")}</button>`, bind(root) { root.querySelector("#again").onclick = () => UI.render(); } };
+    const where = (x) => x.action === "payment" ? "" : `<div class="s muted">${t(x.action === "team" ? "mya.in_team" : "mya.in_portal")}</div>`;
+    return { html: `<p class="muted">${t("mya.lede")}</p>${d.items.map((x) => `<div class="card ${x.action === "portal" ? "" : "tap"} ${x.late ? "c-red" : x.action === "payment" ? "c-gold" : "c-grey"}" ${x.action === "payment" ? `data-go="#/myappr/pay/${+x.id}"` : x.action === "team" ? `data-go="#/team?tab=${x.kind === "timesheet" ? "timesheets" : "requests"}"` : ""}>
+        <div class="t">${esc(x.icon)} ${esc(x.label)} <small>${esc(x.ref)}</small></div><div class="s">${esc(x.title)}</div>
+        <div class="s muted">${esc(x.who)}${x.who ? " • " : ""}${x.age ? t("mya.days", { n: x.age }) : t("mya.today")}${x.with ? ` • ${esc(x.with)}` : ""}${x.late ? ` • ${t("mya.late")}` : ""}</div>${where(x)}</div>`).join("") || `<p class="list-empty">${t("mya.none")}</p>`}`,
+      bind(root) { UI.goLinks(root); } };
+  }
+  async function mypay(id) {
+    UI.chrome(true, t("mya.pay"), "more", true);
+    let p = null, err = ""; try { p = await API.payment(id); } catch (e) { err = e && e.offline ? t("mya.offline") : ((e.data && e.data.error) || e.message || ""); }
+    if (!p) return { html: `<p class="list-empty">${esc(err || t("mya.gone"))}</p><button class="btn navy" data-go="#/myappr">${t("mya.title")}</button>`, bind(root) { UI.goLinks(root); } };
+    return { html: `<div class="card ${p.late ? "c-red" : "c-gold"}"><div class="t">${esc(p.supplier)} <small>${esc(p.req_no)}</small></div>
+        <div class="s" style="font-size:22px;font-weight:700;margin:6px 0">${esc(money(p.amount, p.currency))}</div>
+        <div class="s muted">${t("mya.asked_by")} ${esc(p.requested_by)} • ${fmt(String(p.created_at || "").slice(0, 10))}${p.pay_by ? ` • ${t("mya.pay_by")} ${fmt(p.pay_by)}` : ""}${p.late ? ` • ${t("mya.late")}` : ""} • ${esc(p.with)}</div>
+        ${p.note ? `<div class="s">${esc(p.note)}</div>` : ""}</div>
+      <h2>${t("mya.invoices")} (${p.invoices.length})</h2>
+      ${p.invoices.map((i) => `<div class="card ${i.credit ? "c-amber" : "c-grey"}"><div class="t">${esc(i.inv_no)} <small>${esc(i.si_no)}${i.credit ? " • " + t("mya.credit") : ""}</small></div>
+        <div class="s">${esc(money(i.amount, i.currency))}${Math.abs(i.amount) !== Math.abs(i.gross) ? ` <small>(${t("mya.of")} ${esc(money(i.gross, i.currency))})</small>` : ""}${i.due ? ` • ${t("mya.due")} ${fmt(i.due)}` : ""}</div>
+        <div class="s muted">${esc(i.po_no)}${i.project ? ` • ${esc(i.project)}` : ""}</div></div>`).join("")}
+      <p class="muted">${t("mya.docs_note")}</p>
+      <div class="row2"><button class="btn gold" id="ok">${t("team.approve")}</button><button class="btn line" id="no">${t("team.reject")}</button></div>`,
+      bind(root) {
+        const done = (r, ok) => { if (aprN) aprN--; UI.closeSheet(); UI.toast(t(ok ? "mya.approved" : "mya.rejected", { no: p.req_no })); location.hash = "#/myappr"; };
+        root.querySelector("#ok").onclick = () => UI.sheet(`<h3>${t("mya.q_approve")}</h3><p>${esc(p.supplier)}<br><b>${esc(money(p.amount, p.currency))}</b></p><textarea id="n" rows="2" maxlength="380" placeholder="${esc(t("mya.note_opt"))}"></textarea><p id="e2" class="note red hidden"></p><button class="btn gold" id="go">${t("team.approve")}</button>`, null, (el) => {
+          const b = el.querySelector("#go"); b.onclick = async () => { b.disabled = true; try { done(await API.paymentDecide(p.id, "approve", el.querySelector("#n").value), true); } catch (e) { b.disabled = false; const x = el.querySelector("#e2"); x.textContent = e && e.offline ? t("mya.offline") : ((e.data && e.data.error) || e.message || "Error"); x.classList.remove("hidden"); } }; });
+        root.querySelector("#no").onclick = () => UI.sheet(`<h3>${t("mya.q_reject")}</h3><p>${esc(p.supplier)} • ${esc(money(p.amount, p.currency))}</p><textarea id="n" rows="3" maxlength="380" placeholder="${esc(t("mya.note_req"))}"></textarea><p id="e2" class="note red hidden"></p><button class="btn red" id="go">${t("team.reject")}</button>`, null, (el) => {
+          const b = el.querySelector("#go"); b.onclick = async () => { const n = el.querySelector("#n").value.trim(); const x = el.querySelector("#e2"); if (!n) { x.textContent = t("mya.note_req"); x.classList.remove("hidden"); return; } b.disabled = true; try { done(await API.paymentDecide(p.id, "reject", n), false); } catch (e) { b.disabled = false; x.textContent = e && e.offline ? t("mya.offline") : ((e.data && e.data.error) || e.message || "Error"); x.classList.remove("hidden"); } }; });
+      } };
+  }
   // ---------------------------------------------------------------- sync log (outbox)
   async function synclog() {
     UI.chrome(true, t("synclog.title"), "more", true);
@@ -285,6 +322,7 @@ window.SCREENS = (() => {
     const row = (go, title, sub, cls) => `<div class="card tap ${cls || ""}" data-go="${go}"><div class="t">${title}</div>${sub ? `<div class="s muted">${sub}</div>` : ""}</div>`;
     return { html: `<div class="card tap c-gold" data-go="#/io"><div class="t">⏱ ${t("io.title")}</div><div class="s muted">${t("io.hint")}</div></div>
       ${ctx.me.hr !== false ? row("#/hr", `${t("more.hr")}${hrUnread ? ` <small>${hrUnread} ${t("hr.new")}</small>` : ""}`, hr ? `${t("hr.available")}: ${(hr.balances || []).filter((b) => b.available != null && !b.via_annual).slice(0, 3).map((b) => `${b.code} ${b.available}`).join(" • ")}` : t("hr.none"), "c-gold") : ""}
+      ${row("#/myappr", `✅ ${t("mya.title")}${aprCount() ? ` <small>${aprCount()}</small>` : ""}`, t("mya.hint"), "c-gold")}
       ${row("#/approvals?tab=drawings", t("more.drawings"))}${row("#/notes", t("more.notes"))}${row("#/docs", t("more.docs"))}${row("#/inbox", `${t("more.inbox")}${inboxUnread ? ` <small>${inboxUnread}</small>` : ""}`)}${row("#/synclog", t("more.synclog"), `${ob.length} ${t("sync.queued")}${ob.filter((o) => o.status === "rejected").length ? ` • ${ob.filter((o) => o.status === "rejected").length} rejected` : ""}${ob.filter((o) => o.status === "needs_totp").length ? ` • ${ob.filter((o) => o.status === "needs_totp").length} ${t("synclog.needs_totp")}` : ""}`, ob.some((o) => o.status !== "queued") ? "c-amber" : "")}
       <div class="card tap c-gold" id="ai"><div class="t">✦ ${t("ai.title")}</div><div class="s muted">${ctx.me.ai || API.mock ? t("ai.help") : t("ai.disabled")}</div></div>
       <h2>${t("more.settings")}</h2>
@@ -308,5 +346,5 @@ window.SCREENS = (() => {
     } };
   }
 
-  return { load, ctx, esc, fmt, today, weekOf, subName, projName, findSub, project, staffName, pstChip, sstChip, login, lock, home, projects, project: projectScreen, sub, approvals, notes, docs, inbox, synclog, more };
+  return { load, ctx, esc, fmt, today, weekOf, subName, projName, findSub, project, staffName, pstChip, sstChip, login, lock, home, projects, project: projectScreen, sub, approvals, notes, docs, inbox, synclog, more, myappr, mypay };
 })();
