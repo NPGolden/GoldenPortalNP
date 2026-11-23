@@ -5,6 +5,7 @@ return [
   'lede'  => 'Your own corner of the portal: your leave balance and requests, the leave periods you can join, your program on the Planning board, the trainings you can apply for and your certificates, your annual evaluation, your messages with HR, and the Community — wishes, kudos, the noticeboard and badges. Short, with the steps to follow.',
   'sections' => [
     ['id' => 'start', 'title' => 'Getting in and getting around', 'body' => [
+      'Recruiting (v1.231.0): with the HR role you can delete applications (one or several), a CV alone, or a talent-pool entry. A reason is asked and the deletion is final; a register of deletions keeps number, vacancy and reason only.',
       'HR role (v1.228.2): with the HR role you can now add a CV by hand to the talent pool, assign an application to a vacancy, and mark your notifications as read — these buttons used to answer «You do not have access to this page».',
       'Newsletter versions (v1.228.1): on a language version of a newsletter, ✨ beside a field translates that one text from the original into the language of the version.',
       'Newsletters in seven languages (v1.228.0): newsletters of Golden A/S can be sent in English, Greek, Italian, Russian, Ukrainian, German and Dutch. On a contact, «Newsletter language» sets the language that person receives; empty means English.',

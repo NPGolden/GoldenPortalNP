@@ -97,6 +97,12 @@ if (function_exists('em_card_html') && em_has()) {
   <button class="btn btn--gold"><?= tt('btn.save') ?></button>
   <?php if ($a['hired_person_id']): ?><p class="hint">→ <a href="<?= url('hr_person', ['id' => (int)$a['hired_person_id']]) ?>"><?= tt('rc.person_card') ?></a></p><?php endif; ?>
 </form>
+<?php if (rcr_can()): /* R97-209 */ ?><div class="card" id="del"><h2>🗑 <?= tt('rc.del_title') ?></h2><p class="hint"><?= tt('rc.del_lede') ?></p>
+<?php if ($a['status'] === 'hired'): ?><p class="hint"><?= tt('rc.del_hired') ?></p><?php endif; ?>
+<div class="btn-row">
+<?php if ($a['cv_path']): ?><form method="post" data-lock data-prompt="<?= e(t('rc.del_cv_q')) ?>" data-prompt-field="note"><?= csrf_field() ?><input type="hidden" name="action" value="rcr_cv_delete"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="note" value=""><button class="btn btn--ghost btn--sm" type="submit" style="color:#b3261e;">📎 <?= tt('rc.del_cv_btn') ?></button></form><?php endif; ?>
+<?php if ($a['status'] !== 'hired'): ?><form method="post" data-lock data-prompt="<?= e(t('rc.del_q')) ?>" data-prompt-field="note"><?= csrf_field() ?><input type="hidden" name="action" value="rcr_app_delete"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="note" value=""><label class="check" style="margin-right:10px;"><input type="checkbox" name="pool" value="1"> <?= tt('rc.del_pool_too') ?></label><button class="btn btn--ghost btn--sm" type="submit" style="color:#b3261e;">🗑 <?= tt('rc.del_btn') ?></button></form><?php endif; ?>
+</div></div><?php endif; ?>
 <details class="card card--details"><summary><h2><?= tt('rc.log') ?></h2></summary><ul class="log"><?php foreach ($log as $l): ?><li><span class="hint"><?= e(fmt_datetime($l['created_at'])) ?> · <?= e((string)($l['by_name'] ?: 'Website')) ?></span><br><b><?= e($l['action']) ?></b> <?= e((string)$l['detail']) ?></li><?php endforeach; ?></ul></details>
 </div></div>
 <?php layout_foot();

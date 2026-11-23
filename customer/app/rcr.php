@@ -287,7 +287,7 @@ function rcr_retention_run(): array {
     try {
         $rows = all('SELECT id, cv_path FROM rc_applications WHERE status IN ("screened","cv_received","rejected","withdrawn") AND COALESCE(status_changed_at, created_at) < ? AND (keep_until IS NULL OR keep_until < CURDATE())', [$cut]);   // R91-004: kept applications are skipped until keep_until passes
         foreach ($rows as $r) { if ($r['cv_path'] && is_file($r['cv_path'])) { @unlink($r['cv_path']); $n['cvs_deleted']++; } }
-        if ($rows) { $ids = array_column($rows, 'id'); $in = implode(',', array_map('intval', $ids)); q("DELETE FROM rc_event_registrations WHERE application_id IN ($in)"); q("DELETE FROM rc_log WHERE application_id IN ($in)"); $n['apps_deleted'] = q("DELETE FROM rc_applications WHERE id IN ($in)")->rowCount(); }
+        if ($rows) $n['apps_deleted'] = rcr_app_erase_rows(array_column($rows, 'id'));   // R97-209: scorecards and interviews go with the application
         foreach (all('SELECT id, cv_path, cv_name, hired_person_id FROM rc_applications WHERE status = "hired" AND COALESCE(status_changed_at, created_at) < ? AND email NOT LIKE "anon-%"', [$cut]) as $r) {
             if ($r['cv_path'] && is_file($r['cv_path'])) { if (!rcr_cv_to_person((int) $r['id'])) @unlink($r['cv_path']); $n['cvs_deleted']++; }   // R91-004: the CV moves to the employee file instead of being destroyed
             q('UPDATE rc_applications SET email = CONCAT("anon-", code, "@retired.local"), name = NULL, phone = NULL, answers = NULL, cv_path = NULL, cv_name = NULL, cover_note = NULL, hr_notes = NULL, ip = NULL, user_agent = NULL WHERE id = ?', [(int) $r['id']]); $n['apps_anonymised']++; }
@@ -298,6 +298,63 @@ function rcr_retention_run(): array {
         db()->commit();
     } catch (Throwable $e) { db()->rollBack(); throw $e; }
     return $n;
+}
+
+/* ------------------------------------------------------------------ deleting applications, CVs and talent-pool entries by hand (GAS-CP-R97-209) */
+/** Rows of the given applications in every recruiting table. The caller holds the transaction and removes the CV files after the commit. */
+function rcr_app_erase_rows(array $ids): int {
+    $ids = array_values(array_filter(array_map('intval', $ids))); if (!$ids) return 0; $in = implode(',', $ids);
+    q("DELETE FROM rc_event_registrations WHERE application_id IN ($in)"); q("DELETE FROM rc_log WHERE application_id IN ($in)");
+    if (rcr_eval_has()) { q("DELETE FROM rc_evaluations WHERE application_id IN ($in)"); q("DELETE FROM rc_interviews WHERE application_id IN ($in)"); }
+    return q("DELETE FROM rc_applications WHERE id IN ($in)")->rowCount();
+}
+/** A CV file may be removed only when it lies in the portal's storage folder. */
+function rcr_cv_unlink(?string $path): bool {
+    if (!$path || !is_file($path)) return false; $real = realpath($path); $root = realpath(rcr_dir());
+    if (!$real || !$root || strpos($real, $root . DIRECTORY_SEPARATOR) !== 0) return false;
+    return @unlink($real);
+}
+/** HR deletes applications for good: record, answers, notes, scorecards, interviews, event links, history and CV file. The register keeps number, vacancy and reason only. */
+function rcr_app_delete(array $ids, string $reason, bool $pool = false): array {
+    if (!rcr_can()) throw new RuntimeException(t('err.noaccess'));
+    $ids = array_slice(array_values(array_unique(array_filter(array_map('intval', $ids)))), 0, 200); if (!$ids) throw new RuntimeException(t('rc.del_none'));
+    $reason = mb_substr(trim($reason), 0, 200); if (mb_strlen($reason) < 3) throw new RuntimeException(t('rc.del_need_reason'));
+    $rows = all('SELECT a.id, a.code, a.email, a.status, a.cv_path, a.vacancy_id, v.code AS vacancy_code FROM rc_applications a JOIN rc_vacancies v ON v.id = a.vacancy_id WHERE a.id IN (' . implode(',', $ids) . ')');
+    $n = ['apps' => 0, 'cvs' => 0, 'pool' => 0, 'skipped' => 0]; $del = []; $files = [];
+    foreach ($rows as $r) { if ($r['status'] === 'hired') { $n['skipped']++; continue; } $del[] = $r; }   // a hired application belongs to the employee file; the retention run anonymises it
+    if (!$del) throw new RuntimeException(t($n['skipped'] ? 'rc.del_hired' : 'rc.del_none'));
+    db()->beginTransaction();
+    try {
+        foreach ($del as $r) {
+            if ($r['cv_path']) $files[] = (string) $r['cv_path'];
+            if ($pool && $r['email'] && !one('SELECT id FROM rc_applications WHERE email = ? AND id NOT IN (' . implode(',', array_column($del, 'id')) . ') LIMIT 1', [$r['email']])) $n['pool'] += q('DELETE FROM rc_talent_pool WHERE email = ?', [$r['email']])->rowCount();
+            rcr_log('app_delete', ['vacancy_id' => (int) $r['vacancy_id']], $r['code'] . ' · ' . $r['vacancy_code'] . ' · ' . $reason);
+        }
+        $n['apps'] = rcr_app_erase_rows(array_column($del, 'id'));
+        db()->commit();
+    } catch (Throwable $e) { db()->rollBack(); throw $e; }
+    foreach ($files as $f) if (rcr_cv_unlink($f)) $n['cvs']++;
+    return $n;
+}
+/** Only the CV file of an application; the application itself stays. */
+function rcr_cv_delete(int $id, string $reason): void {
+    if (!rcr_can()) throw new RuntimeException(t('err.noaccess'));
+    $a = rcr_application($id); if (!$a || !$a['cv_path']) throw new RuntimeException(t('rc.del_none'));
+    $reason = mb_substr(trim($reason), 0, 200); if (mb_strlen($reason) < 3) throw new RuntimeException(t('rc.del_need_reason'));
+    q('UPDATE rc_applications SET cv_path = NULL, cv_name = NULL, cv_token_hash = NULL WHERE id = ?', [$id]);
+    rcr_cv_unlink((string) $a['cv_path']);
+    rcr_log('cv_delete', ['application_id' => $id, 'vacancy_id' => (int) $a['vacancy_id']], $reason);
+    rcr_log('cv_delete', ['vacancy_id' => (int) $a['vacancy_id']], $a['code'] . ' · ' . $a['vacancy_code'] . ' · ' . $reason);   // register line that outlives the application
+}
+/** One talent-pool entry. An application of the same person, if any, is left alone. */
+function rcr_pool_delete(int $pid): void {
+    if (!rcr_can()) throw new RuntimeException(t('err.noaccess'));
+    if (!q('DELETE FROM rc_talent_pool WHERE id = ?', [$pid])->rowCount()) throw new RuntimeException(t('rc.del_none'));
+    rcr_log('pool_delete', [], 'entry #' . $pid);
+}
+/** Register of what was deleted by hand: number, vacancy, reason, who and when. No name, no e-mail address. */
+function rcr_deleted_log(int $limit = 200): array {
+    return all('SELECT l.action, l.detail, l.created_at, cu.full_name AS by_name FROM rc_log l LEFT JOIN customer_users cu ON cu.id = l.user_id WHERE l.application_id IS NULL AND l.action IN ("app_delete","cv_delete","pool_delete") ORDER BY l.id DESC LIMIT ' . max(1, min(500, $limit)));
 }
 
 /* ------------------------------------------------------------------ applicant evaluation (GAS-CP-R91-001) */

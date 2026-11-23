@@ -4185,3 +4185,14 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - `POST /pm/approvals/payment/{id}/decide` `{decision: approve|reject, note}` → `si_request_decide()` (its own rights check, history, notifications), note suffixed «(Golden PM app)»; rate limit `decide` 30. Reject needs a note. `/me` of the PM app carries `counts.approvals`.
 - App: routes `#/myappr`, `#/myappr/pay/{id}` (`SCREENS.myappr`, `SCREENS.mypay`); online only; demonstration data set `M.approvals` (invented) for the demonstration account. Texts `mya.*` in en / el / it / uk / bg.
 - Not done: invoice documents in the app; management step of requisitions; JD, newsletter, equipment, HR-flow and change-request approvals (their modules are not loaded by the API).
+
+## §491 Recruiting: applications, CVs and talent-pool entries deleted by hand (GAS-CP-R97-209, v1.231.0)
+
+- `rcr_app_delete(array $ids, string $reason, bool $pool)` — HR only (`rcr_can()`), up to 200 ids, reason of 3–200 characters. Status `hired` is skipped (employee file; the retention run anonymises it). In one transaction: `rcr_app_erase_rows()` removes `rc_event_registrations`, `rc_log`, `rc_evaluations`, `rc_interviews` and `rc_applications` rows; with `$pool` the `rc_talent_pool` row of the same e-mail goes when no other application uses it. CV files are removed after the commit.
+- `rcr_cv_unlink()` removes a file only when its real path lies inside `storage/rc` — a path stored in the database cannot point the delete at another file.
+- `rcr_cv_delete($id, $reason)` clears `cv_path`, `cv_name`, `cv_token_hash` and removes the file; the application stays (also for a hired person). `rcr_pool_delete($id)` removes one talent-pool row.
+- Nothing goes to the recycle bin: candidate data that is deleted must be gone (GDPR erasure). The confirmation text says so.
+- Register: `rc_log` rows with `application_id` NULL and action `app_delete` / `cv_delete` / `pool_delete`; detail = application number · vacancy code · reason. No name, no e-mail. Read by `rcr_deleted_log()`, shown as «Register of deletions» under Recruiting › Talent pool.
+- Actions `rcr_app_delete`, `rcr_cv_delete`, `rcr_pool_delete` in `rcr_actions.php`, added to `HR_ACTIONS` (checked with `tools/check-scopes.php`). CSRF and the one-submit lock as on every form; reason through `data-prompt`, no inline script.
+- Fix: `rcr_retention_run()` left the scorecards and interviews of the applications it deleted; it now uses `rcr_app_erase_rows()`.
+- Language keys +27 (13 198 per language).

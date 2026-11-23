@@ -24,6 +24,9 @@ function rcr_handle_action(string $action): bool {
             foreach (['rc_site_origin', 'rc_retention_months', 'rc_pool_retention_months', 'rc_notify_email', 'rc_cv_max_mb', 'rc_mail_from'] as $k) cp_setting_set($k, mb_substr(trim((string)($_POST[$k] ?? '')), 0, 190));
             if (!empty($_POST['rc_rotate_key'])) { $nk = bin2hex(random_bytes(24)); cp_setting_set('rc_site_key', $nk); $_SESSION['rc_key_once'] = $nk; rcr_log('key_rotated'); }   // shown in full once, on the next page view only
             flash('good', t('sys.saved')); redirect('rcr_settings');
+        case 'rcr_app_delete': $n = rcr_app_delete(isset($_POST['ids']) && is_array($_POST['ids']) ? $_POST['ids'] : [(int)($_POST['id'] ?? 0)], (string)($_POST['note'] ?? ''), !empty($_POST['pool'])); flash('good', t('rc.del_done', ['n' => $n['apps'], 'cv' => $n['cvs']]) . ($n['pool'] ? ' ' . t('rc.del_done_pool', ['n' => $n['pool']]) : '') . ($n['skipped'] ? ' ' . t('rc.del_skipped', ['n' => $n['skipped']]) : '')); redirect('rcr_dashboard', ['tab' => 'apps']);   // R97-209
+        case 'rcr_cv_delete': rcr_cv_delete((int)$_POST['id'], (string)($_POST['note'] ?? '')); flash('good', t('rc.del_cv_done')); redirect('rcr_application', ['id' => (int)$_POST['id']]);
+        case 'rcr_pool_delete': rcr_pool_delete((int)$_POST['id']); flash('good', t('rc.del_pool_done')); redirect('rcr_dashboard', ['tab' => 'pool']);
         case 'rcr_retention_now': if (!rcr_can()) throw new RuntimeException(t('err.noaccess')); $n = rcr_retention_run(); flash('good', 'Retention run: ' . json_encode($n)); redirect('rcr_settings');
     }
     return false;

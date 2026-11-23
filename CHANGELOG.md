@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.230.0** (build 2026-11-23). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.231.0** (build 2026-11-23). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.231.0 | GAS-CP-R97-209 | 2026-11-23 | Recruiting: HR deletes applications (one or several), a CV alone, or a talent-pool entry — with a reason and a register of deletions; the retention run now also clears scorecards and interviews | — |
 | 1.230.0 | GAS-CP-R97-207 | 2026-11-23 | Golden PM 1.0.20: My approvals — everything that waits for my decision; supplier payment requests opened, approved or rejected in the app | — |
 | 1.229.0 | GAS-CP-R97-206 | 2026-11-23 | Payables: a cancelled supplier invoice, proforma or credit note can be deleted by management, with a reason; register of deleted invoices | — |
 | 1.228.2 | GAS-CP-R97-205 | 2026-11-23 | HR role: «Add a CV by hand» and «Assign to a vacancy» in Recruiting, mark notifications as read, and six more buttons no longer answer «no access» | — |
