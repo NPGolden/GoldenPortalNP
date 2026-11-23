@@ -16,6 +16,27 @@ const NL_BLOCKS = ['h', 'p', 'img', 'btn', 'card', 'hr'];
 const NL_TOPICS = ['newsletter', 'events'];
 const NL_MAX_BLOCKS = 40;
 const NL_MAX_RCPT = 5000;
+/** R97-203: the languages a newsletter can be written in. One of them is the language of the issue itself; the others are versions of it. */
+const NL_LANGS = ['en' => 'English', 'el' => 'Ελληνικά', 'it' => 'Italiano', 'ru' => 'Русский', 'uk' => 'Українська', 'de' => 'Deutsch', 'nl' => 'Nederlands'];
+const NL_LANG_EN = ['en' => 'British English', 'el' => 'Greek', 'it' => 'Italian', 'ru' => 'Russian', 'uk' => 'Ukrainian', 'de' => 'German', 'nl' => 'Dutch'];
+/** Greeting and footer of the message in the languages the portal itself is not written in (and Ukrainian, whose portal texts of the newsletter were never translated). */
+const NL_FIXED = [
+    'ru' => ['nl.hello' => 'Уважаемые дамы и господа,', 'nl.hello_name' => 'Уважаемый(ая) {n},', 'nl.f_unsub' => 'Отписаться', 'nl.f_privacy' => 'Политика конфиденциальности',
+             'nl.f_why' => 'Вы получили это сообщение, потому что являетесь деловым контактом Golden A/S или подписались на нашем сайте.', 'nl.f_why_kyma' => 'Вы получили это сообщение, потому что являетесь деловым контактом KYMA Marine Power или подписались на kyma-marinepower.eu.'],
+    'uk' => ['nl.hello' => 'Шановні пані та панове,', 'nl.hello_name' => 'Шановний(а) {n},', 'nl.f_unsub' => 'Відписатися', 'nl.f_privacy' => 'Політика конфіденційності',
+             'nl.f_why' => 'Ви отримали це повідомлення, оскільки є діловим контактом Golden A/S або підписалися на нашому сайті.', 'nl.f_why_kyma' => 'Ви отримали це повідомлення, оскільки є діловим контактом KYMA Marine Power або підписалися на kyma-marinepower.eu.'],
+    'de' => ['nl.hello' => 'Sehr geehrte Damen und Herren,', 'nl.hello_name' => 'Guten Tag {n},', 'nl.f_unsub' => 'Abmelden', 'nl.f_privacy' => 'Datenschutzerklärung',
+             'nl.f_why' => 'Sie erhalten diese Nachricht, weil Sie ein Geschäftskontakt von Golden A/S sind oder sich auf unserer Website angemeldet haben.', 'nl.f_why_kyma' => 'Sie erhalten diese Nachricht, weil Sie ein Geschäftskontakt von KYMA Marine Power sind oder sich auf kyma-marinepower.eu angemeldet haben.'],
+    'nl' => ['nl.hello' => 'Geachte heer, mevrouw,', 'nl.hello_name' => 'Beste {n},', 'nl.f_unsub' => 'Uitschrijven', 'nl.f_privacy' => 'Privacybeleid',
+             'nl.f_why' => 'U ontvangt dit bericht omdat u een zakelijk contact van Golden A/S bent of u zich op onze website heeft aangemeld.', 'nl.f_why_kyma' => 'U ontvangt dit bericht omdat u een zakelijk contact van KYMA Marine Power bent of u zich op kyma-marinepower.eu heeft aangemeld.'],
+];
+function nl_lang_ok(?string $l): string { return isset(NL_LANGS[(string)$l]) ? (string)$l : 'en'; }
+function nl_tr_has(): bool { static $h = null; if ($h === null) { try { $h = nl_has() && (bool) one("SHOW COLUMNS FROM nl_issues LIKE 'tr'") && (bool) one("SHOW COLUMNS FROM nl_sends LIKE 'lang'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** A fixed text of the message in the language of the version. */
+function nl_t(string $k, string $lang, array $p = []): string {
+    if (isset(NL_FIXED[$lang][$k])) { $s = NL_FIXED[$lang][$k]; foreach ($p as $a => $v) $s = str_replace('{' . $a . '}', (string)$v, $s); return $s; }
+    return function_exists('t_in') ? t_in($k, isset(NL_FIXED[$lang]) ? 'en' : $lang, $p) : t($k, $p);
+}
 
 function nl_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'nl_issues'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function nl_can(): bool { return nl_has() && is_staff() && (is_cp_admin() || (function_exists('mgmt_can') && mgmt_can()) || (function_exists('pi_is_sales') && pi_is_sales())); }
@@ -80,6 +101,7 @@ function nl_url_ok(string $u): string { $u = trim($u); if ($u === '' || strlen($
 function nl_issue(int $id): ?array {
     $r = nl_has() && $id ? one('SELECT * FROM nl_issues WHERE id = ?', [$id]) : null; if (!$r) return null;
     $r['blocks'] = json_decode((string)($r['blocks'] ?? ''), true) ?: []; $r['audience'] = json_decode((string)($r['audience'] ?? ''), true) ?: [];
+    $tr = json_decode((string)($r['tr'] ?? ''), true); $r['tr'] = is_array($tr) ? array_intersect_key($tr, NL_LANGS) : [];   // R97-203
     return $r;
 }
 function nl_issues(?string $dept = null): array {
@@ -106,7 +128,7 @@ function nl_appr_ids(): array { static $c = null; if ($c === null) { try { $c = 
 /** The rule is on by default; it rests while no approver account exists, so sending can never be locked out. */
 function nl_appr_on(): bool { return nl_appr_has() && (string) cp_setting('nl_approval', '1') === '1' && nl_appr_ids(); }
 /** Fingerprint of what the readers get and who gets it: an approval is valid for exactly this. */
-function nl_hash(array $I): string { $a = [(string)$I['subject'], (string)($I['preheader'] ?? ''), (string)$I['lang'], $I['blocks'], $I['audience'], (string)($I['site'] ?? 'golden')]; if (!empty($I['web_publish'])) $a[] = 'web:' . (string)($I['web_slug'] ?? '');   /* R97-176: publishing on the website is part of what is approved; issues without it keep their fingerprint */ return sha1((string) json_encode($a, JSON_UNESCAPED_UNICODE)); }
+function nl_hash(array $I): string { $a = [(string)$I['subject'], (string)($I['preheader'] ?? ''), (string)$I['lang'], $I['blocks'], $I['audience'], (string)($I['site'] ?? 'golden')]; if (!empty($I['tr'])) $a[] = $I['tr'];   /* R97-203: a changed language version needs approval again */ if (!empty($I['web_publish'])) $a[] = 'web:' . (string)($I['web_slug'] ?? '');   /* R97-176: publishing on the website is part of what is approved; issues without it keep their fingerprint */ return sha1((string) json_encode($a, JSON_UNESCAPED_UNICODE)); }
 function nl_appr_state(array $I): string { $s = (string)($I['appr_state'] ?? ''); if ($s === 'approved' && !hash_equals((string)($I['appr_hash'] ?? ''), nl_hash($I))) return ''; return in_array($s, ['pending', 'approved', 'returned'], true) ? $s : ''; }
 function nl_appr_ok(array $I): bool { return !nl_appr_on() || nl_approver() || nl_appr_state($I) === 'approved'; }
 /** May this account launch the issue? Administrators and management as before; with the rule on, also the author once the issue is approved. */
@@ -131,7 +153,7 @@ function nl_appr_decide(int $id, bool $ok, string $reply): void {
 function nl_save_from_post(int $id): void {
     $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); nl_editable($I);
     $s = fn(string $k, int $max) => mb_substr(trim((string)($_POST[$k] ?? '')), 0, $max);
-    $title = $s('title', 200) ?: $I['title']; $subject = preg_replace('/[\r\n]+/', ' ', $s('subject', 200)) ?: $title; $lang = in_array($_POST['lang'] ?? '', ['en', 'el', 'it'], true) ? (string)$_POST['lang'] : 'en';
+    $title = $s('title', 200) ?: $I['title']; $subject = preg_replace('/[\r\n]+/', ' ', $s('subject', 200)) ?: $title; $lang = nl_lang_ok((string)($_POST['lang'] ?? ''));
     $blocks = [];
     foreach ((array)($_POST['b'] ?? []) as $i => $b) {
         if (count($blocks) >= NL_MAX_BLOCKS || !is_array($b)) break; $t = (string)($b['t'] ?? ''); if (!in_array($t, NL_BLOCKS, true) || !empty($b['del'])) continue;
@@ -139,14 +161,16 @@ function nl_save_from_post(int $id): void {
         if (isset($b['url'])) $x['url'] = nl_url_ok((string)$b['url']);
         $x['img'] = preg_match('/^[A-Za-z0-9]{24}$/', (string)($b['img'] ?? '')) ? (string)$b['img'] : '';
         if (!empty($_FILES['bf']['tmp_name'][$i]) && is_uploaded_file($_FILES['bf']['tmp_name'][$i])) $x['img'] = nl_image_store($id, $_FILES['bf']['tmp_name'][$i], (int)$_FILES['bf']['size'][$i]);
+        $x['k'] = preg_match('/^[a-z0-9]{6}$/', (string)($b['k'] ?? '')) ? (string)$b['k'] : nl_bkey();   // R97-203: the language versions hold on to a block by this key
         $x['pos'] = (int)($b['pos'] ?? ($i * 10)); $blocks[] = $x;
     }
     usort($blocks, fn($a, $b) => $a['pos'] <=> $b['pos']); foreach ($blocks as &$x) unset($x['pos']); unset($x);
-    $add = (string)($_POST['add'] ?? ''); if (in_array($add, NL_BLOCKS, true) && count($blocks) < NL_MAX_BLOCKS) $blocks[] = ['t' => $add];
+    $add = (string)($_POST['add'] ?? ''); if (in_array($add, NL_BLOCKS, true) && count($blocks) < NL_MAX_BLOCKS) $blocks[] = ['t' => $add, 'k' => nl_bkey()];
     $dp = nl_dept($I);   // R97-160: an HR issue has no lists and no website subscribers
     $aud = ['lists' => $dp === 'hr' ? [] : array_values(array_filter(array_map('intval', (array)($_POST['lists'] ?? [])))), 'groups' => array_values(array_intersect(array_keys(nl_groups($dp)), (array)($_POST['groups'] ?? []))), 'topics' => $dp === 'hr' ? [] : array_values(array_intersect(NL_TOPICS, (array)($_POST['topics'] ?? []))),
             'country' => $s('country', 80), 'extra' => $s('extra', 4000)];
     q('UPDATE nl_issues SET title = ?, subject = ?, preheader = ?, lang = ?, blocks = ?, audience = ? WHERE id = ?', [$title, $subject, $s('preheader', 200) ?: null, $lang, json_encode($blocks, JSON_UNESCAPED_UNICODE), json_encode($aud, JSON_UNESCAPED_UNICODE), $id]);
+    if (nl_tr_has() && !empty($I['tr'][$lang])) { $tr = $I['tr']; unset($tr[$lang]); q('UPDATE nl_issues SET tr = ? WHERE id = ?', [$tr ? json_encode($tr, JSON_UNESCAPED_UNICODE) : null, $id]); }   // the language of the issue itself has no version
     if (nl_web_has() && $dp !== 'hr') { $wp = !empty($_POST['web_publish']) && nl_site_of($I) === 'golden' ? 1 : 0; $raw = $s('web_slug', 80); $slug = $raw !== '' || $wp ? nl_slug_free($raw !== '' ? $raw : $title, $id) : ''; q('UPDATE nl_issues SET web_publish = ?, web_slug = ? WHERE id = ?', [$wp, $slug !== '' ? $slug : null, $id]); }   // R97-176
 }
 /** An uploaded picture: JPEG / PNG / GIF up to 2 MB, checked by its content, stored outside the web root, served by token. */
@@ -157,7 +181,7 @@ function nl_image_store(int $issueId, string $tmp, int $size): string {
     q('INSERT INTO nl_images (issue_id, token, mime, file) VALUES (?,?,?,?)', [$issueId, $tok, $ext[1], $file]); return $tok;
 }
 function nl_delete(int $id): void { $I = nl_issue($id); if (!$I) return; if ($I['status'] !== 'draft') throw new RuntimeException(t('nl.locked')); foreach (all('SELECT file FROM nl_images WHERE issue_id = ?', [$id]) as $f) @unlink(nl_dir() . '/' . basename((string)$f['file'])); q('DELETE FROM nl_images WHERE issue_id = ?', [$id]); q('DELETE FROM nl_issues WHERE id = ?', [$id]); }
-function nl_copy(int $id): int { $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); $u = current_user(); q('INSERT INTO nl_issues (title, subject, preheader, lang, blocks, audience, created_by, created_name) VALUES (?,?,?,?,?,?,?,?)', [mb_substr($I['title'] . ' (copy)', 0, 200), $I['subject'], $I['preheader'], $I['lang'], json_encode($I['blocks'], JSON_UNESCAPED_UNICODE), json_encode($I['audience'], JSON_UNESCAPED_UNICODE), (int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? '')]); $nid = (int) db()->lastInsertId(); if (kym_has()) q('UPDATE nl_issues SET site = ? WHERE id = ?', [nl_site_of($I), $nid]); if (nl_dept($I) === 'hr' && nl_dept_has()) q("UPDATE nl_issues SET dept = 'hr' WHERE id = ?", [$nid]); return $nid; }   // R97-050: a copy stays with its website
+function nl_copy(int $id): int { $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); $u = current_user(); q('INSERT INTO nl_issues (title, subject, preheader, lang, blocks, audience, created_by, created_name) VALUES (?,?,?,?,?,?,?,?)', [mb_substr($I['title'] . ' (copy)', 0, 200), $I['subject'], $I['preheader'], $I['lang'], json_encode($I['blocks'], JSON_UNESCAPED_UNICODE), json_encode($I['audience'], JSON_UNESCAPED_UNICODE), (int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? '')]); $nid = (int) db()->lastInsertId(); if (kym_has()) q('UPDATE nl_issues SET site = ? WHERE id = ?', [nl_site_of($I), $nid]); if (nl_dept($I) === 'hr' && nl_dept_has()) q("UPDATE nl_issues SET dept = 'hr' WHERE id = ?", [$nid]); if (nl_tr_has() && !empty($I['tr'])) q('UPDATE nl_issues SET tr = ? WHERE id = ?', [json_encode($I['tr'], JSON_UNESCAPED_UNICODE), $nid]); return $nid; }   // R97-050: a copy stays with its website
 
 /* ---------------------------------------------------------------- audience */
 /** The recipients an audience resolves to: email => [email, name, contact_id, company_id, company, grp]. Opt-outs removed, one row per address. */
@@ -202,17 +226,21 @@ function nl_web_toggle(int $id): bool {
 }
 /** What the website may read through web_feed.php?r=news (site key): the issues published on the website — the list, or one issue with its blocks.
  *  Only the content already sent to the readers: subject, preview line, date, blocks, addresses of the pictures. Nothing about recipients or results. */
-function nl_pub_news(string $site, string $slug = ''): array {
+function nl_pub_news(string $site, string $slug = '', string $lang = ''): array {
     if (!nl_web_has() || kym_site($site) !== 'golden') return $slug === '' ? ['items' => []] : throw new RuntimeException('not found', 404);
     $w = "web_publish = 1 AND web_at IS NOT NULL AND web_slug IS NOT NULL AND status IN ('sending','sent')" . (nl_dept_has() ? " AND dept = 'sales'" : '') . (kym_has() ? " AND site = 'golden'" : '');
     $base = nl_base(); $img = fn($t): string => is_string($t) && preg_match('/^[A-Za-z0-9]{24}$/', $t) ? $base . '/nl.php?i=' . $t : '';
-    $head = function (array $r) use ($img): array { $first = ''; foreach ((json_decode((string)$r['blocks'], true) ?: []) as $b) if (is_array($b) && ($first = $img($b['img'] ?? '')) !== '') break;
-        return ['slug' => (string)$r['web_slug'], 'title' => (string)$r['subject'], 'summary' => (string)($r['preheader'] ?? ''), 'date' => substr((string)$r['web_at'], 0, 10), 'lang' => (string)$r['lang'], 'img' => $first]; };
-    $cols = 'web_slug, subject, preheader, web_at, lang, blocks';
+    /* R97-203: an article is offered in the language asked for when that version is ready; "langs" names the languages it can be read in */
+    $lang = isset(NL_LANGS[$lang]) ? $lang : ''; $trc = nl_tr_has();
+    $ver = function (array $r) use ($lang, $trc): array { $r['blocks'] = json_decode((string)$r['blocks'], true) ?: []; $tr = $trc ? json_decode((string)($r['tr'] ?? ''), true) : null; $r['tr'] = is_array($tr) ? array_intersect_key($tr, NL_LANGS) : [];
+        $r['langs'] = array_values(array_unique(array_merge([(string)$r['lang']], nl_tr_ready($r)))); $web = $r['web_slug']; $at = $r['web_at']; if ($lang !== '') $r = nl_in_lang($r, $lang) + ['langs' => $r['langs']]; $r['web_slug'] = $web; $r['web_at'] = $at; return $r; };
+    $head = function (array $r) use ($img, $ver): array { $r = $ver($r); $first = ''; foreach ($r['blocks'] as $b) if (is_array($b) && ($first = $img($b['img'] ?? '')) !== '') break;
+        return ['slug' => (string)$r['web_slug'], 'title' => (string)$r['subject'], 'summary' => (string)($r['preheader'] ?? ''), 'date' => substr((string)$r['web_at'], 0, 10), 'lang' => (string)$r['lang'], 'langs' => $r['langs'], 'img' => $first]; };
+    $cols = 'web_slug, subject, preheader, web_at, lang, blocks' . ($trc ? ', tr' : '');
     if ($slug !== '') {
         $r = preg_match('/^[a-z0-9][a-z0-9-]{0,79}$/', $slug) ? one("SELECT $cols FROM nl_issues WHERE $w AND web_slug = ?", [$slug]) : null; if (!$r) throw new RuntimeException('not found', 404);
         $o = $head($r); $o['blocks'] = [];
-        foreach ((json_decode((string)$r['blocks'], true) ?: []) as $b) { if (!is_array($b) || !in_array($b['t'] ?? '', NL_BLOCKS, true)) continue; $x = ['t' => (string)$b['t']];
+        foreach ($ver($r)['blocks'] as $b) { if (!is_array($b) || !in_array($b['t'] ?? '', NL_BLOCKS, true)) continue; $x = ['t' => (string)$b['t']];
             foreach (['text', 'title', 'label'] as $k) if (isset($b[$k]) && is_string($b[$k]) && $b[$k] !== '') $x[$k] = $b[$k];
             if (!empty($b['url']) && is_string($b['url']) && nl_url_ok($b['url']) !== '') $x['url'] = $b['url']; if (($u = $img($b['img'] ?? '')) !== '') $x['img'] = $u; $o['blocks'][] = $x; }
         return ['item' => $o];
@@ -224,7 +252,7 @@ function nl_pub_news(string $site, string $slug = ''): array {
 const NL_IMPORT_MAX_MD = 200000;   // bytes of the block sheet
 const NL_IMPORT_MAX_PICS = 20;
 /** A block sheet (.md, UTF-8) → head and blocks of an issue. Nothing is stored here.
- *  Head between two lines of ---: title, subject, preheader, lang (en / el / it), and for the website web (yes / no) and slug (R97-176).
+ *  Head between two lines of ---: title, subject, preheader, lang (en / el / it / ru / uk / de / nl — the language the sheet is written in; the other languages are added in the portal), and for the website web (yes / no) and slug (R97-176).
  *  Body: # heading · text paragraphs (blank line between them, **bold**, lines starting with - as a list) · ![description](picture.jpg) ·
  *  a line that is only [label](https://…) = button · --- = divider · lines starting with > = one highlight (### title, text, picture, button).
  *  A picture is named by its file name; the folder part of the path is ignored. Returns head, blocks (a picture block carries 'file'), files. */
@@ -287,7 +315,7 @@ function nl_import_from_post(string $dept, string $site): array {
     $miss = array_values(array_diff($P['files'], array_keys($have))); if ($miss) throw new RuntimeException(t('nl.imp_missing', ['f' => implode(', ', array_map($show, array_slice($miss, 0, 10)))]));
     foreach ($P['files'] as $k) { [$tmp, $size] = $have[$k]; $info = @getimagesize($tmp); if ($size <= 0 || $size > 2 * 1024 * 1024 || !in_array($info[2] ?? 0, [IMAGETYPE_JPEG, IMAGETYPE_PNG, IMAGETYPE_GIF], true)) throw new RuntimeException(t('nl.imp_pic_bad', ['f' => $show($k)])); }
     $subject = mb_substr(trim((string) preg_replace('/[\r\n]+/', ' ', $H['subject'])), 0, 200); $title = mb_substr($H['title'] !== '' ? $H['title'] : ($subject !== '' ? $subject : (string) preg_replace('/\.[A-Za-z]+$/', '', basename((string)$f['name']))), 0, 200);
-    $lang = in_array($H['lang'], ['en', 'el', 'it'], true) ? $H['lang'] : 'en';
+    $lang = nl_lang_ok(['gr' => 'el', 'ua' => 'uk'][strtolower($H['lang'])] ?? strtolower($H['lang']));
     $id = nl_create($title, $site, $dept);
     try {
         $tok = []; foreach ($P['files'] as $k) $tok[$k] = nl_image_store($id, $have[$k][0], $have[$k][1]);
@@ -318,7 +346,7 @@ function nl_text_html(string $s, callable $link): string {
 }
 /** The whole message as HTML. $link(url) returns the address to print for a link (tracked or plain); %%NAME%%, %%OPEN%%, %%UNSUB%% stay as markers. */
 function nl_render(array $I, callable $link, bool $preview = false): string {
-    $base = nl_base(); $img = fn(string $tok) => $base . '/nl.php?i=' . $tok; $T = fn(string $k, array $p = []) => function_exists('t_in') ? t_in($k, (string)$I['lang'], $p) : t($k, $p);
+    $base = nl_base(); $img = fn(string $tok) => $base . '/nl.php?i=' . $tok; $T = fn(string $k, array $p = []) => nl_t($k, (string)$I['lang'], $p);
     $BR = nl_brand(nl_site_of($I)); $navy = $BR['navy']; $gold = $BR['gold']; $body = '';
     $btn = fn(string $label, string $url) => $url === '' || $label === '' ? '' : '<table role="presentation" cellpadding="0" cellspacing="0" align="center" style="margin:6px auto 18px;"><tr><td style="background:' . $gold . ';border-radius:6px;"><a href="' . e($link($url)) . '" style="display:inline-block;padding:11px 26px;font:bold 15px Aptos,Calibri,Arial,sans-serif;color:' . $navy . ';text-decoration:none;">' . e($label) . '</a></td></tr></table>';
     foreach ($I['blocks'] as $b) {
@@ -343,7 +371,7 @@ function nl_render(array $I, callable $link, bool $preview = false): string {
          . '</table></td></tr></table>' . ($preview ? '' : '<img src="%%OPEN%%" width="1" height="1" alt="" style="display:block;border:0;width:1px;height:1px;">') . '</body></html>';
 }
 function nl_preview_html(array $I): string { return strtr(nl_render($I, fn($u) => $u, true), ['%%UNSUB%%' => '#']); }
-function nl_greeting(array $I, string $name): string { $n = trim($name); $k = $n !== '' ? 'nl.hello_name' : 'nl.hello'; return function_exists('t_in') ? t_in($k, (string)$I['lang'], ['n' => $n]) : t($k, ['n' => $n]); }
+function nl_greeting(array $I, string $name): string { $n = trim($name); return nl_t($n !== '' ? 'nl.hello_name' : 'nl.hello', (string)$I['lang'], ['n' => $n]); }
 
 /* ---------------------------------------------------------------- sending */
 /** One message through Microsoft 365, from the mailbox of the site. Returns [ok, short error].
@@ -375,11 +403,11 @@ function nl_graph_send_mime(string $box, string $fromName, string $to, string $s
     return [$code === 202, mb_substr(trim($code . ' ' . (string)($j['error']['code'] ?? '') . ' ' . (string)($j['error']['message'] ?? '')), 0, 180)];
 }
 /** One test message of a draft to the signed-in person — links are not tracked, nothing is recorded. */
-function nl_send_test(int $id): string {
-    $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); $site = nl_site_of($I); if (!nl_ready($site)) throw new RuntimeException(t($site === 'kyma' ? 'nl.no_mailer_kyma' : 'nl.no_mailer'));
+function nl_send_test(int $id, ?string $lang = null): string {
+    $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); if ($lang !== null) $I = nl_in_lang($I, $lang, true); $site = nl_site_of($I); if (!nl_ready($site)) throw new RuntimeException(t($site === 'kyma' ? 'nl.no_mailer_kyma' : 'nl.no_mailer'));
     $u = current_user(); $to = (string)($u['email'] ?? ''); if (!filter_var($to, FILTER_VALIDATE_EMAIL)) throw new RuntimeException(t('nl.no_mailer'));
     $html = strtr(nl_render($I, fn($x) => $x), ['%%NAME%%' => e(nl_greeting($I, (string)($u['full_name'] ?? ''))), '%%OPEN%%' => nl_base() . '/nl.php?o=test', '%%UNSUB%%' => KYM_HOME[$site]]);
-    [$ok, $err] = nl_graph_send($to, '[TEST] ' . $I['subject'], $html, $site, nl_list_headers($site) ? nl_base() . '/nl.php?u=test' : null);   // the test uses the same way of sending as the real issue if (!$ok) throw new RuntimeException(t('nl.send_fail', ['e' => $err])); return $to;
+    [$ok, $err] = nl_graph_send($to, '[TEST' . ($lang !== null ? ' ' . strtoupper((string)$I['lang']) : '') . '] ' . $I['subject'], $html, $site, nl_list_headers($site) ? nl_base() . '/nl.php?u=test' : null);   // the test uses the same way of sending as the real issue if (!$ok) throw new RuntimeException(t('nl.send_fail', ['e' => $err])); return $to;
 }
 /** Queue a draft: resolve the audience, register the links, create one row per recipient. From here the issue is locked. */
 function nl_queue(int $id): int {
@@ -390,9 +418,12 @@ function nl_queue(int $id): int {
     db()->beginTransaction();
     try {
         q('DELETE FROM nl_links WHERE issue_id = ?', [$id]); $n = 0; $seen = [];
-        nl_render($I, function (string $url) use (&$n, &$seen, $id) { if (!isset($seen[$url])) { $seen[$url] = ++$n; q('INSERT INTO nl_links (issue_id, n, url) VALUES (?,?,?)', [$id, $n, $url]); } return $url; });
+        $reg = function (string $url) use (&$n, &$seen, $id) { if (!isset($seen[$url])) { $seen[$url] = ++$n; q('INSERT INTO nl_links (issue_id, n, url) VALUES (?,?,?)', [$id, $n, $url]); } return $url; };
+        nl_render($I, $reg); foreach (nl_tr_ready($I) as $tl) nl_render(nl_in_lang($I, $tl), $reg);   // R97-203: a link written only in a language version is counted too
+        $rl = nl_tr_has() ? nl_rcpt_langs($rc, $site) : [];
         $ins = db()->prepare('INSERT IGNORE INTO nl_sends (issue_id, email, name, contact_id, company_id, company, grp, token) VALUES (?,?,?,?,?,?,?,?)');
         foreach ($rc as $r) $ins->execute([$id, $r['email'], $r['name'] ?: null, $r['contact_id'], $r['company_id'], $r['company'] ?: null, $r['grp'], nl_token()]);
+        if ($rl) { $up = db()->prepare('UPDATE nl_sends SET lang = ? WHERE issue_id = ? AND email = ?'); foreach ($rl as $em => $l) $up->execute([$l, $id, $em]); }
         q("UPDATE nl_issues SET status = 'sending', n_total = ?, queued_by = ?, queued_name = ?, queued_at = NOW() WHERE id = ?", [count($rc), (int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? ''), $id]);
         if (nl_web_has()) q('UPDATE nl_issues SET web_at = COALESCE(web_at, NOW()) WHERE id = ? AND web_publish = 1 AND web_slug IS NOT NULL', [$id]);   // R97-176: the article appears on the website when sending starts
         db()->commit();
@@ -407,12 +438,14 @@ function nl_send_batch(?int $max = null): int {
     if (!$I) return 0; $id = (int)$I['id']; $site = nl_site_of($I);
     $today = (int) scalar("SELECT COUNT(*) FROM nl_sends WHERE status = 'sent' AND sent_at >= CURDATE()"); $room = min($max ?? nl_batch(), nl_daily() - $today); if ($room <= 0) return 0;
     $links = []; foreach (all('SELECT n, url FROM nl_links WHERE issue_id = ?', [$id]) as $l) $links[(string)$l['url']] = (int)$l['n'];
-    $tpl = nl_render($I, fn(string $u) => isset($links[$u]) ? '%%C' . $links[$u] . '%%' : $u); $base = nl_base(); $sent = 0;
+    $lk = fn(string $u) => isset($links[$u]) ? '%%C' . $links[$u] . '%%' : $u; $V = [(string)$I['lang'] => [$I, nl_render($I, $lk)]]; $base = nl_base(); $sent = 0;
+    $ver = function (?string $l) use (&$V, $I, $lk): array { $l = (string)$l; if ($l === '' || !isset(NL_LANGS[$l])) $l = 'en'; if (!isset($V[$l])) { $x = nl_in_lang($I, $l); $V[$l] = $x['lang'] === $I['lang'] ? $V[(string)$I['lang']] : [$x, nl_render($x, $lk)]; } return $V[$l]; };   // R97-203: the reader's language when that version is ready, else the issue as written
     foreach (all("SELECT * FROM nl_sends WHERE issue_id = ? AND status = 'queued' ORDER BY id LIMIT " . (int)$room, [$id]) as $s) {
         if (!q("UPDATE nl_sends SET status = 'sending' WHERE id = ? AND status = 'queued'", [(int)$s['id']])->rowCount()) continue;   // claimed: a second sweep does not send the same row
         $ob = [$s['email']]; if (scalar('SELECT 1 FROM nl_optout WHERE email = ?' . nl_w($site, $ob), $ob)) { q("UPDATE nl_sends SET status = 'skipped', error = 'opt-out' WHERE id = ?", [(int)$s['id']]); continue; }
-        $map = ['%%NAME%%' => e(nl_greeting($I, (string)$s['name'])), '%%OPEN%%' => $base . '/nl.php?o=' . $s['token'], '%%UNSUB%%' => $base . '/nl.php?u=' . $s['token']]; foreach ($links as $n) $map['%%C' . $n . '%%'] = $base . '/nl.php?c=' . $s['token'] . '&amp;l=' . $n;
-        try { [$ok, $err] = nl_graph_send((string)$s['email'], (string)$I['subject'], strtr($tpl, $map), $site, $map['%%UNSUB%%']); } catch (Throwable $e) { $ok = false; $err = mb_substr($e->getMessage(), 0, 180); }
+        [$Iv, $tpl] = $ver($s['lang'] ?? null);
+        $map = ['%%NAME%%' => e(nl_greeting($Iv, (string)$s['name'])), '%%OPEN%%' => $base . '/nl.php?o=' . $s['token'], '%%UNSUB%%' => $base . '/nl.php?u=' . $s['token']]; foreach ($links as $n) $map['%%C' . $n . '%%'] = $base . '/nl.php?c=' . $s['token'] . '&amp;l=' . $n;
+        try { [$ok, $err] = nl_graph_send((string)$s['email'], (string)$Iv['subject'], strtr($tpl, $map), $site, $map['%%UNSUB%%']); } catch (Throwable $e) { $ok = false; $err = mb_substr($e->getMessage(), 0, 180); }
         if ($ok) { q("UPDATE nl_sends SET status = 'sent', sent_at = NOW(), error = NULL WHERE id = ?", [(int)$s['id']]); $sent++; } else { q("UPDATE nl_sends SET status = 'failed', error = ? WHERE id = ?", [$err, (int)$s['id']]); if (str_starts_with($err, '429') || str_starts_with($err, '0 ')) break; }
     }
     if (!scalar("SELECT 1 FROM nl_sends WHERE issue_id = ? AND status IN ('queued','sending') LIMIT 1", [$id])) q("UPDATE nl_issues SET status = 'sent', sent_at = NOW() WHERE id = ?", [$id]);
@@ -427,6 +460,7 @@ function nl_stats(int $id): array {
     $ks = kym_has(); $st = $ks ? db()->quote(kym_site((string) scalar('SELECT site FROM nl_issues WHERE id = ?', [$id]))) : ''; $oj = $ks ? " AND o.site = $st" : '';
     $bounce = (int) scalar("SELECT COUNT(*) FROM nl_sends s JOIN nl_optout o ON o.email = s.email AND o.reason = 'bounce'$oj WHERE s.issue_id = ?", [$id]);
     return ['tot' => array_map('intval', $t) + ['bounce' => $bounce],
+            'langs' => nl_tr_has() ? all("SELECT COALESCE(lang, '') lang, COUNT(*) n, SUM(status = 'sent') sent, SUM(opened_at IS NOT NULL) opened, SUM(clicked_at IS NOT NULL) clicked FROM nl_sends WHERE issue_id = ? GROUP BY COALESCE(lang, '') ORDER BY n DESC", [$id]) : [],
             'groups' => all("SELECT grp, COUNT(*) n, SUM(status = 'sent') sent, SUM(opened_at IS NOT NULL) opened, SUM(clicked_at IS NOT NULL) clicked, SUM(unsub_at IS NOT NULL) unsub FROM nl_sends WHERE issue_id = ? GROUP BY grp ORDER BY n DESC", [$id]),
             'links' => all('SELECT l.n, l.url, COUNT(c.id) clicks, COUNT(DISTINCT c.send_id) people FROM nl_links l LEFT JOIN nl_clicks c ON c.link_id = l.id WHERE l.issue_id = ? GROUP BY l.id ORDER BY clicks DESC, l.n', [$id]),
             'orgs' => all("SELECT COALESCE(company, '—') company, company_id, COUNT(*) n, SUM(opened_at IS NOT NULL) opened, SUM(clicked_at IS NOT NULL) clicked FROM nl_sends WHERE issue_id = ? AND status = 'sent' GROUP BY company, company_id HAVING opened > 0 OR clicked > 0 ORDER BY clicked DESC, opened DESC, company LIMIT 60", [$id]),
@@ -481,7 +515,7 @@ function nl_pub_subscribe(array $b, string $ip, string $site = 'golden'): array 
     if ($site === 'kyma' && (!$ks || !nl_ready('kyma'))) throw new RuntimeException('newsletter not open yet', 503);   // R97-050: no KYMA sign-up until the KYMA mailbox can send the confirmation
     $f = fn(string $k, int $max) => mb_substr(trim(preg_replace('/[\r\n\t]+/', ' ', (string)($b[$k] ?? ''))), 0, $max);
     $email = mb_strtolower($f('email', 190)); if (!filter_var($email, FILTER_VALIDATE_EMAIL)) throw new RuntimeException('bad email', 422);
-    $topics = array_values(array_intersect(NL_TOPICS, array_map('strval', (array)($b['topics'] ?? ['newsletter'])))) ?: ['newsletter']; $lang = in_array($b['lang'] ?? '', $site === 'kyma' ? ['en', 'el', 'it', 'es', 'fr', 'de', 'ar', 'nl'] : ['en', 'el', 'it'], true) ? (string)$b['lang'] : 'en';
+    $topics = array_values(array_intersect(NL_TOPICS, array_map('strval', (array)($b['topics'] ?? ['newsletter'])))) ?: ['newsletter']; $lang = in_array($b['lang'] ?? '', $site === 'kyma' ? ['en', 'el', 'it', 'es', 'fr', 'de', 'ar', 'nl'] : array_keys(NL_LANGS), true) ? (string)$b['lang'] : 'en';
     $kind = in_array($b['kind'] ?? '', ['yard', 'owner', 'customer', 'supplier', 'management', 'other'], true) ? (string)$b['kind'] : null; $role = function_exists('ct_categories') && isset(ct_categories()[(string)($b['role'] ?? '')]) ? (string)$b['role'] : null;
     $cb = [$email]; $cur = one('SELECT * FROM nl_subs WHERE email = ?' . nl_w($site, $cb), $cb);
     if ($cur && $cur['status'] === 'confirmed') { $set = array_unique(array_merge(explode(',', (string)$cur['topics']), $topics)); q('UPDATE nl_subs SET topics = ? WHERE id = ?', [implode(',', array_intersect(NL_TOPICS, $set)), (int)$cur['id']]); return ['status' => 'ok']; }
@@ -577,7 +611,7 @@ function nl_ai_on(): bool { return function_exists('ai_can') && ai_can('newslett
 function nl_ai_draft(int $id, string $brief, bool $news, bool $replace): int {
     $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); nl_editable($I); if (!nl_ai_on()) throw new RuntimeException(t('nl.ai_off'));
     $brief = mb_substr(trim($brief), 0, 3000); if ($brief === '' && !$news) throw new RuntimeException(t('nl.ai_need'));
-    $langs = ['en' => 'British English', 'el' => 'Greek', 'it' => 'Italian']; $grp = implode(', ', array_map('nl_group_label', (array)($I['audience']['groups'] ?? []))) ?: 'customers, yards, owners and suppliers of the marine industry';
+    $langs = NL_LANG_EN; $grp = implode(', ', array_map('nl_group_label', (array)($I['audience']['groups'] ?? []))) ?: 'customers, yards, owners and suppliers of the marine industry';
     $L = ['Newsletter title: ' . $I['title'], 'Readers: ' . $grp, 'Language of the newsletter: ' . ($langs[$I['lang']] ?? 'English')]; if ($brief !== '') $L[] = "Brief from the author (the facts to use):\n" . $brief;
     if ($news && function_exists('mi_has') && mi_has()) { try { $rows = all('SELECT title, source, url, grp FROM mi_items WHERE hidden = 0 AND published_at >= (UTC_TIMESTAMP() - INTERVAL 21 DAY) ORDER BY published_at DESC LIMIT 25'); if ($rows) { $L[] = 'Recent industry headlines (public news; pick at most three that matter to the readers, name the source, link to the address given):'; foreach ($rows as $r) $L[] = '- [' . $r['grp'] . '] ' . $r['title'] . ' — ' . $r['source'] . ' — ' . $r['url']; } } catch (Throwable $e) {} }
     $prompt = "Draft a company newsletter of Golden A/S (marine electrical, automation and navigation systems integrator, Piraeus) for the readers named below. Tone: professional, factual, warm, no superlatives, no invented facts, figures, names, dates or customers — use only the brief and the headlines. "
@@ -590,6 +624,82 @@ function nl_ai_draft(int $id, string $brief, bool $news, bool $replace): int {
     $blocks = array_slice($replace ? $new : array_merge($I['blocks'], $new), 0, NL_MAX_BLOCKS); $sub = is_string($j['subject'] ?? null) ? mb_substr(trim(preg_replace('/[\r\n]+/', ' ', $j['subject'])), 0, 200) : ''; $pre = is_string($j['preheader'] ?? null) ? mb_substr(trim($j['preheader']), 0, 200) : '';
     q('UPDATE nl_issues SET blocks = ?, subject = IF(? <> \'\' AND ?, ?, subject), preheader = IF(? <> \'\' AND ?, ?, preheader) WHERE id = ?', [json_encode($blocks, JSON_UNESCAPED_UNICODE), $sub, (int)$replace, $sub, $pre, (int)$replace, $pre, $id]);
     return count($new);
+}
+
+/* ---------------------------------------------------------------- language versions (R97-203) */
+function nl_bkey(): string { return substr(strtolower(nl_token()), 0, 6); }
+/** Every block carries a key; issues written before R97-203, imported or drafted by the assistant get theirs here. */
+function nl_keys_ensure(int $id): array {
+    $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); $ch = false; $seen = [];
+    foreach ($I['blocks'] as &$b) { if (!preg_match('/^[a-z0-9]{6}$/', (string)($b['k'] ?? '')) || isset($seen[$b['k']])) { $b['k'] = nl_bkey(); $ch = true; } $seen[$b['k']] = 1; } unset($b);
+    if ($ch) q('UPDATE nl_issues SET blocks = ? WHERE id = ?', [json_encode($I['blocks'], JSON_UNESCAPED_UNICODE), $id]);
+    return $I;
+}
+/** What of a block is language: its text, title and label (pictures, links and the order belong to the issue). */
+function nl_block_words(array $b): array { $o = []; foreach (['title', 'text', 'label'] as $f) if (isset($b[$f]) && is_string($b[$f]) && trim($b[$f]) !== '') $o[$f] = $b[$f]; return $o; }
+function nl_block_sig(array $b): string { return substr(md5(json_encode(nl_block_words($b))), 0, 10); }
+/** The versions that go out: marked ready and holding at least a subject or one translated block. */
+function nl_tr_ready(array $I): array { $o = []; foreach ((array)($I['tr'] ?? []) as $l => $v) if ($l !== $I['lang'] && isset(NL_LANGS[$l]) && !empty($v['ok']) && (trim((string)($v['subject'] ?? '')) !== '' || !empty($v['b']))) $o[] = $l; return $o; }
+/** State of a version for the list on the issue: words to translate, translated, and those whose original changed since. */
+function nl_tr_state(array $I, string $l): array {
+    $v = (array)($I['tr'][$l] ?? []); $n = 0; $done = 0; $stale = 0;
+    foreach ($I['blocks'] as $b) { if (!nl_block_words($b)) continue; $n++; $x = (array)($v['b'][(string)($b['k'] ?? '')] ?? []); if (!nl_block_words($x)) continue; $done++; if (($x['h'] ?? '') !== nl_block_sig($b)) $stale++; }
+    return ['exists' => (bool)$v, 'ok' => !empty($v['ok']), 'n' => $n, 'done' => $done, 'stale' => $stale, 'subject' => trim((string)($v['subject'] ?? '')) !== ''];
+}
+/** The issue as it reads in a language: the version when it is ready ($force: also a draft, for the preview and the test), else the issue as written. */
+function nl_in_lang(array $I, ?string $lang, bool $force = false): array {
+    $lang = (string)$lang; if ($lang === '' || $lang === $I['lang'] || !isset(NL_LANGS[$lang])) return $I;
+    $v = (array)($I['tr'][$lang] ?? []); if (!$v || (!$force && !in_array($lang, nl_tr_ready($I), true))) return $I;
+    $o = $I; $o['lang'] = $lang; if (trim((string)($v['subject'] ?? '')) !== '') $o['subject'] = (string)$v['subject']; if (trim((string)($v['preheader'] ?? '')) !== '') $o['preheader'] = (string)$v['preheader'];
+    foreach ($o['blocks'] as &$b) { $x = (array)($v['b'][(string)($b['k'] ?? '')] ?? []); foreach (['text', 'title', 'label'] as $f) if (isset($x[$f]) && is_string($x[$f]) && trim($x[$f]) !== '' && isset($b[$f])) $b[$f] = $x[$f]; } unset($b);
+    return $o;
+}
+function nl_tr_store(int $id, array $tr): void { $tr = array_intersect_key($tr, NL_LANGS); q('UPDATE nl_issues SET tr = ? WHERE id = ?', [$tr ? json_encode($tr, JSON_UNESCAPED_UNICODE) : null, $id]); }
+function nl_tr_lang_post(array $I): string { $l = (string)($_POST['tl'] ?? ($_GET['tl'] ?? '')); if (!isset(NL_LANGS[$l]) || $l === $I['lang']) throw new RuntimeException(t('nl.tr_bad')); return $l; }
+/** Save the translator's screen: subject, preview line, the words of every block, and "ready to send". */
+function nl_tr_save_from_post(int $id): string {
+    if (!nl_tr_has()) throw new RuntimeException(t('nl.tr_need')); $I = nl_keys_ensure($id); nl_editable($I); $l = nl_tr_lang_post($I);
+    $s = fn(string $k, int $max) => mb_substr(trim(str_replace("\r", '', (string)($_POST[$k] ?? ''))), 0, $max); $in = (array)($_POST['w'] ?? []); $B = [];
+    foreach ($I['blocks'] as $b) { $k = (string)$b['k']; $src = nl_block_words($b); if (!$src || !is_array($in[$k] ?? null)) continue; $x = [];
+        foreach (['text' => 6000, 'title' => 200, 'label' => 80] as $f => $max) if (isset($src[$f]) && isset($in[$k][$f])) { $val = mb_substr(trim(str_replace("\r", '', (string)$in[$k][$f])), 0, $max); if ($val !== '') $x[$f] = $val; }
+        if ($x) { $prev = (array)($I['tr'][$l]['b'][$k] ?? []); $ph = (string)($prev['h'] ?? ''); unset($prev['h']);   // the original it was made from: renewed when the translator changed the words or ticked «still right»
+            $x['h'] = $ph === '' || !empty($in[$k]['seen']) || $prev != $x ? nl_block_sig($b) : $ph; $B[$k] = $x; } }
+    $tr = $I['tr']; $tr[$l] = ['subject' => preg_replace('/[\r\n]+/', ' ', $s('subject', 200)), 'preheader' => $s('preheader', 200), 'ok' => empty($_POST['ok']) ? 0 : 1, 'b' => $B];
+    nl_tr_store($id, $tr); return $l;
+}
+function nl_tr_remove(int $id): string { $I = nl_issue($id); if (!$I) throw new RuntimeException(t('err.notfound')); nl_editable($I); $l = nl_tr_lang_post($I); $tr = $I['tr']; unset($tr[$l]); nl_tr_store($id, $tr); return $l; }
+/** A first translation by the assistant, for a person to read before it is marked ready. Only the words of the newsletter leave the portal — no reader, no address. */
+function nl_tr_ai(int $id): array {
+    if (!nl_tr_has()) throw new RuntimeException(t('nl.tr_need')); $I = nl_keys_ensure($id); nl_editable($I); if (!nl_ai_on()) throw new RuntimeException(t('nl.ai_off')); $l = nl_tr_lang_post($I);
+    $src = ['subject' => (string)$I['subject'], 'preheader' => (string)($I['preheader'] ?? ''), 'blocks' => []];
+    foreach ($I['blocks'] as $b) if ($w = nl_block_words($b)) $src['blocks'][] = ['k' => (string)$b['k']] + $w;
+    if (!$src['blocks'] && trim($src['subject']) === '') throw new RuntimeException(t('nl.empty'));
+    $prompt = 'Translate this company newsletter of Golden A/S (marine electrical, automation and navigation systems integrator) from ' . (NL_LANG_EN[$I['lang']] ?? 'English') . ' into ' . NL_LANG_EN[$l] . ', for business readers of the marine industry. '
+            . 'Professional, natural wording of a native speaker; the formal form of address. Keep unchanged: company, vessel, product and person names, numbers, dates, units, e-mail addresses, every https:// address, and the ** marks around bold words. Keep blank lines between paragraphs. Add nothing and leave nothing out. '
+            . 'The subject stays under 70 characters and the preheader under 110 where the language allows. Answer with JSON only, in exactly the shape of the input, with the same "k" values: {"subject":"…","preheader":"…","blocks":[{"k":"…","text":"…","title":"…","label":"…"}]} — give for each block only the fields it has in the input.' . "\n\n" . json_encode($src, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $res = ai_run('write', ['title' => t('nl.title'), 'headline' => (string)$I['title'] . ' → ' . strtoupper($l)], $prompt, null, 'newsletter'); if (empty($res['ok'])) throw new RuntimeException((string)($res['error'] ?? 'AI'));
+    $j = ai_json((string)$res['text']); if (!$j || !is_array($j['blocks'] ?? null)) throw new RuntimeException(t('ai.failed'));
+    $by = []; foreach ($j['blocks'] as $x) if (is_array($x) && isset($x['k']) && is_string($x['k'])) $by[$x['k']] = $x;
+    $B = []; foreach ($I['blocks'] as $b) { $k = (string)$b['k']; $w = nl_block_words($b); if (!$w || !isset($by[$k])) continue; $x = [];
+        foreach (['text' => 6000, 'title' => 200, 'label' => 80] as $f => $max) if (isset($w[$f]) && isset($by[$k][$f]) && is_string($by[$k][$f]) && trim($by[$k][$f]) !== '') $x[$f] = mb_substr(trim(str_replace("\r", '', $by[$k][$f])), 0, $max);
+        if ($x) { $x['h'] = nl_block_sig($b); $B[$k] = $x; } }
+    if (!$B) throw new RuntimeException(t('ai.failed'));
+    $one = fn($v, int $max): string => is_string($v) ? mb_substr(trim((string) preg_replace('/[\r\n]+/', ' ', $v)), 0, $max) : '';
+    $tr = $I['tr']; $tr[$l] = ['subject' => $one($j['subject'] ?? '', 200), 'preheader' => $one($j['preheader'] ?? '', 200), 'ok' => 0, 'b' => $B, 'ai' => 1];   // never ready by itself: a person reads it first
+    nl_tr_store($id, $tr); return [$l, count($B)];
+}
+/** The language of every reader: the contact's own, else the one chosen at the website sign-up, else English. [email => lang] */
+function nl_rcpt_langs(array $rc, string $site): array {
+    $o = []; $ids = []; foreach ($rc as $r) { $o[$r['email']] = 'en'; if (!empty($r['contact_id'])) $ids[(int)$r['contact_id']] = $r['email']; }
+    try { $sb = []; foreach (all("SELECT LOWER(email) e, lang FROM nl_subs WHERE status = 'confirmed' AND lang IS NOT NULL AND lang <> ''" . nl_w($site, $sb), $sb) as $x) if (isset($o[$x['e']]) && isset(NL_LANGS[(string)$x['lang']])) $o[$x['e']] = (string)$x['lang']; } catch (Throwable $e) {}
+    try { foreach (array_chunk(array_keys($ids), 500) as $ch) foreach (all('SELECT id, nl_lang FROM contacts WHERE nl_lang IS NOT NULL AND nl_lang <> \'\' AND id IN (' . implode(',', array_map('intval', $ch)) . ')') as $x) if (isset(NL_LANGS[(string)$x['nl_lang']])) $o[$ids[(int)$x['id']]] = (string)$x['nl_lang']; } catch (Throwable $e) {}
+    return $o;
+}
+/** How many readers of the audience would get each language as things stand now. [lang => n] */
+function nl_lang_counts(array $I, array $rc): array {
+    if (!nl_tr_has()) return []; $ready = array_flip(nl_tr_ready($I)); $c = [];
+    foreach (nl_rcpt_langs($rc, nl_site_of($I)) as $l) { $l = isset($ready[$l]) ? $l : (string)$I['lang']; $c[$l] = ($c[$l] ?? 0) + 1; }
+    arsort($c); return $c;
 }
 
 /* ---------------------------------------------------------------- actions */
@@ -617,6 +727,11 @@ function nl_handle_action(string $action): bool {
         case 'nl_delete': nl_delete($id); flash('good', t('nl.deleted')); redirect(nl_dept($I0) === 'hr' ? 'hr_newsletters' : 'newsletters', ['_r' => uniqid()]);
         case 'nl_ai': $sv(); $n = nl_ai_draft($id, (string)($_POST['brief'] ?? ''), !empty($_POST['news']), !empty($_POST['replace'])); flash('good', t('nl.ai_done', ['n' => $n])); $back('#blocks');
         case 'nl_test': $sv(); $to = nl_send_test($id); flash('good', t('nl.test_sent', ['e' => $to])); $back();
+        /* R97-203: language versions */
+        case 'nl_tr_save': $l = nl_tr_save_from_post($id); if (nl_appr_recheck($id)) flash('info', t('nl.ap_reset')); flash('good', t('nl.saved')); redirect('newsletter', ['id' => $id, 'tl' => $l, '_r' => uniqid()]);
+        case 'nl_tr_test': $l = nl_tr_save_from_post($id); $to = nl_send_test($id, $l); flash('good', t('nl.test_sent', ['e' => $to])); redirect('newsletter', ['id' => $id, 'tl' => $l, '_r' => uniqid()]);
+        case 'nl_tr_ai': if (empty($_POST['w']) && !empty($_POST['title'])) $sv(); [$l, $n] = nl_tr_ai($id); if (nl_appr_recheck($id)) flash('info', t('nl.ap_reset')); flash('good', t('nl.tr_ai_done', ['n' => $n, 'l' => NL_LANGS[$l]])); redirect('newsletter', ['id' => $id, 'tl' => $l, '_r' => uniqid()]);
+        case 'nl_tr_remove': $l = nl_tr_remove($id); if (nl_appr_recheck($id)) flash('info', t('nl.ap_reset')); flash('good', t('nl.tr_removed', ['l' => NL_LANGS[$l]])); $back('#langs');
         case 'nl_queue': $sv(); $n = nl_queue($id); flash('good', t('nl.queued', ['n' => $n])); $back('#stats');
         case 'nl_batch': if (!nl_can_send()) throw new RuntimeException(t('err.noaccess')); $n = nl_send_batch(min(30, nl_batch() * 2)); flash('good', t('nl.batch_sent', ['n' => $n])); $back('#stats');
         case 'nl_cancel': $n = nl_cancel($id); flash('good', t('nl.cancelled', ['n' => $n])); $back('#stats');

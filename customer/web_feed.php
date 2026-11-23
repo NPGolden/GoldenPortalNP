@@ -32,7 +32,7 @@ if ($site === '') { usleep(300000); error_log('[web_feed] forbidden from ' . $ip
 $deny = function (string $why) use ($out, $ip, $site): void { usleep(300000); error_log('[web_feed] ' . $site . ': ' . $why . ' from ' . $ip); $out(['error' => 'forbidden'], 403); };
 $hs = strtolower(trim((string) ($_SERVER['HTTP_X_SITE'] ?? ''))); if ($hs !== '' && $hs !== $site) $deny('header names site ' . preg_replace('/[^a-z0-9]/', '', $hs));
 try {
-    if ($m === 'GET' && (string) ($_GET['r'] ?? '') === 'news') { if (!function_exists('nl_pub_news')) $out(['error' => 'not found'], 404); $out(nl_pub_news($site, (string) ($_GET['a'] ?? ''))); }   // R97-176: issues published on the website
+    if ($m === 'GET' && (string) ($_GET['r'] ?? '') === 'news') { if (!function_exists('nl_pub_news')) $out(['error' => 'not found'], 404); $out(nl_pub_news($site, (string) ($_GET['a'] ?? ''), (string) ($_GET['l'] ?? ''))); }   // R97-176: issues published on the website
     if ($m === 'GET') { if ($site !== 'golden') $deny('counts not open to this site'); $c = web_counts(); web_mark_pull($ip); $out($c); }
     if (!web_inbox_has()) $out(['error' => 'inbox disabled'], 503);
     $r = (string) ($_GET['r'] ?? ''); $body = json_decode((string) file_get_contents('php://input'), true); if (!is_array($body)) $out(['error' => 'invalid body'], 400);

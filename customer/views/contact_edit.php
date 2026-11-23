@@ -46,6 +46,7 @@ layout_head($title, 'contacts');
       <div class="grid grid-3">
         <div class="field"><label for="email"><?= tt('au.email') ?></label><input id="email" name="email" type="email" maxlength="190" value="<?= $v('email') ?>"></div>
         <div class="field"><label for="mobile"><?= tt('ct.mobile') ?></label><input id="mobile" name="mobile" maxlength="60" value="<?= $v('mobile') ?>"></div>
+        <?php if (function_exists('nl_tr_has') && nl_tr_has()): ?><div class="field"><label for="nl_lang"><?= tt('ct.nl_lang') ?></label><select id="nl_lang" name="nl_lang" data-nosearch><option value=""><?= tt('ct.nl_lang_none') ?></option><?php foreach (NL_LANGS as $lk => $ln): ?><option value="<?= $lk ?>"<?= (string)($c['nl_lang'] ?? '') === $lk ? ' selected' : '' ?>><?= e($ln) ?></option><?php endforeach; ?></select><p class="hint"><?= tt('ct.nl_lang_hint') ?></p></div><?php endif; ?>
         <div class="field"><label for="phone"><?= tt('ct.phone') ?></label><input id="phone" name="phone" maxlength="60" value="<?= $v('phone') ?>"></div>
       </div>
       <div class="grid grid-3">

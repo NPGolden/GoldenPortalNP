@@ -4139,3 +4139,17 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 
 - `soc_post_update()`: when the form carries `pinned_until` and the user passes `soc_can_post()`, the date (`YYYY-MM-DD`) is stored, anything else stores NULL (unpinned). Without the field the pin is left as it is, so an edit by a writer who may not pin never removes a pin.
 - `views/community.php`: the edit form shows «Pin until» (prefilled) for `$canPost`. No database step, no new language key. The staff handbook is unchanged: employees cannot pin.
+
+## §486 Newsletters in seven languages (GAS-CP-R97-203, v1.228.0)
+
+- Migration `install/migrate_cp_r97_203_nl_languages.sql` (key `r99k`): `nl_issues.tr` (JSON), `nl_sends.lang`, `contacts.nl_lang`. `nl_tr_has()` guards every use.
+- `NL_LANGS` = en, el, it, ru, uk, de, nl. `nl_issues.lang` is the language the issue is written in; `tr` = `{lang: {subject, preheader, ok, ai?, b: {blockKey: {title?, text?, label?, h}}}}`. Each block carries a key `k` (six characters; hidden field in the editor, `nl_keys_ensure()` gives keys to older, imported and assistant-drafted issues). A version holds words only — pictures, links, buttons and order are the issue's.
+- `nl_in_lang($I, $lang, $force)` returns the issue with the words of a version laid over it (empty field = original); without `$force` only a version in `nl_tr_ready()` (ticked `ok`, with a subject or at least one block). `nl_block_sig()` is stored as `h` when a block is translated; a different signature later = "the original changed" (`nl_tr_state()`), cleared by a changed translation or the tick «The translation is still right».
+- Editor: card `#langs` on `?p=newsletter&id=N`; translator screen `?p=newsletter&id=N&tl=<lang>` (original beside translation); preview `&preview=1&tl=`; actions `nl_tr_save`, `nl_tr_test`, `nl_tr_ai`, `nl_tr_remove`. A sent issue and an issue waiting for approval are locked as before; `nl_hash()` includes `tr`, so an approval lapses when a version changes.
+- Assistant: `nl_tr_ai()` sends subject, preview line and the words of the blocks (with their keys) through `ai_run('write', …, 'newsletter')` and reads JSON back; names, numbers, addresses and `**` marks are to be kept; the result is stored with `ok = 0`. No reader, address or audience is in the prompt.
+- Sending: `nl_queue()` registers the links of the issue and of every ready version and writes `nl_sends.lang` from `nl_rcpt_langs()` (contact `nl_lang` → website subscriber `lang` → `en`). `nl_send_batch()` renders one template per language met in the batch; a language without a ready version gets the issue as written. `nl_t()` gives greeting and footer: portal texts for en / el / it, `NL_FIXED` for ru / uk / de / nl.
+- Statistics: `nl_stats()['langs']`. Audience card: `nl_lang_counts()`.
+- Website: `web_feed.php?r=news[&a=slug][&l=lang]` → `nl_pub_news($site, $slug, $lang)`; every item names `langs`. Website R20: `api/news.php` passes `l` (cached per language), `news.js` reads `&l=` or the browser language and shows the language links on an article.
+- Contacts: field «Newsletter language» on `?p=contact_edit`; import column `Language` (code or name; `gr` = el, `ua` = uk). Website sign-up accepts the seven codes.
+- Block sheet: head `lang` accepts the seven codes (the language the sheet is written in). Versions are made in the portal, not by a second sheet.
+- Language keys +36 (13 152 per language); the new newsletter texts are in English, Greek and Italian — Bulgarian and Ukrainian show English, as the rest of the newsletter pages do.

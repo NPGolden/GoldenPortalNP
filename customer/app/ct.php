@@ -428,6 +428,7 @@ function ct_save_from_post(int $id): int {
     if (cc_has()) { $others = array_values(array_unique(array_filter(array_map('intval', (array)($_POST['other_companies'] ?? []))))); q('DELETE FROM contact_companies WHERE contact_id = ?', [$id]); foreach (array_unique(array_merge($coid ? [$coid] : [], $others)) as $oc) if (scalar('SELECT 1 FROM companies WHERE id = ?', [$oc])) q('INSERT IGNORE INTO contact_companies (contact_id, company_id) VALUES (?, ?)', [$id, $oc]); }   // R85-002: a person may belong to several organisations
     if (co_has()) q('UPDATE contacts SET company_id = ?, channels = ?, subscriptions = ? WHERE id = ?', [$coid, $channels ?: null, $subs ?: null, $id]);
     if (ct_origin_has()) q('UPDATE contacts SET needs_review = 0 WHERE id = ? AND needs_review = 1', [$id]);   // R97-040: saved by a person = reviewed
+    if (isset($_POST['nl_lang']) && function_exists('nl_tr_has') && nl_tr_has()) { $nlg = (string)$_POST['nl_lang']; q('UPDATE contacts SET nl_lang = ? WHERE id = ?', [isset(NL_LANGS[$nlg]) ? $nlg : null, $id]); }   // R97-203: the language this person receives newsletters in (empty = English)
     if (function_exists('kym_has') && kym_has() && isset($_POST['brands_form'])) kym_brand_set('contact', $id, (array)($_POST['brands'] ?? []));   // R97-050: the brand marking is set by hand on the form
     // vessels: vessel[] with role[vid] and primary
     if (isset($_POST['vessel'])) {
@@ -522,7 +523,7 @@ function ct_import(string $path, bool $dry): array {
     [$hi, $map] = $hdr;
     $map += xlsx_header_map($rows[$hi], ['company' => ['Company', 'Customer', 'Organisation', 'Organization', 'Owner', 'Firm'], 'category' => ['Category', 'Type', 'Kind', 'Group'], 'position' => ['Position', 'Title', 'Job title', 'Role', 'Function'],
                                          'email' => ['Email', 'E-mail', 'Mail'], 'phone' => ['Phone', 'Telephone', 'Tel', 'Office phone'], 'mobile' => ['Mobile', 'Cell', 'GSM', 'Mobile phone'],
-                                         'vessels' => ['Vessels', 'Vessel', 'Yachts', 'Yacht', 'Ships'], 'birthday' => ['Birthday', 'Date of birth', 'DOB', 'Birth date', 'Born'], 'nameday' => ['Name day', 'Nameday', 'Name-day', 'Saint day'],
+                                         'vessels' => ['Vessels', 'Vessel', 'Yachts', 'Yacht', 'Ships'], 'birthday' => ['Birthday', 'Date of birth', 'DOB', 'Birth date', 'Born'], 'nameday' => ['Name day', 'Nameday', 'Name-day', 'Saint day'], 'nl_lang' => ['Language', 'Lang', 'Newsletter language'],
                                          'interests' => ['Interests', 'Hobbies', 'Likes'], 'notes' => ['Notes', 'Note', 'Remarks', 'Comments', 'Comment'], 'active' => ['Active', 'Status'], 'country' => ['Country', 'Nation', 'Country of work'],
                                          'channels' => ['Channels', 'Communication', 'Communication methods', 'Contact by', 'Preferred channels'], 'subscriptions' => ['Subscriptions', 'Lists', 'Mailing lists', 'Opt-in', 'Campaigns']]);
     $g = fn(array $r, string $k) => ($map[$k] ?? null) !== null ? trim((string)($r[$map[$k]] ?? '')) : '';
@@ -576,6 +577,9 @@ function ct_import(string $path, bool $dry): array {
                 $id = (int) db()->lastInsertId(); $res['contacts_new']++;
                 if (co_has()) q('UPDATE contacts SET company_id = ?, channels = ?, subscriptions = ? WHERE id = ?', [$coid, $channels ?: ($email ? 'email' : null), ($subs ?? ct_default_subs($email)) ?: null, $id]);   // R97-042: all four lists by default
             }
+            /* R97-203: optional column «Language» — the language of the newsletters for this person (code or name; empty leaves it as it is) */
+            $lgRaw = mb_strtolower(trim($g($r, 'nl_lang'))); if ($lgRaw !== '' && function_exists('nl_tr_has') && nl_tr_has()) { $lg = ['gr' => 'el', 'greek' => 'el', 'ελληνικά' => 'el', 'ua' => 'uk', 'ukrainian' => 'uk', 'english' => 'en', 'italian' => 'it', 'italiano' => 'it', 'russian' => 'ru', 'german' => 'de', 'deutsch' => 'de', 'dutch' => 'nl', 'nederlands' => 'nl'][$lgRaw] ?? $lgRaw;
+                if (!isset(NL_LANGS[$lg])) $res['warnings'][] = [$line, 'Language: ' . mb_substr($lgRaw, 0, 20)]; elseif (!($c && !empty($GLOBALS['ct_import_fill_only']) && trim((string)($c['nl_lang'] ?? '')) !== '')) q('UPDATE contacts SET nl_lang = ? WHERE id = ?', [$lg, $id]); }
             // vessels: "MY ALPHA (Captain); MY BETA (Owner's rep)" — existing vessels only
             $vs = $g($r, 'vessels');
             if ($vs !== '') {
