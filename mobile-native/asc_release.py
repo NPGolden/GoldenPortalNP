@@ -3,7 +3,7 @@
 Reads store/<app>/metadata.json and store/<app>/screenshots/*.png; env ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8 (path),
 DEMO_USER / DEMO_PASS (reviewer account, never printed). Idempotent: re-running updates what is there.
 Steps: app → appInfo localisation (name, subtitle, privacy URL) + categories + age rating → version (create or reuse the
-editable one, releaseType MANUAL) → version localisation (description, keywords, promo, URLs, what's new when allowed)
+editable one, releaseType AFTER_APPROVAL since R97-210: Apple releases the version by itself once approved) → version localisation (description, keywords, promo, URLs, what's new when allowed)
 → screenshots (APP_IPHONE_67 set replaced) → latest VALID build attached → review details → [submit].
 Not covered by the public API: App Privacy questionnaire, pricing/availability, content rights — set once in the UI."""
 import hashlib, json, os, sys, time, glob
@@ -84,9 +84,9 @@ if editable:
     ver = editable[0]
     if ver["attributes"]["versionString"] != version_string and ver["attributes"]["appStoreState"] in ("PREPARE_FOR_SUBMISSION", "DEVELOPER_REJECTED", "REJECTED", "METADATA_REJECTED", "INVALID_BINARY"):
         req("PATCH", f"/appStoreVersions/{ver['id']}", json={"data": {"type": "appStoreVersions", "id": ver["id"], "attributes": {"versionString": version_string}}})
-    req("PATCH", f"/appStoreVersions/{ver['id']}", json={"data": {"type": "appStoreVersions", "id": ver["id"], "attributes": {"releaseType": META.get("releaseType", "MANUAL"), "copyright": META.get("copyright", "2026 Golden A/S")}}})
+    req("PATCH", f"/appStoreVersions/{ver['id']}", json={"data": {"type": "appStoreVersions", "id": ver["id"], "attributes": {"releaseType": META.get("releaseType", "AFTER_APPROVAL"), "copyright": META.get("copyright", "2026 Golden A/S")}}})
 else:
-    ver = req("POST", "/appStoreVersions", json={"data": {"type": "appStoreVersions", "attributes": {"platform": "IOS", "versionString": version_string, "releaseType": META.get("releaseType", "MANUAL")}, "relationships": {"app": rel("apps", aid)}}})["data"]
+    ver = req("POST", "/appStoreVersions", json={"data": {"type": "appStoreVersions", "attributes": {"platform": "IOS", "versionString": version_string, "releaseType": META.get("releaseType", "AFTER_APPROVAL")}, "relationships": {"app": rel("apps", aid)}}})["data"]
 vid = ver["id"]; log("version", version_string, ver["attributes"]["appStoreState"], vid)
 
 # ---- version localisation ----
