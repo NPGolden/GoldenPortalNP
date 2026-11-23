@@ -15,12 +15,14 @@
  */
 declare(strict_types=1);
 
-const AI_KINDS = ['fill', 'write', 'translate', 'ask', 'assess', 'match'];   // R93-006: match = pick inventory items for BOM rows
+const AI_KINDS = ['fill', 'write', 'translate', 'translate_to', 'ask', 'assess', 'match'];   // R97-204: translate_to = one text into a named language (newsletter versions)   // R93-006: match = pick inventory items for BOM rows
 const AI_ASSESS_PHOTOS = 6;   // R73-001: photos per weekly-note assessment
 const AI_MODELS = ['claude-haiku-5-5', 'claude-sonnet-5-5', 'claude-opus-5-5'];
 const AI_MAX_TEXT = 24000;      // characters of pasted text
 const AI_MAX_IMAGE = 4 * 1024 * 1024;
-const AI_RATE = [30, 600];      // calls per window (seconds) per user
+const AI_RATE = [90, 600];      // calls per window (seconds) per user (R97-204: 90, was 30 — a newsletter version is translated cell by cell)
+/** Languages a text can be translated into with kind translate_to. */
+const AI_LANG_NAMES = ['en' => 'British English', 'el' => 'Greek', 'it' => 'Italian', 'ru' => 'Russian', 'uk' => 'Ukrainian', 'de' => 'German', 'nl' => 'Dutch', 'bg' => 'Bulgarian'];
 
 function ai_has(): bool { static $h = null; if ($h === null) { try { $h = function_exists('lic_has') && lic_has() && (bool) scalar("SHOW TABLES LIKE 'ai_log'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function ai_setting(string $k, string $def = ''): string { $v = cp_setting($k); return $v === null || $v === '' ? $def : $v; }
@@ -76,6 +78,8 @@ function ai_system(string $kind, array $ctx): string {
         case 'fill':      $s .= "\nTask: from the user's input (text and/or photo) propose values for the form fields. Answer ONLY a JSON object {\"fields\": {\"<name>\": <value>, …}, \"notes\": \"<one line on what could not be filled>\"}. Use field names exactly as listed; for select fields answer with an option value; dates as yyyy-mm-dd; numbers plain; multi-line text allowed. Omit fields you cannot fill."; break;
         case 'match':     $s .= "\nTask: you are the procurement engineer of a marine electrical / automation integrator. The input lists BOM rows (row number, description, maker, maker part number, unit) and, for each row, candidate inventory items (id, code, description, maker, maker part number, unit, on hand). Pick for every row the ONE candidate that is the same article (same maker part number in any formatting, or clearly the same product — equivalent series, voltage, rating, size); never pick an item that is merely similar or a different rating. Answer ONLY a JSON object {\"matches\":[{\"row\":<row number>,\"item\":<candidate id or null>,\"confidence\":<0-100>,\"reason\":\"<max 20 words>\"}]} with one entry per row; item null when nothing fits."; break;
         case 'write':     $s .= "\nTask: write or improve the text of ONE field as asked. Answer ONLY the final text, no preamble, no quotes."; break;
+        case 'translate_to': $to = AI_LANG_NAMES[(string)($ctx['to'] ?? '')] ?? 'British English'; $from = AI_LANG_NAMES[(string)($ctx['from'] ?? '')] ?? '';
+                          $s .= "\nTask: translate the text in <input>" . ($from !== '' ? " from {$from}" : '') . " into {$to}, for business readers of the marine industry. Natural, professional wording of a native speaker; the formal form of address. Keep unchanged: company, vessel, product and person names, numbers, dates, units, e-mail addresses, every web address, and the ** marks around bold words. Keep the line breaks and blank lines as they are. Add nothing, explain nothing, leave nothing out. Answer ONLY the translation — no quotes, no preamble."; break;
         case 'translate': $s .= "\nTask: translate the given text to English, keeping technical terms, numbers, names and layout (line breaks, bullets). Answer ONLY the translation."; break;
         case 'assess':    $s .= "\nTask: you are a senior marine electrical / automation commissioning engineer surveying equipment on board. The photos are attached to a weekly site note of a sub-project; the note text (if any) is in <input>. For EVERY photo, in order, assess what is shown and answer ONLY a JSON object: "
                               . "{\"items\": [{\"photo\": <1-based number>, \"equipment\": \"<what it is, with tag / maker if legible>\", \"condition\": \"good|fair|poor|defective|not assessable\", \"as_found\": \"<2-4 sentences: condition as found, visible defects, workmanship, cleanliness, labelling, cable management, corrosion, overheating marks, IP integrity, missing covers / guards>\", "
@@ -97,7 +101,7 @@ function ai_run(string $kind, array $ctx, string $prompt, ?array $image, string 
     foreach ($images as $i => $im) { if (count($images) > 1) $content[] = ['type' => 'text', 'text' => 'Photo ' . ($i + 1) . ':']; $content[] = ['type' => 'image', 'source' => ['type' => 'base64', 'media_type' => $im['type'], 'data' => base64_encode($im['bytes'])]]; }
     $content[] = ['type' => 'text', 'text' => '<input>' . ($prompt !== '' ? $prompt : '(see photo)') . '</input>'];
     $model = ai_setting('ai_model', AI_MODELS[1]);
-    $body = ['model' => $model, 'max_tokens' => $kind === 'ask' ? 1200 : ($kind === 'assess' ? 4000 : 2500), 'system' => [['type' => 'text', 'text' => ai_system($kind, $ctx), 'cache_control' => ['type' => 'ephemeral']]], 'messages' => [['role' => 'user', 'content' => $content]]];
+    $body = ['model' => $model, 'max_tokens' => $kind === 'ask' ? 1200 : ($kind === 'assess' || $kind === 'translate_to' ? 4000 : 2500), 'system' => [['type' => 'text', 'text' => ai_system($kind, $ctx), 'cache_control' => ['type' => 'ephemeral']]], 'messages' => [['role' => 'user', 'content' => $content]]];
     $t0 = microtime(true); $res = ai_http($body); $ms = (int) round((microtime(true) - $t0) * 1000);
     $in = (int)($res['usage']['input_tokens'] ?? 0) + (int)($res['usage']['cache_creation_input_tokens'] ?? 0) + (int)($res['usage']['cache_read_input_tokens'] ?? 0); $out = (int)($res['usage']['output_tokens'] ?? 0);
     $ok = empty($res['_error']); $text = ''; if ($ok) foreach ((array)($res['content'] ?? []) as $c) if (($c['type'] ?? '') === 'text') $text .= $c['text'];
@@ -166,7 +170,8 @@ function ai_endpoint(): void {
     $fields = []; foreach ((array)($ctx['fields'] ?? []) as $f) { if (!is_array($f) || empty($f['name']) || !preg_match('/^[A-Za-z0-9_\[\]\-]{1,80}$/', (string)$f['name'])) continue; if (count($fields) >= 120) break;
         $opts = []; foreach ((array)($f['options'] ?? []) as $o) { if (count($opts) >= 60) break; if (is_array($o)) $opts[] = ['value' => mb_substr((string)($o['value'] ?? ''), 0, 60), 'label' => mb_substr((string)($o['label'] ?? ''), 0, 80)]; }
         $fields[] = ['name' => (string)$f['name'], 'label' => mb_substr((string)($f['label'] ?? ''), 0, 80), 'type' => preg_replace('/[^a-z\-]/', '', (string)($f['type'] ?? 'text')) ?: 'text', 'options' => $opts, 'value' => mb_substr((string)($f['value'] ?? ''), 0, 1500)]; }
-    $ctx = ['title' => mb_substr((string)($ctx['title'] ?? ''), 0, 120), 'headline' => mb_substr((string)($ctx['headline'] ?? ''), 0, 300), 'fields' => $fields, 'page' => $page];
+    $ctx = ['title' => mb_substr((string)($ctx['title'] ?? ''), 0, 120), 'headline' => mb_substr((string)($ctx['headline'] ?? ''), 0, 300), 'fields' => $fields, 'page' => $page, 'to' => isset(AI_LANG_NAMES[(string)($ctx['to'] ?? '')]) ? (string)$ctx['to'] : '', 'from' => isset(AI_LANG_NAMES[(string)($ctx['from'] ?? '')]) ? (string)$ctx['from'] : ''];   // R97-204: only a language code of the list reaches the prompt
+    if ($kind === 'translate_to' && $ctx['to'] === '') $out(['ok' => false, 'error' => t('err.noaccess')], 400);
     $img = null;
     if (!empty($_FILES['image']['tmp_name']) && is_uploaded_file($_FILES['image']['tmp_name'])) {
         if ((int)$_FILES['image']['size'] > AI_MAX_IMAGE) $out(['ok' => false, 'error' => t('ai.image_big')]);

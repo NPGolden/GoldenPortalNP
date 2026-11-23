@@ -7,21 +7,23 @@ if (!empty($_GET['preview'])) { header("Content-Security-Policy: default-src 'no
 $bl0 = ['h' => t('nl.b_h'), 'p' => t('nl.b_p'), 'img' => t('nl.b_img'), 'btn' => t('nl.b_btn'), 'card' => t('nl.b_card'), 'hr' => t('nl.b_hr')];
 $TRH = function_exists('nl_tr_has') && nl_tr_has(); $tl = (string)($_GET['tl'] ?? '');
 if ($TRH && isset(NL_LANGS[$tl]) && $tl !== $I['lang']) {   // R97-203: one language version — the original beside the translation
-    if ($I['status'] === 'draft') $I = nl_keys_ensure($id); $V = (array)($I['tr'][$tl] ?? []); $dr = $I['status'] === 'draft' && ($I['appr_state'] ?? '') !== 'pending'; $ro2 = $dr ? '' : ' readonly'; $selfT = url('newsletter', ['id' => $id, 'tl' => $tl]); $st = nl_tr_state($I, $tl);
+    if ($I['status'] === 'draft') $I = nl_keys_ensure($id); $V = (array)($I['tr'][$tl] ?? []); $dr = $I['status'] === 'draft' && ($I['appr_state'] ?? '') !== 'pending'; $ro2 = $dr ? '' : ' readonly'; $selfT = url('newsletter', ['id' => $id, 'tl' => $tl]); $st = nl_tr_state($I, $tl); $aiOn = nl_ai_on();
     layout_head($I['title'] . ' · ' . NL_LANGS[$tl], $isHr ? 'hr_newsletters' : 'web_sales'); ?>
 <style nonce="<?= csp_nonce() ?>">.nl-tr{display:grid;grid-template-columns:1fr 1fr;gap:14px;padding:12px 0;border-top:1px solid var(--line)}.nl-tr:first-of-type{border-top:0}.nl-tr .src{white-space:pre-wrap;text-align:justify;font-size:14px;line-height:1.5;background:var(--bg-soft,#F6F7F9);border-radius:8px;padding:10px 12px;margin:0 0 6px}.nl-tr label.h{font-weight:600;font-size:12px;display:block;margin:0 0 4px;opacity:.75}@media (max-width:820px){.nl-tr{grid-template-columns:1fr}}</style>
 <p class="eyebrow"><a href="<?= nl_list_url($I) ?>"><?= tt($isHr ? 'nl.hr_title' : 'nl.title') ?></a> › <a href="<?= url('newsletter', ['id' => $id]) ?>#langs"><?= e($I['title']) ?></a> › <?= e(NL_LANGS[$tl]) ?></p>
 <div class="page-head"><div><h1>🌐 <?= e(t('nl.tr_head', ['l' => NL_LANGS[$tl]])) ?> <?= pill($st['ok'] ? 'green' : ($st['exists'] ? 'gold' : 'mute'), t($st['ok'] ? 'nl.tr_s_ready' : ($st['exists'] ? 'nl.tr_s_draft' : 'nl.tr_s_none'))) ?></h1><p class="lede" style="margin-bottom:0;text-align:justify;"><?= tt('nl.tr_lede') ?></p></div>
   <div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('newsletter', ['id' => $id]) ?>#langs">← <?= tt('nl.tr_back') ?></a><a class="btn btn--ghost btn--sm" href="<?= url('newsletter', ['id' => $id, 'preview' => 1, 'tl' => $tl]) ?>" target="_blank" rel="noopener">👁 <?= tt('nl.preview') ?></a></div></div>
 <?php if (!empty($V['ai']) && !$st['ok']): ?><p class="flash flash--info"><?= tt('nl.tr_ai_note') ?></p><?php endif; ?>
-<form method="post" action="<?= $selfT ?>" data-lock><?= csrf_field() ?><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="tl" value="<?= e($tl) ?>">
+<?php if ($dr && $aiOn): ?><div class="card" id="nl-tr-ai"><div class="btn-row"><button type="button" class="btn btn--sm" id="nl-tr-all">✨ <?= tt('nl.tr_all') ?></button><button type="button" class="btn btn--ghost btn--sm" id="nl-tr-again" data-q="<?= tt('nl.tr_again_q') ?>">↻ <?= tt('nl.tr_again') ?></button><span class="hint" id="nl-tr-prog" aria-live="polite"></span></div><p class="hint" style="margin:8px 0 0;text-align:justify;"><?= tt('nl.tr_ai_how') ?></p></div>
+<?php elseif ($dr): ?><p class="flash flash--info"><?= tt('nl.tr_ai_off') ?></p><?php endif; ?>
+<form method="post" action="<?= $selfT ?>" data-lock id="nl-tr-form"><?= csrf_field() ?><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="tl" value="<?= e($tl) ?>">
 <div class="card">
-  <div class="nl-tr"><div><label class="h"><?= tt('nl.subject') ?> — <?= e(t('nl.tr_orig', ['l' => NL_LANGS[$I['lang']] ?? $I['lang']])) ?></label><p class="src"><?= e((string)$I['subject']) ?></p></div><div><label class="h"><?= tt('nl.subject') ?> — <?= e(NL_LANGS[$tl]) ?></label><input name="subject" maxlength="200" value="<?= e((string)($V['subject'] ?? '')) ?>"<?= $ro2 ?>></div></div>
-  <div class="nl-tr"><div><label class="h"><?= tt('nl.preheader') ?></label><p class="src"><?= e((string)($I['preheader'] ?? '')) ?: '—' ?></p></div><div><label class="h"><?= tt('nl.preheader') ?> — <?= e(NL_LANGS[$tl]) ?></label><input name="preheader" maxlength="200" value="<?= e((string)($V['preheader'] ?? '')) ?>"<?= $ro2 ?>></div></div>
+  <div class="nl-tr"><div><label class="h"><?= tt('nl.subject') ?> — <?= e(t('nl.tr_orig', ['l' => NL_LANGS[$I['lang']] ?? $I['lang']])) ?></label><p class="src" data-src><?= e((string)$I['subject']) ?></p></div><div><label class="h"><?= tt('nl.subject') ?> — <?= e(NL_LANGS[$tl]) ?><?php if ($dr && $aiOn): ?> <button type="button" class="btn btn--ghost btn--sm" data-tr title="<?= tt('nl.tr_one') ?>" style="padding:1px 8px;margin-left:6px;">✨</button> <span class="hint" data-msg></span><?php endif; ?></label><input name="subject" maxlength="200" value="<?= e((string)($V['subject'] ?? '')) ?>"<?= $ro2 ?>></div></div>
+  <div class="nl-tr"><div><label class="h"><?= tt('nl.preheader') ?></label><?php $ph0 = trim((string)($I['preheader'] ?? '')); ?><p class="src"<?= $ph0 !== '' ? ' data-src' : '' ?>><?= $ph0 !== '' ? e($ph0) : '—' ?></p></div><div><label class="h"><?= tt('nl.preheader') ?> — <?= e(NL_LANGS[$tl]) ?><?php if ($ph0 !== ''): ?><?php if ($dr && $aiOn): ?> <button type="button" class="btn btn--ghost btn--sm" data-tr title="<?= tt('nl.tr_one') ?>" style="padding:1px 8px;margin-left:6px;">✨</button> <span class="hint" data-msg></span><?php endif; ?><?php endif; ?></label><input name="preheader" maxlength="200" value="<?= e((string)($V['preheader'] ?? '')) ?>"<?= $ro2 ?>></div></div>
   <?php $fl = ['text' => t('nl.tr_f_text'), 'title' => t('nl.f_title'), 'label' => t('nl.f_label')]; foreach ($I['blocks'] as $b): $w = nl_block_words($b); if (!$w) continue; $k = (string)($b['k'] ?? ''); if ($k === '') continue; $x = (array)($V['b'][$k] ?? []); $stale = nl_block_words($x) && ($x['h'] ?? '') !== nl_block_sig($b); ?>
   <?php foreach ($w as $f => $src): $long = $f === 'text' && ($b['t'] ?? '') !== 'h'; ?>
-  <div class="nl-tr"><div><label class="h"><?= e($bl0[$b['t']] ?? (string)$b['t']) ?> · <?= e($fl[$f]) ?></label><p class="src"><?= e($src) ?></p></div>
-    <div><label class="h"><?= e(NL_LANGS[$tl]) ?><?php if ($stale): ?> <?= pill('bad', t('nl.tr_changed')) ?><?php endif; ?></label>
+  <div class="nl-tr"><div><label class="h"><?= e($bl0[$b['t']] ?? (string)$b['t']) ?> · <?= e($fl[$f]) ?></label><p class="src" data-src><?= e($src) ?></p></div>
+    <div><label class="h"><?= e(NL_LANGS[$tl]) ?><?php if ($stale): ?> <?= pill('bad', t('nl.tr_changed')) ?><?php endif; ?><?php if ($dr && $aiOn): ?> <button type="button" class="btn btn--ghost btn--sm" data-tr title="<?= tt('nl.tr_one') ?>" style="padding:1px 8px;margin-left:6px;">✨</button> <span class="hint" data-msg></span><?php endif; ?></label>
       <?php if ($long): ?><textarea name="w[<?= e($k) ?>][<?= $f ?>]" rows="<?= max(3, min(14, (int) ceil(mb_strlen($src) / 70) + substr_count($src, "\n"))) ?>" maxlength="6000"<?= $ro2 ?>><?= e((string)($x[$f] ?? '')) ?></textarea>
       <?php else: ?><input name="w[<?= e($k) ?>][<?= $f ?>]" maxlength="<?= $f === 'label' ? 80 : 200 ?>" value="<?= e((string)($x[$f] ?? '')) ?>"<?= $ro2 ?>><?php endif; ?>
       <?php if ($stale && $dr && $f === array_key_first($w)): ?><label class="chk hint" style="margin:4px 0 0;"><input type="checkbox" name="w[<?= e($k) ?>][seen]" value="1"> <?= tt('nl.tr_seen') ?></label><?php endif; ?></div></div>
@@ -31,10 +33,29 @@ if ($TRH && isset(NL_LANGS[$tl]) && $tl !== $I['lang']) {   // R97-203: one lang
   <label class="chk" style="margin:0 0 4px;"><input type="checkbox" name="ok" value="1"<?= !empty($V['ok']) ? ' checked' : '' ?>> <b><?= tt('nl.tr_ok') ?></b></label><p class="hint" style="margin:0 0 12px;text-align:justify;"><?= tt('nl.tr_ok_hint') ?></p>
   <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit" name="action" value="nl_tr_save">✓ <?= tt('nl.save') ?></button>
     <button class="btn btn--sm" type="submit" name="action" value="nl_tr_test" data-busy="…">✉ <?= tt('nl.tr_test') ?></button>
-    <?php if (nl_ai_on()): ?><button class="btn btn--ghost btn--sm" type="submit" name="action" value="nl_tr_ai" data-busy="…"<?= $st['exists'] ? ' data-confirm="' . tt('nl.tr_ai_q') . '"' : '' ?> style="margin-left:auto;">✨ <?= tt($st['exists'] ? 'nl.tr_ai_again' : 'nl.tr_ai') ?></button><?php endif; ?>
-    <?php if ($st['exists']): ?><button class="btn btn--ghost btn--sm" type="submit" name="action" value="nl_tr_remove" data-confirm="<?= tt('nl.tr_remove_q') ?>">🗑 <?= tt('nl.tr_remove') ?></button><?php endif; ?></div>
+   
+    <?php if ($st['exists']): ?><button class="btn btn--ghost btn--sm" type="submit" name="action" value="nl_tr_remove" data-confirm="<?= tt('nl.tr_remove_q') ?>" style="margin-left:auto;">🗑 <?= tt('nl.tr_remove') ?></button><?php endif; ?></div>
 </div><?php endif; ?>
 </form>
+<?php if ($dr && $aiOn): ?><script nonce="<?= csp_nonce() ?>">(function(){ if(!window.GASAI||!GASAI.csrf) return;
+  var TO=<?= json_encode($tl) ?>, FROM=<?= json_encode((string)$I['lang']) ?>, HEAD=<?= json_encode((string)$I['title']) ?>, T=<?= json_encode(['prog' => t('nl.tr_progress'), 'done' => t('nl.tr_done'), 'stop' => t('nl.tr_stop'), 'none' => t('nl.tr_nothing')], JSON_UNESCAPED_UNICODE) ?>;
+  var rows=[].slice.call(document.querySelectorAll('.nl-tr')).filter(function(r){return r.querySelector('[data-src]')&&r.querySelector('[data-tr]');}), prog=document.getElementById('nl-tr-prog'), busy=false;
+  function field(r){return r.querySelector('textarea[name],input[name][maxlength]');}
+  function plain(s){var d=document.createElement('textarea'); d.innerHTML=String(s||''); return d.value;}
+  function one(r){ var b=r.querySelector('[data-tr]'), f=field(r), m=r.querySelector('[data-msg]'), fd=new FormData();
+    fd.append('kind','translate_to'); fd.append('page','newsletter'); fd.append('ctx',JSON.stringify({title:'Newsletter',headline:HEAD,to:TO,from:FROM})); fd.append('prompt',r.querySelector('[data-src]').textContent);
+    b.disabled=true; m.textContent='…';
+    return fetch('index.php?p=ai',{method:'POST',body:fd,credentials:'same-origin',headers:{'X-CSRF':GASAI.csrf}}).then(function(x){return x.json();}).then(function(x){ b.disabled=false;
+      if(x&&x.ok&&x.text){ var v=String(x.text); if(f.tagName!=='TEXTAREA') v=v.replace(/\s*\n+\s*/g,' '); var mx=parseInt(f.getAttribute('maxlength')||'0',10); if(mx&&v.length>mx) v=v.slice(0,mx); f.value=v; m.textContent='✓'; return '';}
+      var e=plain((x&&x.error)||'error'); m.textContent=e; return e; }).catch(function(){ b.disabled=false; m.textContent='network'; return 'network'; }); }
+  rows.forEach(function(r){ r.querySelector('[data-tr]').addEventListener('click',function(){ if(!busy) one(r); }); });
+  function many(all){ if(busy) return; var list=rows.filter(function(r){return all||!field(r).value.trim();}); if(!list.length){ prog.textContent=T.none; return; } busy=true; var i=0, bad=0;
+    (function next(){ if(i>=list.length){ busy=false; prog.textContent=T.done; return; } prog.textContent=T.prog.replace('{i}',i+1).replace('{n}',list.length);
+      one(list[i++]).then(function(e){ if(e){ bad++; if(bad>=2){ busy=false; prog.textContent=T.stop.replace('{e}',e); return; } } next(); }); })(); }
+  var a=document.getElementById('nl-tr-all'), g=document.getElementById('nl-tr-again');
+  if(a) a.addEventListener('click',function(){many(false);}); if(g) g.addEventListener('click',function(){ if(window.confirm(g.getAttribute('data-q'))) many(true); });
+  if(/[?&]auto=1(&|$)/.test(location.search)){ try{history.replaceState(null,'',location.href.replace(/([?&])auto=1&?/,'$1').replace(/[?&]$/,''));}catch(e){} many(false); }
+})();</script><?php endif; ?>
 <?php layout_foot(); return; }
 $self = url('newsletter', ['id' => $id]); $draft = $I['status'] === 'draft'; $send = nl_can_send(); $aud = $I['audience']; $site = nl_site_of($I); $ks = function_exists('kym_has') && kym_has(); $rc = $draft ? nl_audience($aud, $site, nl_dept($I)) : []; $cnt = nl_audience_counts($rc);
 $S = $draft ? null : nl_stats($id); $ro = $draft ? '' : ' readonly'; $dis = $draft ? '' : ' disabled'; $bl = ['h' => t('nl.b_h'), 'p' => t('nl.b_p'), 'img' => t('nl.b_img'), 'btn' => t('nl.b_btn'), 'card' => t('nl.b_card'), 'hr' => t('nl.b_hr')];
@@ -121,7 +142,7 @@ layout_head($I['title'] . ' · ' . t($isHr ? 'nl.hr_title' : 'nl.title'), $isHr 
     <td><?php if ($prim): ?><?= pill('green', t('nl.tr_primary')) ?><?php else: ?><?= pill($st['ok'] && in_array($lk2, $rdy, true) ? 'green' : ($st['exists'] ? 'gold' : 'mute'), t($st['ok'] && in_array($lk2, $rdy, true) ? 'nl.tr_s_ready' : ($st['exists'] ? 'nl.tr_s_draft' : 'nl.tr_s_none'))) ?><?php if ($st['exists']): ?> <span class="hint"><?= e(t('nl.tr_prog', ['d' => $st['done'], 'n' => $st['n']])) ?></span><?php if ($st['stale']): ?> <?= pill('bad', t('nl.tr_stale', ['n' => $st['stale']])) ?><?php endif; endif; endif; ?></td>
     <?php if ($draft): ?><td class="num"><?= (int)($lc[$lk2] ?? 0) ?></td><?php endif; ?>
     <td style="text-align:right;white-space:nowrap;"><?php if (!$prim): ?><a class="btn btn--ghost btn--sm" href="<?= url('newsletter', ['id' => $id, 'tl' => $lk2]) ?>">✎ <?= tt('nl.tr_open') ?></a>
-      <?php if ($draft && nl_ai_on() && !$st['exists'] && ($I['appr_state'] ?? '') !== 'pending'): ?> <button class="btn btn--ghost btn--sm" type="submit" name="action" value="nl_tr_ai" formaction="<?= $self ?>&amp;tl=<?= $lk2 ?>" data-busy="…">✨ <?= tt('nl.tr_ai') ?></button><?php endif; ?>
+      <?php if ($draft && nl_ai_on() && !$st['exists'] && ($I['appr_state'] ?? '') !== 'pending'): ?> <a class="btn btn--ghost btn--sm" href="<?= url('newsletter', ['id' => $id, 'tl' => $lk2, 'auto' => 1]) ?>">✨ <?= tt('nl.tr_ai') ?></a><?php endif; ?>
       <?php endif; ?></td></tr>
   <?php endforeach; ?></tbody></table></div>
   <?php if ($draft): ?><p class="hint" style="margin:8px 0 0;text-align:justify;"><?= tt('nl.tr_readers_hint') ?></p><?php endif; ?>

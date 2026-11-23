@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.228.0';
+const CP_VERSION = '1.228.1';
 const CP_BUILD   = '2026-11-23';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-204', 'version' => '1.228.1', 'date' => '2026-11-23', 'title' => 'Newsletter versions: the assistant translates cell by cell — ✨ beside every field, «Translate the empty fields», the reason shown when it cannot answer', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-203', 'version' => '1.228.0', 'date' => '2026-11-23', 'title' => 'Newsletters in seven languages (EN, GR, IT, RU, UA, DE, NL): one issue with a version per language, translation drafted by the assistant and read by a person, every reader receives his language, website article per language, language on the contact', 'db' => 'install/migrate_cp_r97_203_nl_languages.sql', 'check' => 'r99k'],
         ['ref' => 'GAS-CP-R97-202', 'version' => '1.227.1', 'date' => '2026-11-23', 'title' => 'Community: an existing post can be pinned — ✎ Edit shows «Pin until»; a date pins the post, another date changes it, an empty field unpins it', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-201', 'version' => '1.227.0', 'date' => '2026-11-23', 'title' => 'Community: the noticeboard is a list of titles that open on click (Expand all / Collapse all; pinned posts and open polls start open); one post can carry its text in the five languages — each person sees the language of the portal they use and can switch; the writer, HR and administrators can edit a post', 'db' => 'install/migrate_cp_r97_201_soc_lang.sql', 'check' => 'r99j'],

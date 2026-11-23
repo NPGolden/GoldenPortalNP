@@ -4153,3 +4153,11 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Contacts: field «Newsletter language» on `?p=contact_edit`; import column `Language` (code or name; `gr` = el, `ua` = uk). Website sign-up accepts the seven codes.
 - Block sheet: head `lang` accepts the seven codes (the language the sheet is written in). Versions are made in the portal, not by a second sheet.
 - Language keys +36 (13 152 per language); the new newsletter texts are in English, Greek and Italian — Bulgarian and Ukrainian show English, as the rest of the newsletter pages do.
+
+## §487 Newsletter versions: translation cell by cell (GAS-CP-R97-204, v1.228.1)
+
+- Cause of the failure in R97-203: `nl_tr_ai()` sent the whole issue as one request of kind `write` — the instruction sat inside `<input>`, which the system prompt declares to be data, never instructions; the answer was limited to 2 500 tokens, too few for a whole issue in JSON. The button is gone from the screens (the function and the action `nl_tr_ai` stay, unused).
+- `app/ai.php`: new kind `translate_to` — the task is in the system prompt («translate the text in <input> from X into Y … answer only the translation»), the language names come from `AI_LANG_NAMES` by code (`ctx.to`, `ctx.from`; `ai_endpoint()` passes only a code of the list and refuses the kind without `to`), 4 000 tokens. `AI_RATE` = 90 calls / 600 s (was 30).
+- Translator screen (`?p=newsletter&id=N&tl=<lang>`): ✨ per field posts `kind=translate_to`, `page=newsletter`, `prompt` = the original text of that field, to `index.php?p=ai` with the `X-CSRF` header (`window.GASAI.csrf`), and writes the answer into the field (single-line fields: line breaks removed, cut to `maxlength`). `#nl-tr-all` runs the empty fields in turn, `#nl-tr-again` all fields; progress in `#nl-tr-prog`; the reason of a failure is shown as text; two failures stop the run. `&auto=1` (link «Translate with the assistant» on the issue) starts the run on opening. Nothing is stored until `nl_tr_save`.
+- Without `nl_ai_on()` the screen says where to switch the assistant on.
+- Language keys +11 (13 163 per language).
