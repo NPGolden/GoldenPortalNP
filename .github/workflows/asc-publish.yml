@@ -1,0 +1,28 @@
+# App Store — release an approved version that waits for us ("Pending Developer Release").   GAS-CP-R97-208
+# Uses the App Store Connect API key of the other workflows (secrets ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_P8_B64).
+name: App Store publish approved version
+on:
+  workflow_dispatch:
+    inputs:
+      app:
+        description: 'Which app'
+        type: choice
+        options: [engineer, pm, customer, hr, employee]
+permissions: { contents: read }
+concurrency: { group: "asc-publish-${{ github.event.inputs.app }}", cancel-in-progress: false }
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: mobile-native } }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Release
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          K: ${{ secrets.ASC_KEY_P8_B64 }}
+          APP: ${{ github.event.inputs.app }}
+        run: |
+          set -e; pip -q install pyjwt cryptography requests >/dev/null
+          echo "$K" | base64 -d > "$RUNNER_TEMP/AuthKey.p8"; export ASC_KEY_P8="$RUNNER_TEMP/AuthKey.p8"
+          python3 asc_publish.py "$APP"; rm -f "$RUNNER_TEMP/AuthKey.p8"
