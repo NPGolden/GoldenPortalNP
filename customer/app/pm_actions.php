@@ -1206,6 +1206,7 @@ function pm_handle_action(string $action, string $page): bool {
             redirect('fsr', ['id' => $id, '_r' => uniqid()]);
         }
         case 'fsr_eq_set': { $id = (int)($_POST['id'] ?? 0); $n = fsr_equipment_set($id, (array)($_POST['eq_ids'] ?? []), (string)($_POST['eq_new'] ?? '')); flash('good', t('eq.fsr_set_done', ['n' => count($n)])); redirect('fsr', ['id' => $id, '_r' => uniqid()]); }   // R97-219
+        case 'fsr_sn_words': { require_staff(); $w = fsr_sn_words_set((string)($_POST['words'] ?? '')); flash('good', t('fsr.sn_words_done', ['w' => implode(', ', $w)])); redirect('fsr_sn', ['_r' => uniqid()]); }   // R97-225
         case 'fsr_reopen': {
             require_staff();
             $id = (int)$_POST['id'];

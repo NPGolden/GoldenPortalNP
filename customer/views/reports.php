@@ -55,6 +55,7 @@ layout_head(t('r.title'), 'reports');
 ?>
 <div class="page-head"><h1><?= tt('r.title') ?></h1><?= vg_toggle('reports') ?></div>
 <p class="lede"><?= tt('r.lede') ?></p>
+<?php if ($staffV && $tab === 'fsr' && function_exists('eq_has') && eq_has()): /* R97-225 */ ?><p style="margin:-4px 0 12px;"><a class="btn btn--ghost btn--sm" href="<?= url('fsr_sn') ?>">🔧 <?= tt('fsr.sn_btn') ?></a></p><?php endif; ?>
 <nav class="tabs" style="margin-bottom:12px;"><?php $T = fn($k, $lbl) => '<a class="tab' . ($tab === $k ? ' is-on' : '') . '" href="' . url('reports', $k === 'fsr' ? [] : ['tab' => $k]) . '">' . $lbl . ' <span class="hint">' . (int)$nTab[$k] . '</span>' . ($nAct[$k] ? ' <span class="pill pill--gold" title="' . tt('r.act_title') . '">⚑ ' . (int)$nAct[$k] . '</span>' : '') . '</a>';
   echo $T('fsr', '📋 ' . t('fsr.plural')); if ($isrOn) echo $T('isr', '🔎 ' . t('isr.plural')); if ($fcOn) echo $T('fc', '🧪 ' . t('fc.plural')); ?></nav>
 <form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1.3fr 1fr 1.3fr 1fr 1fr 1fr auto;"><input type="hidden" name="p" value="reports"><?php if ($tab !== 'fsr'): ?><input type="hidden" name="tab" value="<?= e($tab) ?>"><?php endif; ?>

@@ -151,6 +151,61 @@ function fsr_equipment_set(int $id, array $ids, string $newSerials): array {
     } catch (Throwable $e) { if ($own) $pdo->rollBack(); throw $e; }
     return $now;
 }
+/* R97-225: service reports that name a maker whose units carry serial numbers (ATLAS, MAGNUS, AVENTICS, EMERSON …) and have no unit of the equipment register linked. */
+const FSR_SN_WORDS = 'ATLAS, MAGNUS, AVENTICS, EMERSON';
+/** The words looked for — setting fsr_sn_words, else the four makers. */
+function fsr_sn_words(): array {
+    $s = function_exists('cp_setting') ? trim((string) cp_setting('fsr_sn_words', '')) : '';
+    $w = array_map(fn($x) => mb_strtoupper(trim((string)$x)), preg_split('/[,;\r\n]+/u', $s !== '' ? $s : FSR_SN_WORDS) ?: []);
+    return array_slice(array_values(array_unique(array_filter($w, fn($x) => mb_strlen($x) >= 3 && mb_strlen($x) <= 40 && !preg_match('/[%_\\\\<>"\']/', $x)))), 0, 20);
+}
+function fsr_sn_words_set(string $raw): array {
+    if (!function_exists('mgmt_can') || !(mgmt_can() || is_cp_admin())) throw new RuntimeException(t('err.noaccess'));
+    cp_setting_set('fsr_sn_words', mb_substr(trim($raw), 0, 600)); $w = fsr_sn_words(); cp_setting_set('fsr_sn_words', implode(', ', $w)); return fsr_sn_words();
+}
+/** Reports (submitted, accepted, disputed) whose tasks, parts, open points, service cards or attached summary name one of the words, with no serial number linked. $scoped: only what the current person may see; the clock job passes false. $after: only reports submitted after this moment. Each row carries 'words' (those found). */
+function fsr_sn_missing(bool $scoped = true, ?string $after = null): array {
+    if (!function_exists('eq_has') || !eq_has()) return []; $words = fsr_sn_words(); if (!$words) return [];
+    $ext = fsr_ext_has(); $w = ["f.status <> 'draft'", 'NOT EXISTS (SELECT 1 FROM fsr_equipment x WHERE x.report_id = f.id)']; $args = [];
+    if ($scoped) { require_staff(); [$scope, $sa] = scope_sql('p'); $w[] = $scope; $args = $sa; }
+    if ($ext) $w[] = "(f.kind = 'internal' OR f.converted_id IS NULL)";   // an attached report that became an internal one is followed on the internal one
+    if ($after) { $w[] = 'f.submitted_at > ?'; $args[] = $after; }
+    $lw = []; $ll = []; $le = []; $aw = []; $al = []; $ae = [];
+    foreach ($words as $x) { $k = '%' . mb_strtolower($x) . '%'; $lw[] = "LOWER(CONCAT_WS(' ', wk.description, wk.parts, wk.open_issues)) LIKE ?"; $aw[] = $k; $ll[] = "LOWER(CONCAT_WS(' ', ln.specialty, ln.remarks)) LIKE ?"; $al[] = $k; $le[] = 'LOWER(f.ext_summary) LIKE ?'; $ae[] = $k; }
+    $any = ['EXISTS (SELECT 1 FROM fsr_works wk WHERE wk.report_id = f.id AND (' . implode(' OR ', $lw) . '))', 'EXISTS (SELECT 1 FROM fsr_lines ln WHERE ln.report_id = f.id AND (' . implode(' OR ', $ll) . '))']; $args = array_merge($args, $aw, $al);
+    if ($ext) { $any[] = '(' . implode(' OR ', $le) . ')'; $args = array_merge($args, $ae); }
+    $w[] = '(' . implode(' OR ', $any) . ')';
+    $rows = all('SELECT f.id, f.report_no, f.report_date, f.status, f.submitted_name, f.submitted_at, f.project_id, f.vessel_name' . ($ext ? ', f.kind, f.ext_summary' : '') . ', p.project_code, p.name AS project_name, p.pm_user_id, v.name AS vessel
+                 FROM fsr_reports f JOIN projects p ON p.id = f.project_id LEFT JOIN vessels v ON v.id = p.vessel_id
+                 WHERE ' . implode(' AND ', $w) . ' ORDER BY f.report_date DESC, f.id DESC LIMIT 2000', $args);
+    if (!$rows) return [];
+    $ids = array_map('intval', array_column($rows, 'id')); $text = array_fill_keys($ids, ''); $in = implode(',', $ids);
+    foreach (all("SELECT report_id, description, parts, open_issues FROM fsr_works WHERE report_id IN ({$in})") as $x) { $pt = ''; foreach ((json_decode((string)($x['parts'] ?? ''), true) ?: []) as $pp) $pt .= ' ' . (is_array($pp) ? implode(' ', array_map('strval', array_filter($pp, 'is_scalar'))) : (string)$pp); $text[(int)$x['report_id']] .= ' ' . $x['description'] . ' ' . $pt . ' ' . $x['open_issues']; }
+    foreach (all("SELECT report_id, specialty, remarks FROM fsr_lines WHERE report_id IN ({$in})") as $x) $text[(int)$x['report_id']] .= ' ' . $x['specialty'] . ' ' . $x['remarks'];
+    $out = [];
+    foreach ($rows as $r) {
+        $t = $text[(int)$r['id']] . ' ' . (string)($r['ext_summary'] ?? ''); $found = [];
+        foreach ($words as $x) if (preg_match('/(?<![\p{L}\p{N}])' . preg_quote($x, '/') . '/iu', $t)) $found[] = $x;   // the word, or the word as the start of a longer one (AVENTICS, Aventics-valve) — not inside another word
+        if (!$found) continue; unset($r['ext_summary']); $r['words'] = $found; $out[] = $r;
+    }
+    return $out;
+}
+/** Once a day from 07:00 (clock job): the reports submitted since the last run that are on the list — notification to the project manager and to management; on Monday a reminder of everything still open. Reads only. Returns the number of reports on the list, or null when it is not time. */
+function fsr_sn_daily(): ?int {
+    if (!function_exists('cp_setting') || !function_exists('eq_has') || !eq_has()) return null; $today = date('Y-m-d');
+    $last = explode('|', (string) cp_setting('fsr_sn_last', ''));
+    if ((int) date('G') < 7 || str_starts_with($last[0], $today)) return null;
+    $since = preg_match('/^\d{4}-\d\d-\d\d \d\d:\d\d$/', $last[0]) ? $last[0] . ':00' : date('Y-m-d 00:00:00', strtotime('-1 day'));
+    $all = fsr_sn_missing(false); $new = array_values(array_filter($all, fn($r) => (string)($r['submitted_at'] ?? '') > $since));
+    cp_setting_set('fsr_sn_last', $today . ' ' . date('H:i') . '|' . count($all) . '|' . count($new));
+    $send = $new ?: ((int) date('N') === 1 ? $all : []);
+    if ($send && function_exists('nf_push')) {
+        $mg = function_exists('prq_mgmt_ids') ? prq_mgmt_ids() : []; $by = [];
+        foreach ($send as $r) { foreach (array_unique(array_merge($mg, [(int)($r['pm_user_id'] ?? 0)])) as $uid) if ($uid) $by[$uid][] = (string)$r['report_no']; }
+        foreach ($by as $uid => $nos) { try { nf_push([$uid], 'fsr:sn', 'fsr:sn:' . $today, t($new ? 'fsr.sn_nf' : 'fsr.sn_nf_open', ['n' => count($nos)]), implode(', ', array_slice($nos, 0, 8)) . (count($nos) > 8 ? ' …' : ''), url('fsr_sn'), null, null); } catch (Throwable $e) {} }
+    }
+    return count($all);
+}
 function fsr_event(int $reportId, string $event, ?string $note = null): void {
     $u = current_user();
     $ip = trim(explode(',', (string)($_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? ''))[0]);
