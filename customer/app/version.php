@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.235.0';
+const CP_VERSION = '1.236.0';
 const CP_BUILD   = '2026-11-23';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-221', 'version' => '1.236.0', 'date' => '2026-11-24', 'title' => 'Service 0.8.5 and Employee 1.1.5: My planning — the scheduled works of the next three weeks on the phone; notices also for changes on later days; a work with a service report is no longer shown as a new assignment', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-219', 'version' => '1.235.0', 'date' => '2026-11-24', 'title' => 'Service report: serial numbers of the equipment can be added or changed on the report page at any time, also after acceptance, without reopening the report', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-217', 'version' => '1.234.2', 'date' => '2026-11-24', 'title' => 'Push: sales and payment notifications go to Golden PM only', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-216', 'version' => '1.234.1', 'date' => '2026-11-24', 'title' => 'Push: sales and payment notifications go to Golden PM (else Golden A/S Employee), never to the Service or HR app; one push a day for sales follow-ups instead of one per offer', 'db' => null, 'check' => null],

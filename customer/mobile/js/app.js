@@ -102,7 +102,7 @@ window.UI = (() => {
     [/^#\/tickets$/, () => SCREENS.tickets()], [/^#\/ticket\/(.+)$/, (m) => SCREENS.ticket(m[1])],
     [/^#\/fsr$/, () => SCREENS.fsrList()], [/^#\/fsr\/([^?]+)(\?.*)?$/, (m, q) => SCREENS.fsrEdit(m[1], q)],
     [/^#\/hours(\?.*)?$/, (m, q) => SCREENS.hours(q)], [/^#\/notes(\?.*)?$/, (m, q) => SCREENS.notes(q)], [/^#\/docs$/, () => SCREENS.docs()],
-    [/^#\/equipment(\?.*)?$/, (m, q) => SCREENS.equipment(q)], [/^#\/more$/, () => SCREENS.more()], [/^#\/hr(\?.*)?$/, (m, q) => HR.page(q)], [/^#\/io$/, () => IO.page()],
+    [/^#\/equipment(\?.*)?$/, (m, q) => SCREENS.equipment(q)], [/^#\/more$/, () => SCREENS.more()], [/^#\/hr(\?.*)?$/, (m, q) => HR.page(q)], [/^#\/io$/, () => IO.page()], [/^#\/plan$/, () => PLAN.page()],
     [/^#\/parts$/, () => PARTS.list({})], [/^#\/parts\?(.*)$/, (m) => PARTS.list(query("#/parts?" + m[1]))], [/^#\/parts\/new$/, () => PARTS.create()], [/^#\/parts\/(\d+)$/, (m) => PARTS.one(+m[1])],   // R82-003
   ];
   const query = (h) => { const q = {}; const i = h.indexOf("?"); if (i < 0) return q; new URLSearchParams(h.slice(i + 1)).forEach((v, k) => { q[k] = v; }); return q; };

@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.235.0** (build 2026-11-23). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.236.0** (build 2026-11-23). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.236.0 | GAS-CP-R97-221 | 2026-11-24 | Service 0.8.5 and Employee 1.1.5: My planning — the scheduled works of the next three weeks on the phone; notices also for changes on later days; a work with a service report is no longer shown as a new assignment | — |
 | 1.235.0 | GAS-CP-R97-219 | 2026-11-24 | Service report: serial numbers of the equipment can be added or changed on the report page at any time, also after acceptance, without reopening the report | — |
 | 1.234.2 | GAS-CP-R97-217 | 2026-11-24 | Push: sales and payment notifications go to Golden PM only | — |
 | 1.234.1 | GAS-CP-R97-216 | 2026-11-24 | Push: sales and payment notifications go to Golden PM (else Golden A/S Employee), never to the Service or HR app; one push a day for sales follow-ups instead of one per offer | — |

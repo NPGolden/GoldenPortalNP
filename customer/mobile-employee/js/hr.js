@@ -54,7 +54,8 @@ window.HR = (() => {
         <label>${t("hr.msg_to_hr")}</label><textarea id="mtx" rows="3" maxlength="2000"></textarea><button class="btn gold" id="msend">${t("hr.msg_send")}</button>`;
     }
     const miss = h.missing_docs || []; const missNote = miss.length ? `<div class="note ${miss.some((m) => m.overdue) ? "red" : "amber"}" data-go-tab="requests"><b>📄 ${t("hr.missing_docs").replace("{n}", miss.length)}</b> — ${t("hr.missing_docs_hint")}<br>${miss.map((m) => `${esc(m.code)} ${fmt(m.date_from)}${m.reason_label ? " · " + esc(m.reason_label) : ""}${m.doc_due ? " — " + t("hr.doc_due_s") + " " + fmt(m.doc_due) + (m.overdue ? " ⚠" : "") : ""}`).join("<br>")}</div>` : "";   // R77-008
-    return { html: `<div class="seg">${tabs.map(([k, l]) => `<button data-t="${k}" class="${tab === k ? "on" : ""}">${l}</button>`).join("")}</div>${missNote}${body}`, bind(root) {
+    const planCard = window.PLAN ? await PLAN.card() : "";   // R97-221: My planning on the first screen
+    return { html: `${planCard}<div class="seg">${tabs.map(([k, l]) => `<button data-t="${k}" class="${tab === k ? "on" : ""}">${l}</button>`).join("")}</div>${missNote}${body}`, bind(root) {
       const $ = (s) => root.querySelector(s);
       root.querySelectorAll(".seg [data-t]").forEach((b) => b.onclick = () => { tab = b.dataset.t; UI.render(); if (tab === "messages" && unread) { DB.enqueue("hr_seen", {}); SYNC.run(false); } });
       const after = async (msg) => { UI.toast(msg || t("common.ok")); await SYNC.run(); UI.render(); };

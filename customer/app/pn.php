@@ -16,6 +16,8 @@
 const PN_APPS = ['customer' => 'gr.goldenas.customer', 'engineer' => 'gr.goldenas.service', 'pm' => 'gr.goldenas.pm', 'hr' => 'gr.goldenas.hr', 'employee' => 'gr.goldenas.employee'];
 const PN_STAFF_ORDER = ['pm', 'engineer', 'employee', 'hr'];        // a member of staff with several apps gets one push, in the first of these he has
 const PN_COMMERCIAL = ['of', 'sb'];                                   // R97-216/217: sales and money topics go to Golden PM only — never to the Service, Employee or HR app
+const PN_PLAN_ORDER = ['engineer', 'employee', 'pm', 'hr'];            // R97-221: planning notices go to the app that shows My planning
+const PN_PLAN_AHEAD = 21;                                           // days ahead for which a change of the planning is announced
 const PN_FRESH_SEC = 7200;                                          // older events are history, not news
 
 function pn_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'mob_push_queue'"); } catch (Throwable $e) { $h = false; } } return $h; }
@@ -51,7 +53,8 @@ function pn_pick_app(array $byApp, ?string $prefer = null, ?array $only = null):
 function pn_commercial(string $kind): bool { $k = preg_replace('/^nf:/', '', $kind); return in_array(explode(':', $k, 2)[0], PN_COMMERCIAL, true) || str_starts_with($k, 'work:si_'); }
 /** Queue one push for a person. False when the person has no phone registered, has switched push off, or the same thing is already queued or was sent today. */
 function pn_enqueue(int $uid, string $kind, string $refKey, string $title, ?string $body, ?string $route = null, ?string $prefer = null): bool {
-    if (!pn_has() || $uid <= 0) return false; $app = pn_pick_app(pn_devices($uid), $prefer, pn_commercial($kind) ? ['pm'] : null); if (!$app) return false;
+    if (!pn_has() || $uid <= 0) return false; $app = pn_pick_app(pn_devices($uid), $prefer, pn_commercial($kind) ? ['pm'] : (str_starts_with($kind, 'plan:') ? PN_PLAN_ORDER : null)); if (!$app) return false;
+    if (str_starts_with($kind, 'plan:')) $route = in_array($app, ['engineer', 'employee'], true) ? '#/plan' : null;   // R97-221: a tap opens My planning
     if (function_exists('wl_has') && wl_has() && !(wl_prefs($uid)['push'] ?? 1)) return false;
     $refKey = mb_substr($refKey, 0, 60);
     if (scalar('SELECT COUNT(*) FROM mob_push_queue WHERE user_id = ? AND ref_key = ? AND (sent_at IS NULL OR sent_at > NOW() - INTERVAL ' . (str_starts_with($refKey, 'ofu:day:') ? '20 HOUR' : '10 MINUTE') . ')', [$uid, $refKey])) return false;
@@ -131,7 +134,7 @@ function pn_plan_on(int $uid): bool { return !(function_exists('wl_has') && wl_h
 /** Called by the planning board when a planner changes somebody's day. Only today and tomorrow matter; the notice itself is written by the clock job, so several edits in a row give one push with the final state. */
 function pn_plan_touch(int $uid, string $date): void {
     try {
-        if (!pn_has() || $uid <= 0 || ($date !== date('Y-m-d') && $date !== date('Y-m-d', strtotime('+1 day')))) return;
+        if (!pn_has() || $uid <= 0 || $date < date('Y-m-d') || $date > date('Y-m-d', strtotime('+' . PN_PLAN_AHEAD . ' days'))) return;   // R97-221: later days too
         if ((int)(current_user()['id'] ?? 0) === $uid) return;     // one's own edit needs no notice
         q('INSERT INTO cp_settings (k, v) VALUES (?, ?) ON DUPLICATE KEY UPDATE v = VALUES(v)', ["pn_pd:$uid:$date", (string) time()]);
     } catch (Throwable $e) { /* a notice must never break the planning */ }
@@ -147,16 +150,25 @@ function pn_plan_tick(): int {
             $n += (int) pn_enqueue($uid, 'plan:day', "plan:$tom", pn_t($x['lang'], 'pn.pl_t', ['d' => $d($tom)]), $b); }
         q("DELETE FROM cp_settings WHERE k LIKE ?", ["pn\\_pd:%:$tom"]);   // changes made before the evening notice are in it
     }
+    $later = [];
     foreach (all("SELECT k, v FROM cp_settings WHERE k LIKE 'pn\\_pd:%'") as $r) {
         [, $uid, $date] = explode(':', (string)$r['k']) + [null, 0, '']; $uid = (int)$uid;
         if ($date >= $today && (int)$r['v'] > time() - 120) continue;          // the planner may still be editing
         q('DELETE FROM cp_settings WHERE k = ? AND v = ?', [$r['k'], $r['v']]);
+        if ($date > $tom) { if ($date >= $today && pn_plan_on($uid)) $later[$uid][] = $date; continue; }   // R97-221: later days are gathered into one notice per person
         if ($date !== $today && !($date === $tom && $sent === $tom)) continue;  // past days; tomorrow before the evening notice
         if (!pn_plan_on($uid)) continue;
         $usr = one("SELECT locale FROM customer_users WHERE id = ? AND is_active = 1 AND role IN ('staff','admin')", [$uid]); if (!$usr) continue; $lang = (string)($usr['locale'] ?: 'en');
         $x = pn_plan_rows($date, $uid)[$uid] ?? null; $b = $x ? pn_plan_text($x['rows'], $lang) : '';
         if ($b === '' && scalar("SELECT COUNT(*) FROM plan_entries WHERE user_id = ? AND plan_date = ?", [$uid, $date])) continue;   // the day is now an absence — HR tells that in its own way
         $n += (int) pn_enqueue($uid, 'plan:chg', "planc:$date:" . (int)$r['v'], pn_t($lang, 'pn.plc_t', ['w' => pn_t($lang, $date === $today ? 'pn.pl_today' : 'pn.pl_tomorrow'), 'd' => $d($date)]), $b !== '' ? $b : pn_t($lang, 'pn.plc_none'));
+    }
+    foreach ($later as $uid => $dates) {   // R97-221
+        $usr = one("SELECT locale FROM customer_users WHERE id = ? AND is_active = 1 AND role IN ('staff','admin')", [$uid]); if (!$usr) continue; $lang = (string)($usr['locale'] ?: 'en');
+        $dates = array_values(array_unique($dates)); sort($dates); $L = [];
+        foreach (array_slice($dates, 0, 4) as $dt) { $x = pn_plan_rows($dt, $uid)[$uid] ?? null; $b = $x ? str_replace("\n", ' / ', pn_plan_text($x['rows'], $lang)) : ''; $L[] = $d($dt) . ': ' . ($b !== '' ? $b : pn_t($lang, 'pn.plc_none')); }
+        if (count($dates) > 4) $L[] = '+' . (count($dates) - 4);
+        $n += (int) pn_enqueue($uid, 'plan:chg', 'planl:' . $dates[0] . ':' . time(), pn_t($lang, 'pn.pll_t', ['d' => implode(', ', array_map($d, array_slice($dates, 0, 6)))]), mb_substr(implode("\n", $L), 0, 400));
     }
     return $n;
 }

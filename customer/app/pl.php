@@ -61,6 +61,22 @@ function pl_grid(string $from, string $to, ?int $userId = null): array {
                   WHERE {$w} ORDER BY e.plan_date, e.id", $a) as $r) $g[(int)$r['user_id']][$r['plan_date']][] = $r;
     return $g;
 }
+/** R97-221: the planning of one person for the apps (My planning): today and the next 21 days, absences included — it is the person's own day. Read only. */
+function pl_api_me(int $uid): array {
+    if (!pl_has() || $uid <= 0) return ['enabled' => false, 'days' => []];
+    $from = date('Y-m-d'); $to = date('Y-m-d', strtotime('+21 days')); $g = pl_grid($from, $to, $uid)[$uid] ?? []; $days = [];
+    for ($d = $from; $d <= $to; $d = date('Y-m-d', strtotime($d . ' +1 day'))) {
+        $E = [];
+        foreach ($g[$d] ?? [] as $e) {
+            $work = $e['kind'] === 'work'; $det = [];
+            if ($work) { if (!empty($e['project_code'])) $det[] = (string)$e['project_code']; if (!empty($e['sub_name'])) $det[] = (string)$e['sub_name']; elseif (!empty($e['project_name'])) $det[] = (string)$e['project_name']; if (!empty($e['wp_no'])) $det[] = trim($e['wp_no'] . ' ' . (string)($e['work_title'] ?? '')); }
+            $E[] = ['kind' => (string)$e['kind'], 'label' => mb_substr(pl_label($e), 0, 120), 'detail' => mb_substr(implode(' · ', $det), 0, 200), 'note' => $work || $e['kind'] === 'other' ? mb_substr((string)($e['note'] ?? ''), 0, 200) : '', 'car' => (string)($e['car'] ?? ''), 'hours' => (float)($e['hours'] ?? 0) ?: null,
+                    'absence' => in_array($e['kind'], defined('PN_PLAN_SKIP') ? PN_PLAN_SKIP : ['leave', 'sick', 'parental', 'strike'], true)];
+        }
+        $days[] = ['date' => $d, 'entries' => $E];
+    }
+    return ['enabled' => true, 'from' => $from, 'to' => $to, 'days' => $days];
+}
 /** Short chip label of an entry: "AMBROSIA Y.02" / "Leave". */
 function pl_label(array $e, bool $long = false): string {
     if ($e['kind'] !== 'work') { if (!empty($e['leave_type_id']) && function_exists('hr_type') && ($ht = hr_type((int)$e['leave_type_id'])) && !$ht['builtin']) return $long ? $ht['name'] : $ht['code']; return $e['kind'] === 'other' && !empty($e['note']) ? (string)$e['note'] : t('pl.k_' . $e['kind']); }   // R51-001

@@ -13431,4 +13431,5 @@ Best regards,
 'eq.fsr_set_done' => 'Equipment saved: {n} unit(s) linked. Their service history shows this report.',
 'eq.fsr_accepted_note' => 'The report is accepted: its text, hours and PDF are not changed. Only the link to the equipment register and the service history of the units are updated, and the change is written to the history of the report.',
 'eq.fsr_ev' => 'Equipment linked: {sn}',
+'pn.pll_t' => 'Your planning changed: {d}',
 ];

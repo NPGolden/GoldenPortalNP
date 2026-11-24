@@ -79,8 +79,10 @@ final class Portal {
         if (function_exists('wp_for_user')) foreach (wp_for_user((int)$u['id']) as $w) {
             $me = one('SELECT acknowledged_at FROM sp_work_people WHERE work_id = ? AND user_id = ?', [(int)$w['id'], (int)$u['id']]);
             $sp = load_subproject((int)$w['subproject_id']);
+            /* R97-221: a work that already has a service report (submitted or accepted) on its sub-project, dated on or after the start of the work, is not a NEW assignment any more — even when nobody pressed Accept or marked the work done */
+            $rep = false; try { $rep = (bool) scalar("SELECT COUNT(*) FROM fsr_reports WHERE subproject_id = ? AND status IN ('submitted','accepted') AND report_date >= ?", [(int)$w['subproject_id'], (string)($w['start_date'] ?: substr((string)$w['created_at'], 0, 10))]); } catch (Throwable $e) {}
             $out[] = ['id' => 'WP' . $w['id'], 'kind' => 'work', 'ref' => trim(($sp['project_code'] ?? '') . ' ' . ($sp['code'] ?? '') . ' ' . $w['wp_no']), 'ref_id' => (int)$w['id'], 'title' => $w['title'], 'project_id' => (int)$w['project_id'], 'subproject_id' => (int)$w['subproject_id'], 'vessel_id' => (int)($sp['vessel_id'] ?? 0) ?: null, 'vessel' => (string)($sp['vessel'] ?? ''),
-                'date' => (string)($w['start_date'] ?: substr((string)$w['created_at'], 0, 10)), 'status' => ($me && $me['acknowledged_at']) ? 'accepted' : 'new', 'by' => (string)(scalar('SELECT full_name FROM customer_users WHERE id = ?', [(int)($w['lead_user_id'] ?? 0)]) ?: 'PM'), 'planned_hours' => (float)($w['planned_hours'] ?? 0)];
+                'date' => (string)($w['start_date'] ?: substr((string)$w['created_at'], 0, 10)), 'status' => (($me && $me['acknowledged_at']) || $rep) ? 'accepted' : 'new', 'by' => (string)(scalar('SELECT full_name FROM customer_users WHERE id = ?', [(int)($w['lead_user_id'] ?? 0)]) ?: 'PM'), 'planned_hours' => (float)($w['planned_hours'] ?? 0)];
         }
         return $out;
     }

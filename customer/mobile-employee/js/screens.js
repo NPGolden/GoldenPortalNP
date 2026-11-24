@@ -55,7 +55,9 @@ window.SCREENS = (() => {
     UI.chrome(true, t("tab.more"), "more");
     const ob = await DB.outbox();
     const hr = await DB.get("meta", "hr"); const hrUnread = hr ? hr.messages.filter((m) => m.from_hr && !m.seen).length : 0;
+    const plSum = window.PLAN ? await PLAN.summary() : "";   // R97-221
     return { html: `<div class="card tap c-gold" data-go="#/io"><div class="t">⏱ ${t("io.title")}</div><div class="s muted">${t("io.hint")}</div></div>
+<div class="card tap c-gold" data-go="#/plan"><div class="t">📅 ${t("pl.title")}</div><div class="s muted">${plSum ? esc(plSum) : t("pl.hint")}</div></div>
 <div class="card tap c-gold" data-go="#/hr"><div class="t">🏖 ${t("hr.title")}${hrUnread ? ` <small>${hrUnread} ${t("hr.new")}</small>` : ""}</div><div class="s muted">${hr ? `${t("hr.available")}: ${hr.balances.filter((b) => !b.by_law && b.available != null && !b.via_annual).slice(0, 3).map((b) => `${b.code} ${b.available}`).join(" • ")}` : t("hr.none")}</div></div>
       <h2>${t("more.settings")}</h2>
       <div class="kv"><b>${t("set.account")}</b><span class="v">${esc(ctx.me.name || "")}</span></div><div class="kv"><b>${t("set.branch")}</b><span class="v">${esc(ctx.me.home_branch)} ${ctx.me.home_branch === "GIT" ? "— GOLDEN AS ITALIAN" : "— Golden A/S Keratsini"}</span></div>

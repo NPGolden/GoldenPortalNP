@@ -2,7 +2,7 @@
  * and a MOCK mode (built-in sample data in the same shape the portal returns) for the demo and the UI tests.
  * Mock mode: localStorage gas.mock = "1", or ?mock=1 on the URL. */
 window.API = (() => {
-  const VERSION = "0.8.4";
+  const VERSION = "0.8.5";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   const demoOn = () => { try { return localStorage.getItem("gas.demo") === "1"; } catch (e) { return false; } };   // R97-169
@@ -79,6 +79,7 @@ window.API = (() => {
    // R82-001: inventory lookup for the parts of a report
     hr: (year) => call("GET", `/hr?year=${year || new Date().getFullYear()}`),
     hrRequest: (p, file) => { const f = new FormData(); Object.keys(p).forEach((k) => f.append(k, p[k] == null ? "" : p[k])); if (file) f.append("doc", file, file.name); return call("POST", "/hr/request", f, true); },
+    planning: () => call("GET", "/me/planning"),   // R97-221 My planning
     inout: () => call("GET", "/inout"), inoutPunch: (p) => call("POST", "/inout/punch", p), inoutConsent: (p) => call("POST", "/inout/consent", p),   // R97-182 In / Out
     hrRequestDoc: (id, file) => { const fd = new FormData(); fd.append("request_id", String(id)); fd.append("doc", file, file.name); return call("POST", "/hr/request/doc", fd, true); },   // R77-007
     hrDocUrl: (id) => `${BASE}/hr/doc/${id}`,
@@ -163,6 +164,7 @@ window.API = (() => {
     const lists = { "/me": M.me, "/tickets": { items: M.tickets }, "/assignments": { items: M.assignments }, "/projects": { items: M.projects }, "/vessels": { items: M.vessels }, "/equipment": { items: M.equipment }, "/budgets": { items: M.budgets }, "/master": M.master, "/documents": { items: M.documents }, "/accounting/status": { items: M.status }, "/fsr": { items: M.fsr }, "/timesheets": { items: M.timesheets }, "/notes": { items: M.notes } };
     if (lists[p]) return delay(lists[p]);
     if (p === "/hr") return delay(M.hr);
+    if (p === "/me/planning") { const dd = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10); return delay({ enabled: true, from: dd(0), to: dd(21), days: [0, 1, 2, 3, 4, 7].map((n) => ({ date: dd(n), entries: n === 4 ? [{ kind: "leave", label: "Leave", detail: "", note: "", car: "", hours: null, absence: true }] : [{ kind: "work", label: n < 2 ? "M/Y DEMO Y.02" : "M/Y SAMPLE Y.01", detail: n < 2 ? "PRJ.100324 · Bridge console installation" : "PRJ.100311 · Shore converter service", note: n === 1 ? "Start 07:30 at the yard gate" : "", car: n < 2 ? "Van 2" : "", hours: 8, absence: false }] })) }); }   // R97-221
     if (p === "/inout") { if (!M.io) { const dd = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10); const site = { id: 1, name: "Perama yard", lat: 37.965, lng: 23.573, radius_m: 300 };
         const mk = (id, kind, n, time, extra) => Object.assign({ id, kind, at: dd(n) + "T" + time + ":00.000Z", day: dd(n), time, lat: 37.9651, lng: 23.5732, acc: 12, site: "Perama yard", dist: 21, flags: [], status: "auto", map: "https://www.google.com/maps?q=37.9651,23.5732", note: null, late_sync: false }, extra || {});
         M.io = { enabled: true, consent: { accepted: false, version: "1", at: null, title: "In / Out — recording of time and position", text: "Golden A/S records the time and the position of your phone at the moment you clock in and at the moment you clock out, together with the nearest company site, the accuracy of the position and the app or computer used. Your position is not followed between the two.\n\nThe data is used to confirm presence at the place of work, working time and overtime. It is compared with your timesheet and your service reports and is taken into account in the personnel evaluation (consistency and accuracy).\n\nYour entries are seen by HR, the management, your manager and the project managers; the statistics only by HR, the CEO and the General Manager. You see your own entries in the app and on the portal.\n\nPrivacy policy: https://www.goldenas.com.gr/privacy.html", accept: "I have read this notice and I accept the recording of the time and position of my In / Out." }, state: "out", since: null, schedule: { workday: true, start: "08:30", end: "17:00", tolerance_min: 10 }, sites: [site, { id: 2, name: "Head office Keratsini", lat: 37.962, lng: 23.619, radius_m: 150 }],

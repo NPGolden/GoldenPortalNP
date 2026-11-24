@@ -4254,3 +4254,11 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - The PDF / Word of the report do not print the linked units, so the accepted document is unchanged.
 - `views/fsr_view.php`: card `#equipment` for staff (not shown to customers); action `fsr_eq_set` in `pm_actions.php`.
 - Language keys +7 (13 247 per language).
+
+## §500 My planning in the Service and Employee apps; later-day notices; reported works not new (GAS-CP-R97-221, v1.236.0)
+
+- `pl_api_me($uid)` (pl.php): own entries of today … +21 days from `pl_grid`, label / detail / note / car / hours / absence. Route `GET /me/planning` (staff apps; added to the Employee app's allowed paths).
+- Apps: `js/plan.js` (identical in `mobile` and `mobile-employee`): `PLAN.page`, `refresh`, `summary`, `card`; data kept in `meta.plan`; route `#/plan`; card on the first screen (Service home, Employee My HR) and in More; refreshed by `SYNC.run`. Service 0.8.5, Employee 1.1.5 (web clients; no store build needed).
+- Push: `PN_PLAN_ORDER` (engineer, employee, pm, hr) for kinds `plan:*`; route `#/plan` when the chosen app is Service or Employee. `pn_plan_touch` marks days up to `PN_PLAN_AHEAD` = 21; `pn_plan_tick` gathers the days after tomorrow into one notice per person (`pn.pll_t`), after the 2-minute quiet time.
+- `Portal::assignments`: a work is `accepted` (not `new`) when a service report with status submitted / accepted exists on its sub-project with `report_date >= start_date`.
+- Language keys +1 (13 248 per language); app texts `pl.*` in five languages.

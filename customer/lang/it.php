@@ -13431,4 +13431,5 @@ Cordiali saluti,
 'eq.fsr_set_done' => 'Apparecchiature salvate: {n} unità collegate. La loro cronologia di assistenza mostra questo rapporto.',
 'eq.fsr_accepted_note' => 'Il rapporto è accettato: testo, ore e PDF non cambiano. Si aggiornano solo il collegamento al registro apparecchiature e la cronologia di assistenza delle unità; la modifica è annotata nella cronologia del rapporto.',
 'eq.fsr_ev' => 'Apparecchiature collegate: {sn}',
+'pn.pll_t' => 'La tua pianificazione è cambiata: {d}',
 ];
