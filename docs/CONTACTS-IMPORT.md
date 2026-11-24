@@ -4326,3 +4326,13 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 
 **Data:** tables `po_dchecks`, `po_dcheck_lines`, `po_dcheck_close`, `inv_supplier_codes` (migration key r99m). The document and the order lines (codes, descriptions, quantities — no prices of ours) go to the assistant service; the answer is validated (only lines of this order, known findings, sane numbers) and text inside the document is treated as data.
 
+## §507 Delivery check: reading in the background (GAS-CP-R97-228, v1.241.1)
+
+**Why:** the first live reading (24/11/2026) took longer than the firewall in front of the portal waits for an answer, and the browser showed «HTTP 504 — Hosting timeout» although the server went on working.
+
+**Now:** «Read and compare» only checks and stores the document and opens the check with status *Being read*; the browser is answered within a second. The assistant is called after the page has been sent (or by a background call of the waiting page — exactly one run per check). The waiting page refreshes every 6 seconds and shows the rows when they are ready. A reading that fails or does not finish within 5 minutes becomes *Not read* with the reason, «Read again» (the document is kept) and «Discard». While a document of an order is being read, a second upload on that order is refused.
+
+**If the 504 page ever appears:** choose *Cancel* on «Resubmit the form?», open the purchase order and look at the card «Delivery check» — do not send the form again, each reading is charged.
+
+No database step; statuses `reading` and `failed` use the existing column. The working copy of the document lives in the protected storage folder (`pdc/`) until it is read or the check is discarded.
+

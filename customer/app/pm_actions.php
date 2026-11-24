@@ -1086,7 +1086,14 @@ function pm_handle_action(string $action, string $page): bool {
         case 'dn_create': { require_pr_wh(); $did = dn_create_from_post(); flash('good', t('dn.created')); redirect('delivery_note', ['id' => $did, '_r' => uniqid()]); }
         case 'dn_cancel': { require_pr_wh(); $did = (int)($_POST['id'] ?? 0); dn_cancel($did, trim((string)($_POST['note'] ?? ''))); flash('good', t('dn.cancelled')); redirect('delivery_note', ['id' => $did, '_r' => uniqid()]); }
         /* R97-227 delivery check */
-        case 'pdc_read': { require_pr_wh(); $oid = (int)($_POST['id'] ?? 0); $cid = pdc_read($oid, $_FILES['file'] ?? []); flash('good', t('pdc.read_done')); redirect('po_delivery_check', ['id' => $cid, '_r' => uniqid()]); }
+        case 'pdc_read': {   // R97-228: the page is answered at once; the reading goes on after it (or from the background call of the waiting page) — a long reading no longer ends in a gateway time-out
+            require_pr_wh(); $oid = (int)($_POST['id'] ?? 0); $cid = pdc_read($oid, $_FILES['file'] ?? []);
+            header('Location: ' . url('po_delivery_check', ['id' => $cid, '_r' => uniqid()]));
+            if (function_exists('nf_can_detach') && nf_can_detach()) { if (session_status() === PHP_SESSION_ACTIVE) session_write_close(); if (function_exists('fastcgi_finish_request')) fastcgi_finish_request(); else litespeed_finish_request(); ignore_user_abort(true); @set_time_limit(300); pdc_read_run($cid); }
+            exit;
+        }
+        case 'pdc_run': { require_pr_wh(); $cid = (int)($_POST['id'] ?? 0); if (session_status() === PHP_SESSION_ACTIVE) session_write_close(); ignore_user_abort(true); @set_time_limit(300); pdc_read_run($cid); http_response_code(204); exit; }
+        case 'pdc_retry': { require_pr_wh(); $cid = (int)($_POST['id'] ?? 0); pdc_retry($cid); redirect('po_delivery_check', ['id' => $cid, '_r' => uniqid()]); }
         case 'pdc_save': { require_pr_wh(); $cid = (int)($_POST['id'] ?? 0); pdc_save_from_post($cid); flash('good', t('pdc.saved')); redirect('po_delivery_check', ['id' => $cid, '_r' => uniqid()]); }
         case 'pdc_submit': { require_pr_wh(); $cid = (int)($_POST['id'] ?? 0); $r = pdc_submit($cid); flash('good', t($r === 'booked' ? 'pdc.booked_ok' : 'pdc.pending_ok')); redirect('po_delivery_check', ['id' => $cid, '_r' => uniqid()]); }
         case 'pdc_decide': { require_po_admin(); $cid = (int)($_POST['id'] ?? 0); $dec = ($_POST['decision'] ?? '') === 'approve' ? 'approve' : 'back'; pdc_decide($cid, $dec, trim((string)($_POST['note'] ?? ''))); flash('good', t($dec === 'approve' ? 'pdc.booked_ok' : 'pdc.back_ok')); redirect('po_delivery_check', ['id' => $cid, '_r' => uniqid()]); }

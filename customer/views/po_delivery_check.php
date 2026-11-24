@@ -32,6 +32,23 @@ $whs = function_exists('stk_warehouses') ? stk_warehouses() : [];
 <?php $prev = pdc_list($oid); if ($prev): ?><div class="card" style="max-width:820px;"><h2><?= tt('pdc.earlier') ?></h2><table class="tbl"><tbody><?php foreach ($prev as $x): ?><tr><td><a href="<?= url('po_delivery_check', ['id' => (int)$x['id']]) ?>"><b><?= e($x['check_no']) ?></b></a></td><td><?= e((string)$x['doc_no']) ?></td><td><?= e(fmt_datetime($x['created_at'])) ?></td><td><?= e((string)$x['created_name']) ?></td><td><?= pdc_pill($x['status']) ?></td></tr><?php endforeach; ?></tbody></table></div><?php endif; ?>
 <?php layout_foot(); return; endif; ?>
 
+<?php if (in_array($c['status'], ['reading', 'failed'], true)): /* R97-228 */ if ($c['status'] === 'reading') { pdc_stale($oid); $c = pdc_load($id); } ?>
+<div class="card" style="max-width:820px;">
+  <?php if ($c['status'] === 'reading'): ?>
+  <h2>⏳ <?= tt('pdc.reading') ?></h2><p><?= e((string)$c['file_name']) ?></p><p class="hint"><?= tt('pdc.reading_hint') ?></p>
+  <?php if ($c['can_drop'] && $c['ai_notes'] === null): ?><form method="post" action="<?= $self ?>" data-bg-post hidden><?= csrf_field() ?><input type="hidden" name="action" value="pdc_run"><input type="hidden" name="id" value="<?= $id ?>"></form><?php endif; ?>
+  <div data-reload-in="6"></div>
+  <?php else: ?>
+  <h2>⚠️ <?= tt('pdc.failed') ?></h2><p><?= e((string)$c['file_name']) ?></p><p><?= e((string)$c['ai_notes']) ?></p>
+  <?php endif; ?>
+  <?php if ($c['can_drop']): ?><div class="btn-row">
+    <?php if ($c['status'] === 'failed' && is_file(pdc_tmp($id)) && pdc_ai_ok()): ?><form method="post" action="<?= $self ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="pdc_retry"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--gold" type="submit">✨ <?= tt('pdc.retry') ?></button></form><?php endif; ?>
+    <form method="post" action="<?= $self ?>" class="inline" data-confirm="<?= e(t('pdc.cancel_q')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="pdc_cancel"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost" type="submit"><?= tt('pdc.cancel') ?></button></form>
+    <a class="btn btn--ghost" href="<?= url('purchase_order', ['id' => $oid]) ?>#dchecks"><?= e($o['po_no']) ?></a>
+  </div><?php endif; ?>
+</div>
+<?php layout_foot(); return; endif; ?>
+
 <?php
 $edit = $c['can_edit']; $cnt = ['same' => 0, 'code' => 0, 'component' => 0, 'extra' => 0]; foreach ($c['lines'] as $d) $cnt[$d['finding']] = ($cnt[$d['finding']] ?? 0) + 1;
 $onDoc = []; foreach ($c['lines'] as $d) if ($d['po_line_id']) $onDoc[(int)$d['po_line_id']] = true;

@@ -128,6 +128,9 @@
     var n = 0, q = 0; f.querySelectorAll('input[name^="' + pre.replace(/["\\]/g, '') + '"]').forEach(function (i) { var v = parseFloat(String(i.value).replace(',', '.')); if (v > 0) { n++; q += v; } });
     return m.replace('{n}', n).replace('{q}', Math.round(q * 1000) / 1000);
   }
+  /* R97-228: a form sent in the background as the page opens (data-bg-post: a long job whose answer nobody waits for) and a page that reloads itself (data-reload-in="seconds") */
+  document.querySelectorAll('form[data-bg-post]').forEach(function (f) { try { fetch(f.getAttribute('action') || location.href, { method: 'POST', body: new FormData(f), credentials: 'same-origin' }).catch(function () {}); } catch (e) {} });
+  document.querySelectorAll('[data-reload-in]').forEach(function (el) { var s = parseInt(el.getAttribute('data-reload-in'), 10) || 6; setTimeout(function () { location.reload(); }, s * 1000); });
   /* buttons that fill or clear the quantity fields of their form: data-fill-open (value from each field's data-open) / data-fill-clear */
   document.querySelectorAll('button[data-fill-open], button[data-fill-clear]').forEach(function (b) {
     b.addEventListener('click', function () { var f = b.form; if (!f) return; var open = b.hasAttribute('data-fill-open');
