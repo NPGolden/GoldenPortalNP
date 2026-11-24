@@ -4397,3 +4397,12 @@ Greek headers of a supplier document are accepted (Κωδικός, Περιγρ�
 **Refused at upload, nothing opened:** not a workbook · columns Code and Qty not found · no rows · more than 300 rows · PO No of another order · workbook larger than 48 MB unpacked or with a DOCTYPE / entity declaration.
 
 No database step. Language keys +29 (13 506 per language). Next ref GAS-CP-R97-233, next guide §512.
+
+## §512 Service app: e-mail for acceptance said «Outgoing e-mail is not set up» (GAS-CP-R97-233, v1.244.1)
+
+**Fault:** Service app › a submitted service report › «Send by e-mail for acceptance» → «Outgoing e-mail is not set up on the portal.» The same action in the portal worked.
+
+**Cause:** requests from the apps go through the API, which loads its own list of portal modules; the mail module (`mailer`) was not in that list, so the check «is e-mail configured?» always answered no. The mail settings themselves were never the problem.
+
+**Fix:** `mailer` added to the modules the API loads (`customer/api/v1/bootstrap.php`). It applies to every app; no app update and no database step. If the message appears again in the portal itself, check Settings › System › Website › Outgoing e-mail and use «Send a test message».
+

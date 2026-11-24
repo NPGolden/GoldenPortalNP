@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.244.0** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.244.1** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.244.1 | GAS-CP-R97-233 | 2026-11-24 | Service app: sending a service report by e-mail for acceptance answered «Outgoing e-mail is not set up» — the mail module was not loaded for requests from the apps; fixed | — |
 | 1.244.0 | GAS-CP-R97-232 | 2026-11-24 | Delivery check: the supplier document can also be given as an Excel file in the layout of the template (Code, Qty, prices, PO line) — rows are taken as typed and matched to the order by code without the assistant; only codes that are not on the order are put to the assistant; Excel template on the page | — |
 | 1.243.0 | GAS-CP-R97-231 | 2026-11-24 | Recruiting: offer to the candidate — financial proposal and terms with the job description, net salary entered by HR, kept as a record and sent by the portal from the e-mail template; answer of the candidate recorded | `install/migrate_cp_r97_231_recruiting_offers.sql` |
 | 1.242.1 | GAS-CP-R97-230 | 2026-11-24 | Recruiting: «Change» and «Invitation» buttons in the row of each planned interview, a finished interview can be set back to planned; Golden HR 1.2.4 changes an interview and sends its invitation from the phone | — |
