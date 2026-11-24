@@ -34,33 +34,36 @@ function fsr_disc_names(): array {
     $c = $rows ? array_values(array_unique(array_map(fn($d) => (string)$d['name'], $rows))) : fsr_specialties_legacy();
     return $c;
 }
-/** R94-003: the specialty choices with their rate card, so the engineer sees which tariff each discipline bills at.
- *  [['name', 'id', 'card', 'card_name', 'rate' (normal hour, local zone, null when unknown), 'cur']] — rates only when $withRates (financial roles). */
+/** R97-224: what the engineer picks on a time line is the SERVICE CARD of the work (A — Service Engineer, C — Atlas Marine Systems Engineer …),
+ *  one choice per hourly card of the current rate list, in card order. No discipline and no price on the form: the rate — normal hours, overtime,
+ *  Saturday / Sunday / holiday, zone — is set by Accounting when the hours are processed. The value stored on the line is the name of the card.
+ *  Without a rate list the technical disciplines are offered as before.
+ *  [['name', 'id', 'card', 'card_name', 'rate' (always null), 'cur']] */
 function fsr_specialty_options(?int $projectId = null, bool $withRates = false): array {
-    static $memo = []; $mk = (int)$projectId . '|' . (int)$withRates; if (isset($memo[$mk])) return $memo[$mk];
-    $names = fsr_disc_names(); $out = []; $used = [];
+    static $memo = []; $mk = (int)$projectId; if (isset($memo[$mk])) return $memo[$mk];
+    $out = []; $seen = [];
     $list = null; if (function_exists('rl_current')) { $bid = $projectId && function_exists('br_of') ? (int)(br_of($projectId)['id'] ?? 0) : 0; $list = rl_current($bid ?: null); }
-    $cards = $list && function_exists('rl_cards') ? rl_cards((int)$list['id']) : [];
-    $rateOf = function (string $card) use ($withRates, $list): ?float { if (!$withRates || !$list || $card === '' || !function_exists('acc_rate_item')) return null; $it = acc_rate_item((int)$list['id'], $card, 'normal', 'local'); return $it ? rl_price($it, 'local') : null; };
-    foreach ($names as $n) {
-        $d = one('SELECT id FROM disciplines WHERE name = ?', [$n]); $card = $d && function_exists('acc_card_of') ? acc_card_of((int)$d['id']) : '';
-        $used[$card] = true;
-        $out[] = ['name' => $n, 'id' => (int)($d['id'] ?? 0), 'card' => $card, 'card_name' => (string)($cards['hourly:' . $card]['name'] ?? ''), 'rate' => $rateOf($card), 'cur' => (string)($list['currency'] ?? 'EUR')];
+    $cards = $list && function_exists('rl_cards') ? rl_cards((int)$list['id']) : []; $cur = (string)($list['currency'] ?? 'EUR');
+    foreach ($cards as $c) { $nm = trim((string)$c['name']); if ($c['section'] !== 'hourly' || $nm === '' || isset($seen[mb_strtolower($nm)])) continue; $seen[mb_strtolower($nm)] = true;
+        $out[] = ['name' => $nm, 'id' => 0, 'card' => (string)$c['card'], 'card_name' => $nm, 'rate' => null, 'cur' => $cur]; }
+    usort($out, fn($a, $b) => strnatcasecmp($a['card'], $b['card']));
+    if (!$out) foreach (fsr_disc_names() as $n) {   // no rate list yet
+        $d = one('SELECT id FROM disciplines WHERE name = ?', [$n]);
+        $out[] = ['name' => $n, 'id' => (int)($d['id'] ?? 0), 'card' => $d && function_exists('acc_card_of') ? acc_card_of((int)$d['id']) : '', 'card_name' => '', 'rate' => null, 'cur' => $cur];
     }
-    // R94-004: every other hourly card of the rate list (maker / product specialists — Atlas, Magnus, Aventics … — that are no discipline) is a specialty of its own, named after the card
-    foreach ($cards as $k => $c) { if ($c['section'] !== 'hourly' || isset($used[$c['card']]) || trim((string)$c['name']) === '') continue; $used[$c['card']] = true;
-        $out[] = ['name' => (string)$c['name'], 'id' => 0, 'card' => (string)$c['card'], 'card_name' => (string)$c['name'], 'rate' => $rateOf((string)$c['card']), 'cur' => (string)($list['currency'] ?? 'EUR')]; }
     return $memo[$mk] = $out;
 }
-/** Every specialty an engineer may pick: the technical disciplines plus the rate-card-only specialties of the current rate list. */
+/** Every choice an engineer may pick (names of the service cards). */
 function fsr_specialties(): array { return array_values(array_unique(array_column(fsr_specialty_options(), 'name'))); }
-/** The hourly rate card a specialty names (card-only specialties and discipline names alike), or '' when unknown. */
-function fsr_specialty_card(string $specialty, ?int $projectId = null): string { $s = mb_strtolower(trim($specialty)); foreach (fsr_specialty_options($projectId) as $o) if (mb_strtolower($o['name']) === $s || ($o['card_name'] !== '' && mb_strtolower($o['card_name']) === $s)) return (string)$o['card']; return ''; }
-/** Label of a specialty option: "Automation · card D — Automation engineer · 95 €/h" (rate only for financial roles). */
-function fsr_specialty_label(array $o): string {
-    $l = $o['name']; if ($o['card'] !== '') $l .= ' · ' . t('fsr.card') . ' ' . $o['card'] . ($o['card_name'] !== '' && $o['card_name'] !== $o['name'] ? ' — ' . $o['card_name'] : '');
-    if ($o['rate'] !== null) $l .= ' · ' . number_format((float)$o['rate'], 0, ',', '.') . ' ' . $o['cur'] . '/h'; return $l;
+/** The hourly rate card a line's specialty names, or '' when unknown: a service card name, or — on reports written before R97-224 — a discipline name with its rate card. */
+function fsr_specialty_card(string $specialty, ?int $projectId = null): string {
+    $s = mb_strtolower(trim($specialty)); if ($s === '') return '';
+    foreach (fsr_specialty_options($projectId) as $o) if (mb_strtolower($o['name']) === $s) return (string)$o['card'];
+    try { $d = one('SELECT id FROM disciplines WHERE LOWER(name) = ? LIMIT 1', [$s]); } catch (Throwable $e) { $d = null; }
+    return $d && function_exists('acc_card_of') ? acc_card_of((int)$d['id']) : '';
 }
+/** Label of a choice: "A — Service Engineer". Never a price. */
+function fsr_specialty_label(array $o): string { return $o['card'] !== '' && $o['card_name'] !== '' ? $o['card'] . ' — ' . $o['name'] : $o['name']; }
 /** R94-008: engineers offered on the time lines — active staff of a technical discipline (HR departments at sort order 900+ left out), the current user first. */
 function fsr_engineer_choices(): array {
     return all("SELECT cu.id, cu.full_name, cu.discipline_id FROM customer_users cu LEFT JOIN disciplines d ON d.id = cu.discipline_id LEFT JOIN staff_roles sr ON sr.id = cu.staff_role_id
@@ -70,7 +73,12 @@ function fsr_engineer_choices(): array {
 /** Whether the signed-in user is technical staff (then their own name pre-fills the first time line; office staff preparing a report on behalf of an engineer get an empty field). */
 function fsr_user_is_technical(): bool { $u = current_user(); if (!$u || !is_staff()) return false; $d = $u['discipline_id'] ?? null; if (!$d) return true; return (int) scalar('SELECT sort_order FROM disciplines WHERE id = ?', [(int)$d]) < 900; }
 /** Default specialty of a line: the engineer's own discipline when known, else the first offered. */
-function fsr_specialty_default(?int $userId = null): string { $n = $userId ? (string) scalar('SELECT d.name FROM customer_users cu JOIN disciplines d ON d.id = cu.discipline_id WHERE cu.id = ?', [$userId]) : ''; $all = fsr_specialties(); return $n !== '' && in_array($n, $all, true) ? $n : ($all[0] ?? 'Service Engineer'); }
+function fsr_specialty_default(?int $userId = null): string {   // the service card of the engineer's own discipline when it is offered, else the first card
+    $opts = fsr_specialty_options(); if (!$opts) return 'Service Engineer';
+    $did = $userId ? (int) scalar('SELECT discipline_id FROM customer_users WHERE id = ?', [$userId]) : 0; $card = $did && function_exists('acc_card_of') ? acc_card_of($did) : '';
+    foreach ($opts as $o) if ($card !== '' && $o['card'] === $card) return $o['name'];
+    return $opts[0]['name'];
+}
 function fsr_time_types(): array { return ['WT' => 'WT', 'TT' => 'TT', 'NC' => 'NC']; }   // NC = not chargeable (R46-005)
 /** R95-004: why a line is not chargeable — decided by the engineer on the service report; accounting only confirms. */
 function fsr_nc_reasons(): array { return ['warranty' => t('fsr.ncr_warranty'), 'goodwill' => t('fsr.ncr_goodwill'), 'internal' => t('fsr.ncr_internal'), 'training' => t('fsr.ncr_training'), 'rework' => t('fsr.ncr_rework'), 'other' => t('fsr.ncr_other')]; }

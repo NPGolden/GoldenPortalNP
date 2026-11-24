@@ -11640,7 +11640,7 @@ Best regards,
 'acc.di_hint' => 'No proforma or offer? Direct invoice registers the invoice in the portal with the net of this report pre-filled and records the accounting answer at the same time (every reported line invoiced under that number).',
 'fsr.di_hint' => 'Register a direct invoice for this accepted service report (no proforma or offer needed)',
 'fsr.card' => 'card',
-'fsr.specialty_hint' => 'The discipline the hours belong to — accounting bills them at this discipline\'s rate card',
+'fsr.specialty_hint' => 'The service card of the work done. Rates are not chosen here: Accounting sets the rate for normal hours, overtime and holidays when the hours are processed.',
 'fsr.legacy_spec' => 'earlier label',
 // GAS-CP-R94-005 — website inquiries → tickets
 'web.no_vessel_yet' => 'No vessel yet (set it on the ticket later)',

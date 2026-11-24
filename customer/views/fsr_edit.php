@@ -96,7 +96,7 @@ layout_head($title, 'projects');
     <datalist id="engineers"><?php foreach ($engineers as $en): ?><option value="<?= e($en['full_name']) ?>"><?php endforeach; ?></datalist>
     <?php
     /* one task block; $i is the form index (any integer), $wk the stored task or null */
-    $spOpts = fsr_specialty_options($pid ?: null, function_exists('fin_visible') && fin_visible()); $spNames = array_column($spOpts, 'name');   // R94-002/004 specialty choices with rate cards
+    $spOpts = fsr_specialty_options($pid ?: null); $spNames = array_column($spOpts, 'name');   // R94-002/004 specialty choices with rate cards
     $taskBlock = function (int $i, ?array $wk) use ($u, $sel, $spOpts, $spNames): void {
         $parts = $wk['parts'] ?? []; $lines = $wk['lines'] ?? []; $photos = $wk['photos'] ?? []; ?>
       <details class="fsr-work" open data-task="<?= $i ?>">

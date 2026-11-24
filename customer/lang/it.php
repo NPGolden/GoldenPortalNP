@@ -11640,7 +11640,7 @@ Cordiali saluti,
 'acc.di_hint' => 'Nessuna proforma o offerta? Fattura diretta registra la fattura nel portale con il netto del rapporto precompilato e registra allo stesso tempo la risposta della contabilità (ogni riga fatturata con quel numero).',
 'fsr.di_hint' => 'Registra una fattura diretta per questo rapporto di servizio accettato (senza proforma né offerta)',
 'fsr.card' => 'listino',
-'fsr.specialty_hint' => 'La disciplina a cui appartengono le ore — la contabilità le fattura al listino di questa disciplina',
+'fsr.specialty_hint' => 'La scheda di servizio del lavoro svolto. Le tariffe non si scelgono qui: la Contabilità definisce la tariffa per ore normali, straordinari e festivi quando elabora le ore.',
 'fsr.legacy_spec' => 'etichetta precedente',
 // GAS-CP-R94-005 — website inquiries → tickets
 'web.no_vessel_yet' => 'Nessuna nave per ora (impostala sul ticket in seguito)',

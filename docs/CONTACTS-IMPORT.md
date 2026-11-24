@@ -4276,3 +4276,10 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - `po_receipt_reverse($oid, $rid, $reason)` (inside `stk_tx`): rights `po_receipt_can_reverse` (po_admin, or the booker on the same day); blocks `po_receipt_reverse_block` (order not partial / received, delivery note not cancelled, closed NCR, licences). Per line: reservation of the requisition line in the receipt's warehouse reduced by min(accepted, held); `stk_move` out, reason `receipt_rev` (refused when the goods are not there — everything rolls back); the `inv_prices` row of the receipt removed and last price / average restored; `pr_lines.qty_received` reduced, status `received` → `ordered` / `reserved` / `to_buy`; `po_lines` totals reduced, status recomputed. Receipt rows deleted; order status `received` / `partial` / `confirmed` / `sent`; event `receive_rev`.
 - Receipt numbers: next number = max(receipts, receive events) + 1, so a reversed number is not reused.
 - Language keys +15 (13 263 per language).
+
+## §503 Service report: service cards on the time lines, no prices (GAS-CP-R97-224, v1.238.0)
+
+- `fsr_specialty_options()`: one option per hourly card of `rl_current()` (name = card name, sorted by card code); `rate` always null; the disciplines are offered only when no rate list has hourly cards. `fsr_specialty_label()` = "A — Service Engineer". `fsr_specialty_default()` = card of the user's discipline (`acc_card_of`), else the first.
+- `fsr_specialty_card()`: card by card name; for lines written before this release, by discipline name → `acc_card_of`. `acc_sync()` therefore still pins the card; hour type and rate stay with Accounting (`acc_report`: rate item, zone, discount, exclude per line).
+- The stored value on `fsr_lines.specialty` is the card name; the printed column keeps its title. API `GET /meta` passes the same options to the Service app.
+- Language: hint `fsr.specialty_hint` rewritten; no new keys (13 264).
