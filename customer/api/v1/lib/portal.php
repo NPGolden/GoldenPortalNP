@@ -264,8 +264,8 @@ final class Portal {
         if (function_exists('eq_fsr_sync')) eq_fsr_sync($id);
         if (function_exists('iss_fsr_sync')) iss_fsr_sync($id);
         if (function_exists('acc_sync')) { try { acc_sync(); } catch (Throwable $e) {} }
-        $r = fsr_load($id);
-        return ['id' => 'F' . $id, 'number' => $r['report_no'], 'status' => $r['status']];
+        $r = fsr_load($id); $snW = function_exists('fsr_sn_on_submit') ? fsr_sn_on_submit($id, true) : null;   // R97-226: the report is submitted; the engineer is told to add the serial number
+        return ['id' => 'F' . $id, 'number' => $r['report_no'], 'status' => $r['status']] + ($snW ? ['warning' => $snW] : []);
     }
     /** Inspection report (SF-GLD-020): isr_save_from_post + isr_submit (→ checking; issued by a checker in the portal). */
     public static function createIsr(array $u, string $uuid, array $p): array {

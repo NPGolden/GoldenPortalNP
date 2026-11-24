@@ -175,7 +175,7 @@ function fsr_sn_missing(bool $scoped = true, ?string $after = null): array {
     $any = ['EXISTS (SELECT 1 FROM fsr_works wk WHERE wk.report_id = f.id AND (' . implode(' OR ', $lw) . '))', 'EXISTS (SELECT 1 FROM fsr_lines ln WHERE ln.report_id = f.id AND (' . implode(' OR ', $ll) . '))']; $args = array_merge($args, $aw, $al);
     if ($ext) { $any[] = '(' . implode(' OR ', $le) . ')'; $args = array_merge($args, $ae); }
     $w[] = '(' . implode(' OR ', $any) . ')';
-    $rows = all('SELECT f.id, f.report_no, f.report_date, f.status, f.submitted_name, f.submitted_at, f.project_id, f.vessel_name' . ($ext ? ', f.kind, f.ext_summary' : '') . ', p.project_code, p.name AS project_name, p.pm_user_id, v.name AS vessel
+    $rows = all('SELECT f.id, f.report_no, f.report_date, f.status, f.submitted_by, f.submitted_name, f.submitted_at, f.project_id, f.vessel_name' . ($ext ? ', f.kind, f.ext_summary' : '') . ', p.project_code, p.name AS project_name, p.pm_user_id, v.name AS vessel
                  FROM fsr_reports f JOIN projects p ON p.id = f.project_id LEFT JOIN vessels v ON v.id = p.vessel_id
                  WHERE ' . implode(' AND ', $w) . ' ORDER BY f.report_date DESC, f.id DESC LIMIT 2000', $args);
     if (!$rows) return [];
@@ -190,7 +190,25 @@ function fsr_sn_missing(bool $scoped = true, ?string $after = null): array {
     }
     return $out;
 }
-/** Once a day from 07:00 (clock job): the reports submitted since the last run that are on the list — notification to the project manager and to management; on Monday a reminder of everything still open. Reads only. Returns the number of reports on the list, or null when it is not time. */
+/** R97-226: the maker words in one loaded report (fsr_load) that has no serial number linked — no query beyond the units of the report. Empty = nothing to warn about. */
+function fsr_sn_words_of(array $r): array {
+    if (!function_exists('eq_has') || !eq_has() || empty($r['id']) || eq_fsr_units((int)$r['id'])) return [];
+    $t = (string)($r['ext_summary'] ?? '');
+    foreach ((array)($r['works'] ?? []) as $w) { $t .= ' ' . ($w['description'] ?? '') . ' ' . ($w['open_issues'] ?? ''); foreach ((array)($w['parts'] ?? []) as $pp) $t .= ' ' . (is_array($pp) ? implode(' ', array_map('strval', array_filter($pp, 'is_scalar'))) : (string)$pp); }
+    foreach ((array)($r['lines'] ?? []) as $l) $t .= ' ' . ($l['specialty'] ?? '') . ' ' . ($l['remarks'] ?? '');
+    $found = []; foreach (fsr_sn_words() as $x) if (preg_match('/(?<![\p{L}\p{N}])' . preg_quote($x, '/') . '/iu', $t)) $found[] = $x;
+    return $found;
+}
+/** At submission: a warning, never a stop. Returns the text of the warning (null = none); with $notify the engineer also gets it as a notification (portal and phone) — used by the Service app, where no page follows. */
+function fsr_sn_on_submit(int $id, bool $notify = false): ?string {
+    try {
+        $r = fsr_load($id); if (!$r) return null; $w = fsr_sn_words_of($r); if (!$w) return null;
+        $msg = t('fsr.sn_warn', ['w' => implode(', ', $w)]);
+        if ($notify && function_exists('nf_push') && ($uid = (int)($r['submitted_by'] ?? 0))) nf_push([$uid], 'fsr:sn', 'fsr:sn1:' . $id, t('fsr.sn_nf_one', ['no' => (string)$r['report_no']]), $msg, url('fsr', ['id' => $id]) . '#equipment', null, null);
+        return $msg;
+    } catch (Throwable $e) { return null; }
+}
+/** Once a day from 07:00 (clock job): the reports submitted since the last run that are on the list — notification to the project manager, to the engineer who submitted the report (R97-226) and to management; on Monday a reminder of everything still open. Reads only. Returns the number of reports on the list, or null when it is not time. */
 function fsr_sn_daily(): ?int {
     if (!function_exists('cp_setting') || !function_exists('eq_has') || !eq_has()) return null; $today = date('Y-m-d');
     $last = explode('|', (string) cp_setting('fsr_sn_last', ''));
@@ -201,7 +219,7 @@ function fsr_sn_daily(): ?int {
     $send = $new ?: ((int) date('N') === 1 ? $all : []);
     if ($send && function_exists('nf_push')) {
         $mg = function_exists('prq_mgmt_ids') ? prq_mgmt_ids() : []; $by = [];
-        foreach ($send as $r) { foreach (array_unique(array_merge($mg, [(int)($r['pm_user_id'] ?? 0)])) as $uid) if ($uid) $by[$uid][] = (string)$r['report_no']; }
+        foreach ($send as $r) { foreach (array_unique(array_merge($mg, [(int)($r['pm_user_id'] ?? 0), (int)($r['submitted_by'] ?? 0)])) as $uid) if ($uid) $by[$uid][] = (string)$r['report_no']; }
         foreach ($by as $uid => $nos) { try { nf_push([$uid], 'fsr:sn', 'fsr:sn:' . $today, t($new ? 'fsr.sn_nf' : 'fsr.sn_nf_open', ['n' => count($nos)]), implode(', ', array_slice($nos, 0, 8)) . (count($nos) > 8 ? ' …' : ''), url('fsr_sn'), null, null); } catch (Throwable $e) {} }
     }
     return count($all);

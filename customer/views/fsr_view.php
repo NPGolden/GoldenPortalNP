@@ -89,6 +89,7 @@ layout_head(t('fsr.title') . ' ' . $r['report_no'], $staff ? 'projects' : 'repor
 <?php if ($staff && function_exists('eq_has') && eq_has()): /* R97-219: serial numbers can be linked at any time, also on an accepted report */
   $eqNow = eq_fsr_units($id); $eqSel = array_map('intval', array_column($eqNow, 'id')); $eqVid = (int) scalar('SELECT vessel_id FROM projects WHERE id = ?', [(int)$r['project_id']]); $eqUnits = eq_for_vessel($eqVid);
   foreach ($eqNow as $x) if (!in_array((int)$x['id'], array_map('intval', array_column($eqUnits, 'id')), true)) $eqUnits[] = $x; ?>
+<?php if (!$eqNow && ($snW = fsr_sn_words_of($r))): /* R97-226 */ ?><div class="flash flash--warn">⚠ <?= e(t('fsr.sn_warn', ['w' => implode(', ', $snW)])) ?></div><?php endif; ?>
 <div class="card" id="equipment"><div class="card-head"><h2>🔧 <?= tt('eq.fsr_units') ?> <span class="count"><?= count($eqNow) ?></span></h2><span class="hint"><?= tt('eq.fsr_view_hint') ?></span></div>
   <?php if ($eqNow): ?><p><?php foreach ($eqNow as $x): ?><a class="pill" href="<?= url('equipment_view', ['id' => (int)$x['id']]) ?>" style="margin-right:6px;"><b><?= e($x['serial_no']) ?></b> <?= e(trim($x['maker'] . ' ' . ($x['family'] ?: $x['model'] ?: ''))) ?></a><?php endforeach; ?></p><?php else: ?><p class="hint"><?= tt('eq.fsr_none') ?></p><?php endif; ?>
   <details<?= $eqNow ? '' : ' open' ?>><summary style="cursor:pointer;font-weight:600;"><?= tt('eq.fsr_change') ?></summary>

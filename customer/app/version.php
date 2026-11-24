@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.239.0';
+const CP_VERSION = '1.240.0';
 const CP_BUILD   = '2026-11-24';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-226', 'version' => '1.240.0', 'date' => '2026-11-24', 'title' => 'Service report: the engineer is warned at submission (not stopped) when the report names ATLAS, MAGNUS, AVENTICS or EMERSON without a serial number; the daily check also notifies the engineer who submitted the report', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-225', 'version' => '1.239.0', 'date' => '2026-11-24', 'title' => 'Service reports that name ATLAS, MAGNUS, AVENTICS or EMERSON without a serial number of the equipment: list page, daily check after 07:00 with notification to the project manager and management', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-224', 'version' => '1.238.0', 'date' => '2026-11-24', 'title' => 'Service report: the time lines offer the service cards (A — Service Engineer …), one per card and without prices; the rate is set by Accounting when the hours are processed', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-223', 'version' => '1.237.0', 'date' => '2026-11-24', 'title' => 'Purchase order: a receipt booked by mistake can be reversed; Book receipt asks for confirmation with the number of lines and the total; the quantities to receive start empty', 'db' => null, 'check' => null],

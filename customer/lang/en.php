@@ -13463,4 +13463,6 @@ Best regards,
 'fsr.sn_words_done' => 'Saved. Looked for: {w}',
 'fsr.sn_nf' => 'Service reports: {n} new report(s) need the serial number of the equipment',
 'fsr.sn_nf_open' => 'Service reports: {n} report(s) still without the serial number of the equipment',
+'fsr.sn_warn' => 'This report names {w} and has no serial number of the equipment. Tick the unit or type the serial number on the card «Equipment serviced» below — the report itself is not changed.',
+'fsr.sn_nf_one' => 'Service report {no}: add the serial number of the equipment',
 ];

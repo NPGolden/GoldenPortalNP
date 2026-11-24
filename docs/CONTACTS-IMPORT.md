@@ -4293,3 +4293,14 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Tested: 27 checks on invented data (SQLite stand-in for the queries): the five places a word can stand, case, word inside another word, draft, linked report, converted attached report, scope, daily run (recipients, once a day, silent day), word list (cleaning, rights, default). Not tested: MariaDB itself, the page in a browser, the live data.
 - Security: staff only; word list limited to management / administrators with CSRF and one-submit lock; words bound as parameters, wildcard characters refused; notification carries report numbers only (no vessel, customer or serial number); the job changes nothing. Cost: one search a day in the clock job; nothing added to other pages (the button carries no count).
 - Language keys +15 (13 279 per language). Next ref GAS-CP-R97-226, next migration key r99m, next guide §505.
+
+## §505 Service report: warning at submission, engineer in the daily notification (GAS-CP-R97-226, v1.240.0)
+
+- Decisions of the user (24/11/2026): the engineer is warned, not stopped; the engineer who submitted the report is notified.
+- `fsr_sn_words_of($r)`: maker words in a loaded report without a linked unit — works on the rows of `fsr_load()`, one query (`eq_fsr_units`). `fsr_sn_on_submit($id, $notify)`: text of the warning or null; never throws.
+- Web (`pm_actions.php`, `fsr_save` with mode submit): after the report is submitted, `flash('warn')` and the report opens at `#equipment`. `views/fsr_view.php`: the same line above the card Equipment serviced for staff, in every status, while no unit is linked.
+- Service app (`api/v1/lib/portal.php`, submit): `nf_push` to the engineer, kind `fsr:sn`, key `fsr:sn1:<id>`, link to the report at `#equipment`; the answer carries `warning` (not shown by the present app build — a later build can show it on the screen).
+- `fsr_sn_daily()`: `submitted_by` added to the recipients (own reports only).
+- Tested: 36 checks on invented data (27 of §504, plus: words of a loaded report, none when a unit is linked, text of the warning, notification to the submitter only with notify, engineer in the daily run with own reports only). Not tested: MariaDB, the page and the app against the live portal.
+- Security: no new input; the warning is escaped text built from the stored word list; the notification carries the report number and the maker words only. Cost: one small query on the report page and at submission.
+- Language keys +2 (13 281 per language). Next ref GAS-CP-R97-227, next migration key r99m, next guide §506.

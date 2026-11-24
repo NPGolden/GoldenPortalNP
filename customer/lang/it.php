@@ -13463,4 +13463,6 @@ Cordiali saluti,
 'fsr.sn_words_done' => 'Salvato. Si cerca: {w}',
 'fsr.sn_nf' => 'Rapporti di servizio: {n} nuovo/i rapporto/i richiedono il numero di serie dell\'apparecchiatura',
 'fsr.sn_nf_open' => 'Rapporti di servizio: {n} rapporto/i ancora senza il numero di serie dell\'apparecchiatura',
+'fsr.sn_warn' => 'Il rapporto cita {w} e non ha il numero di serie dell\'apparecchiatura. Selezionare l\'unità o scrivere il numero di serie nella scheda «Apparecchiature oggetto del servizio» qui sotto — il rapporto non viene modificato.',
+'fsr.sn_nf_one' => 'Rapporto di servizio {no}: aggiungere il numero di serie dell\'apparecchiatura',
 ];

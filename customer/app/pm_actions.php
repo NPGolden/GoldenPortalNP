@@ -949,6 +949,7 @@ function pm_handle_action(string $action, string $page): bool {
             if (function_exists('eq_fsr_sync')) eq_fsr_sync($id);   // R27-001: the service history of the units follows the report
             if (function_exists('iss_fsr_sync')) iss_fsr_sync($id);  // R29-001: open issues of the task blocks → register
             flash('good', t('fsr.submitted'));
+            if ($snW = fsr_sn_on_submit($id)) { flash('warn', $snW); redirect('fsr', ['id' => $id, '_r' => uniqid()], '#equipment'); }   // R97-226: warned, not stopped
             redirect('fsr', ['id' => $id, '_r' => uniqid()]);
         }
         /* ------------------------------- equipment register (R27-001) */
