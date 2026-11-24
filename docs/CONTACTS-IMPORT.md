@@ -4336,3 +4336,15 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 
 No database step; statuses `reading` and `failed` use the existing column. The working copy of the document lives in the protected storage folder (`pdc/`) until it is read or the check is discarded.
 
+## §508 Recruiting: change an interview, invitation through the portal from the template (GAS-CP-R97-229, v1.242.0)
+
+**Where:** HR › Recruiting › an application › card «Interviews». Rights: HR, or the hiring manager of the vacancy.
+
+**Change:** «✎ Change the interview» on a planned interview — stage, date and time, duration, mode, link / place, interviewers. The change is written to the recruiting log (old → new time). If anything the candidate was told changes (date, stage, duration, mode, place), the mark «candidate notified» is removed. Done, no-show and cancelled interviews cannot be changed.
+
+**Invitation:** «✉ Invitation to the candidate» shows To, Subject and Text, taken from the e-mail template *Recruiting — interview invitation* (Settings › E-mail templates) in the language of the candidate. New placeholders: `{when}` `{duration}` `{stage}` `{mode}` `{interviewers}` (besides `{name}` `{title}` `{no}` `{user}` `{branch}` `{signature}`). The built-in text now carries them; a template of your own that has no `{when}` gets the details added before the signature. HR may change the text, then «Send the invitation»: the portal sends it (sender of Settings › Recruiting, or the portal mail service) and marks the interview with the time it was sent. Without a sender nothing leaves and the page says so. The tick «E-mail the invitation» when planning an interview uses the same template.
+
+**Times:** interview times are shown as typed (Athens time), no longer shifted by the time zone of the database.
+
+**Limits:** three invitations a minute per application; no sending to anonymised applications; subject one line, text up to 8 000 characters.
+

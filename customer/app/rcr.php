@@ -417,13 +417,54 @@ function rcr_interview_save(int $appId, array $in): int {
     $id = (int) db()->lastInsertId();
     if ($a['status'] !== 'interview' && !in_array($a['status'], ['offer', 'hired', 'rejected', 'withdrawn'], true)) { q("UPDATE rc_applications SET status = 'interview', status_changed_at = NOW() WHERE id = ?", [$appId]); rcr_log('status', ['application_id' => $appId, 'vacancy_id' => (int) $a['vacancy_id']], $a['status'] . ' → interview'); }
     rcr_log('interview_planned', ['application_id' => $appId, 'vacancy_id' => (int) $a['vacancy_id']], t('rc.ev_stage_' . $stage) . ' · ' . date('d/m/Y H:i', strtotime($when)));
-    if (!empty($in['notify'])) {
-        $body = sprintf("%s,\n\n%s\n\n%s: %s\n%s: %s\n%s: %s\n\n%s\n\nGolden Automation Systems — HR", $a['name'] ?: $a['email'], t('rc.ev_mail_intro', ['vacancy' => $a['vacancy']]), t('rc.ev_stage'), t('rc.ev_stage_' . $stage), t('rc.ev_when'), date('d/m/Y H:i', strtotime($when)) . ' (Athens)', t('rc.ev_mode'), t('rc.ev_mode_' . $mode) . ($in['location'] ? ' · ' . trim((string) $in['location']) : ''), t('rc.ev_mail_outro'));
-        if (rcr_mail((string) $a['email'], 'Golden A/S — ' . t('rc.ev_interview') . ' · ' . $a['vacancy_code'], $body)) q('UPDATE rc_interviews SET candidate_notified_at = NOW() WHERE id = ?', [$id]);
-    }
+    if (!empty($in['notify'])) { $d = rcr_interview_draft($id); rcr_interview_send($id, $d['subject'], $d['body']); }   // R97-229: the invitation is the e-mail template «Recruiting — interview invitation»
     return $id;
 }
 function rcr_interview_status(int $id, string $st): void { if (!in_array($st, ['planned', 'done', 'no_show', 'cancelled'], true)) return; $i = one('SELECT * FROM rc_interviews WHERE id = ?', [$id]); if (!$i) return; $a = rcr_application((int) $i['application_id']); if (!$a || !rcr_can_view((int) $a['vacancy_id'])) throw new RuntimeException(t('err.noaccess')); q('UPDATE rc_interviews SET status = ? WHERE id = ?', [$st, $id]); rcr_log('interview_' . $st, ['application_id' => (int) $i['application_id']], (string) $i['stage']); }
+
+/* ---- R97-229: an interview can be changed while it is planned, and its invitation goes out through the portal from the e-mail template ---- */
+/** The time of an interview as it was typed (Athens wall-clock time) — never shifted by the zone of the database. */
+function rcr_wall(string $d): string { $ts = strtotime($d); return $ts ? fmt_date(date('Y-m-d', $ts)) . ' ' . date('H:i', $ts) : '—'; }
+/** One interview with its application, for a person who may see the vacancy. */
+function rcr_interview(int $id): ?array {
+    if (!rcr_eval_has()) return null; $i = one('SELECT * FROM rc_interviews WHERE id = ?', [$id]); if (!$i) return null;
+    $a = rcr_application((int) $i['application_id']); if (!$a || !rcr_can_view((int) $a['vacancy_id'])) return null; $i['app'] = $a; return $i;
+}
+function rcr_interview_update(int $id, array $in): void {
+    $i = rcr_interview($id); if (!$i) throw new RuntimeException(t('err.noaccess')); if ($i['status'] !== 'planned') throw new RuntimeException(t('rc.ev_only_planned'));
+    $when = trim((string) ($in['scheduled_at'] ?? '')); if (!$when || !strtotime($when)) throw new RuntimeException(t('rc.ev_need_date')); $when = date('Y-m-d H:i:s', strtotime($when));
+    $stage = in_array($in['stage'] ?? '', RCR_INT_STAGE, true) ? $in['stage'] : $i['stage']; $mode = in_array($in['mode'] ?? '', ['online', 'onsite', 'phone'], true) ? $in['mode'] : $i['mode'];
+    $dur = max(15, min(480, (int) ($in['duration_min'] ?? $i['duration_min']))); $loc = mb_substr(trim((string) ($in['location'] ?? '')), 0, 200) ?: null; $who = mb_substr(trim((string) ($in['interviewers'] ?? '')), 0, 300) ?: null;
+    $told = $when !== (string) $i['scheduled_at'] || $mode !== $i['mode'] || $loc !== $i['location'] || $dur !== (int) $i['duration_min'] || $stage !== $i['stage'];   // what the candidate was told has changed: the invitation must go again
+    q('UPDATE rc_interviews SET stage = ?, scheduled_at = ?, duration_min = ?, mode = ?, location = ?, interviewers = ?' . ($told ? ', candidate_notified_at = NULL' : '') . ' WHERE id = ?', [$stage, $when, $dur, $mode, $loc, $who, $id]);
+    $ch = []; if ($when !== (string) $i['scheduled_at']) $ch[] = date('d/m/Y H:i', strtotime((string) $i['scheduled_at'])) . ' → ' . date('d/m/Y H:i', strtotime($when)); if ($stage !== $i['stage']) $ch[] = t('rc.ev_stage_' . $stage); if ($mode !== $i['mode']) $ch[] = t('rc.ev_mode_' . $mode); if ($dur !== (int) $i['duration_min']) $ch[] = $dur . ' min';
+    rcr_log('interview_changed', ['application_id' => (int) $i['application_id'], 'vacancy_id' => (int) $i['app']['vacancy_id']], mb_substr(implode(' · ', $ch) ?: t('rc.ev_interviewers'), 0, 250));
+    if (!empty($in['notify'])) { $d = rcr_interview_draft($id); rcr_interview_send($id, $d['subject'], $d['body']); }
+}
+/** The invitation of an interview from the template «Recruiting — interview invitation», in the language of the candidate, with the interview filled in. */
+function rcr_interview_draft(int $id): array {
+    $i = rcr_interview($id); if (!$i) throw new RuntimeException(t('err.noaccess')); $a = $i['app']; $u = current_user();
+    $lc = in_array((string) ($a['lang'] ?? ''), array_keys(LOCALES), true) ? (string) $a['lang'] : 'en'; $tr = fn(string $k) => t_in($k, $lc);
+    $when = date('d/m/Y H:i', strtotime((string) $i['scheduled_at'])) . ' (' . $tr('rc.ev_athens') . ')'; $mode = $tr('rc.ev_mode_' . $i['mode']) . ($i['location'] ? ' · ' . $i['location'] : ''); $dur = (int) $i['duration_min'] . ' min';
+    $det = $tr('rc.ev_stage') . ': ' . $tr('rc.ev_stage_' . $i['stage']) . "\n" . $tr('rc.ev_when') . ': ' . $when . "\n" . $tr('rc.ev_duration') . ': ' . (int) $i['duration_min'] . "\n" . $tr('rc.ev_mode') . ': ' . $mode . ($i['interviewers'] ? "\n" . $tr('rc.ev_interviewers') . ': ' . $i['interviewers'] : '');
+    $branch = ''; try { if (!empty($u['branch_id']) && function_exists('br_get')) $branch = (string) (br_get((int) $u['branch_id'])['name'] ?? ''); } catch (Throwable $e) {}
+    $r = function_exists('et_render') ? et_render('rc_interview', ['no' => (string) $a['code'], 'title' => (string) $a['vacancy'], 'doc' => (string) $a['vacancy_code'], 'name' => (string) ($a['name'] ?: $a['email']), 'email' => (string) $a['email'], 'user' => (string) $u['full_name'], 'branch' => $branch ?: 'Golden A/S',
+            'when' => $when, 'duration' => $dur, 'stage' => $tr('rc.ev_stage_' . $i['stage']), 'mode' => $mode, 'interviewers' => (string) $i['interviewers'], 'locale' => $lc, 'branch_id' => $u['branch_id'] ?? null, '_details' => $det])
+        : ['subject' => 'Golden A/S — ' . $tr('rc.ev_interview') . ' · ' . $a['vacancy_code'], 'body' => ($a['name'] ?: $a['email']) . ",\n\n" . $tr('rc.ev_mail_intro') . "\n\n" . $det . "\n\n" . $tr('rc.ev_mail_outro') . "\n\nGolden A/S — HR"];
+    return ['to' => (string) $a['email'], 'subject' => (string) $r['subject'], 'body' => (string) $r['body'], 'locale' => $lc];
+}
+/** Sends the invitation (the text HR sees and may have changed) to the candidate through the portal. True when it left; false when no sender is set up — then it is kept in the recruiting log. */
+function rcr_interview_send(int $id, string $subject, string $body): bool {
+    $i = rcr_interview($id); if (!$i) throw new RuntimeException(t('err.noaccess')); if ($i['status'] !== 'planned') throw new RuntimeException(t('rc.ev_only_planned')); $a = $i['app'];
+    $subject = mb_substr(trim(preg_replace('/[\r\n\t]+/', ' ', $subject)), 0, 200); $body = mb_substr(trim(str_replace("\r\n", "\n", $body)), 0, 8000);
+    if ($subject === '' || mb_strlen($body) < 20) throw new RuntimeException(t('rc.ev_need_text'));
+    if (!filter_var((string) $a['email'], FILTER_VALIDATE_EMAIL) || str_starts_with((string) $a['email'], 'anon-')) throw new RuntimeException(t('rc.ev_no_email'));
+    if ((int) scalar("SELECT COUNT(*) FROM rc_log WHERE action = 'interview_invited' AND application_id = ? AND created_at > NOW() - INTERVAL 1 MINUTE", [(int) $i['application_id']]) >= 3) throw new RuntimeException(t('rc.ev_too_many'));
+    $ok = rcr_mail((string) $a['email'], $subject, $body);
+    if ($ok) q('UPDATE rc_interviews SET candidate_notified_at = NOW() WHERE id = ?', [$id]);
+    rcr_log('interview_invited', ['application_id' => (int) $i['application_id'], 'vacancy_id' => (int) $a['vacancy_id']], ($ok ? '✉ ' : '… ') . date('d/m/Y H:i', strtotime((string) $i['scheduled_at'])));
+    return $ok;
+}
 
 /* ---- R92-001: the assistant drafts a vacancy from a short brief (title, summary, description, requirements, tags, location, type, seniority, department, branch) ---- */
 function rcr_vacancy_ai_fields(array $cur): array {

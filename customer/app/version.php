@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.241.1';
+const CP_VERSION = '1.242.0';
 const CP_BUILD   = '2026-11-24';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-229', 'version' => '1.242.0', 'date' => '2026-11-24', 'title' => 'Recruiting: a planned interview can be changed (stage, date, duration, mode, place, interviewers) and its invitation is sent to the candidate through the portal from the e-mail template, with the interview filled in', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-228', 'version' => '1.241.1', 'date' => '2026-11-24', 'title' => 'Delivery check: the document is read in the background — the upload answers at once and a waiting page follows the reading, so a long reading no longer ends in the 504 time-out page of the firewall; read again and discard on a failed reading', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-227', 'version' => '1.241.0', 'date' => '2026-11-24', 'title' => 'Purchase order: delivery check — the delivery note or invoice of the supplier (scan, photo, PDF) is read by the assistant, compared with the order and turned into a proposed receipt; changed codes and assemblies decided per line, Procurement approves', 'db' => 'install/migrate_cp_r97_227_delivery_check.sql', 'check' => 'r99m'],
         ['ref' => 'GAS-CP-R97-226', 'version' => '1.240.0', 'date' => '2026-11-24', 'title' => 'Service report: the engineer is warned at submission (not stopped) when the report names ATLAS, MAGNUS, AVENTICS or EMERSON without a serial number; the daily check also notifies the engineer who submitted the report', 'db' => null, 'check' => null],

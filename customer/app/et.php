@@ -10,7 +10,7 @@
  */
 
 const ET_KINDS = ['offer', 'weekly', 'fsr', 'isr', 'wf', 'contacts', 'welcome', 'accounting', 'proforma', 'statement', 'rfq', 'po', 'po_chase', 'ncr', 'remittance', 'sup_statement', 'dn', 'rc_general', 'rc_shortlisted', 'rc_interview', 'rc_offer', 'rc_rejected', 'signature'];   // R92-005: recruiting e-mails to candidates   // R88-001: dn = delivery note   // R84-001: procurement set
-const ET_PLACEHOLDERS = ['no', 'title', 'vessel', 'customer', 'project', 'week', 'doc', 'user', 'branch', 'date', 'name', 'email', 'url', 'signature'];   // name / email / url: the account the welcome e-mail is for (GAS-CP-R36-001)
+const ET_PLACEHOLDERS = ['no', 'title', 'vessel', 'customer', 'project', 'week', 'doc', 'user', 'branch', 'date', 'name', 'email', 'url', 'when', 'duration', 'stage', 'mode', 'interviewers', 'signature'];   // when … interviewers: the interview of a recruiting invitation (R97-229)   // name / email / url: the account the welcome e-mail is for (GAS-CP-R36-001)
 
 function et_has(): bool {
     static $h = null;
@@ -59,6 +59,7 @@ function et_render(string $kind, array $ctx): array {
     $vars['{signature}'] = strtr($sig, array_diff_key($vars, ['{signature}' => 1]));
     $body = (string)$t['body'];
     if ($kind !== 'signature' && !str_contains($body, '{signature}')) $body = rtrim($body) . "\n\n{signature}";
+    if (!empty($ctx['_details']) && !str_contains($body, '{when}') && ($p = strpos($body, '{signature}')) !== false) $body = rtrim(substr($body, 0, $p)) . "\n\n" . $ctx['_details'] . "\n\n" . substr($body, $p);   // R97-229: a template without the interview placeholders still carries the details
     return ['subject' => strtr((string)$t['subject'], $vars), 'body' => strtr($body, $vars), 'template_id' => isset($t['id']) ? (int)$t['id'] : null];
 }
 
