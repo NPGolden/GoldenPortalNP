@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.236.1';
+const CP_VERSION = '1.237.0';
 const CP_BUILD   = '2026-11-23';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-223', 'version' => '1.237.0', 'date' => '2026-11-24', 'title' => 'Purchase order: a receipt booked by mistake can be reversed; Book receipt asks for confirmation with the number of lines and the total; the quantities to receive start empty', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-222', 'version' => '1.236.1', 'date' => '2026-11-24', 'title' => 'Wellness: the focus sound and the focus timer continue when another menu is opened', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-221', 'version' => '1.236.0', 'date' => '2026-11-24', 'title' => 'Service 0.8.5 and Employee 1.1.5: My planning — the scheduled works of the next three weeks on the phone; notices also for changes on later days; a work with a service report is no longer shown as a new assignment', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-219', 'version' => '1.235.0', 'date' => '2026-11-24', 'title' => 'Service report: serial numbers of the equipment can be added or changed on the report page at any time, also after acceptance, without reopening the report', 'db' => null, 'check' => null],

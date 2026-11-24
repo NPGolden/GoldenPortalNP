@@ -545,6 +545,53 @@ function po_sp_cost_sync(int $oid): void {
 }
 
 /* ---- goods receipt */
+/* ------------------------------------------------------------------ reversing a receipt booked by mistake (GAS-CP-R97-223) */
+/** May this person reverse the receipt? Procurement / management always; the person who booked it, on the day it was booked. */
+function po_receipt_can_reverse(array $r): bool { $u = current_user(); return po_admin() || (function_exists('pr_wh') && pr_wh() && (int)$r['user_id'] === (int)($u['id'] ?? 0) && substr((string)$r['created_at'], 0, 10) === date('Y-m-d')); }
+/** Why a receipt cannot be reversed, or null. */
+function po_receipt_reverse_block(array $o, array $r): ?string {
+    if (!in_array($o['status'], ['partial', 'received'], true)) return t('po.rev_status');
+    foreach (all('SELECT DISTINCT d.dn_no, d.status FROM po_receipt_lines rl JOIN inv_delivery_notes d ON d.id = rl.dn_id WHERE rl.receipt_id = ?', [(int)$r['id']]) as $d) if ($d['status'] !== 'cancelled') return t('po.rev_dn', ['no' => $d['dn_no']]);
+    if (scalar("SELECT COUNT(*) FROM po_receipt_lines WHERE receipt_id = ? AND ncr_status = 'closed'", [(int)$r['id']])) return t('po.rev_ncr');
+    try { if (scalar('SELECT COUNT(*) FROM inv_licences WHERE receipt_id = ?', [(int)$r['id']])) return t('po.rev_lic'); } catch (Throwable $e) {}
+    return null;
+}
+/** Takes a receipt back completely: the goods leave the stock again, what was kept for requisitions is given up, the order lines and the order return to what they were before the receipt, and the receipt is removed. The history of the order and the stock movements keep the trace. All or nothing. */
+function po_receipt_reverse(int $oid, int $rid, string $reason): string { return stk_tx(fn() => po_receipt_reverse_x($oid, $rid, $reason)); }
+function po_receipt_reverse_x(int $oid, int $rid, string $reason): string {
+    require_pr_wh(); $o = po_load($oid); $r = one('SELECT * FROM po_receipts WHERE id = ? AND order_id = ? FOR UPDATE', [$rid, $oid]);
+    if (!$o || !$r) throw new RuntimeException(t('err.notfound')); if (!po_receipt_can_reverse($r)) throw new RuntimeException(t('err.noaccess'));
+    $reason = mb_substr(trim($reason), 0, 200); if (mb_strlen($reason) < 3) throw new RuntimeException(t('prq.need_reason'));
+    if ($b = po_receipt_reverse_block($o, $r)) throw new RuntimeException($b);
+    $wh = (int)$r['warehouse_id']; $n = 0;
+    foreach (all('SELECT rl.*, l.item_id, l.pr_line_id, l.seq, l.qty AS l_qty, l.qty_received AS l_recv, l.qty_accepted AS l_acc, l.qty_rejected AS l_rej, l.status AS l_status, i.code FROM po_receipt_lines rl JOIN po_lines l ON l.id = rl.po_line_id LEFT JOIN inv_items i ON i.id = l.item_id WHERE rl.receipt_id = ? ORDER BY l.seq FOR UPDATE', [$rid]) as $x) {
+        $qr = (float)$x['qty_received']; $qa = (float)$x['qty_accepted']; $qj = (float)$x['qty_rejected']; $n++;
+        if ($qa > 0.0005 && $x['item_id']) {
+            if ($x['pr_line_id'] && function_exists('prq_rsv_of')) { $pl = one('SELECT * FROM pr_lines WHERE id = ? FOR UPDATE', [(int)$x['pr_line_id']]); $held = $pl ? (float)(prq_rsv_of($pl)[$wh] ?? 0) : 0.0; if ($held > 0.0005) prq_rsv_take($pl, min($qa, $held), $wh, true); }
+            try { stk_move((int)$x['item_id'], $wh, 'out', $qa, ['ref_kind' => 'po', 'ref_id' => $oid, 'project_id' => $o['project_id'] ? (int)$o['project_id'] : null, 'subproject_id' => $o['subproject_id'] ? (int)$o['subproject_id'] : null, 'reason' => 'receipt_rev', 'note' => mb_substr('↩ ' . $r['receipt_no'] . ' · ' . $reason, 0, 250)]); }
+            catch (RuntimeException $e) { throw new RuntimeException(t('po.rev_stock', ['n' => (int)$x['seq'], 'c' => (string)($x['code'] ?? ''), 'm' => $e->getMessage()])); }
+            $pr = one("SELECT id FROM inv_prices WHERE item_id = ? AND po_line_id = ? AND source = 'receipt' AND ABS(COALESCE(qty,0) - ?) < 0.0005 ORDER BY id DESC LIMIT 1", [(int)$x['item_id'], (int)$x['po_line_id'], $qa]);
+            if ($pr) { q('DELETE FROM inv_prices WHERE id = ?', [(int)$pr['id']]);   // the price of a delivery that did not happen
+                $last = one("SELECT unit_price, priced_at, supplier_id FROM inv_prices WHERE item_id = ? AND source <> 'rollup' ORDER BY priced_at DESC, id DESC LIMIT 1", [(int)$x['item_id']]);
+                if ($last) { $avg = one("SELECT SUM(unit_price * COALESCE(NULLIF(qty,0),1)) / SUM(COALESCE(NULLIF(qty,0),1)) AS a FROM (SELECT unit_price, qty FROM inv_prices WHERE item_id = ? AND source <> 'rollup' ORDER BY priced_at DESC, id DESC LIMIT 10) x", [(int)$x['item_id']]); q('UPDATE inv_items SET last_price = ?, last_price_at = ?, last_supplier_id = ?, avg_cost = ? WHERE id = ?', [$last['unit_price'], $last['priced_at'], $last['supplier_id'], $avg && $avg['a'] !== null ? round((float)$avg['a'], 4) : null, (int)$x['item_id']]); } }
+        }
+        if ($qa > 0.0005 && $x['pr_line_id']) {
+            q('UPDATE pr_lines SET qty_received = GREATEST(0, qty_received - ?) WHERE id = ?', [$qa, (int)$x['pr_line_id']]);
+            $pl = one('SELECT * FROM pr_lines WHERE id = ?', [(int)$x['pr_line_id']]);
+            if ($pl && $pl['status'] === 'received' && (float)$pl['qty_received'] <= 0.0005) q('UPDATE pr_lines SET status = ? WHERE id = ?', [(float)$pl['qty_ordered'] > 0.0005 ? 'ordered' : ((float)$pl['qty_reserved'] >= (float)$pl['qty'] - 0.0005 ? 'reserved' : 'to_buy'), (int)$pl['id']]);
+        }
+        $recv = max(0.0, (float)$x['l_recv'] - $qr); $acc = max(0.0, (float)$x['l_acc'] - $qa); $rej = max(0.0, (float)$x['l_rej'] - $qj);
+        $st = $x['l_status'] === 'cancelled' ? 'cancelled' : ($acc >= (float)$x['l_qty'] - 0.0005 ? 'received' : ($recv > 0.0005 ? 'partial' : 'open'));
+        q('UPDATE po_lines SET qty_received = ?, qty_accepted = ?, qty_rejected = ?, status = ? WHERE id = ?', [$recv, $acc, $rej, $st, (int)$x['po_line_id']]);
+    }
+    q('DELETE FROM po_receipt_lines WHERE receipt_id = ?', [$rid]); q('DELETE FROM po_receipts WHERE id = ?', [$rid]);
+    $open = (int) scalar("SELECT COUNT(*) FROM po_lines WHERE order_id = ? AND status IN ('open','partial')", [$oid]); $left = (int) scalar('SELECT COUNT(*) FROM po_receipts WHERE order_id = ?', [$oid]);
+    $st = !$open ? 'received' : ($left ? 'partial' : (scalar("SELECT COUNT(*) FROM po_events WHERE order_id = ? AND event = 'confirm'", [$oid]) ? 'confirmed' : 'sent'));
+    q('UPDATE po_orders SET status = ? WHERE id = ?', [$st, $oid]); po_event($oid, 'receive_rev', $r['receipt_no'] . ' · ' . $n . ' ' . t('prq.lines') . ' · ' . $reason);
+    po_expected_update($oid); po_progress_apply($o['subproject_id'] ? (int)$o['subproject_id'] : null);
+    cache_bump_later('inv'); cache_bump_later('eng'); return (string)$r['receipt_no'];
+}
+
 function po_receipts(int $oid): array { return all('SELECT r.*, (SELECT COUNT(*) FROM po_receipt_lines l WHERE l.receipt_id = r.id) AS n_lines, (SELECT COUNT(*) FROM po_receipt_lines l WHERE l.receipt_id = r.id AND l.ncr_status = \'open\') AS n_ncr FROM po_receipts r WHERE r.order_id = ? ORDER BY r.id DESC', [$oid]); }
 function po_receipt_lines(int $rid): array { return all('SELECT rl.*, l.seq, l.description, l.unit, l.item_id, i.code AS item_code FROM po_receipt_lines rl JOIN po_lines l ON l.id = rl.po_line_id LEFT JOIN inv_items i ON i.id = l.item_id WHERE rl.receipt_id = ? ORDER BY l.seq', [$rid]); }
 function po_ncr_open(int $oid): array { return all('SELECT rl.*, r.receipt_no, r.received_at, l.seq, l.description, l.unit, i.code AS item_code FROM po_receipt_lines rl JOIN po_receipts r ON r.id = rl.receipt_id JOIN po_lines l ON l.id = rl.po_line_id LEFT JOIN inv_items i ON i.id = l.item_id WHERE r.order_id = ? AND rl.ncr_status = \'open\' ORDER BY r.id, l.seq', [$oid]); }
@@ -565,7 +612,7 @@ function po_receive_from_post_x(): int {
         $qp = $dest === 'project' ? $qa : 0.0; $pqRaw = trim((string)($_POST['pq'][$lid] ?? '')); if ($dest === 'project' && $pqRaw !== '') { $pq = (float) str_replace(',', '.', $pqRaw); if ($pq < 0 || $pq > $qa + 0.0005) throw new RuntimeException(t('dn.dest_qty_bad', ['n' => (int)$l['seq'], 'q' => stk_qty($qa)])); $qp = min($qa, $pq); if ($qp <= 0.0005) { $qp = 0.0; $dest = 'stock'; } }
         $todo[] = [$l, $qr, $qa, $qrej, $reason ?: null, $action, mb_substr(trim((string)($_POST['loc'][$lid] ?? '')), 0, 40) ?: null, $dest, $qp]; }
     if (!$todo) throw new RuntimeException(t('po.need_receipt_qty'));
-    $n = (int) scalar('SELECT COUNT(*) + 1 FROM po_receipts WHERE order_id = ?', [$oid]); $no = $o['po_no'] . '-GR' . $n;
+    $n = max((int) scalar('SELECT COUNT(*) + 1 FROM po_receipts WHERE order_id = ?', [$oid]), (int) scalar("SELECT COUNT(*) + 1 FROM po_events WHERE order_id = ? AND event = 'receive'", [$oid])); $no = $o['po_no'] . '-GR' . $n;   // R97-223: the number of a reversed receipt is not used again
     $fileId = null; if (!empty($_FILES['file']['tmp_name']) && $o['project_id']) $fileId = cp_store_file($_FILES['file'], (int)$o['project_id'], $o['subproject_id'] ? (int)$o['subproject_id'] : null, 'file', 'internal', $no . ($dn ? ' · ' . $dn : ''));
     q('INSERT INTO po_receipts (order_id, receipt_no, received_at, delivery_note, warehouse_id, note, file_id, user_id, user_name) VALUES (?,?,?,?,?,?,?,?,?)', [$oid, $no, $date, $dn, $wh, $note, $fileId, (int)$u['id'], $u['full_name']]); $rid = (int) db()->lastInsertId();
     $ncr = 0; $dnL = []; $dnHas = function_exists('dn_has') && dn_has();

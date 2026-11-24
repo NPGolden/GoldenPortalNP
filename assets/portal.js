@@ -122,17 +122,28 @@
     if (form) form.addEventListener('submit', function () { if (input) input.value = drawn ? c.toDataURL('image/png') : ''; });
   });
 
+  /* R97-223: data-confirm-sum="recv[" — the question shows what is about to be booked: {n} = fields of that name with a quantity, {q} = their total */
+  function confirmText(f) {
+    var m = f.dataset.confirm || '', pre = f.dataset.confirmSum; if (!pre) return m;
+    var n = 0, q = 0; f.querySelectorAll('input[name^="' + pre.replace(/["\\]/g, '') + '"]').forEach(function (i) { var v = parseFloat(String(i.value).replace(',', '.')); if (v > 0) { n++; q += v; } });
+    return m.replace('{n}', n).replace('{q}', Math.round(q * 1000) / 1000);
+  }
+  /* buttons that fill or clear the quantity fields of their form: data-fill-open (value from each field's data-open) / data-fill-clear */
+  document.querySelectorAll('button[data-fill-open], button[data-fill-clear]').forEach(function (b) {
+    b.addEventListener('click', function () { var f = b.form; if (!f) return; var open = b.hasAttribute('data-fill-open');
+      f.querySelectorAll('input[data-open]').forEach(function (i) { i.value = open && parseFloat(i.dataset.open) > 0 ? i.dataset.open : ''; i.dispatchEvent(new Event('input', { bubbles: true })); }); });
+  });
   document.querySelectorAll('form[data-confirm]').forEach(function (f) {
     f.addEventListener('submit', function (e) {
       if (f.__confirmed) return;
       e.preventDefault();
       if (typeof HTMLDialogElement !== 'function') {            // very old browsers
-        if (window.confirm(f.dataset.confirm)) { f.__confirmed = true; f.requestSubmit ? f.requestSubmit() : f.submit(); }
+        if (window.confirm(confirmText(f))) { f.__confirmed = true; f.requestSubmit ? f.requestSubmit() : f.submit(); }
         return;
       }
       var d = getDialog();
       d.querySelector('h2').textContent = f.dataset.confirmTitle || 'Please confirm';
-      d.querySelector('p').textContent = f.dataset.confirm.replace(/\\n/g, '\n');
+      d.querySelector('p').textContent = confirmText(f).replace(/\\n/g, '\n');
       var ok = d.querySelector('button[value=ok]'), cancel = d.querySelector('button[value=cancel]');
       ok.textContent = f.dataset.confirmOk || 'OK';
       cancel.textContent = f.dataset.confirmCancel || 'Cancel';

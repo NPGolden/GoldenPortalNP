@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.236.1** (build 2026-11-23). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.237.0** (build 2026-11-23). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.237.0 | GAS-CP-R97-223 | 2026-11-24 | Purchase order: a receipt booked by mistake can be reversed; Book receipt asks for confirmation with the number of lines and the total; the quantities to receive start empty | — |
 | 1.236.1 | GAS-CP-R97-222 | 2026-11-24 | Wellness: the focus sound and the focus timer continue when another menu is opened | — |
 | 1.236.0 | GAS-CP-R97-221 | 2026-11-24 | Service 0.8.5 and Employee 1.1.5: My planning — the scheduled works of the next three weeks on the phone; notices also for changes on later days; a work with a service report is no longer shown as a new assignment | — |
 | 1.235.0 | GAS-CP-R97-219 | 2026-11-24 | Service report: serial numbers of the equipment can be added or changed on the report page at any time, also after acceptance, without reopening the report | — |

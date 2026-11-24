@@ -4268,3 +4268,11 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Cause: the sound is generated with Web Audio inside the page; a menu click loads a new document and the audio graph ends.
 - `assets/wellness.js`: `sessionStorage` keys `gas.wl.snd.<user>` (kind, set by a user start, removed by a user stop) and `gas.wl.tm.<user>` (`phase`, `end`). On load the timer is restored and the sound is started again: `AudioContext.resume()`; when the browser keeps the context suspended, the first `pointerdown` / `keydown` / `touchstart` starts it.
 - Per tab (sessionStorage), nothing is sent to the server, nothing starts that the person did not start.
+
+## §502 Purchase order: reverse a receipt; confirmation and empty quantities at Book receipt (GAS-CP-R97-223, v1.237.0)
+
+- Cause of the report: the receipt form filled every line with its open quantity; one press on Book receipt received a whole order.
+- `views/purchase_order.php`: `recv[...]` fields start empty and carry `data-open`; buttons `data-fill-open` / `data-fill-clear`; the form has `data-confirm` with `data-confirm-sum="recv["` — `assets/portal.js` `confirmText()` puts the number of lines with a quantity and their total into the question.
+- `po_receipt_reverse($oid, $rid, $reason)` (inside `stk_tx`): rights `po_receipt_can_reverse` (po_admin, or the booker on the same day); blocks `po_receipt_reverse_block` (order not partial / received, delivery note not cancelled, closed NCR, licences). Per line: reservation of the requisition line in the receipt's warehouse reduced by min(accepted, held); `stk_move` out, reason `receipt_rev` (refused when the goods are not there — everything rolls back); the `inv_prices` row of the receipt removed and last price / average restored; `pr_lines.qty_received` reduced, status `received` → `ordered` / `reserved` / `to_buy`; `po_lines` totals reduced, status recomputed. Receipt rows deleted; order status `received` / `partial` / `confirmed` / `sent`; event `receive_rev`.
+- Receipt numbers: next number = max(receipts, receive events) + 1, so a reversed number is not reused.
+- Language keys +15 (13 263 per language).
