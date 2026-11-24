@@ -4418,3 +4418,26 @@ No database step. Language keys +29 (13 506 per language). Next ref GAS-CP-R97-2
 **Not changed:** approval by Procurement, booking, and the rule itself — closing the rest of a partly delivered line in the same check is still not possible (receive the part, then cancel the rest on the order).
 
 No database step. Language keys +3 (13 509 per language). Next ref GAS-CP-R97-235, next guide §514.
+
+## §514 HR: Strike is registered without approval (GAS-CP-R97-235, v1.245.0)
+
+**What changed:** a leave type can be marked **No approval** (HR › Settings › Leave types, next to «HR only»). It is switched on for **Strike**.
+
+**For the employee:** My leave (portal, Employee app, Service app) › type *Strike* › day(s) › send. The entry is registered at once: status *approved*, note «Registered without approval», shown on the planning board as strike. No reason has to be chosen. The employee can cancel it until the day it starts; later only HR can.
+
+**For manager and HR:** a notification «Registered without approval — name · STR · dates», for information; there is nothing to decide. HR can still cancel or correct the entry in HR › Requests.
+
+**Unchanged:** annual leave, sick leave, parental leave and every other type keep their approval steps. Strike remains unpaid and does not count against the annual entitlement.
+
+**Data:** column `hr_leave_types.no_approval` (migration key r99o).
+
+### Leave above the remaining days — registered directly (same release)
+
+**When:** the employee asks for leave and the portal answers «Not enough … available» (now with the advice to ask HR, the General Manager or the CEO).
+
+**Who:** HR, the Owner / CEO and the General Manager.
+
+**How:** HR › Requests › «+ Request for an employee» › person, type, dates › tick **Register directly — also above the remaining days** › send. The leave is registered and approved in one step and written to the planning board. Without the tick the request follows the normal route and the balance check applies as before.
+
+**Trace:** the request shows the note «Above the remaining days by N days — registered directly by <name>» (or «Registered directly by <name>» when the balance was enough). The balance of the employee becomes negative by the days owed. The employee receives «Leave request approved»; HR and the manager are informed.
+

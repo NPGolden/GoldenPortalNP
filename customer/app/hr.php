@@ -121,6 +121,7 @@ function hr_type_save_from_post(): void {
     try { if ($id) q('UPDATE hr_leave_types SET code = ?, name = ?, kind = ?, counts = ?, needs_reason = ?, sort_order = ?' . ($r54 ? ', unit = ?, hr_only = ?, needs_doc = ?, paid = ?, consumes_annual = ?, max_year = ?, rule_key = ?' : '') . $mlSet . ' WHERE id = ?', [...$v, $id]);
           else q('INSERT INTO hr_leave_types (code, name, kind, counts, needs_reason, sort_order' . ($r54 ? ', unit, hr_only, needs_doc, paid, consumes_annual, max_year, rule_key' : '') . $mlCols . ') VALUES (' . implode(',', array_fill(0, count($v), '?')) . ')', $v); }
     catch (PDOException $e) { if ((int)$e->errorInfo[1] === 1062) throw new RuntimeException(t('sys.dup', ['v' => $code])); throw $e; }
+    if ($r54 && function_exists('hr_noappr_has') && hr_noappr_has()) q('UPDATE hr_leave_types SET no_approval = ? WHERE code = ?', [(int)!empty($_POST['no_approval']), $code]);   // R97-235
 }
 /** Validate the type / reason of a board assignment (called by pl_assign). Returns [type_id, reason]. */
 function hr_assign_check(string $kind, array $in): array {

@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.244.2** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.245.0** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.245.0 | GAS-CP-R97-235 | 2026-11-24 | HR: leave types registered without approval — Strike is registered at once when the employee enters it, goes on the planning board, manager and HR are informed; switch per leave type in HR settings. HR, the General Manager or the CEO register a leave for an employee directly, also above the remaining days | `install/migrate_cp_r97_235_leave_no_approval.sql` |
 | 1.244.2 | GAS-CP-R97-234 | 2026-11-24 | Delivery check: «Send to Procurement» / «Book the receipt» sits with «Save» and saves the table first; the button is no longer greyed out without a word — what stops the check is listed at the buttons; an order line that receives goods cannot be ticked «Replaced» (such ticks are dropped at saving); Excel rows also match our codes that carry the maker in front (SE.A9F74310) | — |
 | 1.244.1 | GAS-CP-R97-233 | 2026-11-24 | Service app: sending a service report by e-mail for acceptance answered «Outgoing e-mail is not set up» — the mail module was not loaded for requests from the apps; fixed | — |
 | 1.244.0 | GAS-CP-R97-232 | 2026-11-24 | Delivery check: the supplier document can also be given as an Excel file in the layout of the template (Code, Qty, prices, PO line) — rows are taken as typed and matched to the order by code without the assistant; only codes that are not on the order are put to the assistant; Excel template on the page | — |

@@ -2,7 +2,7 @@
 /** Work › HR requests — approval queue for managers (their people) and HR (everyone), plus HR-entered requests (GAS-CP-R54-001). */
 require __DIR__ . '/_layout.php';
 $u = require_staff();
-if (!function_exists('hr2_has') || !hr2_has() || !(hr_can() || hr_is_manager())) { http_response_code(403); layout_head(t('hr.requests'), 'hr_requests'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
+if (!function_exists('hr2_has') || !hr2_has() || !(hr_can() || hr_is_manager() || hr_over_can())) { http_response_code(403); layout_head(t('hr.requests'), 'hr_requests'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
 $isHr = hr_can(); $year = (int)($_GET['year'] ?? date('Y')); if ($year < 2000 || $year > 2100) $year = (int) date('Y');
 $st = (string)($_GET['st'] ?? 'open'); $me = (int)$u['id'];
 $pid = $isHr ? (int)($_GET['pid'] ?? 0) : 0; $pp = $pid ? hr_person($pid) : null; if ($pp) { $st = $st === 'open' && !isset($_GET['st']) ? 'all' : $st; if (isset($_GET['year']) && (int)$_GET['year'] === 0) $year = 0; }   // R54-005: per-person history for HR
@@ -10,7 +10,7 @@ $fh = fn($v) => $v === null ? '—' : rtrim(rtrim(number_format((float)$v, 2, '.
 $all = $isHr ? hr_requests_for('hr', $year) : hr_requests_for('manager', $year); if ($pp) $all = array_values(array_filter($all, fn($r) => (int)$r['person_id'] === $pid));
 $open = array_filter($st === 'open' && !$pp ? ($isHr ? hr_requests_for('hr', 0) : hr_requests_for('manager', 0)) : $all, fn($r) => in_array($r['status'], ['pending_mgr', 'pending_hr'], true));   // R77-018: open requests of every year — a request for next January must not vanish behind the year filter
 $rows = $st === 'open' ? $open : ($st === 'all' ? $all : array_filter($all, fn($r) => $r['status'] === $st));
-$people = $isHr ? hr_people() : [];
+$canFor = $isHr || hr_over_can(); $people = $canFor ? hr_people() : [];   // R97-235: the General Manager too registers a leave for an employee
 layout_head(t('hr.requests'), 'hr_requests');
 ?>
 <div class="page-head"><div><h1><?= $pp ? '📜 ' . e($pp['name_en']) . ' — ' . tt('hr.history') : '✅ ' . tt('hr.requests') ?></h1><p class="lede" style="margin-bottom:0;"><?= $pp ? tt('hr.history_lede') : ($isHr ? tt('hr.requests_lede_hr') : tt('hr.requests_lede_mgr')) ?></p></div>
@@ -48,7 +48,7 @@ layout_head(t('hr.requests'), 'hr_requests');
   <?php endif; ?>
 </div>
 
-<?php if ($isHr): ?>
+<?php if ($canFor): ?>
 <div class="card" id="req-new">
   <h2>+ <?= tt('hr.new_request_for') ?></h2>
   <p class="hint"><?= tt('hr.new_request_for_hint') ?></p>
@@ -63,6 +63,7 @@ layout_head(t('hr.requests'), 'hr_requests');
       <?php if (function_exists('hr_req_has_reasons') && hr_req_has_reasons()): require_once __DIR__ . '/_hr_reason.php'; hr_reason_fields('hr_type', [null, null], true); else: ?><div class="field"><label><?= tt('hr.reason') ?></label><input name="reason" maxlength="300"></div><?php endif; ?>
       <div class="field"><label><?= tt('hr.document') ?></label><input type="file" name="doc" accept=".pdf,image/*"></div>
     </div>
+    <?php if (hr_over_can()): ?><label class="chk" style="margin:8px 0;" title="<?= tt('hr.over_balance_hint') ?>"><input type="checkbox" name="over_balance" value="1"<?= $isHr ? '' : ' checked required' ?>> <?= tt('hr.over_balance') ?></label><p class="hint"><?= tt('hr.over_balance_hint') ?></p><?php endif; ?>
     <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit"><?= tt('hr.send_request') ?></button></div>
   </form>
 </div>
