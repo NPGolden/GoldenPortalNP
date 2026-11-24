@@ -266,7 +266,7 @@ function pdc_code_norm(string $c): string { return (string) preg_replace('/[\s.\
 function pdc_xlsx_match(array $rows, array $lines, array $alias): array {
     $idx = []; $left = []; $bySeq = []; $how = [];
     foreach ($lines as $l) { $id = (int)$l['id']; $left[$id] = (float)$l['open_qty']; $bySeq[(int)$l['seq']] = $id;
-        foreach ([['code', (string)($l['code'] ?? '')], ['part', (string)($l['part_no'] ?? '')], ['part', (string)($l['factory_code'] ?? '')]] as [$h, $v]) { $k = pdc_code_norm($v); if ($k !== '' && !isset($how[$k][$id])) { $idx[$k][] = $id; $how[$k][$id] = $h; } }
+        foreach ([['code', (string)($l['code'] ?? '')], ['code', (string) preg_replace('/^[A-Za-z]{1,6}\./', '', trim((string)($l['code'] ?? '')))], ['part', (string)($l['part_no'] ?? '')], ['part', (string)($l['factory_code'] ?? '')]] as [$h, $v]) { $k = pdc_code_norm($v); if ($k !== '' && !isset($how[$k][$id])) { $idx[$k][] = $id; $how[$k][$id] = $h; } }   // R97-234: our codes carry the maker in front (SE.A9F74310) — also compared without it
         foreach ($alias[(int)($l['item_id'] ?? 0)] ?? [] as $v) { $k = pdc_code_norm((string)$v); if ($k !== '' && !isset($how[$k][$id])) { $idx[$k][] = $id; $how[$k][$id] = 'alias'; } }
     }
     $out = []; $pins = [];
@@ -350,18 +350,20 @@ function pdc_save_from_post(int $id): void {
     $c = pdc_load($id); if (!$c || !$c['can_edit']) throw new RuntimeException(t('err.noaccess'));
     $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['doc_date'] ?? '')) ? $_POST['doc_date'] : null; $wh = (int)($_POST['warehouse_id'] ?? 0) ?: ((int)$c['warehouse_id'] ?: null);
     q('UPDATE po_dchecks SET doc_no = ?, doc_date = ?, warehouse_id = ?, note = ? WHERE id = ?', [mb_substr(trim((string)($_POST['doc_no'] ?? '')), 0, 80) ?: null, $date, $wh, mb_substr(trim((string)($_POST['note'] ?? '')), 0, 600) ?: null, $id]);
-    $A = (array)($_POST['act'] ?? []); $PL = (array)($_POST['pl'] ?? []); $Q = (array)($_POST['qty'] ?? []); $IC = (array)($_POST['icode'] ?? []); $RM = (array)($_POST['rem'] ?? []);
-    foreach ($c['lines'] as $d) { $lid = (int)$d['id']; if (!array_key_exists($lid, $A)) continue;
+    $A = (array)($_POST['act'] ?? []); $recvOn = [];   // R97-234: order lines that receive goods with this check
+    $PL = (array)($_POST['pl'] ?? []); $Q = (array)($_POST['qty'] ?? []); $IC = (array)($_POST['icode'] ?? []); $RM = (array)($_POST['rem'] ?? []);
+    foreach ($c['lines'] as $d) { $lid = (int)$d['id']; if (!array_key_exists($lid, $A)) { if (in_array($d['action'], ['recv', 'switch'], true) && $d['po_line_id']) $recvOn[(int)$d['po_line_id']] = true; continue; }
         $act = in_array($A[$lid], PDC_ACTIONS, true) ? $A[$lid] : 'skip'; $pl = (int)($PL[$lid] ?? 0); if (!isset($c['po_by_id'][$pl])) $pl = 0;
         $qty = max(0.0, round((float) str_replace(',', '.', (string)($Q[$lid] ?? '0')), 3)); if ($qty > 1e7) $qty = 0.0;
         $code = mb_substr(trim((string)($IC[$lid] ?? '')), 0, 60); $item = null; $new = null;
         if ($act === 'switch' || $act === 'add') { if ($code === '') $code = mb_substr((string)$d['doc_code'], 0, 60); $it = $code !== '' ? stk_item_by_code($code) : null; if ($it) $item = (int)$it['id']; else $new = $code; }
         if (in_array($act, ['recv', 'switch'], true) && !$pl) $act = 'skip';   // nothing to receive against
         if ($act === 'recv' && $qty <= 0) $act = 'skip';
+        if (in_array($act, ['recv', 'switch'], true)) $recvOn[$pl] = true;
         q('UPDATE po_dcheck_lines SET action = ?, po_line_id = ?, qty = ?, item_id = ?, new_code = ?, remember = ? WHERE id = ? AND check_id = ?', [$act, $pl ?: null, $act === 'skip' ? 0 : $qty, $item, $new, (int)(!empty($RM[$lid]) && $act === 'recv'), $lid, $id]);
     }
     q('DELETE FROM po_dcheck_close WHERE check_id = ?', [$id]);
-    foreach (array_unique(array_map('intval', (array)($_POST['close'] ?? []))) as $pl) if (isset($c['po_by_id'][$pl])) q('INSERT IGNORE INTO po_dcheck_close (check_id, po_line_id) VALUES (?,?)', [$id, $pl]);
+    foreach (array_unique(array_map('intval', (array)($_POST['close'] ?? []))) as $pl) if (isset($c['po_by_id'][$pl]) && !isset($recvOn[$pl])) q('INSERT IGNORE INTO po_dcheck_close (check_id, po_line_id) VALUES (?,?)', [$id, $pl]);
 }
 /** What would stop the booking, as texts ([] = can be booked). Checked at submit and again at booking. */
 function pdc_problems(array $c): array {

@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.244.1';
+const CP_VERSION = '1.244.2';
 const CP_BUILD   = '2026-11-24';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-234', 'version' => '1.244.2', 'date' => '2026-11-24', 'title' => 'Delivery check: «Send to Procurement» / «Book the receipt» sits with «Save» and saves the table first; the button is no longer greyed out without a word — what stops the check is listed at the buttons; an order line that receives goods cannot be ticked «Replaced» (such ticks are dropped at saving); Excel rows also match our codes that carry the maker in front (SE.A9F74310)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-233', 'version' => '1.244.1', 'date' => '2026-11-24', 'title' => 'Service app: sending a service report by e-mail for acceptance answered «Outgoing e-mail is not set up» — the mail module was not loaded for requests from the apps; fixed', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-232', 'version' => '1.244.0', 'date' => '2026-11-24', 'title' => 'Delivery check: the supplier document can also be given as an Excel file in the layout of the template (Code, Qty, prices, PO line) — rows are taken as typed and matched to the order by code without the assistant; only codes that are not on the order are put to the assistant; Excel template on the page', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-231', 'version' => '1.243.0', 'date' => '2026-11-24', 'title' => 'Recruiting: offer to the candidate — financial proposal and terms with the job description, net salary entered by HR, kept as a record and sent by the portal from the e-mail template; answer of the candidate recorded', 'db' => 'install/migrate_cp_r97_231_recruiting_offers.sql', 'check' => 'r99n'],

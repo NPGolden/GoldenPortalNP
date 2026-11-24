@@ -53,7 +53,7 @@ $whs = function_exists('stk_warehouses') ? stk_warehouses() : [];
 
 <?php
 $edit = $c['can_edit']; $cnt = ['same' => 0, 'code' => 0, 'component' => 0, 'extra' => 0]; foreach ($c['lines'] as $d) $cnt[$d['finding']] = ($cnt[$d['finding']] ?? 0) + 1;
-$onDoc = []; foreach ($c['lines'] as $d) if ($d['po_line_id']) $onDoc[(int)$d['po_line_id']] = true;
+$onDoc = []; $recvOn = []; foreach ($c['lines'] as $d) if ($d['po_line_id']) { $onDoc[(int)$d['po_line_id']] = true; if (in_array($d['action'], ['recv', 'switch'], true)) $recvOn[(int)$d['po_line_id']] = true; }
 $problems = in_array($c['status'], ['draft', 'pending'], true) ? pdc_problems($c) : [];
 ?>
 <?php if ($c['status'] === 'draft' && $c['decided_note']): ?><div class="card" style="border-left:4px solid var(--red);"><b><?= tt('pdc.sent_back') ?></b> <?= e((string)$c['decided_name']) ?> · <?= e(fmt_datetime((string)$c['decided_at'])) ?> — <?= e((string)$c['decided_note']) ?></div><?php endif; ?>
@@ -106,16 +106,16 @@ $problems = in_array($c['status'], ['draft', 'pending'], true) ? pdc_problems($c
 <?php foreach ($c['po_lines'] as $l): if ((float)$l['open_qty'] <= 0.0005 && !in_array((int)$l['id'], $c['close'], true)) continue; $on = isset($onDoc[(int)$l['id']]); ?>
 <tr><td><?= (int)$l['seq'] ?></td><td style="font-family:var(--mono);"><?= e((string)$l['code']) ?></td><td><?= e(mb_substr((string)$l['description'], 0, 90)) ?></td><td class="num"><?= e(stk_qty((float)$l['open_qty'])) ?> <?= e((string)$l['unit']) ?></td>
   <td><?= $on ? pill('green', t('pdc.on_doc')) : pill('mute', t('pdc.not_on_doc')) ?></td>
-  <td><label class="chk"><input type="checkbox" name="close[]" value="<?= (int)$l['id'] ?>"<?= in_array((int)$l['id'], $c['close'], true) ? ' checked' : '' ?><?= $edit ? '' : ' disabled' ?>> <small><?= tt('pdc.close_lbl') ?></small></label></td></tr>
+  <td><?php if (isset($recvOn[(int)$l['id']])): /* R97-234: a line that receives goods with this check is not closed */ ?><small class="hint"><?= tt('pdc.close_recv') ?></small><?php else: ?><label class="chk"><input type="checkbox" name="close[]" value="<?= (int)$l['id'] ?>"<?= in_array((int)$l['id'], $c['close'], true) ? ' checked' : '' ?><?= $edit ? '' : ' disabled' ?>> <small><?= tt('pdc.close_lbl') ?></small></label><?php endif; ?></td></tr>
 <?php endforeach; ?></tbody></table></div></div>
 
-<?php if ($edit): ?><div class="btn-row"><button class="btn btn--ghost" type="submit"><?= tt('pdc.save') ?></button><span class="hint"><?= tt('pdc.save_hint') ?></span></div><?php endif; ?>
+<?php if ($edit && $problems): /* R97-234: what stops the check, shown where the buttons are */ ?><div class="card" style="border-left:4px solid var(--red);"><b><?= tt('pdc.stops') ?></b><ul style="margin:6px 0 0 18px;"><?php foreach (array_slice($problems, 0, 12) as $p): ?><li><?= e($p) ?></li><?php endforeach; ?></ul></div><?php endif; ?>
+<?php if ($edit): ?><div class="btn-row"><button class="btn btn--ghost" type="submit"><?= tt('pdc.save') ?></button>
+  <?php if ($c['status'] === 'draft'): /* R97-234: one press saves the table and sends the check on */ ?><button class="btn btn--gold" type="submit" name="action" value="pdc_submit" data-confirm="<?= e(t('pdc.submit_q')) ?>"><?= $c['why'] ? '➜ ' . tt('pdc.submit_proc') : '📥 ' . tt('pdc.submit_book') ?></button><?php endif; ?>
+  <span class="hint"><?= tt('pdc.save_hint') ?></span></div><?php endif; ?>
 </form>
 
 <div class="btn-row" style="margin-top:14px;">
-<?php if ($c['status'] === 'draft' && $edit): ?>
-  <form method="post" action="<?= $self ?>" data-lock data-confirm="<?= e(t($c['why'] ? 'pdc.submit_q_proc' : 'pdc.submit_q_book')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="pdc_submit"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--gold" type="submit"<?= $problems ? ' disabled' : '' ?>><?= $c['why'] ? '➜ ' . tt('pdc.submit_proc') : '📥 ' . tt('pdc.submit_book') ?></button></form>
-<?php endif; ?>
 <?php if ($c['can_decide']): ?>
   <form method="post" action="<?= $self ?>" data-lock data-confirm="<?= e(t('pdc.approve_q')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="pdc_decide"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="decision" value="approve"><button class="btn btn--gold" type="submit"<?= $problems ? ' disabled' : '' ?>>✓ <?= tt('pdc.approve') ?></button></form>
   <form method="post" action="<?= $self ?>" data-lock data-prompt="<?= e(t('pdc.back_q')) ?>" data-prompt-field="note"><?= csrf_field() ?><input type="hidden" name="action" value="pdc_decide"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="decision" value="back"><input type="hidden" name="note" value=""><button class="btn btn--ghost" type="submit">↩ <?= tt('pdc.back') ?></button></form>

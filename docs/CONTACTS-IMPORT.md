@@ -4406,3 +4406,15 @@ No database step. Language keys +29 (13 506 per language). Next ref GAS-CP-R97-2
 
 **Fix:** `mailer` added to the modules the API loads (`customer/api/v1/bootstrap.php`). It applies to every app; no app update and no database step. If the message appears again in the portal itself, check Settings › System › Website › Outgoing e-mail and use «Send a test message».
 
+## §513 Delivery check: send saves first; «Replaced» only on lines that are not received (GAS-CP-R97-234, v1.244.2)
+
+**Fault (24/11/2026, delivery check of GAS-PO-26-0024, 80 rows from Excel):** «Send to Procurement» did nothing. Order lines that were on the document had been ticked «Replaced / close this line». A line cannot receive goods and be closed in the same check, so every such row is a blocker («order line #n is ticked Replaced and cannot receive»); with blockers the button was rendered disabled, and the list of blockers stood only at the top of a page of 80 rows. The button was also a form of its own: changes in the table that had not been saved were not sent with it.
+
+**Now:**
+- The send button is inside the form of the table, next to «Save» (`name="action" value="pdc_submit"`): the action saves the table (`pdc_save_from_post`) and then submits. It is never disabled; blockers are listed in a red box above the buttons and returned as the message when the button is pressed.
+- `pdc_save_from_post` does not store «Replaced» for an order line that has a row with *receive under our code* or *receive under the delivered item*. The page shows «received with this document» instead of the tick on such lines.
+- `pdc_xlsx_match`: our code is also compared without a maker prefix of 1–6 letters and a dot (`SE.A9F74310` ↔ `A9F74310`).
+
+**Not changed:** approval by Procurement, booking, and the rule itself — closing the rest of a partly delivered line in the same check is still not possible (receive the part, then cancel the rest on the order).
+
+No database step. Language keys +3 (13 509 per language). Next ref GAS-CP-R97-235, next guide §514.
