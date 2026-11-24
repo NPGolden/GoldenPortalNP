@@ -4354,3 +4354,17 @@ No database step; statuses `reading` and `failed` use the existing column. The w
 
 **Golden HR app 1.2.4** (updates by itself, no store version): candidate screen › Interviews › a planned interview shows «invited <date>» or «invitation not sent», and the buttons **✎ Change** and **✉ Invitation**. The invitation is read from the portal template in the language of the candidate, can be adjusted and is sent by the portal. API: `POST /hr/app/interview/{id}`, `GET` and `POST /hr/app/interview/{id}/invitation` (HR accounts only).
 
+## §510 Recruiting: offer to the candidate — terms, net salary, job description (GAS-CP-R97-231, v1.243.0)
+
+**Where:** HR › Recruiting › an application › card «💼 Offer and terms». **HR only** — the hiring manager of the vacancy does not see the card.
+
+**Fields:** position · net salary (amount, currency, per month / year, payments per year) · contract (indefinite, fixed term, project, internship) · start date · working hours · place of work · probation (months) · benefits · other terms · offer valid until · job description (from the approved job description linked to the vacancy, otherwise the vacancy text; editable).
+
+**Steps:** «Save the draft» → the e-mail appears (To, Subject, Text) from the template *Recruiting — offer* in the language of the candidate → adjust if needed → «Send the offer». Needed before sending: net salary, start date, job description.
+
+**Template placeholders:** `{salary}` `{contract}` `{start}` `{hours}` `{place}` `{probation}` `{benefits}` `{terms}` `{valid}` `{jd}` besides `{name}` `{title}` `{no}` `{user}` `{branch}` `{signature}`. A line of the template whose term is empty is left out. A template of your own without `{salary}` gets the terms and the job description added before the signature.
+
+**Record:** when the e-mail has left, the offer (number `<application>-OF<n>`) is frozen with the exact subject and text, who sent it and when; the application moves to «Offer». A revised offer is a new one. The answer is recorded: Accepted · Declined · Withdrawn, with a note. Accepting does not hire — set the application to «Hired» as before.
+
+**Privacy:** the amount is stored only in the offer (table `rc_offers`, migration key r99n), shown only to HR, never written to the recruiting log or to notifications. Offers are deleted with the application; when a hired application is anonymised by the retention run, the e-mail text is cleared and the terms stay.
+

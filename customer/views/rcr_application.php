@@ -91,6 +91,50 @@ if (function_exists('em_card_html') && em_has()) {
 </form></details><?php endif; ?>
 </div><?php endforeach; ?>
 <?php endif; ?>
+<?php if (function_exists('rcr_offer_can') && rcr_offer_can() && !str_starts_with((string)$a['email'], 'anon-')): /* R97-231: the offer — financial proposal and terms with the job description; HR only */
+  $offs = rcr_offers($id); $od = null; foreach ($offs as $x) if ($x['status'] === 'draft') { $od = $x; break; }
+  $jdDef = $od ? null : rcr_offer_jd_text($a, in_array((string)($a['lang'] ?? ''), array_keys(LOCALES), true) ? (string)$a['lang'] : 'en'); $vv = one('SELECT emp_type, location FROM rc_vacancies WHERE id = ?', [(int)$a['vacancy_id']]) ?: [];
+  $ov = fn(string $k, $def = '') => $od ? (string)($od[$k] ?? '') : (string)$def; $canNew = !in_array($a['status'], ['withdrawn'], true); ?>
+<div class="card" id="offer"><div class="card-head"><h2>💼 <?= tt('rc.of_title') ?></h2><span class="hint"><?= tt('rc.of_lede') ?></span></div>
+<?php if ($offs): ?><table class="tbl"><thead><tr><th><?= tt('rc.of_no') ?></th><th><?= tt('rc.of_position') ?></th><th><?= tt('rc.of_salary') ?></th><th><?= tt('rc.of_start') ?></th><th><?= tt('th.status') ?></th><th></th></tr></thead><tbody>
+<?php foreach ($offs as $x): $xid = (int)$x['id']; ?><tr><td><b style="font-family:var(--mono);"><?= e($x['offer_no']) ?></b><br><span class="hint"><?= e((string)$x['created_name']) ?></span></td><td><?= e($x['position']) ?></td><td><?= e(rcr_offer_salary_text($x, locale())) ?: '—' ?></td><td><?= $x['start_date'] ? e(fmt_date($x['start_date'])) : '—' ?></td>
+<td><?= rcr_offer_pill($x['status']) ?><?= $x['sent_at'] ? '<br><span class="hint">✉ ' . e(fmt_datetime((string)$x['sent_at'])) . ' · ' . e((string)$x['sent_name']) . '</span>' : '' ?><?= $x['outcome_note'] ? '<br><span class="hint">' . e((string)$x['outcome_note']) . '</span>' : '' ?></td>
+<td><?php if ($x['status'] === 'sent'): ?><form method="post" action="<?= url('rcr_application', ['id' => $id]) ?>" style="display:flex;gap:4px;flex-wrap:wrap;" data-confirm="<?= e(t('rc.of_outcome_q')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="rcr_offer_outcome"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="offer_id" value="<?= $xid ?>"><input name="note" maxlength="300" placeholder="<?= e(t('hr.notes')) ?>" style="max-width:150px;"><button class="btn btn--gold btn--sm" name="status" value="accepted">✓ <?= tt('rc.of_st_accepted') ?></button><button class="btn btn--ghost btn--sm" name="status" value="declined">✕ <?= tt('rc.of_st_declined') ?></button><button class="btn btn--ghost btn--sm" name="status" value="withdrawn"><?= tt('rc.of_st_withdrawn') ?></button></form>
+<?php elseif ($x['status'] === 'draft'): ?><form method="post" action="<?= url('rcr_application', ['id' => $id]) ?>" data-confirm="<?= e(t('rc.of_discard_q')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="rcr_offer_outcome"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="offer_id" value="<?= $xid ?>"><button class="btn btn--ghost btn--sm" name="status" value="withdrawn"><?= tt('rc.of_discard') ?></button></form><?php endif; ?></td></tr>
+<?php if ($x['body']): ?><tr><td colspan="6"><details><summary class="hint" style="cursor:pointer;">✉ <?= tt('rc.of_as_sent') ?> — <?= e((string)$x['subject']) ?></summary><pre style="white-space:pre-wrap;font-family:inherit;margin:8px 0 0;"><?= e((string)$x['body']) ?></pre></details></td></tr><?php endif; ?>
+<?php endforeach; ?></tbody></table><?php endif; ?>
+<?php if ($canNew): ?>
+<details style="margin-top:10px;"<?= $od || !$offs ? ' open' : '' ?>><summary class="btn btn--ghost" style="display:inline-block;cursor:pointer;"><?= $od ? '✎ ' . e($od['offer_no']) . ' — ' . tt('rc.of_edit') : '＋ ' . tt($offs ? 'rc.of_new_rev' : 'rc.of_new') ?></summary>
+<form method="post" action="<?= url('rcr_application', ['id' => $id]) ?>" class="form-grid" data-lock style="margin-top:12px;"><?= csrf_field() ?><input type="hidden" name="action" value="rcr_offer_save"><input type="hidden" name="id" value="<?= $id ?>">
+  <div class="field span2"><label><?= tt('rc.of_position') ?></label><input name="position" maxlength="190" value="<?= e($ov('position', $a['vacancy'])) ?>" required></div>
+  <div class="field"><label><?= tt('rc.of_salary_net') ?> *</label><input name="net_salary" inputmode="decimal" maxlength="14" autocomplete="off" value="<?= $od && $od['net_salary'] !== null ? e(number_format((float)$od['net_salary'], 2, ',', '.')) : '' ?>" placeholder="0,00"></div>
+  <div class="field"><label><?= tt('rc.of_currency') ?></label><select name="currency" data-nosearch><?php foreach (['EUR', 'USD', 'GBP', 'CHF', 'BGN'] as $cc): ?><option<?= $ov('currency', 'EUR') === $cc ? ' selected' : '' ?>><?= $cc ?></option><?php endforeach; ?></select></div>
+  <div class="field"><label><?= tt('rc.of_per') ?></label><select name="salary_per" data-nosearch><option value="month"<?= $ov('salary_per', 'month') === 'month' ? ' selected' : '' ?>><?= tt('rc.of_per_month') ?></option><option value="year"<?= $ov('salary_per') === 'year' ? ' selected' : '' ?>><?= tt('rc.of_per_year') ?></option></select></div>
+  <div class="field"><label><?= tt('rc.of_payments_lbl') ?></label><input type="number" name="payments_per_year" min="1" max="16" value="<?= e($ov('payments_per_year', '14')) ?>"></div>
+  <div class="field"><label><?= tt('rc.of_contract') ?></label><select name="contract" data-nosearch><?php foreach (RCR_OFFER_CONTRACT as $cc): ?><option value="<?= $cc ?>"<?= $ov('contract', ($vv['emp_type'] ?? '') === 'internship' ? 'internship' : 'indefinite') === $cc ? ' selected' : '' ?>><?= tt('rc.of_c_' . $cc) ?></option><?php endforeach; ?></select></div>
+  <div class="field"><label><?= tt('rc.of_start') ?> *</label><input type="date" name="start_date" value="<?= e($ov('start_date')) ?>"></div>
+  <div class="field"><label><?= tt('rc.of_hours') ?></label><input name="hours" maxlength="120" value="<?= e($ov('hours', t('rc.of_hours_def'))) ?>"></div>
+  <div class="field"><label><?= tt('rc.of_place') ?></label><input name="place" maxlength="160" value="<?= e($ov('place', (string)($vv['location'] ?? ''))) ?>"></div>
+  <div class="field"><label><?= tt('rc.of_probation') ?> (<?= tt('rc.of_months_lbl') ?>)</label><input type="number" name="probation_months" min="0" max="24" value="<?= e($ov('probation_months')) ?>"></div>
+  <div class="field"><label><?= tt('rc.of_valid') ?></label><input type="date" name="valid_until" value="<?= e($ov('valid_until', date('Y-m-d', strtotime('+10 days')))) ?>"></div>
+  <div class="field span2"><label><?= tt('rc.of_benefits') ?></label><textarea name="benefits" rows="3" maxlength="4000"><?= e($ov('benefits')) ?></textarea></div>
+  <div class="field span2"><label><?= tt('rc.of_terms') ?></label><textarea name="terms" rows="4" maxlength="6000"><?= e($ov('terms')) ?></textarea></div>
+  <div class="field span2"><label><?= tt('rc.of_jd') ?> *</label><textarea name="jd_text" rows="10" maxlength="30000"><?= e($od ? (string)$od['jd_text'] : (string)$jdDef['text']) ?></textarea><span class="hint"><?= tt('rc.of_jd_hint') ?></span></div>
+  <div class="btn-row span2"><button class="btn btn--gold"><?= tt('rc.of_save') ?></button></div>
+</form></details>
+<?php if ($od): $miss = rcr_offer_missing($od); $dr = null; if (!$miss) { try { $dr = rcr_offer_draft((int)$od['id']); } catch (Throwable $e) {} } ?>
+<?php if ($miss): ?><p style="margin-top:10px;"><?= pill('gold', t('rc.of_missing', ['what' => implode(', ', $miss)])) ?></p>
+<?php elseif ($dr): ?><details style="margin-top:10px;" open><summary class="btn btn--ghost" style="display:inline-block;cursor:pointer;">✉ <?= tt('rc.of_mail') ?></summary>
+<form method="post" action="<?= url('rcr_application', ['id' => $id]) ?>" data-lock data-confirm="<?= e(t('rc.of_send_q', ['to' => $dr['to']])) ?>" style="margin-top:12px;"><?= csrf_field() ?><input type="hidden" name="action" value="rcr_offer_send"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="offer_id" value="<?= (int)$od['id'] ?>">
+  <p class="hint"><?= tt('rc.of_mail_hint') ?></p>
+  <div class="field"><label><?= tt('rc.ev_to') ?></label><input value="<?= e($dr['to']) ?>" readonly></div>
+  <div class="field"><label><?= tt('rc.ev_subject') ?></label><input name="subject" maxlength="200" value="<?= e($dr['subject']) ?>" required></div>
+  <div class="field"><label><?= tt('rc.ev_text') ?></label><textarea name="body" rows="22" maxlength="60000" required><?= e($dr['body']) ?></textarea></div>
+  <div class="btn-row"><button class="btn btn--gold">✉ <?= tt('rc.of_send') ?></button></div>
+</form></details><?php endif; endif; ?>
+<?php endif; ?>
+</div>
+<?php endif; ?>
 <details style="margin-top:10px;"<?= $ints ? '' : ' open' ?>><summary class="btn btn--ghost" style="display:inline-block;cursor:pointer;">＋ <?= tt('rc.ev_plan_interview') ?></summary>
 <form method="post" class="form-grid" data-lock style="margin-top:12px;"><?= csrf_field() ?><input type="hidden" name="action" value="rcr_interview_save"><input type="hidden" name="id" value="<?= $id ?>">
   <div class="field"><label><?= tt('rc.ev_stage') ?></label><select name="stage" data-nosearch><?php foreach (RCR_INT_STAGE as $st): ?><option value="<?= $st ?>"<?= $st === 'technical' ? ' selected' : '' ?>><?= tt('rc.ev_stage_' . $st) ?></option><?php endforeach; ?></select></div>

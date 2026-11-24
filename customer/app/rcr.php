@@ -290,7 +290,8 @@ function rcr_retention_run(): array {
         if ($rows) $n['apps_deleted'] = rcr_app_erase_rows(array_column($rows, 'id'));   // R97-209: scorecards and interviews go with the application
         foreach (all('SELECT id, cv_path, cv_name, hired_person_id FROM rc_applications WHERE status = "hired" AND COALESCE(status_changed_at, created_at) < ? AND email NOT LIKE "anon-%"', [$cut]) as $r) {
             if ($r['cv_path'] && is_file($r['cv_path'])) { if (!rcr_cv_to_person((int) $r['id'])) @unlink($r['cv_path']); $n['cvs_deleted']++; }   // R91-004: the CV moves to the employee file instead of being destroyed
-            q('UPDATE rc_applications SET email = CONCAT("anon-", code, "@retired.local"), name = NULL, phone = NULL, answers = NULL, cv_path = NULL, cv_name = NULL, cover_note = NULL, hr_notes = NULL, ip = NULL, user_agent = NULL WHERE id = ?', [(int) $r['id']]); $n['apps_anonymised']++; }
+            q('UPDATE rc_applications SET email = CONCAT("anon-", code, "@retired.local"), name = NULL, phone = NULL, answers = NULL, cv_path = NULL, cv_name = NULL, cover_note = NULL, hr_notes = NULL, ip = NULL, user_agent = NULL WHERE id = ?', [(int) $r['id']]); $n['apps_anonymised']++;
+            if (rcr_offer_has()) q('UPDATE rc_offers SET subject = NULL, body = NULL, outcome_note = NULL WHERE application_id = ?', [(int) $r['id']]); }   // R97-231: the e-mail text names the person; the terms stay as the record of the hire
         $n['events_deleted'] = q('DELETE r FROM rc_event_registrations r JOIN rc_events e ON e.id = r.event_id WHERE e.starts_at < ?', [$cut])->rowCount();
         $poolCut = date('Y-m-d H:i:s', strtotime('-' . max(1, (int) cp_setting('rc_pool_retention_months', '24')) . ' months'));   // R91-004: the pool is consent-based and has its own retention
         $n['pool_deleted'] = q('DELETE FROM rc_talent_pool WHERE created_at < ?', [$poolCut])->rowCount();
@@ -306,6 +307,7 @@ function rcr_app_erase_rows(array $ids): int {
     $ids = array_values(array_filter(array_map('intval', $ids))); if (!$ids) return 0; $in = implode(',', $ids);
     q("DELETE FROM rc_event_registrations WHERE application_id IN ($in)"); q("DELETE FROM rc_log WHERE application_id IN ($in)");
     if (rcr_eval_has()) { q("DELETE FROM rc_evaluations WHERE application_id IN ($in)"); q("DELETE FROM rc_interviews WHERE application_id IN ($in)"); }
+    if (rcr_offer_has()) q("DELETE FROM rc_offers WHERE application_id IN ($in)");   // R97-231: the offer is personal data of the candidate and goes with the application
     return q("DELETE FROM rc_applications WHERE id IN ($in)")->rowCount();
 }
 /** A CV file may be removed only when it lies in the portal's storage folder. */
@@ -545,5 +547,94 @@ function rcr_site_purge(): void {
         }
     } catch (Throwable $e) {}
     try { cp_setting_set('rc_site_purge_last', date('Y-m-d H:i:s') . '|' . $code); } catch (Throwable $e) {}
+}
+
+/* ================================================================== R97-231: the offer to a candidate
+ * Financial proposal and terms with the job description, written by HR, kept as a record (rc_offers) and sent by the portal from the
+ * e-mail template «Recruiting — offer». Only HR sees or writes offers: the net salary never appears in logs, notifications or to the hiring manager. */
+const RCR_OFFER_STATUS = ['draft', 'sent', 'accepted', 'declined', 'withdrawn'];
+const RCR_OFFER_CONTRACT = ['indefinite', 'fixed', 'project', 'internship'];
+function rcr_offer_has(): bool { static $h = null; if ($h === null) { try { $h = rcr_has() && (bool) scalar("SHOW TABLES LIKE 'rc_offers'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function rcr_offer_can(): bool { return rcr_offer_has() && rcr_can(); }
+function rcr_offers(int $appId): array { return rcr_offer_can() ? all('SELECT * FROM rc_offers WHERE application_id = ? ORDER BY id DESC', [$appId]) : []; }
+function rcr_offer(int $id): ?array { if (!rcr_offer_can()) return null; $o = one('SELECT * FROM rc_offers WHERE id = ?', [$id]); if (!$o) return null; $a = rcr_application((int) $o['application_id']); if (!$a) return null; $o['app'] = $a; return $o; }
+function rcr_offer_pill(string $s): string { return pill(['draft' => 'mute', 'sent' => 'gold', 'accepted' => 'green', 'declined' => 'bad', 'withdrawn' => 'mute'][$s] ?? 'mute', t('rc.of_st_' . $s)); }
+/** "1.850,00 EUR net per month × 14 payments per year" in the given language. */
+function rcr_offer_salary_text(array $o, string $lc): string {
+    if ($o['net_salary'] === null) return ''; $tr = fn(string $k, array $v = []) => t_in($k, $lc, $v);
+    $s = number_format((float) $o['net_salary'], 2, ',', '.') . ' ' . $o['currency'] . ' ' . $tr('rc.of_net_' . ($o['salary_per'] === 'year' ? 'year' : 'month'));
+    if ($o['salary_per'] !== 'year' && (int) $o['payments_per_year'] > 0) $s .= ' × ' . $tr('rc.of_payments', ['n' => (int) $o['payments_per_year']]);
+    return $s;
+}
+/** The job description as plain text for the offer: the approved job description linked to the vacancy, otherwise the text of the vacancy. */
+function rcr_offer_jd_text(array $a, string $lc = 'en'): array {
+    $v = one('SELECT * FROM rc_vacancies WHERE id = ?', [(int) $a['vacancy_id']]); $tr = fn(string $k) => t_in($k, $lc); $out = []; $jdId = null;
+    if ($v && !empty($v['jd_id']) && function_exists('jd_has') && jd_has() && ($jd = jd_load((int) $v['jd_id'])) && ($c = jd_current($jd))) {
+        $jdId = (int) $jd['id']; $out[] = $c['title'] . ' (' . $c['code'] . ' R' . (int) $c['rev'] . ')'; if ($c['reports_to'] !== '') $out[] = $tr('jd.reports_to') . ': ' . $c['reports_to']; if ($c['purpose'] !== '') $out[] = $tr('jd.s_purpose') . ":\n" . $c['purpose'];
+        foreach (JD_SECTIONS as $k) if (!empty($c[$k])) $out[] = $tr('jd.s_' . $k) . ":\n- " . implode("\n- ", $c[$k]);
+    } elseif ($v) {
+        $out[] = (string) $v['title']; if ((string) $v['summary'] !== '') $out[] = (string) $v['summary'];
+        $d = trim(html_entity_decode(strip_tags(preg_replace('#<(br|/p|/li|/h\d)\b[^>]*>#i', "\n", (string) $v['description_html'])), ENT_QUOTES, 'UTF-8')); if ($d !== '') $out[] = preg_replace("/\n{3,}/", "\n\n", $d);
+        $rq = array_values(array_filter(array_map('strval', (array) json_decode((string) ($v['requirements'] ?? '[]'), true)), 'strlen')); if ($rq) $out[] = "- " . implode("\n- ", $rq);
+    }
+    return ['text' => trim(implode("\n\n", $out)), 'jd_id' => $jdId];
+}
+/** Saves the draft offer of an application (one draft at a time; a sent offer is a record and is not changed — a revised offer is a new one). */
+function rcr_offer_save(int $appId, array $in): int {
+    if (!rcr_offer_can()) throw new RuntimeException(t('err.noaccess')); $a = rcr_application($appId); if (!$a || in_array($a['status'], ['withdrawn'], true) || str_starts_with((string) $a['email'], 'anon-')) throw new RuntimeException(t('err.noaccess'));
+    $u = current_user(); $txt = fn(string $k, int $max) => ($x = mb_substr(trim(str_replace("\r\n", "\n", (string) ($in[$k] ?? ''))), 0, $max)) !== '' ? $x : null; $dte = fn(string $k) => preg_match('/^\d{4}-\d{2}-\d{2}$/', (string) ($in[$k] ?? '')) ? (string) $in[$k] : null;
+    $pos = $txt('position', 190) ?: (string) $a['vacancy']; $raw = str_replace([' ', "\u{a0}"], '', (string) ($in['net_salary'] ?? ''));
+    if (preg_match('/^\d{1,3}(\.\d{3})+(,\d{1,2})?$/', $raw)) $raw = str_replace(['.', ','], ['', '.'], $raw); else $raw = str_replace(',', '.', $raw);   // 1.850,00 or 1850.00 or 1850,5
+    $sal = $raw === '' ? null : (is_numeric($raw) && (float) $raw > 0 && (float) $raw < 10000000 ? round((float) $raw, 2) : false); if ($sal === false) throw new RuntimeException(t('rc.of_bad_salary'));
+    $cur = preg_match('/^[A-Z]{3}$/', (string) ($in['currency'] ?? '')) ? (string) $in['currency'] : 'EUR'; $per = ($in['salary_per'] ?? '') === 'year' ? 'year' : 'month';
+    $pay = (int) ($in['payments_per_year'] ?? 0); $pay = $pay >= 1 && $pay <= 16 ? $pay : null; $con = in_array($in['contract'] ?? '', RCR_OFFER_CONTRACT, true) ? (string) $in['contract'] : 'indefinite';
+    $prob = (string) ($in['probation_months'] ?? '') === '' ? null : max(0, min(24, (int) $in['probation_months']));
+    $vals = [$pos, $sal, $cur, $per, $pay, $con, $dte('start_date'), $txt('hours', 120), $txt('place', 160), $prob, $txt('benefits', 4000), $txt('terms', 6000), $dte('valid_until'), $txt('jd_text', 30000)];
+    $d = one("SELECT id FROM rc_offers WHERE application_id = ? AND status = 'draft' ORDER BY id DESC LIMIT 1", [$appId]);
+    if ($d) { q('UPDATE rc_offers SET position=?, net_salary=?, currency=?, salary_per=?, payments_per_year=?, contract=?, start_date=?, hours=?, place=?, probation_months=?, benefits=?, terms=?, valid_until=?, jd_text=? WHERE id = ?', [...$vals, (int) $d['id']]); return (int) $d['id']; }
+    $n = (int) scalar('SELECT COUNT(*) + 1 FROM rc_offers WHERE application_id = ?', [$appId]); $jd = rcr_offer_jd_text($a);
+    q('INSERT INTO rc_offers (position, net_salary, currency, salary_per, payments_per_year, contract, start_date, hours, place, probation_months, benefits, terms, valid_until, jd_text, application_id, offer_no, jd_id, created_by, created_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [...$vals, $appId, $a['code'] . '-OF' . $n, $jd['jd_id'], (int) $u['id'], (string) $u['full_name']]);
+    $id = (int) db()->lastInsertId(); rcr_log('offer_draft', ['application_id' => $appId, 'vacancy_id' => (int) $a['vacancy_id']], $a['code'] . '-OF' . $n); return $id;
+}
+/** The e-mail of an offer from the template «Recruiting — offer», in the language of the candidate, with the terms and the job description filled in. */
+function rcr_offer_draft(int $id): array {
+    $o = rcr_offer($id); if (!$o) throw new RuntimeException(t('err.noaccess')); $a = $o['app']; $u = current_user();
+    $lc = in_array((string) ($a['lang'] ?? ''), array_keys(LOCALES), true) ? (string) $a['lang'] : 'en'; $tr = fn(string $k, array $v = []) => t_in($k, $lc, $v); $dt = fn(?string $d) => $d ? date('d/m/Y', strtotime($d)) : '';
+    $sal = rcr_offer_salary_text($o, $lc); $con = $tr('rc.of_c_' . $o['contract']); $prob = $o['probation_months'] !== null ? $tr('rc.of_months', ['n' => (int) $o['probation_months']]) : '';
+    $rows = [[$tr('rc.of_position'), (string) $o['position']], [$tr('rc.of_salary'), $sal], [$tr('rc.of_contract'), $con], [$tr('rc.of_start'), $dt($o['start_date'])], [$tr('rc.of_hours'), (string) $o['hours']], [$tr('rc.of_place'), (string) $o['place']], [$tr('rc.of_probation'), $prob], [$tr('rc.of_benefits'), (string) $o['benefits']], [$tr('rc.of_terms'), (string) $o['terms']], [$tr('rc.of_valid'), $dt($o['valid_until'])]];
+    $det = implode("\n", array_map(fn($r) => $r[0] . ': ' . (str_contains($r[1], "\n") ? "\n" . $r[1] : $r[1]), array_values(array_filter($rows, fn($r) => $r[1] !== ''))));
+    $jd = trim((string) $o['jd_text']); if ($jd !== '') $det .= "\n\n" . $tr('rc.of_jd') . "\n" . str_repeat('-', 40) . "\n" . $jd;
+    $branch = ''; try { if (!empty($u['branch_id']) && function_exists('br_get')) $branch = (string) (br_get((int) $u['branch_id'])['name'] ?? ''); } catch (Throwable $e) {}
+    $nz = fn(string $v) => $v !== '' ? $v : "\u{1}";   // a term left empty is marked, and the line of the template that carries it is taken out below
+    $r = function_exists('et_render') ? et_render('rc_offer', ['no' => (string) $o['offer_no'], 'title' => (string) $o['position'], 'doc' => (string) $a['vacancy_code'], 'name' => (string) ($a['name'] ?: $a['email']), 'email' => (string) $a['email'], 'user' => (string) $u['full_name'], 'branch' => $branch ?: 'Golden A/S',
+            'salary' => $nz($sal), 'start' => $nz($dt($o['start_date'])), 'contract' => $con, 'hours' => $nz((string) $o['hours']), 'place' => $nz((string) $o['place']), 'probation' => $nz($prob), 'benefits' => $nz((string) $o['benefits']), 'terms' => $nz((string) $o['terms']), 'valid' => $nz($dt($o['valid_until'])), 'jd' => $jd,
+            'locale' => $lc, 'branch_id' => $u['branch_id'] ?? null, '_details' => $det, '_details_if' => '{salary}'])
+        : ['subject' => 'Golden A/S — ' . $tr('rc.st_offer') . ' · ' . $o['position'], 'body' => ($a['name'] ?: $a['email']) . ",\n\n" . $det . "\n\nGolden A/S — HR"];
+    $body = str_replace("\u{1}", '', preg_replace('/^[^\n]*\x01[^\n]*(\n|$)/mu', '', (string) $r['body'])); $r['subject'] = str_replace("\u{1}", '', (string) $r['subject']);   // a term left empty leaves no line in the e-mail
+    return ['to' => (string) $a['email'], 'subject' => (string) $r['subject'], 'body' => preg_replace("/\n{3,}/", "\n\n", $body), 'locale' => $lc];
+}
+/** What still stops an offer from being sent ([] = ready). */
+function rcr_offer_missing(array $o): array { $m = []; if ($o['net_salary'] === null) $m[] = t('rc.of_salary'); if (!$o['start_date']) $m[] = t('rc.of_start'); if (trim((string) $o['jd_text']) === '') $m[] = t('rc.of_jd'); return $m; }
+/** Sends the offer (the text HR sees and may have changed) through the portal. When it leaves, the offer becomes a record: status sent, the text kept, the application moved to «Offer». */
+function rcr_offer_send(int $id, string $subject, string $body): bool {
+    $o = rcr_offer($id); if (!$o) throw new RuntimeException(t('err.noaccess')); if ($o['status'] !== 'draft') throw new RuntimeException(t('rc.of_only_draft')); $a = $o['app']; $u = current_user();
+    if ($m = rcr_offer_missing($o)) throw new RuntimeException(t('rc.of_missing', ['what' => implode(', ', $m)]));
+    $subject = mb_substr(trim(preg_replace('/[\r\n\t]+/', ' ', $subject)), 0, 200); $body = mb_substr(trim(str_replace("\r\n", "\n", $body)), 0, 60000); if ($subject === '' || mb_strlen($body) < 20) throw new RuntimeException(t('rc.ev_need_text'));
+    if (!filter_var((string) $a['email'], FILTER_VALIDATE_EMAIL) || str_starts_with((string) $a['email'], 'anon-')) throw new RuntimeException(t('rc.ev_no_email'));
+    if ((int) scalar("SELECT COUNT(*) FROM rc_log WHERE action IN ('offer_sent','offer_not_sent') AND application_id = ? AND created_at > NOW() - INTERVAL 1 MINUTE", [(int) $o['application_id']]) >= 3) throw new RuntimeException(t('rc.ev_too_many'));
+    $ok = rcr_mail((string) $a['email'], $subject, $body);
+    rcr_log($ok ? 'offer_sent' : 'offer_not_sent', ['application_id' => (int) $o['application_id'], 'vacancy_id' => (int) $a['vacancy_id']], (string) $o['offer_no']);
+    if (!$ok) return false;
+    q("UPDATE rc_offers SET status = 'sent', subject = ?, body = ?, sent_at = NOW(), sent_by = ?, sent_name = ? WHERE id = ? AND status = 'draft'", [$subject, $body, (int) $u['id'], (string) $u['full_name'], $id]);
+    if (!in_array($a['status'], ['offer', 'hired', 'rejected', 'withdrawn'], true)) { q("UPDATE rc_applications SET status = 'offer', status_changed_at = NOW() WHERE id = ?", [(int) $o['application_id']]); rcr_log('status', ['application_id' => (int) $o['application_id'], 'vacancy_id' => (int) $a['vacancy_id']], $a['status'] . ' → offer'); }
+    return true;
+}
+/** The answer of the candidate, or the offer taken back: accepted · declined · withdrawn. A draft can only be discarded (withdrawn). */
+function rcr_offer_outcome(int $id, string $st, string $note = ''): void {
+    $o = rcr_offer($id); if (!$o || !in_array($st, ['accepted', 'declined', 'withdrawn'], true)) throw new RuntimeException(t('err.noaccess'));
+    if (!($o['status'] === 'sent' || ($o['status'] === 'draft' && $st === 'withdrawn'))) throw new RuntimeException(t('rc.of_only_sent'));
+    q('UPDATE rc_offers SET status = ?, outcome_at = NOW(), outcome_note = ? WHERE id = ?', [$st, mb_substr(trim($note), 0, 300) ?: null, $id]);
+    rcr_log('offer_' . $st, ['application_id' => (int) $o['application_id'], 'vacancy_id' => (int) $o['app']['vacancy_id']], (string) $o['offer_no']);
 }
 
