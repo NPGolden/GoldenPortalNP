@@ -1159,7 +1159,7 @@ function pm_handle_action(string $action, string $page): bool {
         case 'pl_delete': { pl_delete((int)$_POST['id']); flash('good', t('pl.deleted')); redirect('planning', array_filter(['m' => $_GET['m'] ?? '', 'disc' => $_GET['disc'] ?? '', 'vessel' => $_GET['vessel'] ?? '', 'me' => $_GET['me'] ?? '', '_r' => uniqid()])); }
         case 'fsr_discs_save': { fsr_tech_disc_save((array)($_POST['fsr_disc'] ?? [])); flash('good', t('fsr.discs_saved')); redirect('admin_disciplines', ['_r' => uniqid()], '#fsr-discs'); }   // R94-002
         case 'bg_discs_save': { bg_disc_setting_save((array)($_POST['bg_disc'] ?? [])); flash('good', t('bg.discs_saved')); redirect('admin_disciplines', ['_r' => uniqid()], '#budget-discs'); }   // R80-005
-        case 'pl_discs_save': { pl_disciplines_save((array)($_POST['pl_disc'] ?? [])); flash('good', t('pl.discs_saved')); redirect('admin_disciplines', ['_r' => uniqid()]); }
+        case 'pl_discs_save': { pl_disciplines_save((array)($_POST['pl_disc'] ?? [])); cp_setting_set('pl_tech_only', empty($_POST['pl_tech_only']) ? '0' : '1'); flash('good', t('pl.discs_saved')); redirect('admin_disciplines', ['_r' => uniqid()]); }
         case 'pl_car_save':   { pl_car_save(); flash('good', t('pl.car_saved')); redirect('planning', array_filter(['m' => $_GET['m'] ?? '', '_r' => uniqid()])); }
         case 'pl_car_delete': { pl_car_delete((int)$_POST['id']); flash('good', t('pl.car_deleted')); redirect('planning', array_filter(['m' => $_GET['m'] ?? '', '_r' => uniqid()])); }
         case 'pl_import': {

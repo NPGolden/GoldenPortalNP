@@ -70,6 +70,7 @@ layout_head(t('disc.title'), 'admin_disciplines');
       <?php foreach ($allDisc as $d): ?><label class="chk"><input type="checkbox" name="pl_disc[]" value="<?= (int)$d['id'] ?>"<?= in_array((int)$d['id'], $plSel, true) ? ' checked' : '' ?>> <?= e($d['name']) ?> <span class="hint">· <?= (int)$d['n'] ?></span><?= $d['is_active'] ? '' : ' ' . pill('mute', t('v.inactive')) ?></label><?php endforeach; ?>
       <label class="chk"><input type="checkbox" name="pl_disc[]" value="0"<?= in_array(0, $plSel, true) ? ' checked' : '' ?>> <?= tt('tm.no_discipline') ?> <span class="hint">· <?= $nNone ?></span></label>
     </div>
+    <label class="chk" style="margin-top:10px;" title="<?= tt('pl.tech_only_hint') ?>"><input type="checkbox" name="pl_tech_only" value="1"<?= function_exists('pl_tech_only') && pl_tech_only() ? ' checked' : '' ?>> <?= tt('pl.tech_only') ?></label><p class="hint"><?= tt('pl.tech_only_hint') ?></p>
     <div class="btn-row" style="margin-top:10px;"><button class="btn btn--gold" type="submit"><?= tt('btn.save') ?></button><span class="hint"><?= $plSel ? e(t('pl.discs_n', ['n' => count($plSel)])) : tt('pl.discs_all') ?></span></div>
   </form>
 </div>

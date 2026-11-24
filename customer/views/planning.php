@@ -14,6 +14,7 @@ if ($fDisc !== '') $people = array_values(array_filter($people, fn($p) => $p['di
 $grid = $ok ? pl_grid($from, $to) : [];
 if ($fVessel) { $vn = (string) scalar('SELECT name FROM vessels WHERE id = ?', [$fVessel]); $people = array_values(array_filter($people, function ($p) use ($grid, $vn) { foreach ($grid[(int)$p['id']] ?? [] as $es) foreach ($es as $e) if (($e['vessel'] ?? '') === $vn) return true; return false; })); }
 $discs = array_values(array_unique(array_map(fn($p) => $p['discipline'], $ok ? pl_people() : [])));
+$plLimit = []; if ($ok && $canEdit) { if (pl_disciplines()) $plLimit[] = t('pl.limit_disc', ['n' => count(pl_disciplines())]); if (function_exists('pl_tech_only') && pl_tech_only() && !(function_exists('hr_can') && hr_can())) $plLimit[] = t('pl.limit_tech'); }   // R97-236: say why the board is not the whole company
 $vesselOpts = all("SELECT DISTINCT v.id, v.name FROM vessels v JOIN projects p ON p.vessel_id = v.id WHERE p.status = 'active' ORDER BY v.name");
 $subOpts = $canEdit ? all("SELECT s.id, s.code, s.name, p.id AS pid, p.project_code, v.name AS vessel FROM subprojects s JOIN projects p ON p.id = s.project_id LEFT JOIN vessels v ON v.id = p.vessel_id WHERE p.status = 'active' AND s.status <> 'completed' ORDER BY v.name, p.project_code, s.sort_order, s.code") : [];
 $projOpts = $canEdit ? all("SELECT p.id, p.project_code, p.name, v.name AS vessel FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id WHERE p.status = 'active' ORDER BY v.name, p.project_code") : [];
@@ -44,6 +45,7 @@ layout_head($title, 'planning');
   <div class="field"><label><?= tt('th.vessel') ?></label><select name="vessel"><option value=""><?= tt('flt.any') ?></option><?php foreach ($vesselOpts as $v): ?><option value="<?= (int)$v['id'] ?>"<?= (int)$v['id'] === $fVessel ? ' selected' : '' ?>><?= e($v['name']) ?></option><?php endforeach; ?></select></div>
   <div class="fltbar-actions"><button class="btn" type="submit"><?= tt('btn.apply') ?></button><a class="btn btn--ghost" href="<?= url('planning', ['reset' => 1, 'reset' => 1]) ?>"><?= tt('btn.clear') ?></a></div>
 </form>
+<?php if (!empty($plLimit) && !$me): ?><p class="hint" id="pl-limit">ⓘ <?= e(implode(' · ', $plLimit)) ?><?= is_cp_admin() ? ' — <a href="' . url('admin_disciplines') . '#plan-discs">' . tt('pl.limit_where') . '</a>' : ' ' . tt('pl.limit_ask') ?></p><?php endif; ?>
 
 <div class="card pl-card">
   <div class="pl-scroll"><table class="pl-board">

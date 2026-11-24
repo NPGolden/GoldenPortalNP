@@ -39,13 +39,15 @@ function pl_disciplines(): array {
     $v = function_exists('cp_setting') ? (string) cp_setting('pl_disciplines', '') : '';
     return $v === '' ? [] : array_values(array_unique(array_map('intval', array_filter(explode(',', $v), fn($x) => $x !== ''))));
 }
+/** R97-236: project managers see the whole company on the board; the old rule «technical staff only» (R54-001) is a switch in Settings › Disciplines, off by default. */
+function pl_tech_only(): bool { return function_exists('cp_setting') && (string) cp_setting('pl_tech_only', '0') === '1'; }
 function pl_disciplines_save(array $ids): void { require_cp_admin(); cp_setting_set('pl_disciplines', implode(',', array_map('intval', $ids))); }
 /** Engineers on the board, grouped by discipline (crew); $all ignores the discipline setting. */
 function pl_people(bool $all = false): array {
     $sel = $all ? [] : pl_disciplines(); $w = ''; $a = [];
     if ($sel) { $in = array_values(array_filter($sel, fn($x) => $x > 0)); $parts = []; if ($in) { $parts[] = 'cu.discipline_id IN (' . implode(',', array_fill(0, count($in), '?')) . ')'; array_push($a, ...$in); } if (in_array(0, $sel, true)) $parts[] = 'cu.discipline_id IS NULL'; $w = ' AND (' . implode(' OR ', $parts) . ')'; }
     if (function_exists('emp_only') && emp_only()) { $w .= ' AND cu.id = ' . (int)(current_user()['id'] ?? 0); }   // R56-002: employee scope — only himself
-    if (!$all && function_exists('hr_technical_user_ids') && !(function_exists('hr_can') && hr_can()) && ($tech = hr_technical_user_ids()) !== null) { $w .= ' AND cu.id IN (' . ($tech ? implode(',', array_map('intval', $tech)) : '0') . ')'; }   // R54-001: PMs see technical staff only; HR sees everybody
+    if (!$all && pl_tech_only() && function_exists('hr_technical_user_ids') && !(function_exists('hr_can') && hr_can()) && ($tech = hr_technical_user_ids()) !== null) { $w .= ' AND cu.id IN (' . ($tech ? implode(',', array_map('intval', $tech)) : '0') . ')'; }   // R54-001: PMs see technical staff only; HR sees everybody
     return all("SELECT cu.id, cu.full_name, cu.role, cu.work_calendar, cu.discipline_id, COALESCE(d.name, '') AS discipline, d.sort_order AS dso FROM customer_users cu LEFT JOIN disciplines d ON d.id = cu.discipline_id
                 WHERE cu.role IN ('staff','admin') AND cu.is_active = 1{$w} ORDER BY ISNULL(d.sort_order), d.sort_order, d.name, cu.full_name", $a);
 }

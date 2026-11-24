@@ -4441,3 +4441,13 @@ No database step. Language keys +3 (13 509 per language). Next ref GAS-CP-R97-23
 
 **Trace:** the request shows the note «Above the remaining days by N days — registered directly by <name>» (or «Registered directly by <name>» when the balance was enough). The balance of the employee becomes negative by the days owed. The employee receives «Leave request approved»; HR and the manager are informed.
 
+## §515 Planning: project managers see the whole company (GAS-CP-R97-236, v1.245.1)
+
+**Before:** a project manager saw on the planning board only the employees marked **technical** in their HR record (rule of R54-001); HR saw everybody.
+
+**Now:** project managers see every active staff account. The old rule is the switch **Project managers see only technical staff** in Settings › Disciplines › Planning — off by default.
+
+**Still limiting the board:** the list of disciplines ticked in the same card («Disciplines in the planning»). If some are ticked, only those disciplines appear — for everybody. A line above the board now says «The board is limited to N discipline(s)» with the place to change it. Untick all to show every discipline.
+
+**Unchanged:** employees without the planning right see only their own programme; HR enters absences only.
+
