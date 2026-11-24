@@ -35,9 +35,13 @@ require_once API_ROOT . '/lib/portal_hr_demo.php';   // R97-169 demonstration da
 require_once API_ROOT . '/lib/portal_parts.php';   // R82-003 part ordering from the apps
 
 /** Act as a portal user for the rest of this request (the portal reads $_SESSION['cu_id']). */
+const API_IDLE_ONLINE = 300;   // seconds without a touch after which an open app no longer counts as «online»
 function api_act_as(int $uid): array {
     if (session_status() !== PHP_SESSION_ACTIVE) { session_id('api' . bin2hex(random_bytes(8))); session_start(); }
     $_SESSION['cu_id'] = $uid; $_SESSION['epoch'] = (int)(scalar('SELECT session_epoch FROM customer_users WHERE id = ?', [$uid]) ?: 0);
+    /* R97-237: an app left open keeps calling the portal by itself (sync every 5 minutes, push token) — that is not a person at work.
+       The app says how long ago the screen was last touched (X-Idle, seconds); after API_IDLE_ONLINE the call no longer marks the person online. */
+    $idle = $_SERVER['HTTP_X_IDLE'] ?? null; if (is_string($idle) && ctype_digit($idle) && (int)$idle > API_IDLE_ONLINE) $GLOBALS['cp_no_presence'] = 1;
     $u = current_user();
     if (!$u) throw new ApiException(401, 'Account disabled');
     if (api_app() === 'customer') { if (($u['role'] ?? 'customer') !== 'customer' || empty($u['customer_id'])) throw new ApiException(403, 'Customer account required'); }   // R68-001: the customer app is for owner accounts only

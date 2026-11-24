@@ -1,8 +1,9 @@
 /* Golden PM — API client for the portal module /customer/api/v1 (JWT access + rotating refresh), app "pm" (CONTRACT §0)
  * and a MOCK mode (built-in sample data in the shapes of the contract) for the demo and the UI tests.
  * Mock mode: localStorage gpm.mock = "1", or ?mock=1 on the URL. */
+(function () { try { window.__gasAct = Date.now(); ["pointerdown", "keydown", "touchstart"].forEach(function (e) { window.addEventListener(e, function () { window.__gasAct = Date.now(); }, { passive: true, capture: true }); }); } catch (e) {} })();   // R97-237: when the screen was last touched — sent as X-Idle so an app left open does not keep its user «online»
 window.API = (() => {
-  const VERSION = "1.0.20";
+  const VERSION = "1.0.21";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   const demoOn = () => { try { return localStorage.getItem("gpm.demo") === "1"; } catch (e) { return false; } };   // R97-169
@@ -12,7 +13,7 @@ window.API = (() => {
   // Capacitor builds move the refresh token to Keychain / Keystore (capacitor/native-bridge.js)
 
   async function raw(method, path, body, isForm) {
-    const h = { "X-App": "pm", "X-App-Version": VERSION, "X-Lang": I18N.get(), "Cache-Control": "no-store" };
+    const h = { "X-App": "pm", "X-App-Version": VERSION, "X-Lang": I18N.get(), "Cache-Control": "no-store", "X-Idle": String(Math.max(0, Math.round((Date.now() - (window.__gasAct || Date.now())) / 1000))) };
     if (tok.access) h.Authorization = `Bearer ${tok.access}`;
     if (!isForm) h["Content-Type"] = "application/json";
     const res = await fetch(`${BASE}${path}`, { method, headers: h, body: isForm ? body : (body ? JSON.stringify(body) : undefined), cache: "no-store" });

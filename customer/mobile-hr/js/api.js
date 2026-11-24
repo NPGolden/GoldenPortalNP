@@ -1,13 +1,14 @@
 /* Golden HR — API client for the portal module /customer/api/v1 (JWT access + rotating refresh), app "hr" (GAS-CP-R74-001).
  * Same transport as Golden PM (customer/mobile-pm/js/api.js); routes under /hr/app/*. No mock mode: HR data is never faked. */
+(function () { try { window.__gasAct = Date.now(); ["pointerdown", "keydown", "touchstart"].forEach(function (e) { window.addEventListener(e, function () { window.__gasAct = Date.now(); }, { passive: true, capture: true }); }); } catch (e) {} })();   // R97-237: when the screen was last touched — sent as X-Idle so an app left open does not keep its user «online»
 window.API = (() => {
-  const VERSION = "1.2.4";
+  const VERSION = "1.2.5";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   const tok = { get access() { try { return sessionStorage.getItem("ghr.at"); } catch (e) { return null; } }, set access(v) { try { v ? sessionStorage.setItem("ghr.at", v) : sessionStorage.removeItem("ghr.at"); } catch (e) {} },
     get refresh() { try { return localStorage.getItem("ghr.rt"); } catch (e) { return null; } }, set refresh(v) { try { v ? localStorage.setItem("ghr.rt", v) : localStorage.removeItem("ghr.rt"); } catch (e) {} } };
 
   async function raw(method, path, body, isForm) {
-    const h = { "X-App": "hr", "X-App-Version": VERSION, "X-Lang": I18N.get(), "Cache-Control": "no-store" };
+    const h = { "X-App": "hr", "X-App-Version": VERSION, "X-Lang": I18N.get(), "Cache-Control": "no-store", "X-Idle": String(Math.max(0, Math.round((Date.now() - (window.__gasAct || Date.now())) / 1000))) };
     if (tok.access) h.Authorization = `Bearer ${tok.access}`;
     if (!isForm) h["Content-Type"] = "application/json";
     const res = await fetch(`${BASE}${path}`, { method, headers: h, body: isForm ? body : (body ? JSON.stringify(body) : undefined), cache: "no-store" });

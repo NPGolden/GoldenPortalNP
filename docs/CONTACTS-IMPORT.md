@@ -4451,3 +4451,13 @@ No database step. Language keys +3 (13 509 per language). Next ref GAS-CP-R97-23
 
 **Unchanged:** employees without the planning right see only their own programme; HR enters absences only.
 
+## §516 Who is online: an app left open no longer counts as online (GAS-CP-R97-237, v1.245.2)
+
+**Fault:** people using the apps appeared as connected to the portal for as long as the app stayed open on the phone — hours or days — because each app synchronises by itself every 5 minutes and every call marked its user as online.
+
+**Now:** the apps send with every call how many seconds ago the screen was last touched (header `X-Idle`). When that is more than 5 minutes, the call is served as usual but does not mark the person online. The name leaves «Who is online» about 5 minutes later, as it does for a closed browser, and returns when the app is used again.
+
+**Apps:** Service 0.8.6, Golden PM 1.0.21, Golden HR 1.2.5, Golden A/S Employee 1.1.6 — the update arrives by itself; until a phone has it, that phone behaves as before.
+
+**Not changed:** the sign-in on the phone. The app stays signed in (tokens rotate, «Sign out everywhere» and device revocation work as before). An automatic lock or sign-out of an idle app is a separate decision.
+
