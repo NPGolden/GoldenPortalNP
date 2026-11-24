@@ -283,8 +283,11 @@ final class PortalPM {
             $id = preg_match('/[?&](?:amp;)?id=(\d+)/', (string)$r['url'], $m) ? (int)$m[1] : 0; $k = (string)$r['kind'];
             $out[] = ['key' => $k . ':' . ($id ?: md5($r['ref'] . '|' . $r['title'] . '|' . $r['at'])), 'kind' => $k, 'icon' => $K[$k][0] ?? '•', 'label' => isset($K[$k]) ? t($K[$k][1]) : $k, 'id' => $id, 'ref' => (string)$r['ref'], 'title' => (string)$r['title'],
                       'who' => (string)$r['who'], 'at' => $r['at'], 'age' => (int)$r['age'], 'with' => (string)$r['with'], 'late' => !empty($r['late']),
+                      'priority' => $k === 'payment' ? (string)($r['prio'] ?? 'normal') : '', 'priority_label' => $k === 'payment' && function_exists('si_prio_has') && si_prio_has() ? t('si.prio_' . (in_array($r['prio'] ?? '', SI_PRIORITIES, true) ? $r['prio'] : 'normal')) : '', 'scope' => (string)($r['scope'] ?? ''),   // R97-238
                       'action' => $k === 'payment' && $id ? 'payment' : (in_array($k, ['leave', 'timesheet'], true) ? 'team' : 'portal')];
         }
+        $rk = ['urgent' => 0, 'high' => 1, 'normal' => 2, '' => 2, 'low' => 3]; $i = 0; foreach ($out as &$o) $o['_i'] = $i++; unset($o);
+        usort($out, fn($a, $b) => (($rk[$a['priority']] ?? 2) <=> ($rk[$b['priority']] ?? 2)) ?: ($a['_i'] <=> $b['_i'])); foreach ($out as &$o) unset($o['_i']); unset($o);   // urgent payments first, the rest in the order of the register
         return ['items' => $out, 'count' => count($out)];
     }
     private static function payLoad(int $id): array {
@@ -299,8 +302,10 @@ final class PortalPM {
         return ['id' => (int)$R['id'], 'req_no' => (string)$R['req_no'], 'supplier' => (string)$R['supplier'], 'amount' => $f($R['amount']), 'currency' => (string)$R['currency'], 'status' => (string)$R['status'],
                 'with' => t($R['status'] === 'mgmt' ? 'apr.w_mgmt' : 'apr.w_acc'), 'pay_by' => $R['pay_by'] ?? null, 'late' => !empty($R['pay_by']) && $R['pay_by'] < date('Y-m-d'), 'note' => (string)($R['note'] ?? ''),
                 'requested_by' => (string)($R['requested_name'] ?? ''), 'created_at' => $R['created_at'] ?? null,
+                'priority' => (string)($R['priority'] ?? 'normal'), 'priority_label' => function_exists('si_prio_has') && si_prio_has() ? t('si.prio_' . (in_array($R['priority'] ?? '', SI_PRIORITIES, true) ? $R['priority'] : 'normal')) : '', 'scope' => function_exists('si_request_scope') ? si_request_scope($id) : ['vessels' => [], 'projects' => [], 'subprojects' => [], 'text' => ''],   // R97-238
                 'invoices' => array_map(fn($x) => ['si_no' => (string)$x['si_no'], 'inv_no' => (string)$x['inv_no'], 'credit' => $x['kind'] === 'credit', 'gross' => $f($x['gross']), 'amount' => $f($x['amount']), 'currency' => (string)$x['currency'],
-                                                   'due' => $x['due_date'], 'po_no' => (string)($x['po_no'] ?? ''), 'project' => trim((string)($x['project_code'] ?? '') . ' ' . (string)($x['sub_code'] ?? ''))], si_request_items($id))];
+                                                   'due' => $x['due_date'], 'po_no' => (string)($x['po_no'] ?? ''), 'project' => trim((string)($x['project_code'] ?? '') . ' ' . (string)($x['sub_code'] ?? '')),
+                                                   'vessel' => (string)($x['vessel'] ?? ''), 'project_name' => trim((string)($x['project_code'] ?? '') . ' ' . (string)($x['project_name'] ?? '')), 'subproject' => trim((string)($x['sub_code'] ?? '') . ' ' . (string)($x['sub_name'] ?? ''))], si_request_items($id))];
     }
     /** Approve or reject it — the portal's own function decides, with its own rights check, history line and notifications. */
     public static function paymentDecide(int $id, array $b): array {

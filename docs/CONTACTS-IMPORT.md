@@ -4461,3 +4461,17 @@ No database step. Language keys +3 (13 509 per language). Next ref GAS-CP-R97-23
 
 **Not changed:** the sign-in on the phone. The app stays signed in (tokens rotate, «Sign out everywhere» and device revocation work as before). An automatic lock or sign-out of an idle app is a separate decision.
 
+## §517 Payables: priority and vessel / project / sub-project on payment requests (GAS-CP-R97-238, v1.246.0)
+
+**Priority.** Payables › Invoices › tick checked invoices of one supplier › choose **Priority** (Urgent · High · Normal · Low) › «Request payment». The choice is obligatory. It can be changed while the request is open by the requester, Accounting or Management («Set priority» on the request; logged in its history). Requests made before this version are *Normal*.
+
+**Vessel, project, sub-project.** Each invoice of a request shows its vessel, project and sub-project — from the link on the invoice, otherwise from its purchase order. The request shows them in one line under its number; the list of requests has the column «Vessel · Project».
+
+**Lists.** Open requests are sorted Urgent → High → Normal → Low, then newest first; filter «Priority» above the list. «Waiting for me» follows the same order.
+
+**Notifications.** Body: `[URGENT] supplier · amount · vessel · project › sub-project` (no prefix for Normal).
+
+**Golden PM 1.0.22 › My approvals.** Payment rows show a priority label and the vessel / project line; urgent ones come first. The approval screen has a block Vessel / Project / Sub-project and repeats them under each invoice. An invoice without a project link shows «not linked to a project».
+
+**Data:** column `si_requests.priority` (migration key r99p).
+

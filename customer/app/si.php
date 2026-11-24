@@ -301,27 +301,50 @@ function si_reopen(int $iid): void { require_si(); $i = si_load($iid); if (!$i |
 /* ------------------------------------------------------------------ payment requests */
 const SI_R_SELECT = "SELECT r.*, co.name AS supplier, (SELECT COUNT(*) FROM si_request_items ri WHERE ri.request_id = r.id) AS n_inv FROM si_requests r JOIN companies co ON co.id = r.supplier_id";
 function si_request_load(int $id): ?array { return si_has() && $id ? one(SI_R_SELECT . ' WHERE r.id = ?', [$id]) ?: null : null; }
-function si_requests(array $f = []): array { $w = []; $a = []; if (!empty($f['status'])) { if ($f['status'] === 'open') $w[] = "r.status IN ('submitted','mgmt','approved')"; elseif ($f['status'] === 'mine') { $ms = si_my_statuses(); $w[] = $ms ? "r.status IN ('" . implode("','", $ms) . "')" : '1 = 0'; } else { $w[] = 'r.status = ?'; $a[] = $f['status']; } } if (!empty($f['supplier_id'])) { $w[] = 'r.supplier_id = ?'; $a[] = (int)$f['supplier_id']; } return all(SI_R_SELECT . ($w ? ' WHERE ' . implode(' AND ', $w) : '') . ' ORDER BY r.id DESC', $a); }
+function si_requests(array $f = []): array { $w = []; $a = []; if (!empty($f['status'])) { if ($f['status'] === 'open') $w[] = "r.status IN ('submitted','mgmt','approved')"; elseif ($f['status'] === 'mine') { $ms = si_my_statuses(); $w[] = $ms ? "r.status IN ('" . implode("','", $ms) . "')" : '1 = 0'; } else { $w[] = 'r.status = ?'; $a[] = $f['status']; } } if (!empty($f['supplier_id'])) { $w[] = 'r.supplier_id = ?'; $a[] = (int)$f['supplier_id']; } if (!empty($f['priority']) && in_array($f['priority'], SI_PRIORITIES, true) && si_prio_has()) { $w[] = 'r.priority = ?'; $a[] = $f['priority']; } return all(SI_R_SELECT . ($w ? ' WHERE ' . implode(' AND ', $w) : '') . ' ORDER BY ' . (si_prio_has() && in_array($f['status'] ?? '', ['open', 'mine', 'submitted', 'mgmt', 'approved'], true) ? SI_PRIO_ORDER . ', ' : '') . 'r.id DESC', $a); }
 /** R97-155: the request statuses the signed-in user may decide — «mgmt» for Management, «submitted» for Accounting and Management (the same rule as si_request_decide). */
 function si_my_statuses(): array { $s = []; if (!si_has() || !is_staff()) return $s; if (si_pay_can()) $s[] = 'submitted'; if (function_exists('mgmt_can') && mgmt_can()) $s[] = 'mgmt'; return $s; }
 /** Payment requests waiting for a decision of the signed-in user, oldest first. */
-function si_my_pending(): array { static $v = null; if ($v !== null) return $v; $ms = si_my_statuses(); if (!$ms) return $v = []; try { return $v = all(SI_R_SELECT . " WHERE r.status IN ('" . implode("','", $ms) . "') ORDER BY r.created_at, r.id"); } catch (Throwable $e) { return $v = []; } }
-function si_request_items(int $rid): array { return all('SELECT ri.*, i.si_no, i.inv_no, i.kind, i.gross, i.paid, i.due_date, i.status AS inv_status, i.currency, i.order_id, i.project_id, i.subproject_id, o.po_no, p.project_code, s.code AS sub_code FROM si_request_items ri JOIN si_invoices i ON i.id = ri.invoice_id LEFT JOIN po_orders o ON o.id = i.order_id LEFT JOIN projects p ON p.id = i.project_id LEFT JOIN subprojects s ON s.id = i.subproject_id WHERE ri.request_id = ? ORDER BY i.due_date, i.id', [$rid]); }
+function si_my_pending(): array { static $v = null; if ($v !== null) return $v; $ms = si_my_statuses(); if (!$ms) return $v = []; try { return $v = all(SI_R_SELECT . " WHERE r.status IN ('" . implode("','", $ms) . "') ORDER BY " . (si_prio_has() ? SI_PRIO_ORDER . ', ' : '') . "r.created_at, r.id"); } catch (Throwable $e) { return $v = []; } }
+function si_request_items(int $rid): array { return all('SELECT ri.*, i.si_no, i.inv_no, i.kind, i.gross, i.paid, i.due_date, i.status AS inv_status, i.currency, i.order_id, COALESCE(i.project_id, o.project_id) AS project_id, COALESCE(i.subproject_id, o.subproject_id) AS subproject_id, o.po_no, p.project_code, p.name AS project_name, s.code AS sub_code, s.name AS sub_name, v.name AS vessel FROM si_request_items ri JOIN si_invoices i ON i.id = ri.invoice_id LEFT JOIN po_orders o ON o.id = i.order_id LEFT JOIN projects p ON p.id = COALESCE(i.project_id, o.project_id) LEFT JOIN subprojects s ON s.id = COALESCE(i.subproject_id, o.subproject_id) LEFT JOIN vessels v ON v.id = p.vessel_id WHERE ri.request_id = ? ORDER BY i.due_date, i.id', [$rid]); }   // R97-238: vessel, project and sub-project of every invoice (from the invoice, else from its purchase order)
+/* ---- R97-238: priority of a payment request, and what it pays for (vessel · project › sub-project) ---- */
+const SI_PRIORITIES = ['urgent', 'high', 'normal', 'low'];
+const SI_PRIO_ORDER = "FIELD(r.priority, 'urgent', 'high', 'normal', 'low')";
+function si_prio_has(): bool { static $h = null; if ($h === null) { try { $h = si_has() && (bool) scalar("SHOW COLUMNS FROM si_requests LIKE 'priority'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function si_prio_pill(?string $p): string { $p = in_array($p, SI_PRIORITIES, true) ? $p : 'normal'; return pill(['urgent' => 'bad', 'high' => 'warn', 'normal' => 'mute', 'low' => 'mute'][$p], t('si.prio_' . $p)); }
+/** What a request pays for: the distinct vessels, projects and sub-projects of its invoices, and one line of text for lists and notifications. */
+function si_request_scope(int $rid): array {
+    $v = []; $p = []; $s = []; $lines = [];
+    foreach (si_request_items($rid) as $it) {
+        $pj = trim((string)($it['project_code'] ?? '') . ' ' . (string)($it['project_name'] ?? '')); $sb = trim((string)($it['sub_code'] ?? '') . ' ' . (string)($it['sub_name'] ?? '')); $vs = trim((string)($it['vessel'] ?? ''));
+        if ($vs !== '') $v[$vs] = 1; if ($pj !== '') $p[$pj] = 1; if ($sb !== '') $s[$sb] = 1;
+        $l = implode(' · ', array_filter([$vs, $pj . ($sb !== '' ? ' › ' . $sb : '')], 'strlen')); if ($l !== '') $lines[$l] = 1;
+    }
+    $t = array_keys($lines); $text = $t ? implode(' | ', array_slice($t, 0, 2)) . (count($t) > 2 ? ' +' . (count($t) - 2) : '') : '';
+    return ['vessels' => array_keys($v), 'projects' => array_keys($p), 'subprojects' => array_keys($s), 'text' => mb_substr($text, 0, 240)];
+}
+/** Change the priority while the request is open: the requester, Accounting or Management. */
+function si_request_priority_set(int $rid, string $prio): void {
+    require_si(); $R = si_request_load($rid); $u = current_user(); if (!$R || !si_prio_has() || !in_array($prio, SI_PRIORITIES, true) || !in_array($R['status'], ['submitted', 'mgmt', 'approved'], true)) throw new RuntimeException(t('err.noaccess'));
+    if (!((int)$R['requested_by'] === (int)$u['id'] || si_pay_can() || (function_exists('mgmt_can') && mgmt_can()))) throw new RuntimeException(t('err.noaccess'));
+    if ($prio === (string)$R['priority']) return; q('UPDATE si_requests SET priority = ? WHERE id = ?', [$prio, $rid]); si_event(null, $rid, 'priority', t('si.prio_' . $R['priority']) . ' → ' . t('si.prio_' . $prio));
+}
 /** Payment request: checked invoices (and credit notes) of one supplier → amount = Σ open; over the threshold → management. */
-function si_request_create(array $invoiceIds, ?string $payBy, string $note): int {
-    require_si(); $u = current_user(); $ids = array_values(array_unique(array_map('intval', $invoiceIds))); if (!$ids) throw new RuntimeException(t('si.need_invoices'));
+function si_request_create(array $invoiceIds, ?string $payBy, string $note, string $priority = ''): int {
+    require_si(); $u = current_user(); if (si_prio_has() && !in_array($priority, SI_PRIORITIES, true)) throw new RuntimeException(t('si.need_priority'));   /* R97-238: the requester says how urgent it is */ $ids = array_values(array_unique(array_map('intval', $invoiceIds))); if (!$ids) throw new RuntimeException(t('si.need_invoices'));
     $rows = all('SELECT * FROM si_invoices WHERE id IN (' . implode(',', array_fill(0, count($ids), '?')) . ") AND status = 'checked'", $ids); if (count($rows) !== count($ids)) throw new RuntimeException(t('si.need_checked'));
     $sup = (int)$rows[0]['supplier_id']; $cur = $rows[0]['currency']; $amt = 0.0;
     foreach ($rows as $r) { if ((int)$r['supplier_id'] !== $sup || $r['currency'] !== $cur) throw new RuntimeException(t('si.one_supplier')); $amt += ($r['kind'] === 'credit' ? -1 : 1) * ((float)$r['gross'] - (float)$r['paid']); }
     if ($amt <= 0) throw new RuntimeException(t('si.need_positive'));
     $thr = si_threshold(); $over = $thr > 0 && $amt > $thr; $br = $rows[0]['branch_id'] ? (int)$rows[0]['branch_id'] : null;
     q('INSERT INTO si_requests (req_no, supplier_id, amount, currency, pay_by, status, over_threshold, note, requested_by, requested_name) VALUES (?,?,?,?,?,?,?,?,?,?)', [si_number('PRQ', $br), $sup, round($amt, 2), $cur, $payBy, $over ? 'mgmt' : ($u && function_exists('mgmt_can') && mgmt_can() ? 'approved' : 'submitted'), $over ? 1 : 0, mb_substr($note, 0, 600) ?: null, (int)$u['id'], $u['full_name']]);
-    $rid = (int) db()->lastInsertId();
+    $rid = (int) db()->lastInsertId(); if (si_prio_has()) q('UPDATE si_requests SET priority = ? WHERE id = ?', [$priority, $rid]);
     foreach ($rows as $r) { q('INSERT INTO si_request_items (request_id, invoice_id, amount) VALUES (?,?,?)', [$rid, (int)$r['id'], ($r['kind'] === 'credit' ? -1 : 1) * ((float)$r['gross'] - (float)$r['paid'])]); q('UPDATE si_invoices SET status = ? WHERE id = ?', ['requested', (int)$r['id']]); si_event((int)$r['id'], $rid, 'request'); }
     $R = si_request_load($rid); si_event(null, $rid, 'create', $R['req_no'] . ' · ' . si_money($amt, $cur) . ($over ? ' · ' . t('si.over_threshold') : ''));
+    $nfBody = (si_prio_has() && $priority !== 'normal' ? '[' . mb_strtoupper(t('si.prio_' . $priority)) . '] ' : '') . $R['supplier'] . ' · ' . si_money($amt, $cur) . (($sc = si_request_scope($rid)['text']) !== '' ? ' · ' . $sc : '');   // R97-238: priority and vessel / project in the notification
     if ($R['status'] === 'approved') { si_request_mark_approved($rid); }
-    elseif ($over && function_exists('nf_push')) { try { nf_push(prq_mgmt_ids(), 'work:si_mgmt', 'sir:' . $rid, t('si.nf_mgmt', ['no' => $R['req_no']]), $R['supplier'] . ' · ' . si_money($amt, $cur), url('payables', ['tab' => 'requests', 'id' => $rid]), (int)$u['id'], $u['full_name']); } catch (Throwable $e) {} }
-    elseif (function_exists('nf_push')) { try { nf_push(si_accounting_ids(), 'work:si_request', 'sir:' . $rid, t('si.nf_request', ['no' => $R['req_no']]), $R['supplier'] . ' · ' . si_money($amt, $cur), url('payables', ['tab' => 'requests', 'id' => $rid]), (int)$u['id'], $u['full_name']); } catch (Throwable $e) {} }
+    elseif ($over && function_exists('nf_push')) { try { nf_push(prq_mgmt_ids(), 'work:si_mgmt', 'sir:' . $rid, t('si.nf_mgmt', ['no' => $R['req_no']]), $nfBody, url('payables', ['tab' => 'requests', 'id' => $rid]), (int)$u['id'], $u['full_name']); } catch (Throwable $e) {} }
+    elseif (function_exists('nf_push')) { try { nf_push(si_accounting_ids(), 'work:si_request', 'sir:' . $rid, t('si.nf_request', ['no' => $R['req_no']]), $nfBody, url('payables', ['tab' => 'requests', 'id' => $rid]), (int)$u['id'], $u['full_name']); } catch (Throwable $e) {} }
     return $rid;
 }
 function si_accounting_ids(): array { try { return array_map('intval', array_column(all("SELECT id FROM customer_users WHERE is_active = 1 AND role IN ('staff','admin') AND is_accounting = 1"), 'id')); } catch (Throwable $e) { return []; } }

@@ -5,6 +5,7 @@ return [
   'lede'  => 'Your own corner of the portal: your leave balance and requests, the leave periods you can join, your program on the Planning board, the trainings you can apply for and your certificates, your annual evaluation, your messages with HR, and the Community — wishes, kudos, the noticeboard and badges. Short, with the steps to follow.',
   'sections' => [
     ['id' => 'start', 'title' => 'Getting in and getting around', 'body' => [
+      'Payables — payment request (v1.246.0): choose the priority (Urgent, High, Normal, Low) before «Request payment»; without it the request is not made. Link each invoice to its project or purchase order first, so that the approvers see the vessel and the project.',
       'Leave — not enough days (v1.245.0): if the portal answers that you do not have enough days and the leave is needed anyway, ask HR, the General Manager or the CEO: they can register it for you directly.',
       'Leave — Strike (v1.245.0): choose the type Strike and the day(s) and send — it is registered at once, no approval is needed. Your manager and HR are informed. You can cancel it yourself until the day it starts.',
       'Service report — e-mail for acceptance from the phone (v1.244.1): in the Service app, «Send by e-mail for acceptance» answered «Outgoing e-mail is not set up on the portal» although the portal sends e-mail normally. The mail module was not loaded for requests coming from the apps; it is now. Nothing to update on the phone — try again.',

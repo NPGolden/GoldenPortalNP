@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.245.2** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.246.0** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.246.0 | GAS-CP-R97-238 | 2026-11-24 | Payables: payment requests carry a priority chosen by the requester (urgent, high, normal, low) and show vessel, project and sub-project — in the portal, the notifications and the payment approvals of Golden PM 1.0.22 | `install/migrate_cp_r97_238_payment_request_priority.sql` |
 | 1.245.2 | GAS-CP-R97-237 | 2026-11-24 | Who is online: an app left open no longer keeps its user online — the apps report how long the screen was untouched (Service 0.8.6, Golden PM 1.0.21, Golden HR 1.2.5, Employee 1.1.6); online only while used in the last 5 minutes | — |
 | 1.245.1 | GAS-CP-R97-236 | 2026-11-24 | Planning: project managers see the whole company on the board (before: only staff marked technical in HR); switch back and a notice when the board is limited to some disciplines | — |
 | 1.245.0 | GAS-CP-R97-235 | 2026-11-24 | HR: leave types registered without approval — Strike is registered at once when the employee enters it, goes on the planning board, manager and HR are informed; switch per leave type in HR settings. HR, the General Manager or the CEO register a leave for an employee directly, also above the remaining days | `install/migrate_cp_r97_235_leave_no_approval.sql` |

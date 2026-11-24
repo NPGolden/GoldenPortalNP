@@ -3,7 +3,7 @@
  * Mock mode: localStorage gpm.mock = "1", or ?mock=1 on the URL. */
 (function () { try { window.__gasAct = Date.now(); ["pointerdown", "keydown", "touchstart"].forEach(function (e) { window.addEventListener(e, function () { window.__gasAct = Date.now(); }, { passive: true, capture: true }); }); } catch (e) {} })();   // R97-237: when the screen was last touched — sent as X-Idle so an app left open does not keep its user «online»
 window.API = (() => {
-  const VERSION = "1.0.21";
+  const VERSION = "1.0.22";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   const demoOn = () => { try { return localStorage.getItem("gpm.demo") === "1"; } catch (e) { return false; } };   // R97-169
@@ -94,7 +94,7 @@ window.API = (() => {
   const STAGES = ["engineering", "procurement", "production", "fat", "installation", "sathat", "commissioning"];
   const overall = (st) => { const v = STAGES.map((k) => st[k]).filter((x) => x !== -1 && x != null); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : 0; };
   const mockState = { user: null, n: 0 };
-  const aprRow = (x) => ({ key: x.kind + ":" + x.id, kind: x.kind, icon: x.icon, label: x.label, id: x.id, ref: x.ref, title: x.title, who: x.who, at: x.at, age: x.age, with: x.with, late: !!x.late, action: x.action });
+  const aprRow = (x) => ({ key: x.kind + ":" + x.id, kind: x.kind, icon: x.icon, label: x.label, id: x.id, ref: x.ref, title: x.title, who: x.who, at: x.at, age: x.age, with: x.with, late: !!x.late, action: x.action, priority: x.priority || "", priority_label: x.priority_label || "", scope: x.scope || "" });
   const ME = { id: 2, name: "Alex Demo", email: "demo.pm@example.com", role: "staff", discipline: "Management", discipline_id: 9, section_id: null, home_branch: "GR", branch_scope: ["GR", "GIT"], languages: ["en", "el", "it", "uk", "bg"], min_app_version: "1.0.6", ai: true, calendar: "GR", hr: true,
     pm: true, hr_manager: true, ts_approver: true, totp_enabled: false, counts: { hr_pending: 2, ts_pending: 2, drawings_overdue: 2, submittals_open: 5, hr_unread: 1 } };
   const STAFF = [
@@ -157,8 +157,8 @@ window.API = (() => {
       { id: 103, project_id: 161, subproject_id: 1611, name: "DRW-000161-N-003_R1 — Radar pedestal", category: "drawing", size: "0.9 MB", mime: "application/pdf" },
     ],
     approvals: [   // R97-207 demonstration data — invented suppliers and amounts
-      { kind: "payment", icon: "💶", label: "Supplier payment", id: 71, ref: "GAS-PAY-26-0071", title: "Aegean Marine Supplies Ltd · 4.860,00 EUR", who: "Maria Demo", at: d(-2) + " 10:20", age: 2, with: "Management", late: false, action: "payment",
-        detail: { id: 71, req_no: "GAS-PAY-26-0071", supplier: "Aegean Marine Supplies Ltd", amount: 4860, currency: "EUR", status: "mgmt", with: "Management", pay_by: d(3), late: false, note: "Cables and glands for the wheelhouse consoles.", requested_by: "Maria Demo", created_at: d(-2) + " 10:20",
+      { kind: "payment", icon: "💶", label: "Supplier payment", priority: "urgent", priority_label: "Urgent", scope: "M/Y DEMO ONE · PRJ.900154 Demo refit › SP-02 Wheelhouse", id: 71, ref: "GAS-PAY-26-0071", title: "Aegean Marine Supplies Ltd · 4.860,00 EUR", who: "Maria Demo", at: d(-2) + " 10:20", age: 2, with: "Management", late: false, action: "payment",
+        detail: { priority: "urgent", priority_label: "Urgent", scope: { vessels: ["M/Y DEMO ONE"], projects: ["PRJ.900154 Demo refit"], subprojects: ["SP-02 Wheelhouse"], text: "" }, id: 71, req_no: "GAS-PAY-26-0071", supplier: "Aegean Marine Supplies Ltd", amount: 4860, currency: "EUR", status: "mgmt", with: "Management", pay_by: d(3), late: false, note: "Cables and glands for the wheelhouse consoles.", requested_by: "Maria Demo", created_at: d(-2) + " 10:20",
           invoices: [{ si_no: "GAS-SI-26-0412", inv_no: "AMS-20418", credit: false, gross: 3120, amount: 3120, currency: "EUR", due: d(3), po_no: "GAS-PO-26-0188", project: "PRJ.000154 Y.010" }, { si_no: "GAS-SI-26-0415", inv_no: "AMS-20431", credit: false, gross: 1740, amount: 1740, currency: "EUR", due: d(9), po_no: "GAS-PO-26-0191", project: "PRJ.000154 Y.020" }] } },
       { kind: "payment", icon: "💶", label: "Supplier payment", id: 72, ref: "GAS-PAY-26-0072", title: "Nordlicht Automation GmbH · 12.400,00 EUR", who: "Maria Demo", at: d(-6) + " 09:05", age: 6, with: "Management", late: true, action: "payment",
         detail: { id: 72, req_no: "GAS-PAY-26-0072", supplier: "Nordlicht Automation GmbH", amount: 12400, currency: "EUR", status: "mgmt", with: "Management", pay_by: d(-1), late: true, note: "", requested_by: "Maria Demo", created_at: d(-6) + " 09:05",

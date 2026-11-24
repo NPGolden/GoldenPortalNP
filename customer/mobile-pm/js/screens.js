@@ -259,13 +259,14 @@ window.SCREENS = (() => {
   let aprN = null;   // the number last read from the portal in this session (the count of /me is as old as the last sync)
   const aprCount = () => aprN != null ? aprN : ((ctx.me && ctx.me.counts || {}).approvals || 0);
   const money = (v, cur) => v == null ? "" : `${Number(v).toLocaleString("el-GR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${cur || "EUR"}`;
+  const prioChip = (x) => x.priority && x.priority !== "normal" && x.priority_label ? ` <span class="chip ${x.priority === "urgent" ? "red" : x.priority === "high" ? "amber" : "grey"}">${esc(x.priority_label)}</span>` : "";   // R97-238
   async function myappr() {
     UI.chrome(true, t("mya.title"), "more", true);
     let d = null, err = ""; try { d = await API.myApprovals(); aprN = d.count; } catch (e) { err = e && e.offline ? t("mya.offline") : ((e.data && e.data.error) || e.message || t("mya.offline")); }
     if (!d) return { html: `<p class="list-empty">${esc(err)}</p><button class="btn navy" id="again">${t("mya.again")}</button>`, bind(root) { root.querySelector("#again").onclick = () => UI.render(); } };
     const where = (x) => x.action === "payment" ? "" : `<div class="s muted">${t(x.action === "team" ? "mya.in_team" : "mya.in_portal")}</div>`;
     return { html: `<p class="muted">${t("mya.lede")}</p>${d.items.map((x) => `<div class="card ${x.action === "portal" ? "" : "tap"} ${x.late ? "c-red" : x.action === "payment" ? "c-gold" : "c-grey"}" ${x.action === "payment" ? `data-go="#/myappr/pay/${+x.id}"` : x.action === "team" ? `data-go="#/team?tab=${x.kind === "timesheet" ? "timesheets" : "requests"}"` : ""}>
-        <div class="t">${esc(x.icon)} ${esc(x.label)} <small>${esc(x.ref)}</small></div><div class="s">${esc(x.title)}</div>
+        <div class="t">${esc(x.icon)} ${esc(x.label)} <small>${esc(x.ref)}</small>${prioChip(x)}</div><div class="s">${esc(x.title)}</div>${x.scope ? `<div class="s">🚢 ${esc(x.scope)}</div>` : ""}
         <div class="s muted">${esc(x.who)}${x.who ? " • " : ""}${x.age ? t("mya.days", { n: x.age }) : t("mya.today")}${x.with ? ` • ${esc(x.with)}` : ""}${x.late ? ` • ${t("mya.late")}` : ""}</div>${where(x)}</div>`).join("") || `<p class="list-empty">${t("mya.none")}</p>`}`,
       bind(root) { UI.goLinks(root); } };
   }
@@ -273,14 +274,16 @@ window.SCREENS = (() => {
     UI.chrome(true, t("mya.pay"), "more", true);
     let p = null, err = ""; try { p = await API.payment(id); } catch (e) { err = e && e.offline ? t("mya.offline") : ((e.data && e.data.error) || e.message || ""); }
     if (!p) return { html: `<p class="list-empty">${esc(err || t("mya.gone"))}</p><button class="btn navy" data-go="#/myappr">${t("mya.title")}</button>`, bind(root) { UI.goLinks(root); } };
-    return { html: `<div class="card ${p.late ? "c-red" : "c-gold"}"><div class="t">${esc(p.supplier)} <small>${esc(p.req_no)}</small></div>
+    const sc = p.scope || {}, list = (a) => (a || []).map(esc).join("<br>");
+    return { html: `<div class="card ${p.late || p.priority === "urgent" ? "c-red" : "c-gold"}"><div class="t">${esc(p.supplier)} <small>${esc(p.req_no)}</small>${prioChip(p)}</div>
         <div class="s" style="font-size:22px;font-weight:700;margin:6px 0">${esc(money(p.amount, p.currency))}</div>
         <div class="s muted">${t("mya.asked_by")} ${esc(p.requested_by)} • ${fmt(String(p.created_at || "").slice(0, 10))}${p.pay_by ? ` • ${t("mya.pay_by")} ${fmt(p.pay_by)}` : ""}${p.late ? ` • ${t("mya.late")}` : ""} • ${esc(p.with)}</div>
         ${p.note ? `<div class="s">${esc(p.note)}</div>` : ""}</div>
+      ${(sc.vessels || []).length || (sc.projects || []).length ? `<div class="card c-grey"><div class="s"><b>🚢 ${t("mya.vessel")}</b><br>${list(sc.vessels) || "—"}</div><div class="s" style="margin-top:6px"><b>📁 ${t("mya.project")}</b><br>${list(sc.projects) || "—"}</div>${(sc.subprojects || []).length ? `<div class="s" style="margin-top:6px"><b>↳ ${t("mya.subproject")}</b><br>${list(sc.subprojects)}</div>` : ""}</div>` : `<div class="card c-grey"><div class="s muted">${t("mya.no_project")}</div></div>`}
       <h2>${t("mya.invoices")} (${p.invoices.length})</h2>
       ${p.invoices.map((i) => `<div class="card ${i.credit ? "c-amber" : "c-grey"}"><div class="t">${esc(i.inv_no)} <small>${esc(i.si_no)}${i.credit ? " • " + t("mya.credit") : ""}</small></div>
         <div class="s">${esc(money(i.amount, i.currency))}${Math.abs(i.amount) !== Math.abs(i.gross) ? ` <small>(${t("mya.of")} ${esc(money(i.gross, i.currency))})</small>` : ""}${i.due ? ` • ${t("mya.due")} ${fmt(i.due)}` : ""}</div>
-        <div class="s muted">${esc(i.po_no)}${i.project ? ` • ${esc(i.project)}` : ""}</div></div>`).join("")}
+        <div class="s muted">${esc(i.po_no)}${i.vessel ? `${i.po_no ? " • " : ""}🚢 ${esc(i.vessel)}` : ""}</div>${i.project_name || i.project ? `<div class="s muted">📁 ${esc(i.project_name || i.project)}${i.subproject ? ` › ${esc(i.subproject)}` : ""}</div>` : ""}</div>`).join("")}
       <p class="muted">${t("mya.docs_note")}</p>
       <div class="row2"><button class="btn gold" id="ok">${t("team.approve")}</button><button class="btn line" id="no">${t("team.reject")}</button></div>`,
       bind(root) {
