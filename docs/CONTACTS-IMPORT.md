@@ -4348,3 +4348,9 @@ No database step; statuses `reading` and `failed` use the existing column. The w
 
 **Limits:** three invitations a minute per application; no sending to anonymised applications; subject one line, text up to 8 000 characters.
 
+## §509 Recruiting: interview buttons in the row; Golden HR 1.2.4 (GAS-CP-R97-230, v1.242.1)
+
+**Portal:** HR › Recruiting › application › «Interviews». A planned interview has, in its own row: ✓ done · ∅ no-show · ✕ cancelled · **✎ Change** · **✉ Invitation**. The two new buttons open the form of that interview under the list. A done / no-show / cancelled interview has **↺ Back to planned** (with confirmation); then it can be changed and invited again.
+
+**Golden HR app 1.2.4** (updates by itself, no store version): candidate screen › Interviews › a planned interview shows «invited <date>» or «invitation not sent», and the buttons **✎ Change** and **✉ Invitation**. The invitation is read from the portal template in the language of the candidate, can be adjusted and is sent by the portal. API: `POST /hr/app/interview/{id}`, `GET` and `POST /hr/app/interview/{id}/invitation` (HR accounts only).
+

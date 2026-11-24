@@ -13603,4 +13603,8 @@ Best regards,
 'rc.ev_no_email' => 'This application has no valid e-mail address.',
 'rc.ev_too_many' => 'Three invitations were just sent for this application. Wait a minute.',
 'rc.ev_athens' => 'Athens time',
+'rc.ev_edit_short' => 'Change',
+'rc.ev_invite_short' => 'Invitation',
+'rc.ev_replan' => 'Back to planned',
+'rc.ev_replan_q' => 'Set this interview back to planned? It can then be changed and invited again.',
 ];

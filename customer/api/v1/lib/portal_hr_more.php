@@ -56,7 +56,7 @@ final class PortalHRMore {
     }
     private static function shapeInterview(array $i): array {
         return ['id' => (int)$i['id'], 'application_id' => (int)$i['application_id'], 'name' => (string)($i['name'] ?? ''), 'vacancy' => (string)($i['vacancy'] ?? ''), 'stage' => (string)$i['stage'], 'stage_label' => t('rc.ev_stage_' . $i['stage']),
-            'at' => (string)$i['scheduled_at'], 'duration' => (int)$i['duration_min'], 'mode' => (string)$i['mode'], 'mode_label' => t('rc.ev_mode_' . $i['mode']), 'location' => (string)($i['location'] ?? ''), 'interviewers' => (string)($i['interviewers'] ?? ''), 'status' => (string)$i['status']];
+            'at' => (string)$i['scheduled_at'], 'duration' => (int)$i['duration_min'], 'mode' => (string)$i['mode'], 'mode_label' => t('rc.ev_mode_' . $i['mode']), 'location' => (string)($i['location'] ?? ''), 'interviewers' => (string)($i['interviewers'] ?? ''), 'status' => (string)$i['status'], 'notified' => (string)($i['candidate_notified_at'] ?? '')];
     }
     private static function labels(): array {
         $st = []; foreach (RCR_APP_STATUS as $s) $st[$s] = t('rc.st_' . $s); $es = []; foreach (RCR_EVAL_STAGE as $s) $es[$s] = t('rc.ev_stage_' . $s); $rc = []; foreach (RCR_EVAL_RECO as $s) $rc[$s] = t('rc.ev_reco_' . $s);
@@ -83,6 +83,7 @@ final class PortalHRMore {
         $o['evaluations'] = array_map(fn($e) => ['id' => (int)$e['id'], 'stage' => (string)$e['stage'], 'stage_label' => t('rc.ev_stage_' . $e['stage']), 'by' => (string)($e['by_name'] ?: $e['evaluator_name']), 'total' => round((float)$e['total'], 1),
             'reco' => (string)$e['recommendation'], 'reco_label' => t('rc.ev_reco_' . $e['recommendation']), 'strengths' => (string)($e['strengths'] ?? ''), 'concerns' => (string)($e['concerns'] ?? ''), 'notes' => (string)($e['notes'] ?? ''), 'at' => (string)$e['created_at']], rcr_evaluations($id));
         $o['interviews'] = array_map(fn($i) => self::shapeInterview($i + ['name' => $o['name'], 'vacancy' => $o['vacancy']]), rcr_interviews($id));
+        $o['int_opts'] = ['stage' => array_combine(RCR_INT_STAGE, array_map(fn($s) => t('rc.ev_stage_' . $s), RCR_INT_STAGE)), 'mode' => ['online' => t('rc.ev_mode_online'), 'onsite' => t('rc.ev_mode_onsite'), 'phone' => t('rc.ev_mode_phone')], 'can_edit' => function_exists('rcr_interview_update')];   // R97-230
         return $o;
     }
     /** The CV, streamed for the in-app reader (never stored on the phone). Every view is written to the recruiting log. */
@@ -107,6 +108,19 @@ final class PortalHRMore {
         $in = ['stage' => (string)($p['stage'] ?? ''), 'score' => array_map('intval', (array)($p['score'] ?? [])), 'recommendation' => (string)($p['recommendation'] ?? ''), 'strengths' => (string)($p['strengths'] ?? ''), 'concerns' => (string)($p['concerns'] ?? ''), 'notes' => (string)($p['notes'] ?? '')];
         self::guard(fn() => rcr_eval_save($id, $in));
         return self::application($id);
+    }
+    /* R97-230 Golden HR 1.2.4: change a planned interview · the invitation from the e-mail template, read and sent */
+    private static function interviewRow(int $id): array { self::rcOn(); $i = function_exists('rcr_interview') ? rcr_interview($id) : null; if (!$i) throw new ApiException(404, 'Interview not found'); return $i; }
+    public static function interviewUpdate(int $id, array $p): array {
+        $i = self::interviewRow($id);
+        $in = ['scheduled_at' => (string)($p['at'] ?? ''), 'stage' => (string)($p['stage'] ?? ''), 'mode' => (string)($p['mode'] ?? ''), 'duration_min' => (int)($p['duration'] ?? 60), 'location' => (string)($p['location'] ?? ''), 'interviewers' => (string)($p['interviewers'] ?? '')];
+        self::guard(fn() => rcr_interview_update($id, $in));
+        return self::application((int)$i['application_id']);
+    }
+    public static function interviewInvitation(int $id): array { self::interviewRow($id); $d = self::guard(fn() => rcr_interview_draft($id)); return ['id' => $id, 'to' => $d['to'], 'subject' => $d['subject'], 'body' => $d['body']]; }
+    public static function interviewInvite(int $id, array $p): array {
+        $i = self::interviewRow($id); $ok = self::guard(fn() => rcr_interview_send($id, (string)($p['subject'] ?? ''), (string)($p['body'] ?? '')));
+        return ['id' => $id, 'sent' => (bool)$ok, 'application_id' => (int)$i['application_id']];
     }
     public static function interviewStatus(int $id, array $p): array {
         self::rcOn(); $st = (string)($p['status'] ?? ''); if (!in_array($st, ['done', 'no_show', 'cancelled'], true)) throw new ApiException(422, 'status');

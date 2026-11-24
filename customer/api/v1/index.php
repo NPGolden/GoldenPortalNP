@@ -92,6 +92,9 @@ try {
         case $method === 'GET' && preg_match('#^/hr/app/cv/(\d+)$#', $path, $mm): RateLimit::check('api', 'cv' . $u['id'], 60); PortalHRMore::cv((int)$mm[1]);
         case $method === 'POST' && preg_match('#^/hr/app/application/(\d+)/status$#', $path, $mm): RateLimit::check('decide', 'u' . $u['id'], 30); Response::json(PortalHRMore::appStatus($u, (int)$mm[1], $body));
         case $method === 'POST' && preg_match('#^/hr/app/application/(\d+)/evaluation$#', $path, $mm): RateLimit::check('sync', 'u' . $u['id'], 60); Response::json(PortalHRMore::appEvaluation($u, (int)$mm[1], $body), 201);
+        case $method === 'POST' && preg_match('#^/hr/app/interview/(\d+)$#', $path, $mm): RateLimit::check('sync', 'u' . $u['id'], 60); Response::json(PortalHRMore::interviewUpdate((int)$mm[1], $body));   // R97-230
+        case $method === 'GET' && preg_match('#^/hr/app/interview/(\d+)/invitation$#', $path, $mm): Response::json(PortalHRMore::interviewInvitation((int)$mm[1]));
+        case $method === 'POST' && preg_match('#^/hr/app/interview/(\d+)/invitation$#', $path, $mm): RateLimit::check('decide', 'u' . $u['id'], 30); Response::json(PortalHRMore::interviewInvite((int)$mm[1], $body));
         case $method === 'POST' && preg_match('#^/hr/app/interview/(\d+)/status$#', $path, $mm): RateLimit::check('sync', 'u' . $u['id'], 60); Response::json(PortalHRMore::interviewStatus((int)$mm[1], $body));
         case $method === 'GET' && $path === '/hr/app/jds': Response::json(PortalHRMore::jds());
         case $method === 'POST' && preg_match('#^/hr/app/jd/(\d+)/decide$#', $path, $mm): RateLimit::check('decide', 'u' . $u['id'], 30); Response::json(PortalHRMore::jdDecide($u, (int)$mm[1], $body));

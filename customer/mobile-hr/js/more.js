@@ -90,14 +90,38 @@ window.HRX = (() => {
       ${A.cover_note ? `<h2>${t("rc.cover")}</h2><p class="pre">${esc(A.cover_note)}</p>` : ""}${A.hr_notes ? `<h2>${t("rc.hr_notes")}</h2><p class="pre">${esc(A.hr_notes)}</p>` : ""}
       ${closed ? "" : `<h2>${t("rc.move")}</h2><div class="ai-actions">${can.map((s) => `<button class="btn ${btnTone[s] || "line"} sm" data-move="${s}">${esc(R.labels.status[s])}</button>`).join("")}</div><p class="muted">${t("rc.hired_portal")}</p>`}
       <h2>${t("rc.interviews")}</h2>${A.interviews.length ? A.interviews.map((i) => `<div class="card ${i.status === "planned" ? "c-gold" : i.status === "done" ? "c-green" : "c-grey"}"><div class="t"><span>${esc(i.stage_label)}</span><small>${esc(dt(i.at))}</small></div><div class="s">${esc(i.mode_label)}${i.location ? ` · ${esc(i.location)}` : ""} · ${i.duration} min${i.interviewers ? ` · ${esc(i.interviewers)}` : ""}</div>
-        ${i.status === "planned" ? `<div class="row2"><button class="btn navy sm" data-int="${i.id}:done">${t("rc.int_done")}</button><button class="btn line sm" data-int="${i.id}:no_show">${t("rc.int_noshow")}</button></div>` : `<div class="s muted">${t("rc.int_" + i.status)}</div>`}</div>`).join("") : `<p class="muted">${t("rc.no_interviews")} ${t("rc.plan_portal")}</p>`}
+        ${i.status === "planned" ? `<div class="s"><span class="chip ${i.notified ? "green" : "amber"}">✉ ${i.notified ? `${t("rc.int_notified")} ${esc(dt(i.notified))}` : t("rc.int_not_notified")}</span></div>${(A.int_opts || {}).can_edit ? `<div class="row2"><button class="btn gold sm" data-inted="${i.id}">✎ ${t("rc.int_edit")}</button><button class="btn line sm" data-intml="${i.id}">✉ ${t("rc.int_invite")}</button></div>` : ""}<div class="row2"><button class="btn navy sm" data-int="${i.id}:done">${t("rc.int_done")}</button><button class="btn line sm" data-int="${i.id}:no_show">${t("rc.int_noshow")}</button></div>` : `<div class="s muted">${t("rc.int_" + i.status)}</div>`}</div>`).join("") : `<p class="muted">${t("rc.no_interviews")} ${t("rc.plan_portal")}</p>`}
       <h2>${t("rc.evaluations")}</h2>${A.evaluations.map((e) => `<div class="card c-navy"><div class="t"><span>${esc(e.stage_label)} — ${esc(e.by)}</span><small>${e.total} / 100</small></div><div class="s"><span class="chip ${e.reco === "no_hire" ? "red" : e.reco === "hold" ? "amber" : "green"}">${esc(e.reco_label)}</span> <span class="muted">${fmt(e.at)}</span></div>${e.strengths ? `<div class="s">＋ ${esc(e.strengths)}</div>` : ""}${e.concerns ? `<div class="s">－ ${esc(e.concerns)}</div>` : ""}${e.notes ? `<div class="s muted">${esc(e.notes)}</div>` : ""}</div>`).join("") || `<p class="muted">${t("rc.no_eval")}</p>`}
       ${R.criteria.length && !closed ? `<button class="btn line" id="addeval">＋ ${t("rc.add_eval")}</button>` : ""}`, bind(root) {
       UI.goLinks(root);
       root.querySelectorAll("[data-move]").forEach((b) => b.onclick = () => moveSheet(A, b.dataset.move, R));
       root.querySelectorAll("[data-int]").forEach((b) => b.onclick = async () => { const [iid, st] = b.dataset.int.split(":"); b.disabled = true; try { await API.interviewStatus(iid, st); drop("rc", "app:" + A.id); UI.toast(t("x.saved")); } catch (e) { UI.toast((e.data && e.data.error) || t("x.offline"), 4000); } UI.render(); });
+      root.querySelectorAll("[data-inted]").forEach((b) => b.onclick = () => intEditSheet(A, A.interviews.find((x) => String(x.id) === b.dataset.inted)));
+      root.querySelectorAll("[data-intml]").forEach((b) => b.onclick = () => intMailSheet(A, A.interviews.find((x) => String(x.id) === b.dataset.intml), b));
       const ae = root.querySelector("#addeval"); if (ae) ae.onclick = () => evalSheet(A, R);
     } };
+  }
+  /* R97-230: change a planned interview; read, adjust and send its invitation (the portal's e-mail template) */
+  function intEditSheet(A, i) {
+    if (!i) return; const o = A.int_opts || { stage: {}, mode: {} }; const opt = (m, sel) => Object.keys(m).map((k) => `<option value="${k}" ${k === sel ? "selected" : ""}>${esc(m[k])}</option>`).join("");
+    UI.sheet(`<h3>${t("rc.int_edit")} — ${esc(A.name)}</h3><label>${t("rc.stage")}</label><select id="stage" data-nosearch>${opt(o.stage, i.stage)}</select>
+      <label>${t("rc.int_when")}</label><input type="datetime-local" id="at" value="${esc(String(i.at).slice(0, 16).replace(" ", "T"))}">
+      <label>${t("rc.int_duration")}</label><input type="number" id="dur" min="15" max="480" step="15" value="${i.duration}">
+      <label>${t("rc.int_mode")}</label><select id="mode" data-nosearch>${opt(o.mode, i.mode)}</select>
+      <label>${t("rc.int_place")}</label><input id="loc" maxlength="200" value="${esc(i.location)}"><label>${t("rc.int_who")}</label><input id="who" maxlength="300" value="${esc(i.interviewers)}">
+      <p class="muted">${t("rc.int_edit_hint")}</p><p id="err" class="note red hidden"></p><button class="btn navy" id="ok">${t("x.save")}</button>`,
+      (sh) => { const v = (id) => sh.querySelector(id).value.trim(); const er = sh.querySelector("#err"); if (!v("#at")) { er.textContent = t("rc.int_when"); er.classList.remove("hidden"); return; }
+        act(sh, () => API.interviewUpdate(i.id, { at: v("#at"), stage: v("#stage"), mode: v("#mode"), duration: +v("#dur") || 60, location: v("#loc"), interviewers: v("#who") }), () => drop("rc", "app:" + A.id)); });
+  }
+  async function intMailSheet(A, i, btn) {
+    if (!i) return; let d; if (btn) btn.disabled = true;
+    try { d = await API.interviewInvitation(i.id); } catch (e) { UI.toast((e.data && e.data.error) || t("x.offline"), 4000); if (btn) btn.disabled = false; return; }
+    if (btn) btn.disabled = false;
+    UI.sheet(`<h3>✉ ${t("rc.int_invite")} — ${esc(A.name)}</h3><p class="muted">${esc(d.to)}</p><label>${t("rc.int_subject")}</label><input id="sub" maxlength="200" value="${esc(d.subject)}">
+      <label>${t("rc.int_text")}</label><textarea id="txt" rows="12" maxlength="8000">${esc(d.body)}</textarea><p class="muted">${t("rc.int_mail_hint")}</p><p id="err" class="note red hidden"></p><button class="btn gold" id="ok">✉ ${t(i.notified ? "rc.int_send_again" : "rc.int_send")}</button>`,
+      async (sh) => { const ok = sh.querySelector("#ok"), er = sh.querySelector("#err"); ok.disabled = true;
+        try { const r = await API.interviewInvite(i.id, { subject: sh.querySelector("#sub").value, body: sh.querySelector("#txt").value }); UI.closeSheet(); drop("rc", "app:" + A.id); UI.toast(t(r.sent ? "rc.int_sent" : "rc.int_not_sent"), r.sent ? 2500 : 6000); UI.render(); }
+        catch (e) { ok.disabled = false; er.textContent = (e.data && e.data.error) || (e.status ? `HTTP ${e.status}` : t("x.offline")); er.classList.remove("hidden"); } });
   }
   function moveSheet(A, st, R) {
     const rej = st === "rejected"; const mail = ["shortlisted", "offer", "rejected"].includes(st);

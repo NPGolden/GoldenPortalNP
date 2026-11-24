@@ -13603,4 +13603,8 @@ Cordiali saluti,
 'rc.ev_no_email' => 'La candidatura non ha un indirizzo e-mail valido.',
 'rc.ev_too_many' => 'Tre inviti appena inviati per questa candidatura. Attendere un minuto.',
 'rc.ev_athens' => 'ora di Atene',
+'rc.ev_edit_short' => 'Modifica',
+'rc.ev_invite_short' => 'Invito',
+'rc.ev_replan' => 'Riporta a pianificato',
+'rc.ev_replan_q' => 'Riportare il colloquio a pianificato? Poi potrà essere modificato e invitato di nuovo.',
 ];

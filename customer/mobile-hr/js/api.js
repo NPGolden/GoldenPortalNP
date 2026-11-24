@@ -1,7 +1,7 @@
 /* Golden HR — API client for the portal module /customer/api/v1 (JWT access + rotating refresh), app "hr" (GAS-CP-R74-001).
  * Same transport as Golden PM (customer/mobile-pm/js/api.js); routes under /hr/app/*. No mock mode: HR data is never faked. */
 window.API = (() => {
-  const VERSION = "1.2.3";
+  const VERSION = "1.2.4";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   const tok = { get access() { try { return sessionStorage.getItem("ghr.at"); } catch (e) { return null; } }, set access(v) { try { v ? sessionStorage.setItem("ghr.at", v) : sessionStorage.removeItem("ghr.at"); } catch (e) {} },
     get refresh() { try { return localStorage.getItem("ghr.rt"); } catch (e) { return null; } }, set refresh(v) { try { v ? localStorage.setItem("ghr.rt", v) : localStorage.removeItem("ghr.rt"); } catch (e) {} } };
@@ -68,7 +68,7 @@ window.API = (() => {
     threads: () => call("GET", "/hr/app/threads"), thread: (pid) => call("GET", `/hr/app/thread/${pid}`), send: (pid, body) => call("POST", "/hr/app/send", { person_id: pid, body }),
     /* R97-156 — live lists, not stored on the phone */
     today: () => call("GET", "/hr/app/today"), recruiting: () => call("GET", "/hr/app/recruiting"), application: (id) => call("GET", `/hr/app/application/${id}`), cvBlob: (id) => blob(`/hr/app/cv/${id}`),
-    appStatus: (id, body) => call("POST", `/hr/app/application/${id}/status`, body), appEval: (id, body) => call("POST", `/hr/app/application/${id}/evaluation`, body), interviewStatus: (id, status) => call("POST", `/hr/app/interview/${id}/status`, { status }),
+    appStatus: (id, body) => call("POST", `/hr/app/application/${id}/status`, body), appEval: (id, body) => call("POST", `/hr/app/application/${id}/evaluation`, body), interviewStatus: (id, status) => call("POST", `/hr/app/interview/${id}/status`, { status }), interviewUpdate: (id, body) => call("POST", `/hr/app/interview/${id}`, body), interviewInvitation: (id) => call("GET", `/hr/app/interview/${id}/invitation`), interviewInvite: (id, body) => call("POST", `/hr/app/interview/${id}/invitation`, body),
     jds: () => call("GET", "/hr/app/jds"), jdDecide: (id, body) => call("POST", `/hr/app/jd/${id}/decide`, body), year: () => call("GET", "/hr/app/year"), yearTick: (body) => call("POST", "/hr/app/year/tick", body),
     expiring: (days) => call("GET", `/hr/app/expiring?days=${days}`), equipment: () => call("GET", "/hr/app/equipment"), eqDoc: (id) => call("GET", `/hr/app/equipment/doc/${id}`),
     eqReceive: (id, body) => call("POST", `/hr/app/equipment/doc/${id}/receive`, body), eqPaper: (id, body) => call("POST", `/hr/app/equipment/doc/${id}/paper`, body),

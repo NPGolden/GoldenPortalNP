@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.242.0** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.242.1** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.242.1 | GAS-CP-R97-230 | 2026-11-24 | Recruiting: «Change» and «Invitation» buttons in the row of each planned interview, a finished interview can be set back to planned; Golden HR 1.2.4 changes an interview and sends its invitation from the phone | — |
 | 1.242.0 | GAS-CP-R97-229 | 2026-11-24 | Recruiting: a planned interview can be changed (stage, date, duration, mode, place, interviewers) and its invitation is sent to the candidate through the portal from the e-mail template, with the interview filled in | — |
 | 1.241.1 | GAS-CP-R97-228 | 2026-11-24 | Delivery check: the document is read in the background — the upload answers at once and a waiting page follows the reading, so a long reading no longer ends in the 504 time-out page of the firewall; read again and discard on a failed reading | — |
 | 1.241.0 | GAS-CP-R97-227 | 2026-11-24 | Purchase order: delivery check — the delivery note or invoice of the supplier (scan, photo, PDF) is read by the assistant, compared with the order and turned into a proposed receipt; changed codes and assemblies decided per line, Procurement approves | `install/migrate_cp_r97_227_delivery_check.sql` |
