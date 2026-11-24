@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.234.1** (build 2026-11-23). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.234.2** (build 2026-11-23). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.234.2 | GAS-CP-R97-217 | 2026-11-24 | Push: sales and payment notifications go to Golden PM only | — |
 | 1.234.1 | GAS-CP-R97-216 | 2026-11-24 | Push: sales and payment notifications go to Golden PM (else Golden A/S Employee), never to the Service or HR app; one push a day for sales follow-ups instead of one per offer | — |
 | 1.234.0 | GAS-CP-R97-215 | 2026-11-23 | Inventory movements reviewed: every stock action is saved whole or not at all, two people cannot take the same goods at once, reservations are kept per warehouse, goods received above the need stay free, and a check of quantity on hand against the movements | `install/migrate_cp_r97_215_reservations_per_warehouse.sql` |
 | 1.233.0 | GAS-CP-R97-214 | 2026-11-23 | Reservations: the check runs by itself every day and notifies Procurement when something does not agree; a project manager sees the reservations of the own projects | — |

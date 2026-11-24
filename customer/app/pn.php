@@ -15,7 +15,7 @@
  */
 const PN_APPS = ['customer' => 'gr.goldenas.customer', 'engineer' => 'gr.goldenas.service', 'pm' => 'gr.goldenas.pm', 'hr' => 'gr.goldenas.hr', 'employee' => 'gr.goldenas.employee'];
 const PN_STAFF_ORDER = ['pm', 'engineer', 'employee', 'hr'];        // a member of staff with several apps gets one push, in the first of these he has
-const PN_COMMERCIAL = ['of', 'sb'];                                   // R97-216: sales and money topics go to Golden PM (else Golden A/S Employee) — never to the Service or HR app
+const PN_COMMERCIAL = ['of', 'sb'];                                   // R97-216/217: sales and money topics go to Golden PM only — never to the Service, Employee or HR app
 const PN_FRESH_SEC = 7200;                                          // older events are history, not news
 
 function pn_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'mob_push_queue'"); } catch (Throwable $e) { $h = false; } } return $h; }
@@ -51,7 +51,7 @@ function pn_pick_app(array $byApp, ?string $prefer = null, ?array $only = null):
 function pn_commercial(string $kind): bool { $k = preg_replace('/^nf:/', '', $kind); return in_array(explode(':', $k, 2)[0], PN_COMMERCIAL, true) || str_starts_with($k, 'work:si_'); }
 /** Queue one push for a person. False when the person has no phone registered, has switched push off, or the same thing is already queued or was sent today. */
 function pn_enqueue(int $uid, string $kind, string $refKey, string $title, ?string $body, ?string $route = null, ?string $prefer = null): bool {
-    if (!pn_has() || $uid <= 0) return false; $app = pn_pick_app(pn_devices($uid), $prefer, pn_commercial($kind) ? ['pm', 'employee'] : null); if (!$app) return false;
+    if (!pn_has() || $uid <= 0) return false; $app = pn_pick_app(pn_devices($uid), $prefer, pn_commercial($kind) ? ['pm'] : null); if (!$app) return false;
     if (function_exists('wl_has') && wl_has() && !(wl_prefs($uid)['push'] ?? 1)) return false;
     $refKey = mb_substr($refKey, 0, 60);
     if (scalar('SELECT COUNT(*) FROM mob_push_queue WHERE user_id = ? AND ref_key = ? AND (sent_at IS NULL OR sent_at > NOW() - INTERVAL ' . (str_starts_with($refKey, 'ofu:day:') ? '20 HOUR' : '10 MINUTE') . ')', [$uid, $refKey])) return false;

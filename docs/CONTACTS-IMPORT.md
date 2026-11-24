@@ -4242,3 +4242,7 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - `PN_COMMERCIAL = ['of','sb']` plus kinds `work:si_*`: `pn_commercial($kind)`; for these `pn_enqueue` picks from `['pm','employee']` only. No app of the two: no push, the bell notification stays.
 - `pn_from_nf`: kind `of:followup` with key `ofu:<offer>:<day>` is queued under `ofu:day:<date>` (one per person per day, 20 h window) with texts `pn.followups_t` / `pn.followups_b`.
 - Language keys +2 (13 240 per language).
+
+## §498 Push: commercial topics to Golden PM only (GAS-CP-R97-217, v1.234.2)
+
+- Decision of 24/11/2026: "Sales notification should go only to PM." `pn_enqueue` picks from `['pm']` for `pn_commercial()` kinds; the fallback to the Employee app of §497 is removed. No PM app with a push token: no push, the bell notification stays.
