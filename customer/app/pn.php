@@ -15,6 +15,7 @@
  */
 const PN_APPS = ['customer' => 'gr.goldenas.customer', 'engineer' => 'gr.goldenas.service', 'pm' => 'gr.goldenas.pm', 'hr' => 'gr.goldenas.hr', 'employee' => 'gr.goldenas.employee'];
 const PN_STAFF_ORDER = ['pm', 'engineer', 'employee', 'hr'];        // a member of staff with several apps gets one push, in the first of these he has
+const PN_COMMERCIAL = ['of', 'sb'];                                   // R97-216: sales and money topics go to Golden PM (else Golden A/S Employee) — never to the Service or HR app
 const PN_FRESH_SEC = 7200;                                          // older events are history, not news
 
 function pn_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'mob_push_queue'"); } catch (Throwable $e) { $h = false; } } return $h; }
@@ -41,17 +42,19 @@ function pn_devices(int $uid): array {
     return $o;
 }
 /** Which app of the person gets this push: a customer has one app; staff get it once, not in every app they have. $prefer puts an app first. */
-function pn_pick_app(array $byApp, ?string $prefer = null): ?string {
+function pn_pick_app(array $byApp, ?string $prefer = null, ?array $only = null): ?string {
     if (isset($byApp['customer'])) return 'customer';
-    foreach (array_merge($prefer ? [$prefer] : [], PN_STAFF_ORDER) as $a) if (isset($byApp[$a])) return $a;
+    foreach (array_merge($prefer ? [$prefer] : [], $only ?? PN_STAFF_ORDER) as $a) if (isset($byApp[$a])) return $a;
     return null;
 }
+/** R97-216: a sales or money topic? (offers, sales follow-ups, system budgets, supplier payments) */
+function pn_commercial(string $kind): bool { $k = preg_replace('/^nf:/', '', $kind); return in_array(explode(':', $k, 2)[0], PN_COMMERCIAL, true) || str_starts_with($k, 'work:si_'); }
 /** Queue one push for a person. False when the person has no phone registered, has switched push off, or the same thing is already queued or was sent today. */
 function pn_enqueue(int $uid, string $kind, string $refKey, string $title, ?string $body, ?string $route = null, ?string $prefer = null): bool {
-    if (!pn_has() || $uid <= 0) return false; $app = pn_pick_app(pn_devices($uid), $prefer); if (!$app) return false;
+    if (!pn_has() || $uid <= 0) return false; $app = pn_pick_app(pn_devices($uid), $prefer, pn_commercial($kind) ? ['pm', 'employee'] : null); if (!$app) return false;
     if (function_exists('wl_has') && wl_has() && !(wl_prefs($uid)['push'] ?? 1)) return false;
     $refKey = mb_substr($refKey, 0, 60);
-    if (scalar('SELECT COUNT(*) FROM mob_push_queue WHERE user_id = ? AND ref_key = ? AND (sent_at IS NULL OR sent_at > NOW() - INTERVAL 10 MINUTE)', [$uid, $refKey])) return false;
+    if (scalar('SELECT COUNT(*) FROM mob_push_queue WHERE user_id = ? AND ref_key = ? AND (sent_at IS NULL OR sent_at > NOW() - INTERVAL ' . (str_starts_with($refKey, 'ofu:day:') ? '20 HOUR' : '10 MINUTE') . ')', [$uid, $refKey])) return false;
     q('INSERT INTO mob_push_queue (user_id, app_id, kind, ref_key, title, body, route) VALUES (?,?,?,?,?,?,?)', [$uid, $app, mb_substr($kind, 0, 30), $refKey, mb_substr($title, 0, 200), $body !== null ? mb_substr($body, 0, 400) : null, $route !== null ? mb_substr($route, 0, 120) : null]);
     return true;
 }
@@ -66,6 +69,10 @@ function pn_from_nf(int $uid, string $kind, string $refKey, string $title, ?stri
     try {
         if (!pn_has() || strtotime($at) < time() - PN_FRESH_SEC) return; static $role = [];
         $role[$uid] ??= (string) scalar('SELECT role FROM customer_users WHERE id = ?', [$uid]);
+        if ($kind === 'of:followup' && str_starts_with($refKey, 'ofu:')) {   // R97-216: one push a day for the sales follow-ups, not one per offer
+            $lang = (string) (scalar('SELECT locale FROM customer_users WHERE id = ?', [$uid]) ?: 'en');
+            pn_enqueue($uid, 'nf:' . $kind, 'ofu:day:' . date('Y-m-d'), pn_t($lang, 'pn.followups_t'), pn_t($lang, 'pn.followups_b', ['first' => $title]), null); return;
+        }
         pn_enqueue($uid, 'nf:' . $kind, $refKey, $title, $body, pn_route($kind, $role[$uid] === 'customer'));
     } catch (Throwable $e) { /* a push must never break the notification */ }
 }

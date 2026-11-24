@@ -4235,3 +4235,10 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - `prq_reserve_audit()` adds `ledger` (`inv_stock.qty_on_hand` against `SUM(inv_moves.qty)`, or below zero) and `split` (rows above the line total; repair rewrites them). Ledger differences are reported only.
 - Not changed: service report consumption keeps `allow_negative`; stocktake adjustment below the reserved quantity is accepted and reported.
 - Migration backfills the table from `pr_lines` (warehouse of the line). Language keys +7 (13 238 per language).
+
+## §497 Push: commercial topics not to the Service or HR app; daily bundle for sales follow-ups (GAS-CP-R97-216, v1.234.1)
+
+- Cause: `pn_pick_app()` gives staff one push in the first app of `PN_STAFF_ORDER` (pm, engineer, employee, hr) that has a push token; a person whose only registered app was Service got every topic there, including `of:followup`.
+- `PN_COMMERCIAL = ['of','sb']` plus kinds `work:si_*`: `pn_commercial($kind)`; for these `pn_enqueue` picks from `['pm','employee']` only. No app of the two: no push, the bell notification stays.
+- `pn_from_nf`: kind `of:followup` with key `ofu:<offer>:<day>` is queued under `ofu:day:<date>` (one per person per day, 20 h window) with texts `pn.followups_t` / `pn.followups_b`.
+- Language keys +2 (13 240 per language).

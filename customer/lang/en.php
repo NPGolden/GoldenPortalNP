@@ -13422,4 +13422,6 @@ Best regards,
 'prq.led_moves' => 'Sum of movements',
 'prq.led_diff' => 'Difference',
 'prq.led_what' => 'These items need a look: count the item and enter a stocktake adjustment with the counted quantity. The portal does not correct them by itself.',
+'pn.followups_t' => 'Sales follow-ups are due',
+'pn.followups_b' => '{first} — and possibly more. Open Sales › Pipeline in the portal.',
 ];

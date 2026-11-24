@@ -13422,4 +13422,6 @@ Cordiali saluti,
 'prq.led_moves' => 'Somma dei movimenti',
 'prq.led_diff' => 'Differenza',
 'prq.led_what' => 'Questi articoli vanno verificati: contare l articolo e registrare una rettifica inventariale con la quantità contata. Il portale non li corregge da solo.',
+'pn.followups_t' => 'Follow-up commerciali in scadenza',
+'pn.followups_b' => '{first} — e forse altri. Aprire Vendite › Pipeline nel portale.',
 ];
