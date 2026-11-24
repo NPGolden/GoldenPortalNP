@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.243.0';
+const CP_VERSION = '1.244.0';
 const CP_BUILD   = '2026-11-24';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-232', 'version' => '1.244.0', 'date' => '2026-11-24', 'title' => 'Delivery check: the supplier document can also be given as an Excel file in the layout of the template (Code, Qty, prices, PO line) — rows are taken as typed and matched to the order by code without the assistant; only codes that are not on the order are put to the assistant; Excel template on the page', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-231', 'version' => '1.243.0', 'date' => '2026-11-24', 'title' => 'Recruiting: offer to the candidate — financial proposal and terms with the job description, net salary entered by HR, kept as a record and sent by the portal from the e-mail template; answer of the candidate recorded', 'db' => 'install/migrate_cp_r97_231_recruiting_offers.sql', 'check' => 'r99n'],
         ['ref' => 'GAS-CP-R97-230', 'version' => '1.242.1', 'date' => '2026-11-24', 'title' => 'Recruiting: «Change» and «Invitation» buttons in the row of each planned interview, a finished interview can be set back to planned; Golden HR 1.2.4 changes an interview and sends its invitation from the phone', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-229', 'version' => '1.242.0', 'date' => '2026-11-24', 'title' => 'Recruiting: a planned interview can be changed (stage, date, duration, mode, place, interviewers) and its invitation is sent to the candidate through the portal from the e-mail template, with the interview filled in', 'db' => null, 'check' => null],

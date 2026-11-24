@@ -4368,3 +4368,32 @@ No database step; statuses `reading` and `failed` use the existing column. The w
 
 **Privacy:** the amount is stored only in the offer (table `rc_offers`, migration key r99n), shown only to HR, never written to the recruiting log or to notifications. Offers are deleted with the application; when a hired application is anonymised by the retention run, the e-mail text is cleared and the terms stay.
 
+## §511 Delivery check: the document as an Excel file (GAS-CP-R97-232, v1.244.0)
+
+**Why:** a scanned invoice of 80 rows is read by the assistant in minutes and a misread code or quantity is possible. When the rows exist as a list (typed, or exported by the supplier), they can be given exactly.
+
+**Where:** purchase order › «Delivery check» › «Check a delivery document» › file `.xlsx` (≤ 2 MB, ≤ 300 rows) · «⤓ Excel template» gives `GAS-delivery-document-template.xlsx` (`?p=po_delivery_check&order=<id>&tpl=xlsx`).
+
+**Layout (first sheet, header within the first 15 lines; columns found by header text):**
+
+| Column | Required | Meaning |
+|---|---|---|
+| Code | yes | Part code as printed on the document |
+| Qty | yes | Delivered quantity > 0 (rows without it are left out and counted) |
+| Description, Unit | no | As printed; used when an item or an order line is created |
+| Unit price, Discount % | no | List price and discount of the row |
+| Net unit price | no | Kept as the price of the row; else Unit price less the discount; else Net value ÷ Qty |
+| Net value | no | Net amount of the row |
+| PO line | no | Line number of the order the row belongs to |
+| Document No, Document date, Document type | no | First filled row counts; type `invoice` or `delivery note` |
+| PO No | no | When filled it must be the order of the page — otherwise the file is refused |
+
+Greek headers of a supplier document are accepted (Κωδικός, Περιγραφή, Ποσότητα, Μ.Μ., Τιμή, Εκπτ.%, Καθαρή αξία; accents and capitals do not matter). Numbers: `17.49`, `17,49`, `1.011,28`, `1,011.28`; one separator alone is always the decimal sign.
+
+**Matching (`pdc_xlsx_match`, no assistant):** code compared without capitals, spaces, dots, dashes, slashes with (1) our code, (2) maker part number of the order line, (3) factory code of the item, (4) codes remembered for the supplier (`inv_supplier_codes`). One line → *ordered part*, 100. Several lines with that code → rows spread over them in order, each up to its open quantity, 90, reason «check the line». PO line given: the row goes to that line; if its code is not the code of the line → *changed code* (one row) or *component* (several rows naming the line). No line → put to the assistant as text (order lines and the unmatched rows only, no prices, no document); its answer is checked (`pdc_xlsx_answer`: only rows asked, only lines of this order, known findings). Assistant off, limit reached or no answer → *not on the order*, and the note of the check says the rows were not put to the assistant.
+
+**Flow and rights:** unchanged (R97-227 / R97-228): the check opens as *Being read*, is filled in the background, then review, «Book the receipt» or «Send to Procurement». An Excel file needs no Assistant right; a scan still does. The workbook is kept with the project as the attachment of the receipt.
+
+**Refused at upload, nothing opened:** not a workbook · columns Code and Qty not found · no rows · more than 300 rows · PO No of another order · workbook larger than 48 MB unpacked or with a DOCTYPE / entity declaration.
+
+No database step. Language keys +29 (13 506 per language). Next ref GAS-CP-R97-233, next guide §512.

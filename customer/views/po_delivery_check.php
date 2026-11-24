@@ -7,6 +7,7 @@ if (!function_exists('pdc_has') || !pdc_has() || !function_exists('pr_wh') || !p
 $c = $id ? pdc_load($id) : null; if ($c) $oid = (int)$c['order_id'];
 $o = $oid ? po_load($oid) : null;
 if (!$o || ($id && !$c)) { http_response_code(404); layout_head(t('pdc.title'), 'purchase_orders'); echo '<h1>' . tt('err.notfound') . '</h1>'; layout_foot(); return; }
+if (!$c && ($_GET['tpl'] ?? '') === 'xlsx' && pdc_can_start($o)) pdc_template_download($o);   // R97-232: the empty Excel delivery document
 $self = url('po_delivery_check', $c ? ['id' => $id] : ['order' => $oid]);
 layout_head(t('pdc.title') . ' · ' . $o['po_no'], 'purchase_orders');
 $whs = function_exists('stk_warehouses') ? stk_warehouses() : [];
@@ -19,12 +20,13 @@ $whs = function_exists('stk_warehouses') ? stk_warehouses() : [];
 <div class="card" style="max-width:820px;">
   <h2><?= tt('pdc.start') ?></h2><p class="hint"><?= tt('pdc.start_lede') ?></p>
   <?php if (!pdc_can_start($o)): ?><p><?= pill('mute', t('pdc.p_status')) ?></p>
-  <?php elseif (!pdc_ai_ok()): ?><p><?= pill('gold', t('pdc.no_ai')) ?></p>
-  <?php else: ?>
+  <?php else: $ai = pdc_ai_ok(); /* R97-232: without the assistant an Excel file in the fixed layout can still be checked */ ?>
+  <?php if (!$ai): ?><p><?= pill('gold', t('pdc.no_ai')) ?> <span class="hint"><?= tt('pdc.xl_only') ?></span></p><?php endif; ?>
   <form method="post" action="<?= $self ?>" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="pdc_read"><input type="hidden" name="id" value="<?= $oid ?>">
-    <div class="grid grid-2"><div class="field"><label><?= tt('pdc.file') ?></label><input type="file" name="file" accept=".pdf,image/jpeg,image/png,image/webp" required><span class="hint"><?= tt('pdc.file_hint') ?></span></div>
+    <div class="grid grid-2"><div class="field"><label><?= tt('pdc.file') ?></label><input type="file" name="file" accept="<?= $ai ? '.pdf,image/jpeg,image/png,image/webp,.xlsx' : '.xlsx' ?>" required><span class="hint"><?= tt($ai ? 'pdc.file_hint' : 'pdc.xl_hint') ?></span></div>
     <?php if (count($whs) > 1): ?><div class="field"><label><?= tt('stk.warehouse') ?></label><select name="warehouse_id" data-nosearch><?php foreach ($whs as $w): ?><option value="<?= (int)$w['id'] ?>"<?= (int)$w['id'] === (int)($o['warehouse_id'] ?: 0) ? ' selected' : '' ?>><?= e($w['code']) ?></option><?php endforeach; ?></select></div><?php endif; ?></div>
-    <div class="btn-row"><button class="btn btn--gold" type="submit">✨ <?= tt('pdc.read_btn') ?></button></div>
+    <div class="btn-row"><button class="btn btn--gold" type="submit">✨ <?= tt('pdc.read_btn') ?></button> <a class="btn btn--ghost" href="<?= url('po_delivery_check', ['order' => $oid, 'tpl' => 'xlsx']) ?>">⤓ <?= tt('pdc.xl_tpl') ?></a></div>
+    <p class="hint"><?= tt('pdc.xl_lede') ?></p>
     <p class="hint"><?= tt('pdc.privacy') ?></p>
   </form>
   <?php endif; ?>
@@ -35,14 +37,14 @@ $whs = function_exists('stk_warehouses') ? stk_warehouses() : [];
 <?php if (in_array($c['status'], ['reading', 'failed'], true)): /* R97-228 */ if ($c['status'] === 'reading') { pdc_stale($oid); $c = pdc_load($id); } ?>
 <div class="card" style="max-width:820px;">
   <?php if ($c['status'] === 'reading'): ?>
-  <h2>⏳ <?= tt('pdc.reading') ?></h2><p><?= e((string)$c['file_name']) ?></p><p class="hint"><?= tt('pdc.reading_hint') ?></p>
+  <h2>⏳ <?= tt(pdc_is_xlsx(pdc_tmp($id)) ? 'pdc.xl_reading_h' : 'pdc.reading') ?></h2><p><?= e((string)$c['file_name']) ?></p><p class="hint"><?= tt(pdc_is_xlsx(pdc_tmp($id)) ? 'pdc.xl_reading' : 'pdc.reading_hint') ?></p>
   <?php if ($c['can_drop'] && $c['ai_notes'] === null): ?><form method="post" action="<?= $self ?>" data-bg-post hidden><?= csrf_field() ?><input type="hidden" name="action" value="pdc_run"><input type="hidden" name="id" value="<?= $id ?>"></form><?php endif; ?>
   <div data-reload-in="6"></div>
   <?php else: ?>
   <h2>⚠️ <?= tt('pdc.failed') ?></h2><p><?= e((string)$c['file_name']) ?></p><p><?= e((string)$c['ai_notes']) ?></p>
   <?php endif; ?>
   <?php if ($c['can_drop']): ?><div class="btn-row">
-    <?php if ($c['status'] === 'failed' && is_file(pdc_tmp($id)) && pdc_ai_ok()): ?><form method="post" action="<?= $self ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="pdc_retry"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--gold" type="submit">✨ <?= tt('pdc.retry') ?></button></form><?php endif; ?>
+    <?php if ($c['status'] === 'failed' && is_file(pdc_tmp($id)) && (pdc_ai_ok() || pdc_is_xlsx(pdc_tmp($id)))): ?><form method="post" action="<?= $self ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="pdc_retry"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--gold" type="submit">✨ <?= tt('pdc.retry') ?></button></form><?php endif; ?>
     <form method="post" action="<?= $self ?>" class="inline" data-confirm="<?= e(t('pdc.cancel_q')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="pdc_cancel"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost" type="submit"><?= tt('pdc.cancel') ?></button></form>
     <a class="btn btn--ghost" href="<?= url('purchase_order', ['id' => $oid]) ?>#dchecks"><?= e($o['po_no']) ?></a>
   </div><?php endif; ?>
