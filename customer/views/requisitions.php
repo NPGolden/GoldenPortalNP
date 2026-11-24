@@ -3,7 +3,7 @@
 require __DIR__ . '/_layout.php';
 $u = require_staff();
 if (!function_exists('prq_can') || !prq_can()) { http_response_code(403); layout_head(t('prq.title'), 'requisitions'); echo '<h1>' . tt('err.noaccess') . '</h1><p class="hint">' . tt('prq.noaccess_hint') . '</p>'; layout_foot(); return; }
-$f = ['status' => (string)($_GET['status'] ?? ''), 'mine' => (int)($_GET['mine'] ?? 0), 'q' => trim((string)($_GET['q'] ?? '')), 'project_id' => (int)($_GET['project_id'] ?? 0)];
+$f = ['status' => (string)($_GET['status'] ?? ''), 'mine' => (int)($_GET['mine'] ?? 0), 'q' => trim((string)($_GET['q'] ?? '')), 'project_id' => (int)($_GET['project_id'] ?? 0), 'priority' => (string)($_GET['priority'] ?? '')];
 if ($f['status'] === '' && !isset($_GET['status'])) $f['status'] = 'open';
 $rows = prq_list($f); [$rows, $pg] = page_list($rows, 'requisitions', array_filter($f));
 $cnt = prq_counts(); $admin = pr_admin(); $priced = stk_price_visible(); $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : '';
@@ -19,8 +19,9 @@ layout_head(t('prq.title'), 'requisitions');
   <a class="stat" href="<?= url('requisitions', ['status' => 'approved']) ?>"><b><?= $cnt['approved'] ?></b><?= tt('prq.k_approved') ?><span class="s"><?= tt('prq.k_approved_hint') ?></span></a>
   <a class="stat" href="<?= url('requisitions', ['mine' => 1, 'status' => '']) ?>"><b><?= $cnt['mine'] ?></b><?= tt('prq.k_mine') ?><span class="s"><?= tt('prq.k_mine_hint') ?></span></a>
 </div>
-<form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1fr auto 1.6fr auto;">
+<form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1fr 1fr auto 1.6fr auto;">
   <input type="hidden" name="p" value="requisitions">
+  <div class="field"><label><?= tt('si.priority') ?></label><select name="priority" data-nosearch><option value=""><?= tt('flt.any') ?></option><?php foreach (PRQ_PRIORITIES as $pp): ?><option value="<?= $pp ?>"<?= $sel($f['priority'], $pp) ?>><?= tt('si.prio_' . $pp) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label><?= tt('prq.status') ?></label><select name="status"><option value=""<?= $sel($f['status'], '') ?>><?= tt('prq.all') ?></option><option value="open"<?= $sel($f['status'], 'open') ?>><?= tt('prq.open') ?></option><option value="pending"<?= $sel($f['status'], 'pending') ?>><?= tt('prq.k_pending') ?></option><?php foreach (PRQ_STATES as $s): ?><option value="<?= $s ?>"<?= $sel($f['status'], $s) ?>><?= tt('prq.s_' . $s) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label>&nbsp;</label><label class="chk"><input type="checkbox" name="mine" value="1"<?= $f['mine'] ? ' checked' : '' ?>> <?= tt('prq.mine') ?></label></div>
   <div class="field"><label><?= tt('pr.search') ?></label><input name="q" value="<?= e($f['q']) ?>" placeholder="<?= tt('prq.search_ph') ?>"></div>
@@ -34,8 +35,8 @@ layout_head(t('prq.title'), 'requisitions');
   <?php if (!$rows): ?><tr><td colspan="9" class="hint"><?= tt('prq.none') ?></td></tr><?php endif; ?>
   <?php foreach ($rows as $r): ?>
     <tr>
-      <td><a href="<?= url('requisition', ['id' => (int)$r['id']]) ?>" style="font-family:var(--mono);"><?= e($r['pr_no']) ?></a><?php if ($r['title']): ?><br><small class="hint"><?= e($r['title']) ?></small><?php endif; ?></td>
-      <td><?= pr_link((int)$r['project_id'], $r['project_code'], $r['project_name']) ?><?php if ($r['subproject_id']): ?><br><small><a href="<?= url('subproject', ['id' => (int)$r['subproject_id'], 'tab' => 'procurement']) ?>"><?= e($r['sub_code'] . ' · ' . $r['sub_name']) ?></a></small><?php endif; ?></td>
+      <td><a href="<?= url('requisition', ['id' => (int)$r['id']]) ?>" style="font-family:var(--mono);"><?= e($r['pr_no']) ?></a><?= prq_prio_has() && ($r['priority'] ?? 'normal') !== 'normal' ? ' ' . prq_prio_pill($r['priority']) : '' ?><?php if ($r['title']): ?><br><small class="hint"><?= e($r['title']) ?></small><?php endif; ?></td>
+      <td><?php if (!empty($r['vessel'])): ?><small class="hint">🚢 <?= e((string)$r['vessel']) ?></small><br><?php endif; ?><?= pr_link((int)$r['project_id'], $r['project_code'], $r['project_name']) ?><?php if ($r['subproject_id']): ?><br><small><a href="<?= url('subproject', ['id' => (int)$r['subproject_id'], 'tab' => 'procurement']) ?>"><?= e($r['sub_code'] . ' · ' . $r['sub_name']) ?></a></small><?php endif; ?></td>
       <td><?= tt('prq.p_' . $r['purpose']) ?></td>
       <td><?= e($r['requester_name'] ?? '') ?><?php if ($r['discipline']): ?><br><small class="hint"><?= e($r['discipline']) ?></small><?php endif; ?></td>
       <td><?= fmt_date($r['need_date']) ?></td>

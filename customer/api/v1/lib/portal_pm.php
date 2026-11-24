@@ -283,7 +283,7 @@ final class PortalPM {
             $id = preg_match('/[?&](?:amp;)?id=(\d+)/', (string)$r['url'], $m) ? (int)$m[1] : 0; $k = (string)$r['kind'];
             $out[] = ['key' => $k . ':' . ($id ?: md5($r['ref'] . '|' . $r['title'] . '|' . $r['at'])), 'kind' => $k, 'icon' => $K[$k][0] ?? '•', 'label' => isset($K[$k]) ? t($K[$k][1]) : $k, 'id' => $id, 'ref' => (string)$r['ref'], 'title' => (string)$r['title'],
                       'who' => (string)$r['who'], 'at' => $r['at'], 'age' => (int)$r['age'], 'with' => (string)$r['with'], 'late' => !empty($r['late']),
-                      'priority' => $k === 'payment' ? (string)($r['prio'] ?? 'normal') : '', 'priority_label' => $k === 'payment' && function_exists('si_prio_has') && si_prio_has() ? t('si.prio_' . (in_array($r['prio'] ?? '', SI_PRIORITIES, true) ? $r['prio'] : 'normal')) : '', 'scope' => (string)($r['scope'] ?? ''),   // R97-238
+                      'priority' => isset($r['prio']) ? (string)$r['prio'] : '', 'priority_label' => isset($r['prio']) && in_array($r['prio'], ['urgent', 'high', 'normal', 'low'], true) ? t('si.prio_' . $r['prio']) : '', 'scope' => (string)($r['scope'] ?? ''),   // R97-238 payments, R97-239 requisitions
                       'action' => $k === 'payment' && $id ? 'payment' : (in_array($k, ['leave', 'timesheet'], true) ? 'team' : 'portal')];
         }
         $rk = ['urgent' => 0, 'high' => 1, 'normal' => 2, '' => 2, 'low' => 3]; $i = 0; foreach ($out as &$o) $o['_i'] = $i++; unset($o);

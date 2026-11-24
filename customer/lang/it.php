@@ -13720,4 +13720,6 @@ Cordiali saluti,
 'si.need_priority' => 'Scegliere la priorità della richiesta di pagamento.',
 'si.prio_set' => 'Imposta priorità',
 'si.ev_priority' => 'Priorità modificata',
+'prq.need_priority' => 'Scegliere la priorità della richiesta.',
+'prq.ev_priority' => 'Priorità modificata',
 ];

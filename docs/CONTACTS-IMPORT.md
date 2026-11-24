@@ -4475,3 +4475,21 @@ No database step. Language keys +3 (13 509 per language). Next ref GAS-CP-R97-23
 
 **Data:** column `si_requests.priority` (migration key r99p).
 
+## §518 Purchasing: priority and vessel / project / sub-project on requisitions and orders (GAS-CP-R97-239, v1.247.0)
+
+**Where a purchase is approved.** A purchase order itself has no approval step: Procurement (and Management above the budget) approve the **requisition**, and orders are then made from approved lines. The priority is therefore asked on the requisition and shown on the order.
+
+**Priority.** Work › Requisitions › New › **Priority** (Urgent · High · Normal · Low), obligatory. Later: on the requisition, «Set priority» for the requester, Procurement or Management; the change is in the history. Requisitions created by the Service app (parts request), from a stock count or from a bill of materials, and all earlier ones, are *Normal*.
+
+**Vessel, project, sub-project.** The requisition shows the vessel of its project; the list shows it above the project.
+
+**Lists.** Waiting and open requisitions are sorted Urgent → High → Normal → Low; filter «Priority».
+
+**Notifications.** `[URGENT] title · vessel · project › sub-project · estimate`.
+
+**Golden PM › My approvals.** A requisition row carries the priority label and the line vessel · project › sub-project; urgent rows first (payments and requisitions together). No app update is needed beyond 1.0.22.
+
+**Purchase order.** Next to the order number: the highest priority among the requisitions it buys for (shown when it is not Normal).
+
+**Data:** column `pr_requests.priority` (migration key r99q).
+

@@ -67,7 +67,22 @@ function prq_line_pill(string $s): string { return pill(PRQ_L_TONE[$s] ?? 'mute'
 function prq_money(?float $v, string $cur = 'EUR'): string { return $v === null ? '—' : number_format($v, 2, ',', '.') . ' ' . $cur; }
 
 /* ------------------------------------------------------------------ read */
-const PRQ_SELECT = "SELECT r.*, p.project_code, p.name AS project_name, s.code AS sub_code, s.name AS sub_name, d.name AS discipline,
+/* ---- R97-239: priority of a requisition (the same four steps as payment requests) and the vessel of its project ---- */
+const PRQ_PRIORITIES = ['urgent', 'high', 'normal', 'low'];
+const PRQ_PRIO_ORDER = "FIELD(r.priority, 'urgent', 'high', 'normal', 'low')";
+function prq_prio_has(): bool { static $h = null; if ($h === null) { try { $h = prq_has() && (bool) scalar("SHOW COLUMNS FROM pr_requests LIKE 'priority'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function prq_prio_pill(?string $p): string { $p = in_array($p, PRQ_PRIORITIES, true) ? $p : 'normal'; return pill(['urgent' => 'bad', 'high' => 'warn', 'normal' => 'mute', 'low' => 'mute'][$p], t('si.prio_' . $p)); }
+/** Vessel · project › sub-project of a requisition row (PRQ_SELECT), one line. */
+function prq_scope_text(array $r): string { return implode(' · ', array_filter([trim((string)($r['vessel'] ?? '')), trim((string)($r['project_code'] ?? '') . ' ' . (string)($r['project_name'] ?? '')) . (!empty($r['subproject_id']) ? ' › ' . trim((string)($r['sub_code'] ?? '') . ' ' . (string)($r['sub_name'] ?? '')) : '')], 'strlen')); }
+/** The highest priority among the requisitions a purchase order buys for ('' when it buys for none or the column is missing). */
+function prq_po_priority(int $orderId): string { if (!prq_prio_has()) return ''; try { return (string) (scalar("SELECT r.priority FROM po_lines pl JOIN pr_lines l ON l.id = pl.pr_line_id JOIN pr_requests r ON r.id = l.request_id WHERE pl.order_id = ? ORDER BY " . PRQ_PRIO_ORDER . " LIMIT 1", [$orderId]) ?: ''); } catch (Throwable $e) { return ''; } }
+/** Change the priority of a requisition that is not finished: the requester, Procurement or Management. */
+function prq_priority_set(int $rid, string $prio): void {
+    require_prq(); $r = prq_load($rid); $u = current_user(); if (!$r || !prq_prio_has() || !in_array($prio, PRQ_PRIORITIES, true) || !in_array($r['status'], ['draft', 'submitted', 'mgmt', 'approved'], true)) throw new RuntimeException(t('err.noaccess'));
+    if (!((int)$r['requester_id'] === (int)$u['id'] || pr_admin() || (function_exists('mgmt_can') && mgmt_can()))) throw new RuntimeException(t('err.noaccess'));
+    if ($prio === (string)$r['priority']) return; q('UPDATE pr_requests SET priority = ? WHERE id = ?', [$prio, $rid]); prq_event($rid, 'priority', t('si.prio_' . $r['priority']) . ' → ' . t('si.prio_' . $prio));
+}
+const PRQ_SELECT = "SELECT r.*, p.project_code, p.name AS project_name, s.code AS sub_code, s.name AS sub_name, d.name AS discipline, (SELECT v.name FROM vessels v WHERE v.id = p.vessel_id) AS vessel,
                     (SELECT COUNT(*) FROM pr_lines l WHERE l.request_id = r.id AND l.status <> 'cancelled') AS n_lines,
                     (SELECT COUNT(*) FROM pr_lines l WHERE l.request_id = r.id AND l.status = 'to_buy') AS n_to_buy
                     FROM pr_requests r JOIN projects p ON p.id = r.project_id LEFT JOIN subprojects s ON s.id = r.subproject_id LEFT JOIN disciplines d ON d.id = r.discipline_id";
@@ -80,7 +95,8 @@ function prq_list(array $f = []): array {
     if (!empty($f['project_id'])) { $w[] = 'r.project_id = ?'; $a[] = (int)$f['project_id']; }
     if (!empty($f['subproject_id'])) { $w[] = 'r.subproject_id = ?'; $a[] = (int)$f['subproject_id']; }
     if (!empty($f['q'])) { $l = '%' . trim((string)$f['q']) . '%'; $w[] = '(r.pr_no LIKE ? OR r.title LIKE ? OR p.name LIKE ? OR p.project_code LIKE ? OR r.requester_name LIKE ? OR EXISTS (SELECT 1 FROM pr_lines l WHERE l.request_id = r.id AND (l.description LIKE ? OR l.part_no LIKE ?)))'; array_push($a, $l, $l, $l, $l, $l, $l, $l); }
-    return all(PRQ_SELECT . ($w ? ' WHERE ' . implode(' AND ', $w) : '') . ' ORDER BY r.id DESC', $a);
+    if (!empty($f['priority']) && in_array($f['priority'], PRQ_PRIORITIES, true) && prq_prio_has()) { $w[] = 'r.priority = ?'; $a[] = $f['priority']; }
+    return all(PRQ_SELECT . ($w ? ' WHERE ' . implode(' AND ', $w) : '') . ' ORDER BY ' . (prq_prio_has() && in_array($f['status'] ?? '', ['open', 'pending', 'submitted', 'mgmt', 'approved'], true) ? PRQ_PRIO_ORDER . ', ' : '') . 'r.id DESC', $a);
 }
 function prq_lines(int $rid): array { return all('SELECT l.*, i.code AS item_code, i.description AS item_desc, i.unit AS item_unit, i.last_price, i.currency AS item_cur, (SELECT COALESCE(SUM(s.qty_on_hand),0) FROM inv_stock s WHERE s.item_id = l.item_id) AS on_hand, (SELECT COALESCE(SUM(s.qty_reserved),0) FROM inv_stock s WHERE s.item_id = l.item_id) AS reserved_all FROM pr_lines l LEFT JOIN inv_items i ON i.id = l.item_id WHERE l.request_id = ? ORDER BY l.seq, l.id', [$rid]); }
 function prq_events(int $rid): array { return all('SELECT * FROM pr_events WHERE request_id = ? ORDER BY id DESC', [$rid]); }
@@ -144,6 +160,7 @@ function prq_save_from_post(): int {
     $title = mb_substr(trim((string)($_POST['title'] ?? '')), 0, 160) ?: null;
     $need = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['need_date'] ?? '')) ? $_POST['need_date'] : null;
     $note = trim((string)($_POST['note'] ?? '')) ?: null;
+    $prio = in_array($_POST['priority'] ?? '', PRQ_PRIORITIES, true) ? (string)$_POST['priority'] : ''; if ($prio === '') { if (array_key_exists('priority', $_POST) && prq_prio_has()) throw new RuntimeException(t('prq.need_priority')); $prio = 'normal'; }   /* R97-239: the portal form asks for it; requisitions made by the Service app or from a stock count are Normal */
     if ($id) {
         $r = prq_load($id); if (!$r || !prq_can_edit($r)) throw new RuntimeException(t('err.noaccess'));
         q('UPDATE pr_requests SET project_id = ?, subproject_id = ?, purpose = ?, title = ?, need_date = ?, note = ? WHERE id = ?', [$pid, $sid, $purpose, $title, $need, $note, $id]);
@@ -154,6 +171,7 @@ function prq_save_from_post(): int {
           [prq_number($pid, $sid), $br, $pid, $sid, $purpose, $title, $need, $note, (int)$u['id'], $u['full_name'], (int)($u['discipline_id'] ?? 0) ?: null]);
         $id = (int) db()->lastInsertId(); prq_event($id, 'create');
     }
+    if (prq_prio_has() && (array_key_exists('priority', $_POST) || !isset($r))) q('UPDATE pr_requests SET priority = ? WHERE id = ?', [$prio, $id]);   // an edit that does not send the field keeps the priority
     return $id;
 }
 function prq_line_save_from_post(): int {
@@ -198,7 +216,7 @@ function prq_submit(int $rid): void {
     $over = $r['purpose'] === 'project' && ($b['parts_budget'] === null || $b['parts_budget'] <= 0 || $est > $b['available']) ? 1 : 0;
     q('UPDATE pr_requests SET status = ?, submitted_at = NOW(), budget_parts = ?, budget_committed = ?, budget_actual = ?, over_budget = ? WHERE id = ?', ['submitted', $b['parts_budget'], $b['committed'], $b['actual'], $over, $rid]);
     prq_event($rid, 'submit', $over ? t('prq.ev_over') : null);
-    prq_notify(prq_proc_ids(), $rid, 'prq_submitted', t('prq.nf_submitted', ['no' => $r['pr_no']]), ($r['title'] ?: '') . ' · ' . $r['project_name'] . ' · ' . prq_money($est));
+    prq_notify(prq_proc_ids(), $rid, 'prq_submitted', t('prq.nf_submitted', ['no' => $r['pr_no']]), (prq_prio_has() && ($r['priority'] ?? 'normal') !== 'normal' ? '[' . mb_strtoupper(t('si.prio_' . $r['priority'])) . '] ' : '') . ($r['title'] ? $r['title'] . ' · ' : '') . prq_scope_text($r) . ' · ' . prq_money($est));   // R97-239: priority, vessel, project and sub-project
     cache_bump_later('inv');
 }
 /** Procurement decides. Within budget → approved (stock reserved). Over budget → to management with the reason. */

@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.246.0';
+const CP_VERSION = '1.247.0';
 const CP_BUILD   = '2026-11-24';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-239', 'version' => '1.247.0', 'date' => '2026-11-24', 'title' => 'Purchasing: requisitions carry a priority (urgent, high, normal, low) and their approvals show vessel, project and sub-project — in the portal, the notifications and My approvals of Golden PM; the purchase order shows the highest priority of its requisitions', 'db' => 'install/migrate_cp_r97_239_requisition_priority.sql', 'check' => 'r99q'],
         ['ref' => 'GAS-CP-R97-238', 'version' => '1.246.0', 'date' => '2026-11-24', 'title' => 'Payables: payment requests carry a priority chosen by the requester (urgent, high, normal, low) and show vessel, project and sub-project — in the portal, the notifications and the payment approvals of Golden PM 1.0.22', 'db' => 'install/migrate_cp_r97_238_payment_request_priority.sql', 'check' => 'r99p'],
         ['ref' => 'GAS-CP-R97-237', 'version' => '1.245.2', 'date' => '2026-11-24', 'title' => 'Who is online: an app left open no longer keeps its user online — the apps report how long the screen was untouched (Service 0.8.6, Golden PM 1.0.21, Golden HR 1.2.5, Employee 1.1.6); online only while used in the last 5 minutes', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-236', 'version' => '1.245.1', 'date' => '2026-11-24', 'title' => 'Planning: project managers see the whole company on the board (before: only staff marked technical in HR); switch back and a notice when the board is limited to some disciplines', 'db' => null, 'check' => null],
@@ -691,6 +692,7 @@ function cp_migration_state(): array {
         'r99n' => $has("SHOW TABLES LIKE 'rc_offers'"),   // R97-231
         'r99o' => $has("SHOW COLUMNS FROM hr_leave_types LIKE 'no_approval'"),   // R97-235
         'r99p' => $has("SHOW COLUMNS FROM si_requests LIKE 'priority'"),   // R97-238
+        'r99q' => $has("SHOW COLUMNS FROM pr_requests LIKE 'priority'"),   // R97-239
         'r99k' => $has("SHOW COLUMNS FROM nl_issues LIKE 'tr'") && $has("SHOW COLUMNS FROM nl_sends LIKE 'lang'") && $has("SHOW COLUMNS FROM contacts LIKE 'nl_lang'"),   // R97-203
         'r99j' => $has("SHOW TABLES LIKE 'soc_post_tr'") && $has("SHOW COLUMNS FROM soc_posts LIKE 'lang'"),   // R97-201
         'r99i' => $has("SHOW TABLES LIKE 'wl_prefs'") && $has("SHOW TABLES LIKE 'wl_mood_seen'"),   // R97-194

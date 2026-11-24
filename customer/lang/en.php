@@ -13720,4 +13720,6 @@ Best regards,
 'si.need_priority' => 'Choose the priority of the payment request.',
 'si.prio_set' => 'Set priority',
 'si.ev_priority' => 'Priority changed',
+'prq.need_priority' => 'Choose the priority of the requisition.',
+'prq.ev_priority' => 'Priority changed',
 ];
