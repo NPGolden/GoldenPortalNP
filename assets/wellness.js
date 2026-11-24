@@ -58,6 +58,10 @@
 
   /* ---------- focus sounds (generated) ---------- */
   var ctx = null, chain = null, playing = null;
+  /* R97-222: every menu opens a new page, which ends the sound. What the person started is remembered for this tab and picked up again on the next page. */
+  var SK = 'gas.wl.snd.' + D.u, TK = 'gas.wl.tm.' + D.u;
+  function keep(k, v) { try { if (v == null) sessionStorage.removeItem(k); else sessionStorage.setItem(k, v); } catch (e) {} }
+  function kept(k) { try { return sessionStorage.getItem(k); } catch (e) { return null; } }
   function noise(kind) { var n = ctx.sampleRate * 4, buf = ctx.createBuffer(1, n, ctx.sampleRate), d = buf.getChannelData(0), i, w, b0 = 0, b1 = 0, b2 = 0, last = 0;
     for (i = 0; i < n; i++) { w = Math.random() * 2 - 1;
       if (kind === 'brown') { last = (last + 0.02 * w) / 1.02; d[i] = last * 3.5; }
@@ -67,14 +71,14 @@
   function lfo(freq, depth, param, base) { var o = ctx.createOscillator(), g = ctx.createGain(); o.frequency.value = freq; g.gain.value = depth; o.connect(g); g.connect(param); param.value = base; o.start(); return o; }
   function stop() { if (chain) { try { chain.out.gain.setTargetAtTime(0, ctx.currentTime, 0.2); } catch (e) {} var c = chain; setTimeout(function () { c.nodes.forEach(function (n) { try { n.stop && n.stop(); n.disconnect(); } catch (e) {} }); }, 700); } chain = null; playing = null; paint(); }
   function play(kind) {
-    if (playing === kind) return stop(); if (chain) stop();
+    if (playing === kind) { keep(SK, null); return stop(); } if (chain) stop();
     try { ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); if (ctx.state === 'suspended') ctx.resume(); } catch (e) { return; }
     var out = ctx.createGain(), nodes = [out], src, f1, f2, g; out.gain.value = 0; out.connect(ctx.destination);
     if (kind === 'rain') { src = noise('white'); f1 = ctx.createBiquadFilter(); f1.type = 'highpass'; f1.frequency.value = 900; f2 = ctx.createBiquadFilter(); f2.type = 'lowpass'; f2.frequency.value = 7000; g = ctx.createGain(); nodes.push(lfo(0.13, 0.12, g.gain, 0.8)); src.connect(f1); f1.connect(f2); f2.connect(g); g.connect(out); nodes.push(f1, f2, g); }
     else if (kind === 'sea') { src = noise('brown'); f1 = ctx.createBiquadFilter(); f1.type = 'lowpass'; f1.frequency.value = 700; g = ctx.createGain(); nodes.push(lfo(0.09, 0.45, g.gain, 0.55), lfo(0.05, 250, f1.frequency, 600)); src.connect(f1); f1.connect(g); g.connect(out); nodes.push(f1, g); }
     else if (kind === 'wind') { src = noise('pink'); f1 = ctx.createBiquadFilter(); f1.type = 'bandpass'; f1.Q.value = 0.8; g = ctx.createGain(); nodes.push(lfo(0.07, 260, f1.frequency, 520), lfo(0.11, 0.25, g.gain, 0.7)); src.connect(f1); f1.connect(g); g.connect(out); nodes.push(f1, g); }
     else { src = noise(kind); f1 = ctx.createBiquadFilter(); f1.type = 'lowpass'; f1.frequency.value = kind === 'white' ? 9000 : 16000; src.connect(f1); f1.connect(out); nodes.push(f1); }
-    src.start(); nodes.push(src); chain = { out: out, nodes: nodes }; playing = kind; vol(P.volume); if (P.sound !== kind) setPref('sound', kind); paint();
+    src.start(); nodes.push(src); chain = { out: out, nodes: nodes }; playing = kind; keep(SK, kind); vol(P.volume); if (P.sound !== kind) setPref('sound', kind); paint();
   }
   function vol(v) { if (chain) chain.out.gain.setTargetAtTime(Math.pow(v / 100, 2) * 0.9, ctx.currentTime, 0.15); }
 
@@ -83,9 +87,10 @@
   function fmt(s) { var m = Math.floor(s / 60), x = s % 60; return (m < 10 ? '0' : '') + m + ':' + (x < 10 ? '0' : '') + x; }
   function tmPaint() { if (ui.time) { ui.time.textContent = fmt(tm.left); ui.phase.textContent = tm.phase === 'focus' ? T.tm_focus : T.tm_break; ui.start.textContent = tm.on ? T.tm_pause : T.tm_start; } badge.hidden = !tm.on; badge.textContent = fmt(tm.left); }
   function tmStep() { if (--tm.left > 0) return tmPaint(); var was = tm.phase; tm.phase = was === 'focus' ? 'break' : 'focus'; tm.left = (tm.phase === 'focus' ? P.timer_focus : P.timer_break) * 60;
-    if (was === 'focus') { var s = store(); store({ brk: s.act || 0, eyes: s.act || 0 }); } toast({ t: was === 'focus' ? T.tm_done_focus : T.tm_done_break, green: was === 'focus', life: 20 }); tmPaint(); }
-  function tmToggle() { tm.on = !tm.on; clearInterval(tm.h); if (tm.on) tm.h = setInterval(tmStep, 1000); tmPaint(); }
-  function tmReset() { tm.on = false; clearInterval(tm.h); tm.phase = 'focus'; tm.left = P.timer_focus * 60; tmPaint(); }
+    if (was === 'focus') { var s = store(); store({ brk: s.act || 0, eyes: s.act || 0 }); } toast({ t: was === 'focus' ? T.tm_done_focus : T.tm_done_break, green: was === 'focus', life: 20 }); tmKeep(); tmPaint(); }
+  function tmKeep() { keep(TK, tm.on ? JSON.stringify({ phase: tm.phase, end: Date.now() + tm.left * 1000 }) : null); }
+  function tmToggle() { tm.on = !tm.on; clearInterval(tm.h); if (tm.on) tm.h = setInterval(tmStep, 1000); tmKeep(); tmPaint(); }
+  function tmReset() { tm.on = false; clearInterval(tm.h); tm.phase = 'focus'; tm.left = P.timer_focus * 60; tmKeep(); tmPaint(); }
 
   /* ---------- breathing minute and stretches ---------- */
   function overlay() { var o = $('div', 'wl-over'); o.setAttribute('role', 'dialog'); o.setAttribute('aria-modal', 'true'); var x = $('button', '', T.close); x.type = 'button'; var kill = function () { o.remove(); document.removeEventListener('keydown', esc); };
@@ -120,4 +125,14 @@
   /* the settings page: the button that asks the browser for notifications */
   var ask = document.getElementById('wl-ask'); if (ask) { var say = function () { ask.nextElementSibling.textContent = !('Notification' in window) ? ask.dataset.none : (Notification.permission === 'granted' ? ask.dataset.on : (Notification.permission === 'denied' ? ask.dataset.off : '')); };
     ask.addEventListener('click', function () { if ('Notification' in window) Notification.requestPermission().then(say); }); say(); }
+  /* R97-222: pick up the sound and the timer of the previous page */
+  (function () {
+    var t0 = kept(TK); if (t0) { try { var o = JSON.parse(t0), left = Math.round((o.end - Date.now()) / 1000); if (left > 0 && left < 4 * 3600) { tm.phase = o.phase === 'break' ? 'break' : 'focus'; tm.left = left; tm.on = true; tm.h = setInterval(tmStep, 1000); tmPaint(); } else keep(TK, null); } catch (e) { keep(TK, null); } }
+    var k0 = kept(SK); if (!k0 || ['rain', 'sea', 'wind', 'brown', 'pink', 'white'].indexOf(k0) < 0) return;
+    var done = false, evs = ['pointerdown', 'keydown', 'touchstart'];
+    function go() { if (done || playing) return; if (!ctx || ctx.state !== 'running') return; done = true; evs.forEach(function (ev) { window.removeEventListener(ev, wake, true); }); play(k0); }
+    function wake() { try { ctx = ctx || new (window.AudioContext || window.webkitAudioContext)(); var p = ctx.resume(); if (p && p.then) p.then(go, function () {}); else go(); } catch (e) {} }
+    evs.forEach(function (ev) { window.addEventListener(ev, wake, true); });   // a browser that wants a touch first: the next click or key starts it again
+    wake();                                                                    // most browsers let a page of the same site continue at once
+  })();
 })();

@@ -4262,3 +4262,9 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Push: `PN_PLAN_ORDER` (engineer, employee, pm, hr) for kinds `plan:*`; route `#/plan` when the chosen app is Service or Employee. `pn_plan_touch` marks days up to `PN_PLAN_AHEAD` = 21; `pn_plan_tick` gathers the days after tomorrow into one notice per person (`pn.pll_t`), after the 2-minute quiet time.
 - `Portal::assignments`: a work is `accepted` (not `new`) when a service report with status submitted / accepted exists on its sub-project with `report_date >= start_date`.
 - Language keys +1 (13 248 per language); app texts `pl.*` in five languages.
+
+## §501 Wellness: sound and timer continue across pages (GAS-CP-R97-222, v1.236.1)
+
+- Cause: the sound is generated with Web Audio inside the page; a menu click loads a new document and the audio graph ends.
+- `assets/wellness.js`: `sessionStorage` keys `gas.wl.snd.<user>` (kind, set by a user start, removed by a user stop) and `gas.wl.tm.<user>` (`phase`, `end`). On load the timer is restored and the sound is started again: `AudioContext.resume()`; when the browser keeps the context suspended, the first `pointerdown` / `keydown` / `touchstart` starts it.
+- Per tab (sessionStorage), nothing is sent to the server, nothing starts that the person did not start.
