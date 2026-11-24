@@ -86,6 +86,21 @@ layout_head(t('fsr.title') . ' ' . $r['report_no'], $staff ? 'projects' : 'repor
   </div>
 </div>
 
+<?php if ($staff && function_exists('eq_has') && eq_has()): /* R97-219: serial numbers can be linked at any time, also on an accepted report */
+  $eqNow = eq_fsr_units($id); $eqSel = array_map('intval', array_column($eqNow, 'id')); $eqVid = (int) scalar('SELECT vessel_id FROM projects WHERE id = ?', [(int)$r['project_id']]); $eqUnits = eq_for_vessel($eqVid);
+  foreach ($eqNow as $x) if (!in_array((int)$x['id'], array_map('intval', array_column($eqUnits, 'id')), true)) $eqUnits[] = $x; ?>
+<div class="card" id="equipment"><div class="card-head"><h2>🔧 <?= tt('eq.fsr_units') ?> <span class="count"><?= count($eqNow) ?></span></h2><span class="hint"><?= tt('eq.fsr_view_hint') ?></span></div>
+  <?php if ($eqNow): ?><p><?php foreach ($eqNow as $x): ?><a class="pill" href="<?= url('equipment_view', ['id' => (int)$x['id']]) ?>" style="margin-right:6px;"><b><?= e($x['serial_no']) ?></b> <?= e(trim($x['maker'] . ' ' . ($x['family'] ?: $x['model'] ?: ''))) ?></a><?php endforeach; ?></p><?php else: ?><p class="hint"><?= tt('eq.fsr_none') ?></p><?php endif; ?>
+  <details<?= $eqNow ? '' : ' open' ?>><summary style="cursor:pointer;font-weight:600;"><?= tt('eq.fsr_change') ?></summary>
+  <form method="post" action="<?= url('fsr', ['id' => $id]) ?>#equipment" data-lock style="margin-top:8px;"><?= csrf_field() ?><input type="hidden" name="action" value="fsr_eq_set"><input type="hidden" name="id" value="<?= $id ?>">
+    <?php if ($eqUnits): ?><div class="eq-pick"><?php foreach ($eqUnits as $eu): ?><label class="chk"><input type="checkbox" name="eq_ids[]" value="<?= (int)$eu['id'] ?>"<?= in_array((int)$eu['id'], $eqSel, true) ? ' checked' : '' ?>> <b><?= e($eu['serial_no']) ?></b> <span class="hint"><?= e(trim($eu['maker'] . ' ' . ($eu['family'] ?: $eu['model'] ?: ''))) ?></span></label><?php endforeach; ?></div><?php endif; ?>
+    <input name="eq_new" maxlength="300" placeholder="<?= tt('eq.fsr_new_ph') ?>" style="margin-top:6px;">
+    <div class="btn-row" style="margin-top:8px;"><button class="btn btn--gold btn--sm" type="submit"><?= tt('eq.fsr_set_btn') ?></button></div>
+    <?php if ($r['status'] === 'accepted'): ?><p class="hint"><?= tt('eq.fsr_accepted_note') ?></p><?php endif; ?>
+  </form></details>
+</div>
+<?php endif; ?>
+
 <div class="card">
   <h2><?= tt('fsr.works') ?></h2>
   <?php foreach ($r['works'] as $wk): ?>

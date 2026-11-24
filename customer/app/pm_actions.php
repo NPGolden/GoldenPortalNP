@@ -1204,6 +1204,7 @@ function pm_handle_action(string $action, string $page): bool {
             flash($action === 'fsr_dispute' ? 'warn' : 'good', t($action === 'fsr_dispute' ? 'fsr.disputed_done' : 'fsr.accepted_done'));
             redirect('fsr', ['id' => $id, '_r' => uniqid()]);
         }
+        case 'fsr_eq_set': { $id = (int)($_POST['id'] ?? 0); $n = fsr_equipment_set($id, (array)($_POST['eq_ids'] ?? []), (string)($_POST['eq_new'] ?? '')); flash('good', t('eq.fsr_set_done', ['n' => count($n)])); redirect('fsr', ['id' => $id, '_r' => uniqid()]); }   // R97-219
         case 'fsr_reopen': {
             require_staff();
             $id = (int)$_POST['id'];

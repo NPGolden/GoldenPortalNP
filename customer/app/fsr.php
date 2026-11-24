@@ -127,6 +127,22 @@ function fsr_list(?int $projectId = null, ?int $subId = null, ?int $customerId =
                 WHERE " . implode(' AND ', $w) . ' ORDER BY f.report_date DESC, f.id DESC', $args);
 }
 
+/** R97-219: the equipment (serial numbers) a report concerns can be set at any time by staff — also after the customer accepted. It is a link to the equipment register, not part of the signed report: text, hours and PDF stay as they are. The service history of each unit is written again from the report. */
+function fsr_equipment_set(int $id, array $ids, string $newSerials): array {
+    require_staff(); if (!function_exists('eq_has') || !eq_has()) throw new RuntimeException(t('err.notfound'));
+    $r = fsr_load($id); if (!$r) throw new RuntimeException(t('err.notfound'));
+    $vid = (int) scalar('SELECT vessel_id FROM projects WHERE id = ?', [(int)$r['project_id']]) ?: null;
+    $ok = $vid ? array_map('intval', array_column(eq_for_vessel($vid), 'id')) : []; $was = array_map('intval', array_column(eq_fsr_units($id), 'id'));
+    $ids = array_values(array_filter(array_unique(array_map('intval', $ids)), fn($x) => in_array($x, $ok, true) || in_array($x, $was, true)));   // only units of this vessel, or already on the report
+    $newSerials = mb_substr(trim($newSerials), 0, 300); $pdo = db(); $own = !$pdo->inTransaction(); if ($own) $pdo->beginTransaction();
+    try {
+        eq_fsr_link($id, $ids, $newSerials, $vid, ''); eq_fsr_sync($id);
+        $now = eq_fsr_units($id); $sn = implode(', ', array_column($now, 'serial_no'));
+        fsr_event($id, 'saved', mb_substr(t('eq.fsr_ev', ['sn' => $sn !== '' ? $sn : '—']), 0, 250));
+        if ($own) $pdo->commit();
+    } catch (Throwable $e) { if ($own) $pdo->rollBack(); throw $e; }
+    return $now;
+}
 function fsr_event(int $reportId, string $event, ?string $note = null): void {
     $u = current_user();
     $ip = trim(explode(',', (string)($_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? ''))[0]);

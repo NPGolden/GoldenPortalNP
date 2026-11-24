@@ -4246,3 +4246,11 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 ## §498 Push: commercial topics to Golden PM only (GAS-CP-R97-217, v1.234.2)
 
 - Decision of 24/11/2026: "Sales notification should go only to PM." `pn_enqueue` picks from `['pm']` for `pn_commercial()` kinds; the fallback to the Employee app of §497 is removed. No PM app with a push token: no push, the bell notification stays.
+
+## §499 Service report: equipment link after acceptance (GAS-CP-R97-219, v1.235.0)
+
+- Request: reopen an accepted report to add a serial number. `fsr_reopen` allows only `submitted` (an accepted report carries the customer's electronic acceptance) and that rule stays.
+- `fsr_equipment_set($id, $ids, $newSerials)`: staff, any status; ids limited to units of the report's vessel or already linked; `eq_fsr_link` + `eq_fsr_sync` in one transaction; event `saved` with note `eq.fsr_ev` (the events column is an ENUM, no new value).
+- The PDF / Word of the report do not print the linked units, so the accepted document is unchanged.
+- `views/fsr_view.php`: card `#equipment` for staff (not shown to customers); action `fsr_eq_set` in `pm_actions.php`.
+- Language keys +7 (13 247 per language).
