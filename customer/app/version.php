@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.240.0';
+const CP_VERSION = '1.241.0';
 const CP_BUILD   = '2026-11-24';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-227', 'version' => '1.241.0', 'date' => '2026-11-24', 'title' => 'Purchase order: delivery check — the delivery note or invoice of the supplier (scan, photo, PDF) is read by the assistant, compared with the order and turned into a proposed receipt; changed codes and assemblies decided per line, Procurement approves', 'db' => 'install/migrate_cp_r97_227_delivery_check.sql', 'check' => 'r99m'],
         ['ref' => 'GAS-CP-R97-226', 'version' => '1.240.0', 'date' => '2026-11-24', 'title' => 'Service report: the engineer is warned at submission (not stopped) when the report names ATLAS, MAGNUS, AVENTICS or EMERSON without a serial number; the daily check also notifies the engineer who submitted the report', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-225', 'version' => '1.239.0', 'date' => '2026-11-24', 'title' => 'Service reports that name ATLAS, MAGNUS, AVENTICS or EMERSON without a serial number of the equipment: list page, daily check after 07:00 with notification to the project manager and management', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-224', 'version' => '1.238.0', 'date' => '2026-11-24', 'title' => 'Service report: the time lines offer the service cards (A — Service Engineer …), one per card and without prices; the rate is set by Accounting when the hours are processed', 'db' => null, 'check' => null],
@@ -675,6 +676,7 @@ function cp_migration_state(): array {
         'r99f' => $has("SHOW COLUMNS FROM work_calendars LIKE 'holidays_from'"),
         'r99d' => $has("SHOW COLUMNS FROM nl_issues LIKE 'web_slug'"),
         'r99l' => $has("SHOW TABLES LIKE 'pr_reservations'"),   // R97-215
+        'r99m' => $has("SHOW TABLES LIKE 'po_dchecks'"),   // R97-227
         'r99k' => $has("SHOW COLUMNS FROM nl_issues LIKE 'tr'") && $has("SHOW COLUMNS FROM nl_sends LIKE 'lang'") && $has("SHOW COLUMNS FROM contacts LIKE 'nl_lang'"),   // R97-203
         'r99j' => $has("SHOW TABLES LIKE 'soc_post_tr'") && $has("SHOW COLUMNS FROM soc_posts LIKE 'lang'"),   // R97-201
         'r99i' => $has("SHOW TABLES LIKE 'wl_prefs'") && $has("SHOW TABLES LIKE 'wl_mood_seen'"),   // R97-194

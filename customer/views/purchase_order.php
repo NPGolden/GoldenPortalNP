@@ -299,6 +299,12 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
 </div>
 </div>
 
+<?php if ($o && !$isRfq && function_exists('pdc_has') && pdc_has() && $wh && ($pdcs = pdc_list($id) or pdc_can_start($o))): /* R97-227 */ ?>
+<div class="card" id="dchecks"><div class="card-head"><h2>📄 <?= tt('pdc.title') ?></h2><span class="hint"><?= tt('pdc.card_hint') ?></span></div>
+  <?php if (!empty($pdcs)): ?><table class="tbl"><tbody><?php foreach ($pdcs as $x): ?><tr><td><a href="<?= url('po_delivery_check', ['id' => (int)$x['id']]) ?>"><b style="font-family:var(--mono);"><?= e($x['check_no']) ?></b></a></td><td><?= e((string)$x['doc_no']) ?></td><td><?= e(fmt_datetime($x['created_at'])) ?></td><td><?= e((string)$x['created_name']) ?></td><td class="num"><?= (int)$x['n_lines'] ?> <?= tt('prq.lines') ?></td><td><?= pdc_pill($x['status']) ?></td></tr><?php endforeach; ?></tbody></table><?php endif; ?>
+  <?php if (pdc_can_start($o)): ?><div class="btn-row" style="margin-top:8px;"><a class="btn btn--gold btn--sm" href="<?= url('po_delivery_check', ['order' => $id]) ?>">✨ <?= tt('pdc.start') ?></a></div><?php endif; ?>
+</div>
+<?php endif; ?>
 <?php if ($wh && in_array($o['status'], ['sent', 'confirmed', 'partial'], true)): ?>
 <div class="card" id="receipt">
   <h2>📥 <?= tt('po.receipt') ?></h2><p class="hint"><?= tt('po.receipt_lede') ?></p>

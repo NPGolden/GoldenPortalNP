@@ -4304,3 +4304,25 @@ Cybersecurity: every write goes through the portal's own functions (rights, logs
 - Tested: 36 checks on invented data (27 of §504, plus: words of a loaded report, none when a unit is linked, text of the warning, notification to the submitter only with notify, engineer in the daily run with own reports only). Not tested: MariaDB, the page and the app against the live portal.
 - Security: no new input; the warning is escaped text built from the stored word list; the notification carries the report number and the maker words only. Cost: one small query on the report page and at submission.
 - Language keys +2 (13 281 per language). Next ref GAS-CP-R97-227, next migration key r99m, next guide §506.
+
+## §506 Purchase order: delivery check with the assistant (GAS-CP-R97-227, v1.241.0)
+
+**Where:** Purchase order (sent, confirmed or partly received) › card «📄 Delivery check» › upload the delivery note or invoice of the supplier (PDF up to 8 MB, JPG/PNG/WEBP photo up to 4 MB) › «Read and compare». Rights: warehouse or Procurement, with the Assistant switched on for the page *Purchase order* and for the user (Settings › Assistant).
+
+**What the assistant does:** reads every goods row of the document and gives one finding per row — *ordered part*, *changed code*, *component of an assembly*, *not on the order* — with the order line it belongs to, a confidence and a one-line reason. Order lines that do not appear on the document are counted. It proposes; it books nothing.
+
+**What people decide, per row:**
+
+| Action | Effect when booked |
+|---|---|
+| Receive under our code | Quantity received on the order line as ordered. With «remember», the supplier code is stored for our item and offered to the assistant next time. |
+| Receive under the delivered item | The order line (and its requisition line) changes to the item typed; an unknown code creates a new inventory item from the document row. Only while the line has no receipt and its requisition holds no stock of the old item. |
+| Add as its own line | A new order line for the row — the components of an assembly, or goods accepted although not ordered. |
+| Do not receive | Nothing. |
+
+«Replaced» on an order line closes its open balance: the line is cancelled (or trimmed to what was received), the requisition line goes back to *to buy* for that balance, and the value of the balance is spread over the components added without a price.
+
+**Who books:** a plain delivery (every row the ordered part, quantity as on the document, within the open quantity, nothing closed) is booked by the warehouse at once. Anything else — changed code, components, extra goods, another quantity, over-receipt, delivered goods not received, closed line — waits for Procurement: «Approve and book» or «Send back» with a remark. The booking is all or nothing and produces one ordinary receipt (delivery-note number and document attached), which «↩ Reverse receipt» can undo.
+
+**Data:** tables `po_dchecks`, `po_dcheck_lines`, `po_dcheck_close`, `inv_supplier_codes` (migration key r99m). The document and the order lines (codes, descriptions, quantities — no prices of ours) go to the assistant service; the answer is validated (only lines of this order, known findings, sane numbers) and text inside the document is treated as data.
+
