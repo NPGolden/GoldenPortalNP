@@ -167,6 +167,8 @@ if SUBMIT:
     openrs = [x for x in req("GET", f"/apps/{aid}/reviewSubmissions", params={"filter[platform]": "IOS", "filter[state]": "READY_FOR_REVIEW,UNRESOLVED_ISSUES"}).get("data", [])]
     if openrs:   # the version already sits in a submission (returned by App Review, or added but not sent): send that one again
         rs = openrs[0]; log("review submission", rs["id"], rs["attributes"]["state"], "— resubmitting")
+        if not req("GET", f"/reviewSubmissions/{rs['id']}/items", params={"limit": 10})["data"]:   # R97-220: left empty when Apple refused the item while the review recording was still being processed
+            req("POST", "/reviewSubmissionItems", json={"data": {"type": "reviewSubmissionItems", "relationships": {"reviewSubmission": rel("reviewSubmissions", rs["id"]), "appStoreVersion": rel("appStoreVersions", vid)}}}); log("version added to the open review submission")
     else:
         rs = req("POST", "/reviewSubmissions", json={"data": {"type": "reviewSubmissions", "attributes": {"platform": "IOS"}, "relationships": {"app": rel("apps", aid)}}})["data"]
         req("POST", "/reviewSubmissionItems", json={"data": {"type": "reviewSubmissionItems", "relationships": {"reviewSubmission": rel("reviewSubmissions", rs["id"]), "appStoreVersion": rel("appStoreVersions", vid)}}})
