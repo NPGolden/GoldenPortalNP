@@ -30,6 +30,8 @@ ref = bundle(APPS[REF]["appId"]); added = 0
 have = {c["attributes"]["capabilityType"] for c in req("GET", f"/bundleIds/{b['id']}/bundleIdCapabilities")["data"]}
 if "PUSH_NOTIFICATIONS" not in have: added += cap("PUSH_NOTIFICATIONS"); have.add("PUSH_NOTIFICATIONS")   # R97-197: every app receives push notifications
 else: log("capability PUSH_NOTIFICATIONS present")
+if "ASSOCIATED_DOMAINS" not in have: added += cap("ASSOCIATED_DOMAINS"); have.add("ASSOCIATED_DOMAINS")   # R97-218: passkeys (Face ID sign-in) need the app tied to goldensas.com
+else: log("capability ASSOCIATED_DOMAINS present")
 if ref and ref["id"] != b["id"]:
     for c in req("GET", f"/bundleIds/{ref['id']}/bundleIdCapabilities")["data"]:
         t = c["attributes"]["capabilityType"]
@@ -37,7 +39,7 @@ if ref and ref["id"] != b["id"]:
         added += cap(t)
 # R97-197: the App Store profiles of this bundle id, whatever their names — a profile made before a capability was added does not carry it and is made again under the same name
 def has_push(x):
-    try: return b"aps-environment" in base64.b64decode(x["attributes"].get("profileContent") or "")
+    try: c = base64.b64decode(x["attributes"].get("profileContent") or ""); return b"aps-environment" in c and b"com.apple.developer.associated-domains" in c   # R97-218: both capabilities
     except Exception: return False
 def make(name):
     certs = [c for c in req("GET", "/certificates", params={"limit": 200})["data"] if c["attributes"]["certificateType"] in ("DISTRIBUTION", "IOS_DISTRIBUTION")]

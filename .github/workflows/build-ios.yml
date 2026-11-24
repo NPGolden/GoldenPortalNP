@@ -82,18 +82,21 @@ jobs:
         id: push
         env: { PROFILE: "${{ steps.prep.outputs.profile }}" }
         run: |
-          set -e; HAS=0
+          set -e; HAS=0; ASSOC=0
           for f in "$HOME/Library/MobileDevice/Provisioning Profiles"/*.mobileprovision "$HOME/Library/Developer/Xcode/UserData/Provisioning Profiles"/*.mobileprovision; do
             [ -f "$f" ] || continue; security cms -D -i "$f" > "$RUNNER_TEMP/p.plist" 2>/dev/null || continue
             [ "$(/usr/libexec/PlistBuddy -c 'Print :Name' "$RUNNER_TEMP/p.plist" 2>/dev/null)" = "$PROFILE" ] || continue
             if /usr/libexec/PlistBuddy -c 'Print :Entitlements:aps-environment' "$RUNNER_TEMP/p.plist" >/dev/null 2>&1; then HAS=1; fi
+            if /usr/libexec/PlistBuddy -c 'Print :Entitlements:com.apple.developer.associated-domains' "$RUNNER_TEMP/p.plist" >/dev/null 2>&1; then ASSOC=1; fi   # GAS-CP-R97-218
           done; rm -f "$RUNNER_TEMP/p.plist"
           if [ "$HAS" != 1 ]; then echo "::warning::The provisioning profile '$PROFILE' has no push entitlement - this build is made WITHOUT push notifications. Run the workflow 'Apple bundle id and profile' for this app, then build again."; echo "on=0" >> "$GITHUB_OUTPUT"; exit 0; fi
-          cd ios/App; python3 ../../ios_push.py; plutil -lint App/App.entitlements
+          if [ "$ASSOC" != 1 ]; then echo "::warning::The provisioning profile '$PROFILE' has no Associated Domains - passkeys (Face ID sign-in) will NOT work in this build. Run the workflow 'Apple bundle id and profile' for this app, then build again."; fi
+          cd ios/App; ASSOC=$ASSOC python3 ../../ios_push.py; plutil -lint App/App.entitlements
+          echo "assoc=$ASSOC" >> "$GITHUB_OUTPUT"
           grep -q "capacitorDidRegisterForRemoteNotifications" App/AppDelegate.swift
           echo "on=1" >> "$GITHUB_OUTPUT"; echo "push: entitlement, callbacks and mark in place"
       - name: Archive and export
-        env: { TEAM: "${{ secrets.APPLE_TEAM_ID }}", PROFILE: "${{ steps.prep.outputs.profile }}", APPID: "${{ steps.prep.outputs.app_id }}", VERSION: "${{ steps.prep.outputs.version }}", PUSH: "${{ steps.push.outputs.on }}" }
+        env: { TEAM: "${{ secrets.APPLE_TEAM_ID }}", PROFILE: "${{ steps.prep.outputs.profile }}", APPID: "${{ steps.prep.outputs.app_id }}", VERSION: "${{ steps.prep.outputs.version }}", PUSH: "${{ steps.push.outputs.on }}", ASSOC: "${{ steps.push.outputs.assoc }}" }
         run: |
           set -e; cd ios/App
           /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" App/Info.plist || true
@@ -117,6 +120,7 @@ jobs:
           xcodebuild $X -scheme App -configuration Release -destination 'generic/platform=iOS' -archivePath build/App.xcarchive archive -quiet
           xcodebuild -exportArchive -archivePath build/App.xcarchive -exportOptionsPlist ExportOptions.plist -exportPath build/export -quiet
           if [ "$PUSH" = 1 ]; then codesign -d --entitlements :- build/App.xcarchive/Products/Applications/App.app 2>/dev/null | grep -A1 "aps-environment" || { echo "push entitlement missing in the signed app"; exit 1; }; fi
+          if [ "$ASSOC" = 1 ]; then codesign -d --entitlements :- build/App.xcarchive/Products/Applications/App.app 2>/dev/null | grep -A3 "associated-domains" || { echo "associated-domains entitlement missing in the signed app"; exit 1; }; fi   # GAS-CP-R97-218
           ls -la build/export; cp build/export/*.ipa "../../$APPID-$VERSION-${{ github.run_number }}.ipa"
       - uses: actions/upload-artifact@v4
         with:
