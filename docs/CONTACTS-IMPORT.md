@@ -4513,3 +4513,18 @@ No database step. Language keys +3 (13 509 per language). Next ref GAS-CP-R97-23
 
 **Order of truth:** an In / Out entry wins over the planning (who punches is «in» or «out»). Approved leave requests and strike days reach the planning by themselves; an absence known only by phone must be entered in the planning (or as a leave by HR) to appear as absent.
 
+## §521 In / Out › Who is in: filters (GAS-CP-R97-242, v1.248.2)
+
+**Where:** HR › In / Out › Who is in, beside the date.
+
+| Filter | Shows |
+|---|---|
+| Everybody | the whole list of the day |
+| no entry | expected, not punched — «those who did not log in» |
+| in now | last entry is In |
+| left | last entry is Out |
+| absent (planning) | away by the planning (§520) |
+| arrived late | first In after the start of the working time |
+
+Each option shows its count. **Name…** narrows by part of a name. The five figures above the list are links: one click filters, a second click on the same figure shows everybody again. «Clear» removes filters; «n of m shown» says how many are listed. The figures always count the whole day, not the filtered list. The link can be bookmarked (e.g. today's «no entry»).
+

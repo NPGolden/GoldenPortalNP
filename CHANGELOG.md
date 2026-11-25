@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.248.1** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.248.2** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.248.2 | GAS-CP-R97-242 | 2026-11-25 | In / Out › Who is in: filters — no entry, in now, left, absent, arrived late — and by name; the figures above the list are links to the same filters | — |
 | 1.248.1 | GAS-CP-R97-241 | 2026-11-25 | In / Out › Who is in: people the planning shows as away (leave, sick leave, parental leave, strike) are listed as «absent» — without the reason — and counted apart from «no entry» | — |
 | 1.248.0 | GAS-CP-R97-240 | 2026-11-25 | Offer › Follow-up and success: follow-up log in the card (planned actions, outcomes, signals — in full); large text boxes for Outcome and Comments, with room for long texts | `install/migrate_cp_r97_240_followup_notes_wide.sql` |
 | 1.247.0 | GAS-CP-R97-239 | 2026-11-24 | Purchasing: requisitions carry a priority (urgent, high, normal, low) and their approvals show vessel, project and sub-project — in the portal, the notifications and My approvals of Golden PM; the purchase order shows the highest priority of its requisitions | `install/migrate_cp_r97_239_requisition_priority.sql` |

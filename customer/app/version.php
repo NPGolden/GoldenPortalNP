@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.248.1';
+const CP_VERSION = '1.248.2';
 const CP_BUILD   = '2026-11-24';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-242', 'version' => '1.248.2', 'date' => '2026-11-25', 'title' => 'In / Out › Who is in: filters — no entry, in now, left, absent, arrived late — and by name; the figures above the list are links to the same filters', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-241', 'version' => '1.248.1', 'date' => '2026-11-25', 'title' => 'In / Out › Who is in: people the planning shows as away (leave, sick leave, parental leave, strike) are listed as «absent» — without the reason — and counted apart from «no entry»', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-240', 'version' => '1.248.0', 'date' => '2026-11-25', 'title' => 'Offer › Follow-up and success: follow-up log in the card (planned actions, outcomes, signals — in full); large text boxes for Outcome and Comments, with room for long texts', 'db' => 'install/migrate_cp_r97_240_followup_notes_wide.sql', 'check' => 'r99r'],
         ['ref' => 'GAS-CP-R97-239', 'version' => '1.247.0', 'date' => '2026-11-24', 'title' => 'Purchasing: requisitions carry a priority (urgent, high, normal, low) and their approvals show vessel, project and sub-project — in the portal, the notifications and My approvals of Golden PM; the purchase order shows the highest priority of its requisitions', 'db' => 'install/migrate_cp_r97_239_requisition_priority.sql', 'check' => 'r99q'],
