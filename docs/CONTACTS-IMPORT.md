@@ -4630,3 +4630,13 @@ Migration `install/migrate_cp_r97_249_hr_tasks.sql` (key r99u): `tasks.hr_only`,
 - People with the HR right who also use the general Tasks page see their HR tasks there too.
 
 Language: 23 new keys, six pool texts reworded.
+
+## §529 Service app 0.8.7: photos from the album, two-tap delete, photos of a sent report (GAS-CP-R97-250, v1.254.0)
+
+- `mobile/js/app.js` `UI.photos.init()`: two inputs — camera (`capture="environment"`) and album (no `capture`, `multiple`). The single input with `capture` opened only the camera on phones. `armDelete(ph, run)`: first tap on × → «Delete?», second tap within 4 s runs the removal. Used by every photo box (reports, inspections, notes, ticket notes).
+- A draft keeps its photos on the phone until the report is sent, so removing there never reaches the server.
+- Sent service reports: `photosBox()` in `mobile/js/reports.js` (under the hours, online only) — `GET /fsr/{id}/photos` (`Portal::fsrPhotos`: items with task and figure, `can_delete`, `can_add`), `GET /fsr/{id}/photos/{file}` (picture, after the same access check), `POST /fsr/{id}/photos/{file}/delete` (`Portal::fsrPhotoDelete`).
+- Rules on the server: only the people of the report (`fsrMine`: creator, submitter, an engineer on its lines, administrator); status `draft`, `submitted` or `disputed` — otherwise 423 `fsr.photo_locked`; the file must be an `fsr_photo` of that report; `cp_trash_file()` (recycle bin, 30 days); history line `fsr.photo_removed`; `fsr_generate_documents()`. `Portal::storePhoto()` now refuses to add to an accepted report as well.
+- App files carry version 0.8.7 (`sw.js`, `js/api.js`, `index.html`); web shell only — no store build.
+
+Language: 2 portal keys, 10 app keys in five languages.

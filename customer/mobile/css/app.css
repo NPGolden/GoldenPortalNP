@@ -63,6 +63,14 @@ textarea { min-height: 84px; resize: vertical; }
 .photos .ph button { position: absolute; top: 2px; right: 2px; border: 0; background: rgba(0,0,0,.6); color: #fff; border-radius: 50%; width: 20px; height: 20px; font-size: 12px; }
 .photos .add { background: #fff; border: 1.5px solid var(--gold); color: var(--gold); font-size: 30px; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 .photos input { display: none; }
+/* R97-250: camera and album buttons; a clear delete with a question on the first tap */
+.photos .add { flex-direction: column; font-size: 24px; line-height: 1; gap: 3px; }
+.photos .add small { font-size: 9.5px; font-weight: 700; letter-spacing: .02em; color: #6B5A1E; }
+.photos .ph button { width: 26px; height: 26px; font-size: 16px; line-height: 1; }
+.photos .ph.ask button { width: auto; height: auto; left: 2px; right: 2px; top: auto; bottom: 2px; border-radius: 6px; padding: 5px 2px; font-size: 11px; font-weight: 700; background: #B3261E; }
+.photos .ph.ask img { opacity: .45; }
+.photos .ph .fig { position: absolute; left: 3px; bottom: 3px; background: rgba(10,27,46,.75); color: #fff; font-size: 10px; padding: 1px 5px; border-radius: 6px; }
+.photos .ph.ask .fig { display: none; }
 
 .sigbox { border: 1px solid var(--navy); border-radius: 8px; background: #FBFBFC; position: relative; }
 .sigbox canvas { width: 100%; height: 150px; display: block; touch-action: none; }

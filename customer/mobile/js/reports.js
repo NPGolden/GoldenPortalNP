@@ -141,6 +141,23 @@ window.REPORTS = (() => {
       } };
   }
   /** Under a submitted report: sign on this device, send for acceptance by e-mail, and the links with their state and problems. */
+  /* R97-250: the photos already on the report in the portal — seen here, removed (until the customer accepted) and added from the camera or the album */
+  async function photosBox(root, f) {
+    const box = root.querySelector("#phbox"); if (!box || API.mock) return; const id = f.portal_id;
+    const msg = (e) => String(e.message || "").replace(/\s*\((GET|POST) [^)]*\)$/, "");
+    const draw = (P) => {
+      box.innerHTML = `<h2>${t("fsr.photos")} <span class="muted">(${P.items.length} / ${P.max})</span></h2><div class="photos" id="srvph"></div><p class="muted">${t(P.can_delete ? "ph.sent_hint" : "ph.locked")}</p>`;
+      const wrap = box.querySelector("#srvph");
+      P.items.forEach((p) => { const ph = document.createElement("div"); ph.className = "ph"; ph.innerHTML = `<img alt="">${p.figure ? `<span class="fig">${p.figure}</span>` : ""}${P.can_delete ? `<button type="button" aria-label="${t("ph.del")}">×</button>` : ""}`; wrap.appendChild(ph);
+        API.fsrPhotoBlob(id, p.id).then((b) => { ph.querySelector("img").src = URL.createObjectURL(b); }).catch(() => {});
+        if (P.can_delete) UI.armDelete(ph, async () => { const N = await API.fsrPhotoDelete(id, p.id); UI.toast(t("ph.removed")); draw(N); }); });
+      if (P.can_add) { wrap.insertAdjacentHTML("beforeend", `<label class="add"><span>📷</span><small>${t("ph.camera")}</small><input type="file" accept="image/*" capture="environment"></label><label class="add alb"><span>🖼</span><small>${t("ph.album")}</small><input type="file" accept="image/*" multiple></label>`);
+        wrap.querySelectorAll("input").forEach((inp) => inp.onchange = async (e) => { const files = [...e.target.files].slice(0, Math.max(0, P.max - P.items.length)); e.target.value = ""; if (!files.length) return; UI.toast(t("ph.uploading"));
+          try { for (const fl of files) { const blob = await UI.photos.compress(fl); await API.photo("F" + id, blob, fl.name.replace(/\.[^.]+$/, "") + ".jpg", 1); } UI.toast(t("ph.added")); } catch (x) { UI.toast(msg(x), 4000); }
+          try { draw(await API.fsrPhotos(id)); } catch (x) {} }); }
+    };
+    try { draw(await API.fsrPhotos(id)); } catch (e) { box.innerHTML = e.status === 404 || e.status === 403 ? "" : `<p class="muted">${t("ph.offline")}</p>`; }
+  }
   async function acceptanceBox(root, f) {
     const box = root.querySelector("#accbox"); if (!box || API.mock) return;
     const msg = (e) => String(e.message || "").replace(/\s*\((GET|POST) [^)]*\)$/, "");
@@ -176,7 +193,8 @@ window.REPORTS = (() => {
     UI.chrome(true, f.number || (kind === "inspection" ? t("rep.newins") : t("rep.newsr")), "fsr", true); UI.badge(kind === "inspection" ? "SF-GLD-020" : f.type === "external" ? "EXT" : "SF-GLD-014");
     if (f.status !== "draft") {
       if (kind === "service" && q.sign && f.portal_id && f.status === "submitted") return signScreen(f);                       // R97-060
-      if (kind === "service" && f.portal_id && f.type !== "external") return { html: view(f) + `<div id="accbox"></div>`, bind(root) { acceptanceBox(root, f); } };
+      if (kind === "service" && f.portal_id && f.type !== "external") return { html: view(f) + `<div id="phbox"></div><div id="accbox"></div>`, bind(root) { photosBox(root, f); acceptanceBox(root, f); } };
+      if (kind === "service" && f.portal_id) return { html: view(f) + `<div id="phbox"></div>`, bind(root) { photosBox(root, f); } };
       return { html: kind === "inspection" ? viewIsr(f) : view(f) };
     }
     if (kind === "service" && q.preview && id !== "new") return previewScreen(f);

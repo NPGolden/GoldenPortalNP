@@ -130,6 +130,10 @@ try {
         case $method === 'POST' && preg_match('#^/fsr/(\d+)/accept-link$#', $path, $m): RateLimit::check('api', 'dl' . $u['id'], 20); Response::json(Portal::acceptLink($u, (int)$m[1], $body), 201);
         case $method === 'POST' && preg_match('#^/fsr/(\d+)/accept-link/(\d+)/cancel$#', $path, $m): Response::json(Portal::acceptCancel($u, (int)$m[1], (int)$m[2]));
         case $method === 'POST' && preg_match('#^/fsr/(\d+)/sign-onsite$#', $path, $m): RateLimit::check('api', 'sgn' . $u['id'], 20); Response::json(Portal::signOnsite($u, (int)$m[1], $body));
+        /* R97-250: photos of a report already sent — list, picture, remove */
+        case $method === 'GET' && preg_match('#^/fsr/(\d+)/photos$#', $path, $m): Response::json(Portal::fsrPhotos($u, (int)$m[1]));
+        case $method === 'GET' && preg_match('#^/fsr/(\d+)/photos/(\d+)$#', $path, $m): Portal::fsrPhotoStream($u, (int)$m[1], (int)$m[2]);
+        case $method === 'POST' && preg_match('#^/fsr/(\d+)/photos/(\d+)/delete$#', $path, $m): RateLimit::check('api', 'fph' . $u['id'], 40); Response::json(Portal::fsrPhotoDelete($u, (int)$m[1], (int)$m[2]));
         case $method === 'GET' && $path === '/timesheets': Response::json(['items' => Response::noMoney(Portal::timesheets($u))]);
         case $method === 'GET' && $path === '/notes': Response::json(['items' => Portal::notes($u)]);
         case $method === 'POST' && $path === '/sync': RateLimit::check('sync', 'u' . $u['id'], 60); require __DIR__ . '/endpoints/sync.php'; sync_ops($u, $body);

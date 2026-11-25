@@ -152,6 +152,26 @@ final class Portal {
         $mine = (int)$r['created_by'] === (int)$u['id'] || (int)$r['submitted_by'] === (int)$u['id'] || array_filter($r['lines'], fn($l) => mb_strtolower(trim((string)$l['engineer'])) === mb_strtolower((string)$u['full_name'])) || is_cp_admin();
         if (!$mine) throw new ApiException(403, 'Not your report'); return $r;
     }
+    /** R97-250: the photos already on a report (after it was sent from the phone) — to look at, add to and, until the customer accepted, remove. */
+    public static function fsrPhotos(array $u, int $id): array {
+        $r = self::fsrMine($u, $id); $open = in_array((string)$r['status'], ['draft', 'submitted', 'disputed'], true);
+        return ['can_delete' => $open, 'can_add' => $open && count($r['photos']) < FSR_MAX_PHOTOS, 'max' => FSR_MAX_PHOTOS,
+                'items' => array_map(fn($p) => ['id' => (int)$p['id'], 'task' => (int)($p['fsr_task'] ?? 1) ?: 1, 'figure' => (int)($p['figure'] ?? 0), 'caption' => (string)($p['description'] ?? '')], $r['photos'])];
+    }
+    private static function fsrPhotoRow(array $u, int $id, int $fid): array {
+        self::fsrMine($u, $id); $f = one("SELECT * FROM sp_files WHERE id = ? AND fsr_id = ? AND kind = 'fsr_photo'", [$fid, $id]); if (!$f) throw new ApiException(404, 'Photo not found'); return $f;
+    }
+    public static function fsrPhotoStream(array $u, int $id, int $fid): void { self::fsrPhotoRow($u, $id, $fid); header_remove('Content-Type'); cp_stream_file($fid); exit; }
+    /** The photo goes to the recycle bin (30 days), the report documents are made again without it, the history of the report says who removed it. */
+    public static function fsrPhotoDelete(array $u, int $id, int $fid): array {
+        $r = self::fsrMine($u, $id); $f = self::fsrPhotoRow($u, $id, $fid);
+        if (!in_array((string)$r['status'], ['draft', 'submitted', 'disputed'], true)) throw new ApiException(423, t('fsr.photo_locked'));
+        $fig = 0; foreach ($r['photos'] as $p) if ((int)$p['id'] === $fid) $fig = (int)($p['figure'] ?? 0);
+        if (function_exists('cp_trash_file')) cp_trash_file($fid, 'Removed in the Service app'); else cp_delete_file($fid);
+        fsr_event($id, 'saved', mb_substr(t('fsr.photo_removed', ['n' => $fig ?: '—', 'f' => (string)($f['original_name'] ?? '')]), 0, 250));
+        try { fsr_generate_documents($id); } catch (Throwable $e) { error_log('[fsr] documents after photo removal: ' . $e->getMessage()); }
+        return self::fsrPhotos($u, $id);
+    }
     /** State of the customer acceptance of a report: what is possible now and the e-mail links with their problems. */
     public static function acceptance(array $u, int $id): array {
         $r = self::fsrMine($u, $id); $open = $r['status'] === 'submitted'; $ready = function_exists('dl_has') && dl_has(); $links = [];
@@ -327,7 +347,8 @@ final class Portal {
     }
     /** Photo for a report (FSR task or ISR item) or a note, stored by the portal's own file function (archive + sha256). */
     public static function storePhoto(array $u, string $ref, array $file, int $task, ?string $caption): array {
-        if (preg_match('/^F(\d+)$/', $ref, $m)) { $r = one('SELECT id, project_id, subproject_id FROM fsr_reports WHERE id = ?', [(int)$m[1]]); if (!$r) throw new ApiException(404, 'Report not found');
+        if (preg_match('/^F(\d+)$/', $ref, $m)) { $r = one('SELECT id, project_id, subproject_id, status FROM fsr_reports WHERE id = ?', [(int)$m[1]]); if (!$r) throw new ApiException(404, 'Report not found');
+            if (!in_array((string)$r['status'], ['draft', 'submitted', 'disputed'], true)) throw new ApiException(423, t('fsr.photo_locked'));   // R97-250: nothing is added to a report the customer accepted
             if ((int) scalar("SELECT COUNT(*) FROM sp_files WHERE fsr_id = ? AND kind = 'fsr_photo'", [(int)$r['id']]) >= FSR_MAX_PHOTOS) throw new ApiException(422, 'Photo limit of the report reached');
             $fid = cp_store_file($file, (int)$r['project_id'], (int)($r['subproject_id'] ?? 0) ?: null, 'fsr_photo', 'external', $caption, null, (int)$r['id']); if ($fid) q('UPDATE sp_files SET fsr_task = ? WHERE id = ?', [max(1, $task), $fid]);
             if ($fid) fsr_generate_documents((int)$r['id']); }

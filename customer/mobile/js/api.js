@@ -3,7 +3,7 @@
  * Mock mode: localStorage gas.mock = "1", or ?mock=1 on the URL. */
 (function () { try { window.__gasAct = Date.now(); ["pointerdown", "keydown", "touchstart"].forEach(function (e) { window.addEventListener(e, function () { window.__gasAct = Date.now(); }, { passive: true, capture: true }); }); } catch (e) {} })();   // R97-237: when the screen was last touched — sent as X-Idle so an app left open does not keep its user «online»
 window.API = (() => {
-  const VERSION = "0.8.6";
+  const VERSION = "0.8.7";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   const demoOn = () => { try { return localStorage.getItem("gas.demo") === "1"; } catch (e) { return false; } };   // R97-169
@@ -47,6 +47,8 @@ window.API = (() => {
     VERSION, get mock() { return MOCK; }, setMock(v) { MOCK = !!v; try { localStorage.setItem("gas.mock", v ? "1" : "0"); } catch (e) {} },
     get signedIn() { if (MOCK && !mockState.user && demoOn()) mockState.user = M.me; return !!(tok.refresh || (MOCK && mockState.user)); },   // R97-169: a demonstration account stays signed in to the demonstration data
     /* R97-060: customer acceptance of a service report — state, e-mail link, signing on this device (online only; never queued) */
+    fsrPhotos(id) { return call("GET", `/fsr/${id}/photos`); }, fsrPhotoDelete(id, fid) { return call("POST", `/fsr/${id}/photos/${fid}/delete`, {}); },   // R97-250
+    async fsrPhotoBlob(id, fid) { const go = () => fetch(`${BASE}/fsr/${id}/photos/${fid}`, { headers: { Authorization: `Bearer ${tok.access}`, "X-App": "engineer", "X-App-Version": VERSION }, cache: "no-store" }); let r = await go(); if (r.status === 401 && tok.refresh) { const x = await raw("POST", "/auth/refresh", { refresh_token: tok.refresh }); tok.access = x.access_token; tok.refresh = x.refresh_token; r = await go(); } if (!r.ok) { const e = new Error(`HTTP ${r.status}`); e.status = r.status; throw e; } return r.blob(); },
     acceptance(id) { return call("GET", `/fsr/${id}/acceptance`); }, acceptLink(id, b) { return call("POST", `/fsr/${id}/accept-link`, b); },
     acceptCancel(id, lid) { return call("POST", `/fsr/${id}/accept-link/${lid}/cancel`, {}); }, signOnsite(id, b) { return call("POST", `/fsr/${id}/sign-onsite`, b); },
     async login(email, password, totp, newPassword) { const r = await call("POST", "/auth/login", { email, password, totp: totp || undefined, new_password: newPassword || undefined, device: deviceInfo() }); tok.access = r.access_token; tok.refresh = r.refresh_token;

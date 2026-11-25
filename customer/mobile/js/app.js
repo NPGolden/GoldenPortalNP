@@ -27,18 +27,26 @@ window.UI = (() => {
   // photos: picked → compressed on device (≤1600 px, JPEG q0.8 ≈ ≤400 kB) → canvas re-encode strips all EXIF (CS-06)
   const photos = {
     init(box, record, max, task) {   // R77-002: task = the task / inspected-system number the photos belong to (undefined = report level)
-      box.innerHTML = `<label class="add">+<input type="file" accept="image/*" capture="environment" multiple></label>`; box._max = max || 9; box._init = true;
-      box.querySelector("input").onchange = async (e) => { for (const f of e.target.files) { if (box.querySelectorAll(".ph").length >= box._max) { toast(`Max ${box._max} photos`); break; } const blob = await compress(f); addThumb(box, blob, f.name.replace(/\.[^.]+$/, "") + ".jpg"); } e.target.value = ""; };
+      // R97-250: two ways in — the camera, or pictures already in the album of the phone (several at once)
+      box.innerHTML = `<label class="add" title="${I18N.t("ph.camera")}"><span>📷</span><small>${I18N.t("ph.camera")}</small><input type="file" accept="image/*" capture="environment"></label><label class="add alb" title="${I18N.t("ph.album")}"><span>🖼</span><small>${I18N.t("ph.album")}</small><input type="file" accept="image/*" multiple></label>`; box._max = max || 9; box._init = true;
+      box.querySelectorAll("input").forEach((inp) => inp.onchange = async (e) => { for (const f of e.target.files) { if (box.querySelectorAll(".ph").length >= box._max) { toast(`Max ${box._max} photos`); break; } const blob = await compress(f); addThumb(box, blob, f.name.replace(/\.[^.]+$/, "") + ".jpg"); } e.target.value = ""; });
       if (record) DB.all("photos").then((all) => all.filter((p) => p.record === record && (task === undefined || (p.task || 1) === task)).forEach((p) => addThumb(box, p.blob, p.name, p.id)));
     },
     count: (box) => box.querySelectorAll(".ph").length,
     async store(box, record, task) { for (const ph of box.querySelectorAll(".ph")) { if (ph._stored && (task === undefined || ph._task === task)) continue; await DB.put("photos", { id: ph._id || (ph._id = DB.uuid()), record, task: task || 1, blob: ph._blob, name: ph._name, captured_at: new Date().toISOString() }); ph._stored = true; ph._task = task; } },
+    compress, armDelete: (ph, run) => armDelete(ph, run),
     async drop(box) { for (const ph of box.querySelectorAll(".ph")) if (ph._id) await DB.del("photos", ph._id); },
   };
   function addThumb(box, blob, name, id) {
     const ph = document.createElement("div"); ph.className = "ph"; ph._blob = blob; ph._name = name; ph._id = id; ph._stored = !!id;
-    ph.innerHTML = `<img src="${URL.createObjectURL(blob)}"><button>×</button>`; ph.querySelector("button").onclick = async () => { if (id) await DB.del("photos", id); ph.remove(); };
+    ph.innerHTML = `<img src="${URL.createObjectURL(blob)}"><button type="button" aria-label="${I18N.t("ph.del")}">×</button>`;
+    armDelete(ph, async () => { if (ph._id) await DB.del("photos", ph._id); ph.remove(); });   // R97-250: first tap asks, second tap removes
     box.insertBefore(ph, box.querySelector(".add"));
+  }
+  /** A photo is removed with two taps on its ×: the first turns it into «Delete?», the second (within 4 s) removes it. */
+  function armDelete(ph, run) {
+    const b = ph.querySelector("button"); let tm = null;
+    b.onclick = async (e) => { e.preventDefault(); e.stopPropagation(); if (!ph.classList.contains("ask")) { ph.classList.add("ask"); b.textContent = I18N.t("ph.del_q"); tm = setTimeout(() => { ph.classList.remove("ask"); b.textContent = "×"; }, 4000); return; } clearTimeout(tm); b.disabled = true; try { await run(); } catch (x) { b.disabled = false; ph.classList.remove("ask"); b.textContent = "×"; toast(String(x.message || x).replace(/\s*\((GET|POST) [^)]*\)$/, ""), 4000); } };
   }
   function compress(file) {
     return new Promise((res) => { const img = new Image(); img.onload = () => { const max = 1600; const sc = Math.min(1, max / Math.max(img.width, img.height)); const c = document.createElement("canvas"); c.width = Math.round(img.width * sc); c.height = Math.round(img.height * sc); c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); c.toBlob((b) => res(b || file), "image/jpeg", 0.8); URL.revokeObjectURL(img.src); }; img.onerror = () => res(file); img.src = URL.createObjectURL(file); });
@@ -141,5 +149,5 @@ window.UI = (() => {
         async () => { if (await biometric()) { try { localStorage.setItem("gas.bio", "1"); } catch (e) {} toast(t("sec.done")); } closeSheet(); },
         (el) => { el.querySelector("#cancel").textContent = t("sec.later"); }); }, 900);
   }
-  return { securityAsk, chrome, badge, toast, goLinks, segs, sheet, closeSheet, photos, sig, biometric, biometricAvailable, render, assistContext, openDocument };
+  return { securityAsk, chrome, badge, toast, goLinks, segs, sheet, closeSheet, photos, armDelete, sig, biometric, biometricAvailable, render, assistContext, openDocument };
 })();

@@ -13889,4 +13889,6 @@ Cordiali saluti,
 'td.hr_done_h' => 'Fatte negli ultimi {n} giorni',
 'td.hr_title_for' => 'Seguito — {n}',
 'td.hr_nf' => 'Attività HR per lei: {t}',
+'fsr.photo_locked' => 'Le foto si aggiungono o tolgono solo finché il cliente non ha accettato il rapporto.',
+'fsr.photo_removed' => 'Foto tolta nell’app Service: figura {n} ({f})',
 ];

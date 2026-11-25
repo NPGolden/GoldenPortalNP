@@ -13889,4 +13889,6 @@ Best regards,
 'td.hr_done_h' => 'Done in the last {n} days',
 'td.hr_title_for' => 'Follow up — {n}',
 'td.hr_nf' => 'HR task for you: {t}',
+'fsr.photo_locked' => 'Photos can be added or removed only until the customer has accepted the report.',
+'fsr.photo_removed' => 'Photo removed in the Service app: figure {n} ({f})',
 ];
