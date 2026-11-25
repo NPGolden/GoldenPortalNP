@@ -145,15 +145,28 @@ function hr_message_send_from_post(): int {
     q('INSERT INTO hr_messages (person_id, from_user_id, from_hr, body) VALUES (?,?,?,?)', [$pid, (int)$u['id'], $fromHr, $body]); $id = (int) db()->lastInsertId();
     if (function_exists('nf_push')) {
         $to = $fromHr ? array_filter([(int)($p['user_id'] ?? 0)]) : hr_hr_user_ids(); $to = array_values(array_unique(array_filter(array_map('intval', $to), fn($x) => $x !== (int)$u['id'])));
-        if ($to) nf_push($to, 'hrm:new', 'hrm:' . $pid, t('hr.nf_msg') . ' — ' . ($fromHr ? 'HR' : $p['name_en']), mb_substr($body, 0, 140), $fromHr ? url('my_leave') . '#hr-msg' : url('hr_person', ['id' => $pid]) . '#hr-msg', (int)$u['id'], $u['full_name'] ?? null);
+        if ($to) nf_push($to, 'hrm:new', 'hrm:' . $pid, t('hr.nf_msg') . ' — ' . ($fromHr ? 'HR' : $p['name_en']), mb_substr($body, 0, 140), $fromHr ? url('my_leave') . '#hr-msg' : url('hr_messages', ['pid' => $pid]) . '#hr-msg', (int)$u['id'], $u['full_name'] ?? null);   // R97-245: HR lands in the message pool, on the conversation
     }
     return $id;
 }
+/* R97-245: the pool of HR messages — one row per employee with a conversation; «to answer» = the employee wrote last and HR has neither answered nor closed it */
+function hr_msg_done_has(): bool { static $h = null; if ($h === null) { try { $h = hr_msg_has() && (bool) scalar("SHOW COLUMNS FROM hr_messages LIKE 'done_at'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function hr_message_threads(): array {
+    if (!hr_msg_has() || !hr_can()) return []; $done = hr_msg_done_has() ? 'm.done_at IS NULL' : '1 = 1';
+    $rows = all("SELECT m.person_id, p.name_en, p.name_el, p.is_active, MAX(m.created_at) AS last_at, COUNT(*) AS n, SUM(CASE WHEN m.from_hr = 0 AND m.seen_at IS NULL THEN 1 ELSE 0 END) AS unread, MAX(CASE WHEN m.from_hr = 1 THEN m.id ELSE 0 END) AS last_hr, MAX(CASE WHEN m.from_hr = 0 AND $done THEN m.id ELSE 0 END) AS last_emp_open, MAX(m.id) AS last_id FROM hr_messages m JOIN hr_people p ON p.id = m.person_id GROUP BY m.person_id, p.name_en, p.name_el, p.is_active");
+    if (!$rows) return []; $last = []; foreach (all('SELECT id, body, from_hr FROM hr_messages WHERE id IN (' . implode(',', array_map(fn($r) => (int)$r['last_id'], $rows)) . ')') as $m) $last[(int)$m['id']] = $m;
+    foreach ($rows as &$r) { $r['unread'] = (int)$r['unread']; $r['wait'] = (int)$r['last_emp_open'] > (int)$r['last_hr']; $l = $last[(int)$r['last_id']] ?? null; $r['last_body'] = $l ? (string)$l['body'] : ''; $r['last_from_hr'] = $l ? (bool)$l['from_hr'] : false; } unset($r);
+    usort($rows, fn($a, $b) => [$b['unread'] > 0, $b['wait'], $b['last_at']] <=> [$a['unread'] > 0, $a['wait'], $a['last_at']]);
+    return $rows;
+}
+function hr_messages_waiting(): int { return count(array_filter(hr_message_threads(), fn($r) => $r['wait'])); }
+/** HR: the conversation needs no answer — it leaves «to answer» until the employee writes again. */
+function hr_message_done(int $pid): void { if (!hr_can() || !hr_msg_done_has()) throw new RuntimeException(t('err.noaccess')); q('UPDATE hr_messages SET done_at = NOW(), seen_at = COALESCE(seen_at, NOW()) WHERE person_id = ? AND from_hr = 0 AND done_at IS NULL', [$pid]); }
 /** The message thread card (same markup for the employee card and My leave). */
-function hr_messages_card(int $pid, bool $hrSide): string {
+function hr_messages_card(int $pid, bool $hrSide, string $back = ''): string {
     $msgs = hr_messages($pid); hr_messages_mark_seen($pid); $h = '<div class="card" id="hr-msg"><h2>💬 ' . tt('hr.msg_title') . '</h2><p class="hint">' . tt($hrSide ? 'hr.msg_hint_hr' : 'hr.msg_hint_emp') . '</p>';
     if (!$msgs) $h .= '<p class="hint">' . tt('hr.msg_none') . '</p>'; else { $h .= '<div class="hr-thread">'; foreach ($msgs as $m) $h .= '<div class="hr-m' . ($m['from_hr'] ? ' is-hr' : '') . '"><div class="hr-m-head"><b>' . e($m['from_name'] ?? ($m['from_hr'] ? 'HR' : '')) . '</b>' . ($m['from_hr'] ? ' <span class="hint">HR</span>' : '') . ' <span class="hint">' . e(fmt_datetime($m['created_at'])) . ($m['seen_at'] ? ' · ✔ ' . tt('hr.msg_seen') : '') . '</span></div><div class="hr-m-body">' . nl2br(e($m['body'])) . '</div></div>'; $h .= '</div>'; }
-    $h .= '<form method="post" action="' . ($hrSide ? url('hr_person', ['id' => $pid]) : url('my_leave')) . '#hr-msg" data-lock>' . csrf_field() . '<input type="hidden" name="action" value="hr_msg_send"><input type="hidden" name="person_id" value="' . $pid . '"><div class="field"><textarea name="body" rows="3" maxlength="2000" required data-plain placeholder="' . tt('hr.msg_ph') . '"></textarea></div><div class="btn-row"><button class="btn btn--gold btn--sm" type="submit">' . tt('hr.msg_send') . '</button></div></form></div>';
+    $h .= '<form method="post" action="' . ($hrSide ? ($back === 'pool' ? url('hr_messages', ['pid' => $pid]) : url('hr_person', ['id' => $pid])) : url('my_leave')) . '#hr-msg" data-lock>' . csrf_field() . '<input type="hidden" name="action" value="hr_msg_send"><input type="hidden" name="person_id" value="' . $pid . '">' . ($back === 'pool' ? '<input type="hidden" name="back" value="pool">' : '') . '<div class="field"><textarea name="body" rows="3" maxlength="2000" required data-plain placeholder="' . tt('hr.msg_ph') . '"></textarea></div><div class="btn-row"><button class="btn btn--gold btn--sm" type="submit">' . tt('hr.msg_send') . '</button></div></form></div>';
     return $h;
 }
 

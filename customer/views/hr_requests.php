@@ -10,6 +10,7 @@ $fh = fn($v) => $v === null ? '—' : rtrim(rtrim(number_format((float)$v, 2, '.
 $all = $isHr ? hr_requests_for('hr', $year) : hr_requests_for('manager', $year); if ($pp) $all = array_values(array_filter($all, fn($r) => (int)$r['person_id'] === $pid));
 $open = array_filter($st === 'open' && !$pp ? ($isHr ? hr_requests_for('hr', 0) : hr_requests_for('manager', 0)) : $all, fn($r) => in_array($r['status'], ['pending_mgr', 'pending_hr'], true));   // R77-018: open requests of every year — a request for next January must not vanish behind the year filter
 $rows = $st === 'open' ? $open : ($st === 'all' ? $all : array_filter($all, fn($r) => $r['status'] === $st));
+require_once __DIR__ . '/_hr_corr.php'; $corrTypes = $isHr ? hr_types() : [];
 $canFor = $isHr || hr_over_can(); $people = $canFor ? hr_people() : [];   // R97-235: the General Manager too registers a leave for an employee
 layout_head(t('hr.requests'), 'hr_requests');
 ?>
@@ -42,7 +43,7 @@ layout_head(t('hr.requests'), 'hr_requests');
         <?php if (function_exists('hr_req_has_reasons') && hr_req_has_reasons()): $tk = hr_type((int)$r['type_id']) ?: ['kind' => 'leave']; ?><select name="reason_code" data-nosearch title="<?= tt('hr.reason') ?>" style="max-width:150px;"><option value=""><?= tt('hr.reason_keep') ?></option><?php foreach (hr_reasons_for($tk) as $c): ?><option value="<?= e($c) ?>"<?= ($r['reason_code'] ?? '') === $c ? ' selected' : '' ?>><?= e(hr_reason_label($c)) ?></option><?php endforeach; ?></select><input name="reason" maxlength="300" value="<?= e((string)($r['reason'] ?? '')) ?>" placeholder="<?= tt('hr.reason_text_ph') ?>" style="width:130px;"><?php endif; ?>
         <input name="note" maxlength="300" placeholder="<?= tt('hr.note_ph') ?>" style="width:150px;"><?php if ($isHr && $r['status'] === 'pending_hr'): ?><input name="efka" maxlength="120" placeholder="<?= tt('hr.efka_ph') ?>" style="width:120px;"><?php endif; ?>
         <button class="btn btn--gold btn--sm" type="submit" name="decision" value="approve">✔ <?= tt('hr.approve') ?></button><button class="btn btn--ghost btn--sm" type="submit" name="decision" value="reject" data-js-confirm="<?= tt('hr.reject_confirm') ?>">✖ <?= tt('hr.reject') ?></button></form>
-      <?php else: ?><span class="hint"><?= $r['manager_at'] ? e($r['manager_name'] ?? '') . ' ' . e(fmt_date($r['manager_at'])) . ($r['manager_note'] ? ' — ' . e($r['manager_note']) : '') . '<br>' : '' ?><?= $r['hr_at'] ? 'HR ' . e($r['hr_name'] ?? '') . ' ' . e(fmt_date($r['hr_at'])) . ($r['hr_note'] ? ' — ' . e($r['hr_note']) : '') : '' ?></span><?php endif; ?></td></tr>
+      <?php else: ?><span class="hint"><?= $r['manager_at'] ? e($r['manager_name'] ?? '') . ' ' . e(fmt_date($r['manager_at'])) . ($r['manager_note'] ? ' — ' . e($r['manager_note']) : '') . '<br>' : '' ?><?= $r['hr_at'] ? 'HR ' . e($r['hr_name'] ?? '') . ' ' . e(fmt_date($r['hr_at'])) . ($r['hr_note'] ? ' — ' . e($r['hr_note']) : '') : '' ?></span><?php endif; ?><?= hr_corr_mark($r) ?><?php if ($isHr) hr_corr_form($r, $corrTypes, true, 'hr', ['year' => $year, 'st' => $st]); ?></td></tr>
   <?php endforeach; ?>
   </tbody></table></div>
   <?php endif; ?>
@@ -51,7 +52,7 @@ layout_head(t('hr.requests'), 'hr_requests');
 <?php if ($canFor): ?>
 <div class="card" id="req-new">
   <h2>+ <?= tt('hr.new_request_for') ?></h2>
-  <p class="hint"><?= tt('hr.new_request_for_hint') ?></p>
+  <p class="hint"><?= tt('hr.new_request_for_hint') ?><?= $isHr ? ' ' . tt('hr.by_hr_hint') : '' ?></p>
   <form method="post" action="<?= url('hr_requests', ['year' => $year]) ?>" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hr_req_new">
     <div class="grid grid-3">
       <div class="field"><label><?= tt('ll.who') ?></label><select name="person_id" required><option value=""></option><?php foreach ($people as $p): ?><option value="<?= (int)$p['id'] ?>"><?= e($p['name_en']) ?><?= $p['user_id'] ? '' : ' (' . t('hr.no_account') . ')' ?></option><?php endforeach; ?></select></div>

@@ -13,7 +13,7 @@ function hr2_has(): bool { static $h = null; if ($h === null) { try { $h = hr_ha
 /** Employee scope: a staff role with scope "employee" sees My leave and the account only. */
 function emp_only(): bool { static $v = null; if ($v !== null) return $v; $u = current_user(); if (!$u || !is_staff() || is_cp_admin() || empty($u['staff_role_id'])) return $v = false; try { return $v = (string) scalar('SELECT scope FROM staff_roles WHERE id = ?', [(int)$u['staff_role_id']]) === 'employee'; } catch (Throwable $e) { return $v = false; } }
 const EMP_PAGES = ['wellness', 'inout', 'process_flow', 'my_equipment', 'my_jd', 'isms_report', 'qhse_lib', 'hr_test_take', 'hr_test_result', 'community', 'socphoto', 'my_leave', 'hr_doc', 'planning', 'hr_pdoc', 'account', 'manual', 'notifications', 'nf_open', 'kb', 'kb_q', 'kbfile', 'avatar', 'logout', 'login', 'twofa', 'ping', 'relock', '404', 'hra', 'hra_flow', 'hra_doc'];
-const EMP_ACTIONS = ['wl_save', 'wl_set', 'wl_mood', 'io_consent', 'io_punch', 'io_decide', 'io_decide_all', 'io_ot_decide', 'hre_accept', 'hre_dispute', 'hre_handover', 'jd_ack', 'ism_report', 'hrs_answer', 'hra_start', 'hra_consent', 'hra_step', 'hra_doc', 'hra_doc_del', 'hra_assist', 'hra_submit', 'hra_withdraw', 'soc_wish', 'soc_kudos', 'soc_post', 'soc_post_edit', 'soc_post_delete', 'soc_react', 'soc_comment', 'soc_vote', 'soc_onboard_tick', 'hr_req_new', 'hr_req_cancel', 'hr_period_join', 'hr_tr_apply', 'hr_ev_ack', 'hr_tg_progress', 'hr_msg_send', 'account_save', 'account_revoke', 'twofa_begin', 'twofa_confirm', 'twofa_off', 'theme_save', 'avatar_save', 'avatar_remove', 'logout', 'nf_seen', 'nf_seen_all', 'kb_ask', 'kb_answer', 'flt_reset', 'hr_req_reason', 'hr_req_doc'];
+const EMP_ACTIONS = ['hr_req_correct', /* R97-245 */ 'wl_save', 'wl_set', 'wl_mood', 'io_consent', 'io_punch', 'io_decide', 'io_decide_all', 'io_ot_decide', 'hre_accept', 'hre_dispute', 'hre_handover', 'jd_ack', 'ism_report', 'hrs_answer', 'hra_start', 'hra_consent', 'hra_step', 'hra_doc', 'hra_doc_del', 'hra_assist', 'hra_submit', 'hra_withdraw', 'soc_wish', 'soc_kudos', 'soc_post', 'soc_post_edit', 'soc_post_delete', 'soc_react', 'soc_comment', 'soc_vote', 'soc_onboard_tick', 'hr_req_new', 'hr_req_cancel', 'hr_period_join', 'hr_tr_apply', 'hr_ev_ack', 'hr_tg_progress', 'hr_msg_send', 'account_save', 'account_revoke', 'twofa_begin', 'twofa_confirm', 'twofa_off', 'theme_save', 'avatar_save', 'avatar_remove', 'logout', 'nf_seen', 'nf_seen_all', 'kb_ask', 'kb_answer', 'flt_reset', 'hr_req_reason', 'hr_req_doc'];
 function emp_gate(string $page): void { if (emp_only() && !in_array($page, EMP_PAGES, true)) { flash('warn', t('hr.emp_only')); redirect('my_leave'); } }
 
 /* ------------------------------------------------------------ registry */
@@ -277,15 +277,17 @@ function hr_request_create_from_post(?array $forPerson = null): int {
     $docDue = $medical && !$doc ? hr_doc_due($p, $from) : null;
     $mgr = $t['hr_only'] && !(function_exists('hr_is_contractor') && hr_is_contractor($p)) ? null : hr_manager_of($p); $status = $mgr ? 'pending_mgr' : 'pending_hr';
     $auto = !empty($t['no_approval']); if ($auto) { $status = 'approved'; $mgr = hr_manager_of($p) ?: null; }   // R97-235: a type registered without approval (strike) — final at once; the manager is kept only to be informed
+    $byHr = $forPerson && hr_can() && (int)($p['user_id'] ?? 0) !== (int)$u['id'];   // R97-245: what HR enters for an employee (illness, strike … not entered by the person) is final at once and the employee is told
     q('INSERT INTO hr_requests (person_id, user_id, type_id, date_from, date_to, time_from, time_to, hours, days, reason, doc_name, doc_path, doc_sha, status, manager_user_id, created_by) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       [(int)$p['id'], (int)($p['user_id'] ?? 0) ?: null, (int)$t['id'], $from, $to, $tf, $tt, $hours, $days, $reason, $doc['name'] ?? null, $doc['path'] ?? null, $doc['sha'] ?? null, $status, $mgr, (int)$u['id']]);
     $id = (int) db()->lastInsertId();
     if (hr_req_has_reasons()) q('UPDATE hr_requests SET reason_code = ?, doc_due = ? WHERE id = ?', [$rcode, $docDue, $id]);
-    if ($auto) { q('UPDATE hr_requests SET hr_at = NOW(), hr_note = ? WHERE id = ?', [t('hr.auto_note'), $id]); hr_request_to_board($id); hr_notify($id, 'registered'); return $id; }
+    if ($auto) { q('UPDATE hr_requests SET hr_at = NOW(), hr_note = ? WHERE id = ?', [$byHr ? mb_substr(t('hr.by_hr_note', ['who' => (string)$u['full_name']]), 0, 300) : t('hr.auto_note'), $id]); if ($byHr) q('UPDATE hr_requests SET hr_user_id = ? WHERE id = ?', [(int)$u['id'], $id]); hr_request_to_board($id); hr_notify($id, 'registered'); if ($byHr) hr_notify($id, 'by_hr'); return $id; }
     if ($over) {   // registered and approved in one step by HR / General Manager / CEO; the note says by whom and by how much the balance is exceeded
         $n = rtrim(rtrim(number_format($excess, 2, '.', ''), '0'), '.'); $note = $excess > 0 ? t('hr.over_note', ['n' => $n, 'u' => $t['unit'] === 'hour' && !$t['consumes_annual'] ? 'h' : mb_strtolower(t('hr.days')), 'who' => (string)$u['full_name']]) : t('hr.over_note_ok', ['who' => (string)$u['full_name']]);
         q("UPDATE hr_requests SET status = 'approved', hr_user_id = ?, hr_at = NOW(), hr_note = ? WHERE id = ?", [(int)$u['id'], mb_substr($note, 0, 300), $id]); hr_request_to_board($id); hr_notify($id, 'approved'); hr_notify($id, 'registered'); return $id;
     }   // R97-235: on the board at once; manager and HR are informed, nobody decides
+    if ($byHr) { q("UPDATE hr_requests SET status = 'approved', manager_user_id = ?, hr_user_id = ?, hr_at = NOW(), hr_note = ? WHERE id = ?", [hr_manager_of($p) ?: null, (int)$u['id'], mb_substr(t('hr.by_hr_note', ['who' => (string)$u['full_name']]), 0, 300), $id]); hr_request_to_board($id); hr_notify($id, 'by_hr'); hr_notify($id, 'registered'); return $id; }
     hr_notify($id, 'new'); return $id;
 }
 function hr_annual_type_id(): ?int { foreach (hr_types() as $id => $t) if ($t['rule_key'] === 'annual') return $id; return null; }
@@ -335,6 +337,64 @@ function hr_request_cancel(int $id): void {
     $self = $r['status'] === 'approved' && !empty(hr_type((int)$r['type_id'])['no_approval']) && (string)$r['date_from'] >= date('Y-m-d');   // R97-235: what the employee registered alone, the employee may take back until the day it starts
     if ($r['status'] === 'approved' && !hr_can() && !$self) throw new RuntimeException(t('hr.req_closed'));
     q("UPDATE hr_requests SET status = 'cancelled' WHERE id = ?", [$id]); q('DELETE FROM plan_entries WHERE request_id = ?', [$id]);
+    if ((int)$r['user_id'] !== (int)$u['id']) { if (function_exists('hr_audit')) hr_audit((int)$r['person_id'], 'request', 'cancelled', hr_request_text($r), null, mb_substr(trim((string)($_POST['note'] ?? '')), 0, 300) ?: null); hr_notify($id, 'cancelled', mb_substr(trim((string)($_POST['note'] ?? '')), 0, 200) ?: null); }   // R97-245: HR took the entry off — the employee is told
+}
+/* ---------------------------------------------------------------- R97-245: a leave entry made by mistake is corrected (HR any open or approved entry; the employee the own entry while it can still change) */
+function hr_corr_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM hr_requests LIKE 'corrected_at'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function hr_request_can_correct(array $r): bool {
+    $u = current_user(); if (!$u || in_array($r['status'], ['cancelled', 'rejected'], true)) return false; if (hr_can()) return true;
+    if ((int)$r['user_id'] !== (int)$u['id'] || !empty($r['period_id'])) return false;
+    if (in_array($r['status'], ['pending_mgr', 'pending_hr'], true)) return true;
+    return $r['status'] === 'approved' && !empty(hr_type((int)$r['type_id'])['no_approval']) && (string)$r['date_from'] >= date('Y-m-d');   // as for taking it back (R97-235)
+}
+/** "ANN 01 Dec 2026 – 05 Dec 2026 · 3 d" — the entry in one line, for the log and the notices. */
+function hr_request_text(array $r): string {
+    $t = hr_type((int)$r['type_id']); $f = fn($v) => rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.');
+    return ($t['code'] ?? '') . ' ' . fmt_date($r['date_from']) . ($r['date_to'] !== $r['date_from'] ? ' – ' . fmt_date($r['date_to']) : '') . ' · ' . ($t && $t['unit'] === 'hour' ? $f($r['hours']) . ' h' : $f($r['days']) . ' ' . mb_strtolower(t('hr.days')));
+}
+/** POST type_id, date_from, date_to, hours, reason, note, over_balance. Same rules as a new entry; the entry itself does not count against its own balance or overlap. */
+function hr_request_correct_from_post(int $id): string {
+    $u = current_user(); $r = one('SELECT * FROM hr_requests WHERE id = ?', [$id]); if (!$u || !$r || !hr2_has()) throw new RuntimeException(t('err.notfound'));
+    if (!hr_request_can_correct($r)) throw new RuntimeException(t(in_array($r['status'], ['cancelled', 'rejected', 'approved'], true) ? 'hr.req_closed' : 'err.noaccess'));
+    $p = hr_person((int)$r['person_id']); if (!$p) throw new RuntimeException(t('hr.no_person')); $isHr = hr_can() && (int)$r['user_id'] !== (int)$u['id']; $t0 = hr_type((int)$r['type_id']);
+    $t = hr_type((int)($_POST['type_id'] ?? 0) ?: (int)$r['type_id']); if (!$t || (!$t['is_active'] && (int)$t['id'] !== (int)$r['type_id'])) throw new RuntimeException(t('err.notfound'));
+    if ((int)$t['id'] !== (int)$r['type_id'] && function_exists('hr_type_enabled') && !hr_type_enabled($p, $t)) throw new RuntimeException(t('hr.type_off', ['t' => $t['name']]));
+    $from = (string)($_POST['date_from'] ?? '') ?: (string)$r['date_from']; $to = (string)($_POST['date_to'] ?? '') ?: $from;
+    if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $from) || !preg_match('/^\d{4}-\d{2}-\d{2}$/', $to) || $to < $from || (strtotime($to) - strtotime($from)) > 370 * 86400) throw new RuntimeException(t('pl.bad_dates'));
+    $hours = null; $tf = null; $tt = null;
+    if ($t['unit'] === 'hour') {
+        $hours = round((float) str_replace(',', '.', (string)($_POST['hours'] ?? '') ?: (string)($r['hours'] ?? '0')), 2); if ($hours <= 0 || $hours > 12) throw new RuntimeException(t('hr.need_hours'));
+        $tf = preg_match('/^\d{2}:\d{2}$/', (string)($_POST['time_from'] ?? '')) ? $_POST['time_from'] . ':00' : ($t0 && $t0['unit'] === 'hour' ? $r['time_from'] : null); $tt = preg_match('/^\d{2}:\d{2}$/', (string)($_POST['time_to'] ?? '')) ? $_POST['time_to'] . ':00' : ($t0 && $t0['unit'] === 'hour' ? $r['time_to'] : null);
+        $to = $from; $days = $t['consumes_annual'] ? round($hours / HR_HOURS_PER_DAY, 2) : 0.0;
+    } else { $days = (float) hr_working_days($p, $from, $to); if ($days <= 0) throw new RuntimeException(t('hr.no_workdays')); }
+    $live = in_array($r['status'], ['pending_mgr', 'pending_hr', 'approved'], true) && (!isset($r['counted']) || (int)$r['counted'] === 1);
+    $over = $isHr && !empty($_POST['over_balance']) && hr_over_can(); $year = (int) substr($from, 0, 4);
+    $chkOf = fn(array $x) => $x['unit'] === 'hour' && $x['consumes_annual'] ? (int)hr_annual_type_id() : (int)$x['id']; $chk = $chkOf($t);
+    $needOf = fn(array $x, $h, $d) => $x['unit'] === 'hour' && !$x['consumes_annual'] ? (float)$h : (float)$d; $need = $needOf($t, $hours, $days);
+    if ($chk && (!isset($r['counted']) || (int)$r['counted'] === 1)) { $b = hr_balance($p, $chk, $year);
+        $credit = $live && $t0 && $chkOf($t0) === $chk && (int) substr((string)$r['date_from'], 0, 4) === $year ? $needOf($t0, $r['hours'], $r['days']) : 0.0;   // what the entry holds now is free again
+        if ($b['available'] !== null && $need > $b['available'] + $credit + 0.001 && !$over) throw new RuntimeException(t('hr.not_enough', ['t' => hr_type($chk)['name'], 'a' => rtrim(rtrim(number_format($b['available'] + $credit, 2, '.', ''), '0'), '.'), 'u' => $b['unit'] === 'hour' ? 'h' : t('hr.days')]) . ($isHr ? '' : ' ' . t('hr.not_enough_ask'))); }
+    if (scalar("SELECT COUNT(*) FROM hr_requests WHERE person_id = ? AND id <> ? AND status IN ('pending_mgr','pending_hr','approved') AND date_from <= ? AND date_to >= ? AND type_id = ?", [(int)$r['person_id'], $id, $to, $from, (int)$t['id']])) throw new RuntimeException(t('hr.overlap'));
+    // reason: kept when it still fits the type; the text may be rewritten
+    $rcode = $r['reason_code'] ?? null; $reason = array_key_exists('reason', $_POST) ? (mb_substr(trim((string)$_POST['reason']), 0, 300) ?: null) : $r['reason'];
+    if (hr_req_has_reasons()) { $ok = hr_reasons_for($t); $pc = trim((string)($_POST['reason_code'] ?? '')); if ($pc !== '' && in_array($pc, $ok, true)) $rcode = $pc; elseif (!in_array((string)$rcode, $ok, true)) $rcode = count($ok) === 1 ? $ok[0] : (in_array('other', $ok, true) ? 'other' : $ok[0]); }
+    $same = (int)$t['id'] === (int)$r['type_id'] && $from === (string)$r['date_from'] && $to === (string)$r['date_to'] && abs((float)$hours - (float)$r['hours']) < 0.001 && (string)$reason === (string)$r['reason'] && (string)$rcode === (string)($r['reason_code'] ?? '');
+    if ($same) throw new RuntimeException(t('hr.corr_same'));
+    $was = hr_request_text($r); $status = (string)$r['status']; $mgr = $r['manager_user_id'] ? (int)$r['manager_user_id'] : null; $reset = false;
+    if (!$isHr) {   // the employee changed it: what needs approval is decided again from the start
+        if (!empty($t['no_approval'])) { $status = 'approved'; $mgr = hr_manager_of($p) ?: null; }
+        else { $mgr = $t['hr_only'] && !(function_exists('hr_is_contractor') && hr_is_contractor($p)) ? null : hr_manager_of($p); $status = $mgr ? 'pending_mgr' : 'pending_hr'; $reset = true; }
+    }
+    q('UPDATE hr_requests SET type_id = ?, date_from = ?, date_to = ?, time_from = ?, time_to = ?, hours = ?, days = ?, reason = ?, status = ?, manager_user_id = ? WHERE id = ?', [(int)$t['id'], $from, $to, $tf, $tt, $hours, $days, $reason, $status, $mgr, $id]);
+    if ($reset) q('UPDATE hr_requests SET manager_at = NULL, manager_note = NULL, hr_user_id = NULL, hr_at = NULL, hr_note = NULL WHERE id = ?', [$id]);
+    if (hr_req_has_reasons()) { $med = hr_reason_medical($t, $rcode); q('UPDATE hr_requests SET reason_code = ?, doc_due = ? WHERE id = ?', [$rcode, $med && empty($r['doc_path']) ? hr_doc_due($p, $from) : null, $id]); }
+    $note = mb_substr(trim((string)($_POST['note'] ?? '')), 0, 200) ?: null;
+    if (hr_corr_has()) q('UPDATE hr_requests SET corrected_at = NOW(), corrected_by = ?, corrected_was = ? WHERE id = ?', [(int)$u['id'], mb_substr($was . ($note ? ' — ' . $note : ''), 0, 300), $id]);
+    if ($status === 'approved') hr_request_to_board($id); else q('DELETE FROM plan_entries WHERE request_id = ?', [$id]);
+    $now = hr_request_text(one('SELECT * FROM hr_requests WHERE id = ?', [$id]));
+    if (function_exists('hr_audit')) hr_audit((int)$r['person_id'], 'request', 'corrected', $was, $now, $note);
+    if ($isHr) hr_notify($id, 'corrected', t('hr.corr_was', ['w' => $was]) . ($note ? ' — ' . $note : '')); else hr_notify($id, 'changed', t('hr.corr_was', ['w' => $was]));
+    return $now;
 }
 /** Approved request → board entries (absence kind of the type, one per working day; hour types one entry with hours). */
 function hr_request_to_board(int $id): void {
@@ -346,16 +406,16 @@ function hr_request_to_board(int $id): void {
         q('INSERT INTO plan_entries (user_id, plan_date, kind, note, created_by, leave_type_id, reason, hours, request_id) VALUES (?,?,?,?,?,?,?,?,?)', [$uid, $date, $t['kind'], $t['unit'] === 'hour' ? $t['code'] . ' ' . rtrim(rtrim(number_format((float)$r['hours'], 2, '.', ''), '0'), '.') . ' h' : null, $me ?: null, (int)$t['id'], $r['reason'], $t['unit'] === 'hour' ? (float)$r['hours'] : null, $id]);
     }
 }
-function hr_notify(int $id, string $ev): void {
+function hr_notify(int $id, string $ev, ?string $body = null): void {
     if (!function_exists('nf_push')) return; $r = one('SELECT r.*, p.name_en, t.name AS type_name, t.code FROM hr_requests r JOIN hr_people p ON p.id = r.person_id JOIN hr_leave_types t ON t.id = r.type_id WHERE r.id = ?', [$id]); if (!$r) return;
     $me = (int)(current_user()['id'] ?? 0); $title = $r['name_en'] . ' · ' . $r['code'] . ' ' . fmt_date($r['date_from']) . ($r['date_to'] !== $r['date_from'] ? ' – ' . fmt_date($r['date_to']) : '') . ($r['hours'] ? ' · ' . $r['hours'] . ' h' : '');
     $to = []; $url = url('hr_requests');
-    if ($ev === 'new') { $to = $r['status'] === 'pending_mgr' ? [(int)$r['manager_user_id']] : hr_hr_user_ids(); }
+    if ($ev === 'new' || $ev === 'changed') { $to = $r['status'] === 'pending_mgr' ? [(int)$r['manager_user_id']] : ($r['status'] === 'approved' ? array_merge(hr_hr_user_ids(), [(int)$r['manager_user_id']]) : hr_hr_user_ids()); }   // R97-245: changed by the employee
     elseif ($ev === 'mgr_ok' || $ev === 'doc') { $to = hr_hr_user_ids(); }
     elseif ($ev === 'registered') { $to = array_merge(hr_hr_user_ids(), [(int)$r['manager_user_id']]); }   // R97-235: for information
     else { $to = [(int)$r['user_id']]; $url = url('my_leave'); }
     $to = array_values(array_filter(array_unique(array_map('intval', $to)), fn($i) => $i && $i !== $me)); if (!$to) return;
-    nf_push($to, 'hrq:' . $ev, 'hrq:' . $id, t('hr.nf_' . $ev) . ' — ' . $title, $r['reason'] ?: null, $url, $me ?: null, current_user()['full_name'] ?? null);
+    nf_push($to, 'hrq:' . $ev, 'hrq:' . $id . (in_array($ev, ['corrected', 'changed'], true) ? ':' . date('His') : ''), t('hr.nf_' . $ev) . ' — ' . $title, $body ?? ($r['reason'] ?: null), $url, $me ?: null, current_user()['full_name'] ?? null);
 }
 /** Requests a user may see: own, as manager (pending_mgr for them), as HR (all). */
 function hr_requests_for(string $scope, int $year = 0): array {

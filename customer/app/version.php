@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.249.0';
+const CP_VERSION = '1.250.0';
 const CP_BUILD   = '2026-11-24';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-245', 'version' => '1.250.0', 'date' => '2026-11-25', 'title' => 'Leave: a mistaken entry is corrected by HR or, while it can still change, by the employee; what HR enters for an employee (illness, strike) is final at once and the employee is notified; HR messages in one list with the ones to answer first', 'db' => 'install/migrate_cp_r97_245_leave_correction_hr_messages_pool.sql', 'check' => 'r99s'],
         ['ref' => 'GAS-CP-R97-244', 'version' => '1.249.0', 'date' => '2026-11-25', 'title' => 'Purchase order: management and portal administrators can delete an order together with its goods receipts, supplier invoices and payments; a line whose code already exists is linked to that item; item codes may hold a comma', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-243', 'version' => '1.248.3', 'date' => '2026-11-25', 'title' => 'Language: opening a notification (or any link made by a colleague who uses another language) no longer changes your language — only the language selector does; notification links are stored without a language', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-242', 'version' => '1.248.2', 'date' => '2026-11-25', 'title' => 'In / Out › Who is in: filters — no entry, in now, left, absent, arrived late — and by name; the figures above the list are links to the same filters', 'db' => null, 'check' => null],
@@ -699,6 +700,7 @@ function cp_migration_state(): array {
         'r99p' => $has("SHOW COLUMNS FROM si_requests LIKE 'priority'"),   // R97-238
         'r99q' => $has("SHOW COLUMNS FROM pr_requests LIKE 'priority'"),   // R97-239
         'r99r' => $has("SHOW COLUMNS FROM offer_events WHERE Field = 'note' AND Type LIKE '%text%'"),   // R97-240
+        'r99s' => $has("SHOW COLUMNS FROM hr_requests LIKE 'corrected_at'") && $has("SHOW COLUMNS FROM hr_messages LIKE 'done_at'"),   // R97-245
         'r99k' => $has("SHOW COLUMNS FROM nl_issues LIKE 'tr'") && $has("SHOW COLUMNS FROM nl_sends LIKE 'lang'") && $has("SHOW COLUMNS FROM contacts LIKE 'nl_lang'"),   // R97-203
         'r99j' => $has("SHOW TABLES LIKE 'soc_post_tr'") && $has("SHOW COLUMNS FROM soc_posts LIKE 'lang'"),   // R97-201
         'r99i' => $has("SHOW TABLES LIKE 'wl_prefs'") && $has("SHOW TABLES LIKE 'wl_mood_seen'"),   // R97-194

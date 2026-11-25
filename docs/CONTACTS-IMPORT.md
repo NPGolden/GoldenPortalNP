@@ -4559,3 +4559,21 @@ Each option shows its count. **Name…** narrows by part of a name. The five fig
 Language: 25 new keys, `stk.bad_code` reworded.
 
 **HR role, recruiting buttons** — `HR_ACTIONS` (`app/auth.php`) lacked `rcr_interview_update`, `rcr_interview_send`, `rcr_offer_save`, `rcr_offer_send`, `rcr_offer_outcome` (added with R97-229/231 to the page but not to the list), so a person with the HR role alone was refused on pressing them. Added; `php tools/check-scopes.php` is clean again for HR and Employee and is part of every release.
+
+## §524 Leave entries corrected · entries by HR final at once · HR message pool (GAS-CP-R97-245, v1.250.0)
+
+Migration `install/migrate_cp_r97_245_leave_correction_hr_messages_pool.sql` (key r99s): `hr_requests.corrected_at / corrected_by / corrected_was`, `hr_messages.done_at`.
+
+**Correction** — `hr_request_correct_from_post($id)` (`app/hr2.php`), action `hr_req_correct`, form `views/_hr_corr.php` (in HR requests and My leave).
+
+- Who: `hr_request_can_correct($r)` — HR any entry that is not cancelled or rejected; the employee the own entry while pending, or an own no-approval entry (strike) until the day it starts; not an entry of a leave period.
+- Same rules as a new entry (type on for the person, working days, hours, overlap, balance). The entry does not count against itself: what it holds is added to the available figure (`$credit`), the overlap check leaves it out.
+- By HR the status stays (approved → the board entries are rewritten). By the employee an entry that needs approval starts again (`pending_mgr` / `pending_hr`, earlier decisions cleared).
+- Trace: `corrected_*` on the entry (shown under the decision), `hr_audit` kind `request` field `corrected` (before → after, note), notices `hrq:corrected` (to the employee, body = what it was) and `hrq:changed` (to the approver).
+- `hr_request_cancel` by HR now tells the employee (`hrq:cancelled`) and is logged; HR has the button «Take the entry off» in the same fold.
+
+**Entry by HR** — `hr_request_create_from_post($forPerson)`: `$byHr` (HR, not the own card) → `approved`, `hr_user_id`, note `hr.by_hr_note`, board, notices `hrq:by_hr` (employee) and `hrq:registered` (manager). Above the balance still needs `over_balance`.
+
+**Message pool** — page `hr_messages` (HR only; in `HR_PAGES`, menu group HR): `hr_message_threads()` one row per person (unread, `wait` = the last open employee message is newer than the last HR message), `hr_message_done($pid)` (action `hr_msg_done`), `hr_messages_card($pid, true, 'pool')` returns to the pool after sending. The notice of a new employee message links to `p=hr_messages&pid=…`; the menu badge moved from HR settings to HR messages and counts what waits.
+
+Language: 37 new keys, `hr.new_request_for_hint` reworded.
