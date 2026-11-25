@@ -4,7 +4,7 @@ declare(strict_types=1);
 function e(?string $s): string { return htmlspecialchars((string)$s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); }
 
 function url(string $page, array $params = []): string {
-    $params = array_merge(['p' => $page], $params);
+    $params = array_merge(['p' => $page], $params); unset($params['setlang']);
     if (locale() !== DEFAULT_LOCALE && !isset($params['lang'])) $params['lang'] = locale();
     return 'index.php?' . http_build_query($params);
 }

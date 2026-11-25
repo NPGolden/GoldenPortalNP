@@ -4528,3 +4528,15 @@ No database step. Language keys +3 (13 509 per language). Next ref GAS-CP-R97-23
 
 Each option shows its count. **Name…** narrows by part of a name. The five figures above the list are links: one click filters, a second click on the same figure shows everybody again. «Clear» removes filters; «n of m shown» says how many are listed. The figures always count the whole day, not the filtered list. The link can be bookmarked (e.g. today's «no entry»).
 
+## §522 Language changed by itself when opening a notification (GAS-CP-R97-243, v1.248.3)
+
+**Fault:** the portal switched language «sometimes» after a click on a notification.
+
+**Cause:** every link the portal builds for a person who works in a language other than English ends with `lang=<their language>`. A notification stores the link made by its **sender**. When the receiver opened it, the portal read `lang=` from the address, switched to that language and saved it on the receiver's profile. It happened only with notifications raised by colleagues using another language — hence «sometimes». Links in messages and e-mails behaved the same.
+
+**Fix, two layers:**
+1. For a signed-in person the address changes the language only when the request comes from the language selector (🌐). A `lang=` carried by a link is ignored. After a choice the page reloads without it in the address, so a copied address cannot pass it on. Before sign-in (login page, public pages) the address still sets the language.
+2. Notification links are stored without `lang=`.
+
+**For people already affected:** choose your language once in the selector; it is saved on the profile.
+

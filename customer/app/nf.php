@@ -162,10 +162,13 @@ function nf_user_name(?int $uid): ?string {
 /* -------------------------------------------------------------- push */
 
 /** One notification per recipient, never to the actor; replaces an unread one on the same object. */
+/** A portal link without the language of the person who built it (lang= / setlang=). */
+function nf_url_clean(string $url): string { $u = $url; for ($i = 0; $i < 4; $i++) $u = (string) preg_replace('/([?&])(?:set)?lang=[^&#]*(?:&|(?=#)|$)/', '$1', $u); return (string) preg_replace('/[?&](?=#|$)/', '', $u); }
 function nf_push(array $userIds, string $kind, string $refKey, string $title, ?string $body, string $url, ?int $actorId, ?string $actorName, ?string $at = null): int {
     $grp = NF_GROUP_OF[explode(':', $kind, 2)[0]] ?? 'work';
     $title = mb_substr(trim($title), 0, 200); $body = $body !== null ? (mb_substr(trim(preg_replace('/\s+/u', ' ', $body)), 0, 400) ?: null) : null;
     $at = $at ?: date('Y-m-d H:i:s'); $n = 0;
+    $url = nf_url_clean($url);   // R97-243: the link is read by other people — it must not carry the language of the sender
     foreach ($userIds as $uid) {
         $uid = (int)$uid;
         if (!$uid || ($actorId && $uid === (int)$actorId)) continue;

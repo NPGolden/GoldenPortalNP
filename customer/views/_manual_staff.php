@@ -5,6 +5,7 @@ return [
   'lede'  => 'Your own corner of the portal: your leave balance and requests, the leave periods you can join, your program on the Planning board, the trainings you can apply for and your certificates, your annual evaluation, your messages with HR, and the Community — wishes, kudos, the noticeboard and badges. Short, with the steps to follow.',
   'sections' => [
     ['id' => 'start', 'title' => 'Getting in and getting around', 'body' => [
+      'Language no longer changes when you open a notification (v1.248.3): links made by a colleague who works in another language carried that language, and opening one — from the bell, a message or an e-mail — switched your portal to it and saved it on your profile. Now, while you are signed in, the language changes only when you choose it in the 🌐 selector. If your language was changed this way, choose yours once in the selector; it is saved and stays.',
       'Requisition — priority (v1.247.0): choose the priority (Urgent, High, Normal, Low) when you create a requisition; Procurement sees urgent ones first.',
       'Payables — payment request (v1.246.0): choose the priority (Urgent, High, Normal, Low) before «Request payment»; without it the request is not made. Link each invoice to its project or purchase order first, so that the approvers see the vessel and the project.',
       'Leave — not enough days (v1.245.0): if the portal answers that you do not have enough days and the leave is needed anyway, ask HR, the General Manager or the CEO: they can register it for you directly.',

@@ -29,13 +29,19 @@ function locale(?string $set = null): string {
     return $cur;
 }
 
+/** R97-243: every link the portal builds carries the language of the person who made it (url() adds lang=…). Stored in a notification, a message or an e-mail,
+ *  such a link used to switch — and save — the language of whoever clicked it. For a signed-in person the address now changes the language only when it
+ *  comes from the language selector (setlang=1); before sign-in (login page, public pages) a lang in the address works as before. */
 function i18n_boot(): void {
-    if (!empty($_GET['lang']) && locale_valid((string)$_GET['lang'])) {
+    $byChoice = empty($_SESSION['cu_id']) || !empty($_GET['setlang']);
+    if ($byChoice && !empty($_GET['lang']) && locale_valid((string)$_GET['lang'])) {
         $_SESSION['locale'] = (string)$_GET['lang'];
         if (!empty($_SESSION['cu_id'])) {
             try { q('UPDATE customer_users SET locale = ? WHERE id = ?', [$_SESSION['locale'], $_SESSION['cu_id']]); }
             catch (Throwable $e) {}
         }
+        // the choice is saved: go on without lang / setlang in the address, so a copied or stored address never carries it to somebody else
+        if (!empty($_GET['setlang']) && ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'GET' && PHP_SAPI !== 'cli' && !headers_sent()) { $p = $_GET; unset($p['lang'], $p['setlang']); header('Location: ' . basename((string)($_SERVER['SCRIPT_NAME'] ?? 'index.php')) . ($p ? '?' . http_build_query($p) : '')); exit; }
     }
     if (!empty($_SESSION['locale']) && locale_valid($_SESSION['locale'])) { locale($_SESSION['locale']); return; }
     foreach (explode(',', (string)($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '')) as $part) {
@@ -58,7 +64,7 @@ function t_in(string $key, string $locale, array $vars = []): string {
 }
 
 function lang_switch_url(string $code): string {
-    $p = $_GET; $p['lang'] = $code;
+    $p = $_GET; $p['lang'] = $code; $p['setlang'] = 1;
     return 'index.php?' . http_build_query($p);
 }
 
@@ -66,7 +72,8 @@ function lang_switch_url(string $code): string {
  *  change, with a no-script "Go" button. $dark = on the navy top bar. */
 function lang_selector(bool $dark = true): string {
     $h = '<form method="get" action="index.php" class="langsel' . ($dark ? ' langsel--dark' : '') . '" aria-label="Language">';
-    foreach ($_GET as $k => $v) if ($k !== 'lang' && is_scalar($v)) $h .= '<input type="hidden" name="' . e((string)$k) . '" value="' . e((string)$v) . '">';
+    foreach ($_GET as $k => $v) if ($k !== 'lang' && $k !== 'setlang' && is_scalar($v)) $h .= '<input type="hidden" name="' . e((string)$k) . '" value="' . e((string)$v) . '">';
+    $h .= '<input type="hidden" name="setlang" value="1">';   // R97-243: this is a choice of the person, not a language carried by a link
     $h .= '<span class="langsel-ico" aria-hidden="true">🌐</span><select name="lang" class="js-langsel" title="' . e(LOCALES[locale()]['native']) . '">';
     foreach (LOCALES as $code => $meta) $h .= '<option value="' . e($code) . '"' . ($code === locale() ? ' selected' : '') . ' title="' . e($meta['native']) . '">' . e($dark ? $meta['short'] : $meta['native']) . '</option>';   // top bar: two-letter codes keep the button small (GAS-CP-R36-002)
     return $h . '</select><noscript><button type="submit" class="btn btn--sm">OK</button></noscript></form>';
