@@ -102,11 +102,13 @@ function stk_nv(array $i): bool { return !empty($i['no_valuation']); }
 function stk_item(int $id): ?array { return stk_has() && $id ? one(STK_SELECT . ' WHERE i.id = ?', [$id]) ?: null : null; }
 function stk_item_by_code(string $code): ?array { return stk_has() && $code !== '' ? one(STK_SELECT . ' WHERE i.code = ?', [$code]) ?: null : null; }
 function stk_makers(): array { return stk_has() ? array_column(all('SELECT DISTINCT maker FROM inv_items WHERE maker IS NOT NULL AND maker <> "" ORDER BY maker'), 'maker') : []; }
+/** What an inventory code may hold — letters, digits, space, dot, comma, dash, slash, plus, underscore (R97-244: the comma, for sizes such as 3X1,5). */
+const STK_CODE_RE = '/^[A-Za-z0-9][A-Za-z0-9 .,_\-\/+]*$/u';
 /** Create an inventory item from a procurement line (code · description · maker · maker part no · unit · category) — R86-002. */
 function stk_item_quick_create(array $d): int {
     require_pr_admin(); $code = mb_substr(trim((string)($d['code'] ?? '')), 0, 60); $desc = mb_substr(trim((string)($d['description'] ?? '')), 0, 255);
     if ($code === '' || $desc === '') throw new RuntimeException(t('stk.need_code_desc'));
-    if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._\-\/+]*$/u', $code)) throw new RuntimeException(t('stk.bad_code'));
+    if (!preg_match(STK_CODE_RE, $code)) throw new RuntimeException(t('stk.bad_code'));
     if ($dup = scalar('SELECT id FROM inv_items WHERE code = ?', [$code])) return (int)$dup;
     $u = current_user();
     q('INSERT INTO inv_items (code, description, category_id, unit, maker, factory_code, status, currency, preferred_supplier_id, created_by) VALUES (?,?,?,?,?,?,\'active\',\'EUR\',?,?)',
@@ -117,7 +119,7 @@ function stk_item_quick_create(array $d): int {
 function stk_item_save_from_post(int $id): int {
     require_pr_admin(); $s = fn(string $k, int $max) => ($v = trim((string)($_POST[$k] ?? ''))) === '' ? null : mb_substr($v, 0, $max);
     $code = $s('code', 60); $desc = $s('description', 255); if (!$code || !$desc) throw new RuntimeException(t('stk.need_code_desc'));
-    if (!preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._\-\/+]*$/u', $code)) throw new RuntimeException(t('stk.bad_code'));
+    if (!preg_match(STK_CODE_RE, $code)) throw new RuntimeException(t('stk.bad_code'));
     $dup = scalar('SELECT id FROM inv_items WHERE code = ? AND id <> ?', [$code, $id]); if ($dup) throw new RuntimeException(t('stk.code_dup', ['c' => $code]));
     $cat = (int)($_POST['category_id'] ?? 0) ?: null; if (($nc = $s('new_category', 120)) !== null) $cat = stk_category_find($nc, true);
     $unit = stk_unit_norm((string)($_POST['unit'] ?? 'pcs')); $pack = ($_POST['pack_qty'] ?? '') !== '' ? (float)$_POST['pack_qty'] : null; $min = max(0.0, (float)($_POST['min_stock'] ?? 0));
@@ -615,7 +617,7 @@ function stk_maker_prefixes(): array {
  *  else from the items most like this part number. Returns ['code', 'prefix', 'from' (maker|similar|''), 'pn', 'exists' (an item with that code is already there)]. */
 function stk_code_propose(array $r, ?array $sim = null): array {
     $pn = trim((string)($r['part_no'] ?? '')); $out = ['code' => '', 'prefix' => '', 'from' => '', 'pn' => $pn, 'exists' => false];
-    if ($pn === '' || !preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._\-\/+]*$/u', $pn)) return $out;
+    if ($pn === '' || !preg_match(STK_CODE_RE, $pn)) return $out;
     $mk = mb_strtolower(trim((string)($r['maker'] ?? ''))); $mp = stk_maker_prefixes(); $pre = $mk !== '' ? ($mp[$mk] ?? ($mp[(string) strtok($mk, ' ')] ?? '')) : ''; $from = $pre !== '' ? 'maker' : '';
     if ($pre === '') { foreach ($sim ?? stk_similar($r, 4) as $x) { if (!in_array($x['why'], ['same', 'code', 'part'], true) || $x['score'] < 70) continue; $pt = stk_pn_tail($x['code']); if ($pt) { $pre = $pt[0]; $from = 'similar'; break; } } }
     if ($pre === '') { $v = []; foreach ($sim ?? stk_similar($r, 4) as $x) { if ($x['score'] < 50) continue; $pt = stk_pn_tail($x['code']); if ($pt) $v[$pt[0]] = ($v[$pt[0]] ?? 0) + 1; } arsort($v); if ($v && (count($v) === 1 || reset($v) >= 2 * (array_values($v)[1] ?? 0))) { $pre = (string) array_key_first($v); $from = 'similar'; } }   // all the similar items carry one prefix
@@ -718,9 +720,14 @@ function line_new_item(string $kind, int $docId, int $lineId, string $code): int
     $code = trim($code); if ($code === '' && ($tc = trim((string)($l['typed_code'] ?? ''))) !== '' && !stk_item_by_code($tc)) $code = $tc;   // R97-126: the code of the imported file first
     if ($code === '') { $pc = stk_code_propose(['part_no' => (string)$l['part_no'], 'maker' => (string)$l['maker'], 'description' => (string)$l['description'], 'code' => '']); if ($pc['code'] === '') throw new RuntimeException(t('stk.newcode_none', ['pn' => $pc['pn'] !== '' ? $pc['pn'] : '…'])); $code = $pc['code']; }   // R97-111: prefix.<maker part number> — never the bare part number
     if ($code === '') throw new RuntimeException(t('stk.need_code_desc'));
-    if (stk_item_by_code($code)) throw new RuntimeException(t('stk.code_taken', ['c' => $code]));
-    $id = stk_item_quick_create(['code' => $code, 'description' => (string)$l['description'], 'maker' => (string)$l['maker'], 'part_no' => (string)$l['part_no'], 'unit' => (string)$l['unit'], 'supplier_id' => $kind === 'po' ? (int)($doc['supplier_id'] ?? 0) : 0]);
-    line_use_item($kind, $docId, $lineId, $id); return $id;
+    unset($GLOBALS['line_new_linked']);
+    if ($ex = stk_item_by_code($code)) {   // R97-244: the code is there already — the line takes that item instead of being refused
+        if (($ex['status'] ?? '') === 'blocked') throw new RuntimeException(t('stk.code_blocked', ['c' => (string)$ex['code'], 'd' => mb_substr((string)$ex['description'], 0, 80)]));
+        line_use_item($kind, $docId, $lineId, (int)$ex['id']); $GLOBALS['line_new_linked'] = mb_substr((string)$ex['description'], 0, 80); return (int)$ex['id'];
+    }
+    return (int) stk_tx(function () use ($kind, $docId, $lineId, $code, $l, $doc) {   // the item and its link are saved together — no item left behind without its line
+        $id = stk_item_quick_create(['code' => $code, 'description' => (string)$l['description'], 'maker' => (string)$l['maker'], 'part_no' => (string)$l['part_no'], 'unit' => (string)$l['unit'], 'supplier_id' => $kind === 'po' ? (int)($doc['supplier_id'] ?? 0) : 0]);
+        line_use_item($kind, $docId, $lineId, $id); return $id; });
 }
 /** The card under the lines: every free-text line with the similar inventory items (stock shown) and, for Procurement, "New inventory item". */
 function line_sim_card(string $kind, int $docId, string $self): string {

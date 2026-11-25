@@ -549,20 +549,21 @@ function po_sp_cost_sync(int $oid): void {
 /** May this person reverse the receipt? Procurement / management always; the person who booked it, on the day it was booked. */
 function po_receipt_can_reverse(array $r): bool { $u = current_user(); return po_admin() || (function_exists('pr_wh') && pr_wh() && (int)$r['user_id'] === (int)($u['id'] ?? 0) && substr((string)$r['created_at'], 0, 10) === date('Y-m-d')); }
 /** Why a receipt cannot be reversed, or null. */
-function po_receipt_reverse_block(array $o, array $r): ?string {
-    if (!in_array($o['status'], ['partial', 'received'], true)) return t('po.rev_status');
+function po_receipt_reverse_block(array $o, array $r, bool $purge = false): ?string {
+    if (!$purge && !in_array($o['status'], ['partial', 'received'], true)) return t('po.rev_status');
     foreach (all('SELECT DISTINCT d.dn_no, d.status FROM po_receipt_lines rl JOIN inv_delivery_notes d ON d.id = rl.dn_id WHERE rl.receipt_id = ?', [(int)$r['id']]) as $d) if ($d['status'] !== 'cancelled') return t('po.rev_dn', ['no' => $d['dn_no']]);
-    if (scalar("SELECT COUNT(*) FROM po_receipt_lines WHERE receipt_id = ? AND ncr_status = 'closed'", [(int)$r['id']])) return t('po.rev_ncr');
+    if (!$purge && scalar("SELECT COUNT(*) FROM po_receipt_lines WHERE receipt_id = ? AND ncr_status = 'closed'", [(int)$r['id']])) return t('po.rev_ncr');
     try { if (scalar('SELECT COUNT(*) FROM inv_licences WHERE receipt_id = ?', [(int)$r['id']])) return t('po.rev_lic'); } catch (Throwable $e) {}
     return null;
 }
 /** Takes a receipt back completely: the goods leave the stock again, what was kept for requisitions is given up, the order lines and the order return to what they were before the receipt, and the receipt is removed. The history of the order and the stock movements keep the trace. All or nothing. */
 function po_receipt_reverse(int $oid, int $rid, string $reason): string { return stk_tx(fn() => po_receipt_reverse_x($oid, $rid, $reason)); }
-function po_receipt_reverse_x(int $oid, int $rid, string $reason): string {
-    require_pr_wh(); $o = po_load($oid); $r = one('SELECT * FROM po_receipts WHERE id = ? AND order_id = ? FOR UPDATE', [$rid, $oid]);
-    if (!$o || !$r) throw new RuntimeException(t('err.notfound')); if (!po_receipt_can_reverse($r)) throw new RuntimeException(t('err.noaccess'));
+function po_receipt_reverse_x(int $oid, int $rid, string $reason, bool $purge = false): string {
+    if ($purge) { if (!po_purge_can()) throw new RuntimeException(t('err.noaccess')); } else require_pr_wh();   // R97-244: the purge of an order has its own right and takes back every receipt, whatever the state of the order
+    $o = po_load($oid); $r = one('SELECT * FROM po_receipts WHERE id = ? AND order_id = ? FOR UPDATE', [$rid, $oid]);
+    if (!$o || !$r) throw new RuntimeException(t('err.notfound')); if (!$purge && !po_receipt_can_reverse($r)) throw new RuntimeException(t('err.noaccess'));
     $reason = mb_substr(trim($reason), 0, 200); if (mb_strlen($reason) < 3) throw new RuntimeException(t('prq.need_reason'));
-    if ($b = po_receipt_reverse_block($o, $r)) throw new RuntimeException($b);
+    if ($b = po_receipt_reverse_block($o, $r, $purge)) throw new RuntimeException($b);
     $wh = (int)$r['warehouse_id']; $n = 0;
     foreach (all('SELECT rl.*, l.item_id, l.pr_line_id, l.seq, l.qty AS l_qty, l.qty_received AS l_recv, l.qty_accepted AS l_acc, l.qty_rejected AS l_rej, l.status AS l_status, i.code FROM po_receipt_lines rl JOIN po_lines l ON l.id = rl.po_line_id LEFT JOIN inv_items i ON i.id = l.item_id WHERE rl.receipt_id = ? ORDER BY l.seq FOR UPDATE', [$rid]) as $x) {
         $qr = (float)$x['qty_received']; $qa = (float)$x['qty_accepted']; $qj = (float)$x['qty_rejected']; $n++;
@@ -694,17 +695,95 @@ function po_delete_block(array $o): ?string {
 function po_delete(int $oid, string $reason): string {
     $o = po_load($oid); if (!$o) throw new RuntimeException(t('err.notfound')); $reason = trim($reason);
     if (($why = po_delete_block($o)) !== null) throw new RuntimeException($why); if ($reason === '') throw new RuntimeException(t('prq.need_reason'));
-    $raw = one('SELECT * FROM po_orders WHERE id = ?', [$oid]); $lines = all('SELECT * FROM po_lines WHERE order_id = ? ORDER BY id', [$oid]); $pdo = db(); $pdo->beginTransaction();
-    try {
-        procdel_record($o['kind'] === 'rfq' ? 'rfq' : 'po', ['no' => $o['po_no'], 'title' => $o['title'], 'party' => $o['supplier'] ?? null, 'project_ref' => trim((string)($o['project_code'] ?? '') . ' ' . (string)($o['sub_code'] ?? '')), 'status' => $o['status'], 'total' => $o['subtotal'], 'currency' => $o['currency'], 'row' => $raw], $lines, $reason);
-        try { q('DELETE qq FROM po_rfq_quotes qq JOIN po_lines l ON l.id = qq.po_line_id WHERE l.order_id = ?', [$oid]); q('DELETE FROM po_rfq_suppliers WHERE rfq_id = ?', [$oid]); } catch (Throwable $e) {}
-        try { q('DELETE FROM po_milestones WHERE order_id = ?', [$oid]); } catch (Throwable $e) {}
-        if (!empty($raw['cost_id'])) { try { q('DELETE FROM sp_costs WHERE id = ?', [(int)$raw['cost_id']]); } catch (Throwable $e) {} }
-        q('DELETE FROM po_lines WHERE order_id = ?', [$oid]); q('DELETE FROM po_events WHERE order_id = ?', [$oid]); q('DELETE FROM po_orders WHERE id = ?', [$oid]);
-        $pdo->commit();
-    } catch (Throwable $e) { $pdo->rollBack(); throw $e; }
+    $raw = one('SELECT * FROM po_orders WHERE id = ?', [$oid]); $lines = all('SELECT * FROM po_lines WHERE order_id = ? ORDER BY id', [$oid]);
+    stk_tx(fn() => po_delete_rows($o, $raw, $lines, $reason));
     cache_bump_later('inv'); cache_bump_later('eng'); if (function_exists('eng_rows_reset')) eng_rows_reset(); if (function_exists('proc_feed_later') && !empty($raw['subproject_id'])) proc_feed_later((int)$raw['subproject_id']);
     return (string)$o['po_no'];
+}
+/** The rows of one order go and one line stays in the list of deleted documents. No checks, no transaction of its own (po_delete, po_purge). */
+function po_delete_rows(array $o, array $raw, array $lines, string $reason, array $extra = []): void {
+    $oid = (int)$o['id']; if ($extra) $raw['_removed_with_it'] = $extra;
+    procdel_record($o['kind'] === 'rfq' ? 'rfq' : 'po', ['no' => $o['po_no'], 'title' => $o['title'], 'party' => $o['supplier'] ?? null, 'project_ref' => trim((string)($o['project_code'] ?? '') . ' ' . (string)($o['sub_code'] ?? '')), 'status' => $raw['status'] ?? $o['status'], 'total' => $o['subtotal'], 'currency' => $o['currency'], 'row' => $raw], $lines, $reason);
+    try { q('DELETE qq FROM po_rfq_quotes qq JOIN po_lines l ON l.id = qq.po_line_id WHERE l.order_id = ?', [$oid]); q('DELETE FROM po_rfq_suppliers WHERE rfq_id = ?', [$oid]); } catch (Throwable $e) {}
+    try { q('DELETE FROM po_milestones WHERE order_id = ?', [$oid]); } catch (Throwable $e) {}
+    if (!empty($raw['cost_id'])) { try { q('DELETE FROM sp_costs WHERE id = ?', [(int)$raw['cost_id']]); } catch (Throwable $e) {} }
+    q('DELETE FROM po_lines WHERE order_id = ?', [$oid]); q('DELETE FROM po_events WHERE order_id = ?', [$oid]); q('DELETE FROM po_orders WHERE id = ?', [$oid]);
+}
+
+/* ------------------------------------------------------------------ R97-244: an order deleted together with its goods receipts, supplier invoices and payments (management / portal administrator) */
+function po_purge_can(): bool { return procdel_has() && is_staff() && (is_cp_admin() || (function_exists('mgmt_can') && mgmt_can())); }
+/** What goes with the order and what stands in the way. ['blocks' => texts, 'receipts', 'invoices', 'payments', 'requests' (each with 'mixed'), 'costs', 'checks', 'dn_cancelled'] */
+function po_purge_plan(array $o): array {
+    $oid = (int)$o['id']; $P = ['blocks' => [], 'receipts' => [], 'invoices' => [], 'payments' => [], 'requests' => [], 'costs' => 0, 'checks' => 0, 'dn_cancelled' => 0];
+    if ($o['kind'] !== 'po') { $P['blocks'][] = t('po.pg_only_po'); return $P; }
+    $P['receipts'] = po_receipts($oid);
+    foreach ($P['receipts'] as $r) { if ($b = po_receipt_reverse_block($o, $r, true)) $P['blocks'][] = $r['receipt_no'] . ': ' . $b; }
+    foreach (procdel_rows("SELECT dn_no FROM inv_delivery_notes WHERE order_id = ? AND status <> 'cancelled'", [$oid]) as $d) { $m = t('po.rev_dn', ['no' => $d['dn_no']]); if (!array_filter($P['blocks'], fn($x) => str_contains($x, $m))) $P['blocks'][] = $m; }
+    $P['dn_cancelled'] = procdel_n("SELECT COUNT(*) FROM inv_delivery_notes WHERE order_id = ? AND status = 'cancelled'", [$oid]);
+    foreach (procdel_rows('SELECT l.item_id, r.warehouse_id, i.code, SUM(rl.qty_accepted) AS q, (SELECT COALESCE(s.qty_on_hand, 0) FROM inv_stock s WHERE s.item_id = l.item_id AND s.warehouse_id = r.warehouse_id) AS oh FROM po_receipt_lines rl JOIN po_receipts r ON r.id = rl.receipt_id JOIN po_lines l ON l.id = rl.po_line_id JOIN inv_items i ON i.id = l.item_id WHERE r.order_id = ? AND rl.qty_accepted > 0.0005 GROUP BY l.item_id, r.warehouse_id, i.code', [$oid]) as $s)
+        if ((float)$s['oh'] < (float)$s['q'] - 0.0005 && !procdel_n('SELECT COUNT(*) FROM inv_licences WHERE item_id = ? AND po_line_id IN (SELECT id FROM po_lines WHERE order_id = ?)', [(int)$s['item_id'], $oid])) $P['blocks'][] = t('po.pg_stock', ['c' => (string)$s['code'], 'q' => stk_qty((float)$s['q']), 'h' => stk_qty((float)$s['oh'])]);
+    $P['costs'] = procdel_n('SELECT COUNT(*) FROM po_costs WHERE order_id = ?', [$oid]); $P['checks'] = procdel_n('SELECT COUNT(*) FROM po_dchecks WHERE order_id = ?', [$oid]);
+    if (!function_exists('si_has') || !si_has()) return $P;
+    $ids = array_map('intval', array_column(all('SELECT id FROM si_invoices WHERE order_id = ? UNION SELECT sl.invoice_id FROM si_lines sl JOIN po_lines l ON l.id = sl.po_line_id WHERE l.order_id = ?', [$oid, $oid]), 'id'));
+    for ($g = 0; $ids && $g < 5; $g++) { $in = implode(',', $ids); $more = array_map('intval', array_column(all("SELECT id FROM si_invoices WHERE credit_of IN ($in) AND id NOT IN ($in)"), 'id')); if (!$more) break; $ids = array_merge($ids, $more); }   // the credit notes of those invoices go with them
+    if (!$ids) return $P; $in = implode(',', $ids);
+    $P['invoices'] = all("SELECT i.id, i.si_no, i.kind, i.is_proforma, i.inv_no, i.proforma_no, i.order_id, i.gross, i.paid, i.currency, i.status, i.issue_date FROM si_invoices i WHERE i.id IN ($in) ORDER BY i.id");
+    foreach ($P['invoices'] as $i) {
+        $other = ($i['order_id'] && (int)$i['order_id'] !== $oid) || (int) scalar('SELECT COUNT(*) FROM si_lines sl JOIN po_lines l ON l.id = sl.po_line_id WHERE sl.invoice_id = ? AND l.order_id <> ?', [(int)$i['id'], $oid]);
+        if ($other) $P['blocks'][] = t('po.pg_inv_other', ['no' => (string)$i['si_no']]);
+    }
+    $P['payments'] = all("SELECT p.id, p.invoice_id, p.request_id, p.pay_date, p.amount, p.currency, p.method, p.ref, i.si_no FROM si_payments p JOIN si_invoices i ON i.id = p.invoice_id WHERE p.invoice_id IN ($in) ORDER BY p.pay_date, p.id");
+    $P['requests'] = all("SELECT r.id, r.req_no, r.amount, r.currency, r.status, (SELECT COUNT(*) FROM si_request_items x WHERE x.request_id = r.id AND x.invoice_id NOT IN ($in)) AS mixed FROM si_requests r WHERE r.id IN (SELECT request_id FROM si_request_items WHERE invoice_id IN ($in)) ORDER BY r.id");
+    return $P;
+}
+function procdel_rows(string $sql, array $args): array { try { return all($sql, $args); } catch (Throwable $e) { return []; } }
+/** Delete the order with everything booked on it. Stock goes back out through the reversal of each receipt (so the ledger, the reservations, the prices and the
+ *  requisition lines are right afterwards), invoices and payments go, payment requests lose those invoices (and go when nothing is left on them).
+ *  All of it or none of it. The order number must be typed and a reason given; the list of deleted documents keeps what was removed. */
+function po_purge(int $oid, string $reason, string $typedNo): array {
+    if (!po_purge_can()) throw new RuntimeException(t('err.noaccess')); $o = po_load($oid); if (!$o) throw new RuntimeException(t('err.notfound'));
+    $reason = trim($reason); if (mb_strlen($reason) < 5) throw new RuntimeException(t('si.del_reason'));
+    if (mb_strtoupper(trim($typedNo)) !== mb_strtoupper((string)$o['po_no'])) throw new RuntimeException(t('po.pg_type_no', ['no' => (string)$o['po_no']]));
+    $plan = po_purge_plan($o); if ($plan['blocks']) throw new RuntimeException(t('po.pg_blocked') . ' ' . implode(' · ', array_slice($plan['blocks'], 0, 6)));
+    $was = (string)$o['status']; $tmp = [];
+    $done = stk_tx(function () use ($oid, $o, $reason, $plan, $was, &$tmp) {
+        $raw = one('SELECT * FROM po_orders WHERE id = ? FOR UPDATE', [$oid]); $lines0 = all('SELECT * FROM po_lines WHERE order_id = ? ORDER BY id', [$oid]);
+        $snap = ['receipts' => [], 'invoices' => [], 'payments' => $plan['payments'], 'requests' => $plan['requests']];
+        foreach ($plan['receipts'] as $r) $snap['receipts'][] = ['row' => one('SELECT * FROM po_receipts WHERE id = ?', [(int)$r['id']]), 'lines' => all('SELECT * FROM po_receipt_lines WHERE receipt_id = ?', [(int)$r['id']])];
+        // 1. every goods receipt is taken back, the newest first
+        foreach ($plan['receipts'] as $r) po_receipt_reverse_x($oid, (int)$r['id'], mb_substr(t('po.pg_log') . ' · ' . $reason, 0, 200), true);
+        // 2. what the order still holds on its requisition lines is given back
+        if (!in_array($was, ['draft', 'cancelled'], true)) foreach (all("SELECT * FROM po_lines WHERE order_id = ? AND pr_line_id IS NOT NULL AND status <> 'cancelled'", [$oid]) as $l) { $rem = max(0.0, (float)$l['qty'] - (float)$l['qty_received']); q('UPDATE pr_lines SET qty_ordered = GREATEST(0, qty_ordered - ?), status = IF(qty_ordered <= 0.0005 AND qty_received <= 0.0005 AND status IN (\'ordered\',\'received\'), IF(qty_reserved >= qty - 0.0005, \'reserved\', \'to_buy\'), status) WHERE id = ?', [$rem, (int)$l['pr_line_id']]); }
+        // 3. payments, payment requests, invoices
+        if ($plan['invoices']) { $ids = array_map(fn($i) => (int)$i['id'], $plan['invoices']); $in = implode(',', $ids);
+            q("DELETE FROM si_payments WHERE invoice_id IN ($in)"); q("DELETE FROM si_request_items WHERE invoice_id IN ($in)");
+            foreach ($plan['requests'] as $rq) { $rid = (int)$rq['id']; $left = one('SELECT COUNT(*) AS n, COALESCE(SUM(amount), 0) AS a FROM si_request_items WHERE request_id = ?', [$rid]);
+                if ((int)$left['n'] === 0) { q('DELETE FROM si_events WHERE request_id = ?', [$rid]); q('DELETE FROM si_requests WHERE id = ?', [$rid]); si_event(null, null, 'delete', mb_substr((string)$rq['req_no'] . ' · ' . si_money((float)$rq['amount'], (string)$rq['currency']) . ' · ' . $o['po_no'] . ' — ' . $reason, 0, 600)); }
+                else { q('UPDATE si_requests SET amount = ? WHERE id = ?', [round((float)$left['a'], 2), $rid]); si_event(null, $rid, 'edit', mb_substr(t('po.pg_req_cut', ['no' => (string)$o['po_no']]), 0, 600)); } }
+            usort($ids, fn($a, $b) => $b <=> $a);   // credit notes (made later) before the invoices they credit
+            foreach ($ids as $iid) { $i = si_load($iid); if (!$i) continue; $snap['invoices'][] = ['row' => one('SELECT * FROM si_invoices WHERE id = ?', [$iid]), 'lines' => all('SELECT * FROM si_lines WHERE invoice_id = ?', [$iid])]; si_delete_rows($i, t('po.pg_log') . ' ' . $o['po_no'] . ' — ' . $reason); } }
+        // 4. logistic costs, delivery planning, delivery checks, prices recorded from the order
+        foreach (procdel_rows('SELECT id, sp_cost_id FROM po_costs WHERE order_id = ?', [$oid]) as $c) { try { q('UPDATE si_lines SET po_cost_id = NULL WHERE po_cost_id = ?', [(int)$c['id']]); } catch (Throwable $e) {} if (!empty($c['sp_cost_id'])) q('DELETE FROM sp_costs WHERE id = ?', [(int)$c['sp_cost_id']]); q('DELETE FROM po_costs WHERE id = ?', [(int)$c['id']]); }
+        try { q('DELETE FROM po_lots WHERE order_id = ?', [$oid]); } catch (Throwable $e) {}
+        foreach (procdel_rows('SELECT id FROM po_dchecks WHERE order_id = ?', [$oid]) as $c) { q('DELETE FROM po_dcheck_close WHERE check_id = ?', [(int)$c['id']]); q('DELETE FROM po_dcheck_lines WHERE check_id = ?', [(int)$c['id']]); q('DELETE FROM po_dchecks WHERE id = ?', [(int)$c['id']]); $tmp[] = (int)$c['id']; }
+        $items = array_map('intval', array_column(procdel_rows('SELECT DISTINCT p.item_id FROM inv_prices p JOIN po_lines l ON l.id = p.po_line_id WHERE l.order_id = ?', [$oid]), 'item_id'));
+        if ($items) { q('DELETE p FROM inv_prices p JOIN po_lines l ON l.id = p.po_line_id WHERE l.order_id = ?', [$oid]); foreach ($items as $it) po_item_price_refresh($it); }
+        try { q("UPDATE inv_dn_lines d JOIN po_lines l ON l.id = d.po_line_id SET d.po_line_id = NULL WHERE l.order_id = ?", [$oid]); q("UPDATE inv_delivery_notes SET order_id = NULL, receipt_id = NULL WHERE order_id = ? AND status = 'cancelled'", [$oid]); } catch (Throwable $e) {}
+        // 5. the order itself — one line in the list of deleted documents, with what went with it
+        $raw['status'] = $was; po_delete_rows($o, $raw, $lines0, mb_substr(t('po.pg_log') . ' — ' . $reason, 0, 300), $snap);
+        return ['no' => (string)$o['po_no'], 'receipts' => count($plan['receipts']), 'invoices' => count($plan['invoices']), 'payments' => count($plan['payments'])];
+    });
+    foreach ($tmp as $cid) if (function_exists('pdc_tmp')) @unlink(pdc_tmp($cid));
+    cache_bump_later('inv'); cache_bump_later('eng'); if (function_exists('eng_rows_reset')) eng_rows_reset();
+    if (function_exists('po_progress_apply')) { try { po_progress_apply($o['subproject_id'] ? (int)$o['subproject_id'] : null); } catch (Throwable $e) {} }
+    if (function_exists('proc_feed_later') && !empty($o['subproject_id'])) proc_feed_later((int)$o['subproject_id']);
+    return $done;
+}
+/** Last price and average cost of an item from the prices that are left (after prices of a removed order went). */
+function po_item_price_refresh(int $itemId): void {
+    $last = one("SELECT unit_price, priced_at, supplier_id FROM inv_prices WHERE item_id = ? AND source <> 'rollup' ORDER BY priced_at DESC, id DESC LIMIT 1", [$itemId]); if (!$last) return;
+    $avg = one("SELECT SUM(unit_price * COALESCE(NULLIF(qty,0),1)) / SUM(COALESCE(NULLIF(qty,0),1)) AS a FROM (SELECT unit_price, qty FROM inv_prices WHERE item_id = ? AND source <> 'rollup' ORDER BY priced_at DESC, id DESC LIMIT 10) x", [$itemId]);
+    q('UPDATE inv_items SET last_price = ?, last_price_at = ?, last_supplier_id = ?, avg_cost = ? WHERE id = ?', [$last['unit_price'], $last['priced_at'], $last['supplier_id'], $avg && $avg['a'] !== null ? round((float)$avg['a'], 4) : null, $itemId]);
 }
 /** Requisition: the requester may delete an own draft; procurement administrators a draft, rejected or cancelled one. Nothing may hang on it. */
 function prq_delete_block(array $r): ?string {

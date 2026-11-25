@@ -274,19 +274,22 @@ function si_delete(int $iid, string $reason): string {
     if ($i['status'] !== 'cancelled') throw new RuntimeException(t('si.del_only_cancelled')); $reason = trim($reason); if (mb_strlen($reason) < 5) throw new RuntimeException(t('si.del_reason'));
     if ((float)$i['paid'] > 0.004 || (int) scalar('SELECT COUNT(*) FROM si_payments WHERE invoice_id = ?', [$iid]) || (int) scalar('SELECT COUNT(*) FROM si_request_items WHERE invoice_id = ?', [$iid]) || (int) scalar("SELECT COUNT(*) FROM si_invoices WHERE credit_of = ? AND status <> 'cancelled'", [$iid])) throw new RuntimeException(t('si.del_has_pay'));
     q('UPDATE si_invoices SET credit_of = NULL WHERE credit_of = ?', [$iid]);   // a cancelled credit note of it stays, without the link
-    $no = (string)$i['si_no']; $what = $no . ' · ' . (string)($i['supplier'] ?? '') . ' · ' . trim((string)($i['inv_no'] ?? '') . ' ' . (string)($i['proforma_no'] ?? '')) . ' · ' . si_money((float)$i['gross'], (string)$i['currency']) . (!empty($i['po_no']) ? ' · ' . $i['po_no'] : '');
-    $pdo = db(); $pdo->beginTransaction();
-    try {
-        if (si_docs_has()) { $T = function_exists('ft_types') ? (ft_types()['si_docs'] ?? null) : null;
-            foreach (si_docs_of($iid) as $d) { $abs = cp_storage() . '/' . $d['stored_name'];
-                if ($T && function_exists('ft_trash_row')) ft_trash_row('si_docs', $d, $T[0]($d), $T[1]($d), $no . ' — ' . t('si.del_log'), true, $reason);
-                else { if (str_starts_with((string)$d['stored_name'], 'si/') && !str_contains((string)$d['stored_name'], '..') && is_file($abs)) @unlink($abs); q('DELETE FROM si_docs WHERE id = ?', [(int)$d['id']]); } } }
-        if (!empty($i['sp_cost_id'])) q('DELETE FROM sp_costs WHERE id = ?', [(int)$i['sp_cost_id']]);
-        q('DELETE FROM si_lines WHERE invoice_id = ?', [$iid]); q('DELETE FROM si_events WHERE invoice_id = ?', [$iid]); q('DELETE FROM si_invoices WHERE id = ? AND status = ?', [$iid, 'cancelled']);
-        si_event(null, null, 'delete', mb_substr($what . ' — ' . $reason, 0, 600));
-        $pdo->commit();
-    } catch (Throwable $e) { if ($pdo->inTransaction()) $pdo->rollBack(); throw $e; }
+    $no = (string)$i['si_no'];
+    stk_tx(fn() => si_delete_rows($i, $reason));
     cache_bump_later('eng'); return $no;
+}
+/** The rows of one invoice go (documents to the recycle bin, cost line, lines, history) and one line stays in the register of deleted invoices. No checks and no
+ *  transaction of its own — the caller has decided and holds the transaction (si_delete, and po_purge of R97-244). */
+function si_delete_rows(array $i, string $reason): void {
+    $iid = (int)$i['id']; $no = (string)$i['si_no']; $what = $no . ' · ' . (string)($i['supplier'] ?? '') . ' · ' . trim((string)($i['inv_no'] ?? '') . ' ' . (string)($i['proforma_no'] ?? '')) . ' · ' . si_money((float)$i['gross'], (string)$i['currency']) . (!empty($i['po_no']) ? ' · ' . $i['po_no'] : '');
+    if (si_docs_has()) { $T = function_exists('ft_types') ? (ft_types()['si_docs'] ?? null) : null;
+        foreach (si_docs_of($iid) as $d) { $abs = cp_storage() . '/' . $d['stored_name'];
+            if ($T && function_exists('ft_trash_row')) ft_trash_row('si_docs', $d, $T[0]($d), $T[1]($d), $no . ' — ' . t('si.del_log'), true, $reason);
+            else { if (str_starts_with((string)$d['stored_name'], 'si/') && !str_contains((string)$d['stored_name'], '..') && is_file($abs)) @unlink($abs); q('DELETE FROM si_docs WHERE id = ?', [(int)$d['id']]); } } }
+    if (!empty($i['sp_cost_id'])) q('DELETE FROM sp_costs WHERE id = ?', [(int)$i['sp_cost_id']]);
+    q('UPDATE si_invoices SET credit_of = NULL WHERE credit_of = ?', [$iid]);
+    q('DELETE FROM si_lines WHERE invoice_id = ?', [$iid]); q('DELETE FROM si_events WHERE invoice_id = ?', [$iid]); q('DELETE FROM si_invoices WHERE id = ?', [$iid]);
+    si_event(null, null, 'delete', mb_substr($what . ' — ' . $reason, 0, 600));
 }
 /** The register of deleted invoices, newest first. */
 function si_deleted_log(int $limit = 100): array { return si_has() ? all("SELECT created_at, user_name, note FROM si_events WHERE event = 'delete' AND invoice_id IS NULL AND request_id IS NULL ORDER BY id DESC LIMIT " . max(1, min(500, $limit))) : []; }

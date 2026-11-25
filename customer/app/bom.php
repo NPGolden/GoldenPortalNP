@@ -462,11 +462,11 @@ function bom_import_decide(int $bid, array $dec, array $items = []): void {
 }
 /** Create an inventory item from a staged row (engineer may do this from the import review). Code: Golden code if free, else the maker part number, else BOM-<rev>-<seq>. */
 function bom_imp_create_item(array $r, int $bid, string $want = ''): int {
-    $ok = fn(string $c) => $c !== '' && preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._\-\/+]*$/u', $c) && !stk_item_by_code($c);
+    $ok = fn(string $c) => $c !== '' && preg_match(STK_CODE_RE, $c) && !stk_item_by_code($c);
     $want = mb_substr(trim($want), 0, 60); if ($want !== '' && stk_item_by_code($want)) throw new RuntimeException(t('stk.code_taken', ['c' => $want]));
     if (!$ok($want)) { $pc = function_exists('stk_code_propose') ? stk_code_propose(['part_no' => (string)($r['part_no'] ?? ''), 'maker' => (string)($r['maker'] ?? ''), 'description' => (string)$r['description'], 'code' => (string)($r['code'] ?? '')]) : ['code' => '']; $want = $ok($pc['code']) ? $pc['code'] : ''; if ($want === '' && trim((string)($r['part_no'] ?? '')) !== '') throw new RuntimeException('#' . (int)$r['seq'] . ' — ' . t('stk.newcode_none', ['pn' => (string)$r['part_no']])); }   // R97-111: our rule — prefix.<maker part number>; without a known prefix the code must be typed
-    $code = $want !== '' ? $want : (string)($r['code'] ?? ''); if ($code === '' || !preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._\-\/+]*$/u', $code) || stk_item_by_code($code)) $code = '';
-    if ($code === '' && !empty($r['part_no']) && preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._\-\/+]*$/u', (string)$r['part_no']) && !stk_item_by_code((string)$r['part_no'])) $code = mb_substr((string)$r['part_no'], 0, 60);
+    $code = $want !== '' ? $want : (string)($r['code'] ?? ''); if ($code === '' || !preg_match(STK_CODE_RE, $code) || stk_item_by_code($code)) $code = '';
+    if ($code === '' && !empty($r['part_no']) && preg_match(STK_CODE_RE, (string)$r['part_no']) && !stk_item_by_code((string)$r['part_no'])) $code = mb_substr((string)$r['part_no'], 0, 60);
     if ($code === '') { $code = 'BOM-' . $bid . '-' . (int)$r['seq']; $n = 0; while (stk_item_by_code($code)) $code = 'BOM-' . $bid . '-' . (int)$r['seq'] . '-' . (++$n); }
     $u = current_user();
     q('INSERT INTO inv_items (code, description, unit, maker, factory_code, status, currency, notes, created_by) VALUES (?,?,?,?,?,?,?,?,?)',

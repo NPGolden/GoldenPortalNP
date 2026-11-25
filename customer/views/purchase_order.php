@@ -39,6 +39,29 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
     <?php if ($o && function_exists('po_delete_block') && po_delete_block($o) === null): ?><form method="post" action="<?= $self ?>" data-lock data-prompt="<?= e(t('po.delete_q', ['no' => $o['po_no']])) ?>" data-prompt-field="note"><?= csrf_field() ?><input type="hidden" name="action" value="po_delete"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="note" value=""><button class="btn btn--ghost btn--sm" type="submit" style="color:#9B2C2C;">🗑 <?= tt('btn.delete') ?></button></form><?php elseif ($o && $admin && function_exists('po_delete_block') && in_array($o['status'], ['draft', 'cancelled'], true)): ?><span class="hint" title="<?= e((string)po_delete_block($o)) ?>">🗑 <?= e((string)po_delete_block($o)) ?></span><?php endif; ?>
   </div>
 </div>
+<?php if ($o && function_exists('po_purge_can') && po_purge_can() && !$isRfq && po_delete_block($o) !== null): /* R97-244: the order with its receipts, invoices and payments */
+  $pg = po_purge_plan($o); $pgM = fn($a, $c) => function_exists('si_money') ? si_money((float)$a, (string)$c) : number_format((float)$a, 2) . ' ' . $c; ?>
+<details class="card card--tight" id="po-purge" style="margin-bottom:12px;border-left:4px solid #9B2C2C;"<?= ($_GET['purge'] ?? '') === '1' ? ' open' : '' ?>>
+  <summary style="cursor:pointer;color:#9B2C2C;font-weight:600;">🗑 <?= tt('po.pg_btn') ?></summary>
+  <p class="hint" style="margin:8px 0;"><?= tt('po.pg_intro') ?></p>
+  <div class="table-scroll"><table class="tbl tbl--compact"><tbody>
+    <tr><th style="width:190px;"><?= tt('po.pg_receipts') ?> <span class="count"><?= count($pg['receipts']) ?></span></th><td><?= $pg['receipts'] ? e(implode(' · ', array_map(fn($r) => $r['receipt_no'] . ' (' . fmt_date($r['received_at']) . ')', $pg['receipts']))) : '<span class="hint">' . tt('po.pg_none') . '</span>' ?></td></tr>
+    <tr><th><?= tt('po.pg_invoices') ?> <span class="count"><?= count($pg['invoices']) ?></span></th><td><?= $pg['invoices'] ? e(implode(' · ', array_map(fn($i) => $i['si_no'] . ' ' . trim((string)$i['inv_no'] . ' ' . (string)$i['proforma_no']) . ' — ' . $pgM($i['gross'], $i['currency']), $pg['invoices']))) : '<span class="hint">' . tt('po.pg_none') . '</span>' ?></td></tr>
+    <tr><th><?= tt('po.pg_payments') ?> <span class="count"><?= count($pg['payments']) ?></span></th><td><?= $pg['payments'] ? e(implode(' · ', array_map(fn($p) => fmt_date($p['pay_date']) . ' ' . $pgM($p['amount'], $p['currency']) . ' (' . $p['si_no'] . ')', $pg['payments']))) : '<span class="hint">' . tt('po.pg_none') . '</span>' ?></td></tr>
+    <tr><th><?= tt('po.pg_requests') ?> <span class="count"><?= count($pg['requests']) ?></span></th><td><?= $pg['requests'] ? e(implode(' · ', array_map(fn($r) => $r['req_no'] . ' ' . $pgM($r['amount'], $r['currency']) . ' — ' . t((int)$r['mixed'] ? 'po.pg_req_mixed' : 'po.pg_req_gone'), $pg['requests']))) : '<span class="hint">' . tt('po.pg_none') . '</span>' ?></td></tr>
+    <tr><th><?= tt('po.pg_other') ?></th><td><?= e(t('po.pg_other_v', ['c' => (int)$pg['costs'], 'k' => (int)$pg['checks']])) ?></td></tr>
+  </tbody></table></div>
+  <?php if ($pg['blocks']): ?>
+  <div class="flash flash--bad" style="margin:10px 0 0;"><b><?= tt('po.pg_blocked') ?></b><ul style="margin:6px 0 0 18px;"><?php foreach ($pg['blocks'] as $b): ?><li><?= e($b) ?></li><?php endforeach; ?></ul></div>
+  <?php else: ?>
+  <form method="post" action="<?= $self ?>" data-lock data-confirm="<?= e(t('po.pg_q')) ?>" class="form-grid" style="margin-top:10px;" autocomplete="off"><?= csrf_field() ?><input type="hidden" name="action" value="po_purge"><input type="hidden" name="id" value="<?= $id ?>">
+    <div class="field"><label><?= tt('po.pg_type_label') ?> — <span class="mono"><?= e($o['po_no']) ?></span></label><input name="po_no" required maxlength="40" autocomplete="off"></div>
+    <div class="field"><label><?= tt('po.pg_reason') ?></label><input name="reason" required minlength="5" maxlength="250"></div>
+    <div class="field" style="align-self:end;"><button class="btn btn--sm" type="submit" style="background:#9B2C2C;border-color:#9B2C2C;color:#fff;">🗑 <?= tt('po.pg_go') ?></button></div>
+  </form>
+  <?php endif; ?>
+</details>
+<?php endif; ?>
 <?php if ($o && function_exists('po_flow') && function_exists('hrf_html')): /* R97-132: where this order stands */ ?>
 <div class="card card--tight" id="po-flow" style="margin-bottom:12px;"><?= hrf_html(po_flow($o)) ?></div>
 <?php endif; ?>

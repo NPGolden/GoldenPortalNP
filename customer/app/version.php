@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.248.3';
+const CP_VERSION = '1.249.0';
 const CP_BUILD   = '2026-11-24';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-244', 'version' => '1.249.0', 'date' => '2026-11-25', 'title' => 'Purchase order: management and portal administrators can delete an order together with its goods receipts, supplier invoices and payments; a line whose code already exists is linked to that item; item codes may hold a comma', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-243', 'version' => '1.248.3', 'date' => '2026-11-25', 'title' => 'Language: opening a notification (or any link made by a colleague who uses another language) no longer changes your language — only the language selector does; notification links are stored without a language', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-242', 'version' => '1.248.2', 'date' => '2026-11-25', 'title' => 'In / Out › Who is in: filters — no entry, in now, left, absent, arrived late — and by name; the figures above the list are links to the same filters', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-241', 'version' => '1.248.1', 'date' => '2026-11-25', 'title' => 'In / Out › Who is in: people the planning shows as away (leave, sick leave, parental leave, strike) are listed as «absent» — without the reason — and counted apart from «no entry»', 'db' => null, 'check' => null],

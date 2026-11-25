@@ -378,7 +378,7 @@ function pdc_problems(array $c): array {
             if ($l['pr_line_id']) { $pr = one('SELECT qty_reserved, qty_issued, qty_received FROM pr_lines WHERE id = ?', [(int)$l['pr_line_id']]); if ($pr && ((float)$pr['qty_reserved'] > 0.0005 || (float)$pr['qty_issued'] > 0.0005 || (float)$pr['qty_received'] > 0.0005)) $P[] = t('pdc.p_switch_pr', ['l' => $tag, 'n' => (int)$l['seq']]); }
             if ($d['item_id'] && $l['item_id'] && (int)$d['item_id'] === (int)$l['item_id']) $P[] = t('pdc.p_switch_same', ['l' => $tag]);
         }
-        if (in_array($d['action'], ['switch', 'add'], true) && !$d['item_id']) { $nc = (string)$d['new_code']; if ($nc === '' || !preg_match('/^[A-Za-z0-9][A-Za-z0-9 ._\-\/+]*$/u', $nc)) $P[] = t('pdc.p_code', ['l' => $tag]); elseif (trim((string)$d['doc_desc']) === '') $P[] = t('pdc.p_desc', ['l' => $tag]); }
+        if (in_array($d['action'], ['switch', 'add'], true) && !$d['item_id']) { $nc = (string)$d['new_code']; if ($nc === '' || !preg_match(STK_CODE_RE, $nc)) $P[] = t('pdc.p_code', ['l' => $tag]); elseif (trim((string)$d['doc_desc']) === '') $P[] = t('pdc.p_desc', ['l' => $tag]); }
     }
     foreach ($perLine as $lid => $acts) if (in_array('switch', $acts, true) && count($acts) > 1) $P[] = t('pdc.p_switch_multi', ['n' => (int)$c['po_by_id'][$lid]['seq']]);
     foreach ($c['close'] as $pl) { $l = $c['po_by_id'][$pl] ?? null; if ($l && (float)$l['open_qty'] <= 0.0005) $P[] = t('pdc.p_close_done', ['n' => (int)$l['seq']]); }

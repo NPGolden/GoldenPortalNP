@@ -4540,3 +4540,22 @@ Each option shows its count. **Name…** narrows by part of a name. The five fig
 
 **For people already affected:** choose your language once in the selector; it is saved on the profile.
 
+
+## §523 Purchase order deleted with its receipts, invoices and payments · code that already exists · comma in codes (GAS-CP-R97-244, v1.249.0)
+
+**Purge of an order** — `po_purge($oid, $reason, $typedNo)` in `app/po.php`, action `po_purge`, card `#po-purge` on the order page (shown when the plain delete is not possible).
+
+- Right: `po_purge_can()` = staff and (`mgmt_can()` or `is_cp_admin()`). Not Procurement alone — payments are removed.
+- `po_purge_plan($o)` lists receipts, invoices (those with `order_id` of the order or a line on one of its lines, plus their credit notes), payments, payment requests (`mixed` = other invoices on it), costs, checks and the **blocks**: delivery note not cancelled, licence from a receipt, stock on hand below what was received, invoice that also covers another order, RFQ.
+- One `stk_tx`: (1) every receipt through `po_receipt_reverse_x(..., purge: true)` — stock out, reservations, prices and requisition lines put back; the state of the order and a closed NCR do not stop it; (2) `pr_lines.qty_ordered` released for an order that was not draft/cancelled; (3) `si_payments`, `si_request_items` deleted, a request left empty deleted, otherwise its amount recalculated; invoices through `si_delete_rows()`; (4) `po_costs` + `sp_costs`, `po_lots`, `po_dchecks*`, `inv_prices` of the lines (`po_item_price_refresh`), cancelled delivery notes unlinked; (5) `po_delete_rows()` — the line in `proc_deleted` carries `_removed_with_it` (receipts, invoices, payments, requests) in the snapshot.
+- Any failure rolls all of it back (tested with stock held for another requisition at the second receipt).
+- `po_delete` and `si_delete` now call the same row helpers inside `stk_tx`; their checks are unchanged.
+- The stock ledger keeps the in and out movements of the removed order (`ref_kind = po`, the order no longer exists).
+
+**Code that already exists** — `line_new_item()` (`app/inv.php`): an existing, not blocked item with that code → `line_use_item()` and the notice `stk.sim_linked_ok` (code and description); blocked → `stk.code_blocked`; a new item and its link are written in one `stk_tx`.
+
+**Comma in item codes** — one constant `STK_CODE_RE` (letters, digits, space, dot, comma, dash, slash, plus, underscore) used by the item form, quick create, BOM import and delivery check.
+
+Language: 25 new keys, `stk.bad_code` reworded.
+
+**HR role, recruiting buttons** — `HR_ACTIONS` (`app/auth.php`) lacked `rcr_interview_update`, `rcr_interview_send`, `rcr_offer_save`, `rcr_offer_send`, `rcr_offer_outcome` (added with R97-229/231 to the page but not to the list), so a person with the HR role alone was refused on pressing them. Added; `php tools/check-scopes.php` is clean again for HR and Employee and is part of every release.
