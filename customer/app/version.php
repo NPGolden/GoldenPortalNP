@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.254.0';
+const CP_VERSION = '1.254.1';
 const CP_BUILD   = '2026-11-24';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-251', 'version' => '1.254.1', 'date' => '2026-11-25', 'title' => 'Service app 0.8.8 — the photos of a report already sent are shown and added per task', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-250', 'version' => '1.254.0', 'date' => '2026-11-25', 'title' => 'Service app 0.8.7 — photos from the camera or the album of the phone; a photo is removed with two taps; photos of a report already sent can be removed or added until the customer accepts', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-249', 'version' => '1.253.0', 'date' => '2026-11-25', 'title' => 'HR messages: the list shows the open conversations — answering or «Close» takes a conversation off it; HR tasks, seen only by people with the HR right', 'db' => 'install/migrate_cp_r97_249_hr_tasks.sql', 'check' => 'r99u'],
         ['ref' => 'GAS-CP-R97-248', 'version' => '1.252.1', 'date' => '2026-11-25', 'title' => 'Recruiting offer: the approver confirms with the authenticator code; the approval ends when the validity date of the offer passes', 'db' => null, 'check' => null],

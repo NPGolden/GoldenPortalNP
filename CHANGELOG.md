@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.254.0** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.254.1** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.254.1 | GAS-CP-R97-251 | 2026-11-25 | Service app 0.8.8 — the photos of a report already sent are shown and added per task | — |
 | 1.254.0 | GAS-CP-R97-250 | 2026-11-25 | Service app 0.8.7 — photos from the camera or the album of the phone; a photo is removed with two taps; photos of a report already sent can be removed or added until the customer accepts | — |
 | 1.253.0 | GAS-CP-R97-249 | 2026-11-25 | HR messages: the list shows the open conversations — answering or «Close» takes a conversation off it; HR tasks, seen only by people with the HR right | `install/migrate_cp_r97_249_hr_tasks.sql` |
 | 1.252.1 | GAS-CP-R97-248 | 2026-11-25 | Recruiting offer: the approver confirms with the authenticator code; the approval ends when the validity date of the offer passes | — |

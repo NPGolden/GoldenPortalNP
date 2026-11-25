@@ -155,7 +155,8 @@ final class Portal {
     /** R97-250: the photos already on a report (after it was sent from the phone) — to look at, add to and, until the customer accepted, remove. */
     public static function fsrPhotos(array $u, int $id): array {
         $r = self::fsrMine($u, $id); $open = in_array((string)$r['status'], ['draft', 'submitted', 'disputed'], true);
-        return ['can_delete' => $open, 'can_add' => $open && count($r['photos']) < FSR_MAX_PHOTOS, 'max' => FSR_MAX_PHOTOS,
+        $tasks = array_map(fn($w) => ['seq' => (int)$w['seq'], 'text' => mb_substr(trim(preg_replace('/\s+/u', ' ', (string)($w['description'] ?? ''))), 0, 80)], $r['works'] ?: [['seq' => 1, 'description' => '']]);   // R97-251: photos belong to a task
+        return ['can_delete' => $open, 'can_add' => $open && count($r['photos']) < FSR_MAX_PHOTOS, 'max' => FSR_MAX_PHOTOS, 'tasks' => $tasks,
                 'items' => array_map(fn($p) => ['id' => (int)$p['id'], 'task' => (int)($p['fsr_task'] ?? 1) ?: 1, 'figure' => (int)($p['figure'] ?? 0), 'caption' => (string)($p['description'] ?? '')], $r['photos'])];
     }
     private static function fsrPhotoRow(array $u, int $id, int $fid): array {

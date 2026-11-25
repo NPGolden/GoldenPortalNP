@@ -4640,3 +4640,9 @@ Language: 23 new keys, six pool texts reworded.
 - App files carry version 0.8.7 (`sw.js`, `js/api.js`, `index.html`); web shell only — no store build.
 
 Language: 2 portal keys, 10 app keys in five languages.
+
+## §530 Service app 0.8.8: photos of a sent report per task (GAS-CP-R97-251, v1.254.1)
+
+- `Portal::fsrPhotos()` returns `tasks` (`seq`, first 80 characters of the description) from the works of the report.
+- `photosBox()` draws one photo row per task (`data-task`), each with its own Camera / Album buttons; an added photo is uploaded with that task number (`sp_files.fsr_task`), so the report prints it with the task. A photo whose task no longer exists gets its own row.
+- Drafts were already per task (R77-002).
