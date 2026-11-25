@@ -81,14 +81,11 @@ if (function_exists('em_card_html') && em_has()) {
   <p class="hint span2"><?= tt('rc.ev_edit_hint') ?></p>
   <div class="btn-row span2"><button class="btn btn--gold"><?= tt('rc.ev_edit_save') ?></button></div>
 </form></details>
-<?php if ($draft): ?><details style="margin-top:8px;"<?= ($openInt === $iid && $openDo === 'mail') || (!$i['candidate_notified_at'] && !($openInt === $iid && $openDo === 'edit')) ? ' open' : '' ?>><summary class="btn btn--ghost btn--sm" style="display:inline-block;cursor:pointer;">✉ <?= tt('rc.ev_invite') ?></summary>
-<form method="post" data-lock data-confirm="<?= e(t('rc.ev_send_q', ['to' => $draft['to']])) ?>" style="margin-top:12px;"><?= csrf_field() ?><input type="hidden" name="action" value="rcr_interview_send"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="int_id" value="<?= $iid ?>">
-  <p class="hint"><?= tt('rc.ev_invite_hint') ?> <?= rcr_can() && function_exists('is_cp_admin') && is_cp_admin() ? '<a href="' . url('admin_email_templates') . '">' . tt('et.title') . '</a>' : '' ?></p>
-  <div class="field"><label><?= tt('rc.ev_to') ?></label><input value="<?= e($draft['to']) ?>" readonly></div>
-  <div class="field"><label><?= tt('rc.ev_subject') ?></label><input name="subject" maxlength="200" value="<?= e($draft['subject']) ?>" required></div>
-  <div class="field"><label><?= tt('rc.ev_text') ?></label><textarea name="body" rows="14" maxlength="8000" required><?= e($draft['body']) ?></textarea></div>
-  <div class="btn-row"><button class="btn btn--gold">✉ <?= tt($i['candidate_notified_at'] ? 'rc.ev_send_again' : 'rc.ev_send') ?></button></div>
-</form></details><?php endif; ?>
+<?php if ($draft && function_exists('em_card_html') && em_has()): /* R97-247: the invitation leaves through the same e-mail card as every other message */
+  echo '<div style="margin-top:8px;">' . em_card_html(['kind' => 'rc_interview', 'text' => ['subject' => (string)$draft['subject'], 'body' => (string)$draft['body']], 'title' => t($i['candidate_notified_at'] ? 'rc.ev_invite_again' : 'rc.ev_invite'), 'note' => t('rc.ev_invite_hint'), 'rows' => 14, 'ctx' => [],
+      'open' => ($openInt === $iid && $openDo === 'mail') || (!$i['candidate_notified_at'] && !($openInt === $iid && $openDo === 'edit')),
+      'people' => [['name' => (string)($a['name'] ?: $a['email']), 'email' => (string)$a['email'], 'role' => t('rc.candidate'), 'on' => true]], 'atts' => [], 'back' => url('rcr_application', ['id' => $id]) . '#int-' . $iid,
+      'hidden' => '<input type="hidden" name="rc_app" value="' . $id . '"><input type="hidden" name="rc_int" value="' . $iid . '">']) . '</div>'; endif; ?>
 </div><?php endforeach; ?>
 <?php endif; ?>
 <?php if (function_exists('rcr_offer_can') && rcr_offer_can() && !str_starts_with((string)$a['email'], 'anon-')): /* R97-231: the offer — financial proposal and terms with the job description; HR only */
@@ -124,7 +121,14 @@ if (function_exists('em_card_html') && em_has()) {
 </form></details>
 <?php if ($od): $miss = rcr_offer_missing($od); $dr = null; if (!$miss) { try { $dr = rcr_offer_draft((int)$od['id']); } catch (Throwable $e) {} } ?>
 <?php if ($miss): ?><p style="margin-top:10px;"><?= pill('gold', t('rc.of_missing', ['what' => implode(', ', $miss)])) ?></p>
+<?php elseif ($dr && function_exists('rcr_offer_appr_has') && rcr_offer_appr_has() && !rcr_offer_approved($od)): $ap = (string)($od['appr_status'] ?? ''); /* R97-247: second approval before the offer can leave */ ?>
+<div style="margin-top:10px;padding:10px 12px;border-left:4px solid #C9A227;background:rgba(201,162,39,.08);border-radius:6px;">
+  <b>🔏 <?= tt('rc.ap_title') ?></b> — <?= $ap === 'pending' ? pill('gold', t('rc.ap_s_pending')) . ' <span class="hint" style="display:inline;">' . e(t('rc.ap_since', ['d' => fmt_datetime((string)$od['appr_req_at']), 'u' => (string)$od['appr_req_name']])) . '</span>' : ($ap === 'rejected' ? pill('bad', t('rc.ap_s_rejected')) . ' <span class="hint" style="display:inline;">' . e((string)$od['appr_name'] . ' · ' . fmt_datetime((string)$od['appr_at']) . ($od['appr_note'] ? ' — ' . $od['appr_note'] : '')) . '</span>' : pill('mute', t('rc.ap_s_none'))) ?>
+  <p class="hint" style="margin:6px 0;"><?= tt($ap === 'pending' ? 'rc.ap_hint_wait' : 'rc.ap_hint') ?></p>
+  <?php if ($ap !== 'pending'): ?><form method="post" action="<?= url('rcr_application', ['id' => $id]) ?>#offer" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="rcr_offer_ask"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="offer_id" value="<?= (int)$od['id'] ?>"><button class="btn btn--gold btn--sm" type="submit">🔏 <?= tt($ap === 'rejected' ? 'rc.ap_ask_again' : 'rc.ap_ask') ?></button></form><?php endif; ?>
+</div>
 <?php elseif ($dr && function_exists('em_card_html') && em_has()): /* R97-246: the same e-mail card as every other message — send now, draft in my Outlook, or message file */
+  if (function_exists('rcr_offer_appr_has') && rcr_offer_appr_has()) echo '<p style="margin:10px 0 0;">' . pill('green', '🔏 ' . t('rc.ap_s_approved')) . ' <span class="hint" style="display:inline;">' . e((string)$od['appr_name'] . ' · ' . fmt_datetime((string)$od['appr_at']) . ($od['appr_note'] ? ' — ' . $od['appr_note'] : '')) . '</span></p>';
   echo '<div id="rc-offer-mail" style="margin-top:10px;">' . em_card_html(['kind' => 'rc_offer', 'text' => ['subject' => (string)$dr['subject'], 'body' => (string)$dr['body']], 'title' => t('rc.of_mail'), 'note' => t('rc.of_mail_hint'), 'open' => true, 'rows' => 22, 'ctx' => [],
       'people' => [['name' => (string)($a['name'] ?: $a['email']), 'email' => (string)$a['email'], 'role' => t('rc.candidate'), 'on' => true]], 'atts' => [], 'back' => url('rcr_application', ['id' => $id]) . '#offer',
       'hidden' => '<input type="hidden" name="rc_app" value="' . $id . '"><input type="hidden" name="rc_offer" value="' . (int)$od['id'] . '">']) . '</div>'; ?>

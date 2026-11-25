@@ -468,6 +468,13 @@ function rcr_interview_send(int $id, string $subject, string $body): bool {
     return $ok;
 }
 
+/** R97-247: the invitation left through the standard e-mail card — marked on the interview and in the log when the candidate is among the recipients. */
+function rcr_interview_mailed(int $id, array $to, string $how): void {
+    $i = rcr_interview($id); if (!$i || $i['status'] !== 'planned') return; $a = $i['app']; if (!in_array(strtolower(trim((string) $a['email'])), array_map('strtolower', $to), true)) return;
+    q('UPDATE rc_interviews SET candidate_notified_at = NOW() WHERE id = ?', [$id]);
+    rcr_log('interview_invited', ['application_id' => (int) $i['application_id'], 'vacancy_id' => (int) $a['vacancy_id']], '✉ ' . date('d/m/Y H:i', strtotime((string) $i['scheduled_at'])) . ' — ' . t('rc.of_how_' . (in_array($how, ['sent', 'outlook', 'file'], true) ? $how : 'sent')));
+}
+
 /* ---- R92-001: the assistant drafts a vacancy from a short brief (title, summary, description, requirements, tags, location, type, seniority, department, branch) ---- */
 function rcr_vacancy_ai_fields(array $cur): array {
     $sel = fn(array $rows, string $k, string $lbl) => array_map(fn($r) => ['value' => (string)$r[$k], 'label' => (string)$r[$lbl]], $rows);
@@ -558,6 +565,47 @@ function rcr_offer_has(): bool { static $h = null; if ($h === null) { try { $h =
 function rcr_offer_can(): bool { return rcr_offer_has() && rcr_can(); }
 function rcr_offers(int $appId): array { return rcr_offer_can() ? all('SELECT * FROM rc_offers WHERE application_id = ? ORDER BY id DESC', [$appId]) : []; }
 function rcr_offer(int $id): ?array { if (!rcr_offer_can()) return null; $o = one('SELECT * FROM rc_offers WHERE id = ?', [$id]); if (!$o) return null; $a = rcr_application((int) $o['application_id']); if (!$a) return null; $o['app'] = $a; return $o; }
+/* ---- R97-247: second approval. An offer leaves (e-mail card, acceptance link) only after the CEO, the General Manager or the Managing Director approved its terms;
+ *      the approver is never the person who asked. An offer prepared by the CEO needs no second person. Saving the terms again takes the approval away. ---- */
+function rcr_offer_appr_has(): bool { static $h = null; if ($h === null) { try { $h = rcr_offer_has() && (bool) scalar("SHOW COLUMNS FROM rc_offers LIKE 'appr_status'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function rcr_offer_approver(): bool { return rcr_offer_appr_has() && is_staff() && function_exists('mgmt_can') && mgmt_can(); }
+function rcr_offer_approver_ids(): array { try { return array_map('intval', array_column(all("SELECT cu.id FROM customer_users cu JOIN staff_roles r ON r.id = cu.staff_role_id WHERE cu.is_active = 1 AND cu.role <> 'customer' AND (r.scope = 'owner' OR LOWER(TRIM(r.name)) IN ('ceo', 'general manager', 'managing director'))"), 'id')); } catch (Throwable $e) { return []; } }
+function rcr_offer_approved(array $o): bool { return !rcr_offer_appr_has() || ($o['appr_status'] ?? null) === 'approved'; }
+/** HR asks for the approval of a draft with all its terms. */
+function rcr_offer_ask(int $id): string {
+    $o = rcr_offer($id); if (!$o || !rcr_offer_appr_has()) throw new RuntimeException(t('err.noaccess')); if ($o['status'] !== 'draft') throw new RuntimeException(t('rc.of_only_draft'));
+    if ($m = rcr_offer_missing($o)) throw new RuntimeException(t('rc.of_missing', ['what' => implode(', ', $m)])); if (($o['appr_status'] ?? '') === 'pending') throw new RuntimeException(t('rc.ap_already'));
+    $u = current_user(); $me = (int) $u['id']; $ctx = ['application_id' => (int) $o['application_id'], 'vacancy_id' => (int) $o['app']['vacancy_id']];
+    if (function_exists('hr_owner') && hr_owner()) {   // the CEO prepared it
+        q("UPDATE rc_offers SET appr_status = 'approved', appr_req_by = ?, appr_req_name = ?, appr_req_at = NOW(), appr_by = ?, appr_name = ?, appr_at = NOW(), appr_note = NULL WHERE id = ?", [$me, (string) $u['full_name'], $me, (string) $u['full_name'], $id]);
+        rcr_log('offer_approved', $ctx, (string) $o['offer_no']); return 'approved';
+    }
+    $to = array_values(array_filter(rcr_offer_approver_ids(), fn($x) => $x !== $me)); if (!$to) throw new RuntimeException(t('rc.ap_nobody'));
+    q("UPDATE rc_offers SET appr_status = 'pending', appr_req_by = ?, appr_req_name = ?, appr_req_at = NOW(), appr_by = NULL, appr_name = NULL, appr_at = NULL, appr_note = NULL WHERE id = ?", [$me, (string) $u['full_name'], $id]);
+    rcr_log('offer_approval_asked', $ctx, (string) $o['offer_no']);
+    if (function_exists('nf_push')) nf_push($to, 'rc:offer_appr', 'rc:offer_appr:' . $id, t('rc.ap_nf_ask', ['no' => (string) $o['offer_no']]), (string) $o['position'], url('rcr_offer_review', ['id' => $id]), $me, (string) $u['full_name']);
+    return 'pending';
+}
+/** The offer as the approver reads it — without the recruiting right: the terms, the candidate by name, nothing else of the application. */
+function rcr_offer_for_approver(int $id): ?array {
+    if (!rcr_offer_approver()) return null; $o = one('SELECT o.*, a.name AS cand_name, a.code AS app_code, a.lang AS cand_lang, v.title AS vacancy, v.code AS vacancy_code FROM rc_offers o JOIN rc_applications a ON a.id = o.application_id LEFT JOIN rc_vacancies v ON v.id = a.vacancy_id WHERE o.id = ?', [$id]);
+    return $o && !empty($o['appr_status']) ? $o : null;
+}
+function rcr_offers_to_approve(): array {
+    if (!rcr_offer_approver()) return []; $me = (int) (current_user()['id'] ?? 0);
+    return all("SELECT o.id, o.offer_no, o.position, o.appr_req_name, o.appr_req_at, a.name AS cand_name FROM rc_offers o JOIN rc_applications a ON a.id = o.application_id WHERE o.status = 'draft' AND o.appr_status = 'pending' AND (o.appr_req_by IS NULL OR o.appr_req_by <> ?) ORDER BY o.appr_req_at", [$me]);
+}
+/** CEO / General Manager / Managing Director: approve, or send back with the reason. */
+function rcr_offer_decide(int $id, bool $approve, string $note): void {
+    $o = rcr_offer_for_approver($id); $u = current_user(); if (!$o || !$u) throw new RuntimeException(t('err.noaccess'));
+    if ($o['status'] !== 'draft' || $o['appr_status'] !== 'pending') throw new RuntimeException(t('rc.ap_not_waiting'));
+    if ((int) $o['appr_req_by'] === (int) $u['id']) throw new RuntimeException(t('rc.ap_not_own'));
+    $note = mb_substr(trim($note), 0, 300); if (!$approve && mb_strlen($note) < 3) throw new RuntimeException(t('rc.ap_need_note'));
+    $n = q("UPDATE rc_offers SET appr_status = ?, appr_by = ?, appr_name = ?, appr_at = NOW(), appr_note = ? WHERE id = ? AND status = 'draft' AND appr_status = 'pending'", [$approve ? 'approved' : 'rejected', (int) $u['id'], (string) $u['full_name'], $note ?: null, $id])->rowCount();
+    if (!$n) throw new RuntimeException(t('rc.ap_not_waiting'));
+    q('INSERT INTO rc_log (application_id, vacancy_id, action, detail, user_id) VALUES (?,?,?,?,?)', [(int) $o['application_id'], null, $approve ? 'offer_approved' : 'offer_sent_back', mb_substr((string) $o['offer_no'] . ' — ' . (string) $u['full_name'] . ($note !== '' ? ' — ' . $note : ''), 0, 500), (int) $u['id']]);
+    if (function_exists('nf_push') && (int) $o['appr_req_by']) nf_push([(int) $o['appr_req_by']], 'rc:offer_appr', 'rc:offer_appr:' . $id . ':d', t($approve ? 'rc.ap_nf_ok' : 'rc.ap_nf_back', ['no' => (string) $o['offer_no']]), $note ?: null, url('rcr_application', ['id' => (int) $o['application_id']]) . '#offer', (int) $u['id'], (string) $u['full_name']);
+}
 function rcr_offer_pill(string $s): string { return pill(['draft' => 'mute', 'sent' => 'gold', 'accepted' => 'green', 'declined' => 'bad', 'withdrawn' => 'mute'][$s] ?? 'mute', t('rc.of_st_' . $s)); }
 /** "1.850,00 EUR net per month × 14 payments per year" in the given language. */
 function rcr_offer_salary_text(array $o, string $lc): string {
@@ -591,7 +639,9 @@ function rcr_offer_save(int $appId, array $in): int {
     $prob = (string) ($in['probation_months'] ?? '') === '' ? null : max(0, min(24, (int) $in['probation_months']));
     $vals = [$pos, $sal, $cur, $per, $pay, $con, $dte('start_date'), $txt('hours', 120), $txt('place', 160), $prob, $txt('benefits', 4000), $txt('terms', 6000), $dte('valid_until'), $txt('jd_text', 30000)];
     $d = one("SELECT id FROM rc_offers WHERE application_id = ? AND status = 'draft' ORDER BY id DESC LIMIT 1", [$appId]);
-    if ($d) { q('UPDATE rc_offers SET position=?, net_salary=?, currency=?, salary_per=?, payments_per_year=?, contract=?, start_date=?, hours=?, place=?, probation_months=?, benefits=?, terms=?, valid_until=?, jd_text=? WHERE id = ?', [...$vals, (int) $d['id']]); return (int) $d['id']; }
+    if ($d) { q('UPDATE rc_offers SET position=?, net_salary=?, currency=?, salary_per=?, payments_per_year=?, contract=?, start_date=?, hours=?, place=?, probation_months=?, benefits=?, terms=?, valid_until=?, jd_text=? WHERE id = ?', [...$vals, (int) $d['id']]);
+        if (rcr_offer_appr_has() && (int) q('UPDATE rc_offers SET appr_status = NULL, appr_by = NULL, appr_name = NULL, appr_at = NULL, appr_note = NULL WHERE id = ? AND appr_status IS NOT NULL', [(int) $d['id']])->rowCount()) rcr_log('offer_approval_reset', ['application_id' => $appId, 'vacancy_id' => (int) $a['vacancy_id']], t('rc.ap_reset_log'));   // R97-247: changed terms are approved again
+        return (int) $d['id']; }
     $n = (int) scalar('SELECT COUNT(*) + 1 FROM rc_offers WHERE application_id = ?', [$appId]); $jd = rcr_offer_jd_text($a);
     q('INSERT INTO rc_offers (position, net_salary, currency, salary_per, payments_per_year, contract, start_date, hours, place, probation_months, benefits, terms, valid_until, jd_text, application_id, offer_no, jd_id, created_by, created_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       [...$vals, $appId, $a['code'] . '-OF' . $n, $jd['jd_id'], (int) $u['id'], (string) $u['full_name']]);
@@ -620,6 +670,7 @@ function rcr_offer_missing(array $o): array { $m = []; if ($o['net_salary'] === 
 function rcr_offer_send(int $id, string $subject, string $body): bool {
     $o = rcr_offer($id); if (!$o) throw new RuntimeException(t('err.noaccess')); if ($o['status'] !== 'draft') throw new RuntimeException(t('rc.of_only_draft')); $a = $o['app']; $u = current_user();
     if ($m = rcr_offer_missing($o)) throw new RuntimeException(t('rc.of_missing', ['what' => implode(', ', $m)]));
+    if (!rcr_offer_approved($o)) throw new RuntimeException(t('rc.ap_needed'));
     $subject = mb_substr(trim(preg_replace('/[\r\n\t]+/', ' ', $subject)), 0, 200); $body = mb_substr(trim(str_replace("\r\n", "\n", $body)), 0, 60000); if ($subject === '' || mb_strlen($body) < 20) throw new RuntimeException(t('rc.ev_need_text'));
     if (!filter_var((string) $a['email'], FILTER_VALIDATE_EMAIL) || str_starts_with((string) $a['email'], 'anon-')) throw new RuntimeException(t('rc.ev_no_email'));
     if ((int) scalar("SELECT COUNT(*) FROM rc_log WHERE action IN ('offer_sent','offer_not_sent') AND application_id = ? AND created_at > NOW() - INTERVAL 1 MINUTE", [(int) $o['application_id']]) >= 3) throw new RuntimeException(t('rc.ev_too_many'));
@@ -635,6 +686,7 @@ function rcr_offer_send(int $id, string $subject, string $body): bool {
 function rcr_offer_mailed(int $id, array $to, string $subject, string $body, string $how): void {
     $o = rcr_offer($id); if (!$o || $o['status'] !== 'draft' || rcr_offer_missing($o)) return; $a = $o['app']; $u = current_user();
     $ctx = ['application_id' => (int) $o['application_id'], 'vacancy_id' => (int) $a['vacancy_id']];
+    if (!rcr_offer_approved($o)) { rcr_log('offer_not_sent', $ctx, (string) $o['offer_no'] . ' — ' . t('rc.ap_needed')); return; }
     if (!in_array(strtolower(trim((string) $a['email'])), array_map('strtolower', $to), true)) { rcr_log('offer_not_sent', $ctx, (string) $o['offer_no'] . ' — ' . t('rc.of_not_to')); return; }
     $subject = mb_substr(trim(preg_replace('/[\r\n\t]+/', ' ', $subject)), 0, 200); $body = mb_substr(trim(str_replace("\r\n", "\n", $body)), 0, 60000);
     q("UPDATE rc_offers SET status = 'sent', subject = ?, body = ?, sent_at = NOW(), sent_by = ?, sent_name = ? WHERE id = ? AND status = 'draft'", [$subject, $body, (int) $u['id'], (string) $u['full_name'], $id]);

@@ -12,7 +12,7 @@ const APR_DAYS = 30;
 function apr_kinds(): array {
     return ['leave' => ['🏖', 'apr.k_leave'], 'timesheet' => ['⏱', 'apr.k_timesheet'], 'training' => ['🎓', 'apr.k_training'], 'requisition' => ['🛒', 'apr.k_requisition'],
             'payment' => ['💶', 'apr.k_payment'], 'eng' => ['📐', 'apr.k_eng'], 'bom' => ['🧾', 'apr.k_bom'], 'jd' => ['📄', 'apr.k_jd'], 'newsletter' => ['✉', 'apr.k_newsletter'],
-            'equipment' => ['🧰', 'apr.k_equipment'], 'hra' => ['🤖', 'apr.k_hra'], 'change' => ['🛠', 'apr.k_change']];
+            'equipment' => ['🧰', 'apr.k_equipment'], 'hra' => ['🤖', 'apr.k_hra'], 'change' => ['🛠', 'apr.k_change'], 'rcoffer' => ['💼', 'apr.k_rcoffer']];
 }
 function apr_me(): int { return (int)(current_user()['id'] ?? 0); }
 function apr_age(?string $at): int { $ts = $at ? strtotime($at) : false; return $ts ? max(0, (int) floor((time() - $ts) / 86400)) : 0; }
@@ -75,6 +75,8 @@ function apr_waiting(): array {
     // HR assistant flows (card changes, hiring, leaving) — whoever has to act now
     if (function_exists('hra_has') && hra_has()) apr_try($o, fn() => array_map(fn($x) => apr_row('hra', (string)$x['code'], t('hra.k_' . $x['kind']), '', $x['submitted_at'], url('hra_flow', ['id' => (int)$x['id']]), ['with' => t('apr.w_' . ($x['status'] === 'ceo' ? 'ceo' : ($x['status'] === 'manager' ? 'manager' : 'hr')))]),
         all("SELECT id, code, kind, status, submitted_at FROM hr_flows WHERE status IN ('submitted','manager','hr','ceo') AND (assignee_id = ?" . (hra_can_manage() ? " OR status IN ('submitted','hr')" : '') . ') ORDER BY submitted_at', [$me])));
+    // Employment offers — CEO / General Manager (R97-247)
+    if (function_exists('rcr_offer_approver') && rcr_offer_approver()) apr_try($o, fn() => array_map(fn($x) => apr_row('rcoffer', (string)$x['offer_no'], (string)$x['position'] . ' · ' . (string)$x['cand_name'], $x['appr_req_name'], $x['appr_req_at'], url('rcr_offer_review', ['id' => (int)$x['id']]), ['with' => t('apr.w_mgmt')]), rcr_offers_to_approve()));
     // Portal change requests — the Developer
     if (function_exists('cr_has') && cr_has() && cr_is_dev()) apr_try($o, fn() => array_map(fn($x) => apr_row('change', '#' . (int)$x['id'], (string)$x['title'], $x['full_name'], $x['created_at'], url('request', ['id' => (int)$x['id']])),
         all("SELECT r.id, r.title, r.created_at, u.full_name FROM cp_requests r LEFT JOIN customer_users u ON u.id = r.user_id WHERE r.status = 'submitted' ORDER BY r.created_at")));
@@ -94,6 +96,9 @@ function apr_mine(): array {
             all("SELECT r.id, r.status, r.date_from, r.date_to, r.created_at, r.manager_at, r.hr_at, t.code, t.name AS type_name, m.full_name AS manager_name FROM hr_requests r JOIN hr_leave_types t ON t.id = r.type_id LEFT JOIN customer_users m ON m.id = r.manager_user_id
                  WHERE r.user_id = ? AND (r.status IN ('pending_mgr','pending_hr') OR (r.status IN ('approved','rejected') AND COALESCE(r.hr_at, r.manager_at, r.created_at) >= {$since})) ORDER BY r.created_at DESC", [$me]));
     });
+    if (function_exists('rcr_offer_appr_has') && rcr_offer_appr_has() && rcr_offer_can()) apr_try($o, fn() => array_map(fn($x) => apr_row('rcoffer', (string)$x['offer_no'], (string)$x['position'], '', $x['appr_req_at'], url('rcr_application', ['id' => (int)$x['application_id']]) . '#offer',
+            ['state' => $st((string)$x['appr_status'], ['approved'], ['rejected']), 'with' => $x['appr_status'] === 'pending' ? t('apr.w_mgmt') : '', 'decided_at' => $x['appr_at']]),
+        all("SELECT id, application_id, offer_no, position, appr_status, appr_req_at, appr_at FROM rc_offers WHERE appr_req_by = ? AND appr_status IS NOT NULL AND (appr_status = 'pending' OR COALESCE(appr_at, appr_req_at) >= {$since}) ORDER BY appr_req_at DESC", [$me])));   // R97-247
     if (function_exists('ts_has') && ts_has()) apr_try($o, fn() => array_map(fn($x) => apr_row('timesheet', (string)$x['ts_no'], fmt_date($x['period_start']) . ' – ' . fmt_date($x['period_end']) . ($x['project_code'] ? ' · ' . $x['project_code'] : ''), '', $x['submitted_at'], url('timesheet', ['id' => (int)$x['id']]),
             ['state' => $st($x['status'], ['approved'], ['rejected']), 'with' => $x['status'] === 'submitted' ? (string)$x['approver'] : '', 'decided_at' => $x['approved_at']]),
         all("SELECT t.id, t.ts_no, t.status, t.period_start, t.period_end, t.submitted_at, t.approved_at, p.project_code, a.full_name AS approver FROM timesheets t LEFT JOIN projects p ON p.id = t.project_id LEFT JOIN customer_users a ON a.id = t.approver_id

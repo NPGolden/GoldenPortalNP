@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.251.0** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.252.0** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.252.0 | GAS-CP-R97-247 | 2026-11-25 | Recruiting: an offer needs the approval of the CEO or the General Manager before it can be sent; interview invitations leave through the standard e-mail card; the offer text points the candidate to the acceptance link | `install/migrate_cp_r97_247_recruiting_offer_approval.sql` |
 | 1.251.0 | GAS-CP-R97-246 | 2026-11-25 | Recruiting: the offer leaves through the standard e-mail card (send now, draft in Outlook) and the candidate accepts it with its starting date through a personal link; leave and HR-message pushes without details; list and weekly notice of entries by HR; order deletion asks the authenticator code and tells the CEO; fields no longer leave narrow cards | — |
 | 1.250.0 | GAS-CP-R97-245 | 2026-11-25 | Leave: a mistaken entry is corrected by HR or, while it can still change, by the employee; what HR enters for an employee (illness, strike) is final at once and the employee is notified; HR messages in one list with the ones to answer first | `install/migrate_cp_r97_245_leave_correction_hr_messages_pool.sql` |
 | 1.249.0 | GAS-CP-R97-244 | 2026-11-25 | Purchase order: management and portal administrators can delete an order together with its goods receipts, supplier invoices and payments; a line whose code already exists is linked to that item; item codes may hold a comma | — |

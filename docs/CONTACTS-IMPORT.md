@@ -4589,3 +4589,21 @@ Language: 37 new keys, `hr.new_request_for_hint` reworded.
 **Form grid** — `.form-grid` columns are `minmax(0, 1fr)`, children `min-width: 0`, `.span2` and `h2` take the row, inputs inside a label fill the cell; `.form-grid--1` = one column (the side cards of the application).
 
 Language: 34 new keys, `rc.of_mail_hint` reworded.
+
+## §526 Recruiting: second approval of an offer · invitations by the e-mail card · offer text (GAS-CP-R97-247, v1.252.0)
+
+Migration `install/migrate_cp_r97_247_recruiting_offer_approval.sql` (key r99t): `rc_offers.appr_status` (NULL / pending / approved / rejected), `appr_req_by / _name / _at`, `appr_by / appr_name / appr_at / appr_note`.
+
+**Approval** (`app/rcr.php`)
+
+- `rcr_offer_ask($id)` — HR, draft with all terms; notice `rc:offer_appr` to `rcr_offer_approver_ids()` (roles CEO / owner scope, General Manager, Managing Director), without figures. Asked by the CEO (`hr_owner()`) → approved at once.
+- `rcr_offer_decide($id, $approve, $note)` — `rcr_offer_approver()` = `mgmt_can()`; never the person who asked; sending back needs a reason; one conditional UPDATE (`appr_status = 'pending'`), log `offer_approved` / `offer_sent_back`, notice to the requester.
+- Approvers need no recruiting right: `rcr_offer_for_approver()` and the page `rcr_offer_review` show the terms of an offer that has an approval request, nothing else of the application.
+- Enforced in `rcr_offer_send()` and `rcr_offer_mailed()` (`rcr_offer_approved()`); the acceptance link needs status `sent`, so it follows. `rcr_offer_save()` on an existing draft clears the approval (log `offer_approval_reset`).
+- Register: `apr_kinds()['rcoffer']`, waiting rows for approvers, own rows for HR.
+
+**Interview invitation** — `em_card_html()` with `rcr_interview_draft()` and the hidden field `rc_int`; `em_after()` → `rcr_interview_mailed()` sets `candidate_notified_at` and logs `interview_invited — sent from the mailbox | draft placed in Outlook | message file prepared`. The form with `rcr_interview_send` is gone from the page; the function stays for the Golden HR app, which still sends from the portal mailbox.
+
+**Offer text** — `et.d_b_rc_offer` in five languages: the sentence that asked for an answer by e-mail now announces the separate e-mail with the personal acceptance link. Stored templates are not touched.
+
+Language: 31 new keys; `rc.ev_invite_hint` and the offer template body reworded.
