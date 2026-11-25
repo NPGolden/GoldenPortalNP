@@ -13863,4 +13863,7 @@ Cordiali saluti,
 'rc.ap_send_back' => 'Rimanda',
 'apr.k_rcoffer' => 'Offerta di lavoro',
 'rc.ev_invite_again' => 'Invito al candidato — invia di nuovo',
+'rc.ap_s_expired' => 'approvazione scaduta',
+'rc.ap_valid_passed' => 'La data di validità di questa offerta è passata. HR imposta una nuova data di validità nelle condizioni e chiede di nuovo approvazione.',
+'rc.ap_totp_hint' => 'necessario per approvare',
 ];

@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.252.0';
+const CP_VERSION = '1.252.1';
 const CP_BUILD   = '2026-11-24';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-248', 'version' => '1.252.1', 'date' => '2026-11-25', 'title' => 'Recruiting offer: the approver confirms with the authenticator code; the approval ends when the validity date of the offer passes', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-247', 'version' => '1.252.0', 'date' => '2026-11-25', 'title' => 'Recruiting: an offer needs the approval of the CEO or the General Manager before it can be sent; interview invitations leave through the standard e-mail card; the offer text points the candidate to the acceptance link', 'db' => 'install/migrate_cp_r97_247_recruiting_offer_approval.sql', 'check' => 'r99t'],
         ['ref' => 'GAS-CP-R97-246', 'version' => '1.251.0', 'date' => '2026-11-25', 'title' => 'Recruiting: the offer leaves through the standard e-mail card (send now, draft in Outlook) and the candidate accepts it with its starting date through a personal link; leave and HR-message pushes without details; list and weekly notice of entries by HR; order deletion asks the authenticator code and tells the CEO; fields no longer leave narrow cards', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-245', 'version' => '1.250.0', 'date' => '2026-11-25', 'title' => 'Leave: a mistaken entry is corrected by HR or, while it can still change, by the employee; what HR enters for an employee (illness, strike) is final at once and the employee is notified; HR messages in one list with the ones to answer first', 'db' => 'install/migrate_cp_r97_245_leave_correction_hr_messages_pool.sql', 'check' => 'r99s'],

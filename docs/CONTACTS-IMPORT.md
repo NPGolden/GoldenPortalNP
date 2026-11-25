@@ -4607,3 +4607,12 @@ Migration `install/migrate_cp_r97_247_recruiting_offer_approval.sql` (key r99t):
 **Offer text** — `et.d_b_rc_offer` in five languages: the sentence that asked for an answer by e-mail now announces the separate e-mail with the personal acceptance link. Stored templates are not touched.
 
 Language: 31 new keys; `rc.ev_invite_hint` and the offer template body reworded.
+
+## §527 Recruiting offer approval: authenticator code and expiry (GAS-CP-R97-248, v1.252.1)
+
+- `rcr_offer_decide()`: to approve, `pk_stepup_ok($u, $_POST['totp'])` — a person without an authenticator passes, a person with one must give the current code; sending back is not gated. The field is on `rcr_offer_review` when `totp_enabled`.
+- `rcr_offer_valid_passed($o)` (validity date before today), `rcr_offer_appr_expired($o)`, and `rcr_offer_approved($o)` = approved **and** validity not passed. Used by `rcr_offer_send()`, `rcr_offer_mailed()` and the application page (pill «approval expired», no e-mail card).
+- `rcr_offer_ask()` and approving refuse an offer whose validity passed (`rc.ap_valid_passed`); saving the terms with a new validity clears the approval, then it is asked again. No scheduled job and no database change: the state is computed.
+- Offers with status `sent` are not affected; the acceptance link of the candidate already ends on the validity date.
+
+Language: 3 new keys.

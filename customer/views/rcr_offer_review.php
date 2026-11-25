@@ -12,7 +12,7 @@ layout_head(t('rc.ap_title') . ' ' . $o['offer_no'], 'my_approvals');
 ?>
 <div class="page-head"><div><p class="crumbs"><a href="<?= url('my_approvals') ?>"><?= tt('apr.title') ?></a> › <?= e($o['offer_no']) ?></p><h1>🔏 <?= tt('rc.ap_title') ?> — <span style="font-family:var(--mono);"><?= e($o['offer_no']) ?></span></h1>
   <p class="lede" style="margin-bottom:0;"><?= e(t('rc.ap_lede', ['u' => (string)$o['appr_req_name'], 'd' => fmt_datetime((string)$o['appr_req_at'])])) ?></p></div>
-  <div><?= pill($o['appr_status'] === 'approved' ? 'green' : ($o['appr_status'] === 'rejected' ? 'bad' : 'gold'), t('rc.ap_s_' . $o['appr_status'])) ?></div></div>
+  <div><?= rcr_offer_appr_expired($o) && $o['status'] === 'draft' ? pill('bad', t('rc.ap_s_expired')) : pill($o['appr_status'] === 'approved' ? 'green' : ($o['appr_status'] === 'rejected' ? 'bad' : 'gold'), t('rc.ap_s_' . $o['appr_status'])) ?></div></div>
 <div class="cols" style="grid-template-columns:3fr 2fr;"><div>
 <div class="card"><h2>💼 <?= tt('rc.ap_terms') ?></h2>
   <div class="table-scroll"><table class="tbl tbl--compact"><tbody><?php foreach ($rows as [$k, $v]): if ($v === '') continue; ?><tr><th style="width:200px;"><?= e($k) ?></th><td style="white-space:pre-wrap;"><?= e($v) ?></td></tr><?php endforeach; ?></tbody></table></div>
@@ -24,6 +24,7 @@ layout_head(t('rc.ap_title') . ' ' . $o['offer_no'], 'my_approvals');
   <p class="hint"><?= tt('rc.ap_decide_hint') ?></p>
   <form method="post" action="<?= url('rcr_offer_review', ['id' => $id]) ?>" data-lock class="form-grid form-grid--1"><?= csrf_field() ?><input type="hidden" name="action" value="rcr_offer_decide"><input type="hidden" name="offer_id" value="<?= $id ?>">
     <div class="field"><label><?= tt('rc.ap_note') ?></label><textarea name="note" rows="3" maxlength="300"></textarea></div>
+    <?php if (rcr_offer_valid_passed($o)): ?><p class="flash flash--bad" style="margin:0;"><?= tt('rc.ap_valid_passed') ?></p><?php elseif (!empty($u['totp_enabled'])): ?><div class="field"><label><?= tt('po.pg_totp_label') ?> — <span class="hint" style="display:inline;"><?= tt('rc.ap_totp_hint') ?></span></label><input name="totp" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" style="max-width:140px;"></div><?php endif; ?>
     <div class="btn-row"><button class="btn btn--gold" type="submit" name="decision" value="approve">✔ <?= tt('hr.approve') ?></button><button class="btn btn--ghost" type="submit" name="decision" value="reject">↩ <?= tt('rc.ap_send_back') ?></button></div>
   </form>
 <?php elseif ($wait): ?><p class="hint"><?= tt('rc.ap_not_own') ?></p>

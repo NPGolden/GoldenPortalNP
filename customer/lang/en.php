@@ -13863,4 +13863,7 @@ Best regards,
 'rc.ap_send_back' => 'Send back',
 'apr.k_rcoffer' => 'Employment offer',
 'rc.ev_invite_again' => 'Invitation to the candidate — send again',
+'rc.ap_s_expired' => 'approval expired',
+'rc.ap_valid_passed' => 'The validity date of this offer has passed. HR sets a new validity date in the terms and asks for the approval again.',
+'rc.ap_totp_hint' => 'needed to approve',
 ];

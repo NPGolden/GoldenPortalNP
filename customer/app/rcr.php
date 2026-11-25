@@ -570,11 +570,15 @@ function rcr_offer(int $id): ?array { if (!rcr_offer_can()) return null; $o = on
 function rcr_offer_appr_has(): bool { static $h = null; if ($h === null) { try { $h = rcr_offer_has() && (bool) scalar("SHOW COLUMNS FROM rc_offers LIKE 'appr_status'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function rcr_offer_approver(): bool { return rcr_offer_appr_has() && is_staff() && function_exists('mgmt_can') && mgmt_can(); }
 function rcr_offer_approver_ids(): array { try { return array_map('intval', array_column(all("SELECT cu.id FROM customer_users cu JOIN staff_roles r ON r.id = cu.staff_role_id WHERE cu.is_active = 1 AND cu.role <> 'customer' AND (r.scope = 'owner' OR LOWER(TRIM(r.name)) IN ('ceo', 'general manager', 'managing director'))"), 'id')); } catch (Throwable $e) { return []; } }
-function rcr_offer_approved(array $o): bool { return !rcr_offer_appr_has() || ($o['appr_status'] ?? null) === 'approved'; }
+/** R97-248: an approval holds until the validity date of the offer; after it the terms are approved again (with a new validity). */
+function rcr_offer_valid_passed(array $o): bool { return !empty($o['valid_until']) && (string) $o['valid_until'] < date('Y-m-d'); }
+function rcr_offer_appr_expired(array $o): bool { return rcr_offer_appr_has() && ($o['appr_status'] ?? null) === 'approved' && rcr_offer_valid_passed($o); }
+function rcr_offer_approved(array $o): bool { return !rcr_offer_appr_has() || (($o['appr_status'] ?? null) === 'approved' && !rcr_offer_valid_passed($o)); }
 /** HR asks for the approval of a draft with all its terms. */
 function rcr_offer_ask(int $id): string {
     $o = rcr_offer($id); if (!$o || !rcr_offer_appr_has()) throw new RuntimeException(t('err.noaccess')); if ($o['status'] !== 'draft') throw new RuntimeException(t('rc.of_only_draft'));
     if ($m = rcr_offer_missing($o)) throw new RuntimeException(t('rc.of_missing', ['what' => implode(', ', $m)])); if (($o['appr_status'] ?? '') === 'pending') throw new RuntimeException(t('rc.ap_already'));
+    if (rcr_offer_valid_passed($o)) throw new RuntimeException(t('rc.ap_valid_passed'));   // R97-248
     $u = current_user(); $me = (int) $u['id']; $ctx = ['application_id' => (int) $o['application_id'], 'vacancy_id' => (int) $o['app']['vacancy_id']];
     if (function_exists('hr_owner') && hr_owner()) {   // the CEO prepared it
         q("UPDATE rc_offers SET appr_status = 'approved', appr_req_by = ?, appr_req_name = ?, appr_req_at = NOW(), appr_by = ?, appr_name = ?, appr_at = NOW(), appr_note = NULL WHERE id = ?", [$me, (string) $u['full_name'], $me, (string) $u['full_name'], $id]);
@@ -601,6 +605,8 @@ function rcr_offer_decide(int $id, bool $approve, string $note): void {
     if ($o['status'] !== 'draft' || $o['appr_status'] !== 'pending') throw new RuntimeException(t('rc.ap_not_waiting'));
     if ((int) $o['appr_req_by'] === (int) $u['id']) throw new RuntimeException(t('rc.ap_not_own'));
     $note = mb_substr(trim($note), 0, 300); if (!$approve && mb_strlen($note) < 3) throw new RuntimeException(t('rc.ap_need_note'));
+    if ($approve && rcr_offer_valid_passed($o)) throw new RuntimeException(t('rc.ap_valid_passed'));   // R97-248: nothing is approved after its validity; send it back instead
+    if ($approve && function_exists('pk_stepup_ok') && !pk_stepup_ok($u, trim((string)($_POST['totp'] ?? '')))) throw new RuntimeException(t('po.pg_totp'));   // R97-248: the approver confirms with the authenticator code
     $n = q("UPDATE rc_offers SET appr_status = ?, appr_by = ?, appr_name = ?, appr_at = NOW(), appr_note = ? WHERE id = ? AND status = 'draft' AND appr_status = 'pending'", [$approve ? 'approved' : 'rejected', (int) $u['id'], (string) $u['full_name'], $note ?: null, $id])->rowCount();
     if (!$n) throw new RuntimeException(t('rc.ap_not_waiting'));
     q('INSERT INTO rc_log (application_id, vacancy_id, action, detail, user_id) VALUES (?,?,?,?,?)', [(int) $o['application_id'], null, $approve ? 'offer_approved' : 'offer_sent_back', mb_substr((string) $o['offer_no'] . ' — ' . (string) $u['full_name'] . ($note !== '' ? ' — ' . $note : ''), 0, 500), (int) $u['id']]);
