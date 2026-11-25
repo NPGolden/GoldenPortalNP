@@ -2,7 +2,7 @@
 /** Assessment result of one person — for HR and the CEO, and for the person after the campaign has closed.   GAS-CP-R97-063   ?p=hr_test_result&id=&pid= */
 require __DIR__ . '/_layout.php';
 $u = require_staff(); $id = (int) ($_GET['id'] ?? 0); $pid = (int) ($_GET['pid'] ?? 0);
-$c = function_exists('hrs_has') && hrs_has() ? hrs_campaign($id) : null; $t = $c ? hrs_target($id, $pid) : null; $isHr = function_exists('hrs_can') && hrs_can();
+$c = function_exists('hrs_has') && hrs_has() ? hrs_campaign($id) : null; $t = $c ? hrs_target($id, $pid) : null; $isHr = function_exists('hrs_can_view') && hrs_can_view();
 if (!$c || !$t || !hrs_may_see($c, $t)) { http_response_code(403); layout_head(t('hrs.title'), $isHr ? 'hr_tests' : 'my_leave'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
 $F = $c['F']; $p = hr_person($pid); $sc = json_decode((string) $t['scores'], true) ?: []; $fl = json_decode((string) $t['flags'], true) ?: []; $own = (int) $t['user_id'] === (int) $u['id'];
 if (!$own && empty($_SESSION['hrs_seen'][$id . ':' . $pid])) { $_SESSION['hrs_seen'][$id . ':' . $pid] = 1; if (function_exists('hr_audit')) hr_audit($pid, 'assessment', mb_substr((string) $c['title'], 0, 120), null, null, t('hrs.au_viewed')); }

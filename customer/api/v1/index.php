@@ -7,6 +7,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(204); exit; }
 $path = '/' . trim((string)parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH), '/'); $path = preg_replace('#^.*?/api/v1#', '', $path) ?: '/';
 $method = $_SERVER['REQUEST_METHOD']; $body = [];
 if (stripos($_SERVER['CONTENT_TYPE'] ?? '', 'application/json') !== false) $body = json_decode(file_get_contents('php://input') ?: '[]', true) ?: [];
+if (is_array($body['device'] ?? null) && is_string($body['device']['platform'] ?? null)) $GLOBALS['ll_platform'] = $body['device']['platform'];   // R97-254: for the login history
 try {
     $app = api_app(); $isPm = $app === 'pm'; $isCu = $app === 'customer'; $isHr = $app === 'hr';   // R74-001: 'hr' (Golden HR)                                                       // R66-001: 'engineer' (Service Engineer) or 'pm' (Golden PM); R68-001: 'customer'
     if (!isset(API_APPS[strtolower(trim((string)($_SERVER['HTTP_X_APP'] ?? API_APP_ID)))])) Response::error(403, 'Wrong application');
@@ -56,7 +57,7 @@ try {
     if ($isCu && !str_starts_with($path, '/me/passkeys')) { $u['device_id'] = (int)$u['device_id']; require __DIR__ . '/endpoints/customer.php'; customer_routes($u, $method, $path, $body); }
     if ($isPm) PortalPM::allowed($u);                                                                                            // rights may change while a token lives
     switch (true) {
-        case $method === 'POST' && $path === '/auth/logout': q('UPDATE mob_refresh_tokens SET revoked_at = NOW() WHERE device_id = ? AND revoked_at IS NULL', [$u['device_id']]); q('UPDATE mob_devices SET push_token = NULL WHERE id = ?', [$u['device_id']]);   /* R97-199: a signed-out phone receives nothing */ Response::json([], 204);
+        case $method === 'POST' && $path === '/auth/logout': try { $GLOBALS['ll_platform'] = (string) scalar('SELECT platform FROM mob_devices WHERE id = ?', [(int)$u['device_id']]); if (function_exists('login_log')) login_log((int)$u['id'], (string)$u['email'], 'logout'); } catch (Throwable $e) {}   /* R97-254 */ q('UPDATE mob_refresh_tokens SET revoked_at = NOW() WHERE device_id = ? AND revoked_at IS NULL', [$u['device_id']]); q('UPDATE mob_devices SET push_token = NULL WHERE id = ?', [$u['device_id']]);   /* R97-199: a signed-out phone receives nothing */ Response::json([], 204);
         case $method === 'GET' && $path === '/me': Response::json($me($u));
         /* R82-003: part ordering from the apps — requisitions (app/prq.php rules) */
         case $method === 'GET' && $path === '/requisitions': Response::json(PortalParts::list((string)($_GET['status'] ?? 'open')));

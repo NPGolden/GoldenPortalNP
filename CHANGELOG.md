@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.256.0** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.257.0** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.257.0 | GAS-CP-R97-254 | 2026-11-25 | General Manager works in HR (without personal data and employee documents) and reads the assessments; login history shows sign-ins from the mobile apps with app, version and platform | `install/migrate_cp_r97_254_login_log_apps.sql` |
 | 1.256.0 | GAS-CP-R97-253 | 2026-11-25 | Inventory: import of company assets from Excel — one row per unit with serial number, company number, warehouse and holder; template, preview, all-or-nothing import | — |
 | 1.255.0 | GAS-CP-R97-252 | 2026-11-25 | Inventory: serial numbers followed through receipts, issues, transfers and delivery notes; company assets handed to people through Equipment of the personnel | `install/migrate_cp_r97_252_serial_numbers_company_assets.sql` |
 | 1.254.1 | GAS-CP-R97-251 | 2026-11-25 | Service app 0.8.8 — the photos of a report already sent are shown and added per task | — |

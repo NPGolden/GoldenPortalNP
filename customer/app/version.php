@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.256.0';
+const CP_VERSION = '1.257.0';
 const CP_BUILD   = '2026-11-24';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-254', 'version' => '1.257.0', 'date' => '2026-11-25', 'title' => 'General Manager works in HR (without personal data and employee documents) and reads the assessments; login history shows sign-ins from the mobile apps with app, version and platform', 'db' => 'install/migrate_cp_r97_254_login_log_apps.sql', 'check' => 'r99w'],
         ['ref' => 'GAS-CP-R97-253', 'version' => '1.256.0', 'date' => '2026-11-25', 'title' => 'Inventory: import of company assets from Excel — one row per unit with serial number, company number, warehouse and holder; template, preview, all-or-nothing import', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-252', 'version' => '1.255.0', 'date' => '2026-11-25', 'title' => 'Inventory: serial numbers followed through receipts, issues, transfers and delivery notes; company assets handed to people through Equipment of the personnel', 'db' => 'install/migrate_cp_r97_252_serial_numbers_company_assets.sql', 'check' => 'r99v'],
         ['ref' => 'GAS-CP-R97-251', 'version' => '1.254.1', 'date' => '2026-11-25', 'title' => 'Service app 0.8.8 — the photos of a report already sent are shown and added per task', 'db' => null, 'check' => null],
@@ -712,6 +713,7 @@ function cp_migration_state(): array {
         'r99t' => $has("SHOW COLUMNS FROM rc_offers LIKE 'appr_status'"),   // R97-247
         'r99u' => $has("SHOW COLUMNS FROM tasks LIKE 'hr_only'"),   // R97-249
         'r99v' => $has("SHOW TABLES LIKE 'inv_serials'") && $has("SHOW COLUMNS FROM inv_items LIKE 'track_serial'") && $has("SHOW COLUMNS FROM hr_eq_items LIKE 'inv_serial_id'"),   // R97-252
+        'r99w' => $has("SHOW COLUMNS FROM login_log LIKE 'source'"),   // R97-254
         'r99k' => $has("SHOW COLUMNS FROM nl_issues LIKE 'tr'") && $has("SHOW COLUMNS FROM nl_sends LIKE 'lang'") && $has("SHOW COLUMNS FROM contacts LIKE 'nl_lang'"),   // R97-203
         'r99j' => $has("SHOW TABLES LIKE 'soc_post_tr'") && $has("SHOW COLUMNS FROM soc_posts LIKE 'lang'"),   // R97-201
         'r99i' => $has("SHOW TABLES LIKE 'wl_prefs'") && $has("SHOW TABLES LIKE 'wl_mood_seen'"),   // R97-194

@@ -1,8 +1,8 @@
 <?php
 /** HR › Assessments — one campaign: questions as imported, people, period, progress, results.   GAS-CP-R97-063   ?p=hr_test&id= */
 require __DIR__ . '/_layout.php';
-$u = require_staff(); $id = (int) ($_GET['id'] ?? 0); $c = function_exists('hrs_can') && hrs_can() ? hrs_campaign($id) : null;
-if (!$c) { http_response_code($id && function_exists('hrs_can') && hrs_can() ? 404 : 403); layout_head(t('hrs.title'), 'hr_tests'); echo '<h1>' . tt(function_exists('hrs_can') && hrs_can() ? 'err.notfound' : 'err.noaccess') . '</h1>'; layout_foot(); return; }
+$u = require_staff(); $id = (int) ($_GET['id'] ?? 0); $see = function_exists('hrs_can_view') && hrs_can_view(); $ro = $see && !hrs_can(); $c = $see ? hrs_campaign($id) : null;   // R97-254: read only for the General Manager
+if (!$c) { http_response_code($id && $see ? 404 : 403); layout_head(t('hrs.title'), 'hr_tests'); echo '<h1>' . tt($see ? 'err.notfound' : 'err.noaccess') . '</h1>'; layout_foot(); return; }
 $F = $c['F']; $set = $F['set']; $tg = hrs_targets($id); $st = $c['status']; $open = in_array($st, ['draft', 'scheduled'], true);
 $warn = $_SESSION['hrs_warn'][$id] ?? []; unset($_SESSION['hrs_warn'][$id]);
 $inIds = array_map(fn($t) => (int) $t['person_id'], $tg); $people = $st !== 'closed' ? hr_people(true) : [];
@@ -16,7 +16,8 @@ layout_head(t('hrs.title') . ' · ' . hrs_tx($F['title']), 'hr_tests');
 <div class="page-head">
   <div><h1>🧭 <?= e(hrs_tx($F['title'])) ?></h1><p class="lede" style="margin-bottom:0;"><?= hrs_status_pill($st) ?> <?= e($c['family_code']) ?> v<?= (int) $c['family_version'] ?><?= $c['starts_on'] ? ' · ' . e(fmt_date($c['starts_on'])) . ' – ' . e(fmt_date($c['ends_on'])) : '' ?> · <?= e(t('hrs.q_counts', ['s' => $nSelf, 'm' => $nMgr])) ?></p></div>
   <div class="btn-row">
-    <?php if ($st === 'running'): ?>
+    <?php if ($ro): ?><span class="pill pill--mute">👁 <?= tt('hrs.ro_pill') ?></span>
+    <?php elseif ($st === 'running'): ?>
       <form method="post" action="<?= url('hr_test', ['id' => $id]) ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hrs_remind"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--ghost" type="submit">🔔 <?= tt('hrs.remind') ?></button></form>
       <form method="post" action="<?= url('hr_test', ['id' => $id]) ?>" class="inline" data-lock data-confirm="<?= e(t('hrs.close_confirm')) ?>"><?= csrf_field() ?><input type="hidden" name="action" value="hrs_close"><input type="hidden" name="id" value="<?= $id ?>"><button class="btn btn--gold" type="submit"><?= tt('hrs.close_now') ?></button></form>
     <?php elseif ($st === 'scheduled'): ?>
@@ -57,7 +58,7 @@ layout_head(t('hrs.title') . ' · ' . hrs_tx($F['title']), 'hr_tests');
       <td><b><?= e($t['name_en']) ?></b><br><span class="hint"><?= e((string) ($t['department'] ?? '')) ?></span></td>
       <td><?= $stLabel($t['self_status']) ?><?= $t['self_submitted_at'] ? ' <span class="hint">' . e(fmt_datetime($t['self_submitted_at'])) . '</span>' : '' ?></td>
       <?php if (!empty($set['manager_form'])): ?>
-      <td><?php if ($t['mgr_status'] === 'done'): ?><?= e((string) $t['rater_name']) ?><?php else: ?><form method="post" action="<?= url('hr_test', ['id' => $id]) ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hrs_rater"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="pid" value="<?= (int) $t['person_id'] ?>">
+      <td><?php if ($t['mgr_status'] === 'done' || $ro): ?><?= e((string) $t['rater_name']) ?><?php else: ?><form method="post" action="<?= url('hr_test', ['id' => $id]) ?>" class="inline" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hrs_rater"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="pid" value="<?= (int) $t['person_id'] ?>">
         <select name="rater" style="max-width:220px;"><option value="0">— <?= tt('hrs.no_rater') ?> —</option><?php foreach ($staff as $s): if ((int) $s['id'] === (int) $t['user_id']) continue; ?><option value="<?= (int) $s['id'] ?>"<?= (int) $s['id'] === (int) $t['rater_user_id'] ? ' selected' : '' ?>><?= e($s['full_name']) ?></option><?php endforeach; ?></select>
         <button class="btn btn--ghost btn--sm" type="submit"><?= tt('btn.save') ?></button></form><?php endif; ?></td>
       <td><?= $t['rater_user_id'] ? $stLabel($t['mgr_status']) : '<span class="hint">—</span>' ?></td>
@@ -65,12 +66,12 @@ layout_head(t('hrs.title') . ' · ' . hrs_tx($F['title']), 'hr_tests');
     </tr><?php endforeach; ?></tbody>
   </table></div>
   <p class="hint"><?= tt('hrs.progress_hint') ?></p>
-  <form method="post" action="<?= url('hr_test', ['id' => $id]) ?>" class="btn-row" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hrs_end"><input type="hidden" name="id" value="<?= $id ?>">
-    <label class="hint" style="margin:0;"><?= tt('hrs.ends_on') ?></label><input type="date" name="ends_on" value="<?= e((string) $c['ends_on']) ?>" min="<?= date('Y-m-d') ?>" style="max-width:170px;" required><button class="btn btn--ghost btn--sm" type="submit"><?= tt('hrs.move_end') ?></button></form>
+  <?php if (!$ro): ?><form method="post" action="<?= url('hr_test', ['id' => $id]) ?>" class="btn-row" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hrs_end"><input type="hidden" name="id" value="<?= $id ?>">
+    <label class="hint" style="margin:0;"><?= tt('hrs.ends_on') ?></label><input type="date" name="ends_on" value="<?= e((string) $c['ends_on']) ?>" min="<?= date('Y-m-d') ?>" style="max-width:170px;" required><button class="btn btn--ghost btn--sm" type="submit"><?= tt('hrs.move_end') ?></button></form><?php endif; ?>
 </div>
 <?php endif; ?>
 
-<?php if ($st !== 'closed'): $byDept = []; foreach ($people as $p) $byDept[(string) ($p['department'] ?? '')][] = $p; ksort($byDept); ?>
+<?php if ($st !== 'closed' && !$ro): $byDept = []; foreach ($people as $p) $byDept[(string) ($p['department'] ?? '')][] = $p; ksort($byDept); ?>
 <div class="card" id="hrs-people">
   <h2>👥 <?= tt($open ? 'hrs.setup' : 'hrs.add_people') ?> <span class="hint" style="display:inline;margin-left:8px;" id="hrs-n"><?= count($inIds) ?></span></h2>
   <form method="post" action="<?= url('hr_test', ['id' => $id]) ?>" data-lock><?= csrf_field() ?><input type="hidden" name="id" value="<?= $id ?>">

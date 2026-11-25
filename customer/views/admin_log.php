@@ -10,8 +10,10 @@ $u = require_cp_admin();
 
 $q       = trim((string)($_GET['q'] ?? ''));
 $outcome = (string)($_GET['outcome'] ?? '');
-$outs    = ['success', 'failed', 'locked', 'disabled', 'logout', 'twofa_failed', 'twofa_enrolled', 'expired', 'device', 'revoked', 'closed', 'pw_changed', 'pw_reset'];   // R49-001
+$outs    = ['success', 'failed', 'locked', 'disabled', 'logout', 'twofa_failed', 'twofa_enrolled', 'expired', 'device', 'revoked', 'closed', 'pw_changed', 'pw_reset', 'passkey', 'passkey_failed', 'passkey_added', 'passkey_removed'];   // R49-001
 if (!in_array($outcome, $outs, true)) $outcome = '';
+$llSrc = function_exists('ll_src_has') && ll_src_has(); $srcs = ['web', 'engineer', 'pm', 'hr', 'employee', 'customer']; $src = (string)($_GET['src'] ?? ''); if (!$llSrc || !in_array($src, array_merge($srcs, ['apps']), true)) $src = '';   // R97-254: where the sign-in came from
+$srcName = fn(?string $s) => $s === null || $s === '' ? t('ll.src_web') : t('ll.src_' . (in_array($s, $srcs, true) ? $s : 'web'));
 $from    = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['from'] ?? '')) ? $_GET['from'] : '';
 $to      = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_GET['to'] ?? '')) ? $_GET['to'] : '';
 $per     = per_page();
@@ -20,6 +22,7 @@ $pageNo  = max(1, (int)($_GET['page'] ?? 1));
 $w = []; $args = [];
 if ($q !== '')       { $w[] = '(l.email LIKE ? OR cu.full_name LIKE ? OR l.ip LIKE ?)'; array_push($args, ...array_fill(0, 3, '%' . $q . '%')); }
 if ($outcome !== '') { $w[] = 'l.outcome = ?'; $args[] = $outcome; }
+if ($src === 'web') $w[] = 'l.source IS NULL'; elseif ($src === 'apps') $w[] = 'l.source IS NOT NULL'; elseif ($src !== '') { $w[] = 'l.source = ?'; $args[] = $src; }
 if ($from !== '')    { $w[] = 'l.created_at >= ?'; $args[] = $from . ' 00:00:00'; }
 if ($to !== '')      { $w[] = 'l.created_at <= ?'; $args[] = $to . ' 23:59:59'; }
 $where = $w ? 'WHERE ' . implode(' AND ', $w) : '';
@@ -32,23 +35,23 @@ if (($_GET['export'] ?? '') === 'csv') {
     header('Content-Disposition: attachment; filename="GAS-login-history-' . date('Ymd-Hi') . '.csv"');
     header('Cache-Control: private, max-age=0');
     $out = fopen('php://output', 'w'); fwrite($out, "\xEF\xBB\xBF");
-    fputcsv($out, ['When', 'Name', 'Email', 'Role', 'Customer', 'Outcome', 'IP', 'Browser'], ';');
+    fputcsv($out, ['When', 'Name', 'Email', 'Role', 'Customer', 'Outcome', 'IP', 'Browser', 'Where', 'App version', 'Platform'], ';');
     foreach (all($select . ' LIMIT 50000', $args) as $r) {
-        fputcsv($out, [$r['created_at'], $r['full_name'] ?? '', $r['email'], $r['role'] ?? '', $r['customer_name'] ?? '', $r['outcome'], $r['ip'] ?? '', $r['user_agent'] ?? ''], ';');
+        fputcsv($out, [$r['created_at'], $r['full_name'] ?? '', $r['email'], $r['role'] ?? '', $r['customer_name'] ?? '', $r['outcome'], $r['ip'] ?? '', $r['user_agent'] ?? '', t_in('ll.src_' . (in_array($r['source'] ?? '', $srcs, true) ? $r['source'] : 'web'), 'en'), $r['app_version'] ?? '', $r['platform'] ?? ''], ';');
     }
     exit;
 }
 
 $total = (int) scalar("SELECT COUNT(*) {$from_sql}", $args);
 $rows  = all($select . ' LIMIT ' . $per . ' OFFSET ' . (($pageNo - 1) * $per), $args);
-$keep  = array_filter(['q' => $q, 'outcome' => $outcome, 'from' => $from, 'to' => $to, 'per' => $per]);
+$keep  = array_filter(['q' => $q, 'src' => $src, 'outcome' => $outcome, 'from' => $from, 'to' => $to, 'per' => $per]);
 
 /* last 24 h at a glance */
-$day = one("SELECT SUM(outcome = 'success') AS ok, SUM(outcome IN ('failed','locked','disabled','twofa_failed')) AS bad,
-                   COUNT(DISTINCT CASE WHEN outcome = 'success' THEN user_id END) AS people
+$day = one("SELECT SUM(outcome IN ('success','passkey')) AS ok, SUM(outcome IN ('failed','locked','disabled','twofa_failed')) AS bad,
+                   COUNT(DISTINCT CASE WHEN outcome IN ('success','passkey') THEN user_id END) AS people
             FROM login_log WHERE created_at >= NOW() - INTERVAL 1 DAY") ?: ['ok' => 0, 'bad' => 0, 'people' => 0];
 
-$tone = ['success' => 'green', 'failed' => 'bad', 'locked' => 'bad', 'disabled' => 'gold', 'logout' => 'mute', 'twofa_failed' => 'bad', 'twofa_enrolled' => 'green'];
+$tone = ['passkey' => 'green', 'passkey_failed' => 'bad', 'success' => 'green', 'failed' => 'bad', 'locked' => 'bad', 'disabled' => 'gold', 'logout' => 'mute', 'twofa_failed' => 'bad', 'twofa_enrolled' => 'green'];
 $sel  = fn($a, $b) => (string)$a === (string)$b ? ' selected' : '';
 /** Short browser label from the user agent. */
 $browser = function (?string $ua): string {
@@ -131,13 +134,15 @@ layout_head(t('ll.title'), 'admin_log');
 </div>
 
 <div class="card card--tight">
-  <form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1.4fr 1fr 1fr 1fr auto auto;">
+  <form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1.4fr 1fr 1fr 1fr 1fr auto auto;">
     <input type="hidden" name="p" value="admin_log">
     <div class="field"><label for="q"><?= tt('pr.search') ?></label><input id="q" name="q" value="<?= e($q) ?>" placeholder="<?= tt('ll.search_ph') ?>"></div>
     <div class="field"><label for="outcome"><?= tt('ll.outcome') ?></label>
       <select id="outcome" name="outcome"><option value=""><?= tt('flt.any') ?></option>
         <?php foreach ($outs as $o): ?><option value="<?= $o ?>"<?= $sel($o, $outcome) ?>><?= e(t('ll.o_' . $o)) ?></option><?php endforeach; ?>
       </select></div>
+    <?php if ($llSrc): ?><div class="field"><label for="src"><?= tt('ll.src') ?></label>
+      <select id="src" name="src" data-nosearch><option value=""><?= tt('flt.any') ?></option><option value="apps"<?= $sel('apps', $src) ?>><?= tt('ll.src_apps') ?></option><?php foreach ($srcs as $s1): ?><option value="<?= $s1 ?>"<?= $sel($s1, $src) ?>><?= e($srcName($s1)) ?></option><?php endforeach; ?></select></div><?php else: ?><div></div><?php endif; ?>
     <div class="field"><label for="from"><?= tt('ll.from') ?></label><input id="from" name="from" type="date" value="<?= e($from) ?>"></div>
     <div class="field"><label for="to"><?= tt('ll.to') ?></label><input id="to" name="to" type="date" value="<?= e($to) ?>"></div>
     <div class="field"><label for="per"><?= tt('pg.per') ?></label>
@@ -151,6 +156,7 @@ layout_head(t('ll.title'), 'admin_log');
 
 <?php if (function_exists('ls_has') && ls_has()): /* R97-123: how long the portal is used */
   $lsD = (int)($_GET['use'] ?? 30); if (!in_array($lsD, [7, 30, 90, 365], true)) $lsD = 30; $lsU = ls_usage($lsD); $lsOne = (int)($_GET['su'] ?? 0); $lsR = ls_recent($lsOne ?: null, $lsOne ? 200 : 40);
+  $lsApps = function_exists('ll_apps_usage') ? ll_apps_usage($lsD) : [];   // R97-254
   $lsTot = array_sum(array_map(fn($r) => (int)$r['secs'], $lsU)); $lsAct = count(array_filter($lsU, fn($r) => (int)$r['n'] > 0)); ?>
 <div class="card" id="usage">
   <div class="card-head"><h2>⏱ <?= tt('ls.title') ?></h2>
@@ -161,8 +167,8 @@ layout_head(t('ll.title'), 'admin_log');
     <span class="stat gold"><b><?= e(ls_dur($lsTot)) ?></b><span class="s"><?= tt('ls.k_total') ?></span></span>
     <span class="stat"><b><?= e(ls_dur($lsAct ? intdiv($lsTot, $lsAct) : 0)) ?></b><span class="s"><?= tt('ls.k_avg') ?></span></span>
   </div>
-  <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('ll.who') ?></th><th class="num"><?= tt('ls.sessions') ?></th><th class="num"><?= tt('ls.days') ?></th><th class="num"><?= tt('ls.time') ?></th><th class="num"><?= tt('ls.per_session') ?></th><th><?= tt('ls.last') ?></th></tr></thead><tbody>
-  <?php foreach ($lsU as $r): $n_ = (int)$r['n']; ?><tr<?= $r['is_active'] ? '' : ' class="is-retired"' ?>><td><a href="<?= url('admin_log', ['use' => $lsD, 'su' => (int)$r['id']]) ?>#usage-s"><?= e($r['full_name']) ?></a><?= $r['role'] === 'admin' ? ' ' . pill('navy', 'admin') : '' ?></td><td class="num"><?= $n_ ?></td><td class="num"><?= (int)$r['days_n'] ?></td><td class="num" data-sort="<?= (int)$r['secs'] ?>"><?= $n_ ? e(ls_dur((int)$r['secs'])) : '—' ?></td><td class="num" data-sort="<?= $n_ ? intdiv((int)$r['secs'], $n_) : 0 ?>"><?= $n_ ? e(ls_dur(intdiv((int)$r['secs'], $n_))) : '—' ?></td><td class="hint"><?= $r['last_start'] ? e(fmt_datetime($r['last_start'])) : e(t('ls.never', ['n' => $lsD])) ?></td></tr><?php endforeach; ?>
+  <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('ll.who') ?></th><th class="num"><?= tt('ls.sessions') ?></th><th class="num"><?= tt('ls.days') ?></th><th class="num"><?= tt('ls.time') ?></th><th class="num"><?= tt('ls.per_session') ?></th><th><?= tt('ls.last') ?></th><th class="num"><?= tt('ls.app_n') ?></th><th><?= tt('ls.app_last') ?></th></tr></thead><tbody>
+  <?php foreach ($lsU as $r): $n_ = (int)$r['n']; ?><tr<?= $r['is_active'] ? '' : ' class="is-retired"' ?>><td><a href="<?= url('admin_log', ['use' => $lsD, 'su' => (int)$r['id']]) ?>#usage-s"><?= e($r['full_name']) ?></a><?= $r['role'] === 'admin' ? ' ' . pill('navy', 'admin') : '' ?></td><td class="num"><?= $n_ ?></td><td class="num"><?= (int)$r['days_n'] ?></td><td class="num" data-sort="<?= (int)$r['secs'] ?>"><?= $n_ ? e(ls_dur((int)$r['secs'])) : '—' ?></td><td class="num" data-sort="<?= $n_ ? intdiv((int)$r['secs'], $n_) : 0 ?>"><?= $n_ ? e(ls_dur(intdiv((int)$r['secs'], $n_))) : '—' ?></td><td class="hint"><?= $r['last_start'] ? e(fmt_datetime($r['last_start'])) : e(t('ls.never', ['n' => $lsD])) ?></td><?php $ap_ = $lsApps[(int)$r['id']] ?? ['n' => 0, 'apps' => []]; ?><td class="num"><?= $ap_['n'] ? '<a href="' . url('admin_log', ['q' => (string)$r['full_name'], 'src' => 'apps']) . '">' . (int)$ap_['n'] . '</a>' : '—' ?></td><td class="hint"><?php foreach ($ap_['apps'] as $a_ => $seen_): ?><div>📱 <?= e($srcName($a_)) ?> · <?= e(fmt_datetime($seen_)) ?></div><?php endforeach; ?><?= $ap_['apps'] ? '' : '—' ?></td></tr><?php endforeach; ?>
   </tbody></table></div>
   <h3 id="usage-s" style="margin-top:14px;"><?= tt('ls.recent') ?><?php if ($lsOne): ?> — <?= e((string) scalar('SELECT full_name FROM customer_users WHERE id = ?', [$lsOne])) ?> <a class="btn btn--ghost btn--sm" href="<?= url('admin_log', ['use' => $lsD]) ?>#usage">× <?= tt('ls.all_people') ?></a><?php endif; ?></h3>
   <?php if (!$lsR): ?><p class="hint"><?= tt('ls.none') ?></p><?php else: ?>
@@ -176,13 +182,14 @@ layout_head(t('ll.title'), 'admin_log');
   <div class="empty"><?= tt('ll.none') ?></div>
 <?php else: ?>
   <div class="table-scroll"><table>
-    <thead><tr><th><?= tt('ll.when') ?></th><th><?= tt('ll.who') ?></th><th><?= tt('au.role') ?></th><th><?= tt('ll.outcome') ?></th><th><?= tt('ll.ip') ?></th><th><?= tt('ll.browser') ?></th></tr></thead>
+    <thead><tr><th><?= tt('ll.when') ?></th><th><?= tt('ll.who') ?></th><th><?= tt('au.role') ?></th><th><?= tt('ll.outcome') ?></th><th><?= tt('ll.src') ?></th><th><?= tt('ll.ip') ?></th><th><?= tt('ll.browser') ?></th></tr></thead>
     <tbody><?php foreach ($rows as $r): ?>
       <tr>
         <td class="date"><?= e(fmt_datetime($r['created_at'])) ?></td>
         <td><strong><?= e($r['full_name'] ?? '—') ?></strong><br><span class="hint"><?= e($r['email']) ?></span></td>
         <td><?= $r['role'] ? pill($r['role'] === 'admin' ? 'gold' : ($r['role'] === 'staff' ? 'green' : 'mute'), t('role.' . $r['role'])) . ($r['customer_name'] ? '<br><span class="hint">' . e($r['customer_name']) . '</span>' : '') : '—' ?></td>
         <td><?= pill($tone[$r['outcome']] ?? 'mute', t('ll.o_' . $r['outcome'])) ?></td>
+        <td><?php if (!empty($r['source'])): ?><?= pill('gold', '📱 ' . $srcName($r['source'])) ?><br><span class="hint"><?= e(trim(($r['app_version'] ? 'v' . $r['app_version'] : '') . ' · ' . (['ios' => 'iPhone / iPad', 'android' => 'Android', 'web' => t('ll.pl_web')][$r['platform'] ?? ''] ?? ''), ' ·')) ?></span><?php else: ?><span class="hint">🖥 <?= tt('ll.src_web') ?></span><?php endif; ?></td>
         <td class="num"><?= e($r['ip'] ?: '—') ?></td>
         <td class="hint" title="<?= e($r['user_agent'] ?? '') ?>"><?= e($browser($r['user_agent'])) ?></td>
       </tr>

@@ -16,7 +16,7 @@ function hr_has(): bool { static $h = null; if ($h === null) { try { $h = (bool)
 /** Administrators and HR-scoped accounts manage leave types, entitlements and see the report. */
 function hr_has_names(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM hr_leave_types LIKE 'name_uk'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** HR management (people, cards, balances, requests on the HR side, settings): the HR role and the Owner / CEO — never a plain administrator (R77-005; before, administrators were included). */
-function hr_can(): bool { return hr_has() && is_staff() && ((function_exists('hr_only') && hr_only()) || (function_exists('hr_owner') && hr_owner())); }
+function hr_can(): bool { return hr_has() && is_staff() && ((function_exists('hr_only') && hr_only()) || (function_exists('hr_owner') && hr_owner()) || (function_exists('hr_gm') && hr_gm())); }   // R97-254: General Manager
 function hr_types(bool $activeOnly = true): array { static $c = []; $k = (int)$activeOnly; if (!isset($c[$k])) { $c[$k] = []; if (hr_has()) foreach (all('SELECT * FROM hr_leave_types' . ($activeOnly ? ' WHERE is_active = 1' : '') . ' ORDER BY is_active DESC, sort_order, name') as $t) { $t['name_en'] = $t['name']; $t['name'] = hr_type_name($t); $c[$k][(int)$t['id']] = $t; } } return $c[$k]; }
 /** The type's name in the current portal language (R54-002: name_el / name_it / name_bg / name_uk columns), English when not translated. */
 /** R77-006: leaves the law allows when the event occurs (birth, marriage, child illness, force majeure …) — a ceiling on request, not an entitlement to be used up. */

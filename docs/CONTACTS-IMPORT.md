@@ -4690,3 +4690,18 @@ Language: 59 new keys.
 | Holder not found / importer without HR right | Unit imported into the warehouse, remark in the preview |
 
 **Security:** the preview is bound to the person who made it and is valid for one hour; the file is read from the upload and not kept; new items and switching an item to asset need the procurement administrator, the holder part needs HR; every unit carries the import in its history (`inv_serial_log`).
+
+## §533 General Manager in HR; assessments read by the General Manager; login history with the mobile apps (GAS-CP-R97-254, v1.257.0)
+
+**General Manager in HR.** `hr_gm()` (`app/auth.php`) is true for the staff role named «General Manager». `hr_can()` now accepts it, so every HR page and action guarded by `hr_can()` (and `rcr_can()`, `hre_can()`) opens. `hr_personal_can()` / `hr_files_can()` are unchanged (HR role and CEO only): personal fields (`HR_PERSONAL`, including gross salary), employee documents (`hr_docs`), personal columns of the export and the confidential notes of the HR Assistant (`hra_can_manage()`) stay closed.
+
+**Assessments.** `hrs_can()` (manage) excludes the General Manager; `hrs_can_view()` = manage or General Manager. Pages `hr_tests`, `hr_test`, `hr_test_result` and the assessment rows of the evaluation card use the view right; the forms (import, start, remind, close, rater, end date, people, delete) are not rendered for a reader and `hrs_handle_action()` refuses them. Opening a result of another person is written by `hr_audit` as before.
+
+| Right | HR Manager | CEO | General Manager |
+|---|---|---|---|
+| HR pages and actions (`hr_can`) | yes | yes | yes |
+| Personal data, documents, confidential notes (`hr_personal_can`) | yes | yes | no |
+| Assessments — read (`hrs_can_view`) | yes | yes | yes |
+| Assessments — manage (`hrs_can`) | yes | yes | no |
+
+**Login history.** Migration `migrate_cp_r97_254_login_log_apps.sql` (key r99w): `login_log.source` (app id, NULL = web portal), `app_version`, `platform`. `login_log()` fills them through `ll_source()` when the request comes through the app API (`X-App`, `X-App-Version`, platform said by the app at sign-in, else read from the user agent). `Portal::login` records `failed`, `locked` and `twofa_failed`; `/auth/logout` records `logout`. Page Settings › Login history: column and filter «Where» (`src` = apps, web, engineer, pm, hr, employee, customer), CSV with three more columns, passkey outcomes labelled; «Portal usage» has app sign-ins per person (`ll_apps_usage()`) and the last use per app from `mob_devices`.

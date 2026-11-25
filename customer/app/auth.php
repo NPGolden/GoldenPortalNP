@@ -93,6 +93,12 @@ function hr_owner(): bool {
     if (!$u || !is_staff() || empty($u['staff_role_id'])) return $v = false;
     try { $r = one('SELECT scope, name FROM staff_roles WHERE id = ?', [(int)$u['staff_role_id']]); return $v = $r && ((string)$r['scope'] === 'owner' || strcasecmp(trim((string)$r['name']), 'CEO') === 0); } catch (Throwable $e) { return $v = false; }   // R77-005: the CEO role counts as Owner for HR
 }
+/** R97-254: the General Manager works in HR like the HR role, except personal data, employee documents and confidential notes (hr_personal_can) and managing assessments (hrs_can). */
+function hr_gm(): bool {
+    static $v = null; if ($v !== null) return $v; $u = current_user();
+    if (!$u || !is_staff() || empty($u['staff_role_id'])) return $v = false;
+    try { return $v = strcasecmp(trim((string) scalar('SELECT name FROM staff_roles WHERE id = ?', [(int)$u['staff_role_id']])), 'General Manager') === 0; } catch (Throwable $e) { return $v = false; }
+}
 function hr_only(): bool {
     static $v = null; if ($v !== null) return $v; $u = current_user();
     if (!$u || !is_staff() || is_cp_admin() || empty($u['staff_role_id'])) return $v = false;
@@ -196,11 +202,29 @@ function ls_recent(?int $uid = null, int $limit = 60): array {
     if (!ls_has()) return [];
     return all('SELECT s.*, cu.full_name, TIMESTAMPDIFF(SECOND, s.started_at, s.last_at) AS secs FROM login_sessions s JOIN customer_users cu ON cu.id = s.user_id' . ($uid ? ' WHERE s.user_id = ' . (int)$uid : '') . ' ORDER BY s.started_at DESC LIMIT ' . max(1, min(500, $limit)));
 }
+/** R97-254: per person — sign-ins from the mobile apps in the last $days and, per app, when it was last used (from the enrolled devices). [uid => ['n' => int, 'apps' => [app => datetime]]] */
+function ll_apps_usage(int $days = 30): array {
+    $o = []; $days = max(1, min(366, $days));
+    try { if (ll_src_has()) foreach (all("SELECT user_id, COUNT(*) n FROM login_log WHERE source IS NOT NULL AND outcome IN ('success','passkey') AND user_id IS NOT NULL AND created_at >= DATE_SUB(NOW(), INTERVAL $days DAY) GROUP BY user_id") as $r) $o[(int)$r['user_id']] = ['n' => (int)$r['n'], 'apps' => []];
+        foreach (all('SELECT user_id, app_id, MAX(COALESCE(last_seen_at, enrolled_at)) AS seen FROM mob_devices WHERE revoked_at IS NULL GROUP BY user_id, app_id ORDER BY seen DESC') as $r) { $o[(int)$r['user_id']] ??= ['n' => 0, 'apps' => []]; $o[(int)$r['user_id']]['apps'][(string)$r['app_id']] = (string)$r['seen']; } } catch (Throwable $e) {}
+    return $o;
+}
+function ll_src_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM login_log LIKE 'source'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** [app id, app version, platform] when the request comes through the app API, else null. The platform is what the app says at sign-in, else read from the user agent. */
+function ll_source(): ?array {
+    if (!function_exists('api_app') || !defined('API_APPS')) return null; $ua = (string)($_SERVER['HTTP_USER_AGENT'] ?? '');
+    $ver = (string)($_SERVER['HTTP_X_APP_VERSION'] ?? ''); $ver = preg_match('/^[0-9][0-9A-Za-z.\-]{0,15}$/', $ver) ? $ver : null;
+    $pl = $GLOBALS['ll_platform'] ?? null; if (!in_array($pl, ['ios', 'android', 'web'], true)) $pl = preg_match('/iPhone|iPad|iOS/', $ua) ? 'ios' : (str_contains($ua, 'Android') ? 'android' : 'web');
+    return [api_app(), $ver, $pl];
+}
 function login_log(?int $userId, string $email, string $outcome): void {
     try {
         $ip = (string)($_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '');
         $ip = trim(explode(',', $ip)[0]);                 // first hop when proxied (Sucuri)
-        q('INSERT INTO login_log (user_id, email, outcome, ip, user_agent) VALUES (?,?,?,?,?)',
+        $src = ll_source();   // R97-254: which app, its version and the platform — null for the web portal
+        if ($src && ll_src_has()) q('INSERT INTO login_log (user_id, email, outcome, ip, user_agent, source, app_version, platform) VALUES (?,?,?,?,?,?,?,?)',
+          [$userId, mb_substr(strtolower(trim($email)), 0, 190), $outcome, mb_substr($ip, 0, 45) ?: null, mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255) ?: null, $src[0], $src[1], $src[2]]);
+        else q('INSERT INTO login_log (user_id, email, outcome, ip, user_agent) VALUES (?,?,?,?,?)',
           [$userId, mb_substr(strtolower(trim($email)), 0, 190), $outcome, mb_substr($ip, 0, 45) ?: null,
            mb_substr((string)($_SERVER['HTTP_USER_AGENT'] ?? ''), 0, 255) ?: null]);
     } catch (Throwable $e) { /* logging must never block access */ }

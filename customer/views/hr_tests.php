@@ -2,8 +2,9 @@
 /** HR › Assessments — campaigns imported from the Excel template; results over the years.   GAS-CP-R97-063   ?p=hr_tests[&template=1] */
 require __DIR__ . '/_layout.php';
 $u = require_staff();
-if (!function_exists('hrs_can') || !hrs_can()) { http_response_code(403); layout_head(t('hrs.title'), 'hr_tests'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
-if (isset($_GET['template'])) {
+if (!function_exists('hrs_can_view') || !hrs_can_view()) { http_response_code(403); layout_head(t('hrs.title'), 'hr_tests'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
+$ro = !hrs_can();   // R97-254: read only for the General Manager
+if (isset($_GET['template']) && !$ro) {
     $f = hrs_template_path(); if (!is_file($f)) { http_response_code(404); exit; }
     header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'); header('Content-Disposition: attachment; filename="' . basename($f) . '"'); header('Content-Length: ' . filesize($f)); header('X-Content-Type-Options: nosniff'); readfile($f); exit;
 }
@@ -11,7 +12,7 @@ $list = hrs_campaigns(); $imp = $_SESSION['hrs_import'] ?? null; unset($_SESSION
 $fams = []; foreach ($list as $c) if ($c['status'] === 'closed') $fams[$c['family_code']] ??= (int) $c['id'];
 layout_head(t('hrs.title'), 'hr_tests');
 ?>
-<p class="eyebrow"><a href="<?= url('hr_dashboard') ?>"><?= tt('hr.dashboard') ?></a> › <?= tt('hrs.title') ?></p>
+<p class="eyebrow"><?php if (!$ro): ?><a href="<?= url('hr_dashboard') ?>"><?= tt('hr.dashboard') ?></a> › <?php endif; ?><?= tt('hrs.title') ?></p>
 <div class="page-head"><div><h1>🧭 <?= tt('hrs.title') ?></h1><p class="lede"><?= tt('hrs.lede') ?></p></div></div>
 
 <?php if ($imp): ?><div class="card" style="border-left:4px solid #b3261e;">
@@ -52,14 +53,15 @@ layout_head(t('hrs.title'), 'hr_tests');
 </div>
 
 <div>
-<div class="card">
+<?php if ($ro): ?><div class="flash flash--info">👁 <?= tt('hrs.ro_note') ?></div><?php endif; ?>
+<div class="card"<?= $ro ? ' hidden' : '' ?>><?php if (!$ro): ?>
   <h2>⬆ <?= tt('hrs.imp_title') ?></h2>
   <p class="hint"><?= tt('hrs.imp_lede') ?></p>
   <form method="post" action="<?= url('hr_tests') ?>" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hrs_import">
     <div class="field"><label><?= tt('hrs.imp_file') ?></label><input type="file" name="file" accept=".xlsx" required></div>
     <div class="btn-row"><button class="btn btn--gold" type="submit"><?= tt('hrs.imp_btn') ?></button><a class="btn btn--ghost" href="<?= url('hr_tests', ['template' => 1]) ?>">⬇ <?= tt('hrs.imp_template') ?></a></div>
   </form>
-</div>
+<?php endif; ?></div>
 <div class="card">
   <h2>ℹ <?= tt('hrs.how_title') ?></h2>
   <ol class="hint" style="padding-left:18px;margin:0;"><li><?= tt('hrs.how_1') ?></li><li><?= tt('hrs.how_2') ?></li><li><?= tt('hrs.how_3') ?></li><li><?= tt('hrs.how_4') ?></li><li><?= tt('hrs.how_5') ?></li></ol>

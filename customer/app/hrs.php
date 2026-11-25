@@ -16,7 +16,9 @@ const HRS_TYPES = ['LIKERT', 'SITUATION', 'CHOICE', 'CHECK'];
 const HRS_MAX_FILE = 3145728;   // 3 MB
 
 function hrs_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'hrs_campaigns'") && function_exists('hr2_has') && hr2_has(); } catch (Throwable $e) { $h = false; } } return $h; }
-function hrs_can(): bool { return function_exists('hr_can') && hr_can() && hrs_has(); }
+function hrs_can(): bool { return function_exists('hr_can') && hr_can() && hrs_has() && !(function_exists('hr_gm') && hr_gm() && !hr_owner()); }   // R97-254: the General Manager reads, does not manage
+/** R97-254: the General Manager reads campaigns and results; managing them stays with HR and the CEO. */
+function hrs_can_view(): bool { return hrs_can() || (hrs_has() && is_staff() && function_exists('hr_gm') && hr_gm()); }
 function hrs_me(): int { return (int) (current_user()['id'] ?? 0); }
 /** Text of a {lang: text} map in the portal language, English when not translated. */
 function hrs_tx($m, ?string $loc = null): string { if (!is_array($m)) return (string) $m; $l = $loc ?: locale(); return (string) ((($m[$l] ?? '') !== '') ? $m[$l] : ($m['en'] ?? '')); }
@@ -375,7 +377,7 @@ function hrs_mine(int $uid): array {
 }
 /** May the current user read the result of this person? HR and the CEO always; the person after the campaign closed, when the campaign allows it. */
 function hrs_may_see(array $c, array $t): bool {
-    if (hrs_can()) return true;
+    if (hrs_can_view()) return true;
     return $c['status'] === 'closed' && (int) $t['user_id'] === hrs_me() && $t['self_status'] === 'done' && !empty($c['F']['set']['employee_sees_result']);
 }
 /** Earlier results of a person in campaigns of the same family: [year => [dim => row]]. */
