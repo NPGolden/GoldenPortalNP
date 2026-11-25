@@ -43,6 +43,7 @@ layout_head(t('sn.imp_title'), 'inventory');
         <div class="field"><label><?= tt('sn.imp_mode') ?></label><select name="mode" data-nosearch><option value="add"><?= tt('sn.imp_m_add') ?></option><option value="number"><?= tt('sn.imp_m_number') ?></option></select></div>
       </div>
       <p class="hint"><?= tt('sn.imp_mode_hint') ?></p>
+      <?php if ($n['switch'] && !empty($u['totp_enabled'])): ?><div class="field"><label><?= tt('po.pg_totp_label') ?></label><input name="totp" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" style="max-width:140px;"><p class="hint"><?= tt('sn.imp_totp_why') ?></p></div><?php endif; ?>
       <div class="btn-row"><button class="btn btn--gold" type="submit"><?= tt('stk.imp_apply') ?></button><a class="btn btn--ghost" href="<?= url('assets_import', ['discard' => 1]) ?>"><?= tt('btn.cancel') ?></a></div>
     </form>
   </div>
@@ -51,5 +52,13 @@ layout_head(t('sn.imp_title'), 'inventory');
 </div>
 <div><div class="card"><h2>ℹ <?= tt('stk.imp_how') ?></h2><ol class="hint" style="padding-left:18px;"><li><?= tt('sn.imp_how1') ?></li><li><?= tt('sn.imp_how2') ?></li><li><?= tt('sn.imp_how3') ?></li><li><?= tt('sn.imp_how4') ?></li></ol>
   <?php if (!$admin): ?><p class="hint">⚠ <?= tt('sn.imp_no_admin') ?></p><?php endif; ?><?php if (!$hr): ?><p class="hint">⚠ <?= tt('sn.imp_w_hr') ?></p><?php endif; ?></div></div>
+</div>
+<?php $ilog = function_exists('sn_import_log') ? sn_import_log(30) : []; ?>
+<div class="card" id="register">
+  <h2>🗒 <?= tt('sn.imp_reg') ?></h2>
+  <?php if (!$ilog): ?><p class="hint"><?= tt('sn.imp_reg_none') ?></p><?php else: ?>
+  <div class="table-scroll"><table class="tbl tbl--compact" data-nosort><thead><tr><th><?= tt('ll.when') ?></th><th><?= tt('ll.who') ?></th><th class="num"><?= tt('sn.imp_k_units') ?></th><th class="num"><?= tt('sn.imp_k_new') ?></th><th class="num"><?= tt('sn.imp_r_switched') ?></th><th class="num"><?= tt('sn.imp_k_holders') ?></th><th class="num"><?= tt('sn.imp_k_skip') ?></th><th><?= tt('stk.warehouse') ?></th><th><?= tt('sn.imp_mode') ?></th></tr></thead><tbody>
+  <?php foreach ($ilog as $r): ?><tr><td><?= e(fmt_datetime((string)$r['created_at'])) ?></td><td><?= e((string)$r['user_name']) ?></td><td class="num"><b><?= (int)$r['units'] ?></b></td><td class="num"><?= (int)$r['new_items'] ?></td><td class="num"><?= (int)$r['switched'] ? pill('gold', (string)(int)$r['switched']) : '0' ?></td><td class="num"><?= (int)$r['handed'] ?></td><td class="num"><?= (int)$r['skipped'] ?></td><td class="hint"><?= e((string)($r['wh_code'] ?? '')) ?></td><td class="hint"><?= tt($r['mode'] === 'number' ? 'sn.imp_r_number' : 'sn.imp_r_add') ?></td></tr><?php endforeach; ?>
+  </tbody></table></div><?php endif; ?>
 </div>
 <?php layout_foot(); ?>

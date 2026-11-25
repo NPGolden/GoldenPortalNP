@@ -447,6 +447,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 else { avatar_store((int)$au['id'], $_FILES['avatar'] ?? []); flash('good', t('av.saved')); }
                 redirect('account', ['_r' => uniqid()]);
             }
+            case 'sec_dev_forget': {   // R97-256: forget one known device of the own account
+                $u = require_login(); $ok = function_exists('sec_device_forget') && sec_device_forget((int)$u['id'], (int)($_POST['id'] ?? 0));
+                flash($ok ? 'good' : 'warn', t($ok ? 'sec.dev_forgot' : 'err.notfound')); redirect('account', ['_r' => uniqid()], '#devices');
+            }
             case 'account_revoke': {   // R49-001: sign out of every other browser (this one gets a fresh session)
                 $u = require_login(); sec_revoke_all((int)$u['id']); login_log((int)$u['id'], (string)$u['email'], 'revoked');
                 session_unset(); session_destroy(); header('Location: index.php?p=login'); exit;

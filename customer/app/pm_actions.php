@@ -998,7 +998,8 @@ function pm_handle_action(string $action, string $page): bool {
         case 'inv_cat_merge': { require_pr_admin(); stk_category_merge((int)($_POST['from'] ?? 0), (int)($_POST['into'] ?? 0)); flash('good', t('stk.saved')); redirect('inventory', ['tab' => 'categories', '_r' => uniqid()]); }
         case 'inv_wh_save': { require_pr_admin(); stk_warehouse_save_from_post((int)($_POST['id'] ?? 0)); flash('good', t('stk.saved')); redirect('admin_procurement', ['_r' => uniqid()], '#wh'); }
         case 'sn_import_parse': { if (empty($_FILES['file']['tmp_name'])) throw new RuntimeException(t('hre.imp_nofile')); $_SESSION['sn_import'] = sn_import_parse((string)$_FILES['file']['tmp_name']); redirect('assets_import', ['_r' => uniqid()]); }   // R97-253
-        case 'sn_import_apply': { $pv = $_SESSION['sn_import'] ?? null; if (!$pv) throw new RuntimeException(t('sn.imp_stale')); $r = sn_import_apply($pv, (int)($_POST['warehouse_id'] ?? 0), ($_POST['mode'] ?? '') === 'number' ? 'number' : 'add'); unset($_SESSION['sn_import']); $_SESSION['sn_import_result'] = $r; redirect('assets_import', ['_r' => uniqid()]); }
+        case 'sn_import_apply': { $pv = $_SESSION['sn_import'] ?? null; if (!$pv) throw new RuntimeException(t('sn.imp_stale'));
+            if ((int)($pv['n']['switch'] ?? 0) > 0 && function_exists('pk_stepup_ok') && !pk_stepup_ok(current_user() ?: [], trim((string)($_POST['totp'] ?? '')))) throw new RuntimeException(t('po.pg_totp'));   /* R97-256: switching existing items to asset is confirmed with the authenticator */ $r = sn_import_apply($pv, (int)($_POST['warehouse_id'] ?? 0), ($_POST['mode'] ?? '') === 'number' ? 'number' : 'add'); unset($_SESSION['sn_import']); $_SESSION['sn_import_result'] = $r; redirect('assets_import', ['_r' => uniqid()]); }
         case 'stk_import_parse': { require_pr_admin(); if (empty($_FILES['file']['tmp_name'])) throw new RuntimeException(t('im.file')); $_SESSION['inv_import'] = stk_import_parse($_FILES['file']['tmp_name']); redirect('inventory_import', ['_r' => uniqid()]); }
         case 'stk_import_apply': { require_pr_admin(); $pv = $_SESSION['inv_import'] ?? null; if (!$pv) throw new RuntimeException(t('stk.imp_empty')); $mode = in_array($_POST['mode'] ?? '', ['full', 'items', 'stock', 'prices'], true) ? $_POST['mode'] : 'full'; $pd = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($_POST['price_date'] ?? '')) ? $_POST['price_date'] : date('Y-m-d');
             $_SESSION['inv_import_result'] = stk_import_apply($pv, $mode, (int)($_POST['warehouse_id'] ?? 0) ?: stk_default_wh(), $pd); unset($_SESSION['inv_import']); redirect('inventory_import', ['_r' => uniqid()]); }
@@ -1427,9 +1428,11 @@ function pm_handle_action(string $action, string $page): bool {
                 $wasGm = function_exists('sec_role_is_gm') && sec_role_is_gm($id);
                 q('UPDATE staff_roles SET name = ?, sort_order = ? WHERE id = ?', [$str('name', 80), (int)($_POST['sort_order'] ?? 0), $id]);
                 if (function_exists('sec_role_is_gm') && !$wasGm && sec_role_is_gm($id)) { $gmU = array_map('intval', array_column(all('SELECT id FROM customer_users WHERE staff_role_id = ? AND is_active = 1', [$id]), 'id')); try { q('UPDATE customer_users SET twofa_required = 1 WHERE staff_role_id = ?', [$id]); } catch (Throwable $e) {} sec_notify_gm($gmU); }   // R97-255: a role renamed to General Manager
+                if (function_exists('sec_role_must_2fa') && sec_role_must_2fa($id)) { try { q("UPDATE customer_users SET twofa_required = 1 WHERE staff_role_id = ? AND role <> 'customer'", [$id]); } catch (Throwable $e) {} }   // R97-256
                 try { q('UPDATE staff_roles SET see_financials = ? WHERE id = ?', [(int)!empty($_POST['see_financials']), $id]); } catch (Throwable $e) {}
                 try { if (isset($_POST['scope'])) q('UPDATE staff_roles SET scope = ? WHERE id = ?', [in_array($_POST['scope'], ['full', 'hr', 'employee', 'owner', 'assistant'], true) ? $_POST['scope'] : 'full', $id]); } catch (Throwable $e) {}   // R51-001
                 try { q('UPDATE staff_roles SET can_offer = ? WHERE id = ?', [(int)!empty($_POST['can_offer']), $id]); } catch (Throwable $e) {}
+                if (function_exists('sec_role_must_2fa') && sec_role_must_2fa($id)) { try { q("UPDATE customer_users SET twofa_required = 1 WHERE staff_role_id = ? AND role <> 'customer'", [$id]); } catch (Throwable $e) {} }   // R97-256: also when the scope becomes owner
             } else {
                 q('INSERT INTO staff_roles (name, sort_order) VALUES (?, ?) ON DUPLICATE KEY UPDATE sort_order = VALUES(sort_order), is_active = 1',
                   [$str('name', 80), (int)($_POST['sort_order'] ?? 0)]);
@@ -1456,7 +1459,7 @@ function pm_handle_action(string $action, string $page): bool {
                locale_valid($_POST['locale'] ?? null) ? $_POST['locale'] : $x['locale'], $id]);
             cu_save_discipline($id, $role);
             if (array_key_exists('twofa_required', $x)) q('UPDATE customer_users SET twofa_required = ? WHERE id = ?', [(int)!empty($_POST['twofa_required']), $id]);
-            if (function_exists('sec_gm_sync')) sec_gm_sync($id, (int)($x['staff_role_id'] ?? 0) ?: null, $srole);   // R97-255
+            if (function_exists('sec_gm_sync')) sec_gm_sync($id, (int)($x['staff_role_id'] ?? 0) ?: null, $srole);   // R97-255 · R97-256 (always: an administrator has no role to look at)
             if (array_key_exists('can_works', $x)) q('UPDATE customer_users SET can_works = ? WHERE id = ?', [$role === 'customer' ? 0 : (int)!empty($_POST['can_works']), $id]);   // R36-005
             if (array_key_exists('rate_card', $x) && isset($_POST['rate_card'])) q('UPDATE customer_users SET rate_card = ? WHERE id = ?', [$role === 'customer' ? null : (mb_substr(trim((string)$_POST['rate_card']), 0, 12) ?: null), $id]);   // R39-001
             if (array_key_exists('is_production', $x)) q('UPDATE customer_users SET is_production = ? WHERE id = ?', [$role === 'customer' ? 0 : (int)!empty($_POST['is_production']), $id]);   // R41-001
@@ -1490,7 +1493,7 @@ function pm_handle_action(string $action, string $page): bool {
                locale_valid($_POST['locale'] ?? null) ? $_POST['locale'] : 'en']);
             $newUid = (int) db()->lastInsertId();
             try { q('UPDATE customer_users SET twofa_required = ? WHERE id = ?', [(int)!empty($_POST['twofa_required']), $newUid]); } catch (Throwable $e) {}
-            if (function_exists('sec_gm_sync') && $role !== 'customer') sec_gm_sync($newUid, null, (int)($_POST['staff_role_id'] ?? 0) ?: null);   // R97-255
+            if (function_exists('sec_gm_sync') && $role !== 'customer') sec_gm_sync($newUid, null, (int)($_POST['staff_role_id'] ?? 0) ?: null);   // R97-255 · R97-256
             if (function_exists('pwc_has') && pwc_has()) pwc_flag($newUid, !empty($_POST['must_change_pw']));   // R97-167
             cu_save_discipline($newUid, $role);
             $hrPid = (int)($_POST['hr_pid'] ?? 0);   // R60-005: created from the HR people list → link the person to the new account

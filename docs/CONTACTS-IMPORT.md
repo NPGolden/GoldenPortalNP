@@ -4716,3 +4716,16 @@ Language: 59 new keys.
 | New device notice | Table `login_devices (user_id, fp, label, first_at, last_at)`; `sec_device_seen()` is called by `finish_login` (key = browser + operating system) and by the app sign-in (key = app + device id). Unknown key on an account that already has devices → notification `sec:new_device` to the person. Seeded by the migration from `login_sessions` and `mob_devices`. |
 
 Migration `migrate_cp_r97_255_gm_authenticator_login_devices.sql`, key r99x.
+
+## §535 Security: asset import notice / authenticator / register; codes count toward the lock; authenticator by position; known devices (GAS-CP-R97-256, v1.259.0)
+
+| Item | How |
+|---|---|
+| Notice of an asset import | `sn_import_apply()` → `nf_push(prq_proc_ids(), 'stk:asset_import', …)` with the importer as actor (the actor is never notified). |
+| Authenticator step | Action `sn_import_apply`: when the preview has `n.switch > 0`, `pk_stepup_ok()` must pass (field `totp` on the form for accounts with an authenticator). |
+| Register of imports | Table `inv_asset_imports` (who, when, mode, warehouse, units, new items, switched, handed, people, skipped, address); `sn_import_log()`; card «Register of imports» on `assets_import`. |
+| Wrong codes in the apps | `Portal::login`: a wrong code calls `sec_wrong_password()`; the counter is reset only after password and code are both right. |
+| Authenticator by position | `sec_twofa_by_position($u)`: `role = admin`, or a role named CEO / Managing Director / General Manager, or scope owner (`sec_role_must_2fa`). `sec_twofa_must()` includes it; `sec_gm_sync()` sets the switch at every account save; `sr_save` sets it when a role is renamed or its scope changes; `Portal::login` answers 403 until the authenticator is set up in the portal. The migration sets the switch for the present accounts. |
+| Known devices | `sec_devices($uid)`, `sec_device_forget($uid, $id)` (own rows only), action `sec_dev_forget` (allowed for every scoped role), card `#devices` on My Account. |
+
+Migration `migrate_cp_r97_256_asset_import_register_authenticator_roles.sql`, key r99y.

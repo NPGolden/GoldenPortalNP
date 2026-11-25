@@ -243,6 +243,15 @@ function sn_import_apply(array $pv, int $whDefault, string $mode): array {
                     q('INSERT INTO hr_eq_items (person_id, category, description, serial_no, asset_tag, qty, cond_out, note, status, issued_on, created_by) VALUES (?,?,?,?,?,1,?,?,?,?,?)', [(int)$x['pid'], $x['eq_cat'], mb_substr($x['description'], 0, 200), $x['serial'], $x['tag'] ?: null, $x['cond'], $x['note'] ?: null, 'draft', $x['given_on'], (int)($u['id'] ?? 0)]);
                     $eq = (int) db()->lastInsertId(); sn_assign_person((int)$s['id'], (int)$x['pid'], $eq, (string)$p['name_en']); q('UPDATE hr_eq_items SET inv_serial_id = ? WHERE id = ?', [(int)$s['id'], $eq]); $res['handed']++; $res['people'][(int)$x['pid']] = 1; } } }
         $res['people'] = count($res['people']); return $res; });
+    $res['skipped'] = (int)($pv['n']['skip'] ?? 0);
+    try { $ip = trim(explode(',', (string)($_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? ''))[0]);   // R97-256: register of imports
+        if (sn_import_log_has()) q('INSERT INTO inv_asset_imports (user_id, user_name, created_at, mode, warehouse_id, units, new_items, switched, handed, people, skipped, ip) VALUES (?,?,NOW(),?,?,?,?,?,?,?,?,?)', [(int)($u['id'] ?? 0) ?: null, mb_substr((string)($u['full_name'] ?? ''), 0, 120), $mode === 'number' ? 'number' : 'add', $whDefault, (int)$res['units'], (int)$res['new_items'], (int)$res['switched'], (int)$res['handed'], (int)$res['people'], (int)$res['skipped'], mb_substr($ip, 0, 45) ?: null]);
+    } catch (Throwable $e) {}
+    try { if (function_exists('nf_push') && function_exists('nf_has') && nf_has() && function_exists('prq_proc_ids') && ($to = prq_proc_ids()))   // R97-256: procurement hears when someone else imports assets
+        nf_push($to, 'stk:asset_import', 'stk:asset_import:' . date('YmdHis') . ':' . (int)($u['id'] ?? 0), t('nf.sn_imp_t', ['u' => (string)($u['full_name'] ?? '—')]), t('sn.imp_done', ['u' => (int)$res['units'], 'i' => (int)$res['new_items'], 's' => (int)$res['switched'], 'h' => (int)$res['handed'], 'p' => (int)$res['people']]), url('assets_import'), (int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? ''));
+    } catch (Throwable $e) {}
     if (function_exists('cache_bump_later')) cache_bump_later('inv');
     return $res;
 }
+function sn_import_log_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'inv_asset_imports'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function sn_import_log(int $limit = 30): array { return sn_import_log_has() ? all('SELECT a.*, w.code AS wh_code FROM inv_asset_imports a LEFT JOIN inv_warehouses w ON w.id = a.warehouse_id ORDER BY a.id DESC LIMIT ' . max(1, min(200, $limit))) : []; }

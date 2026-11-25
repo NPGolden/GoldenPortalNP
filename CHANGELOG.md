@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.258.0** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.259.0** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.259.0 | GAS-CP-R97-256 | 2026-11-25 | Security: asset import notice, authenticator step and register; wrong authenticator codes in the apps count toward the lock; authenticator obligatory for CEO, Managing Director and administrators; known devices on My Account | `install/migrate_cp_r97_256_asset_import_register_authenticator_roles.sql` |
 | 1.258.0 | GAS-CP-R97-255 | 2026-11-25 | Security: wrong passwords in the apps count toward the account lock; authenticator obligatory for the General Manager; notice to the CEO when the role is given; notice of a sign-in from a new device | `install/migrate_cp_r97_255_gm_authenticator_login_devices.sql` |
 | 1.257.0 | GAS-CP-R97-254 | 2026-11-25 | General Manager works in HR (without personal data and employee documents) and reads the assessments; login history shows sign-ins from the mobile apps with app, version and platform | `install/migrate_cp_r97_254_login_log_apps.sql` |
 | 1.256.0 | GAS-CP-R97-253 | 2026-11-25 | Inventory: import of company assets from Excel — one row per unit with serial number, company number, warehouse and holder; template, preview, all-or-nothing import | — |

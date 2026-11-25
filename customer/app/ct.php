@@ -656,7 +656,7 @@ function au_import(string $path, bool $dry): array {
                 if ($twofa === null) $twofa = 1;
             }
             if ($hasTotp && $twofa !== null) q('UPDATE customer_users SET twofa_required = ? WHERE id = ?', [$twofa, $uid]);
-            if (function_exists('sec_gm_sync') && $role !== 'customer') sec_gm_sync($uid, $x ? ((int)($x['staff_role_id'] ?? 0) ?: null) : null, $srole ? (int)$srole : null);   // R97-255
+            if (function_exists('sec_gm_sync')) sec_gm_sync($uid, $x ? ((int)($x['staff_role_id'] ?? 0) ?: null) : null, $srole ? (int)$srole : null);   // R97-255
             if ($hasDisc && $role !== 'customer') {
                 $dn = $g($r, 'disc'); $mn = $g($r, 'manager');
                 if ($dn !== '') { $did = scalar('SELECT id FROM disciplines WHERE LOWER(name) = LOWER(?) LIMIT 1', [$dn]); if ($did) q('UPDATE customer_users SET discipline_id = ? WHERE id = ?', [$did, $uid]); else $res['warnings'][] = [$line, t('au.im_baddisc', ['v' => $dn])]; }

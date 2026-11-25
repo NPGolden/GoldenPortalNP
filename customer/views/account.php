@@ -124,6 +124,16 @@ if ($has2fa): ?>
   <form method="post" action="<?= url('account') ?>" data-lock data-confirm="<?= tt('sec.my_revoke_confirm') ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('sec.my_revoke') ?>" data-confirm-cancel="<?= tt('btn.cancel') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="account_revoke"><button class="btn btn--ghost btn--danger-ghost" type="submit"><?= tt('sec.my_revoke') ?></button></form>
 </div>
 <?php endif; ?>
+<?php $devs_ = function_exists('sec_devices') ? sec_devices((int)$u['id']) : []; if ($devs_): /* R97-256 */ ?>
+<div class="card" id="devices">
+  <h2>💻 <?= tt('sec.dev_title') ?></h2>
+  <p class="hint"><?= tt('sec.dev_lede') ?></p>
+  <div class="table-scroll"><table class="tbl tbl--compact" data-nosort><thead><tr><th><?= tt('sec.dev_c') ?></th><th><?= tt('sec.dev_first') ?></th><th><?= tt('sec.dev_last') ?></th><th></th></tr></thead><tbody>
+  <?php foreach ($devs_ as $d_): ?><tr><td><?= $d_['app'] ? '📱' : '🖥' ?> <b><?= e($d_['label']) ?></b><?= $d_['here'] ? ' ' . pill('green', t('sec.dev_here')) : '' ?></td><td class="hint"><?= e(fmt_datetime($d_['first_at'])) ?></td><td class="hint"><?= e(fmt_datetime($d_['last_at'])) ?></td>
+    <td><?php if (!$d_['here']): ?><form method="post" action="<?= url('account') ?>#devices" class="inline" data-lock data-confirm="<?= e(t('sec.dev_forget_q')) ?>" data-confirm-title="<?= tt('dlg.title') ?>" data-confirm-ok="<?= tt('sec.dev_forget') ?>" data-confirm-cancel="<?= tt('btn.cancel') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="sec_dev_forget"><input type="hidden" name="id" value="<?= (int)$d_['id'] ?>"><button class="btn btn--ghost btn--sm" type="submit"><?= tt('sec.dev_forget') ?></button></form><?php endif; ?></td></tr><?php endforeach; ?>
+  </tbody></table></div>
+</div>
+<?php endif; ?>
 <?php if (function_exists('clk_has') && clk_has()): $myClk = clk_user_codes(); ?>
 <div class="card" id="clocks" style="max-width:860px;">
   <h2>🕓 <?= tt('clk.my_title') ?></h2>
