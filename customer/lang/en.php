@@ -13727,4 +13727,7 @@ Best regards,
 'pp.log' => 'Follow-up log',
 'pp.log_none' => 'Nothing recorded yet. Planned actions, outcomes and signals appear here.',
 'pp.log_more' => 'Show {n} older entries',
+'io.st_absent' => 'absent',
+'io.k_absent' => 'absent (planning)',
+'io.k_absent_hint' => 'People the planning shows as away for the day. The reason is not shown here.',
 ];

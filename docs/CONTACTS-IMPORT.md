@@ -4503,3 +4503,13 @@ No database step. Language keys +3 (13 509 per language). Next ref GAS-CP-R97-23
 
 **Data:** `offer_events.note` is now text, `offers.next_action_note` 2 000 characters (migration key r99r).
 
+## §520 In / Out › Who is in: «absent» from the planning (GAS-CP-R97-241, v1.248.1)
+
+**Before:** everyone without an entry showed «not yet» and counted as «no entry», also people on leave.
+
+**Now:** HR › In / Out › Who is in reads the planning of the chosen day. A person with no entry and a planning entry of the kind *leave*, *sick leave*, *parental leave* or *strike* is shown with the label **absent** — the kind is never shown on this list — and is counted in the new figure **absent (planning)**. «No entry» now means: expected, not punched.
+
+**Not absences:** travel, training, office, warehouse and work on a project — those people still show «not yet» until they punch.
+
+**Order of truth:** an In / Out entry wins over the planning (who punches is «in» or «out»). Approved leave requests and strike days reach the planning by themselves; an absence known only by phone must be entered in the planning (or as a leave by HR) to appear as absent.
+

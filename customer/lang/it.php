@@ -13727,4 +13727,7 @@ Cordiali saluti,
 'pp.log' => 'Registro dei follow-up',
 'pp.log_none' => 'Ancora nulla registrato. Qui compaiono azioni pianificate, esiti e segnali.',
 'pp.log_more' => 'Mostra {n} voci precedenti',
+'io.st_absent' => 'assente',
+'io.k_absent' => 'assenti (pianificazione)',
+'io.k_absent_hint' => 'Persone che la pianificazione indica come assenti per il giorno. Il motivo non è mostrato qui.',
 ];

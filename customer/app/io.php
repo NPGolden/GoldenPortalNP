@@ -205,11 +205,17 @@ function io_pending_count(): int {
     $ids = io_team_ids(); if ($ids !== null && !$ids) return $n = 0;
     try { return $n = (int) scalar("SELECT COUNT(*) FROM io_entries WHERE status = 'pending'" . ($ids === null ? '' : ' AND user_id IN (' . implode(',', $ids) . ')')); } catch (Throwable $e) { return $n = 0; }
 }
-/** Today's board: every member of staff with the first In, the last Out and the state. */
+/** R97-241: who the planning shows as away on a day (leave, sick leave, parental leave, strike) — [user id => true]. The board says «absent» for them and never the kind. */
+const IO_ABSENT_KINDS = ['leave', 'sick', 'parental', 'strike'];
+function io_absent_ids(string $day): array {
+    try { return array_fill_keys(array_map('intval', array_column(all("SELECT DISTINCT user_id FROM plan_entries WHERE plan_date = ? AND kind IN ('" . implode("','", IO_ABSENT_KINDS) . "')", [$day]), 'user_id')), true); } catch (Throwable $e) { return []; }
+}
+/** Today's board: every member of staff with the first In, the last Out and the state (in · out · absent by the planning · none). */
 function io_board(string $day): array {
     $by = []; foreach (all("SELECT e.*, s.name AS site_name FROM io_entries e LEFT JOIN io_sites s ON s.id = e.site_id WHERE e.local_day = ? AND e.status <> 'rejected' ORDER BY e.at_utc, e.id", [$day]) as $r) $by[(int)$r['user_id']][] = $r;
+    $abs = io_absent_ids($day);
     $out = []; foreach (io_staff() as $uid => $name) { $rows = $by[$uid] ?? []; $in = null; $o = null; foreach ($rows as $r) { if ($r['kind'] === 'in' && !$in) $in = $r; if ($r['kind'] === 'out') $o = $r; }
-        $lastK = $rows ? $rows[count($rows) - 1]['kind'] : null; $out[] = ['uid' => $uid, 'name' => $name, 'in' => $in, 'out' => $lastK === 'out' ? $o : null, 'state' => $lastK === 'in' ? 'in' : ($rows ? 'out' : 'none'), 'n' => count($rows)]; }
+        $lastK = $rows ? $rows[count($rows) - 1]['kind'] : null; $out[] = ['uid' => $uid, 'name' => $name, 'in' => $in, 'out' => $lastK === 'out' ? $o : null, 'state' => $lastK === 'in' ? 'in' : ($rows ? 'out' : (isset($abs[$uid]) ? 'absent' : 'none')), 'n' => count($rows)]; }
     return $out;
 }
 /** The In / Out figures of one person for a period (shared by the statistics and the yearly evaluation). $days: [day => punches]. */
