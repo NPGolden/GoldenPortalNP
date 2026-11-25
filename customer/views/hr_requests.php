@@ -49,6 +49,15 @@ layout_head(t('hr.requests'), 'hr_requests');
   <?php endif; ?>
 </div>
 
+<?php if (function_exists('hr_log_can') && hr_log_can() && !$pp): $lg = hr_log_rows(30); /* R97-246 */ ?>
+<details class="card card--details" id="hr-log"<?= !empty($_GET['log']) ? ' open' : '' ?>><summary><h2>🧾 <?= e(t('hr.log_title', ['n' => 30])) ?> <span class="count"><?= count($lg) ?></span></h2></summary>
+  <p class="hint"><?= tt('hr.log_lede') ?></p>
+  <?php if (!$lg): ?><p class="hint"><?= tt('hr.log_none') ?></p><?php else: ?>
+  <div class="table-scroll"><table class="tbl tbl--compact"><thead><tr><th><?= tt('hr.log_th_when') ?></th><th><?= tt('ll.who') ?></th><th><?= tt('hr.log_th_action') ?></th><th><?= tt('hr.log_th_before') ?></th><th><?= tt('hr.log_th_after') ?></th><th><?= tt('hr.log_th_by') ?></th><th><?= tt('hr.corr_note') ?></th></tr></thead><tbody>
+  <?php foreach ($lg as $l): ?><tr><td class="nowrap"><?= e(fmt_datetime($l['created_at'])) ?></td><td><b><?= e($l['name_en']) ?></b></td><td><?= pill($l['field'] === 'cancelled' ? 'bad' : ($l['field'] === 'corrected' ? 'gold' : 'blue'), t('hr.log_a_' . $l['field'])) ?></td><td><?= e((string)$l['old_value']) ?></td><td><?= e((string)$l['new_value']) ?></td><td><?= e((string)$l['by_name']) ?></td><td><?= e((string)$l['note']) ?></td></tr><?php endforeach; ?>
+  </tbody></table></div><?php endif; ?>
+</details>
+<?php endif; ?>
 <?php if ($canFor): ?>
 <div class="card" id="req-new">
   <h2>+ <?= tt('hr.new_request_for') ?></h2>

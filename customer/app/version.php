@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.250.0';
+const CP_VERSION = '1.251.0';
 const CP_BUILD   = '2026-11-24';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-246', 'version' => '1.251.0', 'date' => '2026-11-25', 'title' => 'Recruiting: the offer leaves through the standard e-mail card (send now, draft in Outlook) and the candidate accepts it with its starting date through a personal link; leave and HR-message pushes without details; list and weekly notice of entries by HR; order deletion asks the authenticator code and tells the CEO; fields no longer leave narrow cards', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-245', 'version' => '1.250.0', 'date' => '2026-11-25', 'title' => 'Leave: a mistaken entry is corrected by HR or, while it can still change, by the employee; what HR enters for an employee (illness, strike) is final at once and the employee is notified; HR messages in one list with the ones to answer first', 'db' => 'install/migrate_cp_r97_245_leave_correction_hr_messages_pool.sql', 'check' => 'r99s'],
         ['ref' => 'GAS-CP-R97-244', 'version' => '1.249.0', 'date' => '2026-11-25', 'title' => 'Purchase order: management and portal administrators can delete an order together with its goods receipts, supplier invoices and payments; a line whose code already exists is linked to that item; item codes may hold a comma', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-243', 'version' => '1.248.3', 'date' => '2026-11-25', 'title' => 'Language: opening a notification (or any link made by a colleague who uses another language) no longer changes your language — only the language selector does; notification links are stored without a language', 'db' => null, 'check' => null],

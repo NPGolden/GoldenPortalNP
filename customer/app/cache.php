@@ -68,6 +68,7 @@ function hk_tick(): void {
         try { if (function_exists('proc_feed_all') && cp_setting('proc_feed_v1', '') !== '1') { cp_setting_set('proc_feed_v1', '1'); $log[] = 'procurement stage ' . proc_feed_all(); } } catch (Throwable $e) { $log[] = 'procurement stage err'; }   // R97-096: once
         try { if (function_exists('rs_weekly')) $log[] = rs_weekly(); } catch (Throwable $e) { $log[] = 'subscriptions err'; }   // R97-092
         try { if (function_exists('hr_doc_daily')) $log[] = hr_doc_daily(); } catch (Throwable $e) { $log[] = 'hr-doc err'; }   // R77-007
+        try { if (function_exists('hr_log_weekly')) $log[] = hr_log_weekly(); } catch (Throwable $e) { $log[] = 'hr-log err'; }   // R97-246
         try { if (function_exists('wl_daily')) $log[] = wl_daily(); } catch (Throwable $e) { $log[] = 'wl err'; }   // R97-194
         try { if (function_exists('ft_daily')) $log[] = ft_daily(); } catch (Throwable $e) { $log[] = 'bin err'; }   // R97-190: files in the recycle bin longer than 30 days
         $dirs = (array) @glob($storage . '/backups/*', GLOB_ONLYDIR); rsort($dirs); $n = 0; foreach (array_slice($dirs, 3) as $d) { cp_rmtree((string)$d, $storage . '/backups'); if (!is_dir($d)) $n++; }   // R97-104: backup folders hold sub-folders — the old loop could not empty them $log[] = 'backups ' . $n;

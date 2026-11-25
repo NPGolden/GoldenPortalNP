@@ -124,15 +124,14 @@ if (function_exists('em_card_html') && em_has()) {
 </form></details>
 <?php if ($od): $miss = rcr_offer_missing($od); $dr = null; if (!$miss) { try { $dr = rcr_offer_draft((int)$od['id']); } catch (Throwable $e) {} } ?>
 <?php if ($miss): ?><p style="margin-top:10px;"><?= pill('gold', t('rc.of_missing', ['what' => implode(', ', $miss)])) ?></p>
-<?php elseif ($dr): ?><details style="margin-top:10px;" open><summary class="btn btn--ghost" style="display:inline-block;cursor:pointer;">✉ <?= tt('rc.of_mail') ?></summary>
-<form method="post" action="<?= url('rcr_application', ['id' => $id]) ?>" data-lock data-confirm="<?= e(t('rc.of_send_q', ['to' => $dr['to']])) ?>" style="margin-top:12px;"><?= csrf_field() ?><input type="hidden" name="action" value="rcr_offer_send"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="offer_id" value="<?= (int)$od['id'] ?>">
-  <p class="hint"><?= tt('rc.of_mail_hint') ?></p>
-  <div class="field"><label><?= tt('rc.ev_to') ?></label><input value="<?= e($dr['to']) ?>" readonly></div>
-  <div class="field"><label><?= tt('rc.ev_subject') ?></label><input name="subject" maxlength="200" value="<?= e($dr['subject']) ?>" required></div>
-  <div class="field"><label><?= tt('rc.ev_text') ?></label><textarea name="body" rows="22" maxlength="60000" required><?= e($dr['body']) ?></textarea></div>
-  <div class="btn-row"><button class="btn btn--gold">✉ <?= tt('rc.of_send') ?></button></div>
-</form></details><?php endif; endif; ?>
+<?php elseif ($dr && function_exists('em_card_html') && em_has()): /* R97-246: the same e-mail card as every other message — send now, draft in my Outlook, or message file */
+  echo '<div id="rc-offer-mail" style="margin-top:10px;">' . em_card_html(['kind' => 'rc_offer', 'text' => ['subject' => (string)$dr['subject'], 'body' => (string)$dr['body']], 'title' => t('rc.of_mail'), 'note' => t('rc.of_mail_hint'), 'open' => true, 'rows' => 22, 'ctx' => [],
+      'people' => [['name' => (string)($a['name'] ?: $a['email']), 'email' => (string)$a['email'], 'role' => t('rc.candidate'), 'on' => true]], 'atts' => [], 'back' => url('rcr_application', ['id' => $id]) . '#offer',
+      'hidden' => '<input type="hidden" name="rc_app" value="' . $id . '"><input type="hidden" name="rc_offer" value="' . (int)$od['id'] . '">']) . '</div>'; ?>
+<?php endif; endif; ?>
 <?php endif; ?>
+<?php $dlOf = null; foreach ($offs as $x) if ($x['status'] === 'sent') { $dlOf = $x; break; } if (!$dlOf) foreach ($offs as $x) if (in_array($x['status'], ['accepted', 'declined'], true)) { $dlOf = $x; break; }
+  if ($dlOf) { $dlDoc = 'rcoffer'; $dlId = (int)$dlOf['id']; require __DIR__ . '/_dl_card.php'; } /* R97-246: acceptance by the candidate through a personal link */ ?>
 </div>
 <?php endif; ?>
 <details style="margin-top:10px;"<?= $ints ? '' : ' open' ?>><summary class="btn btn--ghost" style="display:inline-block;cursor:pointer;">＋ <?= tt('rc.ev_plan_interview') ?></summary>
@@ -151,13 +150,13 @@ if (function_exists('em_card_html') && em_has()) {
 <div class="card" id="keep"><h2>🗄 <?= tt('rc.keep_title') ?></h2>
 <?php if (!empty($a['keep_until']) && $a['keep_until'] >= date('Y-m-d')): ?><p><?= pill('green', t('rc.keep_active', ['date' => date('d/m/Y', strtotime($a['keep_until']))])) ?></p><p class="hint"><?= e((string)$a['keep_reason']) ?><?= !empty($a['pool_consent_at']) ? ' · ' . tt('rc.keep_pool_yes') : '' ?></p>
 <?php else: ?><p class="hint"><?= t('rc.keep_hint', ['months' => (int)cp_setting('rc_retention_months', '6')]) ?></p><?php endif; ?>
-<form method="post" class="form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="rcr_keep"><input type="hidden" name="id" value="<?= $id ?>">
+<form method="post" class="form-grid form-grid--1" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="rcr_keep"><input type="hidden" name="id" value="<?= $id ?>">
   <label><?= tt('rc.keep_for') ?><select name="months" data-nosearch><option value="12"><?= t('rc.keep_months', ['n' => 12]) ?></option><option value="6"><?= t('rc.keep_months', ['n' => 6]) ?></option><option value="24"><?= t('rc.keep_months', ['n' => 24]) ?></option><option value="36"><?= t('rc.keep_months', ['n' => 36]) ?></option><option value="0"><?= tt('rc.keep_clear') ?></option></select></label>
   <label><?= tt('rc.keep_reason') ?><input name="reason" maxlength="200" value="<?= e((string)$a['keep_reason']) ?>" placeholder="<?= tt('rc.keep_reason_ph') ?>"></label>
   <label class="check span2"><input type="checkbox" name="pool_consent" value="1"<?= !empty($a['pool_consent_at']) ? ' checked' : '' ?>> <?= tt('rc.keep_pool_consent') ?></label>
   <div class="btn-row span2"><button class="btn btn--ghost"><?= tt('btn.save') ?></button></div>
 </form></div>
-<form method="post" class="card form-grid" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="rcr_app_decide"><input type="hidden" name="id" value="<?= $id ?>"><h2><?= tt('rc.decision') ?></h2>
+<form method="post" class="card form-grid form-grid--1" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="rcr_app_decide"><input type="hidden" name="id" value="<?= $id ?>"><h2><?= tt('rc.decision') ?></h2>
   <div class="field"><label><?= tt('th.status') ?></label><select name="status" data-nosearch><?php foreach (RCR_APP_STATUS as $s): ?><option value="<?= $s ?>"<?= $a['status'] === $s ? ' selected' : '' ?>><?= tt('rc.st_' . $s) ?></option><?php endforeach; ?></select></div>
   <div class="field"><label><?= tt('rc.rating') ?></label><select name="rating" data-nosearch><option value=""></option><?php for ($i = 1; $i <= 5; $i++): ?><option value="<?= $i ?>"<?= (int)$a['rating'] === $i ? ' selected' : '' ?>><?= str_repeat('★', $i) ?></option><?php endfor; ?></select></div>
   <div class="field"><label><?= tt('rc.owner') ?></label><select name="owner_user_id"><option value=""></option><?php foreach ($owners as $o): ?><option value="<?= (int)$o['id'] ?>"<?= (int)$a['owner_user_id'] === (int)$o['id'] ? ' selected' : '' ?>><?= e($o['full_name']) ?></option><?php endforeach; ?></select></div>

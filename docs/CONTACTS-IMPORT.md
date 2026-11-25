@@ -4577,3 +4577,15 @@ Migration `install/migrate_cp_r97_245_leave_correction_hr_messages_pool.sql` (ke
 **Message pool** — page `hr_messages` (HR only; in `HR_PAGES`, menu group HR): `hr_message_threads()` one row per person (unread, `wait` = the last open employee message is newer than the last HR message), `hr_message_done($pid)` (action `hr_msg_done`), `hr_messages_card($pid, true, 'pool')` returns to the pool after sending. The notice of a new employee message links to `p=hr_messages&pid=…`; the menu badge moved from HR settings to HR messages and counts what waits.
 
 Language: 37 new keys, `hr.new_request_for_hint` reworded.
+
+## §525 Recruiting offer: standard e-mail card and acceptance by link · security items of R97-244/245 · form grid (GAS-CP-R97-246, v1.251.0)
+
+**Offer e-mail** — `views/rcr_application.php` renders `em_card_html()` with `'text' => rcr_offer_draft()` (new options `text`, `title`, `note`, `open`, `rows`) and the hidden field `rc_offer`. `em_after()` calls `rcr_offer_mailed($id, $to, $subject, $body, $how)` after Send now / Draft in my Outlook / message file: the candidate must be in `$to`; `rc_offers` → `sent` with subject, text, sender; log `offer_sent — sent from the mailbox | draft placed in Outlook | message file prepared`; application → `offer`. As for purchase orders, a prepared draft counts as sent. `rcr_offer_send` (direct send by the portal mailbox) stays for the API but has no button.
+
+**Acceptance by the candidate** — the acceptance-by-link module (`app/dl.php`, `sign.php`, R97-058) has the document `rcoffer`: `dl_info()` (open = offer `sent`; language of the candidate; `to_email`), no file needed (the page shows the stored text with position, starting date, validity), only the address of the application, validity = `valid_until` else 14 days. Decisions `accepted` (tick «accept with the starting date») / `declined` (remark needed) → `rcr_offer_answered()` writes `outcome_at`, `outcome_note` (name, address, starting date, remark) and `rc_log` with the network address. Card `_dl_card.php` under the offers. `dl_send` / `dl_cancel` are in `HR_ACTIONS`; a person with the HR role alone may use them for `rcoffer` only. No drawn signature (unlike service reports).
+
+**Security** — `pn_from_nf()`: kinds `hrq:*`, `hrm:*` (`PN_PRIVATE`) are queued with neutral texts `pn.hr_me_*`, `pn.hr_appr_*`, `pn.hr_msg_*` in the language of the reader. `hr_audit` now also has `entered_by_hr`; `hr_log_rows()` / fold `#hr-log` on HR requests (HR, management, administrator); `hr_log_weekly()` in the daily job, once per ISO week, counts only, to CEO / General Manager / Managing Director. `po_purge()` checks `pk_stepup_ok()` (field `totp` on the card when the person has an authenticator) and sends `po:purged` to the CEO.
+
+**Form grid** — `.form-grid` columns are `minmax(0, 1fr)`, children `min-width: 0`, `.span2` and `h2` take the row, inputs inside a label fill the cell; `.form-grid--1` = one column (the side cards of the application).
+
+Language: 34 new keys, `rc.of_mail_hint` reworded.

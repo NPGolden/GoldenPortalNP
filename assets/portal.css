@@ -1884,7 +1884,14 @@ html[data-theme="dark"] .pp-col { background: #16263A; } html[data-theme="dark"]
 .pr-disc { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 12px; } .pr-disc label { display: flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; }
 
 /* R80: procurement forms — two-column field grid, full-width fields, kv full row */
-.form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px 16px; }
+.form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; }
+/* R97-246: a field never grows out of its card; .span2 and the title take the whole row; --1 = one column for narrow side cards */
+.form-grid > * { min-width: 0; }
+.form-grid > .span2, .form-grid > h2 { grid-column: 1 / -1; }
+.form-grid > label > input:not([type=checkbox]):not([type=radio]), .form-grid > label > select, .form-grid > label > textarea { display: block; width: 100%; max-width: 100%; box-sizing: border-box; margin-top: 4px; }
+.form-grid select, .form-grid input, .form-grid textarea { max-width: 100%; }
+.form-grid--1 { grid-template-columns: minmax(0, 1fr); }
+.form-grid--1 > * { grid-column: 1 / -1; }
 .form-grid .field { margin: 0; }
 .field--full, .kv--full { grid-column: 1 / -1; }
 @media (max-width: 760px) { .form-grid { grid-template-columns: 1fr; } }

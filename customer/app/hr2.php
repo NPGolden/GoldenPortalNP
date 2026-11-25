@@ -282,11 +282,14 @@ function hr_request_create_from_post(?array $forPerson = null): int {
       [(int)$p['id'], (int)($p['user_id'] ?? 0) ?: null, (int)$t['id'], $from, $to, $tf, $tt, $hours, $days, $reason, $doc['name'] ?? null, $doc['path'] ?? null, $doc['sha'] ?? null, $status, $mgr, (int)$u['id']]);
     $id = (int) db()->lastInsertId();
     if (hr_req_has_reasons()) q('UPDATE hr_requests SET reason_code = ?, doc_due = ? WHERE id = ?', [$rcode, $docDue, $id]);
+    if ($byHr && $auto && function_exists('hr_audit')) hr_audit((int)$p['id'], 'request', 'entered_by_hr', null, hr_request_text(one('SELECT * FROM hr_requests WHERE id = ?', [$id])), null);
     if ($auto) { q('UPDATE hr_requests SET hr_at = NOW(), hr_note = ? WHERE id = ?', [$byHr ? mb_substr(t('hr.by_hr_note', ['who' => (string)$u['full_name']]), 0, 300) : t('hr.auto_note'), $id]); if ($byHr) q('UPDATE hr_requests SET hr_user_id = ? WHERE id = ?', [(int)$u['id'], $id]); hr_request_to_board($id); hr_notify($id, 'registered'); if ($byHr) hr_notify($id, 'by_hr'); return $id; }
+    if ($over && function_exists('hr_audit')) hr_audit((int)$p['id'], 'request', 'entered_by_hr', null, hr_request_text(one('SELECT * FROM hr_requests WHERE id = ?', [$id])), t('hr.over_balance'));
     if ($over) {   // registered and approved in one step by HR / General Manager / CEO; the note says by whom and by how much the balance is exceeded
         $n = rtrim(rtrim(number_format($excess, 2, '.', ''), '0'), '.'); $note = $excess > 0 ? t('hr.over_note', ['n' => $n, 'u' => $t['unit'] === 'hour' && !$t['consumes_annual'] ? 'h' : mb_strtolower(t('hr.days')), 'who' => (string)$u['full_name']]) : t('hr.over_note_ok', ['who' => (string)$u['full_name']]);
         q("UPDATE hr_requests SET status = 'approved', hr_user_id = ?, hr_at = NOW(), hr_note = ? WHERE id = ?", [(int)$u['id'], mb_substr($note, 0, 300), $id]); hr_request_to_board($id); hr_notify($id, 'approved'); hr_notify($id, 'registered'); return $id;
     }   // R97-235: on the board at once; manager and HR are informed, nobody decides
+    if ($byHr && function_exists('hr_audit')) hr_audit((int)$p['id'], 'request', 'entered_by_hr', null, hr_request_text(one('SELECT * FROM hr_requests WHERE id = ?', [$id])), null);   // R97-246: the plain case (the two above return before this line)
     if ($byHr) { q("UPDATE hr_requests SET status = 'approved', manager_user_id = ?, hr_user_id = ?, hr_at = NOW(), hr_note = ? WHERE id = ?", [hr_manager_of($p) ?: null, (int)$u['id'], mb_substr(t('hr.by_hr_note', ['who' => (string)$u['full_name']]), 0, 300), $id]); hr_request_to_board($id); hr_notify($id, 'by_hr'); hr_notify($id, 'registered'); return $id; }
     hr_notify($id, 'new'); return $id;
 }
@@ -340,6 +343,22 @@ function hr_request_cancel(int $id): void {
     if ((int)$r['user_id'] !== (int)$u['id']) { if (function_exists('hr_audit')) hr_audit((int)$r['person_id'], 'request', 'cancelled', hr_request_text($r), null, mb_substr(trim((string)($_POST['note'] ?? '')), 0, 300) ?: null); hr_notify($id, 'cancelled', mb_substr(trim((string)($_POST['note'] ?? '')), 0, 200) ?: null); }   // R97-245: HR took the entry off — the employee is told
 }
 /* ---------------------------------------------------------------- R97-245: a leave entry made by mistake is corrected (HR any open or approved entry; the employee the own entry while it can still change) */
+/* R97-246: what HR entered for an employee, corrected or took off — the list for management and the weekly notice */
+const HR_LOG_ACTIONS = ['entered_by_hr', 'corrected', 'cancelled'];
+function hr_log_can(): bool { return function_exists('hr4_has') && hr4_has() && is_staff() && (hr_can() || (function_exists('mgmt_can') && mgmt_can()) || is_cp_admin()); }
+function hr_log_rows(int $days = 30, bool $check = true): array {
+    if ($check && !hr_log_can()) return []; if (!function_exists('hr4_has') || !hr4_has()) return [];
+    return all("SELECT a.created_at, a.field, a.old_value, a.new_value, a.note, p.name_en, cu.full_name AS by_name FROM hr_audit a JOIN hr_people p ON p.id = a.person_id LEFT JOIN customer_users cu ON cu.id = a.user_id WHERE a.kind = 'request' AND a.field IN ('entered_by_hr','corrected','cancelled') AND (p.user_id IS NULL OR a.user_id IS NULL OR a.user_id <> p.user_id) AND a.created_at >= NOW() - INTERVAL " . max(1, min(366, $days)) . " DAY ORDER BY a.created_at DESC, a.id DESC LIMIT 500");
+}
+/** Once a week (first daily run of the ISO week): management is told how many entries HR made, corrected or took off in the last 7 days. Counts only — the list is on HR requests. */
+function hr_log_weekly(): string {
+    if (!function_exists('nf_push') || !function_exists('hr4_has') || !hr4_has()) return 'hr-log off'; $wk = date('o-W'); if ((string) cp_setting('hr_log_week', '') === $wk) return 'hr-log -';
+    cp_setting_set('hr_log_week', $wk); $n = ['entered_by_hr' => 0, 'corrected' => 0, 'cancelled' => 0]; foreach (hr_log_rows(7, false) as $r) $n[$r['field']]++;
+    if (!array_sum($n)) return 'hr-log 0';
+    $to = []; try { $to = array_map('intval', array_column(all("SELECT cu.id FROM customer_users cu JOIN staff_roles r ON r.id = cu.staff_role_id WHERE cu.is_active = 1 AND (r.scope = 'owner' OR LOWER(TRIM(r.name)) IN ('ceo', 'general manager', 'managing director'))"), 'id')); } catch (Throwable $e) {}
+    if ($to) nf_push($to, 'hrq:digest', 'hrq:digest:' . $wk, t('hr.nf_digest', ['e' => $n['entered_by_hr'], 'c' => $n['corrected'], 'x' => $n['cancelled']]), null, url('hr_requests', ['log' => 1]) . '#hr-log', null, null);
+    return 'hr-log ' . array_sum($n) . ' to ' . count($to);
+}
 function hr_corr_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM hr_requests LIKE 'corrected_at'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function hr_request_can_correct(array $r): bool {
     $u = current_user(); if (!$u || in_array($r['status'], ['cancelled', 'rejected'], true)) return false; if (hr_can()) return true;

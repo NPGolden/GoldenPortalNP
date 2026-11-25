@@ -12,7 +12,7 @@
  */
 declare(strict_types=1);
 
-const DL_DOCS = ['fsr', 'fc', 'offer', 'oa'];
+const DL_DOCS = ['fsr', 'fc', 'offer', 'oa', 'rcoffer'];   // R97-246: rcoffer = the employment offer to a candidate (recruiting)
 const DL_CODE_MIN = 15;          // minutes a code is valid
 const DL_CODE_TRIES = 5;         // wrong attempts per code
 const DL_CODE_SENDS = 6;         // codes per link
@@ -44,13 +44,15 @@ function dl_info(string $doc, int $id): ?array {
         return ['doc' => $doc, 'id' => $id, 'r' => $r, 'no' => (string)$r['report_no'], 'title' => (string)(($r['tpl']['title'] ?? '') ?: t('fc.title')), 'open' => $r['status'] === 'submitted', 'file' => (int)($r['pdf_file_id'] ?? 0), 'customer_id' => (int)$r['customer_id'], 'customer' => (string)(($r['customer_name'] ?? '') ?: ($r['customer_db_name'] ?? '')), 'vessel' => (string)($r['vessel_name'] ?? ''), 'valid_until' => null, 'back' => url('fc', ['id' => $id])]; }
     if ($doc === 'offer') { if (!function_exists('of_has') || !of_has()) return null; $r = of_load($id); if (!$r) return null;
         return ['doc' => $doc, 'id' => $id, 'r' => $r, 'no' => trim((string)$r['offer_no'] . ' ' . (string)$r['revision']), 'title' => t('of.one'), 'open' => of_is_pending($r), 'file' => (int)($r['file_id'] ?? 0), 'customer_id' => (int)$r['customer_id'], 'customer' => (string)($r['customer_name'] ?? ''), 'vessel' => (string)($r['vessel'] ?? ''), 'valid_until' => $r['valid_until'] ?: null, 'back' => url('offer', ['id' => $id])]; }
+    if ($doc === 'rcoffer') { if (!function_exists('rcr_offer')) return null; $r = rcr_offer($id); if (!$r) return null; $a = $r['app']; $lc = in_array((string)($a['lang'] ?? ''), ['en', 'el', 'it'], true) ? (string)$a['lang'] : 'en';
+        return ['doc' => $doc, 'id' => $id, 'r' => $r, 'no' => (string)$r['offer_no'], 'title' => t_in('rc.of_doc', $lc), 'open' => $r['status'] === 'sent', 'file' => 0, 'customer_id' => 0, 'customer' => '', 'vessel' => '', 'valid_until' => $r['valid_until'] ?: null, 'back' => url('rcr_application', ['id' => (int)$r['application_id']]), 'lang' => $lc, 'to_email' => strtolower(trim((string)$a['email'])), 'to_name' => (string)($a['name'] ?? '')]; }
     $r = oa_load($id); if (!$r) return null;
     return ['doc' => $doc, 'id' => $id, 'r' => $r, 'no' => trim((string)$r['doc_no'] . ' ' . (string)$r['revision']), 'title' => t('oa.one'), 'open' => in_array($r['status'], oa_open_statuses(), true), 'file' => (int)($r['file_id'] ?? 0), 'customer_id' => (int)$r['customer_id'], 'customer' => (string)($r['customer_name'] ?? ''), 'vessel' => (string)($r['vessel'] ?? ''), 'valid_until' => null, 'back' => url('approval', ['id' => $id])];
 }
 /** When the link ends — as a number of seconds from now. */
 function dl_ttl(array $I): int {
     if ($I['doc'] === 'fsr') return 24 * 3600;
-    if ($I['doc'] === 'offer' && $I['valid_until']) { $left = strtotime($I['valid_until'] . ' 23:59:59') - time(); if ($left > 3600) return $left; }
+    if (in_array($I['doc'], ['offer', 'rcoffer'], true) && $I['valid_until']) { $left = strtotime($I['valid_until'] . ' 23:59:59') - time(); if ($left > 3600) return $left; }
     return 14 * 86400;
 }
 /** Plain-text mail with optional attachments, from the portal's mailbox, replies to the sender of the document. */
@@ -135,13 +137,14 @@ function dl_create(string $doc, int $id, string $email, string $name, bool $send
     $I = dl_info($doc, $id); if (!$I) throw new RuntimeException(t('err.notfound')); if (!$I['open']) throw new RuntimeException(t('dl.not_open'));
     $email = strtolower(trim($email)); if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 190) throw new RuntimeException(t('dl.bad_email'));
     if ($send && !(function_exists('cp_mail_configured') && cp_mail_configured())) throw new RuntimeException(t('dl.no_mail'));
-    if (!$I['file']) throw new RuntimeException(t('dl.no_file'));   // the recipient must be able to read what is accepted
+    if (!$I['file'] && $doc !== 'rcoffer') throw new RuntimeException(t('dl.no_file'));   // the recipient must be able to read what is accepted (the employment offer is shown as its text)
+    if ($doc === 'rcoffer' && $email !== (string)$I['to_email']) throw new RuntimeException(t('rc.of_dl_only'));   // an employment offer is accepted by the candidate, at the address of the application
     $name = mb_substr(trim(preg_replace('/\s+/u', ' ', $name)), 0, 120);
     if ((int) scalar('SELECT COUNT(*) FROM doc_links WHERE doc = ? AND doc_id = ? AND created_at > NOW() - INTERVAL 1 HOUR', [$doc, $id]) >= 10) throw new RuntimeException(t('dl.too_many'));
     q("UPDATE doc_links SET cancelled_at = NOW(), cancel_note = 'replaced' WHERE doc = ? AND doc_id = ? AND email = ? AND used_at IS NULL AND cancelled_at IS NULL", [$doc, $id, $email]);
     $token = dl_token();
     q('INSERT INTO doc_links (doc, doc_id, doc_no, doc_title, token_hash, email, name, lang, created_by, created_name, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?, NOW() + INTERVAL ? SECOND)',
-      [$doc, $id, mb_substr($I['no'], 0, 80), mb_substr($I['title'], 0, 160), dl_hash($token), $email, $name ?: null, in_array(locale(), ['en', 'el', 'it'], true) ? locale() : 'en', (int)$u['id'], (string)$u['full_name'], dl_ttl($I)]);
+      [$doc, $id, mb_substr($I['no'], 0, 80), mb_substr($I['title'], 0, 160), dl_hash($token), $email, $name ?: null, $I['lang'] ?? (in_array(locale(), ['en', 'el', 'it'], true) ? locale() : 'en'), (int)$u['id'], (string)$u['full_name'], dl_ttl($I)]);
     $lid = (int) db()->lastInsertId(); $L = one('SELECT * FROM doc_links WHERE id = ?', [$lid]);
     if ($send && !dl_mail_link($L, $token, false, dl_att($I['file'], $I['no'] . '.pdf'))) { q('DELETE FROM doc_links WHERE id = ?', [$lid]); throw new RuntimeException(t('dl.mail_failed') . ' (' . dl_mail_reason() . ')'); }
     return [$lid, $token];
@@ -200,6 +203,11 @@ function dl_decide(array $L, array $I, string $decision, string $name, string $r
             if ($n) $ev($evt, 'accepted', $note);
         } else throw new RuntimeException(t('err.notfound'));
         if ($n) { if ($doc === 'fsr') fsr_generate_documents($id); else fc_generate_documents($id); }
+    } elseif ($doc === 'rcoffer') {
+        if (!in_array($decision, ['accepted', 'declined'], true)) throw new RuntimeException(t('err.notfound'));
+        if ($decision === 'declined' && $remark === '') throw new RuntimeException(t('dl.remark_needed'));
+        if ($decision === 'accepted' && !$read) throw new RuntimeException(t('sgn.read_needed'));
+        $n = rcr_offer_answered($id, $decision, $name, (string)$L['email'], $remark, (string)$ip);
     } elseif ($doc === 'offer') {
         if (!in_array($decision, ['approved', 'rejected'], true)) throw new RuntimeException(t('err.notfound'));
         if ($decision === 'rejected' && $remark === '') throw new RuntimeException(t('of.reject_note_req'));
@@ -250,12 +258,13 @@ function dl_sweep(): int {
 
 function dl_handle_action(string $action): bool {
     if ($action !== 'dl_send' && $action !== 'dl_cancel') return false; require_staff();
-    $doc = (string)($_POST['doc'] ?? ''); $id = (int)($_POST['id'] ?? 0); $I = dl_info($doc, $id); if (!$I) throw new RuntimeException(t('err.notfound'));
-    $page = ['fsr' => 'fsr', 'fc' => 'fc', 'offer' => 'offer', 'oa' => 'approval'][$doc];
+    $doc = (string)($_POST['doc'] ?? ''); $id = (int)($_POST['id'] ?? 0); if ($doc !== 'rcoffer' && function_exists('hr_only') && hr_only()) throw new RuntimeException(t('err.noaccess'));   // R97-246: the HR role sends links for employment offers only
+    $I = dl_info($doc, $id); if (!$I) throw new RuntimeException(t('err.notfound'));
+    $page = ['fsr' => 'fsr', 'fc' => 'fc', 'offer' => 'offer', 'oa' => 'approval', 'rcoffer' => 'rcr_application'][$doc]; $backId = $doc === 'rcoffer' ? (int)$I['r']['application_id'] : $id;
     try {
         if ($action === 'dl_send') { dl_create($doc, $id, (string)($_POST['email'] ?? ''), (string)($_POST['name'] ?? '')); flash('good', t('dl.sent', ['e' => strtolower(trim((string)$_POST['email']))])); }
         else { dl_cancel((int)($_POST['link'] ?? 0)); flash('good', t('dl.cancelled')); }
     } catch (RuntimeException $e) { flash('bad', $e->getMessage()); }
-    redirect($page, ['id' => $id, '_r' => uniqid()], '#dl');
+    redirect($page, ['id' => $backId, '_r' => uniqid()], '#dl');
     return true;
 }

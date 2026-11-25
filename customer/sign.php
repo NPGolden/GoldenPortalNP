@@ -85,18 +85,24 @@ try {
     <p class="hint" style="margin-top:10px;"><?= e(t('dl.c_valid', ['d' => fmt_datetime((string)$L['expires_at'])])) ?></p>
   </div>
 <?php else:
-    $pdfUrl = $I['file'] ? $self . '&f=1' : ''; require __DIR__ . '/views/_sgn_preview.php';
+    if ($doc === 'rcoffer') { $sd = $r['start_date'] ? date('d/m/Y', strtotime((string)$r['start_date'])) : '—'; ?>
+  <div class="card"><h2><?= tt('rc.of_doc') ?></h2>
+    <dl class="sgn-dl"><dt><?= tt('rc.of_position') ?></dt><dd><?= e((string)$r['position']) ?></dd><dt><?= tt('rc.of_start') ?></dt><dd><b><?= e($sd) ?></b></dd><?php if ($r['valid_until']): ?><dt><?= tt('rc.of_valid') ?></dt><dd><?= e(date('d/m/Y', strtotime((string)$r['valid_until']))) ?></dd><?php endif; ?></dl>
+    <div style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;line-height:1.5;border-top:1px solid #E3E7EE;padding-top:12px;"><?= e((string)$r['body']) ?></div>
+  </div>
+<?php } else { $pdfUrl = $I['file'] ? $self . '&f=1' : ''; require __DIR__ . '/views/_sgn_preview.php'; }
     $pad = $doc === 'fsr' || $doc === 'fc';
     $btns = $pad ? [['accepted', 'sgn.accept', 'gold', 'read,sign'], ['disputed', 'sgn.dispute', 'danger', 'remark']]
+          : ($doc === 'rcoffer' ? [['accepted', 'rc.of_dl_accept', 'gold', 'read'], ['declined', 'rc.of_dl_decline', 'danger', 'remark']]
           : ($doc === 'offer' ? [['approved', 'of.approve', 'gold', 'read'], ['rejected', 'of.reject', 'danger', 'remark']]
-          : [['approved', 'oa.approve', 'gold', 'read'], ['approved_comments', 'dl.oa_comments', 'plain', 'remark'], ['rejected', 'oa.reject', 'danger', 'remark']]); ?>
-  <div class="card" id="sign"><h2>✍ <?= tt($pad ? 'sgn.h_sign' : 'dl.h_decide') ?></h2><p class="hint"><?= tt($pad ? 'sgn.sign_lede' : 'dl.decide_lede') ?></p>
+          : [['approved', 'oa.approve', 'gold', 'read'], ['approved_comments', 'dl.oa_comments', 'plain', 'remark'], ['rejected', 'oa.reject', 'danger', 'remark']])); ?>
+  <div class="card" id="sign"><h2>✍ <?= tt($pad ? 'sgn.h_sign' : 'dl.h_decide') ?></h2><p class="hint"><?= tt($pad ? 'sgn.sign_lede' : ($doc === 'rcoffer' ? 'rc.of_dl_lede' : 'dl.decide_lede')) ?></p>
     <form method="post" action="<?= e($self) ?>" id="sgnform" novalidate>
       <input type="hidden" name="a" value="decide"><input type="hidden" name="decision" value=""><input type="hidden" name="signature" value="">
       <div class="field"><label for="signer_name"><?= tt('sgn.name') ?> *</label><input id="signer_name" name="signer_name" maxlength="90" autocomplete="name" required value="<?= e($post['name'] ?? (string)($L['name'] ?? '')) ?>"></div>
-      <div class="field"><label for="signer_role"><?= tt('sgn.role') ?></label><input id="signer_role" name="signer_role" maxlength="80" placeholder="<?= tt('sgn.role_ph') ?>" value="<?= e($post['role'] ?? '') ?>"></div>
+      <div class="field"<?= $doc === 'rcoffer' ? ' hidden' : '' ?>><label for="signer_role"><?= tt('sgn.role') ?></label><input id="signer_role" name="signer_role" maxlength="80" placeholder="<?= tt('sgn.role_ph') ?>" value="<?= e($post['role'] ?? '') ?>"></div>
       <div class="field"><label for="remark"><?= tt($doc === 'oa' ? 'dl.comments' : 'fsr.remark') ?></label><textarea id="remark" name="remark" rows="3" maxlength="2000" placeholder="<?= tt('sgn.remark_ph') ?>"><?= e($post['remark'] ?? '') ?></textarea></div>
-      <label class="check"><input type="checkbox" name="read" value="1" id="sgnread"> <?= tt($pad ? 'sgn.read' : ($doc === 'offer' ? 'dl.read_offer' : 'dl.read_doc')) ?></label>
+      <label class="check"><input type="checkbox" name="read" value="1" id="sgnread"> <?= $doc === 'rcoffer' ? e(t('rc.of_dl_read', ['d' => $sd])) : tt($pad ? 'sgn.read' : ($doc === 'offer' ? 'dl.read_offer' : 'dl.read_doc')) ?></label>
       <?php if ($pad): ?><div class="field" style="margin-top:12px;"><label><?= tt('sgn.pad') ?></label><canvas id="sgnpad" class="sigpad" width="600" height="220"></canvas><button type="button" class="btn btn--ghost btn--sm" id="sgnclear"><?= tt('btn.clear') ?></button></div><?php endif; ?>
       <p class="flash flash--bad" id="sgnerr" hidden></p>
       <div class="btn-row sgn-actions sgn-actions--<?= count($btns) ?>"><?php foreach ($btns as [$dec, $key, $tone, $need]): ?><button class="btn<?= $tone === 'gold' ? ' btn--gold' : ($tone === 'danger' ? ' btn--ghost btn--danger-ghost' : '') ?>" type="button" data-dec="<?= $dec ?>" data-need="<?= $need ?>"><?= tt($key) ?></button><?php endforeach; ?></div>

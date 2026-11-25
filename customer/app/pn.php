@@ -18,6 +18,8 @@ const PN_STAFF_ORDER = ['pm', 'engineer', 'employee', 'hr'];        // a member 
 const PN_COMMERCIAL = ['of', 'sb'];                                   // R97-216/217: sales and money topics go to Golden PM only — never to the Service, Employee or HR app
 const PN_PLAN_ORDER = ['engineer', 'employee', 'pm', 'hr'];            // R97-221: planning notices go to the app that shows My planning
 const PN_PLAN_AHEAD = 21;                                           // days ahead for which a change of the planning is announced
+const PN_PRIVATE = ['hrq', 'hrm'];                                     // R97-246: topics whose push carries no details
+const PN_HR_OWN = ['hrq:approved', 'hrq:rejected', 'hrq:by_hr', 'hrq:corrected', 'hrq:cancelled', 'hrq:doc_due'];   // leave notices about the reader's own leave
 const PN_FRESH_SEC = 7200;                                          // older events are history, not news
 
 function pn_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'mob_push_queue'"); } catch (Throwable $e) { $h = false; } } return $h; }
@@ -75,6 +77,10 @@ function pn_from_nf(int $uid, string $kind, string $refKey, string $title, ?stri
         if ($kind === 'of:followup' && str_starts_with($refKey, 'ofu:')) {   // R97-216: one push a day for the sales follow-ups, not one per offer
             $lang = (string) (scalar('SELECT locale FROM customer_users WHERE id = ?', [$uid]) ?: 'en');
             pn_enqueue($uid, 'nf:' . $kind, 'ofu:day:' . date('Y-m-d'), pn_t($lang, 'pn.followups_t'), pn_t($lang, 'pn.followups_b', ['first' => $title]), null); return;
+        }
+        if (in_array(explode(':', $kind, 2)[0], PN_PRIVATE, true)) {   // R97-246: leave and HR messages — the lock screen says only that there is news; names, leave types and message text are read after sign-in
+            $lang = (string) (scalar('SELECT locale FROM customer_users WHERE id = ?', [$uid]) ?: 'en'); $k = str_starts_with($kind, 'hrm:') ? 'msg' : (in_array($kind, PN_HR_OWN, true) ? 'me' : 'appr');
+            $title = pn_t($lang, 'pn.hr_' . $k . '_t'); $body = pn_t($lang, 'pn.hr_' . $k . '_b');
         }
         pn_enqueue($uid, 'nf:' . $kind, $refKey, $title, $body, pn_route($kind, $role[$uid] === 'customer'));
     } catch (Throwable $e) { /* a push must never break the notification */ }

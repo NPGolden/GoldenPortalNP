@@ -50,12 +50,12 @@ function em_mailto(array $emails, array $ctx): string {
 /** The card. $o: kind, ctx (see em_text), people (em_people), atts [[key, label]], back (form action url). */
 function em_card_html(array $o): string {
     if (!em_has()) return '';
-    $u = current_user(); $tx = em_text($o['kind'], $o['ctx']); $id = 'em' . substr(md5($o['kind'] . $tx['subject']), 0, 6);
+    $u = current_user(); $tx = isset($o['text']) ? ['subject' => (string)$o['text']['subject'], 'body' => (string)$o['text']['body'], 'template_id' => null] : em_text($o['kind'], $o['ctx']); $id = 'em' . substr(md5($o['kind'] . $tx['subject']), 0, 6);   // R97-246: 'text' = a message prepared by the caller (the recruiting offer), 'title' / 'open' / 'note' for its card
     $kinds = $o['kinds'] ?? [];   // R84-001: several templates in one card — [kind => label]; the choice swaps subject and text
     $txs = []; foreach ($kinds as $k => $label) $txs[$k] = $k === $o['kind'] ? ['s' => $tx['subject'], 'b' => $tx['body']] : (function () use ($k, $o) { $t = em_text($k, $o['ctx']); return ['s' => $t['subject'], 'b' => $t['body']]; })();
     $dl = $_SESSION['em_odraft'] ?? null; if ($dl !== null) unset($_SESSION['em_odraft']);   // R97-024: the draft just created in the person's Outlook
     $h = ($dl !== null ? '<p class="flash flash--good" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;"><span style="flex:1 1 320px;">' . tt('em.odraft_ok') . '</span>' . ($dl !== '' ? '<a class="btn btn--sm" href="' . e($dl) . '" target="_blank" rel="noopener noreferrer">' . tt('em.odraft_open') . ' ↗</a>' : '') . '</p>' : '')
-       . '<details class="card em-card" id="' . $id . '"><summary class="btn btn--ghost btn--sm">✉ ' . tt('em.title') . '</summary>';
+       . '<details class="card em-card" id="' . $id . '"' . (!empty($o['open']) ? ' open' : '') . '><summary class="btn btn--ghost btn--sm">✉ ' . (isset($o['title']) ? e((string)$o['title']) : tt('em.title')) . '</summary>' . (isset($o['note']) ? '<p class="hint" style="margin:8px 0;">' . e((string)$o['note']) . '</p>' : '');
     $h .= '<form method="post" action="' . e($o['back']) . '" class="em-form"' . ($txs ? ' data-em-tx="' . e(json_encode($txs, JSON_UNESCAPED_UNICODE)) . '"' : '') . '>' . csrf_field() . '<input type="hidden" name="action" value="em_draft">' . (string)($o['hidden'] ?? '');
     if (count($kinds) > 1) { $h .= '<div class="field" style="margin-bottom:8px;"><label>' . tt('em.template') . '</label><select name="em_kind" class="js-em-kind" data-nosearch>'; foreach ($kinds as $k => $label) $h .= '<option value="' . e($k) . '"' . ($k === $o['kind'] ? ' selected' : '') . '>' . e($label) . '</option>'; $h .= '</select></div>'; }
     $h .= '<div class="em-people"><label class="em-l">' . tt('em.to') . '</label>';
@@ -66,7 +66,7 @@ function em_card_html(array $o): string {
     $h .= '<div class="field" style="margin:6px 0 0;"><input name="to_more" placeholder="' . tt('em.more_ph') . '"></div></div>';
     $h .= '<div class="grid grid-2"><div class="field"><label>' . tt('em.cc') . '</label><input name="cc" value="' . e((string)($u['email'] ?? '')) . '"></div>';
     $h .= '<div class="field"><label>' . tt('em.subject') . '</label><input name="subject" required value="' . e($tx['subject']) . '"></div></div>';
-    $h .= '<div class="field"><label>' . tt('em.text') . '</label><textarea name="body" rows="8">' . e($tx['body']) . '</textarea></div>';
+    $h .= '<div class="field"><label>' . tt('em.text') . '</label><textarea name="body" rows="' . (int)($o['rows'] ?? 8) . '">' . e($tx['body']) . '</textarea></div>';
     if ($o['atts']) {
         $h .= '<div class="em-atts"><label class="em-l">' . tt('em.atts') . '</label>';
         foreach ($o['atts'] as $i => [$k, $label]) $h .= '<label class="chk em-a"><input type="checkbox" name="att[]" value="' . e($k) . '"' . ($i === 0 || !empty($o['atts_all']) ? ' checked' : '') . '> 📎 ' . e($label) . '</label>';
@@ -177,6 +177,7 @@ function em_after(array $to, string $subject): void {
     if (!empty($_POST['po_id']) && !empty($_POST['rfq_sup']) && function_exists('rfo_mark_sent') && po_admin()) { try { rfo_mark_sent((int)$_POST['po_id'], (int)$_POST['rfq_sup'], $to); } catch (Throwable $e) {} }   // R88-001: RFO to this invited supplier
     elseif (!empty($_POST['po_id']) && function_exists('po_mark_sent') && po_admin()) { try { po_mark_sent((int)$_POST['po_id'], $to); } catch (Throwable $e) {} }   // R80-003: the PO / RFQ counts as sent once the draft is prepared
     if (!empty($_POST['rc_app']) && function_exists('rcr_log') && function_exists('rcr_application')) { $ra = rcr_application((int)$_POST['rc_app']); if ($ra && rcr_can_view((int)$ra['vacancy_id'])) rcr_log('email_drafted', ['application_id' => (int)$ra['id']], implode(', ', $to) . ' — ' . $subject); }   // R92-005
+    if (!empty($_POST['rc_offer']) && function_exists('rcr_offer_mailed')) { try { rcr_offer_mailed((int)$_POST['rc_offer'], $to, $subject, (string)($_POST['body'] ?? ''), (string)($_POST['action'] ?? '') === 'em_send' ? 'sent' : ((string)($_POST['action'] ?? '') === 'em_odraft' ? 'outlook' : 'file')); } catch (Throwable $e) {} }   // R97-246: the recruiting offer goes out through this card
     if (!empty($_POST['acc_report']) && function_exists('acc_mark_sent')) acc_mark_sent((int)$_POST['acc_report'], implode(', ', $to));   // R38-001: the accounting report is now with accounting
 }
 /** POST em_send → the message leaves through Microsoft Graph from the signed-in person's own mailbox and lands in its Sent Items (R97-023). Returns the recipients. */

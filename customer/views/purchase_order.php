@@ -57,6 +57,7 @@ layout_head(($o ? $o['po_no'] : ($isRfq ? t('po.new_rfq') : t('po.new_po'))) . '
   <form method="post" action="<?= $self ?>" data-lock data-confirm="<?= e(t('po.pg_q')) ?>" class="form-grid" style="margin-top:10px;" autocomplete="off"><?= csrf_field() ?><input type="hidden" name="action" value="po_purge"><input type="hidden" name="id" value="<?= $id ?>">
     <div class="field"><label><?= tt('po.pg_type_label') ?> — <span class="mono"><?= e($o['po_no']) ?></span></label><input name="po_no" required maxlength="40" autocomplete="off"></div>
     <div class="field"><label><?= tt('po.pg_reason') ?></label><input name="reason" required minlength="5" maxlength="250"></div>
+    <?php if (!empty($u['totp_enabled'])): ?><div class="field"><label><?= tt('po.pg_totp_label') ?></label><input name="totp" required inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" style="max-width:140px;"></div><?php endif; ?>
     <div class="field" style="align-self:end;"><button class="btn btn--sm" type="submit" style="background:#9B2C2C;border-color:#9B2C2C;color:#fff;">🗑 <?= tt('po.pg_go') ?></button></div>
   </form>
   <?php endif; ?>

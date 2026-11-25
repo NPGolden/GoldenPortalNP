@@ -630,6 +630,28 @@ function rcr_offer_send(int $id, string $subject, string $body): bool {
     if (!in_array($a['status'], ['offer', 'hired', 'rejected', 'withdrawn'], true)) { q("UPDATE rc_applications SET status = 'offer', status_changed_at = NOW() WHERE id = ?", [(int) $o['application_id']]); rcr_log('status', ['application_id' => (int) $o['application_id'], 'vacancy_id' => (int) $a['vacancy_id']], $a['status'] . ' → offer'); }
     return true;
 }
+/** R97-246: the offer left through the standard e-mail card (sent from the person's mailbox, or prepared as a draft in Outlook / as a message file).
+ *  It becomes the record — subject and text as they were in the card — and the application moves to «Offer», when the candidate is among the recipients. */
+function rcr_offer_mailed(int $id, array $to, string $subject, string $body, string $how): void {
+    $o = rcr_offer($id); if (!$o || $o['status'] !== 'draft' || rcr_offer_missing($o)) return; $a = $o['app']; $u = current_user();
+    $ctx = ['application_id' => (int) $o['application_id'], 'vacancy_id' => (int) $a['vacancy_id']];
+    if (!in_array(strtolower(trim((string) $a['email'])), array_map('strtolower', $to), true)) { rcr_log('offer_not_sent', $ctx, (string) $o['offer_no'] . ' — ' . t('rc.of_not_to')); return; }
+    $subject = mb_substr(trim(preg_replace('/[\r\n\t]+/', ' ', $subject)), 0, 200); $body = mb_substr(trim(str_replace("\r\n", "\n", $body)), 0, 60000);
+    q("UPDATE rc_offers SET status = 'sent', subject = ?, body = ?, sent_at = NOW(), sent_by = ?, sent_name = ? WHERE id = ? AND status = 'draft'", [$subject, $body, (int) $u['id'], (string) $u['full_name'], $id]);
+    rcr_log('offer_sent', $ctx, (string) $o['offer_no'] . ' — ' . t('rc.of_how_' . (in_array($how, ['sent', 'outlook', 'file'], true) ? $how : 'sent')));
+    if (!in_array($a['status'], ['offer', 'hired', 'rejected', 'withdrawn'], true)) { q("UPDATE rc_applications SET status = 'offer', status_changed_at = NOW() WHERE id = ?", [(int) $o['application_id']]); rcr_log('status', $ctx, $a['status'] . ' → offer'); }
+}
+/** R97-246: the candidate answered through the personal e-mail link (mailbox confirmed with a code). The answer, the name, the address, the starting date
+ *  that was accepted and the network address are kept on the offer and in the recruiting log. Returns 1 when the offer was still waiting. */
+function rcr_offer_answered(int $id, string $st, string $name, string $email, string $remark, string $ip): int {
+    $o = one('SELECT * FROM rc_offers WHERE id = ?', [$id]); if (!$o || !in_array($st, ['accepted', 'declined'], true)) return 0;
+    $a = one('SELECT id, vacancy_id FROM rc_applications WHERE id = ?', [(int) $o['application_id']]) ?: ['id' => (int) $o['application_id'], 'vacancy_id' => null];
+    $start = $o['start_date'] ? date('d/m/Y', strtotime((string) $o['start_date'])) : '';
+    $note = t($st === 'accepted' ? 'rc.of_dl_note_ok' : 'rc.of_dl_note_no', ['n' => $name, 'e' => $email, 'd' => $start]) . ($remark !== '' ? ' — ' . $remark : '');
+    $n = q("UPDATE rc_offers SET status = ?, outcome_at = NOW(), outcome_note = ? WHERE id = ? AND status = 'sent'", [$st, mb_substr($note, 0, 300), $id])->rowCount(); if (!$n) return 0;
+    q('INSERT INTO rc_log (application_id, vacancy_id, action, detail) VALUES (?,?,?,?)', [(int) $a['id'], $a['vacancy_id'] ? (int) $a['vacancy_id'] : null, 'offer_' . $st, mb_substr((string) $o['offer_no'] . ' — ' . $note . ($ip !== '' ? ' · IP ' . $ip : ''), 0, 500)]);   // no portal user: the candidate answered
+    return $n;
+}
 /** The answer of the candidate, or the offer taken back: accepted · declined · withdrawn. A draft can only be discarded (withdrawn). */
 function rcr_offer_outcome(int $id, string $st, string $note = ''): void {
     $o = rcr_offer($id); if (!$o || !in_array($st, ['accepted', 'declined', 'withdrawn'], true)) throw new RuntimeException(t('err.noaccess'));

@@ -744,6 +744,7 @@ function po_purge(int $oid, string $reason, string $typedNo): array {
     if (!po_purge_can()) throw new RuntimeException(t('err.noaccess')); $o = po_load($oid); if (!$o) throw new RuntimeException(t('err.notfound'));
     $reason = trim($reason); if (mb_strlen($reason) < 5) throw new RuntimeException(t('si.del_reason'));
     if (mb_strtoupper(trim($typedNo)) !== mb_strtoupper((string)$o['po_no'])) throw new RuntimeException(t('po.pg_type_no', ['no' => (string)$o['po_no']]));
+    if (function_exists('pk_stepup_ok') && !pk_stepup_ok(current_user() ?: [], trim((string)($_POST['totp'] ?? '')))) throw new RuntimeException(t('po.pg_totp'));   // R97-246: who has an authenticator confirms with its code
     $plan = po_purge_plan($o); if ($plan['blocks']) throw new RuntimeException(t('po.pg_blocked') . ' ' . implode(' · ', array_slice($plan['blocks'], 0, 6)));
     $was = (string)$o['status']; $tmp = [];
     $done = stk_tx(function () use ($oid, $o, $reason, $plan, $was, &$tmp) {
@@ -774,6 +775,7 @@ function po_purge(int $oid, string $reason, string $typedNo): array {
         return ['no' => (string)$o['po_no'], 'receipts' => count($plan['receipts']), 'invoices' => count($plan['invoices']), 'payments' => count($plan['payments'])];
     });
     foreach ($tmp as $cid) if (function_exists('pdc_tmp')) @unlink(pdc_tmp($cid));
+    if (function_exists('nf_push') && function_exists('hr_owner_ids')) { try { $me = current_user(); nf_push(hr_owner_ids(), 'po:purged', 'po:purged:' . $oid, t('po.nf_purged', ['no' => $done['no'], 'r' => $done['receipts'], 'i' => $done['invoices'], 'p' => $done['payments']]), $reason, url('purchase_orders'), (int)($me['id'] ?? 0) ?: null, $me['full_name'] ?? null); } catch (Throwable $e) {} }   // R97-246: the CEO is told at once
     cache_bump_later('inv'); cache_bump_later('eng'); if (function_exists('eng_rows_reset')) eng_rows_reset();
     if (function_exists('po_progress_apply')) { try { po_progress_apply($o['subproject_id'] ? (int)$o['subproject_id'] : null); } catch (Throwable $e) {} }
     if (function_exists('proc_feed_later') && !empty($o['subproject_id'])) proc_feed_later((int)$o['subproject_id']);
