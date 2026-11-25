@@ -57,7 +57,7 @@ layout_head(t('a.title'), 'account');
 /* ---- two-factor authentication ------------------------------- R6 */
 $has2fa   = array_key_exists('totp_enabled', $u);            // migration applied?
 $enabled  = !empty($u['totp_enabled']);
-$required = !empty($u['twofa_required']);
+$required = function_exists('sec_twofa_must') ? sec_twofa_must($u) : !empty($u['twofa_required']);
 $setup    = $has2fa && !empty($_GET['setup']) && !empty($_SESSION['acct_enrol_secret']);
 if ($has2fa): ?>
 <div class="card" style="max-width:560px;">

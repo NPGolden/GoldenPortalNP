@@ -1424,7 +1424,9 @@ function pm_handle_action(string $action, string $page): bool {
             if ($id && !empty($_POST['toggle'])) {
                 q('UPDATE staff_roles SET is_active = 1 - is_active WHERE id = ?', [$id]);
             } elseif ($id) {
+                $wasGm = function_exists('sec_role_is_gm') && sec_role_is_gm($id);
                 q('UPDATE staff_roles SET name = ?, sort_order = ? WHERE id = ?', [$str('name', 80), (int)($_POST['sort_order'] ?? 0), $id]);
+                if (function_exists('sec_role_is_gm') && !$wasGm && sec_role_is_gm($id)) { $gmU = array_map('intval', array_column(all('SELECT id FROM customer_users WHERE staff_role_id = ? AND is_active = 1', [$id]), 'id')); try { q('UPDATE customer_users SET twofa_required = 1 WHERE staff_role_id = ?', [$id]); } catch (Throwable $e) {} sec_notify_gm($gmU); }   // R97-255: a role renamed to General Manager
                 try { q('UPDATE staff_roles SET see_financials = ? WHERE id = ?', [(int)!empty($_POST['see_financials']), $id]); } catch (Throwable $e) {}
                 try { if (isset($_POST['scope'])) q('UPDATE staff_roles SET scope = ? WHERE id = ?', [in_array($_POST['scope'], ['full', 'hr', 'employee', 'owner', 'assistant'], true) ? $_POST['scope'] : 'full', $id]); } catch (Throwable $e) {}   // R51-001
                 try { q('UPDATE staff_roles SET can_offer = ? WHERE id = ?', [(int)!empty($_POST['can_offer']), $id]); } catch (Throwable $e) {}
@@ -1454,6 +1456,7 @@ function pm_handle_action(string $action, string $page): bool {
                locale_valid($_POST['locale'] ?? null) ? $_POST['locale'] : $x['locale'], $id]);
             cu_save_discipline($id, $role);
             if (array_key_exists('twofa_required', $x)) q('UPDATE customer_users SET twofa_required = ? WHERE id = ?', [(int)!empty($_POST['twofa_required']), $id]);
+            if (function_exists('sec_gm_sync')) sec_gm_sync($id, (int)($x['staff_role_id'] ?? 0) ?: null, $srole);   // R97-255
             if (array_key_exists('can_works', $x)) q('UPDATE customer_users SET can_works = ? WHERE id = ?', [$role === 'customer' ? 0 : (int)!empty($_POST['can_works']), $id]);   // R36-005
             if (array_key_exists('rate_card', $x) && isset($_POST['rate_card'])) q('UPDATE customer_users SET rate_card = ? WHERE id = ?', [$role === 'customer' ? null : (mb_substr(trim((string)$_POST['rate_card']), 0, 12) ?: null), $id]);   // R39-001
             if (array_key_exists('is_production', $x)) q('UPDATE customer_users SET is_production = ? WHERE id = ?', [$role === 'customer' ? 0 : (int)!empty($_POST['is_production']), $id]);   // R41-001
@@ -1487,6 +1490,7 @@ function pm_handle_action(string $action, string $page): bool {
                locale_valid($_POST['locale'] ?? null) ? $_POST['locale'] : 'en']);
             $newUid = (int) db()->lastInsertId();
             try { q('UPDATE customer_users SET twofa_required = ? WHERE id = ?', [(int)!empty($_POST['twofa_required']), $newUid]); } catch (Throwable $e) {}
+            if (function_exists('sec_gm_sync') && $role !== 'customer') sec_gm_sync($newUid, null, (int)($_POST['staff_role_id'] ?? 0) ?: null);   // R97-255
             if (function_exists('pwc_has') && pwc_has()) pwc_flag($newUid, !empty($_POST['must_change_pw']));   // R97-167
             cu_save_discipline($newUid, $role);
             $hrPid = (int)($_POST['hr_pid'] ?? 0);   // R60-005: created from the HR people list → link the person to the new account

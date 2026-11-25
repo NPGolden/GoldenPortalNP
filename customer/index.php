@@ -234,7 +234,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
             case 'twofa_off': {
                 $au = require_login();
-                if (!empty($au['twofa_required'])) { flash('bad', t('a.twofa_required_note')); redirect('account'); }
+                if (sec_twofa_must($au)) { flash('bad', t('a.twofa_required_note')); redirect('account'); }   // R97-255: also by the General Manager role
                 if (!password_verify((string)($_POST['password'] ?? ''), (string)$au['password_hash'])) { flash('bad', t('a.twofa_badpass')); redirect('account'); }
                 q('UPDATE customer_users SET totp_secret = NULL, totp_enabled = 0 WHERE id = ?', [$au['id']]);
                 flash('good', t('a.twofa_disabled'));

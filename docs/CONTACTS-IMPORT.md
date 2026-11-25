@@ -4705,3 +4705,14 @@ Language: 59 new keys.
 | Assessments — manage (`hrs_can`) | yes | yes | no |
 
 **Login history.** Migration `migrate_cp_r97_254_login_log_apps.sql` (key r99w): `login_log.source` (app id, NULL = web portal), `app_version`, `platform`. `login_log()` fills them through `ll_source()` when the request comes through the app API (`X-App`, `X-App-Version`, platform said by the app at sign-in, else read from the user agent). `Portal::login` records `failed`, `locked` and `twofa_failed`; `/auth/logout` records `logout`. Page Settings › Login history: column and filter «Where» (`src` = apps, web, engineer, pm, hr, employee, customer), CSV with three more columns, passkey outcomes labelled; «Portal usage» has app sign-ins per person (`ll_apps_usage()`) and the last use per app from `mob_devices`.
+
+## §534 Security: lock from the apps, authenticator for the General Manager, role notice, new device notice (GAS-CP-R97-255, v1.258.0)
+
+| Item | How |
+|---|---|
+| Account lock from the apps | `Portal::login` checks the lock first, then calls `sec_wrong_password()` (shared counter `failed_logins`, lock at 5 for 15 minutes, `sec_notify_locked`); a correct password resets the counter. HTTP 423 «Account locked». |
+| Authenticator obligatory for the General Manager | `sec_twofa_must($u)` = switch on the account or role General Manager (`sec_role_is_gm`). Used at the portal sign-in, at «switch off» on My Account, and in `Portal::login` (403 until the authenticator is set up in the portal). The migration sets `twofa_required = 1` for the present accounts with the role. |
+| Role notice | `sec_gm_sync($uid, $oldRole, $newRole)` after `cu_update`, account creation and the accounts import; a role renamed to General Manager in `sr_save` → `sec_notify_gm()`. Notification kind `sec:gm_role` to `hr_owner_ids()` (CEO). |
+| New device notice | Table `login_devices (user_id, fp, label, first_at, last_at)`; `sec_device_seen()` is called by `finish_login` (key = browser + operating system) and by the app sign-in (key = app + device id). Unknown key on an account that already has devices → notification `sec:new_device` to the person. Seeded by the migration from `login_sessions` and `mob_devices`. |
+
+Migration `migrate_cp_r97_255_gm_authenticator_login_devices.sql`, key r99x.

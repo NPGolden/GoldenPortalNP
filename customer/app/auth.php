@@ -265,6 +265,39 @@ function pwc_store(int $uid, string $new): void {
 }
 /** Set by an administrator, per account. */
 function pwc_flag(int $uid, bool $on): void { if (pwc_has()) q('UPDATE customer_users SET must_change_pw = ? WHERE id = ?', [(int)$on, $uid]); }
+/* ------------------------------------------------------------------ R97-255: account lock from the apps, General Manager role, new devices */
+/** A wrong password counts toward the lock wherever it is typed (portal or app): five in a row lock the account for 15 minutes. Returns true when this one locked it. */
+function sec_wrong_password(array $u): bool {
+    $fails = (int)($u['failed_logins'] ?? 0) + 1; $lock = $fails >= 5 ? date('Y-m-d H:i:s', time() + 15 * 60) : null;
+    q('UPDATE customer_users SET failed_logins = ?, locked_until = ? WHERE id = ?', [$fails, $lock, (int)$u['id']]);
+    if ($lock) sec_notify_locked($u); return (bool)$lock;
+}
+function sec_role_is_gm(?int $roleId): bool { if (!$roleId) return false; try { return strcasecmp(trim((string) scalar('SELECT name FROM staff_roles WHERE id = ?', [$roleId])), 'General Manager') === 0; } catch (Throwable $e) { return false; } }
+/** The authenticator is obligatory: by the switch on the account, or by the General Manager role. */
+function sec_twofa_must(array $u): bool { return !empty($u['twofa_required']) || (($u['role'] ?? '') !== 'customer' && sec_role_is_gm((int)($u['staff_role_id'] ?? 0) ?: null)); }
+/** After an account is saved: the General Manager role switches the authenticator on for good, and the CEO hears when the role is newly given. */
+function sec_gm_sync(int $uid, ?int $oldRole, ?int $newRole): void {
+    try { if (!sec_role_is_gm($newRole)) return; try { q('UPDATE customer_users SET twofa_required = 1 WHERE id = ?', [$uid]); } catch (Throwable $e) {}
+        if (!sec_role_is_gm($oldRole)) sec_notify_gm([$uid]); } catch (Throwable $e) {}
+}
+function sec_notify_gm(array $uids): void {
+    try { if (!$uids || !function_exists('nf_push') || !function_exists('nf_has') || !nf_has() || !function_exists('hr_owner_ids')) return; $to = hr_owner_ids(); if (!$to) return; $me = current_user();
+        foreach ($uids as $uid) { $x = one('SELECT full_name, email, totp_enabled FROM customer_users WHERE id = ?', [(int)$uid]); if (!$x) continue;
+            nf_push($to, 'sec:gm_role', 'sec:gm_role:' . (int)$uid, t('nf.sec_gm_t', ['u' => (string)$x['full_name']]), t('nf.sec_gm_b', ['by' => (string)($me['full_name'] ?? '—'), 'a' => t(!empty($x['totp_enabled']) ? 'nf.sec_gm_a1' : 'nf.sec_gm_a0')]), url('admin_users', ['q' => (string)$x['email']]), null, null); }
+    } catch (Throwable $e) {}
+}
+function sec_dev_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'login_devices'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** A sign-in from a browser or phone this account has not used before: the person is told. The very first device of an account is written down silently. */
+function sec_device_seen(int $uid, string $key, string $label): void {
+    try { if (!sec_dev_has() || $uid < 1 || $key === '') return; $fp = sha1($key); $label = mb_substr(trim($label), 0, 80) ?: '—';
+        if (scalar('SELECT id FROM login_devices WHERE user_id = ? AND fp = ?', [$uid, $fp])) { q('UPDATE login_devices SET last_at = NOW() WHERE user_id = ? AND fp = ?', [$uid, $fp]); return; }
+        $known = (int) scalar('SELECT COUNT(*) FROM login_devices WHERE user_id = ?', [$uid]);
+        q('INSERT IGNORE INTO login_devices (user_id, fp, label, first_at, last_at) VALUES (?,?,?,NOW(),NOW())', [$uid, $fp, $label]);
+        if (!$known || !function_exists('nf_push') || !function_exists('nf_has') || !nf_has()) return;
+        $ip = trim(explode(',', (string)($_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? ''))[0]);
+        nf_push([$uid], 'sec:new_device', 'sec:new_device:' . $uid . ':' . substr($fp, 0, 12), t('nf.sec_dev_t', ['d' => $label]), t('nf.sec_dev_b', ['ip' => $ip !== '' ? $ip : '—']), url('account'), null, null);
+    } catch (Throwable $e) { /* never blocks a sign-in */ }
+}
 function attempt_login(string $email, string $pass): array {
     $email = strtolower(trim($email));
     $u = one('SELECT cu.*, c.is_active AS c_active FROM customer_users cu
@@ -292,7 +325,7 @@ function attempt_login(string $email, string $pass): array {
     /* Second factor: everyone whose account requires it (the default) or who
      * has enrolled an authenticator. Before the R6 migration the columns do
      * not exist and sign-in completes in one step. */
-    $needs2fa = !empty($u['totp_enabled']) || !empty($u['twofa_required']);
+    $needs2fa = !empty($u['totp_enabled']) || sec_twofa_must($u);   // R97-255: the General Manager role too
     if ($needs2fa) {
         session_regenerate_id(true);
         $_SESSION['pending_uid'] = (int)$u['id'];
@@ -319,6 +352,7 @@ function finish_login(int $userId): void {
     if (locale_valid($u['locale'] ?? null)) { $_SESSION['locale'] = $u['locale']; locale($u['locale']); }
     login_log($userId, (string)$u['email'], 'success');
     ls_start($userId);   // R97-123
+    sec_device_seen($userId, 'web|' . ls_device(), ls_device());   // R97-255
 }
 
 /** The account waiting for its second factor, or null (10-minute window). */

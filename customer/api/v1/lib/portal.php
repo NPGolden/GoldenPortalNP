@@ -21,10 +21,13 @@ final class Portal {
     }
     public static function login(string $email, string $pass, ?string $totp): array {
         $u = one('SELECT cu.* FROM customer_users cu WHERE cu.email = ? AND cu.is_active = 1', [$email]);
-        if (!$u || !password_verify($pass, (string)$u['password_hash'])) { if (function_exists('login_log')) login_log($u ? (int)$u['id'] : null, $email, 'failed'); usleep(300000); throw new ApiException(401, 'Invalid credentials'); }   // R97-254: refused sign-ins of the apps are in the login history too
+        if ($u && !empty($u['locked_until']) && strtotime((string)$u['locked_until']) > time()) { if (function_exists('login_log')) login_log((int)$u['id'], $email, 'locked'); usleep(300000); throw new ApiException(423, 'Account locked'); }   // R97-255: checked before the password, as in the portal
+        if (!$u || !password_verify($pass, (string)$u['password_hash'])) { $lk = $u && function_exists('sec_wrong_password') ? sec_wrong_password($u) : false; if (function_exists('login_log')) login_log($u ? (int)$u['id'] : null, $email, $lk ? 'locked' : 'failed'); usleep(300000); throw new ApiException($lk ? 423 : 401, $lk ? 'Account locked' : 'Invalid credentials'); }   // R97-254 · R97-255: wrong passwords in the apps count toward the lock
+        if ((int)($u['failed_logins'] ?? 0) > 0) q('UPDATE customer_users SET failed_logins = 0, locked_until = NULL WHERE id = ?', [(int)$u['id']]);   // R97-254: refused sign-ins of the apps are in the login history too
         if (api_app() === 'customer') { if (($u['role'] ?? 'customer') !== 'customer') throw new ApiException(403, 'Customer account required'); }   // R68-001
         elseif (!in_array($u['role'], ['staff', 'admin'], true)) throw new ApiException(403, 'Staff account required');
         if (!empty($u['locked_until']) && strtotime((string)$u['locked_until']) > time()) { if (function_exists('login_log')) login_log((int)$u['id'], $email, 'locked'); throw new ApiException(423, 'Account locked'); }
+        if (empty($u['totp_enabled']) && function_exists('sec_role_is_gm') && sec_role_is_gm((int)($u['staff_role_id'] ?? 0) ?: null)) throw new ApiException(403, 'Set up the authenticator in the web portal first, then sign in here.');   // R97-255
         if (!empty($u['totp_enabled']) && !empty($u['totp_secret'])) { if (!$totp || !totp_verify((string)$u['totp_secret'], $totp)) { if ($totp && function_exists('login_log')) login_log((int)$u['id'], $email, 'twofa_failed'); throw new ApiException(401, 'Authenticator code required', ['totp' => true]); } }
         if (function_exists('login_log')) login_log((int)$u['id'], $email, 'success');
         return $u;

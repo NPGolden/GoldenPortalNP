@@ -26,7 +26,7 @@ try {
             pwc_store((int)$u['id'], $np); if (function_exists('login_log')) login_log((int)$u['id'], (string)$u['email'], 'pw_changed'); }
         $dev = (array)($body['device'] ?? []); $u = api_act_as((int)$u['id']); if ($isPm) PortalPM::allowed($u); if ($isCu) PortalCustomer::allowed($u); if ($isHr) PortalHR::allowed($u);   // §0: who may sign in to each app (before the device is enrolled)
         if ($isHr && !empty($u['is_demo'])) PortalHRDemo::reset($u);   // R97-169: the demonstration starts again at every sign-in
-        $did = Jwt::registerDevice((int)$u['id'], $dev); $u['device_id'] = $did;
+        $did = Jwt::registerDevice((int)$u['id'], $dev); $u['device_id'] = $did; if (function_exists('sec_device_seen')) sec_device_seen((int)$u['id'], 'app|' . api_app() . '|' . (mb_substr((string)($dev['device_id'] ?? ''), 0, 64) ?: (string)($dev['platform'] ?? 'web')), (function_exists('t') ? t('ll.src_' . api_app()) : api_app()) . ' — ' . (['ios' => 'iPhone / iPad', 'android' => 'Android'][$dev['platform'] ?? ''] ?? 'browser'));   /* R97-255 */
         Response::json(['access_token' => Jwt::issue($u, $did), 'refresh_token' => Jwt::issueRefresh($did, $dev['platform'] ?? 'web'), 'user' => $me($u)]); }
     /* R71-001: passkey sign-in — challenge kept server-side (5 min, single use); the assertion is verified in app/pk.php; a verified passkey satisfies the authenticator step */
     if ($path === '/auth/passkey/options' && $method === 'POST') { RateLimit::check('auth', RateLimit::ip(), 10); if (!pk_enabled()) Response::error(403, 'Passkeys are switched off');
@@ -37,7 +37,7 @@ try {
         if ($isCu) { if (($u['role'] ?? 'customer') !== 'customer') Response::error(403, 'Customer account required'); } elseif (!in_array($u['role'], ['staff', 'admin'], true)) Response::error(403, 'Staff account required');
         if (function_exists('login_log')) login_log((int)$u['id'], (string)$u['email'], 'passkey');
         $dev = (array)($body['device'] ?? []); $u = api_act_as((int)$u['id']); if ($isPm) PortalPM::allowed($u); if ($isCu) PortalCustomer::allowed($u); if ($isHr) PortalHR::allowed($u);
-        $did = Jwt::registerDevice((int)$u['id'], $dev); $u['device_id'] = $did;
+        $did = Jwt::registerDevice((int)$u['id'], $dev); $u['device_id'] = $did; if (function_exists('sec_device_seen')) sec_device_seen((int)$u['id'], 'app|' . api_app() . '|' . (mb_substr((string)($dev['device_id'] ?? ''), 0, 64) ?: (string)($dev['platform'] ?? 'web')), (function_exists('t') ? t('ll.src_' . api_app()) : api_app()) . ' — ' . (['ios' => 'iPhone / iPad', 'android' => 'Android'][$dev['platform'] ?? ''] ?? 'browser'));   /* R97-255 */
         Response::json(['access_token' => Jwt::issue($u, $did), 'refresh_token' => Jwt::issueRefresh($did, $dev['platform'] ?? 'web'), 'user' => $me($u)]); }
     if ($path === '/auth/refresh' && $method === 'POST') { RateLimit::check('auth', RateLimit::ip(), 10);
         $r = Jwt::consumeRefresh((string)($body['refresh_token'] ?? '')); $u = api_act_as((int)$r['user_id']); if ($isPm) PortalPM::allowed($u); if ($isCu) PortalCustomer::allowed($u); if ($isHr) PortalHR::allowed($u);
