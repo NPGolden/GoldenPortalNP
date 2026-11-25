@@ -4493,3 +4493,13 @@ No database step. Language keys +3 (13 509 per language). Next ref GAS-CP-R97-23
 
 **Data:** column `pr_requests.priority` (migration key r99q).
 
+## §519 Offer › Follow-up and success: log and larger text boxes (GAS-CP-R97-240, v1.248.0)
+
+**Where:** Sales › an offer that is still open › card «🎯 Follow-up and success».
+
+**Follow-up log.** At the bottom of the card: planned actions (🗓), outcomes of actions done (✔) and signals set or cleared, newest first, with date, time, person and the whole text. The eight latest are shown; «Show N older entries» opens the rest. The log is a view of the offer history — nothing is stored twice.
+
+**Writing.** «Outcome» (shown when an action is planned; tick «Mark the current action as done…» to record it) and «Comments on the next action» are multi-line boxes, resizable by the lower-right corner. Line breaks are kept in the log. Limits: outcome 6 000 characters, comment 2 000.
+
+**Data:** `offer_events.note` is now text, `offers.next_action_note` 2 000 characters (migration key r99r).
+

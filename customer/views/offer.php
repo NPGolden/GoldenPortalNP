@@ -77,17 +77,17 @@ layout_head($o['offer_no'] . ' · ' . $o['title'], 'offers');
         <div class="grid grid-2">
           <div>
             <h3 class="ed-h"><?= tt('pp.next_action') ?></h3>
-            <?php if ($o['next_action_type']): ?><p style="margin:0 0 6px;"><b><?= e(pp_action_label($o['next_action_type'])) ?></b> · <?= e(fmt_date($o['next_action_at'])) ?><?= $late > 0 ? ' ' . pill('bad', t('pp.overdue_d', ['d' => $late])) : ($late === 0 ? ' ' . pill('gold', t('pp.today')) : '') ?><?= $ownerId ? ' · ' . e((string)(array_values(array_filter($staffList, fn($x) => (int)$x['id'] === $ownerId))[0]['name'] ?? '')) : '' ?><?= $o['next_action_note'] ? '<br><span class="hint">' . e($o['next_action_note']) . '</span>' : '' ?></p>
+            <?php if ($o['next_action_type']): ?><p style="margin:0 0 6px;"><b><?= e(pp_action_label($o['next_action_type'])) ?></b> · <?= e(fmt_date($o['next_action_at'])) ?><?= $late > 0 ? ' ' . pill('bad', t('pp.overdue_d', ['d' => $late])) : ($late === 0 ? ' ' . pill('gold', t('pp.today')) : '') ?><?= $ownerId ? ' · ' . e((string)(array_values(array_filter($staffList, fn($x) => (int)$x['id'] === $ownerId))[0]['name'] ?? '')) : '' ?><?= $o['next_action_note'] ? '<br><span class="hint" style="white-space:pre-wrap;">' . e($o['next_action_note']) . '</span>' : '' ?></p>
             <?php else: ?><p class="flash flash--warn" style="margin:0 0 6px;"><?= tt('pp.no_action') ?></p><?php endif; ?>
             <form method="post" action="<?= url('offer', ['id' => $id]) ?>#followup" data-lock>
               <?= csrf_field() ?><input type="hidden" name="action" value="pp_action"><input type="hidden" name="id" value="<?= $id ?>">
-              <?php if ($o['next_action_type']): ?><label class="chk"><input type="checkbox" name="done" value="1"> <?= tt('pp.mark_done') ?></label><div class="field"><label><?= tt('pp.outcome') ?></label><input name="outcome" maxlength="1000" placeholder="<?= tt('pp.outcome_ph') ?>"></div><?php endif; ?>
+              <?php if ($o['next_action_type']): ?><label class="chk"><input type="checkbox" name="done" value="1"> <?= tt('pp.mark_done') ?></label><div class="field"><label><?= tt('pp.outcome') ?></label><textarea name="outcome" rows="6" maxlength="<?= pp_wide() ? 6000 : 900 ?>" placeholder="<?= tt('pp.outcome_ph') ?>" style="width:100%;min-height:130px;resize:vertical;"></textarea></div><?php endif; ?>
               <div class="grid grid-3">
                 <div class="field"><label><?= tt('pp.act_type') ?></label><select name="type" data-nosearch><?php foreach (PP_ACTIONS as $a): ?><option value="<?= $a ?>"<?= $a === ($o['next_action_type'] ?: 'call') ? ' selected' : '' ?>><?= e(pp_action_label($a)) ?></option><?php endforeach; ?></select></div>
                 <div class="field"><label><?= tt('th.date') ?></label><input type="date" name="date" value="<?= e($o['next_action_at'] ?: date('Y-m-d', strtotime('+7 days'))) ?>" required></div>
                 <div class="field"><label><?= tt('pp.owner') ?></label><select name="user_id"><?php foreach ($staffList as $x): ?><option value="<?= (int)$x['id'] ?>"<?= (int)$x['id'] === $ownerId ? ' selected' : '' ?>><?= e($x['name']) ?></option><?php endforeach; ?></select></div>
               </div>
-              <div class="field"><label><?= tt('oa.note') ?></label><input name="note" maxlength="300" value="<?= e((string)$o['next_action_note']) ?>"></div>
+              <div class="field"><label><?= tt('pp.comment') ?></label><textarea name="note" rows="4" maxlength="<?= pp_wide() ? 2000 : 300 ?>" placeholder="<?= tt('pp.comment_ph') ?>" style="width:100%;min-height:90px;resize:vertical;"><?= e((string)$o['next_action_note']) ?></textarea></div>
               <button class="btn btn--sm" type="submit"><?= tt('pp.save_action') ?></button>
             </form>
             <p class="hint" style="margin:8px 0 0;"><b><?= tt('pp.cadence') ?>:</b> <?= implode(' · ', array_map(fn($c) => e(pp_action_label($c['type'])) . ' ' . e(fmt_date($c['date'])) . (!empty($c['validity']) ? ' (' . tt('of.valid_until') . ')' : ''), $plan)) ?></p>
@@ -104,6 +104,14 @@ layout_head($o['offer_no'] . ' · ' . $o['title'], 'offers');
             <p class="hint" style="margin:8px 0 0;"><?= tt('pp.signals_hint') ?></p>
           </div>
         </div>
+        <?php /* R97-240: the follow-up log — every planned action, every outcome and every signal, newest first, in full */
+          $ppKinds = ['followup_done' => ['✔', t('pp.ev_followup_done')], 'followup_set' => ['🗓', t('pp.ev_followup_set')], 'signal_on' => ['▲', t('pp.ev_signal_on')], 'signal_off' => ['▽', t('pp.ev_signal_off')]];
+          $ppLog = array_reverse(array_values(array_filter($o['events'] ?? [], fn($x) => isset($ppKinds[$x['event']])))); $ppShow = 8; ?>
+        <h3 class="ed-h" style="margin-top:14px;"><?= tt('pp.log') ?> <span class="hint">(<?= count($ppLog) ?>)</span></h3>
+        <?php if (!$ppLog): ?><p class="hint"><?= tt('pp.log_none') ?></p><?php else: $ppRow = function (array $x) use ($ppKinds) { [$ic, $lb] = $ppKinds[$x['event']]; return '<div style="border-left:3px solid ' . ($x['event'] === 'followup_done' ? 'var(--green)' : ($x['event'] === 'followup_set' ? 'var(--gold)' : 'var(--line,#ccc)')) . ';padding:6px 0 6px 10px;margin:6px 0;"><div><b>' . $ic . ' ' . e($lb) . '</b> <span class="hint">' . e(fmt_datetime((string)$x['created_at'])) . ($x['user_name'] ? ' · ' . e((string)$x['user_name']) : '') . '</span></div>' . ((string)$x['note'] !== '' ? '<div style="white-space:pre-wrap;overflow-wrap:anywhere;margin-top:2px;">' . e((string)$x['note']) . '</div>' : '') . '</div>'; }; ?>
+          <?php foreach (array_slice($ppLog, 0, $ppShow) as $x) echo $ppRow($x); ?>
+          <?php if (count($ppLog) > $ppShow): ?><details><summary class="hint" style="cursor:pointer;"><?= e(t('pp.log_more', ['n' => count($ppLog) - $ppShow])) ?></summary><?php foreach (array_slice($ppLog, $ppShow) as $x) echo $ppRow($x); ?></details><?php endif; ?>
+        <?php endif; ?>
       </div>
     <?php endif; ?>
     <?php if ($staff && $next): ?>

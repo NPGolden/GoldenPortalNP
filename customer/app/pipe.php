@@ -50,17 +50,19 @@ function pp_prob_pill(int $pct): string { return pill($pct >= 70 ? 'green' : ($p
 function pp_signals_bulk(array $ids): array { $ids = array_values(array_unique(array_filter(array_map('intval', $ids)))); if (!$ids || !pp_has()) return []; $out = []; foreach (all('SELECT * FROM offer_signals WHERE offer_id IN (' . implode(',', $ids) . ')') as $r) $out[(int)$r['offer_id']][$r['skey']] = $r; return $out; }
 
 /* ------------------------------------------------------------------ next action */
+/** R97-240: true when the follow-up texts have room (outcome up to 6 000 characters, comment up to 2 000). */
+function pp_wide(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM offer_events WHERE Field = 'note' AND Type LIKE '%text%'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function pp_action_label(string $k): string { return in_array($k, PP_ACTIONS, true) ? t('pp.act_' . $k) : $k; }
 function pp_set_action(int $offerId, ?string $type, ?string $date, ?int $userId, ?string $note = null, bool $silent = false): void {
     if (!pp_has()) return; $type = in_array((string)$type, PP_ACTIONS, true) ? $type : null; $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$date) ? $date : null;
     if ($type && !$date) throw new RuntimeException(t('pp.need_date'));
-    q('UPDATE offers SET next_action_type = ?, next_action_at = ?, next_action_user_id = ?, next_action_note = ? WHERE id = ?', [$type, $date, $userId ?: null, $note ? mb_substr($note, 0, 300) : null, $offerId]);
+    q('UPDATE offers SET next_action_type = ?, next_action_at = ?, next_action_user_id = ?, next_action_note = ? WHERE id = ?', [$type, $date, $userId ?: null, $note ? mb_substr(trim(str_replace("\r\n", "\n", $note)), 0, pp_wide() ? 2000 : 300) : null, $offerId]);
     if (!$silent && $type) of_event($offerId, 'followup_set', pp_action_label($type) . ' · ' . fmt_date($date) . ($note ? ' — ' . $note : ''));
 }
 /** Mark the current action done (event with the outcome) and clear it; the caller sets the next one. */
 function pp_action_done(int $offerId, string $outcome): void {
     $o = one('SELECT next_action_type, next_action_at FROM offers WHERE id = ?', [$offerId]); if (!$o) throw new RuntimeException(t('err.notfound'));
-    of_event($offerId, 'followup_done', ($o['next_action_type'] ? pp_action_label($o['next_action_type']) . ' · ' : '') . mb_substr(trim($outcome), 0, 1000));
+    of_event($offerId, 'followup_done', ($o['next_action_type'] ? pp_action_label($o['next_action_type']) . ' · ' : '') . mb_substr(trim(str_replace("\r\n", "\n", $outcome)), 0, pp_wide() ? 6000 : 900));
     q('UPDATE offers SET next_action_type = NULL, next_action_at = NULL, next_action_note = NULL, last_contact_at = CURDATE() WHERE id = ?', [$offerId]);
 }
 /** Default cadence when an offer is sent: the first step (confirm receipt, D+2) becomes the next action; the rest is the plan shown on the offer. */
