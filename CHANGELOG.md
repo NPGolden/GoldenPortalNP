@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.255.0** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.256.0** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.256.0 | GAS-CP-R97-253 | 2026-11-25 | Inventory: import of company assets from Excel — one row per unit with serial number, company number, warehouse and holder; template, preview, all-or-nothing import | — |
 | 1.255.0 | GAS-CP-R97-252 | 2026-11-25 | Inventory: serial numbers followed through receipts, issues, transfers and delivery notes; company assets handed to people through Equipment of the personnel | `install/migrate_cp_r97_252_serial_numbers_company_assets.sql` |
 | 1.254.1 | GAS-CP-R97-251 | 2026-11-25 | Service app 0.8.8 — the photos of a report already sent are shown and added per task | — |
 | 1.254.0 | GAS-CP-R97-250 | 2026-11-25 | Service app 0.8.7 — photos from the camera or the album of the phone; a photo is removed with two taps; photos of a report already sent can be removed or added until the customer accepts | — |

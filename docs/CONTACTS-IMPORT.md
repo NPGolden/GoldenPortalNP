@@ -4669,3 +4669,24 @@ Migration `install/migrate_cp_r97_252_serial_numbers_company_assets.sql` (key r9
 Rights: `sn_can()` = warehouse right or procurement administrator. The module is loaded by the portal and the API (`sn` in both module lists).
 
 Language: 59 new keys.
+
+## §532 Inventory: import of company assets from Excel (GAS-CP-R97-253, v1.256.0)
+
+**Where:** Procurement › Inventory › *Import company assets* (page `assets_import`). Right: warehouse right or procurement administrator (`sn_import_can()` = `sn_can()`).
+
+**File:** `.xlsx`, up to 5 MB and 3 000 rows, one row per unit. Columns (`SN_IMPORT_COLS`): Item code\*, Description, Category, Maker, Model / Part No., Unit, Warehouse, Serial No.\*, Company No., Value, Holder code, Holder, Equipment category, Condition, Given on, Notes. Without a serial number the company number is used as the number of the unit. The template (`?template=1`, `sn_import_template()`) has a second sheet with the rules and the warehouse codes.
+
+**Flow:** upload → `sn_import_parse()` (upload checks) → `sn_import_read()` builds the preview kept in `$_SESSION['sn_import']` (nothing written) → `sn_import_apply($pv, $warehouse, 'add'|'number')` inside one `stk_tx` (all or nothing).
+
+| Case | What happens |
+|---|---|
+| Item code not in the inventory | Item created with `is_asset = 1`, `track_serial = 1` (procurement administrator only; description needed on the first row) |
+| Existing item, not an asset | Switched to company asset with serial numbers (procurement administrator only) |
+| Number already in stock or with a person | Row skipped |
+| Same number twice in the file, no number, comma or semicolon in the number, unknown warehouse | Row skipped with the reason |
+| Mode *add* | One stock-in movement per item and warehouse (note «Asset import»), numbers attached with `sn_attach` |
+| Mode *number* | `sn_register_units()` — numbers for stock already counted, never more than on hand; units of a newly made item are always added |
+| Row with a holder (HR right needed) | Unit booked in, `hr_eq_items` line (draft, linked by `inv_serial_id`), `sn_assign_person()`; HR sends the issue list for acceptance |
+| Holder not found / importer without HR right | Unit imported into the warehouse, remark in the preview |
+
+**Security:** the preview is bound to the person who made it and is valid for one hour; the file is read from the upload and not kept; new items and switching an item to asset need the procurement administrator, the holder part needs HR; every unit carries the import in its history (`inv_serial_log`).
