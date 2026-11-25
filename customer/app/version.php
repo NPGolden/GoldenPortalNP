@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.252.1';
+const CP_VERSION = '1.253.0';
 const CP_BUILD   = '2026-11-24';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-249', 'version' => '1.253.0', 'date' => '2026-11-25', 'title' => 'HR messages: the list shows the open conversations — answering or «Close» takes a conversation off it; HR tasks, seen only by people with the HR right', 'db' => 'install/migrate_cp_r97_249_hr_tasks.sql', 'check' => 'r99u'],
         ['ref' => 'GAS-CP-R97-248', 'version' => '1.252.1', 'date' => '2026-11-25', 'title' => 'Recruiting offer: the approver confirms with the authenticator code; the approval ends when the validity date of the offer passes', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-247', 'version' => '1.252.0', 'date' => '2026-11-25', 'title' => 'Recruiting: an offer needs the approval of the CEO or the General Manager before it can be sent; interview invitations leave through the standard e-mail card; the offer text points the candidate to the acceptance link', 'db' => 'install/migrate_cp_r97_247_recruiting_offer_approval.sql', 'check' => 'r99t'],
         ['ref' => 'GAS-CP-R97-246', 'version' => '1.251.0', 'date' => '2026-11-25', 'title' => 'Recruiting: the offer leaves through the standard e-mail card (send now, draft in Outlook) and the candidate accepts it with its starting date through a personal link; leave and HR-message pushes without details; list and weekly notice of entries by HR; order deletion asks the authenticator code and tells the CEO; fields no longer leave narrow cards', 'db' => null, 'check' => null],
@@ -705,6 +706,7 @@ function cp_migration_state(): array {
         'r99r' => $has("SHOW COLUMNS FROM offer_events WHERE Field = 'note' AND Type LIKE '%text%'"),   // R97-240
         'r99s' => $has("SHOW COLUMNS FROM hr_requests LIKE 'corrected_at'") && $has("SHOW COLUMNS FROM hr_messages LIKE 'done_at'"),   // R97-245
         'r99t' => $has("SHOW COLUMNS FROM rc_offers LIKE 'appr_status'"),   // R97-247
+        'r99u' => $has("SHOW COLUMNS FROM tasks LIKE 'hr_only'"),   // R97-249
         'r99k' => $has("SHOW COLUMNS FROM nl_issues LIKE 'tr'") && $has("SHOW COLUMNS FROM nl_sends LIKE 'lang'") && $has("SHOW COLUMNS FROM contacts LIKE 'nl_lang'"),   // R97-203
         'r99j' => $has("SHOW TABLES LIKE 'soc_post_tr'") && $has("SHOW COLUMNS FROM soc_posts LIKE 'lang'"),   // R97-201
         'r99i' => $has("SHOW TABLES LIKE 'wl_prefs'") && $has("SHOW TABLES LIKE 'wl_mood_seen'"),   // R97-194

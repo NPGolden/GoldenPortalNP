@@ -127,8 +127,13 @@ function td_recur_label(array $t): string {
 
 /** tasks.offer_id present (R28-001)? */
 function td_offer_col(): bool { static $h = null; if ($h === null) { try { $h = td_has() && (bool) scalar("SHOW COLUMNS FROM tasks LIKE 'offer_id'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/* ---- R97-249: HR tasks — rows with hr_only = 1 exist only for people with the HR right; every list, count, reminder and action goes through these two guards ---- */
+function td_hr_col(): bool { static $h = null; if ($h === null) { try { $h = td_has() && (bool) scalar("SHOW COLUMNS FROM tasks LIKE 'hr_only'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** ' AND <alias>hr_only = 0' for a reader without the HR right, '' otherwise. */
+function td_hr_sql(string $alias = 't.'): string { return td_hr_col() && !(function_exists('hr_can') && hr_can()) ? ' AND ' . $alias . 'hr_only = 0' : ''; }
 function td_load(int $id): ?array {
     if (!td_has() || !$id) return null;
+    if (td_hr_col() && !(function_exists('hr_can') && hr_can()) && (int) scalar('SELECT hr_only FROM tasks WHERE id = ?', [$id]) === 1) return null;
     $of = td_offer_col() ? ', ofr.offer_no, ofr.revision AS offer_rev, ofr.title AS offer_title' : ', NULL AS offer_no, NULL AS offer_rev, NULL AS offer_title'; $oj = td_offer_col() ? ' LEFT JOIN offers ofr ON ofr.id = t.offer_id' : '';
     return one("SELECT t.*, p.name AS project_name, p.erp_code, s.name AS subproject_name, v.name AS vessel_name, a.full_name AS assignee, o.full_name AS owner{$of}
                 FROM tasks t LEFT JOIN projects p ON p.id = t.project_id LEFT JOIN subprojects s ON s.id = t.subproject_id LEFT JOIN vessels v ON v.id = t.vessel_id
@@ -211,10 +216,11 @@ function td_delete(int $id): void {
 
 function td_people(array $t): array {
     if (!empty($t['assignee_id'])) return [(int)$t['assignee_id']];
+    if (!empty($t['hr_only'])) return function_exists('hr_hr_user_ids') ? hr_hr_user_ids() : [];   // R97-249: an HR task without a name belongs to the HR members, never to a project team
     return nf_project_staff((int)($t['project_id'] ?? 0));
 }
 function td_where(array $f, array &$b): string {
-    $u = current_user(); $w = ['1 = 1'];
+    $u = current_user(); $w = ['1 = 1' . td_hr_sql()];
     $mine = '(t.assignee_id = ? OR (t.assignee_id IS NULL AND (t.owner_id = ? OR EXISTS (SELECT 1 FROM projects pp WHERE pp.id = t.project_id AND pp.pm_user_id = ?))' . (is_cp_admin() ? ' OR t.assignee_id IS NULL' : '') . '))';
     switch ($f['view'] ?? 'myday') {
         case 'myday':   $w[] = "t.status = 'open' AND t.due_at < DATE_ADD(CURDATE(), INTERVAL 1 DAY) AND $mine"; array_push($b, $u['id'], $u['id'], $u['id']); break;
@@ -264,6 +270,30 @@ function td_context(array $t): string {
     return implode(' › ', $parts);
 }
 
+/* -------------------------------------------------------------- HR tasks (R97-249) */
+/** HR tasks: open ones (oldest due first) or the ones done in the last $doneDays days. Only for HR. */
+function td_hr_list(bool $done = false, int $doneDays = 30): array {
+    if (!td_hr_col() || !function_exists('hr_can') || !hr_can()) return [];
+    return all("SELECT t.id, t.title, t.notes, t.due_at, t.status, t.done_at, t.priority, t.assignee_id, t.owner_id, t.hr_person_id, a.full_name AS assignee, o.full_name AS owner, p.name_en AS person FROM tasks t LEFT JOIN customer_users a ON a.id = t.assignee_id LEFT JOIN customer_users o ON o.id = t.owner_id LEFT JOIN hr_people p ON p.id = t.hr_person_id
+                WHERE t.hr_only = 1 AND " . ($done ? "t.status = 'done' AND t.done_at >= NOW() - INTERVAL " . max(1, min(366, $doneDays)) . " DAY ORDER BY t.done_at DESC" : "t.status = 'open' ORDER BY t.due_at, FIELD(t.priority, 'high', 'normal', 'low')") . ' LIMIT 300');
+}
+/** POST title, due_date, assignee_id (an HR member or empty = all HR), person_id, notes, priority. */
+function td_hr_add_from_post(): int {
+    $u = require_staff(); if (!td_hr_col() || !function_exists('hr_can') || !hr_can()) throw new RuntimeException(t('err.noaccess'));
+    $title = mb_substr(trim((string)($_POST['title'] ?? '')), 0, 200); if ($title === '') throw new RuntimeException(t('td.need_title'));
+    $date = substr((string)($_POST['due_date'] ?? ''), 0, 10); if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) $date = date('Y-m-d', strtotime('+1 day'));
+    $ass = (int)($_POST['assignee_id'] ?? 0); if (!$ass || !in_array($ass, hr_hr_members(), true)) $ass = null;
+    $pid = (int)($_POST['person_id'] ?? 0); if ($pid && !hr_person($pid)) $pid = 0;
+    $prio = in_array($_POST['priority'] ?? '', ['low', 'normal', 'high'], true) ? (string)$_POST['priority'] : 'normal';
+    q("INSERT INTO tasks (title, notes, kind, assignee_id, priority, due_at, recur, recur_every, remind_before, owner_id, hr_only, hr_person_id) VALUES (?,?,'general',?,?,?,'none',1,0,?,1,?)", [$title, mb_substr(trim((string)($_POST['notes'] ?? '')), 0, 4000) ?: null, $ass, $prio, $date . ' 09:00:00', (int)$u['id'], $pid ?: null]);
+    $id = (int) db()->lastInsertId(); td_log($id, 'created', $date . ' 09:00:00', (int)$u['id']);
+    if ($ass && $ass !== (int)$u['id'] && function_exists('nf_push')) nf_push([$ass], 'td:hr', 'td:' . $id, t('td.hr_nf', ['t' => $title]), null, url('hr_messages') . '#hr-tasks', (int)$u['id'], (string)$u['full_name']);
+    return $id;
+}
+/** The people who may hold an HR task: everyone with the HR right (HR role, HR owner / CEO). */
+function hr_hr_members(): array { $ids = function_exists('hr_hr_user_ids') ? hr_hr_user_ids() : []; if (function_exists('hr_owner_ids')) $ids = array_merge($ids, hr_owner_ids()); return array_values(array_unique(array_map('intval', $ids))); }
+function td_hr_count(?int $pid = null): int { if (!td_hr_col() || !function_exists('hr_can') || !hr_can()) return 0; return (int) scalar("SELECT COUNT(*) FROM tasks WHERE hr_only = 1 AND status = 'open'" . ($pid ? ' AND hr_person_id = ' . (int)$pid : '')); }
+
 /* -------------------------------------------------------------- reminders */
 
 /** Called from nf_sweep. Reminds once when remind_at passes, then once a day while overdue. */
@@ -278,7 +308,7 @@ function td_remind(): int {
         $over = $t['due_at'] < date('Y-m-d H:i:s');
         $kind = $over ? 'td:overdue' : 'td:due';
         $ctx = td_context($t);
-        $n += nf_push(td_people($t), $kind, 'td:' . $t['id'], $t['title'] . ($ctx ? ' — ' . $ctx : ''), t('td.due_on', ['d' => fmt_datetime($t['due_at'])]) . ($t['recur'] !== 'none' ? ' · ↻ ' . td_recur_label($t) : ''), url('tasks', ['view' => 'mine', 'hl' => $t['id']]), null, null);
+        $n += nf_push(td_people($t), $kind, 'td:' . $t['id'], $t['title'] . ($ctx ? ' — ' . $ctx : ''), t('td.due_on', ['d' => fmt_datetime($t['due_at'])]) . ($t['recur'] !== 'none' ? ' · ↻ ' . td_recur_label($t) : ''), !empty($t['hr_only']) ? url('hr_messages') . '#hr-tasks' : url('tasks', ['view' => 'mine', 'hl' => $t['id']]), null, null);
         q('UPDATE tasks SET reminded_at = NOW() WHERE id = ?', [$t['id']]);
         td_log((int)$t['id'], 'reminded', $t['due_at'], null);
     }

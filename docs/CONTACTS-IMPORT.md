@@ -4616,3 +4616,17 @@ Language: 31 new keys; `rc.ev_invite_hint` and the offer template body reworded.
 - Offers with status `sent` are not affected; the acceptance link of the candidate already ends on the validity date.
 
 Language: 3 new keys.
+
+## §528 HR messages: open / closed conversations · HR tasks (GAS-CP-R97-249, v1.253.0)
+
+Migration `install/migrate_cp_r97_249_hr_tasks.sql` (key r99u): `tasks.hr_only`, `tasks.hr_person_id`, index `(hr_only, status)`.
+
+**Conversations** — `views/hr_messages.php`: filter `f` = `wait` (open, the default), `unread`, `closed`, `all`. Open = `hr_message_threads()['wait']` (last open employee message newer than the last HR message). Answering or `hr_message_done()` («Close») closes; a new employee message opens it again. No new column.
+
+**HR tasks** — rows of `tasks` with `hr_only = 1` (so reminders and the log work as for every task):
+
+- Guards in `app/td.php`: `td_hr_sql()` in `td_where()` (every list, the badge) and on the counts of the Tasks page; `td_load()` returns null for a reader without `hr_can()` — so `td_done`, `td_reopen`, `td_delete`, the task form and `td_save_from_post` refuse. `td_people()` sends the reminders of an HR task to its HR assignee or to `hr_hr_user_ids()`, with the link `hr_messages#hr-tasks`.
+- `td_hr_add_from_post()` (assignee only from `hr_hr_members()`), `td_hr_list()`, `td_hr_count()`; actions `hr_task_add`, `hr_task_done`, `hr_task_reopen`, `hr_task_delete` (in `HR_ACTIONS`), card `#hr-tasks` on the HR messages page.
+- People with the HR right who also use the general Tasks page see their HR tasks there too.
+
+Language: 23 new keys, six pool texts reworded.
