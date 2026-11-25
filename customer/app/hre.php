@@ -88,6 +88,8 @@ function hre_add_from_post(): int {
     $src = (int)($_POST['src_id'] ?? 0) ?: null;
     if ($src) { $ins = hre_sources()[$src] ?? null; if (!$ins) $src = null; else { if ($desc === '') $desc = mb_substr($ins['title'], 0, 200); if ($serial === '') $serial = mb_substr($ins['serial'], 0, 80); if ($tag === '') $tag = mb_substr($ins['code'], 0, 40); $cat = $ins['cat'];
         if ($h = hre_holder_of($src)) throw new RuntimeException(t('hre.err_held', ['n' => $h])); } }
+    $asset = (int)($_POST['inv_sn'] ?? 0); $ast = null;   // R97-252: a company asset of the inventory, by its serial number
+    if ($asset && function_exists('sn_assets_free')) { $ast = sn_assets_free()[$asset] ?? null; if (!$ast) throw new RuntimeException(t('sn.asset_gone')); if ($desc === '') $desc = mb_substr($ast['title'], 0, 200); $serial = mb_substr($ast['serial'], 0, 80); if ($tag === '' && $ast['tag'] !== '') $tag = mb_substr($ast['tag'], 0, 40); $_POST['qty'] = '1'; }
     if ($desc === '') throw new RuntimeException(t('hre.err_desc'));
     if (!in_array($cat, $mine, true)) throw new RuntimeException(t('hre.err_cat'));
     $exp = trim((string)($_POST['expires_on'] ?? '')); if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $exp)) $exp = null;
@@ -95,6 +97,7 @@ function hre_add_from_post(): int {
     $cond = (string)($_POST['cond_out'] ?? 'new'); if (!in_array($cond, HRE_CONDS, true)) $cond = 'new';
     q('INSERT INTO hr_eq_items (person_id, category, description, serial_no, asset_tag, qty, size, cond_out, note, status, src_id, created_by, expires_on) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
       [$pid, $cat, $desc, $serial ?: null, $tag ?: null, $qty, mb_substr(trim((string)($_POST['size'] ?? '')), 0, 20) ?: null, $cond, mb_substr(trim((string)($_POST['note'] ?? '')), 0, 300) ?: null, 'draft', $src, hre_me(), $exp]);
+    if ($ast) { $eqId = (int) db()->lastInsertId(); try { stk_tx(function () use ($asset, $pid, $eqId, $p) { sn_assign_person($asset, $pid, $eqId, (string)$p['name_en']); q('UPDATE hr_eq_items SET inv_serial_id = ? WHERE id = ?', [$asset, $eqId]); }); } catch (Throwable $e) { q('DELETE FROM hr_eq_items WHERE id = ?', [$eqId]); throw $e; } }
     if (!hre_can() && function_exists('nf_push')) { $u = current_user(); try { nf_push(array_values(array_diff(hre_hr_uids(), [hre_me()])), 'hre', 'hre:prep:' . $pid . ':' . date('Ymd'), t('hre.nf_prepared', ['n' => (string)$p['name_en']]), null, url('hr_person', ['id' => $pid, 'tab' => 'eq']) . '#eq-add', (int)$u['id'], (string)$u['full_name']); } catch (Throwable $e) {} }
     return $pid;
 }
@@ -103,6 +106,7 @@ function hre_del_from_post(): int {
     $i = one('SELECT * FROM hr_eq_items WHERE id = ?', [(int)($_POST['item_id'] ?? 0)]); if (!$i) throw new RuntimeException(t('err.notfound'));
     if (!hre_can() && ((int)$i['created_by'] !== hre_me() || !in_array($i['category'], $mine, true))) throw new RuntimeException(t('err.noaccess'));   // a preparer removes only a draft of his / her own
     if ($i['status'] !== 'draft') throw new RuntimeException(t('hre.err_not_draft'));
+    if (!empty($i['inv_serial_id']) && function_exists('sn_release_person')) stk_tx(fn() => sn_release_person((int)$i['inv_serial_id'], 'back', t('sn.ref_not_issued')));   // R97-252: the asset is in the warehouse again
     q('DELETE FROM hr_eq_items WHERE id = ?', [(int)$i['id']]); return (int)$i['person_id'];
 }
 
@@ -224,7 +228,8 @@ function hre_receive_from_post(): array {
     try {
         foreach ($items as $i) { $r = (string)$res[$i['id']]; $cnt[$r]++; $nt = mb_substr(trim((string)($notes[$i['id']] ?? '')), 0, 300) ?: null; $ci = (string)($conds[$i['id']] ?? ''); if (!in_array($ci, HRE_CONDS, true)) $ci = null;
             if ($r === 'missing') q("UPDATE hr_eq_items SET status = 'missing', return_note = ? WHERE id = ?", [$nt, (int)$i['id']]);
-            else q('UPDATE hr_eq_items SET status = ?, returned_on = CURDATE(), cond_in = ?, return_note = ? WHERE id = ?', [$r === 'writeoff' ? 'writeoff' : 'returned', $r === 'damaged' ? 'damaged' : $ci, $nt, (int)$i['id']]); }
+            else q('UPDATE hr_eq_items SET status = ?, returned_on = CURDATE(), cond_in = ?, return_note = ? WHERE id = ?', [$r === 'writeoff' ? 'writeoff' : 'returned', $r === 'damaged' ? 'damaged' : $ci, $nt, (int)$i['id']]);
+            if ($r !== 'missing' && !empty($i['inv_serial_id']) && function_exists('sn_release_person')) sn_release_person((int)$i['inv_serial_id'], $r === 'writeoff' ? 'scrapped' : 'back', t('hre.return_list') . ' ' . $d['doc_no'] . ' · ' . t('hre.r_' . $r)); }   // R97-252: the asset returns to the warehouse, or is written off
         q("UPDATE hr_eq_docs SET status = 'accepted', hr_at = NOW(), hr_by = ?, hr_name = ? WHERE id = ?", [hre_me(), (string)($u['full_name'] ?? ''), (int)$d['id']]);
         $pdo->commit();
     } catch (Throwable $e) { $pdo->rollBack(); throw $e; }

@@ -81,6 +81,7 @@ function dn_cancel(int $id, string $note): void { stk_tx(fn() => dn_cancel_x($id
 function dn_cancel_x(int $id, string $note): void {
     require_pr_wh(); $d = dn_load($id); if (!$d || $d['status'] !== 'issued') throw new RuntimeException(t('err.noaccess'));
     foreach (dn_lines($id) as $l) { if (!$l['item_id'] || !$l['move_id']) continue; $mv = one('SELECT * FROM inv_moves WHERE id = ?', [(int)$l['move_id']]); if (!$mv) continue;
+        if (function_exists('sn_undo_move')) sn_undo_move((int)$l['move_id'], t('dn.cancelled_note', ['no' => $d['dn_no']]));   // R97-252: the numbers that left on the note are in the warehouse again
         stk_move((int)$l['item_id'], (int)$mv['warehouse_id'], 'in', abs((float)$mv['qty']), ['unit_price' => $mv['unit_price'], 'project_id' => $mv['project_id'], 'subproject_id' => $mv['subproject_id'], 'reason' => $d['kind'] === 'customer' ? 'return_customer' : 'return_project', 'ref_kind' => 'dn', 'ref_id' => $id, 'ref_no' => $d['dn_no'], 'company_id' => $mv['company_id'], 'note' => t('dn.cancelled_note', ['no' => $d['dn_no']])]);
         if ($l['pr_line_id']) q('UPDATE pr_lines SET qty_issued = GREATEST(0, qty_issued - ?), status = IF(status = \'issued\', \'received\', status) WHERE id = ?', [abs((float)$mv['qty']), (int)$l['pr_line_id']]);
         if ($l['pr_line_id']) {   // R97-109: the goods are back in the warehouse for the same requisition — reserved again, so they can go on another note
@@ -125,6 +126,7 @@ function dn_pdf(array $d): string {
     $need(20); $hrow(); $pdf->setFont('R', 8); $pdf->setColor($ink);
     foreach ($L as $l) {
         $desc = $l['description'] . (($l['maker'] || $l['factory_code']) ? ' — ' . trim(($l['maker'] ?? '') . ' ' . ($l['factory_code'] ?? '')) : '') . ($l['note'] ? ' · ' . $l['note'] : '');
+        if (!empty($l['move_id']) && function_exists('sn_of_move') && ($snL = sn_of_move((int)$l['move_id']))) $desc .= ' — S/N: ' . implode(', ', $snL);   // R97-252
         $pdf->setFont('R', 8); $lines = $pdf->wrap($desc, $cols[2][1] - 3); $h = max(5.5, count($lines) * 3.8 + 1.8);
         if ($y + $h + 2 > 272) { $need($h + 8); $hrow(); }   // R97-149: column headers again on a new page
         $pdf->setFont('R', 8); $pdf->setColor($ink);

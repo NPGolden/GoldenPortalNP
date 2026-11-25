@@ -4646,3 +4646,26 @@ Language: 2 portal keys, 10 app keys in five languages.
 - `Portal::fsrPhotos()` returns `tasks` (`seq`, first 80 characters of the description) from the works of the report.
 - `photosBox()` draws one photo row per task (`data-task`), each with its own Camera / Album buttons; an added photo is uploaded with that task number (`sp_files.fsr_task`), so the report prints it with the task. A photo whose task no longer exists gets its own row.
 - Drafts were already per task (R77-002).
+
+## §531 Inventory: serial numbers and company assets (GAS-CP-R97-252, v1.255.0)
+
+Migration `install/migrate_cp_r97_252_serial_numbers_company_assets.sql` (key r99v): `inv_items.is_asset`, `inv_items.track_serial`; tables `inv_serials` (one row per unit: item, serial, asset tag, status `in_stock | out | with_person | scrapped | removed`, warehouse, person, last reference) and `inv_serial_log` (event, movement, delivery note, warehouse, person, reference, who); `hr_eq_items.inv_serial_id`.
+
+**Principle** (`app/sn.php`): quantities stay with `stk_move()`; serial numbers are attached to a movement by its id — `sn_attach($moveId, $numbers, $opts)`. In: the numbers enter the warehouse of the movement (refused when already in stock or with a person). Out: they must be in stock in that warehouse; state after = `out`, `scrapped` (reason scrap) or `with_person`. Never more numbers than units; `exact` = as many as units. A number of a unit that was in stock before numbers were kept is created on its way out.
+
+**Where numbers are asked**
+
+- Item movement form (`stk_move_from_post_x`): in / out need as many numbers as units; transfer moves the given numbers (`sn_transfer`).
+- Purchase receipt (`po_receive_from_post_x`): box `sn[line]` per tracked line; the form sends `sn_form`, so a wrong count stops the booking. A receipt booked by another route (delivery check) has no box and is not blocked.
+- Afterwards: `sn_attach_from_post` (action `sn_attach`) from the movement list of the item and from the delivery note page (tick from `sn_in_stock()` of that warehouse, or type).
+- `sn_register_from_post`: numbers of units already in stock, never more than the quantity on hand in that warehouse. `sn_balance()` = on hand against numbered units.
+
+**Taken back**: `dn_cancel_x` → `sn_undo_move()` (numbers in stock again); `po_receipt_reverse_x` → `sn_undo_ref()` (numbers of that receipt marked `removed`).
+
+**Delivery note**: `dn_pdf()` prints `S/N: …` after the description of the line (`sn_of_move`).
+
+**Company assets ↔ equipment of the personnel** (`app/hre.php`): field `inv_sn` in both add forms lists `sn_assets_free()`; `hre_add_from_post` → `sn_assign_person()` (stock out, reason `personnel`, state `with_person`, link on the line); draft line deleted → `sn_release_person(…, 'back')`; `hre_receive_from_post`: ok / damaged → back into the default warehouse (reason `return_personnel`), write-off → `scrapped`, missing → stays with the person.
+
+Rights: `sn_can()` = warehouse right or procurement administrator. The module is loaded by the portal and the API (`sn` in both module lists).
+
+Language: 59 new keys.

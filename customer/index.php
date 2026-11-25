@@ -21,6 +21,7 @@ require __DIR__ . '/app/po.php';     // R80-003 RFQs and purchase orders
 require __DIR__ . '/app/ut.php';   // R83-001 utilization
 require __DIR__ . '/app/org.php';  // R85-001 organisations
 require __DIR__ . '/app/stc.php';  // R87-001 stock control
+require __DIR__ . '/app/sn.php';   // R97-252 serial numbers and company assets
 require __DIR__ . '/app/ilk.php';  // R88-001 item links · software licences
 require __DIR__ . '/app/rfo.php';  // R88-001 RFO to several suppliers
 require __DIR__ . '/app/dn.php';   // R88-001 delivery notes
