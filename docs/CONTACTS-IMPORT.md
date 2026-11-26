@@ -4769,3 +4769,7 @@ Fail = firewall page (403 with «Website Firewall» / «Access Denied» / «Bloc
 ## §540 Job descriptions: the CEO approves all stages (GAS-CP-R97-261, v1.261.0)
 
 `jd_approve_all($id)` (`app/jd.php`), action `jd_approve_all`, only for `jd_is_ceo()`. Status draft or review; a draft is first put under review (same content check as `jd_submit`). Every stage of `JD_STEPS` that is open and has approvers is signed with the CEO as `<step>_by`; `<step>_name` is the name of the CEO, followed by «(CEO)» on a stage the CEO does not hold. Then `jd_finish()` (revision kept, people told) and `jd.nf_ceo_all` to the approvers whose stage was signed. Button on `hr_jd` (draft and review); `hr_jds` lists every description under review for the CEO.
+
+## §541 Job descriptions: authenticator code for «Approve all stages as CEO» (GAS-CP-R97-262, v1.261.1)
+
+`jd_approve_all()` verifies `$_POST['totp']` with `totp_verify()` against the authenticator of the CEO before anything is written. Unlike `pk_stepup_ok()`, an account without an authenticator does not pass: the action answers `jd.ceo_need_totp`. The form on `hr_jd` carries the code field.

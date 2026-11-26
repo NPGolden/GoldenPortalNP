@@ -14044,4 +14044,5 @@ SN-0002',
 'jd.ceo_all' => 'Approva tutte le fasi come CEO',
 'jd.ceo_all_confirm' => 'Approvare personalmente ogni fase aperta di questa descrizione della posizione? Entra subito in vigore; gli approvatori di cui firma la fase vengono avvisati.',
 'jd.nf_ceo_all' => 'La descrizione della posizione {c} {t} ({r}) è stata approvata dal CEO per tutte le fasi',
+'jd.ceo_need_totp' => 'Configuri prima l authenticator in My Account: l approvazione di tutte le fasi si conferma sempre con il suo codice.',
 ];

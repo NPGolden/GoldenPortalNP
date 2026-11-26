@@ -14044,4 +14044,5 @@ SN-0002',
 'jd.ceo_all' => 'Approve all stages as CEO',
 'jd.ceo_all_confirm' => 'Approve every open stage of this job description yourself? It comes into force at once; the approvers whose stage you sign are told.',
 'jd.nf_ceo_all' => 'Job description {c} {t} ({r}) was approved by the CEO for all stages',
+'jd.ceo_need_totp' => 'Set up your authenticator under My Account first: approving all stages is always confirmed with its code.',
 ];

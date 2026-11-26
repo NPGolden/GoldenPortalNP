@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.261.0** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.261.1** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.261.1 | GAS-CP-R97-262 | 2026-11-26 | Job descriptions: «Approve all stages as CEO» always asks the authenticator code | — |
 | 1.261.0 | GAS-CP-R97-261 | 2026-11-26 | Job descriptions: the CEO approves all stages in one action, from the draft or at any stage | — |
 | 1.260.2 | GAS-CP-R97-260 | 2026-11-26 | Self-test through the website firewall: stops when the public address does not answer, is marked before it starts, shorter waiting times | — |
 | 1.260.1 | GAS-CP-R97-259 | 2026-11-26 | Self-test through the website firewall widened: app sign-in, careers and website forms, the five app pages | — |

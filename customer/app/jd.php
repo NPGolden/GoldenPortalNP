@@ -141,6 +141,8 @@ function jd_approve_all(int $id): int {
     $jd = jd_load($id); if (!$jd || !in_array($jd['status'], ['draft', 'review'], true)) throw new RuntimeException(t('jd.not_review'));
     if (trim((string)$jd['purpose']) === '' || !jd_lines($jd['duties'])) throw new RuntimeException(t('jd.need_body'));
     $u = current_user(); $me = (int)$u['id']; $name = (string)$u['full_name']; $n = 0; $told = [];
+    if (empty($u['totp_enabled']) || empty($u['totp_secret'])) throw new RuntimeException(t('jd.ceo_need_totp'));   // the action skips two approvers: always confirmed with the authenticator
+    if (!totp_verify((string)$u['totp_secret'], trim((string)($_POST['totp'] ?? '')))) throw new RuntimeException(t('po.pg_totp'));
     if ($jd['status'] === 'draft') q("UPDATE hr_jds SET status = 'review', submitted_at = NOW(), submitted_name = ?, reject_note = NULL, dm_by = NULL, dm_name = NULL, dm_at = NULL, gm_by = NULL, gm_name = NULL, gm_at = NULL, ceo_by = NULL, ceo_name = NULL, ceo_at = NULL WHERE id = ? AND status = 'draft'", [$name, $id]);
     $jd = jd_load($id);
     foreach (JD_STEPS as $s) { if (!empty($jd[$s . '_at'])) continue; $users = jd_step_users($jd, $s); if (!$users) continue;
