@@ -146,7 +146,7 @@ final class PortalHR {
     public static function thread(int $pid): array {
         $p = hr_person($pid); if (!$p) throw new ApiException(404, 'Person not found');
         $items = []; foreach (hr_messages($pid) as $m) $items[] = ['id' => (int)$m['id'], 'from_hr' => !empty($m['from_hr']), 'from' => (string)($m['from_name'] ?? ''), 'body' => (string)$m['body'], 'at' => (string)$m['created_at'], 'seen' => $m['seen_at'] !== null];
-        hr_messages_mark_seen($pid);
+        hr_messages_mark_seen($pid, true);
         return ['person_id' => $pid, 'person' => (string)$p['name_en'], 'items' => $items];
     }
     public static function send(array $u, array $p): array {

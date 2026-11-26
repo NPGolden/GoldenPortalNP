@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.263.0';
+const CP_VERSION = '1.264.0';
 const CP_BUILD   = '2026-11-27';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-266', 'version' => '1.264.0', 'date' => '2026-11-27', 'title' => 'HR messages: Done closes a request and tells the employee, HR holders write to HR from the desktop; applicants: dated notes and decision changes in the history; In / Out: monthly report of late arrivals and early leaves with notes of HR', 'db' => 'install/migrate_cp_r97_266_hr_done_applicant_notes_month_report.sql', 'check' => 'r99z'],
         ['ref' => 'GAS-CP-R97-265', 'version' => '1.263.0', 'date' => '2026-11-27', 'title' => 'Health report corrections: delivery check keeps its database connection after a long assistant reading; the session is released while the assistant works; slow pages show session wait and database connection; projects, new invoice, community and collections read in batches; daily report shows the web server values', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-264', 'version' => '1.262.0', 'date' => '2026-11-26', 'title' => 'Recruiting offer: job description selector — another approved job description for the offer without moving the applicant', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-263', 'version' => '1.261.2', 'date' => '2026-11-26', 'title' => 'Release updater: signed call through the website firewall, status call, house-keeping of old release files and backups', 'db' => null, 'check' => null],
@@ -727,6 +728,7 @@ function cp_migration_state(): array {
         'r99w' => $has("SHOW COLUMNS FROM login_log LIKE 'source'"),   // R97-254
         'r99x' => $has("SHOW TABLES LIKE 'login_devices'"),   // R97-255
         'r99y' => $has("SHOW TABLES LIKE 'inv_asset_imports'"),   // R97-256
+        'r99z' => $has("SHOW TABLES LIKE 'io_month_notes'"),   // R97-266
         'r99k' => $has("SHOW COLUMNS FROM nl_issues LIKE 'tr'") && $has("SHOW COLUMNS FROM nl_sends LIKE 'lang'") && $has("SHOW COLUMNS FROM contacts LIKE 'nl_lang'"),   // R97-203
         'r99j' => $has("SHOW TABLES LIKE 'soc_post_tr'") && $has("SHOW COLUMNS FROM soc_posts LIKE 'lang'"),   // R97-201
         'r99i' => $has("SHOW TABLES LIKE 'wl_prefs'") && $has("SHOW TABLES LIKE 'wl_mood_seen'"),   // R97-194

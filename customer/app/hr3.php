@@ -135,7 +135,7 @@ function hr_messages_unread(?int $pid = null): int {
     if (hr_can()) return (int) scalar('SELECT COUNT(*) FROM hr_messages WHERE from_hr = 0 AND seen_at IS NULL' . ($pid ? ' AND person_id = ' . (int)$pid : ''));
     $p = hr_person_of_user((int)$u['id']); return $p ? (int) scalar('SELECT COUNT(*) FROM hr_messages WHERE person_id = ? AND from_hr = 1 AND seen_at IS NULL', [(int)$p['id']]) : 0;
 }
-function hr_messages_mark_seen(int $pid): void { if (!hr_msg_has()) return; if (hr_can()) q('UPDATE hr_messages SET seen_at = NOW() WHERE person_id = ? AND from_hr = 0 AND seen_at IS NULL', [$pid]); else q('UPDATE hr_messages SET seen_at = NOW() WHERE person_id = ? AND from_hr = 1 AND seen_at IS NULL', [$pid]); }
+function hr_messages_mark_seen(int $pid, ?bool $hrSide = null): void { if (!hr_msg_has()) return; if ($hrSide ?? hr_can()) q('UPDATE hr_messages SET seen_at = NOW() WHERE person_id = ? AND from_hr = 0 AND seen_at IS NULL', [$pid]); else q('UPDATE hr_messages SET seen_at = NOW() WHERE person_id = ? AND from_hr = 1 AND seen_at IS NULL', [$pid]); }
 /** POST person_id (HR) or none (employee), body. Visible only to HR / admins and the person. */
 function hr_message_send_from_post(): int {
     if (!hr_msg_has()) throw new RuntimeException(t('err.noaccess')); $u = current_user(); if (!$u || !is_staff()) throw new RuntimeException(t('err.noaccess'));
@@ -155,18 +155,30 @@ function hr_message_threads(): array {
     if (!hr_msg_has() || !hr_can()) return []; $done = hr_msg_done_has() ? 'm.done_at IS NULL' : '1 = 1';
     $rows = all("SELECT m.person_id, p.name_en, p.name_el, p.is_active, MAX(m.created_at) AS last_at, COUNT(*) AS n, SUM(CASE WHEN m.from_hr = 0 AND m.seen_at IS NULL THEN 1 ELSE 0 END) AS unread, MAX(CASE WHEN m.from_hr = 1 THEN m.id ELSE 0 END) AS last_hr, MAX(CASE WHEN m.from_hr = 0 AND $done THEN m.id ELSE 0 END) AS last_emp_open, MAX(m.id) AS last_id FROM hr_messages m JOIN hr_people p ON p.id = m.person_id GROUP BY m.person_id, p.name_en, p.name_el, p.is_active");
     if (!$rows) return []; $last = []; foreach (all('SELECT id, body, from_hr FROM hr_messages WHERE id IN (' . implode(',', array_map(fn($r) => (int)$r['last_id'], $rows)) . ')') as $m) $last[(int)$m['id']] = $m;
-    foreach ($rows as &$r) { $r['unread'] = (int)$r['unread']; $r['wait'] = (int)$r['last_emp_open'] > (int)$r['last_hr']; $l = $last[(int)$r['last_id']] ?? null; $r['last_body'] = $l ? (string)$l['body'] : ''; $r['last_from_hr'] = $l ? (bool)$l['from_hr'] : false; } unset($r);
-    usort($rows, fn($a, $b) => [$b['unread'] > 0, $b['wait'], $b['last_at']] <=> [$a['unread'] > 0, $a['wait'], $a['last_at']]);
+    foreach ($rows as &$r) { $r['unread'] = (int)$r['unread']; $r['wait'] = (int)$r['last_emp_open'] > (int)$r['last_hr']; $r['open'] = hr_msg_done_has() ? (int)$r['last_emp_open'] > 0 : $r['wait'];   /* R97-266: open until HR presses Done; wait = still to answer */ $l = $last[(int)$r['last_id']] ?? null; $r['last_body'] = $l ? (string)$l['body'] : ''; $r['last_from_hr'] = $l ? (bool)$l['from_hr'] : false; } unset($r);
+    usort($rows, fn($a, $b) => [$b['unread'] > 0, $b['wait'], $b['open'], $b['last_at']] <=> [$a['unread'] > 0, $a['wait'], $a['open'], $a['last_at']]);
     return $rows;
 }
 function hr_messages_waiting(): int { return count(array_filter(hr_message_threads(), fn($r) => $r['wait'])); }
-/** HR: the conversation needs no answer — it leaves «to answer» until the employee writes again. */
-function hr_message_done(int $pid): void { if (!hr_can() || !hr_msg_done_has()) throw new RuntimeException(t('err.noaccess')); q('UPDATE hr_messages SET done_at = NOW(), seen_at = COALESCE(seen_at, NOW()) WHERE person_id = ? AND from_hr = 0 AND done_at IS NULL', [$pid]); }
+/** R97-266: is something of this employee still open with HR (an employee message not yet marked Done)? */
+function hr_message_open(int $pid): bool { return hr_msg_done_has() && (bool) scalar('SELECT COUNT(*) FROM hr_messages WHERE person_id = ? AND from_hr = 0 AND done_at IS NULL', [$pid]); }
+/** HR: Done — the request is handled. It leaves the open list, a closing line is written in the conversation in the language of the employee and the employee is notified (R97-266). */
+function hr_message_done(int $pid, string $note = ''): void {
+    if (!hr_can() || !hr_msg_done_has()) throw new RuntimeException(t('err.noaccess')); $p = hr_person($pid); if (!$p) throw new RuntimeException(t('err.notfound')); $u = current_user();
+    if (!q('UPDATE hr_messages SET done_at = NOW(), seen_at = COALESCE(seen_at, NOW()) WHERE person_id = ? AND from_hr = 0 AND done_at IS NULL', [$pid])->rowCount()) return;
+    $lc = 'en'; try { $l = (string) scalar('SELECT locale FROM customer_users WHERE id = ?', [(int)($p['user_id'] ?? 0)]); if (locale_valid($l)) $lc = $l; } catch (Throwable $e) {}
+    $line = lang_table($lc)['hr.msg_done_line'] ?? lang_table(DEFAULT_LOCALE)['hr.msg_done_line'] ?? 'Done'; $note = mb_substr(trim($note), 0, 500); $body = '✔ ' . $line . ($note !== '' ? "\n" . $note : '');
+    q('INSERT INTO hr_messages (person_id, from_user_id, from_hr, body) VALUES (?,?,1,?)', [$pid, (int)$u['id'], $body]);
+    if (function_exists('nf_push') && !empty($p['user_id']) && (int)$p['user_id'] !== (int)$u['id']) nf_push([(int)$p['user_id']], 'hrm:new', 'hrm:' . $pid, t('hr.nf_msg') . ' — HR', mb_substr($body, 0, 140), url('my_leave') . '#hr-msg', (int)$u['id'], $u['full_name'] ?? null);
+}
 /** The message thread card (same markup for the employee card and My leave). */
 function hr_messages_card(int $pid, bool $hrSide, string $back = ''): string {
-    $msgs = hr_messages($pid); hr_messages_mark_seen($pid); $h = '<div class="card" id="hr-msg"><h2>💬 ' . tt('hr.msg_title') . '</h2><p class="hint">' . tt($hrSide ? 'hr.msg_hint_hr' : 'hr.msg_hint_emp') . '</p>';
+    $msgs = hr_messages($pid); hr_messages_mark_seen($pid, $hrSide); $h = '<div class="card" id="hr-msg"><h2>💬 ' . tt('hr.msg_title') . '</h2><p class="hint">' . tt($hrSide ? 'hr.msg_hint_hr' : 'hr.msg_hint_emp') . '</p>';
     if (!$msgs) $h .= '<p class="hint">' . tt('hr.msg_none') . '</p>'; else { $h .= '<div class="hr-thread">'; foreach ($msgs as $m) $h .= '<div class="hr-m' . ($m['from_hr'] ? ' is-hr' : '') . '"><div class="hr-m-head"><b>' . e($m['from_name'] ?? ($m['from_hr'] ? 'HR' : '')) . '</b>' . ($m['from_hr'] ? ' <span class="hint">HR</span>' : '') . ' <span class="hint">' . e(fmt_datetime($m['created_at'])) . ($m['seen_at'] ? ' · ✔ ' . tt('hr.msg_seen') : '') . '</span></div><div class="hr-m-body">' . nl2br(e($m['body'])) . '</div></div>'; $h .= '</div>'; }
-    $h .= '<form method="post" action="' . ($hrSide ? ($back === 'pool' ? url('hr_messages', ['pid' => $pid]) : url('hr_person', ['id' => $pid])) : url('my_leave')) . '#hr-msg" data-lock>' . csrf_field() . '<input type="hidden" name="action" value="hr_msg_send"><input type="hidden" name="person_id" value="' . $pid . '">' . ($back === 'pool' ? '<input type="hidden" name="back" value="pool">' : '') . '<div class="field"><textarea name="body" rows="3" maxlength="2000" required data-plain placeholder="' . tt('hr.msg_ph') . '"></textarea></div><div class="btn-row"><button class="btn btn--gold btn--sm" type="submit">' . tt('hr.msg_send') . '</button></div></form></div>';
+    $h .= '<form method="post" action="' . ($hrSide ? ($back === 'pool' ? url('hr_messages', ['pid' => $pid]) : url('hr_person', ['id' => $pid])) : url('my_leave')) . '#hr-msg" data-lock>' . csrf_field() . '<input type="hidden" name="action" value="hr_msg_send"><input type="hidden" name="person_id" value="' . $pid . '">' . ($back === 'pool' ? '<input type="hidden" name="back" value="pool">' : '') . ($hrSide ? '' : '<input type="hidden" name="as_employee" value="1">') . '<div class="field"><textarea name="body" rows="3" maxlength="2000" required data-plain placeholder="' . tt('hr.msg_ph') . '"></textarea></div><div class="btn-row"><button class="btn btn--gold btn--sm" type="submit">' . tt('hr.msg_send') . '</button></div></form>';
+    if ($hrSide && hr_message_open($pid)) $h .= '<form method="post" action="' . url('hr_messages') . '" data-lock style="margin-top:12px;padding-top:10px;border-top:1px solid rgba(31,58,95,.15);display:flex;gap:8px;flex-wrap:wrap;align-items:center;">' . csrf_field() . '<input type="hidden" name="action" value="hr_msg_done"><input type="hidden" name="person_id" value="' . $pid . '"><input type="hidden" name="back" value="' . ($back === 'pool' ? 'pool' : 'card') . '"><input name="note" maxlength="500" placeholder="' . tt('hr.msg_done_note_ph') . '" style="flex:1;min-width:200px;"><button class="btn btn--gold btn--sm" type="submit">✔ ' . tt('hr.msg_done') . '</button><span class="hint" style="flex-basis:100%;">' . tt('hr.msg_done_hint') . '</span></form>';   // R97-266
+    elseif (!$hrSide && $msgs) $h .= '<p class="hint" style="margin-top:8px;">' . (hr_message_open($pid) ? '🟡 ' . tt('hr.msg_emp_open') : '✔ ' . tt('hr.msg_emp_closed')) . '</p>';
+    $h .= '</div>';
     return $h;
 }
 

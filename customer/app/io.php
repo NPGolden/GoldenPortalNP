@@ -276,6 +276,41 @@ function io_stats(string $from, string $to): array {
     }
     return $out;
 }
+/* ---- R97-266: monthly report of late arrivals and early leaves, with a note of HR on each person ---- */
+function io_month_has(): bool { static $v = null; if ($v === null) { try { $v = io_has() && (bool) one("SHOW TABLES LIKE 'io_month_notes'"); } catch (Throwable $e) { $v = false; } } return $v; }
+function io_month_ok(string $ym): string { return preg_match('/^\d{4}-(0[1-9]|1[0-2])$/', $ym) ? $ym : date('Y-m'); }
+/** One row per member of staff: late arrivals (first In after the start + tolerance) and early leaves (last Out of the day before the end − tolerance), in minutes against the work calendar. */
+function io_month_report(string $ym): array {
+    if (!io_stats_can()) throw new RuntimeException(t('err.noaccess')); $ym = io_month_ok($ym); $from = $ym . '-01'; $to = date('Y-m-t', strtotime($from)); $today = date('Y-m-d');
+    $by = []; foreach (all("SELECT user_id, local_day, local_time, kind, flags FROM io_entries WHERE local_day BETWEEN ? AND ? AND status <> 'rejected' ORDER BY user_id, at_utc, id", [$from, $to]) as $r) $by[(int)$r['user_id']][(string)$r['local_day']][] = $r;
+    $notes = []; if (io_month_has()) foreach (all('SELECT n.*, cu.full_name AS by_name FROM io_month_notes n LEFT JOIN customer_users cu ON cu.id = n.by_user_id WHERE n.ym = ?', [$ym]) as $n) $notes[(int)$n['user_id']] = $n;
+    $sec = fn($t) => (int) strtotime('1970-01-01 ' . $t . ' UTC'); $out = [];
+    foreach (io_staff() as $uid => $name) {
+        $cal = function_exists('wc_user_calendar') ? wc_user_calendar($uid) : 'GR'; $late = []; $early = [];
+        foreach ($by[$uid] ?? [] as $day => $list) {
+            $rule = function_exists('wc_day') ? (wc_day($cal, $day)['rule'] ?? null) : null; $firstIn = null; foreach ($list as $r) if ($r['kind'] === 'in') { $firstIn = $r; break; } $last = $list[count($list) - 1];
+            if ($firstIn && in_array('late', explode(',', (string)$firstIn['flags']), true)) $late[] = ['day' => $day, 'time' => substr((string)$firstIn['local_time'], 0, 5), 'min' => !empty($rule['start_time']) ? max(0, (int) round(($sec($firstIn['local_time']) - $sec($rule['start_time'])) / 60)) : 0];
+            if ($day < $today && $last['kind'] === 'out' && in_array('early', explode(',', (string)$last['flags']), true)) $early[] = ['day' => $day, 'time' => substr((string)$last['local_time'], 0, 5), 'min' => !empty($rule['end_time']) ? max(0, (int) round(($sec($rule['end_time']) - $sec($last['local_time'])) / 60)) : 0];
+        }
+        $n = $notes[$uid] ?? null;
+        $out[] = ['uid' => $uid, 'name' => $name, 'days' => count($by[$uid] ?? []), 'late' => $late, 'early' => $early, 'late_min' => array_sum(array_column($late, 'min')), 'early_min' => array_sum(array_column($early, 'min')), 'note' => (string)($n['note'] ?? ''), 'note_by' => (string)($n['by_name'] ?? ''), 'note_at' => (string)($n['updated_at'] ?? '')];
+    }
+    return $out;
+}
+/** HR writes the notes of the month; only changed notes are stored, an emptied note is removed. */
+function io_month_notes_save(string $ym, array $notes): int {
+    if (!io_month_has() || !function_exists('hr_can') || !hr_can()) throw new RuntimeException(t('err.noaccess')); $ym = io_month_ok($ym); $staff = io_staff(); $me = (int)(current_user()['id'] ?? 0); $n = 0;
+    foreach ($notes as $uid => $txt) { $uid = (int)$uid; if (!isset($staff[$uid])) continue; $txt = mb_substr(trim((string)$txt), 0, 1000); $old = (string)(scalar('SELECT note FROM io_month_notes WHERE user_id = ? AND ym = ?', [$uid, $ym]) ?: '');
+        if ($txt === $old) continue; $n++;
+        if ($txt === '') q('DELETE FROM io_month_notes WHERE user_id = ? AND ym = ?', [$uid, $ym]);
+        else q('INSERT INTO io_month_notes (user_id, ym, note, by_user_id) VALUES (?,?,?,?) ON DUPLICATE KEY UPDATE note = VALUES(note), by_user_id = VALUES(by_user_id)', [$uid, $ym, $txt, $me]); }
+    return $n;
+}
+function io_month_sheets(string $ym, array $rows): array {
+    $x = []; $list = fn(array $l) => implode('; ', array_map(fn($d) => date('d/m', strtotime($d['day'])) . ' ' . $d['time'] . ' (' . $d['min'] . ' min)', $l));
+    foreach ($rows as $r) $x[] = [$r['name'], $r['days'], count($r['late']), $r['late_min'], $list($r['late']), count($r['early']), $r['early_min'], $list($r['early']), $r['note']];
+    return [['name' => $ym, 'first' => true, 'header' => [t('io.th_person'), t('io.mr_days'), t('io.mr_late_n'), t('io.mr_late_min'), t('io.mr_late_days'), t('io.mr_early_n'), t('io.mr_early_min'), t('io.mr_early_days'), t('io.mr_note')], 'rows' => $x, 'widths' => [28, 8, 8, 10, 50, 8, 10, 50, 60]]];
+}
 /** A stored UTC date-time shown in the company's time zone. */
 function io_fmt_utc(?string $utc): string { if (!$utc) return '—'; try { return (new DateTime($utc, new DateTimeZone('UTC')))->setTimezone(new DateTimeZone(tz_app()))->format('d/m/Y H:i'); } catch (Throwable $e) { return (string)$utc; } }
 function io_hm(int $min): string { return sprintf('%d:%02d', intdiv(max(0, $min), 60), max(0, $min) % 60); }

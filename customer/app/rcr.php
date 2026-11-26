@@ -140,12 +140,26 @@ function rcr_applications(array $f = []): array {
     return all('SELECT a.*, v.title AS vacancy, v.code AS vacancy_code, cu.full_name AS owner FROM rc_applications a JOIN rc_vacancies v ON v.id = a.vacancy_id LEFT JOIN customer_users cu ON cu.id = a.owner_user_id WHERE ' . implode(' AND ', $w) . ' ORDER BY a.created_at DESC LIMIT 500', $p);
 }
 function rcr_application(int $id): ?array { return one('SELECT a.*, v.title AS vacancy, v.code AS vacancy_code, v.hiring_manager_id FROM rc_applications a JOIN rc_vacancies v ON v.id = a.vacancy_id WHERE a.id = ?', [$id]); }
+/* R97-266: dated notes on an applicant — who wrote what and when; each one is also a line of the history */
+function rcr_notes_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'rc_notes'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function rcr_notes(int $appId): array { return rcr_notes_has() ? all('SELECT n.*, cu.full_name AS by_name FROM rc_notes n LEFT JOIN customer_users cu ON cu.id = n.user_id WHERE n.application_id = ? ORDER BY n.created_at DESC, n.id DESC', [$appId]) : []; }
+function rcr_note_add(int $appId, string $body): void {
+    $a = rcr_application($appId); if (!$a || !rcr_can_view((int) $a['vacancy_id']) || !rcr_notes_has()) throw new RuntimeException(t('err.noaccess'));
+    $body = mb_substr(trim($body), 0, 4000); if ($body === '') throw new RuntimeException(t('rc.note_need'));
+    q('INSERT INTO rc_notes (application_id, body, user_id) VALUES (?,?,?)', [$appId, $body, (int) (current_user()['id'] ?? 0) ?: null]);
+    rcr_log('note', ['application_id' => $appId, 'vacancy_id' => (int) $a['vacancy_id']], mb_strimwidth(preg_replace('/\s+/u', ' ', $body), 0, 300, '…'));
+}
 function rcr_application_events(int $id): array { return all('SELECT r.*, e.title, e.starts_at, e.kind FROM rc_event_registrations r JOIN rc_events e ON e.id = r.event_id WHERE r.application_id = ? ORDER BY e.starts_at', [$id]); }
 function rcr_application_decide(int $id, array $in): void {
     $a = rcr_application($id); if (!$a || !rcr_can_view((int) $a['vacancy_id'])) throw new RuntimeException(t('err.noaccess'));
     $st = in_array($in['status'] ?? '', RCR_APP_STATUS, true) ? $in['status'] : $a['status'];
     q('UPDATE rc_applications SET status = ?, rating = ?, hr_notes = ?, owner_user_id = ?, status_changed_at = IF(status <> ?, NOW(), status_changed_at) WHERE id = ?',
       [$st, (int) ($in['rating'] ?? 0) ?: null, mb_substr(trim((string) ($in['hr_notes'] ?? '')), 0, 4000) ?: null, (int) ($in['owner_user_id'] ?? 0) ?: null, $st, $id]);
+    $ch = []; $nr = (int) ($in['rating'] ?? 0); $no = (int) ($in['owner_user_id'] ?? 0); $nn = mb_substr(trim((string) ($in['hr_notes'] ?? '')), 0, 4000);   // R97-266: every change of the decision card is written in the history
+    if ($nr !== (int) $a['rating']) $ch[] = t('rc.rating') . ' ' . ((int) $a['rating'] ?: '—') . ' → ' . ($nr ?: '—');
+    if ($no !== (int) $a['owner_user_id']) $ch[] = t('rc.owner') . ' → ' . ($no ? (string) scalar('SELECT full_name FROM customer_users WHERE id = ?', [$no]) : '—');
+    if ($nn !== trim((string) $a['hr_notes'])) $ch[] = t('hr.notes') . ': ' . ($nn === '' ? '—' : mb_strimwidth(preg_replace('/\s+/u', ' ', $nn), 0, 300, '…'));
+    if ($ch) rcr_log('decision', ['application_id' => $id, 'vacancy_id' => (int) $a['vacancy_id']], mb_substr(implode(' · ', $ch), 0, 490));
     if ($st !== $a['status']) { rcr_log('status', ['application_id' => $id, 'vacancy_id' => (int) $a['vacancy_id']], $a['status'] . ' → ' . $st);
         if (!empty($in['notify_candidate']) && in_array($st, ['shortlisted', 'offer', 'rejected'], true)) rcr_mail((string) $a['email'], 'Golden A/S — ' . t('rc.st_' . $st) . ' · ' . $a['vacancy_code'], ($a['name'] ?: $a['email']) . ",\n\n" . t('rc.ev_mail_' . $st, ['vacancy' => $a['vacancy']]) . "\n\nGolden Automation Systems — HR"); }   // R91-001
     if ($st === 'hired' && empty($a['hired_person_id']) && function_exists('hr2_has') && hr2_has()) {   // onboarding handshake: a person card in HR › People
@@ -305,7 +319,7 @@ function rcr_retention_run(): array {
 /** Rows of the given applications in every recruiting table. The caller holds the transaction and removes the CV files after the commit. */
 function rcr_app_erase_rows(array $ids): int {
     $ids = array_values(array_filter(array_map('intval', $ids))); if (!$ids) return 0; $in = implode(',', $ids);
-    q("DELETE FROM rc_event_registrations WHERE application_id IN ($in)"); q("DELETE FROM rc_log WHERE application_id IN ($in)");
+    q("DELETE FROM rc_event_registrations WHERE application_id IN ($in)"); q("DELETE FROM rc_log WHERE application_id IN ($in)"); if (rcr_notes_has()) q("DELETE FROM rc_notes WHERE application_id IN ($in)");   /* R97-266: notes are personal data of the candidate and go with the application */
     if (rcr_eval_has()) { q("DELETE FROM rc_evaluations WHERE application_id IN ($in)"); q("DELETE FROM rc_interviews WHERE application_id IN ($in)"); }
     if (rcr_offer_has()) q("DELETE FROM rc_offers WHERE application_id IN ($in)");   // R97-231: the offer is personal data of the candidate and goes with the application
     return q("DELETE FROM rc_applications WHERE id IN ($in)")->rowCount();

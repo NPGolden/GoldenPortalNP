@@ -11,6 +11,7 @@ function io_handle_action(string $action): bool {
         case 'io_decide': io_decide((int)$_POST['id'], (string)($_POST['status'] ?? ''), (string)($_POST['note'] ?? '')); flash('good', t('sys.saved')); $back('exc');
         case 'io_decide_all': { $n = 0; foreach ((array)($_POST['ids'] ?? []) as $id) { io_decide((int)$id, (string)($_POST['status'] ?? ''), (string)($_POST['note'] ?? '')); $n++; } flash('good', t('io.decided_n', ['n' => $n])); $back('exc'); }
         case 'io_ot_decide': io_ot_decide((int)$_POST['uid'], (string)$_POST['day'], (string)($_POST['status'] ?? ''), (string)($_POST['note'] ?? '')); flash('good', t('sys.saved')); $back('ot', array_filter(['from' => $_POST['from'] ?? '', 'to' => $_POST['to'] ?? '']));
+        case 'io_month_notes': { $ym = io_month_ok((string)($_POST['ym'] ?? '')); $n = io_month_notes_save($ym, (array)($_POST['note'] ?? [])); flash('good', t('io.mr_saved', ['n' => $n])); $back('month', ['ym' => $ym, 'all' => !empty($_POST['all']) ? 1 : null]); }   // R97-266
         case 'io_site_save': io_site_save($_POST); flash('good', t('sys.saved')); $back('sites');
         case 'io_settings_save': io_settings_save($_POST); flash('good', t('sys.saved')); $back('sites');
     }

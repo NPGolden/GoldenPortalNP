@@ -25,6 +25,7 @@ function rcr_handle_action(string $action): bool {
         case 'rcr_eval_criteria_save': if (!rcr_can()) throw new RuntimeException(t('err.noaccess')); rcr_eval_criteria_save($_POST['crit'] ?? []); flash('good', t('sys.saved')); redirect('rcr_settings', ['_r' => uniqid()], '#eval');
         case 'rcr_assign': rcr_assign_vacancy((int)$_POST['id'], (int)($_POST['vacancy_id'] ?? 0)); flash('good', t('rc.assign_done')); redirect('rcr_application', ['id' => (int)$_POST['id'], '_r' => uniqid()]);   // R97-158
         case 'rcr_manual_add': $id = rcr_manual_add($_POST, $_FILES['cv'] ?? []); flash('good', t('rc.man_done')); redirect('rcr_application', ['id' => $id]);   // R97-161
+        case 'rcr_app_note': rcr_note_add((int)$_POST['id'], (string)($_POST['body'] ?? '')); flash('good', t('rc.note_saved')); redirect('rcr_application', ['id' => (int)$_POST['id'], '_r' => uniqid()], '#notes');   // R97-266
         case 'rcr_app_decide': rcr_application_decide((int)$_POST['id'], $_POST); flash('good', t('sys.saved')); redirect('rcr_application', ['id' => (int)$_POST['id']]);
         case 'rcr_set_save': $id = rcr_set_save($_POST); flash('good', t('sys.saved')); redirect('rcr_sets', ['id' => $id]);
         case 'rcr_settings_save': if (!rcr_can()) throw new RuntimeException(t('err.noaccess'));
