@@ -141,7 +141,7 @@ function diag_run(): array {
         if (!function_exists('sec_pubtest')) return; $r = sec_pubtest(); if (function_exists('cp_setting_set')) cp_setting_set('sec_pubtest', json_encode($r));
         if (!$r || !array_key_exists('ok', $r)) { $R[] = diag_row('app', t('dg.pubtest'), 'warn', t('dg.pub_none'), ''); return; }
         $one = $r['oneclick'] === false ? ' · ' . t('dg.pub_one_no') : ($r['oneclick'] === true ? ' · ' . t('dg.pub_one_ok') : '');
-        $R[] = diag_row('app', t('dg.pubtest'), $r['ok'] === false ? 'fail' : ($r['ok'] === null || $r['oneclick'] === false ? 'warn' : 'ok'), (string)$r['at'] . ' · ' . ($r['ok'] === false ? implode(' · ', (array)$r['issues']) : ($r['ok'] === null ? implode(' · ', (array)$r['issues']) : t('dg.pub_ok'))) . $one, $r['ok'] === false ? t('dg.fix_pub') : ($r['oneclick'] === false ? t('dg.fix_pub_one') : ''));
+        $R[] = diag_row('app', t('dg.pubtest'), $r['ok'] === false ? 'fail' : ($r['ok'] === null || $r['oneclick'] === false ? 'warn' : 'ok'), (string)$r['at'] . ' · ' . ($r['ok'] === false ? implode(' · ', (array)$r['issues']) : ($r['ok'] === null ? implode(' · ', (array)$r['issues']) : t('dg.pub_ok') . (!empty($r['n']) ? ' (' . (int)$r['n'] . ')' : ''))) . $one, $r['ok'] === false ? t('dg.fix_pub') : ($r['oneclick'] === false ? t('dg.fix_pub_one') : ''));
     }, 'app', t('dg.pubtest'));
 
     // R69-002: block cache, house-keeping and the slow-pages log

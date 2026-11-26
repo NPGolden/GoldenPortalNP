@@ -4747,3 +4747,17 @@ Migration `migrate_cp_r97_256_asset_import_register_authenticator_roles.sql`, ke
 `sec_pubtest_daily()` runs from `tick.php` once a day after 07:00, keeps the result in the setting `sec_pubtest` and notifies the administrators (`sec:pubtest`) when `ok` is false. Diagnostics (`diag_run`) runs the test at once: row «Public pages through the website firewall» — fail when a button is refused, warn when only the one-click unsubscribe is refused.
 
 Firewall allowlist for the one-click unsubscribe (owner action): Website Security › Firewall › Access control › Allow URL paths → `/customer/nl.php`.
+
+## §538 Wider self-test through the website firewall (GAS-CP-R97-259, v1.260.1)
+
+`sec_pubtest()` now tests ten doors (`n` in the result):
+
+| Door | Request | Answer expected from the portal |
+|---|---|---|
+| Acceptance link, unsubscribe page | GET, POST with referrer (link that does not exist) | page «link not valid» / refusal by the page itself |
+| App sign-in | POST `api/v1/auth/login`, `X-App: pm`, no app version, referrer of the app page | 426 «Update required» — before any sign-in, nothing logged |
+| Careers form | POST `rcr_feed.php?r=apply` with Origin and referrer of the website, no site key | 403 `{"error":"forbidden"}` from the portal |
+| Website form | POST `web_feed.php?r=ticket`, same | refusal by the portal |
+| Five app pages | GET `mobile*/` | 200, no `no-referrer` in header or meta |
+
+Fail = firewall page (403 with «Website Firewall» / «Access Denied» / «Block ID»), status 500 and above, an app page that does not open, or `no-referrer`. A refusal by the portal itself is the expected answer and is not a failure.

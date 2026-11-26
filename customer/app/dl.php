@@ -34,27 +34,41 @@ function dl_base(): string {
 function dl_url(string $token): string { return dl_base() . '/sign.php?t=' . $token; }
 /* ------------------------------------------------------------------ R97-258: self-test of the public pages through the website firewall */
 /** One request the way a phone browser sends it. [status, headers (lower case), body start] */
-function sec_pub_req(string $url, bool $post, ?string $referer): array {
-    if (!function_exists('curl_init')) return [0, '', '']; $ch = curl_init($url); $h = ['Accept: text/html,application/xhtml+xml', 'Accept-Language: en']; if ($referer) $h[] = 'Referer: ' . $referer;
+function sec_pub_req(string $url, bool $post, ?string $referer, array $hdr = [], ?string $body = null): array {
+    if (!function_exists('curl_init')) return [0, '', '']; $ch = curl_init($url); $h = array_merge(['Accept: text/html,application/xhtml+xml,application/json', 'Accept-Language: en'], $hdr); if ($referer) $h[] = 'Referer: ' . $referer;
     curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HEADER => true, CURLOPT_TIMEOUT => 8, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_FOLLOWLOCATION => false, CURLOPT_HTTPHEADER => $h,
         CURLOPT_USERAGENT => 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1']);
-    if ($post) { curl_setopt($ch, CURLOPT_POST, true); curl_setopt($ch, CURLOPT_POSTFIELDS, 'a=selftest'); }
+    if ($post) { curl_setopt($ch, CURLOPT_POST, true); curl_setopt($ch, CURLOPT_POSTFIELDS, $body ?? 'a=selftest'); }
     $raw = (string) curl_exec($ch); $st = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE); $hs = (int) curl_getinfo($ch, CURLINFO_HEADER_SIZE); curl_close($ch);
     return [$st, strtolower(substr($raw, 0, $hs)), substr($raw, $hs, 6000)];
 }
-/** The acceptance page and the unsubscribe page, asked through the public address with a link that does not exist: are they reachable, do they let the browser send the referrer, and does the firewall let a button through?
- *  'ok' false = a customer would meet «Access Denied». 'oneclick' = whether a POST without referrer (the one-click unsubscribe of mail providers) passes. Nothing is written by the pages: the link is not valid. */
+/** The public doors of the portal, asked through the public address the way a browser or app does — with nothing that can be written:
+ *  the acceptance page and the unsubscribe page (a link that does not exist), the sign-in address of the apps (no app version: answered «update required» before any sign-in),
+ *  the careers and website forms of goldenas.com.gr (no site key: answered «forbidden» by the portal), and the five app pages.
+ *  'ok' false = somebody would meet «Access Denied» or a page sends no referrer. 'oneclick' = whether a POST without referrer (the one-click unsubscribe of mail providers) passes. 'n' = doors tested. */
 function sec_pubtest(): array {
-    $base = dl_base(); $o = ['at' => date('Y-m-d H:i'), 'ok' => true, 'issues' => [], 'oneclick' => null];
+    $base = dl_base(); $o = ['at' => date('Y-m-d H:i'), 'ok' => true, 'issues' => [], 'oneclick' => null, 'n' => 0];
     if (!str_starts_with($base, 'https://') || !function_exists('curl_init')) { $o['ok'] = null; $o['issues'][] = 'not run'; return $o; }
     $fw = fn(array $r) => $r[0] === 403 && (stripos($r[2], 'Website Firewall') !== false || stripos($r[2], 'sucuri') !== false || preg_match('/Block ID|Access Denied/i', $r[2])); $id = fn(array $r) => preg_match('/\b([A-Z]{2,6}\d{2,4})\b/', strip_tags($r[2]), $m) ? $m[1] : '403';
-    foreach (['sign.php?t=' . str_repeat('a', 40), 'nl.php'] as $path) { $u = $base . '/' . $path; $name = strtok($path, '?');
-        $g = sec_pub_req($u, false, null); if ($g[0] === 0) { $o['ok'] = null; $o['issues'][] = $name . ': no answer'; continue; }
-        if ($fw($g)) { $o['ok'] = false; $o['issues'][] = $name . ': GET ' . $id($g); continue; }
-        if (preg_match('/^referrer-policy:\s*no-referrer\s*$/m', $g[1])) { $o['ok'] = false; $o['issues'][] = $name . ': Referrer-Policy no-referrer'; }
-        $p = sec_pub_req($u, true, $u); if ($fw($p)) { $o['ok'] = false; $o['issues'][] = $name . ': POST ' . $id($p); }
+    $noref = fn(array $r) => (bool) preg_match('/^referrer-policy:\s*no-referrer\s*$/m', $r[1]) || (bool) preg_match('/<meta[^>]+name=["\']referrer["\'][^>]+content=["\']no-referrer["\']/i', $r[2]);
+    $bad = function (string $what) use (&$o) { $o['ok'] = false; $o['issues'][] = $what; }; $dead = function (string $what) use (&$o) { if ($o['ok'] !== false) $o['ok'] = null; $o['issues'][] = $what . ': no answer'; };
+    foreach (['sign.php?t=' . str_repeat('a', 40), 'nl.php'] as $path) { $u = $base . '/' . $path; $name = strtok($path, '?'); $o['n']++;
+        $g = sec_pub_req($u, false, null); if ($g[0] === 0) { $dead($name); continue; }
+        if ($fw($g)) { $bad($name . ': GET ' . $id($g)); continue; }
+        if ($noref($g)) $bad($name . ': Referrer-Policy no-referrer');
+        $p = sec_pub_req($u, true, $u); if ($fw($p)) $bad($name . ': POST ' . $id($p));
         if ($name === 'nl.php') { $q = sec_pub_req($u, true, null); $o['oneclick'] = $q[0] === 0 ? null : !$fw($q); }
     }
+    // R97-259: the wider test — app sign-in, forms of the website, app pages
+    $site = rtrim((string) (function_exists('cp_setting') ? cp_setting('rc_site_origin', 'https://goldenas.com.gr') : 'https://goldenas.com.gr'), '/'); if (!preg_match('#^https://[a-z0-9.\-]+$#i', $site)) $site = 'https://goldenas.com.gr';
+    $json = ['Content-Type: application/json'];
+    foreach ([['app sign-in', $base . '/api/v1/auth/login', $base . '/mobile-pm/', array_merge($json, ['X-App: pm'])],
+              ['careers form', $base . '/rcr_feed.php?r=apply', $site . '/', array_merge($json, ['Origin: ' . $site])],
+              ['website form', $base . '/web_feed.php?r=ticket', $site . '/', array_merge($json, ['Origin: ' . $site])]] as [$name, $u, $ref, $h]) { $o['n']++;
+        $p = sec_pub_req($u, true, $ref, $h, '{}'); if ($p[0] === 0) { $dead($name); continue; } if ($fw($p)) $bad($name . ': POST ' . $id($p)); elseif ($p[0] >= 500) $bad($name . ': ' . $p[0]); }
+    foreach (['mobile' => 'Service', 'mobile-pm' => 'Golden PM', 'mobile-hr' => 'Golden HR', 'mobile-employee' => 'Employee', 'mobile-customer' => 'Customer'] as $dir => $name) { if (!is_dir(dirname(__DIR__) . '/' . $dir)) continue; $o['n']++;
+        $g = sec_pub_req($base . '/' . $dir . '/', false, null); if ($g[0] === 0) { $dead($name . ' app'); continue; }
+        if ($fw($g)) $bad($name . ' app: GET ' . $id($g)); elseif ($g[0] >= 400) $bad($name . ' app: ' . $g[0]); elseif ($noref($g)) $bad($name . ' app: no-referrer'); }
     return $o;
 }
 /** Once a day from the scheduler (after 07:00): the result is kept for Diagnostics, and the administrators hear when a customer would be refused. */
