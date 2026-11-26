@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.259.1';
+const CP_VERSION = '1.260.0';
 const CP_BUILD   = '2026-11-24';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-258', 'version' => '1.260.0', 'date' => '2026-11-26', 'title' => 'Daily self-test of the public pages through the website firewall, with a Diagnostics row and a notice to the administrators', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-257', 'version' => '1.259.1', 'date' => '2026-11-26', 'title' => 'Acceptance by e-mail link and newsletter unsubscribe: buttons refused by the website firewall (Access Denied, FBP007) — fixed', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-256', 'version' => '1.259.0', 'date' => '2026-11-25', 'title' => 'Security: asset import notice, authenticator step and register; wrong authenticator codes in the apps count toward the lock; authenticator obligatory for CEO, Managing Director and administrators; known devices on My Account', 'db' => 'install/migrate_cp_r97_256_asset_import_register_authenticator_roles.sql', 'check' => 'r99y'],
         ['ref' => 'GAS-CP-R97-255', 'version' => '1.258.0', 'date' => '2026-11-25', 'title' => 'Security: wrong passwords in the apps count toward the account lock; authenticator obligatory for the General Manager; notice to the CEO when the role is given; notice of a sign-in from a new device', 'db' => 'install/migrate_cp_r97_255_gm_authenticator_login_devices.sql', 'check' => 'r99x'],

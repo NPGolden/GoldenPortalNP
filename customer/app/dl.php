@@ -32,6 +32,40 @@ function dl_base(): string {
     return rtrim($b, '/');
 }
 function dl_url(string $token): string { return dl_base() . '/sign.php?t=' . $token; }
+/* ------------------------------------------------------------------ R97-258: self-test of the public pages through the website firewall */
+/** One request the way a phone browser sends it. [status, headers (lower case), body start] */
+function sec_pub_req(string $url, bool $post, ?string $referer): array {
+    if (!function_exists('curl_init')) return [0, '', '']; $ch = curl_init($url); $h = ['Accept: text/html,application/xhtml+xml', 'Accept-Language: en']; if ($referer) $h[] = 'Referer: ' . $referer;
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HEADER => true, CURLOPT_TIMEOUT => 8, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_FOLLOWLOCATION => false, CURLOPT_HTTPHEADER => $h,
+        CURLOPT_USERAGENT => 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1']);
+    if ($post) { curl_setopt($ch, CURLOPT_POST, true); curl_setopt($ch, CURLOPT_POSTFIELDS, 'a=selftest'); }
+    $raw = (string) curl_exec($ch); $st = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE); $hs = (int) curl_getinfo($ch, CURLINFO_HEADER_SIZE); curl_close($ch);
+    return [$st, strtolower(substr($raw, 0, $hs)), substr($raw, $hs, 6000)];
+}
+/** The acceptance page and the unsubscribe page, asked through the public address with a link that does not exist: are they reachable, do they let the browser send the referrer, and does the firewall let a button through?
+ *  'ok' false = a customer would meet «Access Denied». 'oneclick' = whether a POST without referrer (the one-click unsubscribe of mail providers) passes. Nothing is written by the pages: the link is not valid. */
+function sec_pubtest(): array {
+    $base = dl_base(); $o = ['at' => date('Y-m-d H:i'), 'ok' => true, 'issues' => [], 'oneclick' => null];
+    if (!str_starts_with($base, 'https://') || !function_exists('curl_init')) { $o['ok'] = null; $o['issues'][] = 'not run'; return $o; }
+    $fw = fn(array $r) => $r[0] === 403 && (stripos($r[2], 'Website Firewall') !== false || stripos($r[2], 'sucuri') !== false || preg_match('/Block ID|Access Denied/i', $r[2])); $id = fn(array $r) => preg_match('/\b([A-Z]{2,6}\d{2,4})\b/', strip_tags($r[2]), $m) ? $m[1] : '403';
+    foreach (['sign.php?t=' . str_repeat('a', 40), 'nl.php'] as $path) { $u = $base . '/' . $path; $name = strtok($path, '?');
+        $g = sec_pub_req($u, false, null); if ($g[0] === 0) { $o['ok'] = null; $o['issues'][] = $name . ': no answer'; continue; }
+        if ($fw($g)) { $o['ok'] = false; $o['issues'][] = $name . ': GET ' . $id($g); continue; }
+        if (preg_match('/^referrer-policy:\s*no-referrer\s*$/m', $g[1])) { $o['ok'] = false; $o['issues'][] = $name . ': Referrer-Policy no-referrer'; }
+        $p = sec_pub_req($u, true, $u); if ($fw($p)) { $o['ok'] = false; $o['issues'][] = $name . ': POST ' . $id($p); }
+        if ($name === 'nl.php') { $q = sec_pub_req($u, true, null); $o['oneclick'] = $q[0] === 0 ? null : !$fw($q); }
+    }
+    return $o;
+}
+/** Once a day from the scheduler (after 07:00): the result is kept for Diagnostics, and the administrators hear when a customer would be refused. */
+function sec_pubtest_daily(): ?string {
+    if (!function_exists('cp_setting')) return null; $today = date('Y-m-d'); $last = (array) json_decode((string) cp_setting('sec_pubtest', ''), true);
+    if ((int) date('G') < 7 || str_starts_with((string)($last['at'] ?? ''), $today)) return null;
+    $r = sec_pubtest(); cp_setting_set('sec_pubtest', json_encode($r));
+    if ($r['ok'] === false && function_exists('nf_push') && function_exists('nf_has') && nf_has()) { $admins = array_map('intval', array_column(all("SELECT id FROM customer_users WHERE role = 'admin' AND is_active = 1"), 'id'));
+        if ($admins) nf_push($admins, 'sec:pubtest', 'sec:pubtest:' . $today, t('nf.sec_pub_t'), t('nf.sec_pub_b', ['i' => implode(' · ', $r['issues'])]), url('admin_about', ['diag' => 1]), null, null); }
+    return $r['ok'] === null ? 'skipped' : ($r['ok'] ? 'ok' : 'refused');
+}
 /** A signed-in member of staff — without the redirect of require_staff(), so the mobile API can call the same functions. */
 function dl_staff(): array { $u = current_user(); if (!$u || !is_staff()) throw new RuntimeException(t('err.noaccess')); return $u; }
 

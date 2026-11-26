@@ -137,6 +137,13 @@ function diag_run(): array {
         if (function_exists('ai_can') && function_exists('ai_setting') && ai_setting('ai_enabled', '0') === '1') { $t = microtime(true); $ch = curl_init(rtrim((string) cfg('ai.base_url', 'https://api.anthropic.com'), '/') . '/v1/models'); curl_setopt_array($ch, [CURLOPT_NOBODY => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 6, CURLOPT_CONNECTTIMEOUT => 4, CURLOPT_SSL_VERIFYPEER => true]); curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE); $err = curl_error($ch); curl_close($ch); $ms = (int) round((microtime(true) - $t) * 1000); $R[] = diag_row('app', t('dg.ai_reach'), $code > 0 ? 'ok' : 'warn', $code > 0 ? 'HTTP ' . $code . ' · ' . $ms . ' ms' : $err, $code > 0 ? '' : t('dg.fix_ai')); }
     }, 'app', t('dg.config'));
 
+    $try(function () use (&$R) {   // R97-258: the public pages through the website firewall — tested now, and kept as the result of the day
+        if (!function_exists('sec_pubtest')) return; $r = sec_pubtest(); if (function_exists('cp_setting_set')) cp_setting_set('sec_pubtest', json_encode($r));
+        if (!$r || !array_key_exists('ok', $r)) { $R[] = diag_row('app', t('dg.pubtest'), 'warn', t('dg.pub_none'), ''); return; }
+        $one = $r['oneclick'] === false ? ' · ' . t('dg.pub_one_no') : ($r['oneclick'] === true ? ' · ' . t('dg.pub_one_ok') : '');
+        $R[] = diag_row('app', t('dg.pubtest'), $r['ok'] === false ? 'fail' : ($r['ok'] === null || $r['oneclick'] === false ? 'warn' : 'ok'), (string)$r['at'] . ' · ' . ($r['ok'] === false ? implode(' · ', (array)$r['issues']) : ($r['ok'] === null ? implode(' · ', (array)$r['issues']) : t('dg.pub_ok'))) . $one, $r['ok'] === false ? t('dg.fix_pub') : ($r['oneclick'] === false ? t('dg.fix_pub_one') : ''));
+    }, 'app', t('dg.pubtest'));
+
     // R69-002: block cache, house-keeping and the slow-pages log
     $try(function () use (&$R) {
         if (!function_exists('cache_backend')) return;

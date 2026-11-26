@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.259.1** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.260.0** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.260.0 | GAS-CP-R97-258 | 2026-11-26 | Daily self-test of the public pages through the website firewall, with a Diagnostics row and a notice to the administrators | — |
 | 1.259.1 | GAS-CP-R97-257 | 2026-11-26 | Acceptance by e-mail link and newsletter unsubscribe: buttons refused by the website firewall (Access Denied, FBP007) — fixed | — |
 | 1.259.0 | GAS-CP-R97-256 | 2026-11-25 | Security: asset import notice, authenticator step and register; wrong authenticator codes in the apps count toward the lock; authenticator obligatory for CEO, Managing Director and administrators; known devices on My Account | `install/migrate_cp_r97_256_asset_import_register_authenticator_roles.sql` |
 | 1.258.0 | GAS-CP-R97-255 | 2026-11-25 | Security: wrong passwords in the apps count toward the account lock; authenticator obligatory for the General Manager; notice to the CEO when the role is given; notice of a sign-in from a new device | `install/migrate_cp_r97_255_gm_authenticator_login_devices.sql` |

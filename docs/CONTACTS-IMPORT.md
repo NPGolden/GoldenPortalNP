@@ -4739,3 +4739,11 @@ Migration `migrate_cp_r97_256_asset_import_register_authenticator_roles.sql`, ke
 **Correction:** both pages send `Referrer-Policy: same-origin` — the referrer (which carries the link token) goes to goldensas.com only and is never sent to another site. **Rule:** no public page of the portal may use `no-referrer` when it has a form.
 
 **Not covered by the portal:** a one-click unsubscribe sent by a mail provider itself (POST without referrer by design) is still refused by the firewall unless `/customer/nl.php` is put on the allowlist in the firewall settings.
+
+## §537 Daily self-test of the public pages through the website firewall (GAS-CP-R97-258, v1.260.0)
+
+`sec_pubtest()` (`app/dl.php`) asks `sign.php?t=<40 × a>` and `nl.php` through `dl_base()` with a phone user agent: GET (answer, not a firewall page, `Referrer-Policy` not `no-referrer`), POST with referrer (must not be a firewall page), and for `nl.php` a POST without referrer (`oneclick`: does the one-click unsubscribe of mail providers pass). The link does not exist, so the pages write nothing. A firewall page = status 403 with «Website Firewall», «Access Denied» or «Block ID» in the body.
+
+`sec_pubtest_daily()` runs from `tick.php` once a day after 07:00, keeps the result in the setting `sec_pubtest` and notifies the administrators (`sec:pubtest`) when `ok` is false. Diagnostics (`diag_run`) runs the test at once: row «Public pages through the website firewall» — fail when a button is refused, warn when only the one-click unsubscribe is refused.
+
+Firewall allowlist for the one-click unsubscribe (owner action): Website Security › Firewall › Access control › Allow URL paths → `/customer/nl.php`.
