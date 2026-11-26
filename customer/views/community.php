@@ -137,7 +137,7 @@ document.addEventListener('click',function(ev){var b=ev.target.closest?ev.target
   <?php soc_badges_refresh($me); $myB = soc_badges($me); ?>
   <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;"><?php foreach (SOC_BADGES as $code => [$icon]): $have = isset($myB[$code]); ?><span class="chip" style="<?= $have ? '' : 'opacity:.35;' ?>" title="<?= e(t('soc.b_' . $code)) ?><?= $have ? ' · ' . e(fmt_date($myB[$code])) : '' ?>"><?= $icon ?> <?= e(t('soc.b_' . $code)) ?></span><?php endforeach; ?></div>
   <h3 class="ac-h"><?= tt('soc.colleagues') ?></h3>
-  <ul style="list-style:none;margin:0;padding:0;display:grid;gap:3px;max-height:420px;overflow:auto;"><?php foreach (soc_staff() as $uid => $su): $bh = soc_badges_html($uid, 8); if (!$bh && $uid !== $me) continue; ?><li><?= avatar_html($uid, (string)$su['full_name'], 18, 'ava--inline') ?> <?= e($su['full_name']) ?> <span style="font-size:15px;"><?= $bh ?></span></li><?php endforeach; ?></ul>
+  <ul style="list-style:none;margin:0;padding:0;display:grid;gap:3px;max-height:420px;overflow:auto;"><?php if (function_exists('soc_badges_prime')) soc_badges_prime(array_keys(soc_staff()));   /* R97-265 */ foreach (soc_staff() as $uid => $su): $bh = soc_badges_html($uid, 8); if (!$bh && $uid !== $me) continue; ?><li><?= avatar_html($uid, (string)$su['full_name'], 18, 'ava--inline') ?> <?= e($su['full_name']) ?> <span style="font-size:15px;"><?= $bh ?></span></li><?php endforeach; ?></ul>
 </div>
 <?php if ($hr): ?>
 <div class="card" id="onboarding">

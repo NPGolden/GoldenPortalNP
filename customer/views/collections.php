@@ -121,7 +121,7 @@ layout_head(t('col.title'), 'collections');
   <div class="table-scroll"><table class="tbl col-open" data-nosort>
     <thead><tr><th><?= tt('pi.no') ?></th><th><?= tt('pi.description') ?></th><th><?= tt('pi.issue_date') ?></th><th><?= tt('pi.due') ?></th><th class="num"><?= tt('col.age') ?></th><th class="num"><?= tt('fr.gross') ?></th><th class="num"><?= tt('pi.paid_lbl') ?></th><th class="num"><?= tt('fr.open') ?></th><th><?= tt('col.promise') ?></th><th><?= tt('col.next') ?></th><th><?= tt('col.last_fu') ?></th><th></th></tr></thead>
     <tbody>
-    <?php $gv = null; $gp = null; $gSum = 0.0; $gN = 0;
+    <?php $gv = null; $gp = null; $gSum = 0.0; $gN = 0; if (function_exists('col_followups_prime')) col_followups_prime(array_column($open, 'id'));   /* R97-265: one statement for the history of all rows */
     $groupFoot = function () use (&$gSum, &$gN, $m) { if ($gN) echo '<tr class="col-gsum"><td colspan="7" class="hint">' . e(t('col.n_items', ['n' => $gN])) . '</td><td class="num"><b>' . e($m($gSum)) . '</b></td><td colspan="4"></td></tr>'; $gSum = 0.0; $gN = 0; };
     foreach ($open as $r):
       if ($r['vessel_id'] !== $gv || $r['project_id'] !== $gp): $groupFoot(); $gv = $r['vessel_id']; $gp = $r['project_id']; ?>

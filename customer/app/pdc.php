@@ -174,7 +174,7 @@ function pdc_read_run(int $cid): bool {
         if (!one("SELECT id FROM po_dchecks WHERE id = ? AND status = 'reading'", [$cid])) return true;   // discarded while it was being read
         stk_tx(fn() => pdc_fill($cid, $P)); @unlink($path);
         po_event($oid, 'dcheck', t('pdc.ev_read', ['f' => mb_substr((string)$c['file_name'], 0, 80), 'n' => count($P['rows'])]));
-    } catch (Throwable $e) { error_log('[pdc] ' . $e->getMessage()); $fail(t('ai.failed')); }
+    } catch (Throwable $e) { error_log('[pdc] ' . $e->getMessage()); try { if (function_exists('db_revive')) db_revive(); $fail(t('ai.failed')); } catch (Throwable $e2) { error_log('[pdc] ' . $e2->getMessage()); } }   // R97-265: the failure is written on a live connection, so the check does not stay on «reading»
     return true;
 }
 function pdc_prompt(): string {

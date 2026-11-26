@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.262.0';
-const CP_BUILD   = '2026-11-24';
+const CP_VERSION = '1.263.0';
+const CP_BUILD   = '2026-11-27';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-265', 'version' => '1.263.0', 'date' => '2026-11-27', 'title' => 'Health report corrections: delivery check keeps its database connection after a long assistant reading; the session is released while the assistant works; slow pages show session wait and database connection; projects, new invoice, community and collections read in batches; daily report shows the web server values', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-264', 'version' => '1.262.0', 'date' => '2026-11-26', 'title' => 'Recruiting offer: job description selector — another approved job description for the offer without moving the applicant', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-263', 'version' => '1.261.2', 'date' => '2026-11-26', 'title' => 'Release updater: signed call through the website firewall, status call, house-keeping of old release files and backups', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-262', 'version' => '1.261.1', 'date' => '2026-11-26', 'title' => 'Job descriptions: «Approve all stages as CEO» always asks the authenticator code', 'db' => null, 'check' => null],

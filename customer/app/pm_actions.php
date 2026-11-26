@@ -2055,7 +2055,18 @@ function pm_delete_project(int $id): void {
 
 /** What a project deletion would remove — for the confirmation text. */
 /** R72-007: every record that hangs on a project — what a GEN- (vessel general) project may be carrying. Counts only, per table that has one. */
+/** R97-265: the same figures for a list of projects — one grouped statement per table instead of one per table and project (card of the GEN- projects). */
+function pm_project_refs_prime(array $ids): void {
+    $ids = array_values(array_unique(array_filter(array_map('intval', $ids)))); if (!$ids) return;
+    foreach ($ids as $i) $GLOBALS['_prf'][$i] = [];
+    foreach (PM_PROJECT_REF_TABLES as $tb => $k) foreach (array_chunk($ids, 500) as $part) {
+        try { foreach (all("SELECT project_id, COUNT(*) n FROM `$tb` WHERE project_id IN (" . implode(',', $part) . ') GROUP BY project_id') as $r) if ((int)$r['n']) $GLOBALS['_prf'][(int)$r['project_id']][$k] = (int)$r['n']; } catch (Throwable $e) {}
+    }
+}
+const PM_PROJECT_REF_TABLES = ['offers' => 'offers', 'fsr_reports' => 'fsr', 'isr_reports' => 'isr', 'acc_reports' => 'acc', 'tickets' => 'tickets', 'timesheets' => 'timesheets', 'documents' => 'documents', 'subprojects' => 'subs', 'drawing_requests' => 'drawings',
+             'job_orders' => 'jobs', 'production_orders' => 'po', 'owner_approvals' => 'approvals', 'class_submittals' => 'submittals', 'plan_entries' => 'plan', 'weekly_notes' => 'notes', 'tasks' => 'tasks', 'proformas' => 'proformas', 'sp_files' => 'files'];
 function pm_project_refs(int $id): array {
+    if (isset($GLOBALS['_prf'][$id])) return $GLOBALS['_prf'][$id];
     $out = [];
     foreach (['offers' => 'offers', 'fsr_reports' => 'fsr', 'isr_reports' => 'isr', 'acc_reports' => 'acc', 'tickets' => 'tickets', 'timesheets' => 'timesheets', 'documents' => 'documents', 'subprojects' => 'subs', 'drawing_requests' => 'drawings',
              'job_orders' => 'jobs', 'production_orders' => 'po', 'owner_approvals' => 'approvals', 'class_submittals' => 'submittals', 'plan_entries' => 'plan', 'weekly_notes' => 'notes', 'tasks' => 'tasks', 'proformas' => 'proformas', 'sp_files' => 'files'] as $tb => $k) {

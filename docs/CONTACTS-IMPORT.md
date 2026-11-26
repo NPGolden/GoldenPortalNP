@@ -4789,3 +4789,22 @@ Fail = firewall page (403 with «Website Firewall» / «Access Denied» / «Bloc
 ## §543 Recruiting offer: job description selector (GAS-CP-R97-264, v1.262.0)
 
 `rcr_offer_jd_text($a, $lc, ?int $pick)` builds the text from the chosen approved job description (else the one of the vacancy) and returns `title`. On `rcr_application`, card «Offer», a GET form (`jd=<id>`) fills position and text in the offer form and adds the hidden `jd_id`; nothing is written until `rcr_offer_save`, which accepts `jd_id` only for a job description with an approved issue (`jd_current`), sets `rc_offers.jd_id` on the draft (or on the new offer) and logs `offer_jd`. The existing rule applies: a changed draft loses its approval. The applicant and the vacancy are not touched.
+
+## §544 Corrections after the health report of 26/11/2026 (GAS-CP-R97-265, v1.263.0)
+
+| # | Finding | Change |
+|---|---|---|
+| 1 | `[pdc] MySQL server has gone away`, check left on «reading» | `db(bool $fresh = false)` and `db_revive()` (`app/db.php`): one `SELECT 1`; a dead connection is replaced. `ai_http()` calls it after a wait of more than 20 s (never inside a transaction). The `catch` of `pdc_read_run()` revives the connection before it writes the failure, and no longer throws. |
+| 2 | A page that waited 13.7 s in «start», cause unknown | `session_boot()` times `session_start()` (`cp_sess_ms`), `db()` times the connection (`cp_conn_ms`); both are written in the 8th field of `storage/slow-pages.log` (`sess=`, `conn=`) and shown in the diagnostics row, the daily report and Settings › System health › Slow pages (keys `ph.c_sess`, `ph.c_conn`). `sess_release()` / `sess_resume()` (`app/auth.php`): `ai_http()` gives the session back during the call and takes it again afterwards (only on a web request, with an open session, before any output; `session_cache_limiter('')` keeps the cache headers of the page). |
+| 3 | Build date not raised | `CP_BUILD`, `VERSION`, head line of `CHANGELOG.md`. |
+| 4 | `projects`, 18 COUNT statements per GEN- project | `pm_project_refs_prime($ids)` — one grouped statement per table (`PM_PROJECT_REF_TABLES`); `pm_project_refs()` answers from it. Called in `views/projects.php` for the GEN- card. |
+| 5 | `invoice_new`, about seven statements per project | `pty_identities_many($pids)` (`app/party.php`): projects, vessel identities and names in batches; identities of an organisation once per organisation through `iv_list()`; a project without a stored party still goes through `pty_project()`. Same rows and order as `pty_identities()`. |
+| 6 | `community` | `soc_feed()` reads reactions, comments and language versions of the posts shown in three statements; `soc_badges_prime()` reads the badges of the team in one (`soc_badges_refresh()` drops the kept answer of the person when it adds a badge). Polls are read per post as before. |
+| 7 | `collections`, history per open row | `col_followups_prime($ids)`; `col_followup_save()` drops the kept answer. |
+| 8 | Daily report: «opcache off · secure cookie off · max_execution_time 0 s» | `diag_web_values()`: a run in the browser reads the three values and keeps them (setting `diag_web`); a run on the command line shows the kept ones with their date (`dg.web_as_of`) or says that none were read (`dg.web_none`). |
+
+**Tested here:** `php -l` on every changed file; the five language files hold the same number of keys (13 866); release and resume of the session on a local PHP server (a second request of the same session answered in 2 ms while the first waited 3 s; the value written after the resume was saved; the cache header of the page stayed).
+
+**Not tested** (no copy of the live database in the session): every statement of the batches against MariaDB, the reconnect after a real time-out of the database server, the pages themselves in a browser. After the release: open Projects (as administrator), New invoice, Community and Collections once and compare with the day before; press ▶ Run diagnostics once in the browser so the report of the next morning shows the web values.
+
+**Security review.** No new entry point, no new right, no inline script. The batches build `IN (…)` lists from integers only (`intval`). The session is given back only around the call to the assistant and is the same session afterwards (same id, same cookie flags). Proposed, not done: set the secure flag of the session cookie also when the configured base address is https (`session_boot()` reads only the HTTPS variable of the server) — no effect on speed.

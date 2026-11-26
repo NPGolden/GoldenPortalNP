@@ -11,6 +11,19 @@ function cp_store_proven(string $dir): bool {
     return $ok;
 }
 
+/** R97-265: give the session back while this request waits on another server, and take it again afterwards. Only on a web request with an open
+ *  session and before any output — otherwise nothing is done and false is returned, so the caller does not resume. */
+function sess_release(): bool {
+    if (PHP_SAPI === 'cli' || session_status() !== PHP_SESSION_ACTIVE || headers_sent()) return false;
+    session_write_close(); return true;
+}
+function sess_resume(): void {
+    if (session_status() === PHP_SESSION_ACTIVE || headers_sent()) return;
+    $keep = $_SESSION ?? [];
+    try { session_cache_limiter(''); session_start(); }   // '' = the cache headers of the page stay as they were set
+    catch (Throwable $e) { $_SESSION = $keep; error_log('[session] resume: ' . $e->getMessage()); }
+    if (session_status() !== PHP_SESSION_ACTIVE) $_SESSION = $keep;
+}
 function session_boot(): void {
     if (session_status() === PHP_SESSION_ACTIVE) return;
 
@@ -29,7 +42,7 @@ function session_boot(): void {
     session_name((string)cfg('app.session_name', 'GASCP'));
     session_set_cookie_params(['httponly' => true, 'samesite' => 'Lax',
         'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off')]);
-    session_start();
+    $ts = microtime(true); session_start(); $GLOBALS['cp_sess_ms'] = (microtime(true) - $ts) * 1000;   // R97-265: time waited for the session (another request of the same person still running), shown apart in the slow-pages log
     if (!empty($_SESSION['last_seen']) && time() - $_SESSION['last_seen'] > $idle) sec_end_session('expired', 'login.idle');
     /* R49-001: absolute lifetime, device binding and the per-user epoch ("sign out everywhere") are checked on every request. */
     if (!empty($_SESSION['cu_id'])) {

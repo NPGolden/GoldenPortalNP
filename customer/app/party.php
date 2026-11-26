@@ -62,6 +62,29 @@ function pty_identities(?int $orgId, ?int $vid, ?int $pid = null): array {
     if ($vid) $put(iv_list('vessel', $vid, true), 'vessel', null, (string) scalar('SELECT name FROM vessels WHERE id = ?', [$vid]));
     return $out;
 }
+/** R97-265: pty_identities() for a list of projects — [project id => [identity id => row]], same rows and order as one call per project.
+ *  The projects are read in one statement, the identities of the vessels in one, the names in two; the identities of an organisation are read
+ *  once per organisation (not once per project). A project without a stored party goes through pty_project() as before (it stores the party). */
+function pty_identities_many(array $pids): array {
+    $pids = array_values(array_unique(array_filter(array_map('intval', $pids)))); $out = []; if (!$pids || !pty_has()) return $out;
+    $P = []; foreach (array_chunk($pids, 500) as $part) foreach (all('SELECT id, vessel_id, billing_org_id FROM projects WHERE id IN (' . implode(',', $part) . ')') as $r) $P[(int)$r['id']] = ['org' => (int)($r['billing_org_id'] ?? 0), 'vid' => (int)($r['vessel_id'] ?? 0)];
+    foreach ($P as $pid => $x) if (!$x['org']) { $one = pty_project($pid); $P[$pid] = ['org' => (int)($one['org_id'] ?? 0), 'vid' => (int)($one['vessel_id'] ?? 0)]; }
+    $orgIds = array_values(array_unique(array_filter(array_column($P, 'org')))); $vids = array_values(array_unique(array_filter(array_column($P, 'vid'))));
+    $oName = []; foreach (array_chunk($orgIds, 500) as $part) foreach (all('SELECT id, name FROM companies WHERE id IN (' . implode(',', $part) . ')') as $r) $oName[(int)$r['id']] = (string)$r['name'];
+    $vName = []; $vIv = [];
+    foreach (array_chunk($vids, 500) as $part) {
+        foreach (all('SELECT id, name FROM vessels WHERE id IN (' . implode(',', $part) . ')') as $r) $vName[(int)$r['id']] = (string)$r['name'];
+        if (function_exists('iv_has') && iv_has()) foreach (all("SELECT * FROM invoicing_details WHERE owner_type = 'vessel' AND owner_id IN (" . implode(',', $part) . ') AND is_active = 1 ORDER BY is_default DESC, is_active DESC, label') as $r) $vIv[(int)$r['owner_id']][] = $r;
+    }
+    $oIv = [];
+    foreach ($pids as $pid) {
+        if (!isset($P[$pid])) continue; $org = $P[$pid]['org']; $vid = $P[$pid]['vid']; $o = [];
+        if ($org) { if (!isset($oIv[$org])) $oIv[$org] = iv_list('company', $org, true); foreach ($oIv[$org] as $r) if (!isset($o[(int)$r['id']])) $o[(int)$r['id']] = array_replace($r, ['src' => 'party', 'org_id' => $org, 'org_name' => (string)($oName[$org] ?? '')]); }
+        if ($vid) foreach ($vIv[$vid] ?? [] as $r) if (!isset($o[(int)$r['id']])) $o[(int)$r['id']] = array_replace($r, ['src' => 'vessel', 'org_id' => null, 'org_name' => (string)($vName[$vid] ?? '')]);
+        $out[$pid] = $o;
+    }
+    return $out;
+}
 function pty_identity_label(array $r): string { $p = ['party' => '★ ', 'vessel' => '⚓ ', 'other' => '🏢 '][$r['src'] ?? ''] ?? ''; return $p . iv_label($r) . ($r['src'] === 'other' && !empty($r['org_name']) ? ' — ' . $r['org_name'] : ''); }
 
 /** Save party + identity of a project from its form (fields billing_org_id, invoicing_id). */

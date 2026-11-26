@@ -124,7 +124,13 @@ function ai_http(array $body, int $timeout = 60): array {   // R79-002: longer t
     $ch = curl_init($base . '/v1/messages');
     curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => json_encode($body, JSON_UNESCAPED_UNICODE), CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => $timeout, CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_HTTPHEADER => array_merge(['content-type: application/json', 'anthropic-version: 2023-06-01', 'x-api-key: ' . ai_key()], ai_setting('ai_workspace') !== '' ? ['anthropic-workspace-id: ' . ai_setting('ai_workspace')] : []), CURLOPT_SSL_VERIFYPEER => true]);   // R50-003: organisation-scoped keys need the workspace id
+    /* R97-265: the answer of the assistant can take from seconds to minutes. The session is released for that time, so another page of the
+     * same person is not held back at its start, and taken again afterwards (flash messages and the request token need it). After a long
+     * wait the database connection is tested and, when the server has closed it meanwhile, opened again. */
+    $rel = function_exists('sess_release') && sess_release(); $t0 = microtime(true);
     $raw = curl_exec($ch); if (function_exists('perf_out')) perf_out($ch, 'AI assistant'); $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE); $err = curl_error($ch); curl_close($ch);
+    if ($rel) sess_resume();
+    if (microtime(true) - $t0 > 20 && function_exists('db_revive')) { try { if (!db()->inTransaction()) db_revive(); } catch (Throwable $e) {} }
     if ($raw === false) return ['_error' => 'network: ' . $err];
     $d = json_decode((string)$raw, true); if (!is_array($d)) return ['_error' => 'bad response ' . $code];
     if ($code >= 300) return ['_error' => (string)($d['error']['message'] ?? ('HTTP ' . $code))];

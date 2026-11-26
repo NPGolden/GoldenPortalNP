@@ -42,7 +42,7 @@ function db_meter_finish(string $page): void {
     $s = db_stats(); perf_finish($page, $s);   // R97-046: every page feeds the trend
     if ($s['page_ms'] < 2000 && $s['queries'] < 150) return; $ph = perf_phases();
     $f = dirname(__DIR__) . '/storage/slow-pages.log'; $u = function_exists('current_user') ? current_user() : null;
-    @file_put_contents($f, date('Y-m-d H:i:s') . "\t" . $page . "\t" . $s['page_ms'] . " ms\t" . $s['queries'] . " q\t" . $s['db_ms'] . " db ms\t" . (string)($u['email'] ?? '-') . "\t" . implode(' | ', array_map(fn($x) => $x[0] . ' ms ' . $x[1], $s['slow'])) . "\tboot=" . $ph['boot'] . ';prep=' . $ph['prep'] . ';render=' . $ph['render'] . ';out=' . $ph['out'] . ';outn=' . $ph['outn'] . "\n", FILE_APPEND | LOCK_EX);   // R97-046: 8th field = where the time went
+    @file_put_contents($f, date('Y-m-d H:i:s') . "\t" . $page . "\t" . $s['page_ms'] . " ms\t" . $s['queries'] . " q\t" . $s['db_ms'] . " db ms\t" . (string)($u['email'] ?? '-') . "\t" . implode(' | ', array_map(fn($x) => $x[0] . ' ms ' . $x[1], $s['slow'])) . "\tboot=" . $ph['boot'] . ';prep=' . $ph['prep'] . ';render=' . $ph['render'] . ';out=' . $ph['out'] . ';outn=' . $ph['outn'] . ';sess=' . (int) round((float)($GLOBALS['cp_sess_ms'] ?? 0)) . ';conn=' . (int) round((float)($GLOBALS['cp_conn_ms'] ?? 0)) . "\n", FILE_APPEND | LOCK_EX);   // R97-046: 8th field = where the time went · R97-265: sess = waited for the session, conn = reaching the database (both inside boot)
 }
 /** Slowest pages for Diagnostics: last 200 lines, sorted by ms. */
 function db_slow_pages(int $n = 8): array {

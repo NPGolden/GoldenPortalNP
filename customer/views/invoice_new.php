@@ -18,7 +18,7 @@ $projects = all("SELECT p.id, p.project_code, p.name, p.vessel_id, p.customer_id
 $subs = all('SELECT s.id, s.project_id, s.code, s.name, s.status FROM subprojects s JOIN projects p ON p.id = s.project_id WHERE ' . sp_pick_cond('s', $curS) . " AND (p.status IN ('active','quoted','onhold') OR p.id = ?) ORDER BY SUBSTRING_INDEX(s.code,'.',1), CAST(SUBSTRING_INDEX(s.code,'.',-1) AS UNSIGNED), s.code", [$curP]);
 $ivs = function_exists('iv_has') && iv_has() ? all("SELECT i.id, i.legal_name, i.vat_no, i.vat_pct, i.owner_type, i.owner_id FROM invoicing_details i WHERE i.is_active = 1 AND i.owner_type IN ('vessel','customer','company') ORDER BY i.legal_name") : [];
 // R95-003: identities are offered per project — the party's first (★), then the vessel's (⚓), then other organisations linked to the vessel (🏢); the JS narrows the list to the chosen project
-$ivByProject = []; if (function_exists('pty_has') && pty_has()) foreach ($projects as $pp) { $PP = pty_project((int)$pp['id']); foreach (pty_identities($PP['org_id'], $PP['vessel_id'], (int)$pp['id']) as $iid => $ivr) $ivByProject[(int)$pp['id']][$iid] = pty_identity_label($ivr); }
+$ivByProject = []; if (function_exists('pty_has') && pty_has()) foreach (pty_identities_many(array_column($projects, 'id')) as $ppId => $ivRows) foreach ($ivRows as $iid => $ivr) $ivByProject[(int)$ppId][$iid] = pty_identity_label($ivr);   // R97-265: in batches — before, about seven statements per project
 $vatDef = 24;
 // R95-006 — the same form registers a customer CREDIT NOTE: ?doc=credit (standalone) or ?credit_of=<invoice> (for an invoice: project, party, identity and VAT follow it)
 $isCr = function_exists('cn_has') && cn_has() && (($_GET['doc'] ?? '') === 'credit' || !empty($_GET['credit_of']));

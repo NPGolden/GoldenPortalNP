@@ -11,6 +11,20 @@ function diag_fmt_bytes(int $b): string { return $b >= 1073741824 ? round($b / 1
 function diag_error_log_path(): string { return dirname(__DIR__) . '/storage/php-errors.log'; }
 
 /** Run everything; returns ['rows' => [...], 'ms' => total time, 'at' => datetime]. */
+/** R97-265: max_execution_time, opcache and the secure flag of the session cookie as the WEB server has them. A run in the browser reads them and keeps them
+ *  (setting diag_web); a run from the command line (the daily report of the clock job) shows the kept ones with their date, or says that none were kept yet —
+ *  the values of the command line (0 s, off, off) said nothing about the portal. */
+function diag_web_values(): array {
+    static $W = null; if ($W !== null) return $W;
+    if (PHP_SAPI !== 'cli') {
+        $W = ['have' => true, 'met' => (string) ini_get('max_execution_time'), 'opc' => (bool)(function_exists('opcache_get_status') && @opcache_get_status(false)), 'sec' => (bool) ini_get('session.cookie_secure'), 'note' => ''];
+        try { if (function_exists('cp_setting_set')) cp_setting_set('diag_web', json_encode(['met' => $W['met'], 'opc' => $W['opc'], 'sec' => $W['sec'], 'at' => date('Y-m-d')])); } catch (Throwable $e) {}
+        return $W;
+    }
+    $k = null; try { $k = function_exists('cp_setting') ? json_decode((string) cp_setting('diag_web', ''), true) : null; } catch (Throwable $e) {}
+    if (is_array($k) && isset($k['met'], $k['at'])) return $W = ['have' => true, 'met' => (string)$k['met'], 'opc' => !empty($k['opc']), 'sec' => !empty($k['sec']), 'note' => ' · ' . t('dg.web_as_of', ['d' => date('d/m/Y', (int) strtotime((string)$k['at']))])];
+    return $W = ['have' => false, 'met' => '', 'opc' => false, 'sec' => false, 'note' => ' · ' . t('dg.web_none')];
+}
 function diag_run(): array {
     $t0 = microtime(true); $R = []; $storage = dirname(__DIR__) . '/storage';
     $try = function (callable $f, string $group, string $name) use (&$R) { try { $t = microtime(true); $f(); } catch (Throwable $e) { $R[] = diag_row($group, $name, 'warn', t('dg.check_failed') . ': ' . mb_substr($e->getMessage(), 0, 200)); } };
@@ -109,7 +123,8 @@ function diag_run(): array {
 
     /* ---------------------------------------------------------------- application */
     $try(function () use (&$R, $storage) {
-        $R[] = diag_row('app', 'PHP', version_compare(PHP_VERSION, '8.1.0', '>=') ? 'ok' : 'fail', PHP_VERSION . ' · memory_limit ' . ini_get('memory_limit') . ' · max_execution_time ' . ini_get('max_execution_time') . ' s · upload ' . ini_get('upload_max_filesize') . ' / post ' . ini_get('post_max_size') . ' / ' . ini_get('max_file_uploads') . ' files · opcache ' . (function_exists('opcache_get_status') && @opcache_get_status(false) ? t('dg.on') : t('dg.off')), version_compare(PHP_VERSION, '8.1.0', '>=') ? '' : t('dg.fix_php'));
+        $W = diag_web_values();   // R97-265: three values differ between the web server and the command line (the daily report runs from the clock job) — the report shows the ones of the web server
+        $R[] = diag_row('app', 'PHP', version_compare(PHP_VERSION, '8.1.0', '>=') ? 'ok' : 'fail', PHP_VERSION . ' · memory_limit ' . ini_get('memory_limit') . ($W['have'] ? ' · max_execution_time ' . $W['met'] . ' s' : '') . ' · upload ' . ini_get('upload_max_filesize') . ' / post ' . ini_get('post_max_size') . ' / ' . ini_get('max_file_uploads') . ' files' . ($W['have'] ? ' · opcache ' . ($W['opc'] ? t('dg.on') : t('dg.off')) : '') . $W['note'], version_compare(PHP_VERSION, '8.1.0', '>=') ? '' : t('dg.fix_php'));
         $ext = []; foreach (['pdo_mysql', 'mbstring', 'curl', 'sodium', 'zip', 'json', 'openssl', 'gd', 'fileinfo', 'intl'] as $e) if (!extension_loaded($e)) $ext[] = $e;
         $R[] = $ext ? diag_row('app', t('dg.extensions'), in_array('pdo_mysql', $ext, true) || in_array('mbstring', $ext, true) ? 'fail' : 'warn', t('dg.missing') . ': ' . implode(', ', $ext), t('dg.fix_ext')) : diag_row('app', t('dg.extensions'), 'ok', t('dg.all_present'));
         $mem = (int) ini_get('memory_limit'); if ($mem > 0 && $mem < 128) $R[] = diag_row('app', 'memory_limit', 'warn', ini_get('memory_limit'), t('dg.fix_memory'));
@@ -133,7 +148,7 @@ function diag_run(): array {
 
     $try(function () use (&$R) {
         $tok = (string) cfg('update.token', ''); $https = str_starts_with((string) cfg('app.base_url', ''), 'https://');
-        $R[] = diag_row('app', t('dg.config'), (strlen($tok) >= 32 && $https) ? 'ok' : 'warn', ($https ? 'https' : 'http') . ' · ' . t('dg.update_token') . ' ' . (strlen($tok) >= 32 ? t('dg.set') : t('dg.weak')) . ' · ' . t('dg.cookie_secure') . ' ' . (ini_get('session.cookie_secure') ? t('dg.on') : t('dg.off')), (strlen($tok) >= 32 && $https) ? '' : t('dg.fix_config'));
+        $R[] = diag_row('app', t('dg.config'), (strlen($tok) >= 32 && $https) ? 'ok' : 'warn', ($https ? 'https' : 'http') . ' · ' . t('dg.update_token') . ' ' . (strlen($tok) >= 32 ? t('dg.set') : t('dg.weak')) . (($W = diag_web_values())['have'] ? ' · ' . t('dg.cookie_secure') . ' ' . ($W['sec'] ? t('dg.on') : t('dg.off')) : '') . $W['note'], (strlen($tok) >= 32 && $https) ? '' : t('dg.fix_config'));
         if (function_exists('ai_can') && function_exists('ai_setting') && ai_setting('ai_enabled', '0') === '1') { $t = microtime(true); $ch = curl_init(rtrim((string) cfg('ai.base_url', 'https://api.anthropic.com'), '/') . '/v1/models'); curl_setopt_array($ch, [CURLOPT_NOBODY => true, CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 6, CURLOPT_CONNECTTIMEOUT => 4, CURLOPT_SSL_VERIFYPEER => true]); curl_exec($ch); $code = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE); $err = curl_error($ch); curl_close($ch); $ms = (int) round((microtime(true) - $t) * 1000); $R[] = diag_row('app', t('dg.ai_reach'), $code > 0 ? 'ok' : 'warn', $code > 0 ? 'HTTP ' . $code . ' · ' . $ms . ' ms' : $err, $code > 0 ? '' : t('dg.fix_ai')); }
     }, 'app', t('dg.config'));
 
@@ -151,7 +166,7 @@ function diag_run(): array {
         $R[] = diag_row('app', t('dg.cache'), is_writable(cache_dir()) || cache_backend() === 'apcu' ? 'ok' : 'warn', (cache_backend() === 'apcu' ? 'APCu' : t('dg.cache_files')) . ($n === '-' ? '' : ' · ' . $n . ' ' . t('dg.cache_entries')), is_writable(cache_dir()) || cache_backend() === 'apcu' ? '' : t('dg.fix_storage'));
         $hk = (string) cp_setting('hk_last', ''); $R[] = diag_row('app', t('dg.housekeeping'), $hk === '' ? 'warn' : (substr($hk, 0, 10) < date('Y-m-d', strtotime('-2 days')) ? 'warn' : 'ok'), $hk === '' ? t('dg.hk_never') : $hk);
         $sp = db_slow_pages(8); if (!$sp) { $R[] = diag_row('app', t('dg.slow_pages'), 'ok', t('dg.slow_none')); return; }
-        $R[] = diag_row('app', t('dg.slow_pages'), $sp[0]['ms'] > 8000 ? 'warn' : 'ok', implode("\n", array_map(fn($r) => $r['at'] . ' · ' . $r['page'] . ' · ' . $r['ms'] . ' ms · ' . $r['q'] . ' q · db ' . $r['db'] . ' ms' . (!empty($r['ph']) ? ' · other servers ' . (int)($r['ph']['out'] ?? 0) . ' ms · start ' . (int)($r['ph']['boot'] ?? 0) . ' / data ' . (int)($r['ph']['prep'] ?? 0) . ' / draw ' . (int)($r['ph']['render'] ?? 0) . ' ms' : '') . ($r['slow'] ? ' · ' . mb_substr($r['slow'], 0, 160) : ''), $sp)), $sp[0]['ms'] > 8000 ? t('dg.fix_slow') : '');
+        $R[] = diag_row('app', t('dg.slow_pages'), $sp[0]['ms'] > 8000 ? 'warn' : 'ok', implode("\n", array_map(fn($r) => $r['at'] . ' · ' . $r['page'] . ' · ' . $r['ms'] . ' ms · ' . $r['q'] . ' q · db ' . $r['db'] . ' ms' . (!empty($r['ph']) ? ' · other servers ' . (int)($r['ph']['out'] ?? 0) . ' ms · start ' . (int)($r['ph']['boot'] ?? 0) . ' / data ' . (int)($r['ph']['prep'] ?? 0) . ' / draw ' . (int)($r['ph']['render'] ?? 0) . ' ms' . (isset($r['ph']['sess']) ? ' · of the start: session wait ' . (int)$r['ph']['sess'] . ' / database connection ' . (int)($r['ph']['conn'] ?? 0) . ' ms' : '') : '') . ($r['slow'] ? ' · ' . mb_substr($r['slow'], 0, 160) : ''), $sp)), $sp[0]['ms'] > 8000 ? t('dg.fix_slow') : '');
     }, 'app', t('dg.slow_pages'));
 
     // the error log the portal keeps since R69-001

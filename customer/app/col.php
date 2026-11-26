@@ -127,8 +127,15 @@ function col_projects(array $f = []): array {
     return array_values($P);
 }
 /* ------------------------------------------------------------------ follow-ups */
-function col_followups(int $piId): array { return col_has() ? all('SELECT * FROM pi_followups WHERE proforma_id = ? ORDER BY id DESC', [$piId]) : []; }
+/** R97-265: the follow-up history of all the rows of a list in one statement; col_followups() answers from it. A save in the same request drops it. */
+function col_followups_prime(array $piIds): void {
+    $piIds = array_values(array_unique(array_filter(array_map('intval', $piIds)))); if (!$piIds || !col_has()) return;
+    foreach ($piIds as $i) $GLOBALS['_colfu'][$i] = [];
+    foreach (array_chunk($piIds, 500) as $part) foreach (all('SELECT * FROM pi_followups WHERE proforma_id IN (' . implode(',', $part) . ') ORDER BY id DESC') as $r) $GLOBALS['_colfu'][(int)$r['proforma_id']][] = $r;
+}
+function col_followups(int $piId): array { if (isset($GLOBALS['_colfu'][$piId])) return $GLOBALS['_colfu'][$piId]; return col_has() ? all('SELECT * FROM pi_followups WHERE proforma_id = ? ORDER BY id DESC', [$piId]) : []; }
 function col_followup_save(int $piId, ?string $next, ?string $promise, string $note): void {
+    unset($GLOBALS['_colfu']);
     if (!col_can()) throw new RuntimeException(t('err.noaccess'));
     [$sc, $sa] = scope_sql('p'); $pi = one("SELECT pi.id, pi.pi_no FROM proformas pi JOIN projects p ON p.id = pi.project_id WHERE pi.id = ? AND {$sc}", array_merge([$piId], $sa)); if (!$pi) throw new RuntimeException(t('err.notfound'));
     $d = fn(?string $v) => ($v && preg_match('/^\d{4}-\d{2}-\d{2}$/', $v) && strtotime($v)) ? $v : null;

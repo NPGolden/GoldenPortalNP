@@ -12,16 +12,20 @@ function cfg(string $path, $default = null) {
     return $node;
 }
 
-function db(): PDO {
+/** R97-265: $fresh = true drops the kept connection and opens a new one (see db_revive). */
+function db(bool $fresh = false): PDO {
     static $pdo = null;
+    if ($fresh) $pdo = null;
     if ($pdo) return $pdo;
     $dsn = sprintf('mysql:host=%s;port=%d;dbname=%s;charset=%s',
         cfg('db.host'), (int)cfg('db.port'), cfg('db.name'), cfg('db.charset'));
+    $tc = microtime(true);
     $pdo = new PDO($dsn, cfg('db.user'), cfg('db.pass'), [
         PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
         PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
         PDO::ATTR_EMULATE_PREPARES   => false,
     ]);
+    $GLOBALS['cp_conn_ms'] = (float)($GLOBALS['cp_conn_ms'] ?? 0) + (microtime(true) - $tc) * 1000;   // R97-265: time to reach the database server, shown apart in the slow-pages log
     try {   // R46-002: NOW() / CURDATE() of this connection follow the configured database zone, so stored moments stay consistent
         $tz = (string)(cfg('app.db_tz', 'UTC') ?: 'UTC'); $tzv = function_exists('cache_get') ? cache_get('tz_db') : null;   // R97-079: kept a minute
         if (!is_string($tzv)) { $r = $pdo->query("SELECT v FROM cp_settings WHERE k = 'tz_db'")->fetch(); $tzv = $r && $r['v'] ? (string)$r['v'] : ''; if (function_exists('cache_set')) cache_set('tz_db', $tzv, 60); }
@@ -29,6 +33,13 @@ function db(): PDO {
         $off = (new DateTime('now', new DateTimeZone($tz)))->format('P'); $pdo->exec("SET time_zone = '" . $off . "'");
     } catch (Throwable $e) {}
     return $pdo;
+}
+
+/** R97-265: after a long wait on another server (an assistant reading of minutes) the database server may have closed the idle connection —
+ *  «MySQL server has gone away» on the next statement. One cheap statement tells; a dead connection is replaced. Never inside a transaction that is still alive. */
+function db_revive(): bool {
+    try { db()->query('SELECT 1')->fetchColumn(); return false; }
+    catch (Throwable $e) { try { db(true); return true; } catch (Throwable $e2) { error_log('[db] reconnect failed: ' . $e2->getMessage()); return false; } }
 }
 
 function q(string $sql, array $p = []): PDOStatement { $t = microtime(true); $s = db()->prepare($sql); $s->execute($p); if (function_exists('db_meter')) db_meter($sql, (microtime(true) - $t) * 1000); return $s; }   // R69-002: query meter

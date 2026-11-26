@@ -241,7 +241,7 @@ layout_head(t('pr.title'), 'projects');
 </div>
 <?= pager_html('projects', $pageNo, $total, $per, $keep) ?>
 <?php endif; ?>
-<?php if ($staff && is_cp_admin()): $gen = all("SELECT p.id, p.project_code, p.name, p.created_at, p.vessel_id, v.name AS vessel FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id WHERE p.project_code LIKE 'GEN-%' ORDER BY p.created_at DESC"); if ($gen): ?>
+<?php if ($staff && is_cp_admin()): $gen = all("SELECT p.id, p.project_code, p.name, p.created_at, p.vessel_id, v.name AS vessel FROM projects p LEFT JOIN vessels v ON v.id = p.vessel_id WHERE p.project_code LIKE 'GEN-%' ORDER BY p.created_at DESC"); if ($gen): if (function_exists('pm_project_refs_prime')) pm_project_refs_prime(array_column($gen, 'id'));   /* R97-265 */ ?>
 <div class="card" id="gen-projects">
   <h2>🗂 <?= tt('pr.gen_title') ?> <span class="hint" style="display:inline;margin-left:6px;"><?= count($gen) ?></span></h2>
   <p class="hint"><?= tt('pr.gen_hint') ?></p>

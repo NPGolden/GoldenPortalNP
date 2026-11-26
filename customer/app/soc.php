@@ -146,10 +146,17 @@ function soc_poll_vote(int $id, int $idx): void { $p = one('SELECT * FROM soc_po
 function soc_feed(int $limit = 30, ?string $kind = null): array {
     if (!soc_has()) return []; $w = $kind ? ' WHERE p.kind = ' . db()->quote($kind) : '';
     $rows = all('SELECT p.*, cu.full_name FROM soc_posts p JOIN customer_users cu ON cu.id = p.user_id' . $w . ' ORDER BY (p.pinned_until IS NOT NULL AND p.pinned_until >= CURDATE()) DESC, p.created_at DESC LIMIT ' . (int)$limit); $me = soc_me(); $trOk = soc_tr_has();
+    /* R97-265: reactions, comments and language versions of all the posts shown are read in three statements — before, three per post */
+    $ids = implode(',', array_map('intval', array_column($rows, 'id'))); $RX = []; $CM = []; $TR = [];
+    if ($ids !== '') {
+        foreach (all('SELECT post_id, emoji, COUNT(*) n, SUM(user_id = ?) mine FROM soc_post_reactions WHERE post_id IN (' . $ids . ') GROUP BY post_id, emoji ORDER BY n DESC', [$me]) as $r) $RX[(int)$r['post_id']][] = ['emoji' => $r['emoji'], 'n' => $r['n'], 'mine' => $r['mine']];
+        foreach (all('SELECT c.*, cu.full_name FROM soc_post_comments c JOIN customer_users cu ON cu.id = c.user_id WHERE c.post_id IN (' . $ids . ') ORDER BY c.created_at, c.id') as $r) $CM[(int)$r['post_id']][] = $r;
+        if ($trOk) foreach (all('SELECT post_id, lang, title, body FROM soc_post_tr WHERE post_id IN (' . $ids . ')') as $r) if (locale_valid((string)$r['lang'])) $TR[(int)$r['post_id']][(string)$r['lang']] = [(string)$r['title'], $r['body'] !== null ? (string)$r['body'] : null];
+    }
     foreach ($rows as &$p) {
-        $p['reactions'] = all('SELECT emoji, COUNT(*) n, SUM(user_id = ?) mine FROM soc_post_reactions WHERE post_id = ? GROUP BY emoji ORDER BY n DESC', [$me, (int)$p['id']]);
-        $p['tr'] = $trOk ? soc_tr_of((int)$p['id']) : []; $base = locale_valid((string)($p['lang'] ?? '')) ? (string)$p['lang'] : ''; $all = [$base => [(string)$p['title'], $p['body'] !== null ? (string)$p['body'] : null]] + $p['tr']; $p['vers'] = []; foreach (array_merge([''], array_keys(LOCALES)) as $lk) if (isset($all[$lk])) $p['vers'][$lk] = $all[$lk]; $p['show'] = isset($p['vers'][locale()]) ? locale() : $base;   // R97-201
-        $p['comments'] = all('SELECT c.*, cu.full_name FROM soc_post_comments c JOIN customer_users cu ON cu.id = c.user_id WHERE c.post_id = ? ORDER BY c.created_at', [(int)$p['id']]);
+        $p['reactions'] = $RX[(int)$p['id']] ?? [];
+        $p['tr'] = $TR[(int)$p['id']] ?? []; $base = locale_valid((string)($p['lang'] ?? '')) ? (string)$p['lang'] : ''; $all = [$base => [(string)$p['title'], $p['body'] !== null ? (string)$p['body'] : null]] + $p['tr']; $p['vers'] = []; foreach (array_merge([''], array_keys(LOCALES)) as $lk) if (isset($all[$lk])) $p['vers'][$lk] = $all[$lk]; $p['show'] = isset($p['vers'][locale()]) ? locale() : $base;   // R97-201
+        $p['comments'] = $CM[(int)$p['id']] ?? [];
         if ($p['kind'] === 'poll') { $p['options'] = all('SELECT o.idx, o.label, (SELECT COUNT(*) FROM soc_post_votes v WHERE v.post_id = o.post_id AND v.idx = o.idx) n FROM soc_post_options o WHERE o.post_id = ? ORDER BY o.idx', [(int)$p['id']]); $p['votes'] = array_sum(array_column($p['options'], 'n')); $mv = scalar('SELECT idx FROM soc_post_votes WHERE post_id = ? AND user_id = ?', [(int)$p['id'], $me]); $p['my_vote'] = ($mv === null || $mv === false) ? null : (int)$mv; $p['closed'] = $p['closes_at'] && $p['closes_at'] < date('Y-m-d'); }
     } unset($p); return $rows;
 }
@@ -171,11 +178,17 @@ function soc_metrics(int $uid): array {
 }
 function soc_badges_refresh(int $uid): array {
     if (!soc_has() || !$uid) return []; $m = soc_metrics($uid); $have = array_column(all('SELECT code FROM soc_badges WHERE user_id = ?', [$uid]), 'code'); $new = [];
-    foreach (SOC_BADGES as $code => [$icon, $key, $th]) if (!in_array($code, $have, true) && ($m[$key] ?? 0) >= $th) { q('INSERT IGNORE INTO soc_badges (user_id, code) VALUES (?,?)', [$uid, $code]); $new[] = $code; }
+    foreach (SOC_BADGES as $code => [$icon, $key, $th]) if (!in_array($code, $have, true) && ($m[$key] ?? 0) >= $th) { q('INSERT IGNORE INTO soc_badges (user_id, code) VALUES (?,?)', [$uid, $code]); $new[] = $code; unset($GLOBALS['_socb'][$uid]); }
     if ($new && $uid === soc_me() && function_exists('nf_push')) nf_push([$uid], 'soc:badge', 'soc:badge:' . $uid . ':' . implode(',', $new), '🏅 ' . t('soc.nf_badge', ['b' => implode(', ', array_map(fn($c) => t('soc.b_' . $c), $new))]), null, url('community') . '#badges', null, null);
     return $new;
 }
-function soc_badges(int $uid): array { return soc_has() ? array_column(all('SELECT code, earned_at FROM soc_badges WHERE user_id = ? ORDER BY earned_at', [$uid]), 'earned_at', 'code') : []; }
+/** R97-265: the badges of a list of people in one statement (list «Badges of the team»); soc_badges() answers from it. */
+function soc_badges_prime(array $uids): void {
+    $uids = array_values(array_unique(array_filter(array_map('intval', $uids)))); if (!$uids || !soc_has()) return;
+    foreach ($uids as $u) $GLOBALS['_socb'][$u] = [];
+    foreach (array_chunk($uids, 500) as $part) foreach (all('SELECT user_id, code, earned_at FROM soc_badges WHERE user_id IN (' . implode(',', $part) . ') ORDER BY earned_at') as $r) $GLOBALS['_socb'][(int)$r['user_id']][(string)$r['code']] = $r['earned_at'];
+}
+function soc_badges(int $uid): array { if (isset($GLOBALS['_socb'][$uid])) return $GLOBALS['_socb'][$uid]; return soc_has() ? array_column(all('SELECT code, earned_at FROM soc_badges WHERE user_id = ? ORDER BY earned_at', [$uid]), 'earned_at', 'code') : []; }
 function soc_badges_html(int $uid, int $max = 6): string { $b = soc_badges($uid); if (!$b) return ''; $h = ''; $i = 0; foreach (array_reverse($b, true) as $code => $at) { if ($i++ >= $max) { $h .= '<span class="hint">+' . (count($b) - $max) . '</span>'; break; } $h .= '<span class="soc-badge" title="' . e(t('soc.b_' . $code)) . ' · ' . e(fmt_date($at)) . '">' . (SOC_BADGES[$code][0] ?? '🏅') . '</span>'; } return $h; }
 
 /* ------------------------------------------------------------------ winner of the month */
