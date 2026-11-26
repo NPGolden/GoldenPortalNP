@@ -1,0 +1,33 @@
+# Diagnostic only: can the runner reach the hosting's FTP? Prints no secret (GitHub masks them); writes nothing on the server.
+name: FTP check
+on: { workflow_dispatch: {} }
+permissions: { contents: read }
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Reach the FTP service
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          PROTO: ${{ secrets.DEPLOY_PROTOCOL }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          PASS: ${{ secrets.DEPLOY_PASSWORD }}
+        run: |
+          set +e
+          H="${HOST%%:*}"
+          echo "protocol: ${PROTO:-ftps}"
+          if echo "$H" | grep -Eq '^[0-9.]+$'; then echo "host is an IP address"; else echo "host is a name"; fi
+          IP=$(getent ahostsv4 "$H" | awk 'NR==1{print $1}')
+          [ "$IP" = "92.205.169.92" ] && echo "host resolves to the hosting IP shown in the GoDaddy panel: yes" || echo "host resolves to the hosting IP shown in the GoDaddy panel: NO"
+          echo "runner public IP: $(curl -s -m 8 https://api.ipify.org)"
+          for p in 21 22 443 2083; do timeout 8 bash -c "exec 3<>/dev/tcp/$H/$p" 2>/dev/null && echo "port $p: open" || echo "port $p: closed or filtered"; done
+          echo "--- banner on port 21 (no login)"
+          timeout 8 bash -c "exec 3<>/dev/tcp/$H/21 && head -c 200 <&3" 2>&1 | tr -d '\r' | head -3
+          echo "--- explicit TLS, no login"
+          curl -sS -m 15 --ssl-reqd "ftp://$H/" -u "anonymous:x" -o /dev/null -w "curl exit code will follow\n" 2>&1 | sed 's/^/  /' | head -5; echo "  exit ${PIPESTATUS[0]}"
+          echo "--- explicit TLS, deploy account, list only"
+          curl -sS -m 20 --ssl-reqd "ftp://$H/" -u "$USER:$PASS" -l -o /dev/null 2>&1 | sed 's/^/  /' | head -5; echo "  exit ${PIPESTATUS[0]}"
+          echo "--- plain FTP greeting only (no login sent)"
+          curl -sS -m 10 "ftp://$H/" -u "anonymous:x" -o /dev/null 2>&1 | sed 's/^/  /' | head -3; echo "  exit ${PIPESTATUS[0]}"
+          exit 0
