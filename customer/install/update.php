@@ -35,12 +35,33 @@ if (!is_file($root . '/app/config.php')) $fail(500, 'app/config.php missing');
 $cfg = require $root . '/app/config.php';
 $token = (string)($cfg['update']['token'] ?? '');
 if (strlen($token) < 32) $fail(403, 'updater disabled (set update.token in app/config.php, 32+ characters)');
-$given = (string)($_SERVER['HTTP_X_UPDATE_TOKEN'] ?? '');
-if ($given === '' || !hash_equals($token, $given)) { usleep(500000); $fail(403, 'bad token'); }
+/* R97-263: two ways in. (a) X-Update-Token — only for a call made directly to the hosting server. (b) X-Update-Sig — for a call that passes the
+ * website firewall: the key never travels; the caller sends  v1.<unix time>.<base64url HMAC-SHA256(key, "v1\n<time>\n<zip>\n<mode>")>  where mode is
+ * dry | apply | status. The time must be within five minutes and newer than the last one accepted (no replay), and the signature covers zip and mode. */
+$given = (string)($_SERVER['HTTP_X_UPDATE_TOKEN'] ?? ''); $sig = (string)($_SERVER['HTTP_X_UPDATE_SIG'] ?? '');
+$mode = !empty($_POST['status']) ? 'status' : (!empty($_POST['dry']) ? 'dry' : 'apply'); $via = 'token';
+if ($sig !== '') {
+    $via = 'signature'; $zipSigned = basename((string)($_POST['zip'] ?? ''));
+    if (!preg_match('/^v1\.(\d{10})\.([A-Za-z0-9_-]{43})$/', $sig, $sm)) { usleep(500000); $fail(403, 'bad signature'); }
+    $ts = (int)$sm[1]; $want = rtrim(strtr(base64_encode(hash_hmac('sha256', "v1\n$ts\n$zipSigned\n$mode", $token, true)), '+/', '-_'), '=');
+    if (!hash_equals($want, $sm[2])) { usleep(500000); $fail(403, 'bad signature'); }
+    if (abs(time() - $ts) > 300) $fail(403, 'signature too old — check the clock');
+    $nf = $storage . '/update.nonce'; $nh = fopen($nf, 'c+'); if (!$nh || !flock($nh, LOCK_EX)) $fail(500, 'nonce file');
+    $last = (int)trim((string)stream_get_contents($nh)); if ($ts <= $last) { flock($nh, LOCK_UN); fclose($nh); $fail(403, 'signature already used'); }
+    ftruncate($nh, 0); rewind($nh); fwrite($nh, (string)$ts); fflush($nh); flock($nh, LOCK_UN); fclose($nh);
+} elseif ($given === '' || !hash_equals($token, $given)) { usleep(500000); $fail(403, 'bad token'); }
+
+/* status: is an update running, which version is on disk, and the report of the last run — for a caller whose connection was cut by the firewall */
+if ($mode === 'status') {
+    $lk = fopen($storage . '/update.lock', 'c'); $busy = !($lk && flock($lk, LOCK_EX | LOCK_NB)); if ($lk && !$busy) flock($lk, LOCK_UN);
+    $curV = preg_match("/CP_VERSION\s*=\s*'([^']+)'/", (string)@file_get_contents($root . '/app/version.php'), $mv0) ? $mv0[1] : '?';
+    $lastR = json_decode((string)@file_get_contents($storage . '/update.last.json'), true);
+    echo json_encode(['ok' => true, 'status' => true, 'running' => $busy, 'version' => $curV, 'last' => is_array($lastR) ? $lastR : null], JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES); exit;
+}
 
 $dry = !empty($_POST['dry']);
 $lockF = $storage . '/update.lock'; $lock = fopen($lockF, 'c'); if (!$lock || !flock($lock, LOCK_EX | LOCK_NB)) $fail(409, 'another update is running');
-$report = ['ok' => true, 'dry' => $dry, 'steps' => [], 'started' => date('c')];
+$report = ['ok' => true, 'dry' => $dry, 'via' => $via, 'steps' => [], 'started' => date('c')];
 $step = function (string $name, string $state, array $data = []) use (&$report, $log): void { $report['steps'][] = ['step' => $name, 'state' => $state] + $data; $log($name . ' ' . $state . ' ' . json_encode($data, JSON_UNESCAPED_SLASHES)); };
 
 /* 2. zip + manifest */
@@ -134,6 +155,19 @@ $sc = function_exists('shell_exec') ? (string)@shell_exec(escapeshellarg(PHP_BIN
 if (trim($sc) === '') { ob_start(); try { include $root . '/install/cp_selfcheck.php'; } catch (Throwable $e) { echo '[FAIL] self-check crashed: ', $e->getMessage(); } $sc = (string)ob_get_clean(); header('Content-Type: application/json; charset=utf-8'); } $warn = preg_match_all('/\[WARN\]/', $sc); $failN = preg_match_all('/\[FAIL\]/', $sc);
 $step('selfcheck', $failN ? 'FAIL' : ($warn ? 'warn' : 'ok'), ['warn' => $warn, 'fail' => $failN, 'lines' => array_values(array_filter(array_map('trim', explode("\n", $sc)), fn($l) => str_contains($l, '[WARN]') || str_contains($l, '[FAIL]')))]);
 if (!$dry) @rename($zipPath, $zipPath . '.applied');
+/* 7. house-keeping (R97-263): every release leaves its zip and a backup with a full database dump — only the newest ones are kept */
+if (!$dry && !$failN) {
+    $freed = 0; $gone = 0; $keepB = max(3, (int)($cfg['update']['keep_backups'] ?? 5)); $keepZ = max(2, (int)($cfg['update']['keep_zips'] ?? 3));
+    $size = function (string $p) use (&$size): int { if (is_link($p) || is_file($p)) return (int)@filesize($p); $t = 0; foreach (@scandir($p) ?: [] as $e) if ($e !== '.' && $e !== '..') $t += $size($p . '/' . $e); return $t; };
+    $rm = function (string $p) use (&$rm): void { if (is_link($p) || is_file($p)) { @unlink($p); return; } foreach (@scandir($p) ?: [] as $e) if ($e !== '.' && $e !== '..') $rm($p . '/' . $e); @rmdir($p); };
+    $bks = array_values(array_filter(glob($storage . '/backups/*', GLOB_ONLYDIR) ?: [], fn($d) => (bool)preg_match('#/\d{8}-\d{6}-v[0-9A-Za-z.?_-]+$#', $d))); rsort($bks);
+    foreach (array_slice($bks, $keepB) as $d) { $freed += $size($d); $rm($d); $gone++; }
+    $done = glob($updDir . '/*.zip.applied') ?: []; usort($done, fn($a, $b) => filemtime($b) <=> filemtime($a));
+    foreach (array_slice($done, $keepZ) as $f) { $freed += (int)@filesize($f); @unlink($f); $gone++; }
+    foreach (glob($updDir . '/*.zip') ?: [] as $f) if (filemtime($f) < time() - 86400) { $freed += (int)@filesize($f); @unlink($f); $gone++; }   // uploaded and never applied
+    $step('housekeeping', 'ok', ['removed' => $gone, 'freed_mb' => round($freed / 1048576, 1), 'backups_kept' => min(count($bks), $keepB), 'zips_kept' => min(count($done), $keepZ)]);
+}
 $report['finished'] = date('c'); $report['ok'] = !$failN;
+if (!$dry) @file_put_contents($storage . '/update.last.json', json_encode($report, JSON_UNESCAPED_SLASHES), LOCK_EX);
 flock($lock, LOCK_UN); fclose($lock);
 echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);

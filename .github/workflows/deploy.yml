@@ -79,17 +79,13 @@ jobs:
       - name: Dry run on the server
         env: { URL: "${{ vars.PORTAL_URL }}", TOKEN: "${{ secrets.UPDATE_TOKEN }}", Z: "${{ steps.build.outputs.zip }}", ORIGIN: "${{ secrets.ORIGIN_IP }}" }
         run: |
-          set -e; H=$(echo "$URL" | sed -E 's#^https?://([^/]+).*#\1#'); R=(); O=$(echo "$ORIGIN" | tr -d '[:space:]' | sed -E 's#^[a-z]+://##; s#[/:].*$##')
-          if [ -n "$O" ]; then echo "$O" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || O=$(getent ahostsv4 "$O" | awk 'NR==1{print $1}'); [ -n "$O" ] || { echo "ORIGIN_IP cannot be resolved"; exit 1; }; R=(--resolve "$H:443:$O"); echo "origin: $O"; fi
-          curl -sS --fail "${R[@]}" -X POST -H "X-Update-Token: $TOKEN" -A "GAS-deploy/1.0" -d "zip=$Z" -d "dry=1" "$URL/install/update.php" | tee /tmp/dry.json
-          python3 -c "import json; r=json.load(open('/tmp/dry.json')); assert r['ok'], r"
+          # R97-263: direct to the hosting server when it answers, else through the website firewall with a signed request (the key is not sent)
+          OUT=/tmp/dry.json python3 tools/deploy_call.py dry
       - name: Apply the release
         if: ${{ github.event.inputs.dry != 'true' }}
         env: { URL: "${{ vars.PORTAL_URL }}", TOKEN: "${{ secrets.UPDATE_TOKEN }}", Z: "${{ steps.build.outputs.zip }}", ORIGIN: "${{ secrets.ORIGIN_IP }}" }
         run: |
-          set -e; H=$(echo "$URL" | sed -E 's#^https?://([^/]+).*#\1#'); R=(); O=$(echo "$ORIGIN" | tr -d '[:space:]' | sed -E 's#^[a-z]+://##; s#[/:].*$##')
-          if [ -n "$O" ]; then echo "$O" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || O=$(getent ahostsv4 "$O" | awk 'NR==1{print $1}'); [ -n "$O" ] || { echo "ORIGIN_IP cannot be resolved"; exit 1; }; R=(--resolve "$H:443:$O"); echo "origin: $O"; fi
-          curl -sS --fail "${R[@]}" -X POST -H "X-Update-Token: $TOKEN" -A "GAS-deploy/1.0" -d "zip=$Z" "$URL/install/update.php" | tee /tmp/apply.json
+          OUT=/tmp/apply.json python3 tools/deploy_call.py apply > /tmp/apply.log || { tail -40 /tmp/apply.log; exit 1; }; head -3 /tmp/apply.log
           python3 - <<'PY'
           import json; r=json.load(open('/tmp/apply.json'))
           print("\n".join(f"{s['step']:<12} {s['state']}" + (f"  {s.get('lines')}" if s.get('lines') else '') for s in r['steps']))
@@ -102,7 +98,8 @@ jobs:
         run: |
           set -e; H=$(echo "$URL" | sed -E 's#^https?://([^/]+).*#\1#'); R=(); O=$(echo "$ORIGIN" | tr -d '[:space:]' | sed -E 's#^[a-z]+://##; s#[/:].*$##')
           if [ -n "$O" ]; then echo "$O" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$' || O=$(getent ahostsv4 "$O" | awk 'NR==1{print $1}'); [ -n "$O" ] && R=(--resolve "$H:443:$O"); fi
-          C=$(curl -sS -o /tmp/api.json -w '%{http_code}' "${R[@]}" -A "GAS-deploy/1.0" -H "X-App: engineer" -H "X-App-Version: 99.0.0" "$URL/api/v1/me" || true)
+          C=$(curl -sS -o /tmp/api.json -w '%{http_code}' --connect-timeout 8 -m 40 "${R[@]}" -A "GAS-deploy/1.0" -H "X-App: engineer" -H "X-App-Version: 99.0.0" "$URL/api/v1/me" || true)
+          [ "$C" = "000" ] && C=$(curl -sS -o /tmp/api.json -w '%{http_code}' -m 40 -A "GAS-deploy/1.0" -H "X-App: engineer" -H "X-App-Version: 99.0.0" "$URL/api/v1/me" || true)   # R97-263: through the website firewall when the server is closed to direct calls
           echo "app service: HTTP $C $(head -c 200 /tmp/api.json)"
           [ "$C" = "401" ] || { echo "The app service does not start (expected 401 Unauthorized without a token) - the mobile apps will show Sync error"; exit 1; }
       - name: Summary

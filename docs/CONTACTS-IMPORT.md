@@ -4773,3 +4773,15 @@ Fail = firewall page (403 with «Website Firewall» / «Access Denied» / «Bloc
 ## §541 Job descriptions: authenticator code for «Approve all stages as CEO» (GAS-CP-R97-262, v1.261.1)
 
 `jd_approve_all()` verifies `$_POST['totp']` with `totp_verify()` against the authenticator of the CEO before anything is written. Unlike `pk_stepup_ok()`, an account without an authenticator does not pass: the action answers `jd.ceo_need_totp`. The form on `hr_jd` carries the code field.
+
+## §542 Release updater: signed route through the website firewall, status, house-keeping (GAS-CP-R97-263, v1.261.2)
+
+**Why:** since 26/11/2026 the hosting server no longer answers direct HTTPS calls from outside; the deploy could upload a release but not apply it.
+
+**Access to `install/update.php`:** (a) `X-Update-Token` — direct calls only; (b) `X-Update-Sig: v1.<unix time>.<base64url HMAC-SHA256(key, "v1\n<time>\n<zip>\n<mode>")>`, mode `dry | apply | status`. Checks: format, `hash_equals`, time within 300 s, time newer than the last accepted one (`storage/update.nonce`, under lock). The key never passes the firewall.
+
+**Status call:** `status=1` → `{running, version, last}`; `last` is the report of the last real run (`storage/update.last.json`).
+
+**House-keeping (step 7, after a successful apply):** keeps the newest `update.keep_backups` (default 5, at least 3) folders of `storage/backups/` and the newest `update.keep_zips` (default 3, at least 2) `*.zip.applied`; removes `*.zip` older than one day. Reported as step `housekeeping` with files removed and MB freed.
+
+**Deploy:** `tools/deploy_call.py dry|apply|status` — direct with a connect timeout of 8 s, else signed through the firewall (with `Referer`, see §536), else status polling for up to ten minutes. Workflow `installer-place.yml` puts `update.php` on the server by FTP when the updater itself must change (previous file kept as `storage/update.prev.txt`).

@@ -1,0 +1,27 @@
+# One-off (GAS-CP-R97-263): puts the release updater of the repository on the server by FTP, for the case where the normal release
+# route cannot run because the updater itself has to change. The file in place is kept as storage/update.prev.txt (not served).
+name: Place the release updater
+on: { workflow_dispatch: {} }
+permissions: { contents: read }
+jobs:
+  place:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload customer/install/update.php
+        env:
+          HOST: ${{ secrets.DEPLOY_HOST }}
+          USER: ${{ secrets.DEPLOY_USER }}
+          PASS: ${{ secrets.DEPLOY_PASSWORD }}
+          DPATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          set -e; php -l customer/install/update.php; sha256sum customer/install/update.php | cut -c1-16
+          DEST="${DPATH%/}/customer/install/update.php.new"
+          up() { curl -sS --fail --ssl-reqd -T customer/install/update.php "ftp://$HOST$DEST" -u "$USER:$PASS" -Q "-*DELE ../storage/update.prev.txt" -Q "-RNFR update.php" -Q "-RNTO ../storage/update.prev.txt" -Q "-RNFR update.php.new" -Q "-RNTO update.php"; }
+          up || { echo "first attempt refused — once more"; sleep 6; up; }
+          echo "placed"
+      - name: The new updater answers through the website firewall
+        env: { URL: "${{ vars.PORTAL_URL }}", TOKEN: "${{ secrets.UPDATE_TOKEN }}" }
+        run: |
+          sleep 3; python3 tools/deploy_call.py status
