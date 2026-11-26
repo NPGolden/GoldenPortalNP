@@ -1,4 +1,4 @@
-# Diagnostic only: can the runner reach the hosting's FTP? Prints no secret (GitHub masks them); writes nothing on the server.
+# Diagnostic only: can the runner reach the hosting's FTP and upload? Prints no secret (GitHub masks them); uploads three small test files to storage/updates and removes them.
 name: FTP check
 on: { workflow_dispatch: {} }
 permissions: { contents: read }
@@ -13,6 +13,7 @@ jobs:
           PROTO: ${{ secrets.DEPLOY_PROTOCOL }}
           USER: ${{ secrets.DEPLOY_USER }}
           PASS: ${{ secrets.DEPLOY_PASSWORD }}
+          DPATH: ${{ secrets.DEPLOY_PATH }}
         run: |
           set +e
           H="${HOST%%:*}"
@@ -30,4 +31,21 @@ jobs:
           curl -sS -m 20 --ssl-reqd "ftp://$H/" -u "$USER:$PASS" -l -o /dev/null 2>&1 | sed 's/^/  /' | head -5; echo "  exit ${PIPESTATUS[0]}"
           echo "--- plain FTP greeting only (no login sent)"
           curl -sS -m 10 "ftp://$H/" -u "anonymous:x" -o /dev/null 2>&1 | sed 's/^/  /' | head -3; echo "  exit ${PIPESTATUS[0]}"
+          DEST="${DPATH%/}/customer/storage/updates/"
+          v() { grep -E "^(< [0-9]{3}|\* (TLS|SSL|Connect|Closing|Recv|Send|Fail|Remembering|upload|We are|Connection))" | sed 's/^/    /' | grep -v "PASS\|USER" | head -40; }
+          echo "--- list the updates folder"
+          curl -sS -m 25 --ssl-reqd "ftp://$HOST$DEST" -u "$USER:$PASS" -l 2>&1 | wc -l | sed 's/^/  entries: /'
+          echo "--- upload a 20-byte file"
+          echo "ftp check $(date -u +%H:%M)" > /tmp/ftpcheck.txt
+          curl -v -sS -m 30 --ssl-reqd -T /tmp/ftpcheck.txt "ftp://$HOST$DEST" -u "$USER:$PASS" 2>&1 | v; echo "  exit ${PIPESTATUS[0]}"
+          echo "--- upload a 20-byte file, EPSV off"
+          curl -v -sS -m 30 --ssl-reqd --disable-epsv -T /tmp/ftpcheck.txt "ftp://$HOST$DEST" -u "$USER:$PASS" 2>&1 | v; echo "  exit ${PIPESTATUS[0]}"
+          echo "--- upload a 3 MB file"
+          head -c 3000000 /dev/urandom > /tmp/ftpcheck.bin
+          curl -sS -m 90 --ssl-reqd -T /tmp/ftpcheck.bin "ftp://$HOST$DEST" -u "$USER:$PASS" 2>&1 | sed 's/^/  /' | head -3; echo "  exit ${PIPESTATUS[0]}"
+          echo "--- upload a 3 MB file named .zip"
+          cp /tmp/ftpcheck.bin /tmp/ftpcheck.zip
+          curl -sS -m 90 --ssl-reqd -T /tmp/ftpcheck.zip "ftp://$HOST$DEST" -u "$USER:$PASS" 2>&1 | sed 's/^/  /' | head -3; echo "  exit ${PIPESTATUS[0]}"
+          echo "--- remove the test files"
+          curl -sS -m 25 --ssl-reqd "ftp://$HOST$DEST" -u "$USER:$PASS" -l -o /dev/null -Q "-DELE ftpcheck.txt" -Q "-DELE ftpcheck.bin" -Q "-DELE ftpcheck.zip" 2>&1 | sed 's/^/  /' | head -3; echo "  exit ${PIPESTATUS[0]}"
           exit 0
