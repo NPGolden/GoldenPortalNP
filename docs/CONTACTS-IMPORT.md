@@ -4785,3 +4785,7 @@ Fail = firewall page (403 with «Website Firewall» / «Access Denied» / «Bloc
 **House-keeping (step 7, after a successful apply):** keeps the newest `update.keep_backups` (default 5, at least 3) folders of `storage/backups/` and the newest `update.keep_zips` (default 3, at least 2) `*.zip.applied`; removes `*.zip` older than one day. Reported as step `housekeeping` with files removed and MB freed.
 
 **Deploy:** `tools/deploy_call.py dry|apply|status` — direct with a connect timeout of 8 s, else signed through the firewall (with `Referer`, see §536), else status polling for up to ten minutes. Workflow `installer-place.yml` puts `update.php` on the server by FTP when the updater itself must change (previous file kept as `storage/update.prev.txt`).
+
+## §543 Recruiting offer: job description selector (GAS-CP-R97-264, v1.262.0)
+
+`rcr_offer_jd_text($a, $lc, ?int $pick)` builds the text from the chosen approved job description (else the one of the vacancy) and returns `title`. On `rcr_application`, card «Offer», a GET form (`jd=<id>`) fills position and text in the offer form and adds the hidden `jd_id`; nothing is written until `rcr_offer_save`, which accepts `jd_id` only for a job description with an approved issue (`jd_current`), sets `rc_offers.jd_id` on the draft (or on the new offer) and logs `offer_jd`. The existing rule applies: a changed draft loses its approval. The applicant and the vacancy are not touched.

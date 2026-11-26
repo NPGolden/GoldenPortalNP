@@ -621,17 +621,18 @@ function rcr_offer_salary_text(array $o, string $lc): string {
     return $s;
 }
 /** The job description as plain text for the offer: the approved job description linked to the vacancy, otherwise the text of the vacancy. */
-function rcr_offer_jd_text(array $a, string $lc = 'en'): array {
-    $v = one('SELECT * FROM rc_vacancies WHERE id = ?', [(int) $a['vacancy_id']]); $tr = fn(string $k) => t_in($k, $lc); $out = []; $jdId = null;
-    if ($v && !empty($v['jd_id']) && function_exists('jd_has') && jd_has() && ($jd = jd_load((int) $v['jd_id'])) && ($c = jd_current($jd))) {
-        $jdId = (int) $jd['id']; $out[] = $c['title'] . ' (' . $c['code'] . ' R' . (int) $c['rev'] . ')'; if ($c['reports_to'] !== '') $out[] = $tr('jd.reports_to') . ': ' . $c['reports_to']; if ($c['purpose'] !== '') $out[] = $tr('jd.s_purpose') . ":\n" . $c['purpose'];
+function rcr_offer_jd_text(array $a, string $lc = 'en', ?int $pick = null): array {
+    $v = one('SELECT * FROM rc_vacancies WHERE id = ?', [(int) $a['vacancy_id']]); $tr = fn(string $k) => t_in($k, $lc); $out = []; $jdId = null; $title = null;
+    $use = $pick ?: ($v && !empty($v['jd_id']) ? (int) $v['jd_id'] : 0);   // R97-264: another approved job description can be chosen for the offer
+    if ($use && function_exists('jd_has') && jd_has() && ($jd = jd_load($use)) && ($c = jd_current($jd))) {
+        $jdId = (int) $jd['id']; $title = (string) $c['title']; $out[] = $c['title'] . ' (' . $c['code'] . ' R' . (int) $c['rev'] . ')'; if ($c['reports_to'] !== '') $out[] = $tr('jd.reports_to') . ': ' . $c['reports_to']; if ($c['purpose'] !== '') $out[] = $tr('jd.s_purpose') . ":\n" . $c['purpose'];
         foreach (JD_SECTIONS as $k) if (!empty($c[$k])) $out[] = $tr('jd.s_' . $k) . ":\n- " . implode("\n- ", $c[$k]);
     } elseif ($v) {
         $out[] = (string) $v['title']; if ((string) $v['summary'] !== '') $out[] = (string) $v['summary'];
         $d = trim(html_entity_decode(strip_tags(preg_replace('#<(br|/p|/li|/h\d)\b[^>]*>#i', "\n", (string) $v['description_html'])), ENT_QUOTES, 'UTF-8')); if ($d !== '') $out[] = preg_replace("/\n{3,}/", "\n\n", $d);
         $rq = array_values(array_filter(array_map('strval', (array) json_decode((string) ($v['requirements'] ?? '[]'), true)), 'strlen')); if ($rq) $out[] = "- " . implode("\n- ", $rq);
     }
-    return ['text' => trim(implode("\n\n", $out)), 'jd_id' => $jdId];
+    return ['text' => trim(implode("\n\n", $out)), 'jd_id' => $jdId, 'title' => $title];
 }
 /** Saves the draft offer of an application (one draft at a time; a sent offer is a record and is not changed — a revised offer is a new one). */
 function rcr_offer_save(int $appId, array $in): int {
@@ -644,11 +645,13 @@ function rcr_offer_save(int $appId, array $in): int {
     $pay = (int) ($in['payments_per_year'] ?? 0); $pay = $pay >= 1 && $pay <= 16 ? $pay : null; $con = in_array($in['contract'] ?? '', RCR_OFFER_CONTRACT, true) ? (string) $in['contract'] : 'indefinite';
     $prob = (string) ($in['probation_months'] ?? '') === '' ? null : max(0, min(24, (int) $in['probation_months']));
     $vals = [$pos, $sal, $cur, $per, $pay, $con, $dte('start_date'), $txt('hours', 120), $txt('place', 160), $prob, $txt('benefits', 4000), $txt('terms', 6000), $dte('valid_until'), $txt('jd_text', 30000)];
-    $d = one("SELECT id FROM rc_offers WHERE application_id = ? AND status = 'draft' ORDER BY id DESC LIMIT 1", [$appId]);
+    $d = one("SELECT id, jd_id FROM rc_offers WHERE application_id = ? AND status = 'draft' ORDER BY id DESC LIMIT 1", [$appId]);
+    $jdPick = (int) ($in['jd_id'] ?? 0); if ($jdPick && !(function_exists('jd_has') && jd_has() && ($pj = jd_load($jdPick)) && jd_current($pj))) $jdPick = 0;   // R97-264: only an approved job description
     if ($d) { q('UPDATE rc_offers SET position=?, net_salary=?, currency=?, salary_per=?, payments_per_year=?, contract=?, start_date=?, hours=?, place=?, probation_months=?, benefits=?, terms=?, valid_until=?, jd_text=? WHERE id = ?', [...$vals, (int) $d['id']]);
         if (rcr_offer_appr_has() && (int) q('UPDATE rc_offers SET appr_status = NULL, appr_by = NULL, appr_name = NULL, appr_at = NULL, appr_note = NULL WHERE id = ? AND appr_status IS NOT NULL', [(int) $d['id']])->rowCount()) rcr_log('offer_approval_reset', ['application_id' => $appId, 'vacancy_id' => (int) $a['vacancy_id']], t('rc.ap_reset_log'));   // R97-247: changed terms are approved again
+        if ($jdPick && $jdPick !== (int) ($d['jd_id'] ?? 0)) { q('UPDATE rc_offers SET jd_id = ? WHERE id = ?', [$jdPick, (int) $d['id']]); rcr_log('offer_jd', ['application_id' => $appId, 'vacancy_id' => (int) $a['vacancy_id']], (string) ($pj['code'] ?? '') . ' · ' . $pos); }
         return (int) $d['id']; }
-    $n = (int) scalar('SELECT COUNT(*) + 1 FROM rc_offers WHERE application_id = ?', [$appId]); $jd = rcr_offer_jd_text($a);
+    $n = (int) scalar('SELECT COUNT(*) + 1 FROM rc_offers WHERE application_id = ?', [$appId]); $jd = rcr_offer_jd_text($a); if ($jdPick) $jd['jd_id'] = $jdPick;
     q('INSERT INTO rc_offers (position, net_salary, currency, salary_per, payments_per_year, contract, start_date, hours, place, probation_months, benefits, terms, valid_until, jd_text, application_id, offer_no, jd_id, created_by, created_name) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
       [...$vals, $appId, $a['code'] . '-OF' . $n, $jd['jd_id'], (int) $u['id'], (string) $u['full_name']]);
     $id = (int) db()->lastInsertId(); rcr_log('offer_draft', ['application_id' => $appId, 'vacancy_id' => (int) $a['vacancy_id']], $a['code'] . '-OF' . $n); return $id;

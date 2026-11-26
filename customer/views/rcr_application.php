@@ -91,7 +91,11 @@ if (function_exists('em_card_html') && em_has()) {
 <?php if (function_exists('rcr_offer_can') && rcr_offer_can() && !str_starts_with((string)$a['email'], 'anon-')): /* R97-231: the offer — financial proposal and terms with the job description; HR only */
   $offs = rcr_offers($id); $od = null; foreach ($offs as $x) if ($x['status'] === 'draft') { $od = $x; break; }
   $jdDef = $od ? null : rcr_offer_jd_text($a, in_array((string)($a['lang'] ?? ''), array_keys(LOCALES), true) ? (string)$a['lang'] : 'en'); $vv = one('SELECT emp_type, location FROM rc_vacancies WHERE id = ?', [(int)$a['vacancy_id']]) ?: [];
-  $ov = fn(string $k, $def = '') => $od ? (string)($od[$k] ?? '') : (string)$def; $canNew = !in_array($a['status'], ['withdrawn'], true); ?>
+  $ov = fn(string $k, $def = '') => $od ? (string)($od[$k] ?? '') : (string)$def; $canNew = !in_array($a['status'], ['withdrawn'], true);
+  /* R97-264: another approved job description for this offer — chosen above the form, filled in, written at «Save» */
+  $jdOptsO = function_exists('jd_options') && function_exists('jd_has') && jd_has() ? jd_options() : []; $jdPickO = (int)($_GET['jd'] ?? 0); $jdFill = null;
+  if ($jdPickO && in_array($jdPickO, array_map(fn($o) => (int)$o['id'], $jdOptsO), true)) { $jdFill = rcr_offer_jd_text($a, in_array((string)($a['lang'] ?? ''), array_keys(LOCALES), true) ? (string)$a['lang'] : 'en', $jdPickO); if ((int)($jdFill['jd_id'] ?? 0) !== $jdPickO) $jdFill = null; }
+  $jdNowO = $jdFill ? $jdPickO : (int)($od ? ($od['jd_id'] ?? 0) : ($jdDef['jd_id'] ?? 0)); ?>
 <div class="card" id="offer"><div class="card-head"><h2>💼 <?= tt('rc.of_title') ?></h2><span class="hint"><?= tt('rc.of_lede') ?></span></div>
 <?php if ($offs): ?><table class="tbl"><thead><tr><th><?= tt('rc.of_no') ?></th><th><?= tt('rc.of_position') ?></th><th><?= tt('rc.of_salary') ?></th><th><?= tt('rc.of_start') ?></th><th><?= tt('th.status') ?></th><th></th></tr></thead><tbody>
 <?php foreach ($offs as $x): $xid = (int)$x['id']; ?><tr><td><b style="font-family:var(--mono);"><?= e($x['offer_no']) ?></b><br><span class="hint"><?= e((string)$x['created_name']) ?></span></td><td><?= e($x['position']) ?></td><td><?= e(rcr_offer_salary_text($x, locale())) ?: '—' ?></td><td><?= $x['start_date'] ? e(fmt_date($x['start_date'])) : '—' ?></td>
@@ -101,9 +105,14 @@ if (function_exists('em_card_html') && em_has()) {
 <?php if ($x['body']): ?><tr><td colspan="6"><details><summary class="hint" style="cursor:pointer;">✉ <?= tt('rc.of_as_sent') ?> — <?= e((string)$x['subject']) ?></summary><pre style="white-space:pre-wrap;font-family:inherit;margin:8px 0 0;"><?= e((string)$x['body']) ?></pre></details></td></tr><?php endif; ?>
 <?php endforeach; ?></tbody></table><?php endif; ?>
 <?php if ($canNew): ?>
-<details style="margin-top:10px;"<?= $od || !$offs ? ' open' : '' ?>><summary class="btn btn--ghost" style="display:inline-block;cursor:pointer;"><?= $od ? '✎ ' . e($od['offer_no']) . ' — ' . tt('rc.of_edit') : '＋ ' . tt($offs ? 'rc.of_new_rev' : 'rc.of_new') ?></summary>
-<form method="post" action="<?= url('rcr_application', ['id' => $id]) ?>" class="form-grid" data-lock style="margin-top:12px;"><?= csrf_field() ?><input type="hidden" name="action" value="rcr_offer_save"><input type="hidden" name="id" value="<?= $id ?>">
-  <div class="field span2"><label><?= tt('rc.of_position') ?></label><input name="position" maxlength="190" value="<?= e($ov('position', $a['vacancy'])) ?>" required></div>
+<details style="margin-top:10px;"<?= $od || !$offs || $jdFill ? ' open' : '' ?>><summary class="btn btn--ghost" style="display:inline-block;cursor:pointer;"><?= $od ? '✎ ' . e($od['offer_no']) . ' — ' . tt('rc.of_edit') : '＋ ' . tt($offs ? 'rc.of_new_rev' : 'rc.of_new') ?></summary>
+<?php if ($jdOptsO): ?><form method="get" action="index.php#offer" class="btn-row" style="margin-top:12px; align-items:flex-end;"><input type="hidden" name="p" value="rcr_application"><input type="hidden" name="id" value="<?= $id ?>">
+  <div class="field" style="margin:0; min-width:320px; flex:1;"><label><?= tt('rc.of_jd_pick') ?></label><select name="jd"><option value=""><?= tt('rc.of_jd_pick_none') ?></option><?php foreach ($jdOptsO as $o): ?><option value="<?= (int)$o['id'] ?>"<?= $jdNowO === (int)$o['id'] ? ' selected' : '' ?>><?= e(jd_option_label($o)) ?></option><?php endforeach; ?></select></div>
+  <button class="btn btn--ghost" type="submit"><?= tt('rc.of_jd_use') ?></button></form>
+  <p class="hint" style="margin:4px 0 0;"><?= tt('rc.of_jd_pick_hint') ?></p>
+  <?php if ($jdFill): ?><div class="flash flash--warn" style="margin-top:8px;"><?= e(t('rc.of_jd_filled', ['t' => (string)$jdFill['title']])) ?></div><?php endif; ?><?php endif; ?>
+<form method="post" action="<?= url('rcr_application', ['id' => $id]) ?>" class="form-grid" data-lock style="margin-top:12px;"><?= csrf_field() ?><input type="hidden" name="action" value="rcr_offer_save"><input type="hidden" name="id" value="<?= $id ?>"><?php if ($jdFill): ?><input type="hidden" name="jd_id" value="<?= $jdPickO ?>"><?php endif; ?>
+  <div class="field span2"><label><?= tt('rc.of_position') ?></label><input name="position" maxlength="190" value="<?= e($jdFill ? (string)$jdFill['title'] : $ov('position', $a['vacancy'])) ?>" required></div>
   <div class="field"><label><?= tt('rc.of_salary_net') ?> *</label><input name="net_salary" inputmode="decimal" maxlength="14" autocomplete="off" value="<?= $od && $od['net_salary'] !== null ? e(number_format((float)$od['net_salary'], 2, ',', '.')) : '' ?>" placeholder="0,00"></div>
   <div class="field"><label><?= tt('rc.of_currency') ?></label><select name="currency" data-nosearch><?php foreach (['EUR', 'USD', 'GBP', 'CHF', 'BGN'] as $cc): ?><option<?= $ov('currency', 'EUR') === $cc ? ' selected' : '' ?>><?= $cc ?></option><?php endforeach; ?></select></div>
   <div class="field"><label><?= tt('rc.of_per') ?></label><select name="salary_per" data-nosearch><option value="month"<?= $ov('salary_per', 'month') === 'month' ? ' selected' : '' ?>><?= tt('rc.of_per_month') ?></option><option value="year"<?= $ov('salary_per') === 'year' ? ' selected' : '' ?>><?= tt('rc.of_per_year') ?></option></select></div>
@@ -116,7 +125,7 @@ if (function_exists('em_card_html') && em_has()) {
   <div class="field"><label><?= tt('rc.of_valid') ?></label><input type="date" name="valid_until" value="<?= e($ov('valid_until', date('Y-m-d', strtotime('+10 days')))) ?>"></div>
   <div class="field span2"><label><?= tt('rc.of_benefits') ?></label><textarea name="benefits" rows="3" maxlength="4000"><?= e($ov('benefits')) ?></textarea></div>
   <div class="field span2"><label><?= tt('rc.of_terms') ?></label><textarea name="terms" rows="4" maxlength="6000"><?= e($ov('terms')) ?></textarea></div>
-  <div class="field span2"><label><?= tt('rc.of_jd') ?> *</label><textarea name="jd_text" rows="10" maxlength="30000"><?= e($od ? (string)$od['jd_text'] : (string)$jdDef['text']) ?></textarea><span class="hint"><?= tt('rc.of_jd_hint') ?></span></div>
+  <div class="field span2"><label><?= tt('rc.of_jd') ?> *</label><textarea name="jd_text" rows="10" maxlength="30000"><?= e($jdFill ? (string)$jdFill['text'] : ($od ? (string)$od['jd_text'] : (string)$jdDef['text'])) ?></textarea><span class="hint"><?= tt('rc.of_jd_hint') ?></span></div>
   <div class="btn-row span2"><button class="btn btn--gold"><?= tt('rc.of_save') ?></button></div>
 </form></details>
 <?php if ($od): $miss = rcr_offer_missing($od); $dr = null; if (!$miss) { try { $dr = rcr_offer_draft((int)$od['id']); } catch (Throwable $e) {} } ?>
