@@ -4839,3 +4839,7 @@ Stage 1: 653 of 11 419 texts (5.7 %): buttons, menu, errors, sign-in, authentica
 ## §548 Georgian — second delivery (GAS-CP-R97-269, v1.265.1)
 
 Translation memory at 2 007 of 11 419 texts (17.6 %). Added since §547: `hr.*` (leave, card, employment, rules, periods, training, evaluations, targets, reasons, messages), `soc.*`, `hre.*`, `jd.*` and the first part of `fsr.*`. Bilingual form labels of the service report (English / Greek) are given as Georgian / English. No code change; `ka.php` rebuilt with `tools/i18n/ka.py build`.
+
+## §549 Georgian — third delivery (GAS-CP-R97-270, v1.265.2)
+
+Translation memory at 3 575 of 11 419 texts (31.3 %). Added since §548: rest of `fsr.*`, `isr.*`, `jo.*`, `ts.*`, `tk.*`, `td.*`, `eq.*`, `hra.*`, `hrs.*`, `kb.*`, `cr.*`, `pf.*`, `wc.*` and the first general areas (months, customer pages, projects, drawing tracker, submittals, tests, reports, import). Texts that are the same in both languages (FAT, IMO, ENG …) are stored in the memory as they are. No code change.

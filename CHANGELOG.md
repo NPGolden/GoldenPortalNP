@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.265.1** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.265.2** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.265.2 | GAS-CP-R97-270 | 2026-11-27 | Georgian — third delivery: service and inspection reports, work orders, timesheets, tickets, tasks, equipment register, HR Assistant, assessments, knowledge base, portal requests, process flow, working calendar, projects and customer pages (31 % of the portal) | — |
 | 1.265.1 | GAS-CP-R97-269 | 2026-11-27 | Georgian — second delivery: My leave and HR, training, evaluations, targets, community, equipment of the personnel, job descriptions, field service reports (17.6 % of the portal) | — |
 | 1.265.0 | GAS-CP-R97-268 | 2026-11-27 | Georgian (ქართული) added as a language — first stage: menu, sign-in, security, dashboard, notifications, In / Out, planning, wellness; the rest follows in stages and is shown in English until then | — |
 | 1.264.1 | GAS-CP-R97-267 | 2026-11-27 | Personal assistant role: message to HR from the web, authenticator and known devices on My account — the role list did not hold these actions | — |
