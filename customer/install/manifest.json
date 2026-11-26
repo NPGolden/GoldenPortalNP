@@ -2,7 +2,7 @@
     "name": "Golden A/S Customer Portal",
     "version": "1.265.0",
     "build": "2026-11-27",
-    "generated_at": "2026-11-26T22:51:41+00:00",
+    "generated_at": "2026-11-26T22:57:05+00:00",
     "count": 1001,
     "files": {
         ".htaccess": {
@@ -2214,8 +2214,8 @@
             "size": 885839
         },
         "customer/lang/ka.php": {
-            "sha256": "920c5f102d44dc3039acd6268911fcd87661db14ead79eeb9d8b681a1276a29e",
-            "size": 970312
+            "sha256": "a4f21690d81f51dcc19c9ece34f99599d710e25eeff7769b1a108d82e22129c0",
+            "size": 1006820
         },
         "customer/lang/uk.php": {
             "sha256": "6e0c1a2ddf5d337d91f0cacf14b42f613f598d722e77e6e3e5e84f2aaa600546",
