@@ -7,6 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
+      - uses: actions/checkout@v4
       - name: Reach the FTP service
         env:
           HOST: ${{ secrets.DEPLOY_HOST }}
@@ -46,6 +47,17 @@ jobs:
           echo "--- upload a 3 MB file named .zip"
           cp /tmp/ftpcheck.bin /tmp/ftpcheck.zip
           curl -sS -m 90 --ssl-reqd -T /tmp/ftpcheck.zip "ftp://$HOST$DEST" -u "$USER:$PASS" 2>&1 | sed 's/^/  /' | head -3; echo "  exit ${PIPESTATUS[0]}"
+          echo "--- upload 15 MB of random data"
+          head -c 15000000 /dev/urandom > /tmp/ftpcheck15.bin
+          curl -sS -m 120 --ssl-reqd -T /tmp/ftpcheck15.bin "ftp://$HOST$DEST" -u "$USER:$PASS" 2>&1 | sed 's/^/  /' | head -3; echo "  exit ${PIPESTATUS[0]}"
+          echo "--- upload a real zip of PHP files (customer/app)"
+          (cd "$GITHUB_WORKSPACE" && zip -qr /tmp/ftpcheck-php.zip customer/app -x 'customer/app/config.php'); ls -la /tmp/ftpcheck-php.zip | awk '{print "  size " $5}'
+          curl -v -sS -m 120 --ssl-reqd -T /tmp/ftpcheck-php.zip "ftp://$HOST$DEST" -u "$USER:$PASS" 2>&1 | grep -E "^(< (1|2|4|5)[0-9]{2} |\* (Recv|Send|Fail|Closing|upload|We are|Connection #))" | grep -v "PASS\|USER\|220\|234\|331\|230\|200\|257\|250" | sed 's/^/    /' | tail -8; echo "  exit ${PIPESTATUS[0]}"
+          echo "--- the same zip with create-dirs, as the deploy does"
+          cp /tmp/ftpcheck-php.zip /tmp/ftpcheck-php2.zip
+          curl -sS -m 120 --ssl-reqd -T /tmp/ftpcheck-php2.zip "ftp://$HOST$DEST" -u "$USER:$PASS" --ftp-create-dirs 2>&1 | sed 's/^/  /' | head -3; echo "  exit ${PIPESTATUS[0]}"
+          echo "--- one PHP file alone"
+          curl -sS -m 60 --ssl-reqd -T "$GITHUB_WORKSPACE/customer/app/version.php" "ftp://$HOST${DEST}ftpcheck-version.txt" -u "$USER:$PASS" 2>&1 | sed 's/^/  /' | head -3; echo "  exit ${PIPESTATUS[0]}"
           echo "--- remove the test files"
-          curl -sS -m 25 --ssl-reqd "ftp://$HOST$DEST" -u "$USER:$PASS" -l -o /dev/null -Q "-DELE ftpcheck.txt" -Q "-DELE ftpcheck.bin" -Q "-DELE ftpcheck.zip" 2>&1 | sed 's/^/  /' | head -3; echo "  exit ${PIPESTATUS[0]}"
+          curl -sS -m 25 --ssl-reqd "ftp://$HOST$DEST" -u "$USER:$PASS" -l -o /dev/null -Q "-DELE ftpcheck.txt" -Q "-DELE ftpcheck.bin" -Q "-DELE ftpcheck.zip" -Q "-DELE ftpcheck15.bin" -Q "-DELE ftpcheck-php.zip" -Q "-DELE ftpcheck-php2.zip" -Q "-DELE ftpcheck-version.txt" 2>&1 | sed 's/^/  /' | head -3; echo "  exit ${PIPESTATUS[0]}"
           exit 0
