@@ -22,7 +22,7 @@ const AI_MAX_TEXT = 24000;      // characters of pasted text
 const AI_MAX_IMAGE = 4 * 1024 * 1024;
 const AI_RATE = [90, 600];      // calls per window (seconds) per user (R97-204: 90, was 30 — a newsletter version is translated cell by cell)
 /** Languages a text can be translated into with kind translate_to. */
-const AI_LANG_NAMES = ['en' => 'British English', 'el' => 'Greek', 'it' => 'Italian', 'ru' => 'Russian', 'uk' => 'Ukrainian', 'de' => 'German', 'nl' => 'Dutch', 'bg' => 'Bulgarian'];
+const AI_LANG_NAMES = ['en' => 'British English', 'el' => 'Greek', 'it' => 'Italian', 'ru' => 'Russian', 'uk' => 'Ukrainian', 'de' => 'German', 'nl' => 'Dutch', 'bg' => 'Bulgarian', 'ka' => 'Georgian'];
 
 function ai_has(): bool { static $h = null; if ($h === null) { try { $h = function_exists('lic_has') && lic_has() && (bool) scalar("SHOW TABLES LIKE 'ai_log'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function ai_setting(string $k, string $def = ''): string { $v = cp_setting($k); return $v === null || $v === '' ? $def : $v; }

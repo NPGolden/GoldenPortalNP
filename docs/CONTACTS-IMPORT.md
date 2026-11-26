@@ -4822,3 +4822,16 @@ Fail = firewall page (403 with «Website Firewall» / «Access Denied» / «Bloc
 ## §546 Personal assistant role: message to HR from the web (GAS-CP-R97-267, v1.264.1)
 
 `PA_ACTIONS` (`app/auth.php`) is the list of POST actions an account scoped «Personal assistant» may send on the web; the apps do not pass this gate, which is why the phone worked. Added: `hr_msg_send`, `hr_req_correct`, `soc_onboard_tick`, `twofa_begin`, `twofa_confirm`, `twofa_off`, `account_revoke`, `sec_dev_forget`, `avatar_remove`, `nf_seen`, `nf_seen_all`, `kb_answer`, `flt_reset` (the list held `twofa_enable`, `nf_read` … — names that do not exist). `tools/check-scopes.php` did not report `hr_msg_send` because the form is built in `hr_messages_card()` and not in a view.
+
+## §547 Georgian language — pipeline and first stage (GAS-CP-R97-268, v1.265.0)
+
+`LOCALES` holds `ka` (ქართული, GE). `customer/lang/ka.php` is **built**, not edited: `tools/i18n/ka.py` reads `en.php`, the translation memory `tools/i18n/ka_tm.json` (English text → Georgian text) and writes every key of `en.php`, in Georgian when the text is in the memory and in English otherwise — so the six language files always hold the same number of keys.
+
+- `python3 tools/i18n/ka.py stat` — how much is translated.
+- `… export <file> [chars]` — the next untranslated texts (`id<TAB>English`), the areas in the order of `PRIO`.
+- `… merge <file>` — takes `id<TAB>Georgian`; a line is refused when placeholders (`{n}`), `%s`, HTML tags, line breaks or edge spaces differ from the English.
+- `… build` — writes `ka.php`.
+
+**Every release from now on:** after adding keys to the five language files, add the Georgian of the new texts to the memory (export → translate → merge) and run `build`; without it the new keys appear in English in Georgian, never missing.
+
+Stage 1: 653 of 11 419 texts (5.7 %): buttons, menu, errors, sign-in, authenticator, passkeys, sessions, devices, dashboard, notifications, In / Out, planning, wellness. Not yet: the remaining areas, the five apps (`mobile*/js/i18n.js`), the handbooks (English in every language).

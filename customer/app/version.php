@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.264.1';
+const CP_VERSION = '1.265.0';
 const CP_BUILD   = '2026-11-27';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-268', 'version' => '1.265.0', 'date' => '2026-11-27', 'title' => 'Georgian (ქართული) added as a language — first stage: menu, sign-in, security, dashboard, notifications, In / Out, planning, wellness; the rest follows in stages and is shown in English until then', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-267', 'version' => '1.264.1', 'date' => '2026-11-27', 'title' => 'Personal assistant role: message to HR from the web, authenticator and known devices on My account — the role list did not hold these actions', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-266', 'version' => '1.264.0', 'date' => '2026-11-27', 'title' => 'HR messages: Done closes a request and tells the employee, HR holders write to HR from the desktop; applicants: dated notes and decision changes in the history; In / Out: monthly report of late arrivals and early leaves with notes of HR', 'db' => 'install/migrate_cp_r97_266_hr_done_applicant_notes_month_report.sql', 'check' => 'r99z'],
         ['ref' => 'GAS-CP-R97-265', 'version' => '1.263.0', 'date' => '2026-11-27', 'title' => 'Health report corrections: delivery check keeps its database connection after a long assistant reading; the session is released while the assistant works; slow pages show session wait and database connection; projects, new invoice, community and collections read in batches; daily report shows the web server values', 'db' => null, 'check' => null],

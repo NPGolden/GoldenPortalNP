@@ -12,6 +12,7 @@ const LOCALES = [
     'it' => ['native' => 'Italiano',   'short' => 'IT'],
     'uk' => ['native' => 'Українська', 'short' => 'UA'],
     'bg' => ['native' => 'Български',  'short' => 'BG'],
+    'ka' => ['native' => 'ქართული',    'short' => 'GE'],   // R97-268: built by tools/i18n/ka.py — texts not translated yet are shown in English
 ];
 const DEFAULT_LOCALE = 'en';
 
