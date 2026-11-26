@@ -15,6 +15,7 @@ jobs:
           USER: ${{ secrets.DEPLOY_USER }}
           PASS: ${{ secrets.DEPLOY_PASSWORD }}
           DPATH: ${{ secrets.DEPLOY_PATH }}
+          ORIGIN: ${{ secrets.ORIGIN_IP }}
         run: |
           set +e
           H="${HOST%%:*}"
@@ -32,6 +33,13 @@ jobs:
           curl -sS -m 20 --ssl-reqd "ftp://$H/" -u "$USER:$PASS" -l -o /dev/null 2>&1 | sed 's/^/  /' | head -5; echo "  exit ${PIPESTATUS[0]}"
           echo "--- plain FTP greeting only (no login sent)"
           curl -sS -m 10 "ftp://$H/" -u "anonymous:x" -o /dev/null 2>&1 | sed 's/^/  /' | head -3; echo "  exit ${PIPESTATUS[0]}"
+          echo "--- the website asked directly at the hosting server (not through the firewall)"
+          O=$(echo "$ORIGIN" | tr -d '[:space:]' | sed -E 's#^[a-z]+://##; s#[/:].*$##'); echo "$O" | grep -Eq '^[0-9.]+$' || O=$(getent ahostsv4 "$O" | awk 'NR==1{print $1}')
+          [ "$O" = "92.205.169.92" ] && echo "  ORIGIN_IP is the hosting IP of the panel: yes" || echo "  ORIGIN_IP is the hosting IP of the panel: NO"
+          for i in 1 2 3; do curl -s -o /dev/null -m 40 --resolve "goldensas.com:443:$O" -A "GAS-deploy/1.0" -w "  direct GET login: %{http_code} connect %{time_connect}s tls %{time_appconnect}s total %{time_total}s\n" "https://goldensas.com/customer/?p=login"; done
+          curl -s -o /dev/null -m 40 --resolve "goldensas.com:443:$O" -A "GAS-deploy/1.0" -w "  direct GET static file: %{http_code} total %{time_total}s\n" "https://goldensas.com/customer/assets/portal.css"
+          curl -s -o /dev/null -m 40 --resolve "goldensas.com:443:$O" -A "GAS-deploy/1.0" -X POST -d "dry=1" -w "  direct POST update.php without token: %{http_code} total %{time_total}s\n" "https://goldensas.com/customer/install/update.php"
+          curl -s -o /dev/null -m 40 -A "GAS-deploy/1.0" -w "  through the firewall GET login: %{http_code} total %{time_total}s\n" "https://goldensas.com/customer/?p=login"
           DEST="${DPATH%/}/customer/storage/updates/"
           v() { grep -E "^(< [0-9]{3}|\* (TLS|SSL|Connect|Closing|Recv|Send|Fail|Remembering|upload|We are|Connection))" | sed 's/^/    /' | grep -v "PASS\|USER" | head -40; }
           echo "--- list the updates folder"
