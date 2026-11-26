@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.265.0** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.265.1** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.265.1 | GAS-CP-R97-269 | 2026-11-27 | Georgian — second delivery: My leave and HR, training, evaluations, targets, community, equipment of the personnel, job descriptions, field service reports (17.6 % of the portal) | — |
 | 1.265.0 | GAS-CP-R97-268 | 2026-11-27 | Georgian (ქართული) added as a language — first stage: menu, sign-in, security, dashboard, notifications, In / Out, planning, wellness; the rest follows in stages and is shown in English until then | — |
 | 1.264.1 | GAS-CP-R97-267 | 2026-11-27 | Personal assistant role: message to HR from the web, authenticator and known devices on My account — the role list did not hold these actions | — |
 | 1.264.0 | GAS-CP-R97-266 | 2026-11-27 | HR messages: Done closes a request and tells the employee, HR holders write to HR from the desktop; applicants: dated notes and decision changes in the history; In / Out: monthly report of late arrivals and early leaves with notes of HR | `install/migrate_cp_r97_266_hr_done_applicant_notes_month_report.sql` |

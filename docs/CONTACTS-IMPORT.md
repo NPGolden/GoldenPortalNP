@@ -4835,3 +4835,7 @@ Fail = firewall page (403 with «Website Firewall» / «Access Denied» / «Bloc
 **Every release from now on:** after adding keys to the five language files, add the Georgian of the new texts to the memory (export → translate → merge) and run `build`; without it the new keys appear in English in Georgian, never missing.
 
 Stage 1: 653 of 11 419 texts (5.7 %): buttons, menu, errors, sign-in, authenticator, passkeys, sessions, devices, dashboard, notifications, In / Out, planning, wellness. Not yet: the remaining areas, the five apps (`mobile*/js/i18n.js`), the handbooks (English in every language).
+
+## §548 Georgian — second delivery (GAS-CP-R97-269, v1.265.1)
+
+Translation memory at 2 007 of 11 419 texts (17.6 %). Added since §547: `hr.*` (leave, card, employment, rules, periods, training, evaluations, targets, reasons, messages), `soc.*`, `hre.*`, `jd.*` and the first part of `fsr.*`. Bilingual form labels of the service report (English / Greek) are given as Georgian / English. No code change; `ka.php` rebuilt with `tools/i18n/ka.py build`.

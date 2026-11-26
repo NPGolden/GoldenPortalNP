@@ -1,8 +1,8 @@
 {
     "name": "Golden A/S Customer Portal",
-    "version": "1.265.0",
+    "version": "1.265.1",
     "build": "2026-11-27",
-    "generated_at": "2026-11-26T22:57:05+00:00",
+    "generated_at": "2026-11-26T22:57:23+00:00",
     "count": 1001,
     "files": {
         ".htaccess": {
@@ -1114,8 +1114,8 @@
             "size": 6873
         },
         "customer/app/version.php": {
-            "sha256": "c03f701c3d6e221276e46285c59e7502787c615ffb19a8b74d0b634fdafafd2e",
-            "size": 295019
+            "sha256": "f4e41714c20eb70538104f6ba70c85d7daf3bf969d521be2a14067064b95e1fc",
+            "size": 295330
         },
         "customer/app/vh.php": {
             "sha256": "06dc02b03a9840b99ce9860942ba8ccf34169b2141ab182a1c34c10716cd6321",
@@ -2818,12 +2818,12 @@
             "size": 46184
         },
         "customer/views/_manual_golden.php": {
-            "sha256": "e1c71099214982c97c6424e1089159836ba2669dd2bc5b310d47bff81d3e7db0",
-            "size": 528509
+            "sha256": "e5a12bc03a1f6af372e08c164b48e52fe01fe34bba15f5a514eaccfcb11c2792",
+            "size": 528947
         },
         "customer/views/_manual_hr.php": {
-            "sha256": "102a2658d6caa5eedcd405b9747b3e17a99f882cdba5a36dcb6de1093b7825df",
-            "size": 91798
+            "sha256": "a4f845b23f12870673caaddd43c32474b59514f83e714fa3e1b0d692b86a85d3",
+            "size": 92236
         },
         "customer/views/_manual_it.php": {
             "sha256": "bb8e04adf864f125f2a52dbbdcfea174a4c5f32d799638244fbc8a73073e18d9",
@@ -2838,8 +2838,8 @@
             "size": 19395
         },
         "customer/views/_manual_staff.php": {
-            "sha256": "89e988edd7b463c6b0616a0f315fffe1fea88fc98d990535d9060888cf74a685",
-            "size": 200279
+            "sha256": "3c6ddb007dd75cb178c956121d984a75c63d8a870307ea4d22148d71264639f7",
+            "size": 200717
         },
         "customer/views/_mcs_overview.php": {
             "sha256": "e045d193b36969ea972c9f3bc3e74a20e3f3e2e7859abd6fb9afaa99a71109b0",
