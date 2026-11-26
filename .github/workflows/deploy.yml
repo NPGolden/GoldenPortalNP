@@ -70,7 +70,10 @@ jobs:
             if [ -n "$KEY" ]; then echo "$KEY" > /tmp/key; chmod 600 /tmp/key; curl -sS --fail -T "$Z" "sftp://$HOST$DEST" -u "$USER:" --key /tmp/key --pubkey "" -k; rm -f /tmp/key
             else curl -sS --fail -T "$Z" "sftp://$HOST$DEST" -u "$USER:$PASS" -k; fi
           else
-            curl -sS --fail --ssl-reqd -T "$Z" "ftp://$HOST$DEST" -u "$USER:$PASS" --ftp-create-dirs
+            up() { curl -sS --fail --ssl-reqd -T "$Z" "ftp://$HOST$DEST" -u "$USER:$PASS" --ftp-create-dirs "$@"; }
+            # R97-263: one retry, with the replies of the server shown (no account data) when the upload is refused
+            up || { echo "upload refused — second attempt with the replies of the server:"; sleep 5
+              up -v 2> /tmp/ftp.log || { grep -E "^(< (1|2|4|5)[0-9]{2}|\* (Recv|Send|Fail|Closing|upload|We are|Connection|TLS alert|OpenSSL|SSL_))" /tmp/ftp.log | grep -vE "PASS|USER|^< (220|234|331|230|200|257|250)" | tail -15; exit 56; }; }
           fi
           echo "uploaded $Z"
       - name: Dry run on the server
