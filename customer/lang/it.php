@@ -14041,4 +14041,7 @@ SN-0002',
 'dg.pub_one_no' => 'la disiscrizione con un clic dei provider di posta è respinta dal firewall',
 'dg.fix_pub' => 'Una pagina pubblica con un modulo non deve inviare «Referrer-Policy: no-referrer»; altrimenti aprire un ticket con il fornitore del firewall indicando il Block ID mostrato.',
 'dg.fix_pub_one' => 'Inserire il percorso /customer/nl.php nella allowlist del firewall del sito (Firewall › Access control › Allow URL paths) perché funzioni il pulsante «Unsubscribe» di Gmail e Outlook.',
+'jd.ceo_all' => 'Approva tutte le fasi come CEO',
+'jd.ceo_all_confirm' => 'Approvare personalmente ogni fase aperta di questa descrizione della posizione? Entra subito in vigore; gli approvatori di cui firma la fase vengono avvisati.',
+'jd.nf_ceo_all' => 'La descrizione della posizione {c} {t} ({r}) è stata approvata dal CEO per tutte le fasi',
 ];

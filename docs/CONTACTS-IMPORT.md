@@ -4765,3 +4765,7 @@ Fail = firewall page (403 with «Website Firewall» / «Access Denied» / «Bloc
 ## §539 Self-test through the website firewall: careful when the site does not answer (GAS-CP-R97-260, v1.260.2)
 
 `sec_pubtest()` starts with one probe of the acceptance page; no answer or a status of 502 and above ends the test (`ok` = null, issue «the public address does not answer — test not run»). `sec_pubtest_daily()` writes the setting `sec_pubtest` with today's date before the test starts, so the scheduler (every five minutes, no lock) cannot start it twice. Request timeout 5 s, connect 3 s.
+
+## §540 Job descriptions: the CEO approves all stages (GAS-CP-R97-261, v1.261.0)
+
+`jd_approve_all($id)` (`app/jd.php`), action `jd_approve_all`, only for `jd_is_ceo()`. Status draft or review; a draft is first put under review (same content check as `jd_submit`). Every stage of `JD_STEPS` that is open and has approvers is signed with the CEO as `<step>_by`; `<step>_name` is the name of the CEO, followed by «(CEO)» on a stage the CEO does not hold. Then `jd_finish()` (revision kept, people told) and `jd.nf_ceo_all` to the approvers whose stage was signed. Button on `hr_jd` (draft and review); `hr_jds` lists every description under review for the CEO.

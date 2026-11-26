@@ -134,6 +134,22 @@ function jd_approve(int $id): int {
     if ($next === null) jd_finish($jd); else jd_notify($jd, jd_step_users($jd, $next), 'jd.nf_review');
     return $n;
 }
+/** R97-261: the CEO approves every stage that is still open, in one action — from the draft or while the description waits for somebody else.
+ *  Each stage carries the name of the CEO (marked «CEO» on the stages of others), and the approvers whose stage was signed for them are told. */
+function jd_approve_all(int $id): int {
+    if (!jd_is_ceo()) throw new RuntimeException(t('err.noaccess'));
+    $jd = jd_load($id); if (!$jd || !in_array($jd['status'], ['draft', 'review'], true)) throw new RuntimeException(t('jd.not_review'));
+    if (trim((string)$jd['purpose']) === '' || !jd_lines($jd['duties'])) throw new RuntimeException(t('jd.need_body'));
+    $u = current_user(); $me = (int)$u['id']; $name = (string)$u['full_name']; $n = 0; $told = [];
+    if ($jd['status'] === 'draft') q("UPDATE hr_jds SET status = 'review', submitted_at = NOW(), submitted_name = ?, reject_note = NULL, dm_by = NULL, dm_name = NULL, dm_at = NULL, gm_by = NULL, gm_name = NULL, gm_at = NULL, ceo_by = NULL, ceo_name = NULL, ceo_at = NULL WHERE id = ? AND status = 'draft'", [$name, $id]);
+    $jd = jd_load($id);
+    foreach (JD_STEPS as $s) { if (!empty($jd[$s . '_at'])) continue; $users = jd_step_users($jd, $s); if (!$users) continue;
+        $mine = in_array($me, $users, true); if (!$mine) $told = array_merge($told, $users);
+        q("UPDATE hr_jds SET {$s}_by = ?, {$s}_name = ?, {$s}_at = NOW() WHERE id = ? AND status = 'review' AND {$s}_at IS NULL", [$me, mb_substr($mine ? $name : $name . ' (' . t('jd.step_ceo') . ')', 0, 120), $id]); $n++; }
+    $jd = jd_load($id); if (jd_next_step($jd) !== null) throw new RuntimeException(t('jd.not_review'));
+    jd_finish($jd); if ($told) jd_notify($jd, $told, 'jd.nf_ceo_all');
+    return $n;
+}
 /** All steps signed (or skipped): the issue is approved and kept as revision R[n]. */
 function jd_finish(array $jd): void {
     q("UPDATE hr_jds SET status = 'approved' WHERE id = ?", [(int)$jd['id']]); $jd = jd_load((int)$jd['id']);
@@ -334,6 +350,7 @@ function jd_handle_action(string $action): bool {
         case 'jd_ai':      { $brief = mb_substr(trim((string)($_POST['brief'] ?? '')), 0, 2000); $r = jd_ai_draft($id, $brief, $_POST); $_SESSION['jd_ai_msg'] = ['brief' => $brief, 'a' => !empty($r['ok']) ? t('jd.ai_done') . (!empty($r['notes']) ? ' ' . $r['notes'] : '') : '', 'err' => empty($r['ok']) ? (string)($r['error'] ?? t('ai.failed')) : '']; redirect('hr_jd', $id ? ['id' => $id, 'edit' => 1, '_r' => uniqid()] : ['new' => 1, '_r' => uniqid()], '#jd-ai'); }
         case 'jd_ai_clear': unset($_SESSION['jd_ai'][$id], $_SESSION['jd_ai_msg']); redirect('hr_jd', $id ? ['id' => $id, 'edit' => 1] : ['new' => 1]);
         case 'jd_submit':  jd_submit($id); $j = jd_load($id); flash('good', t($j && $j['status'] === 'approved' ? 'jd.approved_ok' : 'jd.submitted')); redirect('hr_jd', ['id' => $id, '_r' => uniqid()]);
+        case 'jd_approve_all': jd_approve_all($id); flash('good', t('jd.approved_ok')); redirect('hr_jd', ['id' => $id, '_r' => uniqid()]);   // R97-261
         case 'jd_approve': jd_approve($id); $j = jd_load($id); flash('good', t($j && $j['status'] === 'approved' ? 'jd.approved_ok' : 'jd.step_ok')); redirect('hr_jd', ['id' => $id, '_r' => uniqid()]);
         case 'jd_reject':  jd_reject($id, (string)($_POST['note'] ?? '')); flash('good', t('jd.returned')); redirect('hr_jd', ['id' => $id, '_r' => uniqid()]);
         case 'jd_revise':  jd_revise($id, (string)($_POST['rev_title'] ?? '')); flash('good', t('jd.revised')); redirect('hr_jd', ['id' => $id, 'edit' => 1, '_r' => uniqid()]);

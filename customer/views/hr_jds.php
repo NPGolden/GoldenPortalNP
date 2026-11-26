@@ -7,7 +7,7 @@ $manage = jd_manage(); $isAppr = jd_is_gm() || jd_is_ceo() || (function_exists('
 if (!$manage && !$isAppr) { http_response_code(403); layout_head(t('jd.title'), 'hr_jds'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
 $f = ['discipline' => (int)($_GET['discipline'] ?? 0), 'status' => in_array($_GET['status'] ?? '', array_merge(JD_STATES, ['all']), true) ? $_GET['status'] : '', 'q' => mb_substr(trim((string)($_GET['q'] ?? '')), 0, 80)];
 $rows = jd_list($f); $depts = function_exists('hr_departments') ? hr_departments() : []; $miss = $manage ? jd_seed_missing() : 0;
-$wait = array_values(array_filter(jd_list(['status' => 'review']), function ($j) { $s = jd_next_step($j); return $s !== null && jd_holds($j, $s); }));
+$wait = array_values(array_filter(jd_list(['status' => 'review']), function ($j) { $s = jd_next_step($j); return $s !== null && (jd_holds($j, $s) || jd_is_ceo()); }));   // R97-261: the CEO can approve at any stage
 layout_head(t('jd.title'), 'hr_jds');
 ?>
 <div class="page-head"><div><h1>📄 <?= tt('jd.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('jd.lede') ?></p></div>

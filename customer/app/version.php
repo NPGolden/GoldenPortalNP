@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.260.2';
+const CP_VERSION = '1.261.0';
 const CP_BUILD   = '2026-11-24';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-261', 'version' => '1.261.0', 'date' => '2026-11-26', 'title' => 'Job descriptions: the CEO approves all stages in one action, from the draft or at any stage', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-260', 'version' => '1.260.2', 'date' => '2026-11-26', 'title' => 'Self-test through the website firewall: stops when the public address does not answer, is marked before it starts, shorter waiting times', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-259', 'version' => '1.260.1', 'date' => '2026-11-26', 'title' => 'Self-test through the website firewall widened: app sign-in, careers and website forms, the five app pages', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-258', 'version' => '1.260.0', 'date' => '2026-11-26', 'title' => 'Daily self-test of the public pages through the website firewall, with a Diagnostics row and a notice to the administrators', 'db' => null, 'check' => null],

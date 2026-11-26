@@ -14041,4 +14041,7 @@ SN-0002',
 'dg.pub_one_no' => 'one-click unsubscribe of mail providers is refused by the firewall',
 'dg.fix_pub' => 'A public page must not send «Referrer-Policy: no-referrer» when it has a form; otherwise open a ticket with the firewall provider with the block ID shown.',
 'dg.fix_pub_one' => 'Put the path /customer/nl.php on the allowlist of the website firewall (Firewall › Access control › Allow URL paths) so that the «Unsubscribe» button of Gmail and Outlook works.',
+'jd.ceo_all' => 'Approve all stages as CEO',
+'jd.ceo_all_confirm' => 'Approve every open stage of this job description yourself? It comes into force at once; the approvers whose stage you sign are told.',
+'jd.nf_ceo_all' => 'Job description {c} {t} ({r}) was approved by the CEO for all stages',
 ];
