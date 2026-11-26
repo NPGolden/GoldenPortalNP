@@ -4843,3 +4843,7 @@ Translation memory at 2 007 of 11 419 texts (17.6 %). Added since §547: `hr.*` 
 ## §549 Georgian — third delivery (GAS-CP-R97-270, v1.265.2)
 
 Translation memory at 3 575 of 11 419 texts (31.3 %). Added since §548: rest of `fsr.*`, `isr.*`, `jo.*`, `ts.*`, `tk.*`, `td.*`, `eq.*`, `hra.*`, `hrs.*`, `kb.*`, `cr.*`, `pf.*`, `wc.*` and the first general areas (months, customer pages, projects, drawing tracker, submittals, tests, reports, import). Texts that are the same in both languages (FAT, IMO, ENG …) are stored in the memory as they are. No code change.
+
+## §550 Georgian — fourth delivery (GAS-CP-R97-271, v1.265.3)
+
+Translation memory at about 48 % of 11 419 texts. Added since §549: general project, fleet and account pages, approvals, offers and the offer builder, contacts, companies, customers, archive, licence, branches, teams, open issues, remote support, works forecast, the E-mail card and its built-in texts (the default message to a customer whose portal language is Georgian is now in Georgian), rate cards, cost control and work packages. Rules and term list of the translation: `tools/i18n/ka_terms.md`. No code change.
