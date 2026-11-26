@@ -11,7 +11,7 @@
 declare(strict_types=1);
 define('CP_ROOT', __DIR__); ini_set('session.use_cookies', '0'); ini_set('session.use_only_cookies', '0'); ini_set('session.cache_limiter', '');
 foreach (['version', 'db', 'cache', 'i18n', 'helpers', 'auth', 'lic', 'mailer', 'ct', 'org', 'nl'] as $m) { $f = __DIR__ . '/app/' . $m . '.php'; if (is_file($f)) require_once $f; }
-header('X-Content-Type-Options: nosniff'); header('X-Robots-Tag: noindex, nofollow'); header('Referrer-Policy: no-referrer'); header('Cache-Control: no-store');
+header('X-Content-Type-Options: nosniff'); header('X-Robots-Tag: noindex, nofollow'); header('Referrer-Policy: same-origin');   /* R97-257: the firewall refuses a POST without referrer (FBP007) — the referrer goes to this site only, never outside */  header('Cache-Control: no-store');
 $home = 'https://www.goldenas.com.gr/'; $gif = function (): void { header('Content-Type: image/gif'); echo base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'); exit; };
 $tok = function (string $k): string { $v = (string)($_GET[$k] ?? ''); return preg_match('/^[A-Za-z0-9]{24}$/', $v) ? $v : ''; };
 /* R97-050: the page takes the identity of the website the token belongs to — KYMA pages carry the KYMA name, colours and link, and nothing of Golden A/S. */

@@ -4729,3 +4729,13 @@ Migration `migrate_cp_r97_255_gm_authenticator_login_devices.sql`, key r99x.
 | Known devices | `sec_devices($uid)`, `sec_device_forget($uid, $id)` (own rows only), action `sec_dev_forget` (allowed for every scoped role), card `#devices` on My Account. |
 
 Migration `migrate_cp_r97_256_asset_import_register_authenticator_roles.sql`, key r99y.
+
+## §536 Acceptance link and unsubscribe page refused by the website firewall, FBP007 (GAS-CP-R97-257, v1.259.1)
+
+**Symptom:** «Access Denied – GoDaddy Website Firewall», block ID FBP007 («fake bot access, POST request without referrer»), on `sign.php?t=…` after pressing a button.
+
+**Cause:** `sign.php` and `nl.php` sent `Referrer-Policy: no-referrer`, so every form of those pages was posted without a referrer; the firewall refuses such a POST from any browser. The portal itself (`index.php`) sends `same-origin` and was never affected.
+
+**Correction:** both pages send `Referrer-Policy: same-origin` — the referrer (which carries the link token) goes to goldensas.com only and is never sent to another site. **Rule:** no public page of the portal may use `no-referrer` when it has a form.
+
+**Not covered by the portal:** a one-click unsubscribe sent by a mail provider itself (POST without referrer by design) is still refused by the firewall unless `/customer/nl.php` is put on the allowlist in the firewall settings.

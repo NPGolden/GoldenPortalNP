@@ -1,8 +1,8 @@
 {
     "name": "Golden A/S Customer Portal",
-    "version": "1.259.0",
+    "version": "1.259.1",
     "build": "2026-11-24",
-    "generated_at": "2026-11-25T20:21:26+00:00",
+    "generated_at": "2026-11-26T10:53:05+00:00",
     "count": 999,
     "files": {
         ".htaccess": {
@@ -10,8 +10,8 @@
             "size": 181
         },
         "CHANGELOG.md": {
-            "sha256": "83fb4b064d62c36a0d4dde118557e7d5a26e2e23cf59d49111f2835f3d736012",
-            "size": 222318
+            "sha256": "002563888915ea9ded4cfad05f557df8264ab7d1258260aac7aab825d49ecc1d",
+            "size": 222664
         },
         "README.md": {
             "sha256": "aaac31c2a33e616de5c3dc217d5e2f5b7803f116db21e3d4a01cfb1b96e4b974",
@@ -1114,8 +1114,8 @@
             "size": 6873
         },
         "customer/app/version.php": {
-            "sha256": "61d2fe33da2e5724a2d6f9f3b0bddb6843623958cd0b543c172f665a77ba9812",
-            "size": 291495
+            "sha256": "cc5828cca89c211b5b307e0743111844459e9046b335d259af3fc6914582e73c",
+            "size": 291753
         },
         "customer/app/vh.php": {
             "sha256": "06dc02b03a9840b99ce9860942ba8ccf34169b2141ab182a1c34c10716cd6321",
@@ -2710,16 +2710,16 @@
             "size": 3183
         },
         "customer/nl.php": {
-            "sha256": "64b2ae3db57d5afd762ccb2eaaea8fe5838e034fc359add5f59681b8227d6f06",
-            "size": 7124
+            "sha256": "2da287802066be45c30f2b48bd92a627b2f53932b63537c2538d1c2a07bdfec6",
+            "size": 7251
         },
         "customer/rcr_feed.php": {
             "sha256": "ba1a924a7db47fc9bc1b326d8cc27b9d15efddc8255328a8d51cd6fca012323e",
             "size": 4773
         },
         "customer/sign.php": {
-            "sha256": "36bc7a6425ca598cb940c469fe319d7dd8634c7086c15ab37598e0183bda4d33",
-            "size": 15825
+            "sha256": "4d3f68399b57004b7f7cb366b447e187718938b9bf654ad989a6b8f7957fe434",
+            "size": 15952
         },
         "customer/tick.php": {
             "sha256": "ed9a11dd8144b1f09bb0f2255ce5d59ea14cb373b3dec8aa0d7f43fac7e5672b",
@@ -2806,32 +2806,32 @@
             "size": 34790
         },
         "customer/views/_manual_customer.php": {
-            "sha256": "2e85f02d7e281495738a9a1a33df038ad789f8c2f30aa5b781c6f14a9610acff",
-            "size": 44914
+            "sha256": "5299f2c4a9226418ba2d1060ca6d97f506709be61c55069f2f1c82f84f9a5451",
+            "size": 45631
         },
         "customer/views/_manual_golden.php": {
-            "sha256": "37c69506b5c5227ca59f8339c95720e7a2c6d5bb7bb82faa0c52355ba1a50d41",
-            "size": 518731
+            "sha256": "34f7af1d56bfbdf43404df90ddb93d1e4fe5596d6bb91e4cd174d0b45186dd8f",
+            "size": 519448
         },
         "customer/views/_manual_hr.php": {
             "sha256": "fd229712d4259b87f21a4bb57fdad36d8611adb8351e4296795f60c749a173b5",
             "size": 87426
         },
         "customer/views/_manual_it.php": {
-            "sha256": "de93cb6ef2d1913f36c92c1c9a7575def58c3624b10df2f7a2298e0c654965d8",
-            "size": 31740
+            "sha256": "2809e8075157d9ad6a48aec071c1d369cb4a5b1ef1a35f846bb2420a4b941d68",
+            "size": 32457
         },
         "customer/views/_manual_pm.php": {
-            "sha256": "1389c892a068c451021dfdc2dabe52be800750d64d444ce8eed3a9d1f742b7b3",
-            "size": 249512
+            "sha256": "648d6ad25ed5194a867a3a29fe3e80b32c8e1846bf2970b1a45a97171f4a6266",
+            "size": 250229
         },
         "customer/views/_manual_qhse.php": {
             "sha256": "54787c83816b4395fd48b213fd28469a169693a2d4f0ca44632cf5c7d11f2070",
             "size": 19395
         },
         "customer/views/_manual_staff.php": {
-            "sha256": "7a91d333bb69e4209c5c7d77812aa160d25c8c1e1ad26fa9177690a82c77b1ea",
-            "size": 196550
+            "sha256": "350f31ecb8ea12d81588d5e961803ad66832731f6189185223c1b44504cccb46",
+            "size": 197267
         },
         "customer/views/_mcs_overview.php": {
             "sha256": "e045d193b36969ea972c9f3bc3e74a20e3f3e2e7859abd6fb9afaa99a71109b0",

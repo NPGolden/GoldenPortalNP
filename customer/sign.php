@@ -12,7 +12,7 @@ if (is_dir(__DIR__ . '/storage') && is_writable(__DIR__ . '/storage')) { ini_set
 ini_set('session.use_cookies', '0'); ini_set('session.use_only_cookies', '0'); ini_set('session.cache_limiter', '');
 // the same modules as the portal itself, in the same order (the list lives in index.php)
 if (preg_match_all("#^require __DIR__ \\. '/app/([a-z0-9_]+)\\.php';#m", (string) file_get_contents(__DIR__ . '/index.php'), $mm)) foreach ($mm[1] as $mod) require_once __DIR__ . '/app/' . $mod . '.php';
-header('X-Content-Type-Options: nosniff'); header('X-Robots-Tag: noindex, nofollow'); header('Referrer-Policy: no-referrer'); header('Cache-Control: no-store, max-age=0'); header('X-Frame-Options: DENY');
+header('X-Content-Type-Options: nosniff'); header('X-Robots-Tag: noindex, nofollow'); header('Referrer-Policy: same-origin');   /* R97-257: the firewall refuses a POST without referrer (FBP007) — the referrer goes to this site only, never outside */  header('Cache-Control: no-store, max-age=0'); header('X-Frame-Options: DENY');
 $nonce = csp_nonce();
 header("Content-Security-Policy: default-src 'none'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; script-src 'nonce-{$nonce}'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'");
 $token = (string)($_GET['t'] ?? ''); if (!preg_match('/^[A-Za-z0-9]{40}$/', $token)) $token = '';
