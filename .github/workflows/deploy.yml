@@ -90,6 +90,9 @@ jobs:
           import json; r=json.load(open('/tmp/apply.json'))
           print("\n".join(f"{s['step']:<12} {s['state']}" + (f"  {s.get('lines')}" if s.get('lines') else '') for s in r['steps']))
           print(f"portal {r['from']} -> {r['to']}  backup in {[s for s in r['steps'] if s['step']=='backup'][0].get('folder')}")
+          hk=[s for s in r['steps'] if s['step']=='housekeeping']
+          if hk: print(f"house-keeping: {hk[0].get('removed')} old items removed, {hk[0].get('freed_mb')} MB freed, {hk[0].get('backups_kept')} backups and {hk[0].get('zips_kept')} release files kept")
+          print('route:', r.get('via'))
           assert r['ok'], 'self-check reported FAIL — see lines above'
           PY
       - name: App service answers (mobile apps)
