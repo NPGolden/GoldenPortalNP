@@ -4761,3 +4761,7 @@ Firewall allowlist for the one-click unsubscribe (owner action): Website Securit
 | Five app pages | GET `mobile*/` | 200, no `no-referrer` in header or meta |
 
 Fail = firewall page (403 with «Website Firewall» / «Access Denied» / «Block ID»), status 500 and above, an app page that does not open, or `no-referrer`. A refusal by the portal itself is the expected answer and is not a failure.
+
+## §539 Self-test through the website firewall: careful when the site does not answer (GAS-CP-R97-260, v1.260.2)
+
+`sec_pubtest()` starts with one probe of the acceptance page; no answer or a status of 502 and above ends the test (`ok` = null, issue «the public address does not answer — test not run»). `sec_pubtest_daily()` writes the setting `sec_pubtest` with today's date before the test starts, so the scheduler (every five minutes, no lock) cannot start it twice. Request timeout 5 s, connect 3 s.

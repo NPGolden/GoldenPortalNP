@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.260.1** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.260.2** (build 2026-11-24). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.260.2 | GAS-CP-R97-260 | 2026-11-26 | Self-test through the website firewall: stops when the public address does not answer, is marked before it starts, shorter waiting times | — |
 | 1.260.1 | GAS-CP-R97-259 | 2026-11-26 | Self-test through the website firewall widened: app sign-in, careers and website forms, the five app pages | — |
 | 1.260.0 | GAS-CP-R97-258 | 2026-11-26 | Daily self-test of the public pages through the website firewall, with a Diagnostics row and a notice to the administrators | — |
 | 1.259.1 | GAS-CP-R97-257 | 2026-11-26 | Acceptance by e-mail link and newsletter unsubscribe: buttons refused by the website firewall (Access Denied, FBP007) — fixed | — |

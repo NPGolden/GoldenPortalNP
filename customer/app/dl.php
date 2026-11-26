@@ -36,7 +36,7 @@ function dl_url(string $token): string { return dl_base() . '/sign.php?t=' . $to
 /** One request the way a phone browser sends it. [status, headers (lower case), body start] */
 function sec_pub_req(string $url, bool $post, ?string $referer, array $hdr = [], ?string $body = null): array {
     if (!function_exists('curl_init')) return [0, '', '']; $ch = curl_init($url); $h = array_merge(['Accept: text/html,application/xhtml+xml,application/json', 'Accept-Language: en'], $hdr); if ($referer) $h[] = 'Referer: ' . $referer;
-    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HEADER => true, CURLOPT_TIMEOUT => 8, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_FOLLOWLOCATION => false, CURLOPT_HTTPHEADER => $h,
+    curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_HEADER => true, CURLOPT_TIMEOUT => 5, CURLOPT_CONNECTTIMEOUT => 3, CURLOPT_FOLLOWLOCATION => false, CURLOPT_HTTPHEADER => $h,
         CURLOPT_USERAGENT => 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.0 Mobile/15E148 Safari/604.1']);
     if ($post) { curl_setopt($ch, CURLOPT_POST, true); curl_setopt($ch, CURLOPT_POSTFIELDS, $body ?? 'a=selftest'); }
     $raw = (string) curl_exec($ch); $st = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE); $hs = (int) curl_getinfo($ch, CURLINFO_HEADER_SIZE); curl_close($ch);
@@ -52,6 +52,7 @@ function sec_pubtest(): array {
     $fw = fn(array $r) => $r[0] === 403 && (stripos($r[2], 'Website Firewall') !== false || stripos($r[2], 'sucuri') !== false || preg_match('/Block ID|Access Denied/i', $r[2])); $id = fn(array $r) => preg_match('/\b([A-Z]{2,6}\d{2,4})\b/', strip_tags($r[2]), $m) ? $m[1] : '403';
     $noref = fn(array $r) => (bool) preg_match('/^referrer-policy:\s*no-referrer\s*$/m', $r[1]) || (bool) preg_match('/<meta[^>]+name=["\']referrer["\'][^>]+content=["\']no-referrer["\']/i', $r[2]);
     $bad = function (string $what) use (&$o) { $o['ok'] = false; $o['issues'][] = $what; }; $dead = function (string $what) use (&$o) { if ($o['ok'] !== false) $o['ok'] = null; $o['issues'][] = $what . ': no answer'; };
+    $probe = sec_pub_req($base . '/sign.php?t=' . str_repeat('a', 40), false, null); if ($probe[0] === 0 || $probe[0] >= 502) { $o['ok'] = null; $o['issues'][] = 'the public address does not answer (' . $probe[0] . ') — test not run'; return $o; }   // R97-260: never add requests to a site that is not answering
     foreach (['sign.php?t=' . str_repeat('a', 40), 'nl.php'] as $path) { $u = $base . '/' . $path; $name = strtok($path, '?'); $o['n']++;
         $g = sec_pub_req($u, false, null); if ($g[0] === 0) { $dead($name); continue; }
         if ($fw($g)) { $bad($name . ': GET ' . $id($g)); continue; }
@@ -75,6 +76,7 @@ function sec_pubtest(): array {
 function sec_pubtest_daily(): ?string {
     if (!function_exists('cp_setting')) return null; $today = date('Y-m-d'); $last = (array) json_decode((string) cp_setting('sec_pubtest', ''), true);
     if ((int) date('G') < 7 || str_starts_with((string)($last['at'] ?? ''), $today)) return null;
+    cp_setting_set('sec_pubtest', json_encode(['at' => date('Y-m-d H:i'), 'ok' => null, 'issues' => ['running'], 'oneclick' => null, 'n' => 0]));   // R97-260: marked before it starts — a slow run is never started a second time by the next tick
     $r = sec_pubtest(); cp_setting_set('sec_pubtest', json_encode($r));
     if ($r['ok'] === false && function_exists('nf_push') && function_exists('nf_has') && nf_has()) { $admins = array_map('intval', array_column(all("SELECT id FROM customer_users WHERE role = 'admin' AND is_active = 1"), 'id'));
         if ($admins) nf_push($admins, 'sec:pubtest', 'sec:pubtest:' . $today, t('nf.sec_pub_t'), t('nf.sec_pub_b', ['i' => implode(' · ', $r['issues'])]), url('admin_about', ['diag' => 1]), null, null); }
