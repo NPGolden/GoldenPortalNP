@@ -101,10 +101,12 @@ function dn_create_x(array $h, array $L): int {
         if ($kind === 'transfer') {   // R97-279: out of one warehouse and into the other in the same action; what is reserved for the project travels with the goods
             $min = null; $moved = [];
             if ($l['item_id'] && !$l['skip_move']) {
-                $moved = dn_xfer_rsv_take((int)$l['item_id'], $wh, (float)$l['qty'], $pid, $sid);
+                $moved = dn_xfer_rsv_take((int)$l['item_id'], $wh, (float)$l['qty'], $pid, $sid, !empty($h['all_rsv']));
+                $snAll = !empty($h['auto_serials']) && function_exists('sn_tracked') && sn_tracked((int)$l['item_id']) && abs((float) scalar('SELECT qty_on_hand FROM inv_stock WHERE item_id = ? AND warehouse_id = ?', [(int)$l['item_id'], $wh]) - (float)$l['qty']) < 0.0005 ? array_column(sn_in_stock((int)$l['item_id'], $wh), 'serial_no') : [];   // R97-282: when everything of a numbered item leaves the warehouse, its numbers go with it
                 $mo = ['project_id' => $pid, 'subproject_id' => $sid, 'ref_kind' => 'dn', 'ref_id' => $dnId, 'ref_no' => $no, 'note' => $l['description']];
                 $mid = stk_move((int)$l['item_id'], $wh, 'xfer_out', (float)$l['qty'], $mo); $min = stk_move((int)$l['item_id'], (int)$to, 'xfer_in', (float)$l['qty'], $mo);
                 foreach ($moved as [$plid, $mq]) dn_xfer_rsv_put($plid, (int)$l['item_id'], (int)$to, $mq, $wh);
+                if ($snAll && count($snAll) <= (int) round((float)$l['qty'])) sn_transfer($mid, (int)$to, $snAll);
             }
             q('INSERT INTO inv_dn_lines (dn_id, seq, item_id, po_line_id, pr_line_id, description, unit, qty, move_id, move_in_id, note) VALUES (?,?,?,?,?,?,?,?,?,?,?)', [$dnId, $seq, $l['item_id'], null, null, $l['description'], $l['unit'], $l['qty'], $mid, $min, $l['note']]);
             $dlid = (int) db()->lastInsertId(); foreach ($moved as [$plid, $mq]) q('INSERT INTO inv_dn_rsv (dn_id, dn_line_id, pr_line_id, qty) VALUES (?,?,?,?)', [$dnId, $dlid, $plid, $mq]);
@@ -123,7 +125,17 @@ function dn_create_x(array $h, array $L): int {
     cache_bump_later('inv'); return $dnId;
 }
 /** R97-279: what requisitions of the project hold of this item in the source warehouse leaves it with the transfer (oldest line first). Returns [[requisition line, quantity], …]. */
-function dn_xfer_rsv_take(int $itemId, int $wh, float $qty, ?int $pid, ?int $sid): array {
+function dn_xfer_rsv_take(int $itemId, int $wh, float $qty, ?int $pid, ?int $sid, bool $all = false): array {
+    if ($all) {   // R97-282: stock of a warehouse sent on as it stands — free stock first; what is needed beyond it takes its reservations along, whatever the project
+        if (!function_exists('prq_rsv_has') || !prq_rsv_has()) return []; $st = one('SELECT qty_on_hand, qty_reserved FROM inv_stock WHERE item_id = ? AND warehouse_id = ? FOR UPDATE', [$itemId, $wh]) ?: ['qty_on_hand' => 0, 'qty_reserved' => 0];
+        $left = $qty - max(0.0, (float)$st['qty_on_hand'] - (float)$st['qty_reserved']); $out = []; if ($left <= 0.0005) return [];
+        foreach (all('SELECT l.* FROM pr_lines l JOIN pr_reservations v ON v.pr_line_id = l.id AND v.warehouse_id = ? AND v.qty > 0.0005 WHERE l.item_id = ? ORDER BY l.id FOR UPDATE', [$wh, $itemId]) as $l) {
+            if ($left <= 0.0005) break; $tq = min((float)(prq_rsv_of($l)[$wh] ?? 0.0), $left); if ($tq <= 0.0005) continue;
+            $t = prq_rsv_take($l, $tq, $wh, true); if (abs((float)($t[$wh] ?? 0.0) - $tq) > 0.0005) throw new RuntimeException(t('prq.issue_split'));
+            $out[] = [(int)$l['id'], $tq]; $left -= $tq;
+        }
+        return $out;
+    }
     if (!$pid || !function_exists('prq_rsv_has') || !prq_rsv_has()) return []; $out = []; $left = $qty; $a = [$wh, $itemId, $pid]; if ($sid) $a[] = $sid;
     foreach (all("SELECT l.* FROM pr_lines l JOIN pr_requests r ON r.id = l.request_id JOIN pr_reservations v ON v.pr_line_id = l.id AND v.warehouse_id = ? AND v.qty > 0.0005
                   WHERE l.item_id = ? AND r.project_id = ? AND r.status = 'approved' AND l.status IN ('reserved','to_buy','received')" . ($sid ? ' AND r.subproject_id = ?' : '') . ' ORDER BY l.id FOR UPDATE', $a) as $l) {
@@ -294,6 +306,48 @@ function dn_receive(int $id, string $note): void {
     dn_event($id, 'received', $note);
     try { if ((int)$d['user_id'] && (int)$d['user_id'] !== (int)$u['id'] && function_exists('nf_push')) nf_push([(int)$d['user_id']], 'dn:recv', 'dn:' . $id, t('dn.nf_recv', ['no' => $d['dn_no']]), dn_wh_label((string)$d['to_wh_code'], (string)$d['to_warehouse']) . ($note !== '' ? ' — ' . $note : ''), url('delivery_note', ['id' => $id]), (int)$u['id'], (string)$u['full_name']); } catch (Throwable $e) { error_log('[dn] notify: ' . $e->getMessage()); }
 }
+/* ---- R97-282: stock per warehouse, and the stock of a warehouse sent to another one ---- */
+const DN_XFER_NOTE = 400;    // lines on one transfer note
+const DN_XFER_MAX = 1200;    // lines in one action
+/** One row per warehouse: items in stock, lines with a reservation, value at the last purchase price (only for those who may see prices). */
+function stk_wh_summary(): array {
+    if (!stk_has()) return []; $val = stk_price_visible(); $o = [];
+    foreach (all('SELECT s.warehouse_id, SUM(s.qty_on_hand > 0.0005) AS n_items, SUM(s.qty_reserved > 0.0005) AS n_reserved, SUM(s.qty_on_hand < -0.0005) AS n_negative' . ($val ? ', SUM(IF(s.qty_on_hand > 0, s.qty_on_hand * COALESCE(i.last_price, 0), 0)) AS value' : '') . ' FROM inv_stock s JOIN inv_items i ON i.id = s.item_id GROUP BY s.warehouse_id') as $r) $o[(int)$r['warehouse_id']] = $r;
+    return $o;
+}
+/** What a warehouse holds. $f: q, cat, show (instock | all | reserved | negative). Returns [rows, total]. */
+function stk_wh_stock(int $whId, array $f = [], int $limit = 200, int $offset = 0): array {
+    if (!stk_has() || !$whId) return [[], 0]; $w = ['s.warehouse_id = ?']; $a = [$whId]; $show = (string)($f['show'] ?? 'instock');
+    $w[] = ['all' => '(ABS(s.qty_on_hand) > 0.0005 OR s.qty_reserved > 0.0005)', 'reserved' => 's.qty_reserved > 0.0005', 'negative' => 's.qty_on_hand < -0.0005'][$show] ?? 's.qty_on_hand > 0.0005';
+    if (!empty($f['cat'])) { $w[] = '(i.category_id = ? OR i.category_id IN (SELECT id FROM inv_categories WHERE parent_id = ?))'; $a[] = (int)$f['cat']; $a[] = (int)$f['cat']; }
+    if (trim((string)($f['q'] ?? '')) !== '') { $l = '%' . trim((string)$f['q']) . '%'; $w[] = '(i.code LIKE ? OR i.description LIKE ? OR i.factory_code LIKE ? OR i.maker LIKE ? OR s.location LIKE ?)'; array_push($a, $l, $l, $l, $l, $l); }
+    $from = ' FROM inv_stock s JOIN inv_items i ON i.id = s.item_id LEFT JOIN inv_categories c ON c.id = i.category_id WHERE ' . implode(' AND ', $w);
+    $total = (int) scalar('SELECT COUNT(*)' . $from, $a);
+    $rows = all('SELECT s.item_id, s.qty_on_hand, s.qty_reserved, s.location, i.code, i.description, i.unit, i.maker, i.factory_code, i.last_price, i.currency, c.name AS category' . $from . ' ORDER BY i.code LIMIT ' . max(1, min(5000, $limit)) . ' OFFSET ' . max(0, $offset), $a);
+    return [$rows, $total];
+}
+/** May this person look at the stock of the warehouse? Procurement, warehouse, management — and the holder of that warehouse. */
+function stk_wh_can_view(?array $w): bool { if (function_exists('pr_can') && pr_can()) return true; $u = current_user(); return $w && $u && is_staff() && stk_wh_x_has() && (int)($w['holder_id'] ?? 0) === (int)$u['id']; }
+/** The stock of a warehouse goes to another one with transfer notes. $pick null = everything in stock; otherwise [item id => quantity]. Reservations and serial numbers travel with the goods. Returns [note ids, lines moved, lines still in the warehouse]. */
+function dn_xfer_stock(int $from, int $to, array $h, ?array $pick): array { @set_time_limit(180); return stk_tx(fn() => dn_xfer_stock_x($from, $to, $h, $pick)); }
+function dn_xfer_stock_x(int $from, int $to, array $h, ?array $pick): array {
+    require_pr_wh(); if (!dn_x_has()) throw new RuntimeException(t('err.noaccess'));
+    if (!$from || !$to || $from === $to || (int) scalar('SELECT COUNT(*) FROM inv_warehouses WHERE id IN (?, ?) AND is_active = 1', [$from, $to]) !== 2) throw new RuntimeException(t('stk.need_to_wh'));
+    $lines = []; $rest = 0;
+    if ($pick === null) { [$rows, $total] = stk_wh_stock($from, ['show' => 'instock'], DN_XFER_MAX, 0); $rest = max(0, $total - count($rows)); foreach ($rows as $r) $lines[] = ['item_id' => (int)$r['item_id'], 'description' => (string)$r['description'], 'unit' => (string)$r['unit'], 'qty' => (float)$r['qty_on_hand']]; }
+    else { $want = []; foreach ($pick as $iid => $q) { $q = (float) str_replace(',', '.', (string)$q); if ((int)$iid > 0 && $q > 0.0005) $want[(int)$iid] = $q; } if (count($want) > DN_XFER_MAX) throw new RuntimeException(t('whs.too_many', ['n' => DN_XFER_MAX]));
+        if ($want) foreach (all('SELECT s.item_id, s.qty_on_hand, i.code, i.description, i.unit FROM inv_stock s JOIN inv_items i ON i.id = s.item_id WHERE s.warehouse_id = ? AND s.item_id IN (' . implode(',', array_keys($want)) . ') ORDER BY i.code', [$from]) as $r) { $q = $want[(int)$r['item_id']]; if ($q > (float)$r['qty_on_hand'] + 0.0005) throw new RuntimeException(t('whs.too_much', ['c' => (string)$r['code'], 'q' => stk_qty((float)$r['qty_on_hand'])])); $lines[] = ['item_id' => (int)$r['item_id'], 'description' => (string)$r['description'], 'unit' => (string)$r['unit'], 'qty' => $q]; } }
+    if (!$lines) throw new RuntimeException(t('dn.need_lines'));
+    $head = ['kind' => 'transfer', 'warehouse_id' => $from, 'to_warehouse_id' => $to, 'all_rsv' => true, 'auto_serials' => true, 'allow_negative' => false, 'project_id' => (int)($h['project_id'] ?? 0), 'subproject_id' => (int)($h['subproject_id'] ?? 0), 'to_user_id' => (int)($h['to_user_id'] ?? 0), 'issued_at' => (string)($h['issued_at'] ?? ''), 'carrier' => (string)($h['carrier'] ?? ''), 'ref_no' => (string)($h['ref_no'] ?? ''), 'note' => (string)($h['note'] ?? '')];
+    $ids = []; foreach (array_chunk($lines, DN_XFER_NOTE) as $chunk) $ids[] = dn_create_x($head, $chunk);
+    return [$ids, count($lines), $rest];
+}
+function dn_xfer_stock_from_post(): array {
+    $all = ($_POST['mode'] ?? '') === 'all'; $pick = null;
+    if (!$all) { $pick = []; foreach ((array)($_POST['pick'] ?? []) as $iid => $on) if ($on) $pick[(int)$iid] = (string)($_POST['xq'][$iid] ?? '0'); }
+    return dn_xfer_stock((int)($_POST['from_wh'] ?? 0), (int)($_POST['to_warehouse_id'] ?? 0), ['project_id' => (int)($_POST['project_id'] ?? 0), 'to_user_id' => (int)($_POST['to_user_id'] ?? 0), 'issued_at' => (string)($_POST['issued_at'] ?? ''), 'carrier' => (string)($_POST['carrier'] ?? ''), 'ref_no' => (string)($_POST['ref_no'] ?? ''), 'note' => (string)($_POST['note'] ?? '')], $pick);
+}
+
 /* ---- R97-281: a new note assembled from the goods that transfer notes brought to a warehouse — a whole note, some lines, or part of a quantity ---- */
 /** The lines of issued transfer notes with what has already been sent on and what is still there. */
 function dn_fwd_lines(array $dnIds): array {

@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.269.0** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.270.0** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.270.0 | GAS-CP-R97-282 | 2026-11-27 | Inventory: stock per warehouse (items, reserved, free, value, Excel) and the stock of a warehouse — all of it or the ticked lines — sent to another warehouse with a transfer note; reservations and serial numbers travel with the goods | — |
 | 1.269.0 | GAS-CP-R97-281 | 2026-11-27 | Delivery notes: a new note assembled from the goods that transfer notes brought to a warehouse — whole notes, some lines or part of the quantities, from one or several notes — to a project or a customer, with what is left shown per line | `install/migrate_cp_r97_281_dn_onward_from_lines.sql` |
 | 1.268.0 | GAS-CP-R97-280 | 2026-11-27 | Delivery notes for the Service engineer: a note names the receiving engineer, who is notified on the phone and accepts it in the Service app 0.8.10 with a signature or sends it back with a remark; transfers to the own mobile warehouse are confirmed the same way | `install/migrate_cp_r97_280_dn_receiving_engineer_app.sql` |
 | 1.267.0 | GAS-CP-R97-279 | 2026-11-27 | Delivery notes: acceptance by the recipient through an e-mail link (code, list of goods, signature) with status and log, signed paper copy; transfer between warehouses for a project with its reservations; mobile warehouses with holder, vehicle and place | `install/migrate_cp_r97_279_dn_acceptance_transfer_mobile_wh.sql` |
