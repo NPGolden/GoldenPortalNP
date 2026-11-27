@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.268.0';
+const CP_VERSION = '1.269.0';
 const CP_BUILD   = '2026-11-27';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-281', 'version' => '1.269.0', 'date' => '2026-11-27', 'title' => 'Delivery notes: a new note assembled from the goods that transfer notes brought to a warehouse — whole notes, some lines or part of the quantities, from one or several notes — to a project or a customer, with what is left shown per line', 'db' => 'install/migrate_cp_r97_281_dn_onward_from_lines.sql', 'check' => 'r9ac'],
         ['ref' => 'GAS-CP-R97-280', 'version' => '1.268.0', 'date' => '2026-11-27', 'title' => 'Delivery notes for the Service engineer: a note names the receiving engineer, who is notified on the phone and accepts it in the Service app 0.8.10 with a signature or sends it back with a remark; transfers to the own mobile warehouse are confirmed the same way', 'db' => 'install/migrate_cp_r97_280_dn_receiving_engineer_app.sql', 'check' => 'r9ab'],
         ['ref' => 'GAS-CP-R97-279', 'version' => '1.267.0', 'date' => '2026-11-27', 'title' => 'Delivery notes: acceptance by the recipient through an e-mail link (code, list of goods, signature) with status and log, signed paper copy; transfer between warehouses for a project with its reservations; mobile warehouses with holder, vehicle and place', 'db' => 'install/migrate_cp_r97_279_dn_acceptance_transfer_mobile_wh.sql', 'check' => 'r9aa'],
         ['ref' => 'GAS-CP-R97-278', 'version' => '1.266.0', 'date' => '2026-11-27', 'title' => 'Delivery notes: the total of the quantities at the end of the lines, on the document (PDF) and on the page — one figure per unit of measure, with the number of lines', 'db' => null, 'check' => null],
@@ -745,6 +746,7 @@ function cp_migration_state(): array {
         'r99z' => $has("SHOW TABLES LIKE 'io_month_notes'"),   // R97-266
         'r9aa' => $has("SHOW COLUMNS FROM inv_delivery_notes LIKE 'delivery'") && $has("SHOW TABLES LIKE 'inv_dn_events'") && $has("SHOW COLUMNS FROM inv_warehouses LIKE 'holder_id'"),   // R97-279
         'r9ab' => $has("SHOW COLUMNS FROM inv_delivery_notes LIKE 'to_user_id'"),   // R97-280
+        'r9ac' => $has("SHOW COLUMNS FROM inv_dn_lines LIKE 'src_line_id'"),   // R97-281
         'r99k' => $has("SHOW COLUMNS FROM nl_issues LIKE 'tr'") && $has("SHOW COLUMNS FROM nl_sends LIKE 'lang'") && $has("SHOW COLUMNS FROM contacts LIKE 'nl_lang'"),   // R97-203
         'r99j' => $has("SHOW TABLES LIKE 'soc_post_tr'") && $has("SHOW COLUMNS FROM soc_posts LIKE 'lang'"),   // R97-201
         'r99i' => $has("SHOW TABLES LIKE 'wl_prefs'") && $has("SHOW TABLES LIKE 'wl_mood_seen'"),   // R97-194
