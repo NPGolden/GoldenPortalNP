@@ -1,9 +1,10 @@
 <?php /** Employee card › tab Equipment: lines, issue lists, handover lists ($p = person, $pid).   GAS-CP-R97-124   (included by hr_person.php) */
 $eqAll = hre_items($pid); $eqDraft = array_values(array_filter($eqAll, fn($i) => $i['status'] === 'draft')); $eqWith = array_values(array_filter($eqAll, fn($i) => in_array($i['status'], HRE_WITH, true)));
-$eqGone = array_values(array_filter($eqAll, fn($i) => in_array($i['status'], ['returned', 'writeoff'], true))); $eqDocs = hre_docs($pid); $eqIns = hre_sources(); $eqKit = function_exists('hre_kit_for') ? hre_kit_for($p) : []; $eqSelf = url('hr_person', ['id' => $pid, 'tab' => 'eq']);
+$eqGone = array_values(array_filter($eqAll, fn($i) => in_array($i['status'], ['returned', 'writeoff', 'refused'], true))); $eqDocs = hre_docs($pid); $eqIns = hre_sources(); $eqKit = function_exists('hre_kit_for') ? hre_kit_for($p) : []; $eqSelf = url('hr_person', ['id' => $pid, 'tab' => 'eq']);
 $eqFree = array_values(array_filter($eqWith, 'hre_free')); $eqAcc = !empty($p['user_id']) && !empty($p['account_active']);
 $eqLine = fn(array $i) => hre_cat_icon((string)$i['category']) . ' <b>' . e($i['description']) . '</b>' . ((string)$i['size'] !== '' ? ' <span class="hint">' . e(t('hre.size') . ' ' . $i['size']) . '</span>' : '') . ((string)$i['note'] !== '' ? '<br><span class="hint">' . e($i['note']) . '</span>' : '');
 ?>
+<?php $eqpPid = $pid; include __DIR__ . '/_eqp_person.php'; ?>
 <div class="card" id="eq-lines">
   <div class="page-head" style="margin-bottom:4px;"><h2 style="margin:0;">🧰 <?= tt('hre.with_title') ?> <span class="count"><?= count($eqWith) ?></span></h2><div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('hr_equipment', ['q' => (string)$p['name_en']]) ?>"><?= tt('hre.title') ?></a></div></div>
   <p class="hint"><?= tt('hre.with_hint') ?></p>
@@ -65,7 +66,10 @@ $eqLine = fn(array $i) => hre_cat_icon((string)$i['category']) . ' <b>' . e($i['
     <?php if ((string)$d['note'] !== ''): ?><p style="margin:4px 0 0;"><?= e($d['note']) ?></p><?php endif; ?>
     <?php if ($d['status'] === 'disputed'): ?><div class="flash flash--warn" style="margin-top:6px;"><b><?= tt('hre.ds_disputed') ?>:</b> <?= e((string)$d['emp_remark']) ?><br><span class="hint"><?= tt('hre.disputed_hint') ?></span></div><?php endif; ?>
     <?php if (!$isRet && $open): ?>
-      <ul style="margin:6px 0;"><?php foreach ($dItems as $i): ?><li><?= e(hre_cat_label((string)$i['category']) . ' — ' . $i['description'] . ((string)$i['serial_no'] !== '' ? ' · S/N ' . $i['serial_no'] : '') . ' × ' . hre_qty($i['qty'])) ?></li><?php endforeach; ?></ul>
+      <ul style="margin:6px 0;list-style:none;padding-left:0;"><?php foreach ($dItems as $i): ?><li style="margin:4px 0;"><?= e(hre_cat_label((string)$i['category']) . ' — ' . $i['description'] . ((string)$i['serial_no'] !== '' ? ' · S/N ' . $i['serial_no'] : '') . ' × ' . hre_qty($i['qty'])) ?>
+        <?php if ($i['status'] === 'refused'): ?> <?= pill('bad', t('hre.st_refused')) ?> <span class="hint"><?= e((string)$i['return_note']) ?></span>
+        <?php elseif ($i['status'] === 'pending'): ?> <form method="post" action="<?= $eqSelf ?>" class="inline" data-lock data-confirm="<?= tt('hre.line_refuse_confirm') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="hre_line_refuse"><input type="hidden" name="item_id" value="<?= (int)$i['id'] ?>"><input name="why" maxlength="300" required placeholder="<?= tt('hre.refuse_ph') ?>" style="max-width:260px;"><button class="btn btn--ghost btn--sm" type="submit">✖ <?= tt('hre.line_refuse_btn') ?></button></form><?php endif; ?></li><?php endforeach; ?></ul>
+      <p class="hint"><?= tt('hre.line_refuse_hint') ?></p>
       <form method="post" action="<?= $eqSelf ?>" class="btn-row" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hre_paper"><input type="hidden" name="doc_id" value="<?= (int)$d['id'] ?>">
         <input name="signer" maxlength="160" value="<?= e((string)$p['name_en']) ?>" style="max-width:260px;"><button class="btn btn--sm" type="submit" data-confirm="<?= tt('hre.paper_confirm') ?>">🖊 <?= tt('hre.paper_btn') ?></button></form>
       <p class="hint"><?= tt($eqAcc ? 'hre.paper_hint' : 'hre.paper_hint_noacc') ?></p>
@@ -89,7 +93,7 @@ $eqLine = fn(array $i) => hre_cat_icon((string)$i['category']) . ' <b>' . e($i['
   <h2>✓ <?= tt('hre.gone_title') ?> <span class="count"><?= count($eqGone) ?></span></h2>
   <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('hre.category') ?></th><th><?= tt('hre.description') ?></th><th><?= tt('hre.serial') ?></th><th class="num"><?= tt('hre.qty') ?></th><th><?= tt('hre.issued_on') ?></th><th><?= tt('hre.returned_on') ?></th><th><?= tt('hre.return_list') ?></th><th><?= tt('hre.result') ?></th></tr></thead><tbody>
   <?php foreach ($eqGone as $i): ?><tr><td><?= e(hre_cat_label((string)$i['category'])) ?></td><td><?= $eqLine($i) ?></td><td><?= e((string)$i['serial_no']) ?></td><td class="num"><?= e(hre_qty($i['qty'])) ?></td><td><?= $i['issued_on'] ? e(fmt_date($i['issued_on'])) : '—' ?></td><td><?= $i['returned_on'] ? e(fmt_date($i['returned_on'])) : '—' ?></td><td><?= e((string)$i['return_no']) ?></td>
-    <td><?= $i['status'] === 'writeoff' ? pill('mute', t('hre.st_writeoff')) : ($i['cond_in'] === 'damaged' ? pill('bad', t('hre.r_damaged')) : pill('green', t('hre.r_ok'))) ?><?= (string)$i['return_note'] !== '' ? '<br><span class="hint">' . e($i['return_note']) . '</span>' : '' ?></td></tr><?php endforeach; ?>
+    <td><?= $i['status'] === 'refused' ? pill('bad', t('hre.st_refused')) : ($i['status'] === 'writeoff' ? pill('mute', t('hre.st_writeoff')) : ($i['cond_in'] === 'damaged' ? pill('bad', t('hre.r_damaged')) : pill('green', t('hre.r_ok')))) ?><?= (string)$i['return_note'] !== '' ? '<br><span class="hint">' . e($i['return_note']) . '</span>' : '' ?></td></tr><?php endforeach; ?>
   </tbody></table></div>
 </div>
 <?php endif; ?>

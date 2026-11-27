@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.273.2** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.274.0** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.274.0 | GAS-CP-R97-290 | 2026-11-27 | Inventory: register of the company equipment (one line per unit) linked to the ISO 9001 measuring equipment register and its calibrations; import of an equipment list (.csv / .xlsx); units given to staff from the register; My equipment shows the units and the calibration of the instruments a person holds; issue lists answered line by line — a line that is not accepted goes back to the warehouse and to the people who prepared it | `install/migrate_cp_r97_290_inventory_equipment_register_iso_measuring.sql` |
 | 1.273.2 | GAS-CP-R97-289 | 2026-11-27 | HR equipment register open to the IT & Cybersecurity team: read only, for computers, telephones, keys and cards | — |
 | 1.273.1 | GAS-CP-R97-288 | 2026-11-27 | HR equipment: company assets already in the name of a person show in the list «With the personnel» before their list is issued; prepared lines are announced on the page and the lists can be issued to all people in one step | — |
 | 1.273.0 | GAS-CP-R97-287 | 2026-11-27 | Corrections after the health report of 27/11/2026: Inventory reads only the page of items shown (count and value in one statement); Projects reads the stage figures of its sub-projects in batches and keeps its vessel groups; column checks answered from the kept schema; daily report gives the refused sign-ins by reason; news feeds Marine Log and Offshore Energy switched off | — |

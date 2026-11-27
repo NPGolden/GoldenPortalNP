@@ -32,7 +32,7 @@ function hre_prep_cats(): array {
     try {
         if (function_exists('ism_team') && (in_array(hre_me(), ism_team(), true) || (function_exists('ism_by_position') && ism_by_position()))) $c = array_merge($c, ['it', 'phone', 'access']);
         if (function_exists('qh_can') && qh_can()) $c = array_merge($c, ['instrument', 'ppe', 'clothes']);
-        if (function_exists('stk_flag') && stk_flag('can_warehouse')) $c = array_merge($c, ['tool', 'clothes', 'ppe']);
+        if (function_exists('stk_flag') && stk_flag('can_warehouse')) $c = array_merge($c, ['tool', 'clothes', 'ppe', 'instrument']);   // R97-290: the warehouse hands out the instruments of the equipment register too
     } catch (Throwable $e) {}
     return $c = array_values(array_unique($c));
 }
@@ -43,7 +43,7 @@ function hre_cat_label(string $c): string { return t('hre.c_' . (in_array($c, HR
 function hre_qty($v): string { return rtrim(rtrim(number_format((float)$v, 2, '.', ''), '0'), '.'); }
 function hre_item_pill(array $i): string {
     if (in_array($i['status'], ['held', 'missing'], true) && !empty($i['return_doc_id']) && ($i['return_status'] ?? 'open') === 'open') return pill('gold', t('hre.st_returning'));
-    return pill(['draft' => 'mute', 'pending' => 'warn', 'held' => 'green', 'returned' => 'mute', 'missing' => 'bad', 'writeoff' => 'mute'][$i['status']] ?? 'mute', t('hre.st_' . $i['status']));
+    return pill(['draft' => 'mute', 'pending' => 'warn', 'held' => 'green', 'returned' => 'mute', 'missing' => 'bad', 'writeoff' => 'mute', 'refused' => 'bad'][$i['status']] ?? 'mute', t('hre.st_' . $i['status']));
 }
 function hre_doc_pill(array $d): string {
     return pill(['sent' => 'warn', 'open' => 'warn', 'accepted' => 'green', 'disputed' => 'bad', 'cancelled' => 'mute'][$d['status']] ?? 'mute', t('hre.ds_' . $d['status'] . ($d['kind'] === 'return' && $d['status'] === 'open' ? '_r' : '')));
@@ -172,6 +172,50 @@ function hre_accept(int $docId, ?string $paperName = null): array {
     }
     return hre_doc($docId);
 }
+/* R97-290 — an issue list is accepted line by line. A line that is not accepted leaves the list with its reason: a unit of the inventory goes back to the
+ * warehouse it left with the refusal written on it, and the people who prepared the line (IT for computers, telephones, keys and cards), the warehouse and HR hear. */
+/** Inside a transaction: one pending line becomes 'refused'. */
+function hre_refuse_line_x(array $i, array $d, string $why, string $who): void {
+    q("UPDATE hr_eq_items SET status = 'refused', returned_on = CURDATE(), return_note = ? WHERE id = ? AND status = 'pending'", [mb_substr($why, 0, 300), (int)$i['id']]);
+    if (!empty($i['inv_serial_id']) && function_exists('sn_refused_by_person')) sn_refused_by_person((int)$i['inv_serial_id'], mb_substr(t('hre.ref_refused', ['n' => $who, 'no' => (string)$d['doc_no'], 'd' => fmt_date(date('Y-m-d'))]) . ': ' . $why, 0, 160));
+}
+/** Who hears about lines that were not accepted: HR, who made the list and the lines, the IT team for its categories, procurement for units of the inventory. */
+function hre_refused_notify(array $d, array $lines, string $who): void {
+    if (!$lines || !function_exists('nf_push')) return; $to = array_merge(hre_hr_uids(), [(int)$d['created_by']]); $it = false; $inv = false; $txt = []; $sn = '';
+    foreach ($lines as [$i, $why]) { $to[] = (int)$i['created_by']; if (in_array($i['category'], HRE_IT_CATS, true)) $it = true; if (!empty($i['inv_serial_id'])) { $inv = true; $sn = (string)$i['serial_no']; } $txt[] = $i['description'] . ((string)$i['serial_no'] !== '' ? ' · S/N ' . $i['serial_no'] : '') . ' — ' . $why; }
+    try { if ($it && function_exists('ism_team')) $to = array_merge($to, ism_team()); if ($inv && function_exists('prq_proc_ids')) $to = array_merge($to, prq_proc_ids()); } catch (Throwable $e) {}
+    $to = array_values(array_diff(array_unique(array_filter(array_map('intval', $to))), [hre_me()])); if (!$to) return; $u = current_user();
+    try { nf_push($to, 'hre', 'hre:refused:' . $d['id'] . ':' . substr(md5(implode('|', $txt)), 0, 10), t('hre.nf_refused', ['n' => $who, 'k' => count($lines), 'no' => (string)$d['doc_no']]), mb_substr(implode("\n", $txt), 0, 900), $inv && function_exists('eqp_has') && eqp_has() ? url('inv_equipment', count($lines) === 1 && $sn !== '' ? ['q' => $sn] : []) : url('hr_equipment', ['st' => 'returned']), (int)($u['id'] ?? 0) ?: null, (string)($u['full_name'] ?? '')); } catch (Throwable $e) {}
+}
+/** The employee answers an issue list line by line: $no = [line id => reason] for the lines that are not accepted; every other line of the list is accepted. */
+function hre_accept_lines(int $docId, array $no): array {
+    $d = hre_doc($docId); $p = hre_my_person(); if (!$d || !$p || (int)$p['id'] !== (int)$d['person_id']) throw new RuntimeException(t('err.noaccess'));
+    if ($d['kind'] !== 'issue' || !in_array($d['status'], ['sent', 'disputed'], true)) throw new RuntimeException(t('hre.err_state')); if (empty($_POST['agree'])) throw new RuntimeException(t('hre.err_agree'));
+    $items = array_values(array_filter(hre_doc_items($d), fn($i) => $i['status'] === 'pending')); if (!$items) throw new RuntimeException(t('hre.err_state'));
+    $ref = []; foreach ($items as $i) if (array_key_exists((int)$i['id'], $no)) { $why = mb_substr(trim(preg_replace('/\s+/u', ' ', (string)$no[(int)$i['id']])), 0, 300); if ($why === '') throw new RuntimeException(t('hre.err_line_why', ['l' => (string)$i['description']])); $ref[] = [$i, $why]; }
+    $name = (string)(current_user()['full_name'] ?? ''); $ip = function_exists('sgn_ip') ? (sgn_ip() ?: null) : null; $ok = count($items) - count($ref);
+    $run = function () use ($d, $docId, $ref, $name, $ip, $ok) {
+        foreach ($ref as [$i, $why]) hre_refuse_line_x($i, $d, $why, $name);
+        q('UPDATE hr_eq_docs SET status = ?, emp_at = NOW(), emp_via = ?, emp_by = ?, emp_name = ?, emp_ip = ?, emp_remark = ? WHERE id = ?', [$ok ? 'accepted' : 'cancelled', 'portal', hre_me(), $name, $ip, $ref ? mb_substr(t('hre.refused_n', ['k' => count($ref)]) . ': ' . implode('; ', array_map(fn($x) => $x[0]['description'] . ' — ' . $x[1], $ref)), 0, 500) : null, $docId]);
+        q("UPDATE hr_eq_items SET status = 'held', issued_on = COALESCE(issued_on, CURDATE()) WHERE issue_doc_id = ? AND status = 'pending'", [$docId]);
+    };
+    if (function_exists('stk_tx') && function_exists('stk_has') && stk_has()) stk_tx($run); else { $pdo = db(); $pdo->beginTransaction(); try { $run(); $pdo->commit(); } catch (Throwable $e) { $pdo->rollBack(); throw $e; } }
+    hre_audit((int)$d['person_id'], t('hre.issue_list') . ' ' . $d['doc_no'], t('hre.ds_accepted') . ' ' . $ok . ' · ' . t('hre.refused_n', ['k' => count($ref)]) . ' — ' . $name . ' (' . t('hre.via_portal') . ')', $ref ? mb_substr(implode('; ', array_map(fn($x) => $x[0]['description'] . ' — ' . $x[1], $ref)), 0, 500) : null);
+    if ($ok) hre_notify(array_merge(hre_hr_uids(), [(int)$d['created_by']]), $d, 'hre.nf_accepted', url('hr_person', ['id' => (int)$d['person_id'], 'tab' => 'eq']));
+    hre_refused_notify($d, $ref, $name);
+    return ['doc' => hre_doc($docId), 'ok' => $ok, 'no' => count($ref)];
+}
+/** HR records that one line of an issue list which is not accepted yet was not accepted (told by the employee, or written on the paper). */
+function hre_line_refuse_from_post(): array {
+    if (!hre_can()) throw new RuntimeException(t('err.noaccess')); $i = one('SELECT * FROM hr_eq_items WHERE id = ?', [(int)($_POST['item_id'] ?? 0)]); $d = $i ? hre_doc((int)$i['issue_doc_id']) : null;
+    if (!$i || !$d || $i['status'] !== 'pending' || $d['kind'] !== 'issue' || !in_array($d['status'], ['sent', 'disputed'], true)) throw new RuntimeException(t('hre.err_state'));
+    $why = mb_substr(trim(preg_replace('/\s+/u', ' ', (string)($_POST['why'] ?? ''))), 0, 300); if ($why === '') throw new RuntimeException(t('hre.err_line_why', ['l' => (string)$i['description']]));
+    $who = (string)(hr_person((int)$d['person_id'])['name_en'] ?? '');
+    $run = function () use ($i, $d, $why, $who) { hre_refuse_line_x($i, $d, $why, $who); if (!scalar("SELECT COUNT(*) FROM hr_eq_items WHERE issue_doc_id = ? AND status = 'pending'", [(int)$d['id']])) q("UPDATE hr_eq_docs SET status = 'cancelled' WHERE id = ?", [(int)$d['id']]); };
+    if (function_exists('stk_tx') && function_exists('stk_has') && stk_has()) stk_tx($run); else { $pdo = db(); $pdo->beginTransaction(); try { $run(); $pdo->commit(); } catch (Throwable $e) { $pdo->rollBack(); throw $e; } }
+    hre_audit((int)$d['person_id'], t('hre.issue_list') . ' ' . $d['doc_no'], t('hre.st_refused'), $i['description'] . ' — ' . $why); hre_refused_notify($d, [[$i, $why]], $who);
+    return $d;
+}
 /** The employee does not agree with an issue list: the remark goes to HR. */
 function hre_dispute(int $docId, string $remark): void {
     $d = hre_doc($docId); $p = hre_my_person(); if (!$d || !$p || (int)$p['id'] !== (int)$d['person_id']) throw new RuntimeException(t('err.noaccess'));
@@ -271,7 +315,7 @@ function hre_register(array $f = []): array {
     if (!hre_has()) return []; $w = ["i.status <> 'followed'"]; $a = [];
     if (in_array($f['cat'] ?? '', HRE_CATS, true)) { $w[] = 'i.category = ?'; $a[] = $f['cat']; }
     if (!empty($f['cats']) && is_array($f['cats'])) { $cc = array_values(array_intersect(HRE_CATS, $f['cats'])); $w[] = $cc ? "i.category IN ('" . implode("','", $cc) . "')" : '0'; }   // R97-289: a reader limited to some categories
-    $st = (string)($f['st'] ?? 'with'); if ($st === 'with') $w[] = hre_inv_has() ? "(i.status IN ('pending','held','missing') OR (i.status = 'draft' AND i.inv_serial_id IS NOT NULL))" : "i.status IN ('pending','held','missing')";   /* R97-287: a company asset that left the warehouse in the name of the person is with the person, also before the list is issued */ elseif ($st === 'returned') $w[] = "i.status IN ('returned','writeoff')"; elseif ($st === 'missing') $w[] = "i.status = 'missing'"; elseif ($st === 'draft') $w[] = "i.status = 'draft'"; elseif ($st === 'exp') $w[] = "i.status IN ('pending','held') AND i.expires_on IS NOT NULL AND i.expires_on <= DATE_ADD(CURDATE(), INTERVAL 60 DAY)";
+    $st = (string)($f['st'] ?? 'with'); if ($st === 'with') $w[] = hre_inv_has() ? "(i.status IN ('pending','held','missing') OR (i.status = 'draft' AND i.inv_serial_id IS NOT NULL))" : "i.status IN ('pending','held','missing')";   /* R97-287: a company asset that left the warehouse in the name of the person is with the person, also before the list is issued */ elseif ($st === 'returned') $w[] = "i.status IN ('returned','writeoff','refused')"; elseif ($st === 'missing') $w[] = "i.status = 'missing'"; elseif ($st === 'draft') $w[] = "i.status = 'draft'"; elseif ($st === 'exp') $w[] = "i.status IN ('pending','held') AND i.expires_on IS NOT NULL AND i.expires_on <= DATE_ADD(CURDATE(), INTERVAL 60 DAY)";
     if (($qq = trim((string)($f['q'] ?? ''))) !== '') { $w[] = '(i.description LIKE ? OR i.serial_no LIKE ? OR i.asset_tag LIKE ? OR p.name_en LIKE ?)'; $l = '%' . $qq . '%'; array_push($a, $l, $l, $l, $l); }
     return all('SELECT i.*, p.name_en, p.is_active AS person_active, di.doc_no AS issue_no, dr.doc_no AS return_no, dr.status AS return_status FROM hr_eq_items i JOIN hr_people p ON p.id = i.person_id LEFT JOIN hr_eq_docs di ON di.id = i.issue_doc_id LEFT JOIN hr_eq_docs dr ON dr.id = i.return_doc_id' . ($w ? ' WHERE ' . implode(' AND ', $w) : '') . ' ORDER BY p.name_en, i.category, i.description LIMIT 3000', $a);
 }
@@ -406,6 +450,7 @@ function hre_pdf(array $d): string {
     foreach ($items as $n => $i) {
         $sn = trim((string)$i['serial_no'] . ((string)$i['asset_tag'] !== '' ? ' / ' . $i['asset_tag'] : ''), ' /'); $desc = (string)$i['description'] . ((string)$i['size'] !== '' ? ' — ' . t('hre.size') . ' ' . $i['size'] : '') . ((string)$i['note'] !== '' ? ' (' . $i['note'] . ')' : '');
         $last = $isRet ? ($d['status'] === 'accepted' ? t('hre.r_' . (in_array($i['status'], ['missing', 'followed'], true) ? 'missing' : ($i['status'] === 'writeoff' ? 'writeoff' : ($i['cond_in'] === 'damaged' ? 'damaged' : 'ok')))) . ((string)$i['return_note'] !== '' ? ' — ' . $i['return_note'] : '') : '') : t('hre.k_' . $i['cond_out']);
+        if (!$isRet && $i['status'] === 'refused') $last = t('hre.st_refused') . ((string)$i['return_note'] !== '' ? ' — ' . $i['return_note'] : '');   // R97-290
         $cells = [(string)($n + 1), hre_cat_label((string)$i['category']), $desc, $sn, hre_qty($i['qty']), $last];
         $pdf->setFont('R', 8.4); $hh = 6.5; foreach ($cells as $k => $c) $hh = max($hh, count($pdf->wrap($c, $cols[$k][0] - 3)) * 3.9 + 2.6);
         if ($need($hh)) $thead();
@@ -451,6 +496,8 @@ function hre_handle_action(string $action): bool {
         case 'hre_cancel':   $d = hre_cancel((int)($_POST['doc_id'] ?? 0)); flash('good', t('hre.cancelled', ['no' => $d['doc_no']])); $back((int)$d['person_id'], '#eq-docs');
         case 'hre_receive':  $d = hre_receive_from_post(); flash('good', t('hre.received_ok', ['no' => $d['doc_no']])); $back((int)$d['person_id'], '#eq-docs');
         case 'hre_handover': { $byHr = hre_can() && (int)($_POST['person_id'] ?? 0) > 0; $d = hre_handover_from_post(); flash('good', t('hre.handover_ok', ['no' => $d['doc_no']])); if ($byHr) $back((int)$d['person_id'], '#eq-docs'); redirect('my_equipment', ['_r' => uniqid()]); }
+        case 'hre_accept_lines': { $ok = array_map('intval', (array)($_POST['ok'] ?? [])); $no = []; foreach ((array)($_POST['line'] ?? []) as $lid) if (!in_array((int)$lid, $ok, true)) $no[(int)$lid] = (string)($_POST['no'][(int)$lid] ?? ''); $r = hre_accept_lines((int)($_POST['doc_id'] ?? 0), $no); flash($r['no'] ? 'warn' : 'good', t($r['no'] ? 'hre.lines_done' : 'hre.accepted_ok', ['no' => $r['doc']['doc_no'], 'a' => $r['ok'], 'r' => $r['no']])); redirect('my_equipment', ['_r' => uniqid()]); }   // R97-290
+        case 'hre_line_refuse': { $d = hre_line_refuse_from_post(); flash('good', t('hre.line_refused_ok')); $back((int)$d['person_id'], '#eq-docs'); }
         case 'hre_accept':   $d = hre_accept((int)($_POST['doc_id'] ?? 0)); flash('good', t($d['kind'] === 'issue' ? 'hre.accepted_ok' : 'hre.confirmed_ok', ['no' => $d['doc_no']])); redirect('my_equipment', ['_r' => uniqid()]);
         case 'hre_dispute':  hre_dispute((int)($_POST['doc_id'] ?? 0), (string)($_POST['remark'] ?? '')); flash('good', t('hre.disputed_ok')); redirect('my_equipment', ['_r' => uniqid()]);
     }

@@ -10,11 +10,22 @@ layout_head(t('hre.mine'), 'my_equipment');
 <?php if (!$ok): ?><div class="flash flash--warn"><?= tt('hre.need_db') ?></div>
 <?php elseif (!$P): ?><div class="empty"><?= tt('hre.mine_noperson') ?></div>
 <?php else: $pid = (int)$P['id']; $docs = hre_docs($pid); $with = hre_items($pid, HRE_WITH); $free = array_values(array_filter($with, 'hre_free'));
-  $toDo = array_values(array_filter($docs, fn($d) => ($d['kind'] === 'issue' && $d['status'] === 'sent') || ($d['kind'] === 'return' && $d['status'] === 'open' && !$d['emp_at']))); ?>
+  $toDo = array_values(array_filter($docs, fn($d) => ($d['kind'] === 'issue' && in_array($d['status'], ['sent', 'disputed'], true)) || ($d['kind'] === 'return' && $d['status'] === 'open' && !$d['emp_at']))); ?>
 <?php foreach ($toDo as $d): $isRet = $d['kind'] === 'return'; $items = hre_doc_items($d); ?>
 <div class="card" style="border-left:4px solid var(--cp-gold,#C9A227);" id="eq-doc-<?= (int)$d['id'] ?>">
   <div class="page-head" style="margin-bottom:4px;"><h2 style="margin:0;"><?= $isRet ? '↩' : '✉' ?> <?= e(t($isRet ? 'hre.return_list' : 'hre.issue_list') . ' ' . $d['doc_no']) ?> <?= hre_doc_pill($d) ?></h2><div class="btn-row"><a class="btn btn--ghost btn--sm" target="_blank" rel="noopener" href="<?= url('my_equipment', ['doc' => (int)$d['id'], 'format' => 'pdf']) ?>">⤓ PDF</a></div></div>
   <p class="hint"><?= e(fmt_date($d['doc_date']) . ' · ' . $d['created_name']) ?><?= (string)$d['note'] !== '' ? ' · ' . e($d['note']) : '' ?></p>
+  <?php if (!$isRet): $pend = array_values(array_filter($items, fn($i) => $i['status'] === 'pending')); ?>
+  <?php if ($d['status'] === 'disputed'): ?><div class="flash flash--warn"><b><?= tt('hre.ds_disputed') ?>:</b> <?= e((string)$d['emp_remark']) ?></div><?php endif; ?>
+  <form method="post" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hre_accept_lines"><input type="hidden" name="doc_id" value="<?= (int)$d['id'] ?>">
+  <div class="table-scroll"><table class="tbl tbl--wrap" data-nosort><thead><tr><th style="width:90px;"><?= tt('hre.accept_col') ?></th><th><?= tt('hre.category') ?></th><th><?= tt('hre.description') ?></th><th><?= tt('hre.serial') ?> / <?= tt('hre.tag') ?></th><th class="num"><?= tt('hre.qty') ?></th><th><?= tt('hre.cond_out') ?></th><th style="min-width:220px;"><?= tt('hre.refuse_why') ?></th></tr></thead><tbody>
+  <?php foreach ($pend as $i): ?><tr><td><input type="hidden" name="line[]" value="<?= (int)$i['id'] ?>"><label class="chk" style="margin:0;"><input type="checkbox" name="ok[]" value="<?= (int)$i['id'] ?>" checked> ✔</label></td><td><?= e(hre_cat_icon((string)$i['category']) . ' ' . hre_cat_label((string)$i['category'])) ?></td><td><b><?= e($i['description']) ?></b><?= (string)$i['size'] !== '' ? ' <span class="hint">' . e(t('hre.size') . ' ' . $i['size']) . '</span>' : '' ?><?= (string)$i['note'] !== '' ? '<br><span class="hint">' . e($i['note']) . '</span>' : '' ?></td><td><?= e(trim((string)$i['serial_no'] . ((string)$i['asset_tag'] !== '' ? ' / ' . $i['asset_tag'] : ''), ' /')) ?></td><td class="num"><?= e(hre_qty($i['qty'])) ?></td><td><?= tt('hre.k_' . $i['cond_out']) ?></td><td><input name="no[<?= (int)$i['id'] ?>]" maxlength="300" placeholder="<?= tt('hre.refuse_ph') ?>" style="width:100%;"></td></tr><?php endforeach; ?>
+  </tbody></table></div>
+  <p class="hint"><?= tt('hre.lines_hint') ?></p>
+  <ul class="hint" style="margin:8px 0;"><?php foreach (range(1, 4) as $k): ?><li><?= tt('hre.decl_' . $k) ?></li><?php endforeach; ?></ul>
+    <label class="chk"><input type="checkbox" name="agree" value="1" required> <b><?= tt('hre.agree_lines') ?></b></label>
+    <div class="btn-row" style="margin-top:6px;"><button class="btn btn--gold" type="submit">✔ <?= tt('hre.lines_btn') ?></button></div></form>
+  <?php else: ?>
   <div class="table-scroll"><table class="tbl" data-nosort><thead><tr><th>#</th><th><?= tt('hre.category') ?></th><th><?= tt('hre.description') ?></th><th><?= tt('hre.serial') ?> / <?= tt('hre.tag') ?></th><th class="num"><?= tt('hre.qty') ?></th><th><?= tt('hre.cond_out') ?></th></tr></thead><tbody>
   <?php foreach ($items as $n => $i): ?><tr><td><?= $n + 1 ?></td><td><?= e(hre_cat_icon((string)$i['category']) . ' ' . hre_cat_label((string)$i['category'])) ?></td><td><b><?= e($i['description']) ?></b><?= (string)$i['size'] !== '' ? ' <span class="hint">' . e(t('hre.size') . ' ' . $i['size']) . '</span>' : '' ?><?= (string)$i['note'] !== '' ? '<br><span class="hint">' . e($i['note']) . '</span>' : '' ?></td><td><?= e(trim((string)$i['serial_no'] . ((string)$i['asset_tag'] !== '' ? ' / ' . $i['asset_tag'] : ''), ' /')) ?></td><td class="num"><?= e(hre_qty($i['qty'])) ?></td><td><?= tt('hre.k_' . $i['cond_out']) ?></td></tr><?php endforeach; ?>
   </tbody></table></div>
@@ -22,11 +33,12 @@ layout_head(t('hre.mine'), 'my_equipment');
   <form method="post" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="hre_accept"><input type="hidden" name="doc_id" value="<?= (int)$d['id'] ?>">
     <label class="chk"><input type="checkbox" name="agree" value="1" required> <b><?= tt($isRet ? 'hre.agree_r' : 'hre.agree') ?></b></label>
     <div class="btn-row" style="margin-top:6px;"><button class="btn btn--gold" type="submit">✔ <?= tt($isRet ? 'hre.confirm_btn' : 'hre.accept_btn') ?></button></div></form>
-  <?php if (!$isRet): ?><form method="post" data-lock style="margin-top:10px;"><?= csrf_field() ?><input type="hidden" name="action" value="hre_dispute"><input type="hidden" name="doc_id" value="<?= (int)$d['id'] ?>">
-    <div class="btn-row"><input name="remark" maxlength="500" required placeholder="<?= tt('hre.dispute_ph') ?>" style="flex:1;min-width:220px;"><button class="btn btn--ghost btn--sm" type="submit"><?= tt('hre.dispute_btn') ?></button></div></form><?php endif; ?>
+
+  <?php endif; ?>
 </div>
 <?php endforeach; ?>
 
+<?php $eqpPid = $pid; include __DIR__ . '/_eqp_person.php'; ?>
 <div class="card" id="eq-mine">
   <h2><?= tt('hre.mine_with') ?> <span class="count"><?= count($with) ?></span></h2>
   <?php if (!$with): ?><div class="empty"><?= tt('hre.mine_none') ?></div><?php else: ?>

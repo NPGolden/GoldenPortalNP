@@ -151,6 +151,17 @@ function sn_release_person(int $serialId, string $how, string $ref): void {
     if ($how === 'scrapped') { q("UPDATE inv_serials SET status = 'scrapped', last_ref = ? WHERE id = ?", [mb_substr($ref, 0, 160), $serialId]); sn_log($serialId, 'scrap', ['person_id' => (int)$s['person_id'], 'ref' => $ref]); return; }
     $wh = stk_default_wh(); $mid = stk_move((int)$s['item_id'], $wh, 'in', 1.0, ['unit_price' => $s['last_price'], 'reason' => 'return_personnel', 'note' => $ref . ' · S/N ' . $s['serial_no']]);
     sn_attach($mid, [(string)$s['serial_no']], ['from_person' => true, 'ref' => $ref]);
+    if (function_exists('eqp_ism_sync')) { try { eqp_ism_sync($serialId); } catch (Throwable $e) {} }   // R97-290: the place on the record of the measuring equipment register
+}
+
+/** R97-290 — the person did not accept the unit: it is in the warehouse it left again, and the refusal is written on the unit (note and history). */
+function sn_refused_by_person(int $serialId, string $ref): void {
+    $s = one('SELECT s.*, i.last_price FROM inv_serials s JOIN inv_items i ON i.id = s.item_id WHERE s.id = ? FOR UPDATE', [$serialId]); if (!$s || $s['status'] !== 'with_person') return;
+    $wh = (int) scalar("SELECT l.warehouse_id FROM inv_serial_log l JOIN inv_warehouses w ON w.id = l.warehouse_id AND w.is_active = 1 WHERE l.serial_id = ? AND l.event = 'out' AND l.warehouse_id IS NOT NULL ORDER BY l.id DESC LIMIT 1", [$serialId]) ?: stk_default_wh();
+    $mid = stk_move((int)$s['item_id'], $wh, 'in', 1.0, ['unit_price' => $s['last_price'], 'reason' => 'return_personnel', 'note' => $ref . ' · S/N ' . $s['serial_no']]);
+    sn_attach($mid, [(string)$s['serial_no']], ['from_person' => true, 'ref' => $ref]);
+    q('UPDATE inv_serials SET note = ? WHERE id = ?', [mb_substr(trim($ref . ((string)($s['note'] ?? '') !== '' ? ' | ' . $s['note'] : '')), 0, 255), $serialId]);
+    if (function_exists('eqp_ism_sync')) { try { eqp_ism_sync($serialId); } catch (Throwable $e) {} }
 }
 
 /* ------------------------------------------------------------------ Excel: company assets, one row per unit (R97-253) */
