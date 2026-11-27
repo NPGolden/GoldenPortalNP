@@ -169,7 +169,7 @@ final class PortalCustomer {
             $png = base64_decode(substr($sig, 22), true); if (!$png || !@getimagesizefromstring($png)) throw new ApiException(422, 'Signature unreadable');
             $fid = cp_store_bytes($png, 'offer-acceptance-signature.png', 'image/png', (int)$o['project_id'], $o['subproject_id'] ? (int)$o['subproject_id'] : null, 'offer_sign', 'external', null, 'Acceptance signature ' . $o['offer_no'] . ' ' . $o['revision'], ['sign' => 'customer', 'offer_id' => $id]);
         }
-        try { of_decide($id, $decision, (string)($p['note'] ?? '')); } catch (RuntimeException $e) { throw new ApiException(409, $e->getMessage()); }
+        try { of_decide($id, $decision, (string)($p['note'] ?? ''), $decision === 'approved' ? ['via' => 'app', 'png' => $png] : null); } catch (RuntimeException $e) { throw new ApiException(409, $e->getMessage()); }   // R97-284: the signature drawn in the app goes on the acceptance form
         if ($decision === 'approved') of_event($id, 'signed_app', 'Signature file #' . $fid . ' · ' . (string)($u['full_name'] ?? '') . ' · mobile app');
         return self::offer($u, $id);
     }

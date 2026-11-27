@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.271.0** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.272.0** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.272.0 | GAS-CP-R97-284 | 2026-11-27 | Offers: the same two ways of acceptance as service reports — in the portal (or the Customer app) and by e-mail link — and each of them leaves the completed offer acceptance form with the offer | — |
 | 1.271.0 | GAS-CP-R97-283 | 2026-11-27 | Offers: acceptance through the e-mail link with a drawn signature, as service reports and delivery notes; an offer acceptance form (PDF) — attached to the link when the offer document was made outside the portal, completed with name, capacity, time, address and signature on acceptance, kept with the offer and sent to the customer | — |
 | 1.270.0 | GAS-CP-R97-282 | 2026-11-27 | Inventory: stock per warehouse (items, reserved, free, value, Excel) and the stock of a warehouse — all of it or the ticked lines — sent to another warehouse with a transfer note; reservations and serial numbers travel with the goods | — |
 | 1.269.0 | GAS-CP-R97-281 | 2026-11-27 | Delivery notes: a new note assembled from the goods that transfer notes brought to a warehouse — whole notes, some lines or part of the quantities, from one or several notes — to a project or a customer, with what is left shown per line | `install/migrate_cp_r97_281_dn_onward_from_lines.sql` |

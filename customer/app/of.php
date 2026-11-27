@@ -192,7 +192,7 @@ function of_save_from_post(int $id): int { cache_bump_later('fs');
     return $id;
 }
 /** The owner's decision on a sent offer (or an administrator recording it on the owner's behalf). */
-function of_decide(int $id, string $decision, string $note): void { cache_bump_later('fs');
+function of_decide(int $id, string $decision, string $note, ?array $acc = null): void { cache_bump_later('fs');   // R97-284: $acc = ['via' => 'app', 'png' => signature] from the Customer app
     $o = of_load($id); $u = current_user();
     if (!$o || !of_is_pending($o) || !in_array($decision, ['approved', 'rejected'], true)) throw new RuntimeException(t('of.not_pending'));
     if (is_staff() && !is_cp_admin()) throw new RuntimeException(t('err.noaccess'));
@@ -203,6 +203,12 @@ function of_decide(int $id, string $decision, string $note): void { cache_bump_l
     if ($decision === 'rejected' && function_exists('sl_has') && sl_has()) { $why = in_array($_POST['lost_reason'] ?? '', SL_LOST, true) ? $_POST['lost_reason'] : (is_staff() ? null : 'other'); if ($why) q('UPDATE offers SET lost_reason = ? WHERE id = ?', [$why, $id]); }   // R39-002
     of_event($id, $decision, $note ?: null);
     of_sync_project((int)$o['project_id']);                                                                           // R57-001
+    if ($decision === 'approved' && function_exists('of_acc_store')) {   // R97-284: the acceptance in the portal or the app leaves the same completed form as the e-mail link
+        try { $o2 = of_load($id) ?: $o; $loc = in_array(locale(), ['en', 'el', 'it'], true) ? locale() : 'en';
+            $fid = of_acc_store($o2, ['name' => (string)$u['full_name'], 'role' => '', 'email' => (string)($u['email'] ?? ''), 'at' => date('Y-m-d H:i:s'), 'ip' => (string) tk_ip(), 'remark' => $note, 'png' => $acc['png'] ?? null, 'via' => is_staff() ? 'staff' : (($acc['via'] ?? '') === 'app' ? 'app' : 'portal')], $loc);
+            if ($fid) of_event($id, 'edited', t('of.af_ev', ['f' => of_acc_name($o2)]));
+        } catch (Throwable $e) { error_log('[of] acceptance form: ' . $e->getMessage()); }
+    }
 }
 /** Golden A/S moves the offer along: cancelled, in_progress, to_be_invoiced, finished, or back to sent (a new revision). */
 function of_set_status(int $id, string $status, string $note = ''): void { cache_bump_later('fs');
@@ -483,8 +489,8 @@ function of_acc_pdf(array $o, ?array $acc = null, string $loc = 'en'): string {
     $pdf->setColor($line); $pdf->rect($Lm + $half + 4, $y, $half, 34); $pdf->setFont('B', 7); $pdf->setColor($navy); $pdf->text($Lm + $half + 6, $y + 3.6, $up($T('of.af_remarks')));
     if ($acc && trim((string)($acc['remark'] ?? '')) !== '') { $pdf->setFont('R', 8.5); $pdf->setColor($ink); $ry = $y + 9; foreach (array_slice($pdf->wrap((string)$acc['remark'], $half - 5), 0, 6) as $ln) { $pdf->text($Lm + $half + 6, $ry, $ln); $ry += 4; } }
     $y += 40;
-    if ($acc) { $pdf->setColor($green); $pdf->rect($Lm, $y, 2.2, 15, 'F'); $pdf->setFont('B', 9); $pdf->text($Lm + 5, $y + 4, $T('of.af_accepted')); $pdf->setFont('R', 8.5); $pdf->setColor($ink);
-        $pdf->text($Lm + 5, $y + 9, $T('of.af_email') . ': ' . (string)($acc['email'] ?? '') . '   ·   ' . fmt_datetime((string)$acc['at'])); $pdf->text($Lm + 5, $y + 13.5, $T('of.af_ip') . ': ' . (string)($acc['ip'] ?? '—') . '   ·   ' . $T('of.af_code_ok')); $y += 21; }
+    if ($acc) { $via = in_array($acc['via'] ?? '', ['portal', 'app', 'staff'], true) ? (string)$acc['via'] : 'email'; $pdf->setColor($green); $pdf->rect($Lm, $y, 2.2, 15, 'F'); $pdf->setFont('B', 9); $pdf->text($Lm + 5, $y + 4, $T($via === 'email' ? 'of.af_accepted' : 'of.af_acc_' . $via)); $pdf->setFont('R', 8.5); $pdf->setColor($ink);
+        $pdf->text($Lm + 5, $y + 9, $T('of.af_email') . ': ' . (string)($acc['email'] ?? '') . '   ·   ' . fmt_datetime((string)$acc['at'])); $pdf->text($Lm + 5, $y + 13.5, $T('of.af_ip') . ': ' . (string)($acc['ip'] ?? '—') . '   ·   ' . $T($via === 'email' ? 'of.af_code_ok' : 'of.af_account')); $y += 21; }
     else { $pdf->setFont('R', 8.5); $pdf->setColor($ink); $y += $pdf->paragraph($Lm, $y, $W, $T('of.af_how'), 4.3) + 4; }
     $pdf->setFont('R', 7); $pdf->setColor('#6a7179'); $pdf->text($Lm, 290, (string)(($bd['footer'] ?? '') ?: $bd['name']) . ' · ' . $no . ' · ' . $T('of.af_title')); $pdf->text($R, 290, '1', 'R');
     return $pdf->bytes($no . ' — ' . $T('of.af_title'));

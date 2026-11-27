@@ -59,6 +59,7 @@ layout_head($o['offer_no'] . ' · ' . $o['title'], 'offers');
       <div class="card">
         <h2><?= tt($staff ? 'oa.decide_behalf' : 'of.your_decision') ?></h2>
         <p class="hint"><?= tt('of.decide_hint') ?></p>
+        <?php if (function_exists('of_acc_store')): ?><p class="hint">✍ <?= tt('of.af_portal_note') ?><?php if ($staff): ?> <a href="<?= url('offer', ['id' => $id, 'accform' => 1]) ?>" target="_blank" rel="noopener">⤓ <?= tt('of.af_blank') ?></a><?php endif; ?></p><?php endif; ?>
         <form method="post" action="<?= url('offer', ['id' => $id]) ?>" data-lock>
           <?= csrf_field() ?><input type="hidden" name="action" value="of_decide"><input type="hidden" name="id" value="<?= $id ?>">
           <div class="field"><label for="note"><?= tt('oa.note') ?></label><textarea id="note" name="note" rows="3" placeholder="<?= tt('of.note_ph') ?>"></textarea></div>
