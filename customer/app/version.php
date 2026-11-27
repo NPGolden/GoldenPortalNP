@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.266.0';
+const CP_VERSION = '1.267.0';
 const CP_BUILD   = '2026-11-27';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-279', 'version' => '1.267.0', 'date' => '2026-11-27', 'title' => 'Delivery notes: acceptance by the recipient through an e-mail link (code, list of goods, signature) with status and log, signed paper copy; transfer between warehouses for a project with its reservations; mobile warehouses with holder, vehicle and place', 'db' => 'install/migrate_cp_r97_279_dn_acceptance_transfer_mobile_wh.sql', 'check' => 'r9aa'],
         ['ref' => 'GAS-CP-R97-278', 'version' => '1.266.0', 'date' => '2026-11-27', 'title' => 'Delivery notes: the total of the quantities at the end of the lines, on the document (PDF) and on the page — one figure per unit of measure, with the number of lines', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-277', 'version' => '1.265.9', 'date' => '2026-11-27', 'title' => 'Georgian in the five apps — Service 0.8.9, Golden PM 1.0.23, Golden HR 1.2.6, Employee 1.1.7, Customer 1.0.16: the language selector of each app offers Georgian; the installed apps take the new version by themselves', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-276', 'version' => '1.265.8', 'date' => '2026-11-27', 'title' => 'PDF documents print Georgian letters: the PDF writer takes Georgian characters from a small Georgian font, loaded only when a document needs it; documents in the other languages are unchanged', 'db' => null, 'check' => null],
@@ -741,6 +742,7 @@ function cp_migration_state(): array {
         'r99x' => $has("SHOW TABLES LIKE 'login_devices'"),   // R97-255
         'r99y' => $has("SHOW TABLES LIKE 'inv_asset_imports'"),   // R97-256
         'r99z' => $has("SHOW TABLES LIKE 'io_month_notes'"),   // R97-266
+        'r9aa' => $has("SHOW COLUMNS FROM inv_delivery_notes LIKE 'delivery'") && $has("SHOW TABLES LIKE 'inv_dn_events'") && $has("SHOW COLUMNS FROM inv_warehouses LIKE 'holder_id'"),   // R97-279
         'r99k' => $has("SHOW COLUMNS FROM nl_issues LIKE 'tr'") && $has("SHOW COLUMNS FROM nl_sends LIKE 'lang'") && $has("SHOW COLUMNS FROM contacts LIKE 'nl_lang'"),   // R97-203
         'r99j' => $has("SHOW TABLES LIKE 'soc_post_tr'") && $has("SHOW COLUMNS FROM soc_posts LIKE 'lang'"),   // R97-201
         'r99i' => $has("SHOW TABLES LIKE 'wl_prefs'") && $has("SHOW TABLES LIKE 'wl_mood_seen'"),   // R97-194

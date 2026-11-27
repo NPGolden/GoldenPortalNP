@@ -12,6 +12,10 @@ $cust = (string)(($r['customer_name'] ?? '') ?: ($r['customer_db_name'] ?? ''));
       <?php if ($doc === 'fsr' || $doc === 'fc'): ?>
       <dt><?= tt('sgn.f_date') ?></dt><dd><?= e(fmt_date((string)($r['report_date'] ?? ''))) ?><?= !empty($r['location']) ? ' · ' . e((string)$r['location']) : '' ?></dd>
       <dt><?= tt('sgn.f_by') ?></dt><dd><?= e((string)($r['submitted_name'] ?? '')) ?><?= !empty($r['submitted_at']) ? ' · ' . e(fmt_datetime((string)$r['submitted_at'])) : '' ?></dd>
+      <?php elseif ($doc === 'dn'): /* R97-279 */ ?>
+      <dt><?= tt('th.date') ?></dt><dd><?= e(fmt_date((string)($r['issued_at'] ?? ''))) ?></dd>
+      <dt><?= tt('th.by') ?></dt><dd><?= e((string)($r['user_name'] ?? '')) ?></dd>
+      <?php if (!empty($r['ref_no'])): ?><dt><?= tt('po.ref') ?></dt><dd><?= e((string)$r['ref_no']) ?></dd><?php endif; ?>
       <?php elseif ($doc === 'offer'): ?>
       <dt><?= tt('sgn.f_subject') ?></dt><dd><?= e((string)$r['title']) ?></dd>
       <dt><?= tt('sgn.f_amount') ?></dt><dd><b><?= e(number_format((float)$r['amount'], 2, ',', '.') . ' ' . (string)($r['currency'] ?: 'EUR')) ?></b><?= (float)($r['vat_pct'] ?? 0) > 0 ? ' <span class="hint">+ ' . e(rtrim(rtrim(number_format((float)$r['vat_pct'], 2, ',', ''), '0'), ',')) . ' % ' . tt('sgn.vat') . '</span>' : '' ?></dd>
@@ -35,6 +39,12 @@ $cust = (string)(($r['customer_name'] ?? '') ?: ($r['customer_db_name'] ?? ''));
   </div>
   <?php endforeach; $S = $r['summary']; ?>
   <div class="card"><h2><?= tt('sgn.h_hours') ?></h2><dl class="sgn-dl sgn-dl--num"><dt><?= e(fsr_time_type_label('WT')) ?></dt><dd><?= e($fmtH((float)$S['wt'])) ?></dd><dt><?= e(fsr_time_type_label('TT')) ?></dt><dd><?= e($fmtH((float)$S['tt'])) ?></dd><?php if ((float)$S['nc'] > 0): ?><dt><?= e(fsr_time_type_label('NC')) ?></dt><dd><?= e($fmtH((float)$S['nc'])) ?></dd><?php endif; ?><dt><b><?= tt('sgn.total') ?></b></dt><dd><b><?= e($fmtH((float)$S['total'])) ?></b></dd></dl></div>
+  <?php elseif ($doc === 'dn'): $dnL = (array)($r['lines'] ?? []); $dnT = dn_qty_totals($dnL); $dnF = true; ?>
+  <div class="card"><h2><?= tt('dn.acc_goods') ?></h2>
+    <div class="table-scroll"><table class="tbl sgn-tbl"><thead><tr><th>#</th><th><?= tt('prq.desc') ?></th><th class="num"><?= tt('prq.qty') ?></th></tr></thead><tbody>
+      <?php foreach ($dnL as $l): ?><tr><td><?= (int)$l['seq'] ?></td><td><?= e((string)$l['description']) ?><?= !empty($l['item_code']) ? '<br><span class="hint">' . e((string)$l['item_code']) . '</span>' : '' ?></td><td class="num"><b><?= e(stk_qty((float)$l['qty'])) ?></b> <?= e((string)$l['unit']) ?></td></tr><?php endforeach; ?>
+    </tbody><tfoot><?php foreach ($dnT as $dnU => $dnQ): ?><tr><th colspan="2" style="text-align:right;"><?= $dnF ? tt('dn.total_qty') : '' ?></th><th class="num"><?= e(trim(stk_qty((float)$dnQ) . ' ' . $dnU)) ?></th></tr><?php $dnF = false; endforeach; ?></tfoot></table></div>
+  </div>
   <?php elseif ($pdfUrl !== ''): ?>
   <div class="card"><p><?= tt('sgn.fc_note') ?></p></div>
   <?php endif; ?>

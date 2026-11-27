@@ -58,7 +58,12 @@ try {
         }
     }
     if (isset($_GET['f'])) {
-        if (!$passOk || !$I['file']) { http_response_code(403); exit; }
+        if (!$passOk || (!$I['file'] && empty($I['gen']))) { http_response_code(403); exit; }
+        if (!empty($I['gen'])) {   // R97-279: a document without a stored file (delivery note) is made now, as it stands
+            $b = dl_doc_bytes($I); if ($b === null) { http_response_code(404); exit; }
+            header_remove('Content-Security-Policy'); header("Content-Security-Policy: default-src 'none'; sandbox"); header('Content-Type: application/pdf'); header('Cache-Control: no-store');
+            header('Content-Disposition: inline; filename="' . preg_replace('/[^A-Za-z0-9._-]/', '_', (string)$I['no']) . '.pdf"'); header('Content-Length: ' . strlen($b)); echo $b; exit;
+        }
         $f = one('SELECT original_name, mime_type FROM sp_files WHERE id = ?', [(int)$I['file']]); $b = cp_file_bytes((int)$I['file']); if ($b === null) { http_response_code(404); exit; }
         $mime = (string)($f['mime_type'] ?? ''); if (!in_array($mime, ['application/pdf', 'image/png', 'image/jpeg'], true)) $mime = 'application/octet-stream';
         header_remove('Content-Security-Policy'); header("Content-Security-Policy: default-src 'none'; sandbox"); header('Content-Type: ' . $mime);
@@ -90,19 +95,20 @@ try {
     <dl class="sgn-dl"><dt><?= tt('rc.of_position') ?></dt><dd><?= e((string)$r['position']) ?></dd><dt><?= tt('rc.of_start') ?></dt><dd><b><?= e($sd) ?></b></dd><?php if ($r['valid_until']): ?><dt><?= tt('rc.of_valid') ?></dt><dd><?= e(date('d/m/Y', strtotime((string)$r['valid_until']))) ?></dd><?php endif; ?></dl>
     <div style="white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;line-height:1.5;border-top:1px solid #E3E7EE;padding-top:12px;"><?= e((string)$r['body']) ?></div>
   </div>
-<?php } else { $pdfUrl = $I['file'] ? $self . '&f=1' : ''; require __DIR__ . '/views/_sgn_preview.php'; }
-    $pad = $doc === 'fsr' || $doc === 'fc';
-    $btns = $pad ? [['accepted', 'sgn.accept', 'gold', 'read,sign'], ['disputed', 'sgn.dispute', 'danger', 'remark']]
+<?php } else { $pdfUrl = ($I['file'] || !empty($I['gen'])) ? $self . '&f=1' : ''; require __DIR__ . '/views/_sgn_preview.php'; }
+    $pad = $doc === 'fsr' || $doc === 'fc' || $doc === 'dn';
+    $btns = $doc === 'dn' ? [['accepted', 'dn.acc_accept', 'gold', 'read,sign'], ['disputed', 'dn.acc_dispute', 'danger', 'remark']]
+          : ($pad ? [['accepted', 'sgn.accept', 'gold', 'read,sign'], ['disputed', 'sgn.dispute', 'danger', 'remark']]
           : ($doc === 'rcoffer' ? [['accepted', 'rc.of_dl_accept', 'gold', 'read'], ['declined', 'rc.of_dl_decline', 'danger', 'remark']]
           : ($doc === 'offer' ? [['approved', 'of.approve', 'gold', 'read'], ['rejected', 'of.reject', 'danger', 'remark']]
-          : [['approved', 'oa.approve', 'gold', 'read'], ['approved_comments', 'dl.oa_comments', 'plain', 'remark'], ['rejected', 'oa.reject', 'danger', 'remark']])); ?>
-  <div class="card" id="sign"><h2>✍ <?= tt($pad ? 'sgn.h_sign' : 'dl.h_decide') ?></h2><p class="hint"><?= tt($pad ? 'sgn.sign_lede' : ($doc === 'rcoffer' ? 'rc.of_dl_lede' : 'dl.decide_lede')) ?></p>
+          : [['approved', 'oa.approve', 'gold', 'read'], ['approved_comments', 'dl.oa_comments', 'plain', 'remark'], ['rejected', 'oa.reject', 'danger', 'remark']]))); ?>
+  <div class="card" id="sign"><h2>✍ <?= tt($pad ? 'sgn.h_sign' : 'dl.h_decide') ?></h2><p class="hint"><?= tt($doc === 'dn' ? 'dn.acc_lede' : ($pad ? 'sgn.sign_lede' : ($doc === 'rcoffer' ? 'rc.of_dl_lede' : 'dl.decide_lede'))) ?></p>
     <form method="post" action="<?= e($self) ?>" id="sgnform" novalidate>
       <input type="hidden" name="a" value="decide"><input type="hidden" name="decision" value=""><input type="hidden" name="signature" value="">
       <div class="field"><label for="signer_name"><?= tt('sgn.name') ?> *</label><input id="signer_name" name="signer_name" maxlength="90" autocomplete="name" required value="<?= e($post['name'] ?? (string)($L['name'] ?? '')) ?>"></div>
       <div class="field"<?= $doc === 'rcoffer' ? ' hidden' : '' ?>><label for="signer_role"><?= tt('sgn.role') ?></label><input id="signer_role" name="signer_role" maxlength="80" placeholder="<?= tt('sgn.role_ph') ?>" value="<?= e($post['role'] ?? '') ?>"></div>
       <div class="field"><label for="remark"><?= tt($doc === 'oa' ? 'dl.comments' : 'fsr.remark') ?></label><textarea id="remark" name="remark" rows="3" maxlength="2000" placeholder="<?= tt('sgn.remark_ph') ?>"><?= e($post['remark'] ?? '') ?></textarea></div>
-      <label class="check"><input type="checkbox" name="read" value="1" id="sgnread"> <?= $doc === 'rcoffer' ? e(t('rc.of_dl_read', ['d' => $sd])) : tt($pad ? 'sgn.read' : ($doc === 'offer' ? 'dl.read_offer' : 'dl.read_doc')) ?></label>
+      <label class="check"><input type="checkbox" name="read" value="1" id="sgnread"> <?= $doc === 'rcoffer' ? e(t('rc.of_dl_read', ['d' => $sd])) : tt($doc === 'dn' ? 'dn.acc_read' : ($pad ? 'sgn.read' : ($doc === 'offer' ? 'dl.read_offer' : 'dl.read_doc'))) ?></label>
       <?php if ($pad): ?><div class="field" style="margin-top:12px;"><label><?= tt('sgn.pad') ?></label><canvas id="sgnpad" class="sigpad" width="600" height="220"></canvas><button type="button" class="btn btn--ghost btn--sm" id="sgnclear"><?= tt('btn.clear') ?></button></div><?php endif; ?>
       <p class="flash flash--bad" id="sgnerr" hidden></p>
       <div class="btn-row sgn-actions sgn-actions--<?= count($btns) ?>"><?php foreach ($btns as [$dec, $key, $tone, $need]): ?><button class="btn<?= $tone === 'gold' ? ' btn--gold' : ($tone === 'danger' ? ' btn--ghost btn--danger-ghost' : '') ?>" type="button" data-dec="<?= $dec ?>" data-need="<?= $need ?>"><?= tt($key) ?></button><?php endforeach; ?></div>

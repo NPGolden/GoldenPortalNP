@@ -6,13 +6,13 @@
  * (random token, only its SHA-256 is stored), opens it on customer/sign.php without an account, confirms the mailbox
  * with a 6-digit code and accepts or sends the document back — with name, capacity and, for reports, a drawn signature.
  *
- * Documents: fsr (service report), fc (function check), offer, oa (owner approval — drawings and other documents).
+ * Documents: fsr (service report), fc (function check), offer, oa (owner approval — drawings and other documents), dn (delivery note, R97-279).
  * Validity: service report 24 hours; offer until its validity date, otherwise 14 days; everything else 14 days.
  * The link stops working when it is used, cancelled, expired, replaced by a reminder, or the document is decided elsewhere.
  */
 declare(strict_types=1);
 
-const DL_DOCS = ['fsr', 'fc', 'offer', 'oa', 'rcoffer'];   // R97-246: rcoffer = the employment offer to a candidate (recruiting)
+const DL_DOCS = ['fsr', 'fc', 'offer', 'oa', 'rcoffer', 'dn'];   // R97-246: rcoffer = the employment offer to a candidate (recruiting)
 const DL_CODE_MIN = 15;          // minutes a code is valid
 const DL_CODE_TRIES = 5;         // wrong attempts per code
 const DL_CODE_SENDS = 6;         // codes per link
@@ -96,6 +96,10 @@ function dl_info(string $doc, int $id): ?array {
         return ['doc' => $doc, 'id' => $id, 'r' => $r, 'no' => trim((string)$r['offer_no'] . ' ' . (string)$r['revision']), 'title' => t('of.one'), 'open' => of_is_pending($r), 'file' => (int)($r['file_id'] ?? 0), 'customer_id' => (int)$r['customer_id'], 'customer' => (string)($r['customer_name'] ?? ''), 'vessel' => (string)($r['vessel'] ?? ''), 'valid_until' => $r['valid_until'] ?: null, 'back' => url('offer', ['id' => $id])]; }
     if ($doc === 'rcoffer') { if (!function_exists('rcr_offer')) return null; $r = rcr_offer($id); if (!$r) return null; $a = $r['app']; $lc = in_array((string)($a['lang'] ?? ''), ['en', 'el', 'it'], true) ? (string)$a['lang'] : 'en';
         return ['doc' => $doc, 'id' => $id, 'r' => $r, 'no' => (string)$r['offer_no'], 'title' => t_in('rc.of_doc', $lc), 'open' => $r['status'] === 'sent', 'file' => 0, 'customer_id' => 0, 'customer' => '', 'vessel' => '', 'valid_until' => $r['valid_until'] ?: null, 'back' => url('rcr_application', ['id' => (int)$r['application_id']]), 'lang' => $lc, 'to_email' => strtolower(trim((string)$a['email'])), 'to_name' => (string)($a['name'] ?? '')]; }
+    if ($doc === 'dn') {   // R97-279: a delivery note to a project, a customer, production or a supplier — its PDF is made when it is asked for ('gen'), so the recipient always reads the note as it stands
+        if (!function_exists('dn_x_has') || !dn_x_has() || !dn_can()) return null; $r = dn_load($id); if (!$r || $r['kind'] === 'transfer') return null;
+        $r['customer_name'] = (string)($r['company'] ?? ''); $r['lines'] = dn_lines($id); $lc = in_array(locale(), ['en', 'el', 'it'], true) ? locale() : 'en';
+        return ['doc' => $doc, 'id' => $id, 'r' => $r, 'no' => (string)$r['dn_no'], 'title' => t_in('dn.pdf_title', $lc), 'open' => $r['status'] === 'issued' && $r['delivery'] !== 'accepted', 'file' => 0, 'gen' => 'dn', 'customer_id' => $r['company_id'] ? (int) scalar('SELECT customer_id FROM companies WHERE id = ?', [(int)$r['company_id']]) : 0, 'customer' => (string)($r['company'] ?? ''), 'vessel' => (string)($r['vessel'] ?? ''), 'valid_until' => null, 'back' => url('delivery_note', ['id' => $id])]; }
     $r = oa_load($id); if (!$r) return null;
     return ['doc' => $doc, 'id' => $id, 'r' => $r, 'no' => trim((string)$r['doc_no'] . ' ' . (string)$r['revision']), 'title' => t('oa.one'), 'open' => in_array($r['status'], oa_open_statuses(), true), 'file' => (int)($r['file_id'] ?? 0), 'customer_id' => (int)$r['customer_id'], 'customer' => (string)($r['customer_name'] ?? ''), 'vessel' => (string)($r['vessel'] ?? ''), 'valid_until' => null, 'back' => url('approval', ['id' => $id])];
 }
@@ -114,6 +118,9 @@ function dl_mail(string $to, string $subject, string $body, ?string $replyTo = n
     } catch (Throwable $e) { error_log('[dl] mail: ' . $e->getMessage()); return false; }
 }
 function dl_att(int $fileId, string $fallback): array { if (!$fileId) return []; $b = cp_file_bytes($fileId); if ($b === null || strlen($b) > 3 * 1024 * 1024) return []; $f = one('SELECT original_name, mime_type FROM sp_files WHERE id = ?', [$fileId]); return [['name' => (string)(($f['original_name'] ?? '') ?: $fallback), 'bytes' => $b, 'mime' => (string)(($f['mime_type'] ?? '') ?: 'application/pdf')]]; }
+/** The document for the mail: the stored file, or the PDF made now for a document that has none (delivery note). */
+function dl_doc_att(array $I): array { if (($I['gen'] ?? '') === 'dn') { $b = dl_doc_bytes($I); return $b === null ? [] : [['name' => $I['no'] . '.pdf', 'bytes' => $b, 'mime' => 'application/pdf']]; } return dl_att((int)$I['file'], $I['no'] . '.pdf'); }
+function dl_doc_bytes(array $I): ?string { if (($I['gen'] ?? '') !== 'dn') return null; $d = dn_load((int)$I['id']); return $d ? dn_pdf($d) : null; }
 function dl_valid_text(array $L, string $lang): string { return fmt_datetime((string)$L['expires_at']); }
 function dl_mail_link(array $L, string $token, bool $reminder = false, array $atts = []): bool {
     $lg = (string)$L['lang']; $v = ['t' => (string)$L['doc_title'], 'no' => (string)$L['doc_no'], 'u' => (string)$L['created_name'], 'n' => (string)($L['name'] ?: ''), 'url' => dl_url($token), 'd' => fmt_datetime((string)$L['expires_at'])];
@@ -187,7 +194,7 @@ function dl_create(string $doc, int $id, string $email, string $name, bool $send
     $I = dl_info($doc, $id); if (!$I) throw new RuntimeException(t('err.notfound')); if (!$I['open']) throw new RuntimeException(t('dl.not_open'));
     $email = strtolower(trim($email)); if (!filter_var($email, FILTER_VALIDATE_EMAIL) || strlen($email) > 190) throw new RuntimeException(t('dl.bad_email'));
     if ($send && !(function_exists('cp_mail_configured') && cp_mail_configured())) throw new RuntimeException(t('dl.no_mail'));
-    if (!$I['file'] && $doc !== 'rcoffer') throw new RuntimeException(t('dl.no_file'));   // the recipient must be able to read what is accepted (the employment offer is shown as its text)
+    if (!$I['file'] && $doc !== 'rcoffer' && empty($I['gen'])) throw new RuntimeException(t('dl.no_file'));   // the recipient must be able to read what is accepted (the employment offer is shown as its text)
     if ($doc === 'rcoffer' && $email !== (string)$I['to_email']) throw new RuntimeException(t('rc.of_dl_only'));   // an employment offer is accepted by the candidate, at the address of the application
     $name = mb_substr(trim(preg_replace('/\s+/u', ' ', $name)), 0, 120);
     if ((int) scalar('SELECT COUNT(*) FROM doc_links WHERE doc = ? AND doc_id = ? AND created_at > NOW() - INTERVAL 1 HOUR', [$doc, $id]) >= 10) throw new RuntimeException(t('dl.too_many'));
@@ -196,7 +203,8 @@ function dl_create(string $doc, int $id, string $email, string $name, bool $send
     q('INSERT INTO doc_links (doc, doc_id, doc_no, doc_title, token_hash, email, name, lang, created_by, created_name, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?, NOW() + INTERVAL ? SECOND)',
       [$doc, $id, mb_substr($I['no'], 0, 80), mb_substr($I['title'], 0, 160), dl_hash($token), $email, $name ?: null, $I['lang'] ?? (in_array(locale(), ['en', 'el', 'it'], true) ? locale() : 'en'), (int)$u['id'], (string)$u['full_name'], dl_ttl($I)]);
     $lid = (int) db()->lastInsertId(); $L = one('SELECT * FROM doc_links WHERE id = ?', [$lid]);
-    if ($send && !dl_mail_link($L, $token, false, dl_att($I['file'], $I['no'] . '.pdf'))) { q('DELETE FROM doc_links WHERE id = ?', [$lid]); throw new RuntimeException(t('dl.mail_failed') . ' (' . dl_mail_reason() . ')'); }
+    if ($send && !dl_mail_link($L, $token, false, dl_doc_att($I))) { q('DELETE FROM doc_links WHERE id = ?', [$lid]); throw new RuntimeException(t('dl.mail_failed') . ' (' . dl_mail_reason() . ')'); }
+    if ($doc === 'dn') dn_link_sent($id, $email);   // R97-279: the note shows "sent for acceptance" and keeps it in its log
     return [$lid, $token];
 }
 function dl_list(string $doc, int $id): array { return dl_has() ? all("SELECT l.*, (l.expires_at < NOW()) AS is_expired, EXISTS (SELECT 1 FROM doc_links n WHERE n.doc = l.doc AND n.doc_id = l.doc_id AND n.email = l.email AND n.id > l.id) AS superseded FROM doc_links l WHERE l.doc = ? AND l.doc_id = ? ORDER BY l.id DESC LIMIT 20", [$doc, $id]) : []; }
@@ -253,6 +261,11 @@ function dl_decide(array $L, array $I, string $decision, string $name, string $r
             if ($n) $ev($evt, 'accepted', $note);
         } else throw new RuntimeException(t('err.notfound'));
         if ($n) { if ($doc === 'fsr') fsr_generate_documents($id); else fc_generate_documents($id); }
+    } elseif ($doc === 'dn') {
+        /* R97-279: a note that was not accepted stays open for a new link, so the document alone does not stop a second answer on the same link — the link is taken first, and given back when the answer is refused */
+        if (!q('UPDATE doc_links SET used_at = NOW() WHERE id = ? AND used_at IS NULL AND cancelled_at IS NULL AND expires_at > NOW()', [(int)$L['id']])->rowCount()) throw new RuntimeException(t('dl.closed'));
+        try { $n = dn_decided($id, $decision, $name, $role, (string)$L['email'], $remark, $sig, $ip, $read); } catch (Throwable $e) { $n = 0; q('UPDATE doc_links SET used_at = NULL WHERE id = ?', [(int)$L['id']]); throw $e; }
+        if (!$n) q('UPDATE doc_links SET used_at = NULL WHERE id = ?', [(int)$L['id']]);
     } elseif ($doc === 'rcoffer') {
         if (!in_array($decision, ['accepted', 'declined'], true)) throw new RuntimeException(t('err.notfound'));
         if ($decision === 'declined' && $remark === '') throw new RuntimeException(t('dl.remark_needed'));
@@ -289,7 +302,7 @@ function dl_after(array $L, string $decision, string $who, string $remark): void
     $staffMail = (string) scalar('SELECT email FROM customer_users WHERE id = ?', [(int)$L['created_by']]);
     if ($staffMail !== '') dl_mail($staffMail, $ttl, $body . "\n\n" . dl_base() . '/' . ($I ? $I['back'] : ''));
     $lg = (string)$L['lang']; $v = ['t' => (string)$L['doc_title'], 'no' => (string)$L['doc_no']];
-    $sent = dl_mail((string)$L['email'], t_in($ok ? 'dl.m_done_s' : 'dl.m_back_s', $lg, $v), t_in($ok ? 'dl.m_done_b' : 'dl.m_back_b', $lg, $v) . "\n\n" . t_in('dl.m_sign', $lg, $v), $staffMail ?: null, $ok && $I && in_array($doc, ['fsr', 'fc'], true) ? dl_att($I['file'], $I['no'] . '.pdf') : []);
+    $sent = dl_mail((string)$L['email'], t_in($ok ? 'dl.m_done_s' : 'dl.m_back_s', $lg, $v), t_in($ok ? 'dl.m_done_b' : 'dl.m_back_b', $lg, $v) . "\n\n" . t_in('dl.m_sign', $lg, $v), $staffMail ?: null, $ok && $I && in_array($doc, ['fsr', 'fc', 'dn'], true) ? dl_doc_att($I) : []);
     if (!$sent && dl_err_has()) { q('UPDATE doc_links SET mail_error = ?, mail_error_at = NOW() WHERE id = ?', [mb_substr('confirmation: ' . dl_mail_reason(), 0, 255), (int)$L['id']]); dl_tell($L, t('dl.nf_mail', $v), t('dl.st_confirmation') . ' → ' . $L['email'] . ' — ' . dl_mail_reason()); }
 }
 
@@ -310,7 +323,7 @@ function dl_handle_action(string $action): bool {
     if ($action !== 'dl_send' && $action !== 'dl_cancel') return false; require_staff();
     $doc = (string)($_POST['doc'] ?? ''); $id = (int)($_POST['id'] ?? 0); if ($doc !== 'rcoffer' && function_exists('hr_only') && hr_only()) throw new RuntimeException(t('err.noaccess'));   // R97-246: the HR role sends links for employment offers only
     $I = dl_info($doc, $id); if (!$I) throw new RuntimeException(t('err.notfound'));
-    $page = ['fsr' => 'fsr', 'fc' => 'fc', 'offer' => 'offer', 'oa' => 'approval', 'rcoffer' => 'rcr_application'][$doc]; $backId = $doc === 'rcoffer' ? (int)$I['r']['application_id'] : $id;
+    $page = ['fsr' => 'fsr', 'fc' => 'fc', 'offer' => 'offer', 'oa' => 'approval', 'rcoffer' => 'rcr_application', 'dn' => 'delivery_note'][$doc]; $backId = $doc === 'rcoffer' ? (int)$I['r']['application_id'] : $id;
     try {
         if ($action === 'dl_send') { dl_create($doc, $id, (string)($_POST['email'] ?? ''), (string)($_POST['name'] ?? '')); flash('good', t('dl.sent', ['e' => strtolower(trim((string)$_POST['email']))])); }
         else { dl_cancel((int)($_POST['link'] ?? 0)); flash('good', t('dl.cancelled')); }

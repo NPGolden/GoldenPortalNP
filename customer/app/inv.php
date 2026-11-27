@@ -57,7 +57,10 @@ function stk_category_save_from_post(int $id): int {
     return $id;
 }
 function stk_category_merge(int $from, int $into): void { require_pr_admin(); if ($from === $into || !$from || !$into) return; q('UPDATE inv_items SET category_id = ? WHERE category_id = ?', [$into, $from]); q('UPDATE inv_categories SET parent_id = ? WHERE parent_id = ?', [$into, $from]); q('DELETE FROM inv_categories WHERE id = ?', [$from]); }
-function stk_warehouses(bool $activeOnly = true): array { if (!stk_has()) return []; return all('SELECT w.*, b.code AS branch_code FROM inv_warehouses w LEFT JOIN branches b ON b.id = w.branch_id ' . ($activeOnly ? 'WHERE w.is_active = 1 ' : '') . 'ORDER BY w.is_default DESC, w.name'); }
+/** R97-279: a warehouse is fixed (a store room) or mobile (a van, a container, a site store) with a holder, a vehicle and the place where it stands now. */
+function stk_wh_x_has(): bool { static $h = null; if ($h === null) { try { $h = stk_has() && (bool) one("SHOW COLUMNS FROM inv_warehouses LIKE 'holder_id'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function stk_wh_name(array $w): string { return ((($w['kind'] ?? '') === 'mobile') ? '🚐 ' : '') . $w['code'] . ' — ' . $w['name']; }
+function stk_warehouses(bool $activeOnly = true): array { if (!stk_has()) return []; return all('SELECT w.*, b.code AS branch_code' . (stk_wh_x_has() ? ', hu.full_name AS holder_name' : '') . ' FROM inv_warehouses w LEFT JOIN branches b ON b.id = w.branch_id ' . (stk_wh_x_has() ? 'LEFT JOIN customer_users hu ON hu.id = w.holder_id ' : '') . ($activeOnly ? 'WHERE w.is_active = 1 ' : '') . 'ORDER BY w.is_default DESC, w.name'); }
 function stk_default_wh(): int { $id = (int) scalar('SELECT id FROM inv_warehouses WHERE is_default = 1 AND is_active = 1 LIMIT 1'); return $id ?: (int) scalar('SELECT id FROM inv_warehouses WHERE is_active = 1 ORDER BY id LIMIT 1'); }
 function stk_warehouse_save_from_post(int $id): int {
     require_pr_admin(); $code = strtoupper(mb_substr(trim((string)($_POST['code'] ?? '')), 0, 12)); $name = mb_substr(trim((string)($_POST['name'] ?? '')), 0, 120); if ($code === '' || $name === '') throw new RuntimeException(t('stk.need_name'));
@@ -66,6 +69,12 @@ function stk_warehouse_save_from_post(int $id): int {
     if ($def) q('UPDATE inv_warehouses SET is_default = 0');
     if ($id) q('UPDATE inv_warehouses SET code = ?, name = ?, branch_id = ?, is_default = ?, is_active = ? WHERE id = ?', [$code, $name, $br, $def, $act, $id]);
     else { q('INSERT INTO inv_warehouses (code, name, branch_id, is_default) VALUES (?,?,?,?)', [$code, $name, $br, $def]); $id = (int) db()->lastInsertId(); }
+    if (stk_wh_x_has()) {   // R97-279
+        $kind = ($_POST['wh_kind'] ?? '') === 'mobile' ? 'mobile' : 'fixed'; $holder = (int)($_POST['holder_id'] ?? 0) ?: null; if ($holder && !scalar("SELECT id FROM customer_users WHERE id = ? AND role IN ('staff','admin') AND is_active = 1", [$holder])) $holder = null;
+        $veh = mb_substr(trim((string)($_POST['vehicle'] ?? '')), 0, 80) ?: null; $loc = mb_substr(trim((string)($_POST['wh_location'] ?? '')), 0, 160) ?: null; if ($kind === 'fixed') $veh = null;
+        if ($kind === 'mobile' && $def) throw new RuntimeException(t('stk.wh_mobile_default'));
+        q('UPDATE inv_warehouses SET kind = ?, holder_id = ?, vehicle = ?, location_at = IF(COALESCE(location, \'\') <> COALESCE(?, \'\'), NOW(), location_at), location = ? WHERE id = ?', [$kind, $holder, $veh, $loc, $loc, $id]);
+    }
     return $id;
 }
 
