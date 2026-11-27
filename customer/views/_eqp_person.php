@@ -1,10 +1,10 @@
 <?php
 /** Card: the units of the equipment register in the name of a person, with the calibration of the measuring instruments (GAS-CP-R97-290). Needs $eqpPid. */
-$eqpH = function_exists('ptl_with_person') ? ptl_with_person((int)$eqpPid) : []; if ($eqpH): ?>
+$eqpH = function_exists('ptl_with_person') ? ptl_with_person((int)$eqpPid) : []; $eqpMe = function_exists('hre_my_person') ? hre_my_person() : null; $eqpOwn = $eqpMe && (int)$eqpMe['id'] === (int)$eqpPid; if ($eqpH): ?>
 <div class="card" id="eq-handed" style="border-left:4px solid var(--cp-gold,#C9A227);">
   <h2>📍 <?= tt('ptl.handed_h') ?> <span class="count"><?= count($eqpH) ?></span></h2>
   <div class="table-scroll"><table class="tbl" data-nosort><thead><tr><th><?= tt('eqp.c_no') ?></th><th><?= tt('hre.description') ?></th><th><?= tt('ptl.project') ?></th><th><?= tt('ptl.since') ?></th><th><?= tt('th.status') ?></th></tr></thead><tbody>
-  <?php foreach ($eqpH as $x): ?><tr><td class="mono"><b><?= e((string)($x['asset_tag'] ?: $x['serial_no'])) ?></b></td><td><?= e($x['description']) ?></td><td><?= e($x['project_code'] . ' ' . $x['project_name']) ?></td><td><?= e(fmt_datetime((string)$x['d_given_at'])) ?><br><span class="hint"><?= e((string)$x['d_given_by']) ?></span></td><td><?= ptl_flag_pill($x) ?></td></tr><?php endforeach; ?>
+  <?php foreach ($eqpH as $x): ?><tr><td class="mono"><b><?= e((string)($x['asset_tag'] ?: $x['serial_no'])) ?></b></td><td><?= e($x['description']) ?></td><td><?= e($x['project_code'] . ' ' . $x['project_name']) ?></td><td><?= e(fmt_datetime((string)$x['d_given_at'])) ?><br><span class="hint"><?= e((string)$x['d_given_by']) ?></span></td><td><?= ptl_flag_pill($x) ?><?php if (ptl_waits($x) && $eqpOwn): ?><form method="post" action="<?= url('my_equipment') ?>" class="btn-row" data-lock style="margin-top:4px;"><?= csrf_field() ?><input type="hidden" name="action" value="ptl_ack"><input type="hidden" name="daily_id" value="<?= (int)$x['daily_id'] ?>"><button class="btn btn--gold btn--sm" type="submit" name="answer" value="ok">✔ <?= tt('ptl.ack_btn') ?></button><input name="note" maxlength="200" placeholder="<?= tt('ptl.note_ph') ?>" style="max-width:130px;"><button class="btn btn--ghost btn--sm" type="submit" name="answer" value="no"><?= tt('ptl.ack_no_btn') ?></button></form><?php endif; ?></td></tr><?php endforeach; ?>
   </tbody></table></div>
   <p class="hint"><?= tt('ptl.handed_hint') ?></p>
 </div>

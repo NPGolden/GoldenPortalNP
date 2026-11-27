@@ -8,11 +8,13 @@ function eqp_has(): bool { static $h = null; if ($h === null) { try { $h = funct
 function eqp_qh(): bool { return function_exists('qh_can') && function_exists('ism_has') && ism_has() && qh_can(); }
 /** The register is read by the warehouse and procurement, by QHSE and by HR; it is changed by the warehouse and procurement. */
 function eqp_it(): bool { return function_exists('hre_it_member') && hre_it_member(); }
-function eqp_can_view(): bool { return eqp_has() && is_staff() && (sn_can() || eqp_qh() || eqp_it() || (function_exists('hre_can') && hre_can())); }
+/** R97-292: HR has no part in the tools — the register is read by the warehouse and procurement, QHSE and the IT team. */
+const EQP_DIRECT = ['tool', 'instrument'];   // lines of these categories go to the person without HR
+function eqp_can_view(): bool { return eqp_has() && is_staff() && (sn_can() || eqp_qh() || eqp_it()); }
 /** Details of a unit: the warehouse and procurement, and the IT team (it corrects the entry of a unit that a person did not accept). Stock is moved by the warehouse only. */
 function eqp_can_edit(): bool { return eqp_has() && (sn_can() || eqp_it()); }
 function eqp_can_stock(): bool { return eqp_has() && sn_can(); }
-function eqp_can_give(): bool { return eqp_has() && function_exists('hre_prep_cats') && (sn_can() || eqp_qh() || eqp_it() || hre_can()) && (bool) hre_prep_cats(); }
+function eqp_can_give(): bool { return eqp_has() && function_exists('hre_prep_cats') && (sn_can() || eqp_qh() || eqp_it()) && (bool) hre_prep_cats(); }
 const EQP_STATES = ['wh', 'person', 'project', 'retired', 'out'];
 const EQP_CALS = ['measuring', 'valid', 'soon', 'expired', 'none', 'out'];
 
@@ -110,9 +112,21 @@ function eqp_give_from_post(): int {
     $cal = eqp_cal($u); if ($cal && $cal[0] === 'out') throw new RuntimeException(t('eqp.e_out_of_service', ['c' => (string)$u['ism_code']]));
     $cat = $cal ? 'instrument' : (string)($_POST['category'] ?? 'tool'); $keep = $_POST;
     try { $_POST = ['person_id' => (int)($keep['person_id'] ?? 0), 'category' => $cat, 'inv_sn' => $id, 'src_id' => $cal ? (int)$u['ism_eq_id'] : 0, 'description' => trim((string)$u['description'] . ((string)$u['maker'] !== '' ? ' — ' . trim($u['maker'] . ' ' . $u['factory_code']) : '')), 'asset_tag' => (string)($u['asset_tag'] ?? ''), 'cond_out' => (string)($keep['cond_out'] ?? 'good'), 'note' => (string)($keep['note'] ?? ''), 'qty' => '1'];
-        $pid = hre_add_from_post(); } finally { $_POST = $keep; }
+        $GLOBALS['hre_no_hr'] = in_array($cat, EQP_DIRECT, true); $pid = hre_add_from_post(); } finally { $_POST = $keep; $GLOBALS['hre_no_hr'] = false; }
     if ($cal) eqp_ism_sync($id);
+    if (in_array($cat, EQP_DIRECT, true)) { $line = (int) scalar("SELECT id FROM hr_eq_items WHERE inv_serial_id = ? AND person_id = ? AND status = 'draft' ORDER BY id DESC LIMIT 1", [$id, $pid]); if ($line) hre_issue_direct($pid, [$line]); }   // R97-292: a tool goes to the person at once — the list waits for the person, not for HR
     return $pid;
+}
+/** R97-292 — the warehouse takes a tool or an instrument back from the person who holds it: the line is closed as returned, the unit is in its warehouse again. */
+function eqp_take_back_from_post(): int {
+    if (!eqp_can_stock()) throw new RuntimeException(t('err.noaccess')); $id = (int)($_POST['unit_id'] ?? 0); $u = eqp_unit($id); if (!$u || $u['status'] !== 'with_person' || !$u['eq_item_id']) throw new RuntimeException(t('eqp.e_takeback'));
+    if (!in_array((string)$u['eq_cat'], EQP_DIRECT, true)) throw new RuntimeException(t('eqp.e_takeback_hr'));
+    $res = ($_POST['result'] ?? 'ok') === 'damaged' ? 'damaged' : 'ok'; $note = mb_substr(trim(preg_replace('/\s+/u', ' ', (string)($_POST['note'] ?? ''))), 0, 300); if ($res === 'damaged' && $note === '') throw new RuntimeException(t('ptl.e_note'));
+    stk_tx(function () use ($u, $id, $res, $note) { $ref = t('eqp.ref_takeback', ['n' => (string)$u['person']]);
+        q("UPDATE hr_eq_items SET status = 'returned', returned_on = CURDATE(), cond_in = ?, return_note = ? WHERE id = ? AND status IN ('draft','pending','held','missing')", [$res, $note ?: null, (int)$u['eq_item_id']]);
+        $doc = (int) scalar('SELECT issue_doc_id FROM hr_eq_items WHERE id = ?', [(int)$u['eq_item_id']]); if ($doc && !scalar("SELECT COUNT(*) FROM hr_eq_items WHERE issue_doc_id = ? AND status = 'pending'", [$doc])) q("UPDATE hr_eq_docs SET status = 'cancelled' WHERE id = ? AND status IN ('sent','disputed')", [$doc]);
+        sn_release_person($id, 'back', $ref . ($note !== '' ? ' — ' . $note : '')); });
+    return $id;
 }
 /** The unit is taken out of use: it leaves the stock as written off; its record of the measuring equipment register is retired with it. */
 function eqp_retire_from_post(): int {
@@ -248,7 +262,8 @@ function eqp_handle_action(string $action): bool {
     switch ($action) {
         case 'eqp_save':      $id = eqp_save_from_post(); flash('good', t('sys.saved')); $one($id);
         case 'eqp_measuring': $id = eqp_measuring_from_post(); flash('good', t('sys.saved')); $one($id, '#cal');
-        case 'eqp_give':      { $id = (int)($_POST['unit_id'] ?? 0); eqp_give_from_post(); flash('good', t('eqp.given')); $one($id, '#holder'); }
+        case 'eqp_give':      { $id = (int)($_POST['unit_id'] ?? 0); eqp_give_from_post(); $uu = eqp_unit($id); flash('good', t($uu && in_array((string)$uu['eq_cat'], EQP_DIRECT, true) ? 'eqp.given_t' : 'eqp.given')); $one($id, '#holder'); }
+        case 'eqp_take_back': $id = eqp_take_back_from_post(); flash('good', t('eqp.takeback_ok')); $one($id, '#holder');
         case 'eqp_retire':    $id = eqp_retire_from_post(); flash('good', t('eqp.retired_ok')); $one($id);
         case 'eqp_import_parse': { $_SESSION['eqp_import'] = eqp_import_read(eqp_import_file_rows($_FILES['file'] ?? []), (string)($_POST['order'] ?? 'auto')); redirect('inv_equipment_import', ['_r' => uniqid()]); }
         case 'eqp_import_apply': { $pv = $_SESSION['eqp_import'] ?? null; if (!$pv) throw new RuntimeException(t('sn.imp_stale')); $r = eqp_import_apply($pv, (int)($_POST['warehouse_id'] ?? 0)); unset($_SESSION['eqp_import']); $_SESSION['eqp_import_result'] = $r; redirect('inv_equipment_import', ['_r' => uniqid()]); }

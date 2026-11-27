@@ -58,7 +58,9 @@ layout_head(eqp_no($r) . ' · ' . t('eqp.title'), 'inventory');
     <h2>👤 <?= tt('eqp.h_holder') ?></h2>
     <?php if ($st === 'person'): ?>
       <p><b><?= e((string)$r['person']) ?></b> <?= $r['eq_status'] ? pill(['draft' => 'mute', 'pending' => 'warn', 'held' => 'green', 'missing' => 'bad'][$r['eq_status']] ?? 'mute', t('hre.st_' . $r['eq_status'])) : '' ?></p>
-      <p class="hint"><?= tt($r['eq_status'] === 'draft' ? 'eqp.holder_draft' : 'eqp.holder_hint') ?></p>
+      <?php $direct = in_array((string)$r['eq_cat'], EQP_DIRECT, true); ?><p class="hint"><?= tt($direct ? 'eqp.holder_hint_t' : ($r['eq_status'] === 'draft' ? 'eqp.holder_draft' : 'eqp.holder_hint')) ?></p>
+      <?php if ($direct && eqp_can_stock()): ?><form method="post" class="btn-row" data-lock data-confirm="<?= tt('eqp.takeback_confirm') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="eqp_take_back"><input type="hidden" name="unit_id" value="<?= $id ?>">
+        <select name="result" data-nosearch style="max-width:140px;"><option value="ok"><?= tt('ptl.r_ok') ?></option><option value="damaged"><?= tt('ptl.r_damaged') ?></option></select><input name="note" maxlength="300" placeholder="<?= tt('ptl.note_ph') ?>" style="flex:1;min-width:140px;"><button class="btn btn--navy btn--sm" type="submit">↩ <?= tt('eqp.takeback_btn') ?></button></form><?php endif; ?>
       <?php if (function_exists('hre_can') && hre_can()): ?><div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('hr_person', ['id' => (int)$r['person_id'], 'tab' => 'eq']) ?>"><?= tt('eqp.holder_card') ?></a></div><?php endif; ?>
     <?php elseif ($st === 'wh' && eqp_can_give()): $mine = hre_prep_cats(); $can = $c ? in_array('instrument', $mine, true) : (bool) array_diff($mine, ['instrument']); ?>
       <?php if ($c && $c[0] === 'out'): ?><div class="flash flash--bad"><?= e(t('eqp.e_out_of_service', ['c' => (string)$r['ism_code']])) ?></div>
@@ -72,7 +74,7 @@ layout_head(eqp_no($r) . ' · ' . t('eqp.title'), 'inventory');
           <div class="field"><label><?= tt('hre.cond_out') ?></label><select name="cond_out" data-nosearch><?php foreach (HRE_CONDS as $k): ?><option value="<?= $k ?>"<?= $k === 'good' ? ' selected' : '' ?>><?= tt('hre.k_' . $k) ?></option><?php endforeach; ?></select></div>
         </div>
         <div class="field"><label><?= tt('eqp.c_note') ?></label><input name="note" maxlength="300"></div>
-        <p class="hint"><?= tt('eqp.give_hint') ?></p>
+        <p class="hint"><?= tt('eqp.give_hint_t') ?></p>
         <div class="btn-row"><button class="btn btn--gold" type="submit">👤 <?= tt('eqp.give_btn') ?></button></div>
       </form><?php endif; ?>
     <?php elseif ($st === 'project'): ?><p>📍 <b><?= e((string)$r['project_code']) ?></b> · <?= tt('ptl.supervisor') ?>: <?= e((string)$r['site_user']) ?><?= $r['site_since'] ? ' · ' . e(fmt_date($r['site_since'])) : '' ?></p><div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('project_tools', ['project' => (int)$r['project_id']]) ?>#u<?= $id ?>"><?= tt('ptl.title') ?></a></div>

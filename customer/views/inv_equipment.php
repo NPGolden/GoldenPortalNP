@@ -53,6 +53,11 @@ layout_head(t('eqp.title'), 'inventory');
       <div class="field"><label><?= tt('ptl.supervisor') ?></label><select name="site_user_id" required><option value="">—</option><?php foreach (ptl_staff() as $su): ?><option value="<?= (int)$su['id'] ?>"><?= e($su['full_name']) ?></option><?php endforeach; ?></select></div>
       <div class="field"><label><?= tt('ptl.due') ?></label><input type="date" name="site_due" min="<?= date('Y-m-d') ?>"></div>
     </div>
+    <?php if (function_exists('dn_can') && dn_can()): ?><div class="grid grid-3">
+      <div class="field"><label class="chk"><input type="checkbox" name="with_dn" value="1" checked> <b><?= tt('ptl.dn_h') ?></b></label></div>
+      <div class="field"><label><?= tt('ptl.dn_name') ?></label><input name="dn_name" maxlength="120"></div>
+      <div class="field"><label><?= tt('ptl.dn_email') ?></label><input type="email" name="dn_email" maxlength="190" autocomplete="off"></div>
+    </div><p class="hint"><?= tt('ptl.dn_hint') ?></p><?php endif; ?>
     <p class="hint"><?= tt('ptl.send_hint') ?></p>
     <div class="btn-row"><button class="btn btn--gold" type="submit" data-confirm="<?= tt('ptl.send_confirm') ?>">📍 <?= tt('ptl.send_btn') ?></button></div>
   </div></form><?php endif; ?>

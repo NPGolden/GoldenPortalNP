@@ -102,7 +102,7 @@ function hre_add_from_post(): int {
     q('INSERT INTO hr_eq_items (person_id, category, description, serial_no, asset_tag, qty, size, cond_out, note, status, src_id, created_by, expires_on) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
       [$pid, $cat, $desc, $serial ?: null, $tag ?: null, $qty, mb_substr(trim((string)($_POST['size'] ?? '')), 0, 20) ?: null, $cond, mb_substr(trim((string)($_POST['note'] ?? '')), 0, 300) ?: null, 'draft', $src, hre_me(), $exp]);
     if ($ast) { $eqId = (int) db()->lastInsertId(); try { stk_tx(function () use ($asset, $pid, $eqId, $p) { sn_assign_person($asset, $pid, $eqId, (string)$p['name_en']); q('UPDATE hr_eq_items SET inv_serial_id = ? WHERE id = ?', [$asset, $eqId]); }); } catch (Throwable $e) { q('DELETE FROM hr_eq_items WHERE id = ?', [$eqId]); throw $e; } }
-    if (!hre_can() && function_exists('nf_push')) { $u = current_user(); try { nf_push(array_values(array_diff(hre_hr_uids(), [hre_me()])), 'hre', 'hre:prep:' . $pid . ':' . date('Ymd'), t('hre.nf_prepared', ['n' => (string)$p['name_en']]), null, url('hr_person', ['id' => $pid, 'tab' => 'eq']) . '#eq-add', (int)$u['id'], (string)$u['full_name']); } catch (Throwable $e) {} }
+    if (!hre_can() && empty($GLOBALS['hre_no_hr']) && function_exists('nf_push')) { $u = current_user(); try { nf_push(array_values(array_diff(hre_hr_uids(), [hre_me()])), 'hre', 'hre:prep:' . $pid . ':' . date('Ymd'), t('hre.nf_prepared', ['n' => (string)$p['name_en']]), null, url('hr_person', ['id' => $pid, 'tab' => 'eq']) . '#eq-add', (int)$u['id'], (string)$u['full_name']); } catch (Throwable $e) {} }
     return $pid;
 }
 function hre_del_from_post(): int {
@@ -147,6 +147,18 @@ function hre_issue_from_post(bool $keepDates = false): array {
     if (!empty($p['user_id']) && !empty($p['account_active'])) hre_notify([(int)$p['user_id']], $d, 'hre.nf_issue', url('my_equipment'));
     return $d;
 }
+/** R97-292 — tools and instruments go to the person without HR: the giver (warehouse, QHSE) puts the lines he just prepared on an issue list of their own. */
+function hre_tools_only(array $items): bool { foreach ($items as $i) if (!in_array((string)$i['category'], ['tool', 'instrument'], true)) return false; return (bool)$items; }
+function hre_issue_direct(int $pid, array $itemIds): ?array {
+    $p = hr_person($pid); if (!$p || !$itemIds) return null; $ids = array_map('intval', $itemIds);
+    $rows = array_values(array_filter(hre_items($pid, ['draft']), fn($i) => in_array((int)$i['id'], $ids, true) && (int)$i['created_by'] === hre_me())); if (!$rows || !hre_tools_only($rows)) return null;
+    $u = current_user(); $pdo = db(); $own = !$pdo->inTransaction(); if ($own) $pdo->beginTransaction();
+    try { $no = hre_next_no('issue'); q('INSERT INTO hr_eq_docs (person_id, kind, doc_no, doc_date, status, note, created_by, created_name) VALUES (?,?,?,?,?,?,?,?)', [$pid, 'issue', $no, date('Y-m-d'), 'sent', null, hre_me(), (string)($u['full_name'] ?? '')]); $id = (int)$pdo->lastInsertId();
+        foreach ($rows as $i) q("UPDATE hr_eq_items SET status = 'pending', issue_doc_id = ? WHERE id = ? AND status = 'draft'", [$id, (int)$i['id']]); if ($own) $pdo->commit();
+    } catch (Throwable $e) { if ($own) $pdo->rollBack(); throw $e; }
+    $d = hre_doc($id); if (!empty($p['user_id']) && !empty($p['account_active'])) hre_notify([(int)$p['user_id']], $d, 'hre.nf_issue', url('my_equipment'));
+    return $d;
+}
 /** The employee accepts an issue list — or confirms a handover list prepared by HR. $paperName: recorded by HR from the signed paper. */
 function hre_accept(int $docId, ?string $paperName = null): array {
     $d = hre_doc($docId); if (!$d) throw new RuntimeException(t('err.notfound'));
@@ -181,7 +193,7 @@ function hre_refuse_line_x(array $i, array $d, string $why, string $who): void {
 }
 /** Who hears about lines that were not accepted: HR, who made the list and the lines, the IT team for its categories, procurement for units of the inventory. */
 function hre_refused_notify(array $d, array $lines, string $who): void {
-    if (!$lines || !function_exists('nf_push')) return; $to = array_merge(hre_hr_uids(), [(int)$d['created_by']]); $it = false; $inv = false; $txt = []; $sn = '';
+    if (!$lines || !function_exists('nf_push')) return; $to = array_merge(hre_tools_only(array_column($lines, 0)) ? [] : hre_hr_uids(), [(int)$d['created_by']]);   // R97-292: HR does not hear about tools $it = false; $inv = false; $txt = []; $sn = '';
     foreach ($lines as [$i, $why]) { $to[] = (int)$i['created_by']; if (in_array($i['category'], HRE_IT_CATS, true)) $it = true; if (!empty($i['inv_serial_id'])) { $inv = true; $sn = (string)$i['serial_no']; } $txt[] = $i['description'] . ((string)$i['serial_no'] !== '' ? ' · S/N ' . $i['serial_no'] : '') . ' — ' . $why; }
     try { if ($it && function_exists('ism_team')) $to = array_merge($to, ism_team()); if ($inv && function_exists('prq_proc_ids')) $to = array_merge($to, prq_proc_ids()); } catch (Throwable $e) {}
     $to = array_values(array_diff(array_unique(array_filter(array_map('intval', $to))), [hre_me()])); if (!$to) return; $u = current_user();
@@ -201,7 +213,8 @@ function hre_accept_lines(int $docId, array $no): array {
     };
     if (function_exists('stk_tx') && function_exists('stk_has') && stk_has()) stk_tx($run); else { $pdo = db(); $pdo->beginTransaction(); try { $run(); $pdo->commit(); } catch (Throwable $e) { $pdo->rollBack(); throw $e; } }
     hre_audit((int)$d['person_id'], t('hre.issue_list') . ' ' . $d['doc_no'], t('hre.ds_accepted') . ' ' . $ok . ' · ' . t('hre.refused_n', ['k' => count($ref)]) . ' — ' . $name . ' (' . t('hre.via_portal') . ')', $ref ? mb_substr(implode('; ', array_map(fn($x) => $x[0]['description'] . ' — ' . $x[1], $ref)), 0, 500) : null);
-    if ($ok) hre_notify(array_merge(hre_hr_uids(), [(int)$d['created_by']]), $d, 'hre.nf_accepted', url('hr_person', ['id' => (int)$d['person_id'], 'tab' => 'eq']));
+    $tools = hre_tools_only($items);
+    if ($ok) hre_notify($tools ? [(int)$d['created_by']] : array_merge(hre_hr_uids(), [(int)$d['created_by']]), $d, 'hre.nf_accepted', $tools && function_exists('eqp_has') && eqp_has() ? url('inv_equipment', ['state' => 'person', 'person' => (int)$d['person_id']]) : url('hr_person', ['id' => (int)$d['person_id'], 'tab' => 'eq']));
     hre_refused_notify($d, $ref, $name);
     return ['doc' => hre_doc($docId), 'ok' => $ok, 'no' => count($ref)];
 }
