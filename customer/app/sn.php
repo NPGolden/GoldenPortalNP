@@ -183,12 +183,12 @@ function sn_import_read(string $path): array {
     if ($hr) foreach (hr_people(false) as $p) { if (!$p['is_active']) continue; $pname[(int)$p['id']] = (string)$p['name_en']; if ((string)$p['emp_code'] !== '') $byCode[$norm((string)$p['emp_code'])] = (int)$p['id']; foreach (['name_en', 'name_el'] as $k) if ((string)($p[$k] ?? '') !== '') { $nn = $norm((string)$p[$k]); $byName[$nn] = isset($byName[$nn]) && $byName[$nn] !== (int)$p['id'] ? 0 : (int)$p['id']; } }
     $cats = []; $conds = []; if (defined('HRE_CATS')) { foreach (HRE_CATS as $c) { $cats[$norm($c)] = $c; foreach (['en', 'el', 'it'] as $lg) $cats[$norm(t_in('hre.c_' . $c, $lg))] = $c; } foreach (HRE_CONDS as $c) { $conds[$norm($c)] = $c; foreach (['en', 'el', 'it'] as $lg) $conds[$norm(t_in('hre.k_' . $c, $lg))] = $c; } }
     $whs = []; foreach (stk_warehouses() as $w) $whs[$norm((string)$w['code'])] = (int)$w['id'];
-    $items = []; $first = []; $seen = []; $out = []; $n = ['ok' => 0, 'skip' => 0, 'new_items' => 0, 'switch' => 0, 'holders' => 0, 'warn' => 0];
+    $items = []; $first = []; $seen = []; $out = []; $n = ['ok' => 0, 'skip' => 0, 'new_items' => 0, 'switch' => 0, 'holders' => 0, 'warn' => 0, 'link' => 0];
     foreach (array_slice($rows, 1, 3000, true) as $ri => $r) {
         $code = mb_substr($get($r, 'code'), 0, 60); $serial = mb_substr(trim(preg_replace('/\s+/u', ' ', $get($r, 'serial_no'))), 0, 80); $tag = mb_substr(trim(preg_replace('/\s+/u', ' ', $get($r, 'asset_tag'))), 0, 40); $desc = mb_substr($get($r, 'description'), 0, 255);
         if ($code === '' && $serial === '' && $tag === '' && $desc === '') continue; if (stripos($get($r, 'note'), 'example row') !== false) continue;
         $x = ['line' => $ri + 1, 'code' => $code, 'description' => $desc, 'category' => mb_substr($get($r, 'category'), 0, 120), 'maker' => mb_substr($get($r, 'maker'), 0, 80), 'part_no' => mb_substr($get($r, 'part_no'), 0, 80), 'unit' => $get($r, 'unit'), 'wh' => 0, 'serial' => $serial !== '' ? $serial : $tag, 'tag' => $tag,
-              'value' => null, 'pid' => 0, 'holder' => '', 'eq_cat' => $cats[$norm($get($r, 'eq_cat'))] ?? 'other', 'cond' => $conds[$norm($get($r, 'cond'))] ?? 'used', 'given_on' => xlsx_date($get($r, 'given_on')), 'note' => mb_substr($get($r, 'note'), 0, 300), 'item_id' => 0, 'state' => '', 'skip' => null, 'warn' => []];
+              'value' => null, 'pid' => 0, 'holder' => '', 'eq_cat' => $cats[$norm($get($r, 'eq_cat'))] ?? 'other', 'cond' => $conds[$norm($get($r, 'cond'))] ?? 'used', 'given_on' => xlsx_date($get($r, 'given_on')), 'note' => mb_substr($get($r, 'note'), 0, 300), 'item_id' => 0, 'state' => '', 'skip' => null, 'warn' => [], 'known' => ''];
         $v = str_replace([' ', ','], ['', '.'], $get($r, 'value')); if ($v !== '' && is_numeric($v) && (float)$v >= 0 && (float)$v < 1e9) $x['value'] = round((float)$v, 2);
         $key = $norm($code);
         if ($code === '') $x['skip'] = t('sn.imp_e_code');
@@ -200,7 +200,7 @@ function sn_import_read(string $path): array {
             $it = $items[$key];
             if ($it) { $x['item_id'] = (int)$it['id']; if ($x['description'] === '') $x['description'] = (string)$it['description'];
                 if (empty($it['is_asset'])) { if (!$admin) $x['skip'] = t('sn.imp_e_switch'); else $x['state'] = 'switch'; } else $x['state'] = 'exists';
-                if (!$x['skip'] && ($k = one("SELECT status FROM inv_serials WHERE item_id = ? AND serial_no = ?", [(int)$it['id'], $x['serial']])) && in_array($k['status'], ['in_stock', 'with_person'], true)) $x['skip'] = t('sn.imp_e_known', ['st' => t('sn.s_' . $k['status'])]);
+                if (!$x['skip'] && ($k = one("SELECT status FROM inv_serials WHERE item_id = ? AND serial_no = ?", [(int)$it['id'], $x['serial']])) && in_array($k['status'], ['in_stock', 'with_person'], true)) $x['known'] = (string)$k['status'];   // R97-285: decided below — a unit already in stock with a holder in the file is put in the name of that person
             } else {
                 if (!isset($first[$key])) { if (!$admin) $x['skip'] = t('sn.imp_e_newitem'); elseif ($desc === '') $x['skip'] = t('sn.imp_e_desc'); else $first[$key] = $x; }
                 if (!$x['skip']) { $x['state'] = 'new'; if ($x['description'] === '') $x['description'] = (string)$first[$key]['description']; }
@@ -209,6 +209,7 @@ function sn_import_read(string $path): array {
         if (!$x['skip'] && ($wc = $get($r, 'warehouse')) !== '') { $x['wh'] = $whs[$norm($wc)] ?? 0; if (!$x['wh']) $x['skip'] = t('sn.imp_e_wh', ['w' => $wc]); }
         if (!$x['skip']) { $ec = $get($r, 'emp_code'); $en = $get($r, 'holder');
             if ($ec !== '' || $en !== '') { if (!$hr) $x['warn'][] = t('sn.imp_w_hr'); else { $pid = $ec !== '' ? ($byCode[$norm($ec)] ?? 0) : 0; if (!$pid && $en !== '') $pid = $byName[$norm($en)] ?? 0; if (!$pid) $x['warn'][] = t('hre.imp_noperson', ['n' => $ec !== '' ? $ec : $en]); else { $x['pid'] = $pid; $x['holder'] = $pname[$pid] ?? ''; } } } }
+        if (!$x['skip'] && $x['known'] !== '') { if ($x['known'] === 'in_stock' && $x['pid']) { $x['state'] = 'link'; $n['link']++; } else $x['skip'] = t('sn.imp_e_known', ['st' => t('sn.s_' . $x['known'])]) . ($x['known'] === 'in_stock' && !$x['pid'] ? ' — ' . t('sn.imp_e_known_h') : ''); }
         if ($x['skip']) $n['skip']++; else { $n['ok']++; $seen[$key . '|' . $norm($x['serial'])] = $ri + 1; if ($x['pid']) $n['holders']++; if ($x['warn']) $n['warn']++; }
         $out[] = $x;
     }
@@ -224,8 +225,13 @@ function sn_import_apply(array $pv, int $whDefault, string $mode): array {
     $whOk = array_map('intval', array_column(stk_warehouses(), 'id')); if (!in_array($whDefault, $whOk, true)) $whDefault = stk_default_wh();
     $admin = function_exists('pr_admin') && pr_admin(); $hr = function_exists('hre_can') && hre_can(); @set_time_limit(600); $u = current_user(); $ref = t('sn.imp_ref');
     $res = stk_tx(function () use ($pv, $whDefault, $mode, $admin, $hr, $u, $ref, $whOk) {
-        $res = ['units' => 0, 'new_items' => 0, 'switched' => 0, 'handed' => 0, 'people' => []]; $ids = []; $groups = []; $made = [];
+        $res = ['units' => 0, 'new_items' => 0, 'switched' => 0, 'handed' => 0, 'linked' => 0, 'people' => []]; $ids = []; $groups = []; $made = [];
         foreach ($pv['rows'] as $x) { if ($x['skip']) continue; $key = mb_strtolower($x['code']);
+            if (($x['state'] ?? '') === 'link') {   // R97-285: the unit is in the inventory already — only the holder is new: a line on the equipment card of the person, the unit out of the warehouse in that name
+                if (!$hr || !$x['pid']) continue; $s = sn_row((int)$x['item_id'], (string)$x['serial'], true); $p = hr_person((int)$x['pid']); if (!$s || $s['status'] !== 'in_stock' || !$p || empty($p['is_active'])) continue;
+                q('INSERT INTO hr_eq_items (person_id, category, description, serial_no, asset_tag, qty, cond_out, note, status, issued_on, created_by) VALUES (?,?,?,?,?,1,?,?,?,?,?)', [(int)$x['pid'], $x['eq_cat'], mb_substr($x['description'], 0, 200), $x['serial'], ($x['tag'] ?: ($s['asset_tag'] ?? null)) ?: null, $x['cond'], $x['note'] ?: null, 'draft', $x['given_on'], (int)($u['id'] ?? 0)]);
+                $eq = (int) db()->lastInsertId(); sn_assign_person((int)$s['id'], (int)$x['pid'], $eq, (string)$p['name_en']); q('UPDATE hr_eq_items SET inv_serial_id = ? WHERE id = ?', [(int)$s['id'], $eq]); $res['handed']++; $res['linked']++; $res['people'][(int)$x['pid']] = 1; continue;
+            }
             if (!isset($ids[$key])) { $it = one('SELECT id, is_asset, last_price FROM inv_items WHERE code = ? FOR UPDATE', [$x['code']]);
                 if (!$it) { if (!$admin) throw new RuntimeException(t('sn.imp_e_newitem')); $cat = $x['category'] !== '' ? stk_category_find($x['category'], true) : null;
                     q("INSERT INTO inv_items (code, description, category_id, unit, maker, factory_code, status, currency, is_asset, track_serial, last_price, last_price_at, created_by) VALUES (?,?,?,?,?,?,'active','EUR',1,1,?,?,?)", [$x['code'], $x['description'], $cat, stk_unit_norm($x['unit'] !== '' ? $x['unit'] : 'pcs'), $x['maker'] ?: null, $x['part_no'] ?: null, $x['value'], $x['value'] !== null ? date('Y-m-d') : null, (int)($u['id'] ?? 0) ?: null]);

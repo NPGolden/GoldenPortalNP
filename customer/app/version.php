@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.272.0';
+const CP_VERSION = '1.272.1';
 const CP_BUILD   = '2026-11-27';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-285', 'version' => '1.272.1', 'date' => '2026-11-27', 'title' => 'Company assets: units already imported into the inventory are put in the name of their holders by importing the file again with the holder filled in — they appear on the equipment card of the person in HR', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-284', 'version' => '1.272.0', 'date' => '2026-11-27', 'title' => 'Offers: the same two ways of acceptance as service reports — in the portal (or the Customer app) and by e-mail link — and each of them leaves the completed offer acceptance form with the offer', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-283', 'version' => '1.271.0', 'date' => '2026-11-27', 'title' => 'Offers: acceptance through the e-mail link with a drawn signature, as service reports and delivery notes; an offer acceptance form (PDF) — attached to the link when the offer document was made outside the portal, completed with name, capacity, time, address and signature on acceptance, kept with the offer and sent to the customer', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-282', 'version' => '1.270.0', 'date' => '2026-11-27', 'title' => 'Inventory: stock per warehouse (items, reserved, free, value, Excel) and the stock of a warehouse — all of it or the ticked lines — sent to another warehouse with a transfer note; reservations and serial numbers travel with the goods', 'db' => null, 'check' => null],

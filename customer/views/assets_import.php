@@ -18,6 +18,7 @@ layout_head(t('sn.imp_title'), 'inventory');
     <form method="post" action="<?= url('assets_import') ?>" enctype="multipart/form-data" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="sn_import_parse">
       <div class="field"><label><?= tt('im.file') ?></label><input type="file" name="file" accept=".xlsx" required></div>
       <p class="hint"><?= tt('sn.imp_cols_hint') ?></p>
+      <p class="hint">👤 <?= tt('sn.imp_link_hint') ?></p>
       <div class="btn-row"><button class="btn btn--gold" type="submit"><?= tt('stk.imp_preview') ?></button><a class="btn btn--ghost" href="<?= url('assets_import', ['template' => 1]) ?>">⤓ <?= tt('stk.imp_template') ?></a></div>
     </form>
   </div>
@@ -30,7 +31,7 @@ layout_head(t('sn.imp_title'), 'inventory');
       <?php $whName = []; foreach ($whs as $w) $whName[(int)$w['id']] = (string)$w['code'];
       $ordered = array_merge(array_filter($prev['rows'], fn($r) => $r['skip']), array_filter($prev['rows'], fn($r) => !$r['skip'] && $r['warn']), array_filter($prev['rows'], fn($r) => !$r['skip'] && !$r['warn']));
       foreach (array_slice($ordered, 0, 200) as $r): ?><tr><td class="hint"><?= (int)$r['line'] ?></td>
-        <td><?php if ($r['skip']): ?><?= pill('bad', t('sn.imp_p_skip')) ?><div class="hint"><?= e($r['skip']) ?></div><?php else: ?><?= $r['state'] === 'new' ? pill('green', t('stk.imp_new1')) : ($r['state'] === 'switch' ? pill('gold', t('sn.imp_p_switch')) : pill('mute', t('stk.imp_exists'))) ?><?php foreach ($r['warn'] as $w): ?><div class="hint">⚠ <?= e($w) ?></div><?php endforeach; ?><?php endif; ?></td>
+        <td><?php if ($r['skip']): ?><?= pill('bad', t('sn.imp_p_skip')) ?><div class="hint"><?= e($r['skip']) ?></div><?php else: ?><?= $r['state'] === 'link' ? pill('navy', '👤 ' . t('sn.imp_p_link')) : ($r['state'] === 'new' ? pill('green', t('stk.imp_new1')) : ($r['state'] === 'switch' ? pill('gold', t('sn.imp_p_switch')) : pill('mute', t('stk.imp_exists')))) ?><?php foreach ($r['warn'] as $w): ?><div class="hint">⚠ <?= e($w) ?></div><?php endforeach; ?><?php endif; ?></td>
         <td class="mono" style="white-space:nowrap;"><?= e($r['code']) ?></td><td class="mono" style="white-space:nowrap;"><?= e($r['serial']) ?></td><td class="mono hint"><?= e($r['tag']) ?></td><td class="hint"><?= e($r['wh'] ? ($whName[(int)$r['wh']] ?? '') : '') ?></td><td><?= e($r['holder']) ?></td><td class="hint"><?= e($r['description']) ?></td></tr><?php endforeach; ?>
       <?php if (count($ordered) > 200): ?><tr><td colspan="8" class="hint"><?= e(t('stk.imp_more', ['n' => count($ordered) - 200])) ?></td></tr><?php endif; ?></tbody></table></div>
   </div>
