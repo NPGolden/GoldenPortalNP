@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.265.5';
+const CP_VERSION = '1.265.6';
 const CP_BUILD   = '2026-11-27';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-274', 'version' => '1.265.6', 'date' => '2026-11-27', 'title' => 'Georgian — seventh delivery: supplier e-mail texts, organisations and roles, shortages and stock project, licences, RFQ comparison, delivery notes, recruiting with candidate e-mails, website inbox and statistics, work permits, onboarding and handover, HR year, direct invoices, credit notes, ownership history, milestones and safety log, System Budgets and conversion to offer, marine intelligence, My approvals, first-sign-in password, recycle bin (95 % of the portal)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-273', 'version' => '1.265.5', 'date' => '2026-11-27', 'title' => 'Georgian — sixth delivery: software releases, acceptance by e-mail link and signature on the device, newsletter approval, KYMA website, budget pricing by procurement and consistency checks, offer follow-up and sales board, payments, collections and statement of account, function checks, inventory, price history and pricing rules, suppliers, requisitions, engineering BOM, purchase orders with lots, logistics and goods receipt, payables, utilization (80 % of the portal)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-272', 'version' => '1.265.4', 'date' => '2026-11-27', 'title' => 'Georgian — fifth delivery: accounting reports, parts to invoice, newsletters, KPIs and sales KPIs, risk log, production orders and subcontracting, numbering, offer classes and payment terms, proforma invoices, cash flow, time zone, stage sections and extra hours, assistant settings, mobile apps, diagnostics and system health, ISO 27001 and QHSE registers, supplier approval, calibration, marine cyber safety (63 % of the portal)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-271', 'version' => '1.265.3', 'date' => '2026-11-27', 'title' => 'Georgian — fourth delivery: fleet, accounts, approvals, offers and the offer builder, contacts, companies, customers, file archive, licence, branches, teams, open issues, remote support and subscriptions, works forecast, e-mail card and templates, rate cards, cost control, work packages (48 % of the portal)', 'db' => null, 'check' => null],
