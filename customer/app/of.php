@@ -440,3 +440,60 @@ function of_for_task_form(array $projectIds, int $keepId = 0): array {
     $ids = array_values(array_filter(array_map('intval', $projectIds))); if (!$ids && !$keepId) return [];
     return all('SELECT id, project_id, offer_no, revision, title, status FROM offers WHERE ' . ($ids ? 'project_id IN (' . implode(',', $ids) . ')' : '0') . ($keepId ? ' OR id = ' . $keepId : '') . ' ORDER BY offer_no DESC', []);
 }
+
+/* ------------------------------------------------------------------ R97-283: offer acceptance form
+ * An offer is accepted through the personal e-mail link with a drawn signature, as service reports and delivery notes are. The acceptance is written on a
+ * form (PDF): offer number, revision, subject, amount, validity, the offer document with its fingerprint, and who accepted, when, from which address, with
+ * the signature. When the offer document was made outside the portal (an uploaded file), the empty form goes out with the link, so the customer can also
+ * print, sign and return it. The completed form is kept with the offer and sent to the customer. */
+function of_made_outside(array $o): bool { return !empty($o['file_id']) && (string) scalar('SELECT kind FROM sp_files WHERE id = ?', [(int)$o['file_id']]) !== 'issued'; }
+function of_sig_png(string $dataUrl): ?string {
+    if (!preg_match('#^data:image/png;base64,([A-Za-z0-9+/=]+)$#', $dataUrl, $m)) return null; $png = base64_decode($m[1], true);
+    if ($png === false || strlen($png) < 200 || strlen($png) > 400000 || !@getimagesizefromstring($png)) return null; return $png;
+}
+function of_acc_name(array $o): string { return preg_replace('/[^A-Za-z0-9._-]+/', '_', trim((string)$o['offer_no'] . '_' . (string)$o['revision'])) . '_acceptance-form.pdf'; }
+/** The form. $acc null = empty, to be filled in by hand; otherwise name, role, email, at, ip, remark, png. */
+function of_acc_pdf(array $o, ?array $acc = null, string $loc = 'en'): string {
+    require_once __DIR__ . '/pdf.php'; $loc = in_array($loc, ['en', 'el', 'it'], true) ? $loc : 'en'; $T = fn(string $k, array $v = []) => t_in($k, $loc, $v);
+    $pdf = new PdfWriter(); $navy = '#0B1E2D'; $gold = '#C89B3C'; $ink = '#1F2933'; $line = '#C8CED6'; $head = '#EEF2F6'; $green = '#2E7D32'; $Lm = 15.0; $R = 195.0; $W = $R - $Lm;
+    $up = fn(string $x) => strtr(mb_strtoupper($x), ['Ά' => 'Α', 'Έ' => 'Ε', 'Ή' => 'Η', 'Ί' => 'Ι', 'Ό' => 'Ο', 'Ύ' => 'Υ', 'Ώ' => 'Ω']);   // Greek capitals carry no accent
+    $bd = function_exists('br_doc') ? br_doc((int)$o['project_id'], null, null) : ['logo' => null, 'name' => 'Golden Automation Systems', 'lines' => [], 'footer' => ''];
+    $no = trim((string)$o['offer_no'] . ' ' . (string)$o['revision']);
+    $pdf->addPage(); if (!empty($bd['logo'])) $pdf->image($bd['logo'], $Lm, 11, 45, 16);
+    $pdf->setColor($navy); $pdf->setFont('B', 15); $pdf->text($R, 19, $up($T('of.af_title')), 'R'); $pdf->setFont('R', 8.5); $pdf->setColor($gold); $pdf->text($R, 25, $no . ' · ' . fmt_date(date('Y-m-d')), 'R');
+    $pdf->setLineWidth(0.5); $pdf->line($Lm, 30, $R, 30); $y = 37.0;
+    $pdf->setFont('B', 8); $pdf->setColor($navy); $pdf->text($Lm, $y, $up($T('pi.from'))); $pdf->text(110, $y, $up($T('of.af_customer'))); $y += 4.5;
+    $pdf->setFont('R', 8.5); $pdf->setColor($ink); $yl = $y; foreach (array_merge([(string)$bd['name']], (array)$bd['lines']) as $l0) foreach ($pdf->wrap((string)$l0, 88) as $ln) { $pdf->text($Lm, $yl, $ln); $yl += 4; }
+    $yr = $y; foreach (array_filter([(string)($o['customer_name'] ?? ''), !empty($o['vessel']) ? (preg_match('#^(M/Y|S/Y|M/V|M/T)\b#i', (string)$o['vessel']) ? '' : 'M/Y ') . $o['vessel'] : '', trim((string)($o['project_code'] ?? '') . ' · ' . (string)($o['project_name'] ?? ''), ' ·')]) as $l0) foreach ($pdf->wrap($l0, 85) as $ln) { $pdf->text(110, $yr, $ln); $yr += 4; }
+    $y = max($yl, $yr) + 5;
+    $amount = number_format((float)$o['amount'], 2, ',', '.') . ' ' . (string)($o['currency'] ?: 'EUR') . ((float)($o['vat_pct'] ?? 0) > 0 ? '  ' . $T('of.af_vat', ['p' => rtrim(rtrim(number_format((float)$o['vat_pct'], 2, ',', ''), '0'), ',')]) : '');
+    $fp = ''; if (!empty($o['file_id'])) { $b = cp_file_bytes((int)$o['file_id']); if ($b !== null) $fp = strtoupper(substr(hash('sha256', $b), 0, 32)) . ' ' . strtoupper(substr(hash('sha256', $b), 32)); }
+    $kv = array_values(array_filter([[$T('of.af_offer'), $no], [$T('of.af_subject'), (string)$o['title']], [$T('of.af_amount'), $amount], [$T('of.valid_until'), !empty($o['valid_until']) ? fmt_date((string)$o['valid_until']) : ''], [$T('of.af_doc'), (string)($o['original_name'] ?? '')], [$T('of.af_print'), $fp]], fn($r) => trim((string)$r[1]) !== ''));
+    $vx = 0.0; foreach ($kv as [$k, $v]) $vx = max($vx, $pdf->width($k, 'B', 8.5)); $vx = $Lm + 2 + max(44.0, $vx + 4);   // the values start after the widest label, whatever the language
+    $rows = []; $pdf->setFont('R', 8.5); foreach ($kv as [$k, $v]) $rows[] = [$k, $pdf->wrap($v, $R - $vx - 2)]; $hh = 3; foreach ($rows as $r) $hh += max(1, count($r[1])) * 4.5;
+    $pdf->setColor($head); $pdf->rect($Lm, $y, $W, $hh, 'F'); $yy = $y + 4.3;
+    foreach ($rows as [$k, $ls]) { $pdf->setFont('B', 8.5); $pdf->setColor($navy); $pdf->text($Lm + 2, $yy, $k); $pdf->setFont($k === $T('of.af_amount') ? 'B' : 'R', 8.5); $pdf->setColor($ink); foreach ($ls ?: [''] as $ln) { $pdf->text($vx, $yy, $ln); $yy += 4.5; } }
+    $y += $hh + 7;
+    $pdf->setFont('B', 10); $pdf->setColor($navy); $pdf->text($Lm, $y, $T('of.af_h_accept')); $y += 6; $pdf->setFont('R', 9); $pdf->setColor($ink); $y += $pdf->paragraph($Lm, $y, $W, $T('of.af_statement', ['no' => $no]), 4.6) + 6;
+    $box = function (float $x, float $w, string $label, string $value, float $h = 13.0) use ($pdf, $navy, $ink, $line, $up, &$y) { $pdf->setColor($line); $pdf->setLineWidth(0.25); $pdf->rect($x, $y, $w, $h); $pdf->setFont('B', 7); $pdf->setColor($navy); $pdf->text($x + 2, $y + 3.6, $up($label)); if ($value !== '') { $pdf->setFont('R', 9.5); $pdf->setColor($ink); $pdf->text($x + 2, $y + 9.6, mb_substr($value, 0, (int)($w / 1.9))); } };
+    $half = ($W - 4) / 2;
+    $box($Lm, $half, $T('of.af_name'), (string)($acc['name'] ?? '')); $box($Lm + $half + 4, $half, $T('of.af_role'), (string)($acc['role'] ?? '')); $y += 16;
+    $box($Lm, $half, $T('of.af_company'), $acc ? (string)($o['customer_name'] ?? '') : ''); $box($Lm + $half + 4, $half, $T('of.af_date'), $acc ? fmt_datetime((string)$acc['at']) : ''); $y += 16;
+    $sy = $y; $box($Lm, $half, $T('of.af_sign'), '', 34); if ($acc && !empty($acc['png'])) $pdf->image((string)$acc['png'], $Lm + 4, $sy + 6, $half - 8, 26);
+    $pdf->setColor($line); $pdf->rect($Lm + $half + 4, $y, $half, 34); $pdf->setFont('B', 7); $pdf->setColor($navy); $pdf->text($Lm + $half + 6, $y + 3.6, $up($T('of.af_remarks')));
+    if ($acc && trim((string)($acc['remark'] ?? '')) !== '') { $pdf->setFont('R', 8.5); $pdf->setColor($ink); $ry = $y + 9; foreach (array_slice($pdf->wrap((string)$acc['remark'], $half - 5), 0, 6) as $ln) { $pdf->text($Lm + $half + 6, $ry, $ln); $ry += 4; } }
+    $y += 40;
+    if ($acc) { $pdf->setColor($green); $pdf->rect($Lm, $y, 2.2, 15, 'F'); $pdf->setFont('B', 9); $pdf->text($Lm + 5, $y + 4, $T('of.af_accepted')); $pdf->setFont('R', 8.5); $pdf->setColor($ink);
+        $pdf->text($Lm + 5, $y + 9, $T('of.af_email') . ': ' . (string)($acc['email'] ?? '') . '   ·   ' . fmt_datetime((string)$acc['at'])); $pdf->text($Lm + 5, $y + 13.5, $T('of.af_ip') . ': ' . (string)($acc['ip'] ?? '—') . '   ·   ' . $T('of.af_code_ok')); $y += 21; }
+    else { $pdf->setFont('R', 8.5); $pdf->setColor($ink); $y += $pdf->paragraph($Lm, $y, $W, $T('of.af_how'), 4.3) + 4; }
+    $pdf->setFont('R', 7); $pdf->setColor('#6a7179'); $pdf->text($Lm, 290, (string)(($bd['footer'] ?? '') ?: $bd['name']) . ' · ' . $no . ' · ' . $T('of.af_title')); $pdf->text($R, 290, '1', 'R');
+    return $pdf->bytes($no . ' — ' . $T('of.af_title'));
+}
+/** Keep the completed form with the offer (attachment the customer may see). Returns the file id. */
+function of_acc_store(array $o, array $acc, string $loc): int {
+    $pdf = of_acc_pdf($o, $acc, $loc); $fid = cp_store_bytes($pdf, of_acc_name($o), 'application/pdf', (int)$o['project_id'], !empty($o['subproject_id']) ? (int)$o['subproject_id'] : null, 'offer_att', 'external', null, trim((string)$o['offer_no'] . ' ' . (string)$o['revision']) . ' — ' . t_in('of.af_title', $loc), []);
+    if ($fid && function_exists('of_att_has') && of_att_has()) q('UPDATE sp_files SET offer_id = ? WHERE id = ?', [(int)$o['id'], $fid]);
+    return (int)$fid;
+}
+/** The last completed form of an offer (file id), or 0. */
+function of_acc_file(int $offerId): int { return function_exists('of_att_has') && of_att_has() ? (int) scalar("SELECT id FROM sp_files WHERE offer_id = ? AND kind = 'offer_att' AND original_name LIKE '%\\_acceptance-form.pdf' ORDER BY id DESC LIMIT 1", [$offerId]) : 0; }

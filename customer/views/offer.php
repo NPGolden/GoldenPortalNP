@@ -5,6 +5,9 @@ $u = require_login(); $staff = is_staff();
 $id = (int)($_GET['id'] ?? 0);
 $o = of_has() ? of_load($id) : null;
 if (!$o) { http_response_code(404); layout_head(t('err.notfound'), 'offers'); echo '<h1>' . tt('err.notfound') . '</h1>'; layout_foot(); return; }
+if (!empty($_GET['accform']) && $staff && function_exists('of_acc_pdf')) {   // R97-283: the empty acceptance form of the offer, for staff
+    $b = of_acc_pdf($o, null, in_array(locale(), ['en', 'el', 'it'], true) ? locale() : 'en'); header('Content-Type: application/pdf'); header('Content-Disposition: inline; filename="' . of_acc_name($o) . '"'); header('Content-Length: ' . strlen($b)); header('Cache-Control: no-store'); echo $b; exit;
+}
 $pending = of_is_pending($o);
 $canDecide = $pending && (!$staff || is_cp_admin());
 $next = of_next_statuses($o);

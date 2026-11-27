@@ -26,7 +26,7 @@ $cust = (string)(($r['customer_name'] ?? '') ?: ($r['customer_db_name'] ?? ''));
       <?php if (!empty($r['due_at'])): ?><dt><?= tt('sgn.f_due') ?></dt><dd><?= e(fmt_date((string)$r['due_at'])) ?></dd><?php endif; ?>
       <?php endif; ?>
     </dl>
-    <?php if ($pdfUrl !== ''): ?><p><a class="btn btn--gold" href="<?= e($pdfUrl) ?>" target="_blank" rel="noopener">⤓ <?= tt('sgn.open_full') ?></a></p><?php endif; ?>
+    <?php if ($pdfUrl !== ''): ?><p><a class="btn btn--gold" href="<?= e($pdfUrl) ?>" target="_blank" rel="noopener">⤓ <?= tt('sgn.open_full') ?></a><?php if (!empty($formUrl)): ?> <a class="btn" href="<?= e($formUrl) ?>" target="_blank" rel="noopener">⤓ <?= tt('of.af_blank') ?></a><?php endif; ?></p><?php if (!empty($formUrl)): ?><p class="hint"><?= tt('of.af_attached') ?></p><?php endif; ?><?php endif; ?>
   </div>
   <?php if ($doc === 'fsr'): foreach ((array)$r['works'] as $w): ?>
   <div class="card"><h2><?= e(t('sgn.task', ['n' => (int)$w['seq']])) ?></h2>

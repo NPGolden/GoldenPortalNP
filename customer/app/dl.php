@@ -93,7 +93,7 @@ function dl_info(string $doc, int $id): ?array {
     if ($doc === 'fc') { if (!function_exists('fc_has') || !fc_has()) return null; $r = fc_load($id); if (!$r) return null;
         return ['doc' => $doc, 'id' => $id, 'r' => $r, 'no' => (string)$r['report_no'], 'title' => (string)(($r['tpl']['title'] ?? '') ?: t('fc.title')), 'open' => $r['status'] === 'submitted', 'file' => (int)($r['pdf_file_id'] ?? 0), 'customer_id' => (int)$r['customer_id'], 'customer' => (string)(($r['customer_name'] ?? '') ?: ($r['customer_db_name'] ?? '')), 'vessel' => (string)($r['vessel_name'] ?? ''), 'valid_until' => null, 'back' => url('fc', ['id' => $id])]; }
     if ($doc === 'offer') { if (!function_exists('of_has') || !of_has()) return null; $r = of_load($id); if (!$r) return null;
-        return ['doc' => $doc, 'id' => $id, 'r' => $r, 'no' => trim((string)$r['offer_no'] . ' ' . (string)$r['revision']), 'title' => t('of.one'), 'open' => of_is_pending($r), 'file' => (int)($r['file_id'] ?? 0), 'customer_id' => (int)$r['customer_id'], 'customer' => (string)($r['customer_name'] ?? ''), 'vessel' => (string)($r['vessel'] ?? ''), 'valid_until' => $r['valid_until'] ?: null, 'back' => url('offer', ['id' => $id])]; }
+        return ['doc' => $doc, 'id' => $id, 'r' => $r, 'no' => trim((string)$r['offer_no'] . ' ' . (string)$r['revision']), 'title' => t('of.one'), 'open' => of_is_pending($r), 'file' => (int)($r['file_id'] ?? 0), 'customer_id' => (int)$r['customer_id'], 'customer' => (string)($r['customer_name'] ?? ''), 'vessel' => (string)($r['vessel'] ?? ''), 'valid_until' => $r['valid_until'] ?: null, 'back' => url('offer', ['id' => $id]), 'form' => function_exists('of_made_outside') && of_made_outside($r), 'form_url' => function_exists('of_acc_pdf') ? url('offer', ['id' => $id, 'accform' => 1]) : '']; }   // R97-283: 'form' = the offer document was made outside the portal, so the acceptance form goes with the link
     if ($doc === 'rcoffer') { if (!function_exists('rcr_offer')) return null; $r = rcr_offer($id); if (!$r) return null; $a = $r['app']; $lc = in_array((string)($a['lang'] ?? ''), ['en', 'el', 'it'], true) ? (string)$a['lang'] : 'en';
         return ['doc' => $doc, 'id' => $id, 'r' => $r, 'no' => (string)$r['offer_no'], 'title' => t_in('rc.of_doc', $lc), 'open' => $r['status'] === 'sent', 'file' => 0, 'customer_id' => 0, 'customer' => '', 'vessel' => '', 'valid_until' => $r['valid_until'] ?: null, 'back' => url('rcr_application', ['id' => (int)$r['application_id']]), 'lang' => $lc, 'to_email' => strtolower(trim((string)$a['email'])), 'to_name' => (string)($a['name'] ?? '')]; }
     if ($doc === 'dn') {   // R97-279: a delivery note to a project, a customer, production or a supplier — its PDF is made when it is asked for ('gen'), so the recipient always reads the note as it stands
@@ -119,7 +119,12 @@ function dl_mail(string $to, string $subject, string $body, ?string $replyTo = n
 }
 function dl_att(int $fileId, string $fallback): array { if (!$fileId) return []; $b = cp_file_bytes($fileId); if ($b === null || strlen($b) > 3 * 1024 * 1024) return []; $f = one('SELECT original_name, mime_type FROM sp_files WHERE id = ?', [$fileId]); return [['name' => (string)(($f['original_name'] ?? '') ?: $fallback), 'bytes' => $b, 'mime' => (string)(($f['mime_type'] ?? '') ?: 'application/pdf')]]; }
 /** The document for the mail: the stored file, or the PDF made now for a document that has none (delivery note). */
-function dl_doc_att(array $I): array { if (($I['gen'] ?? '') === 'dn') { $b = dl_doc_bytes($I); return $b === null ? [] : [['name' => $I['no'] . '.pdf', 'bytes' => $b, 'mime' => 'application/pdf']]; } return dl_att((int)$I['file'], $I['no'] . '.pdf'); }
+function dl_doc_att(array $I, string $lang = 'en'): array {
+    if (($I['gen'] ?? '') === 'dn') { $b = dl_doc_bytes($I); return $b === null ? [] : [['name' => $I['no'] . '.pdf', 'bytes' => $b, 'mime' => 'application/pdf']]; }
+    $a = dl_att((int)$I['file'], $I['no'] . '.pdf');
+    if ($I['doc'] === 'offer' && !empty($I['form']) && function_exists('of_acc_pdf')) { try { $a[] = ['name' => of_acc_name($I['r']), 'bytes' => of_acc_pdf($I['r'], null, $lang), 'mime' => 'application/pdf']; } catch (Throwable $e) { error_log('[dl] form: ' . $e->getMessage()); } }   // R97-283
+    return $a;
+}
 function dl_doc_bytes(array $I): ?string { if (($I['gen'] ?? '') !== 'dn') return null; $d = dn_load((int)$I['id']); return $d ? dn_pdf($d) : null; }
 function dl_valid_text(array $L, string $lang): string { return fmt_datetime((string)$L['expires_at']); }
 function dl_mail_link(array $L, string $token, bool $reminder = false, array $atts = []): bool {
@@ -203,7 +208,7 @@ function dl_create(string $doc, int $id, string $email, string $name, bool $send
     q('INSERT INTO doc_links (doc, doc_id, doc_no, doc_title, token_hash, email, name, lang, created_by, created_name, expires_at) VALUES (?,?,?,?,?,?,?,?,?,?, NOW() + INTERVAL ? SECOND)',
       [$doc, $id, mb_substr($I['no'], 0, 80), mb_substr($I['title'], 0, 160), dl_hash($token), $email, $name ?: null, $I['lang'] ?? (in_array(locale(), ['en', 'el', 'it'], true) ? locale() : 'en'), (int)$u['id'], (string)$u['full_name'], dl_ttl($I)]);
     $lid = (int) db()->lastInsertId(); $L = one('SELECT * FROM doc_links WHERE id = ?', [$lid]);
-    if ($send && !dl_mail_link($L, $token, false, dl_doc_att($I))) { q('DELETE FROM doc_links WHERE id = ?', [$lid]); throw new RuntimeException(t('dl.mail_failed') . ' (' . dl_mail_reason() . ')'); }
+    if ($send && !dl_mail_link($L, $token, false, dl_doc_att($I, (string)$L['lang']))) { q('DELETE FROM doc_links WHERE id = ?', [$lid]); throw new RuntimeException(t('dl.mail_failed') . ' (' . dl_mail_reason() . ')'); }
     if ($doc === 'dn') dn_link_sent($id, $email);   // R97-279: the note shows "sent for acceptance" and keeps it in its log
     return [$lid, $token];
 }
@@ -275,9 +280,12 @@ function dl_decide(array $L, array $I, string $decision, string $name, string $r
         if (!in_array($decision, ['approved', 'rejected'], true)) throw new RuntimeException(t('err.notfound'));
         if ($decision === 'rejected' && $remark === '') throw new RuntimeException(t('of.reject_note_req'));
         if ($decision === 'approved' && !$read) throw new RuntimeException(t('sgn.read_needed'));
+        $ofPng = null; if ($decision === 'approved' && function_exists('of_sig_png')) { $ofPng = of_sig_png($sig); if ($ofPng === null) throw new RuntimeException(t('sgn.sign_needed')); }   // R97-283: an offer is accepted with a drawn signature, as a service report is
         if (function_exists('cache_bump_later')) cache_bump_later('fs');
         $n = q('UPDATE offers SET status = ?, status_at = CURDATE(), decided_by = NULL, decided_name = ?, decided_at = NOW(), decided_ip = ?, decision_note = ? WHERE id = ? AND status = ?', [$decision, mb_substr($who . ' · ' . $L['email'], 0, 120), $ip, $remark ?: null, $id, (string)$r['status']])->rowCount();
-        if ($n) { if ($decision === 'rejected' && function_exists('sl_has') && sl_has()) q("UPDATE offers SET lost_reason = COALESCE(lost_reason, 'other') WHERE id = ?", [$id]); $ev('offer_events', $decision, $note); of_sync_project((int)$r['project_id']); }
+        if ($n) { if ($decision === 'rejected' && function_exists('sl_has') && sl_has()) q("UPDATE offers SET lost_reason = COALESCE(lost_reason, 'other') WHERE id = ?", [$id]); $ev('offer_events', $decision, $note); of_sync_project((int)$r['project_id']);
+            if ($decision === 'approved' && $ofPng !== null) { try { $o2 = of_load($id) ?: $r; $fid = of_acc_store($o2, ['name' => $name, 'role' => $role, 'email' => (string)$L['email'], 'at' => date('Y-m-d H:i:s'), 'ip' => (string)$ip, 'remark' => $remark, 'png' => $ofPng], (string)$L['lang']); if ($fid) $ev('offer_events', 'edited', t('of.af_ev', ['f' => of_acc_name($o2)])); } catch (Throwable $e) { error_log('[dl] acceptance form: ' . $e->getMessage()); } }   // R97-283: the completed acceptance form is kept with the offer
+        }
     } else {
         if (!in_array($decision, ['approved', 'approved_comments', 'rejected'], true)) throw new RuntimeException(t('err.notfound'));
         if ($decision !== 'approved' && $remark === '') throw new RuntimeException(t('oa.note_req'));
@@ -302,7 +310,8 @@ function dl_after(array $L, string $decision, string $who, string $remark): void
     $staffMail = (string) scalar('SELECT email FROM customer_users WHERE id = ?', [(int)$L['created_by']]);
     if ($staffMail !== '') dl_mail($staffMail, $ttl, $body . "\n\n" . dl_base() . '/' . ($I ? $I['back'] : ''));
     $lg = (string)$L['lang']; $v = ['t' => (string)$L['doc_title'], 'no' => (string)$L['doc_no']];
-    $sent = dl_mail((string)$L['email'], t_in($ok ? 'dl.m_done_s' : 'dl.m_back_s', $lg, $v), t_in($ok ? 'dl.m_done_b' : 'dl.m_back_b', $lg, $v) . "\n\n" . t_in('dl.m_sign', $lg, $v), $staffMail ?: null, $ok && $I && in_array($doc, ['fsr', 'fc', 'dn'], true) ? dl_doc_att($I) : []);
+    $ofForm = $ok && $doc === 'offer' && function_exists('of_acc_file') ? of_acc_file($id) : 0;   // R97-283
+    $sent = dl_mail((string)$L['email'], t_in($ok ? 'dl.m_done_s' : 'dl.m_back_s', $lg, $v), t_in($ok ? ($ofForm ? 'dl.m_done_of' : 'dl.m_done_b') : 'dl.m_back_b', $lg, $v) . "\n\n" . t_in('dl.m_sign', $lg, $v), $staffMail ?: null, $ofForm ? dl_att($ofForm, 'acceptance-form.pdf') : ($ok && $I && in_array($doc, ['fsr', 'fc', 'dn'], true) ? dl_doc_att($I) : []));
     if (!$sent && dl_err_has()) { q('UPDATE doc_links SET mail_error = ?, mail_error_at = NOW() WHERE id = ?', [mb_substr('confirmation: ' . dl_mail_reason(), 0, 255), (int)$L['id']]); dl_tell($L, t('dl.nf_mail', $v), t('dl.st_confirmation') . ' → ' . $L['email'] . ' — ' . dl_mail_reason()); }
 }
 
