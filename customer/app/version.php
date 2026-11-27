@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.265.3';
+const CP_VERSION = '1.265.4';
 const CP_BUILD   = '2026-11-27';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-272', 'version' => '1.265.4', 'date' => '2026-11-27', 'title' => 'Georgian — fifth delivery: accounting reports, parts to invoice, newsletters, KPIs and sales KPIs, risk log, production orders and subcontracting, numbering, offer classes and payment terms, proforma invoices, cash flow, time zone, stage sections and extra hours, assistant settings, mobile apps, diagnostics and system health, ISO 27001 and QHSE registers, supplier approval, calibration, marine cyber safety (63 % of the portal)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-271', 'version' => '1.265.3', 'date' => '2026-11-27', 'title' => 'Georgian — fourth delivery: fleet, accounts, approvals, offers and the offer builder, contacts, companies, customers, file archive, licence, branches, teams, open issues, remote support and subscriptions, works forecast, e-mail card and templates, rate cards, cost control, work packages (48 % of the portal)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-270', 'version' => '1.265.2', 'date' => '2026-11-27', 'title' => 'Georgian — third delivery: service and inspection reports, work orders, timesheets, tickets, tasks, equipment register, HR Assistant, assessments, knowledge base, portal requests, process flow, working calendar, projects and customer pages (31 % of the portal)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-269', 'version' => '1.265.1', 'date' => '2026-11-27', 'title' => 'Georgian — second delivery: My leave and HR, training, evaluations, targets, community, equipment of the personnel, job descriptions, field service reports (17.6 % of the portal)', 'db' => null, 'check' => null],
