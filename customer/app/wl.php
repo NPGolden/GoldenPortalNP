@@ -9,9 +9,10 @@
  * not what).
  */
 const WL_DEFAULTS = ['breaks' => 1, 'break_min' => 50, 'eyes' => 1, 'hydrate' => 1, 'posture' => 1, 'eod' => 1, 'io_remind' => 1, 'plan' => 1, 'mood' => 1,
-                     'desktop' => 0, 'push' => 1, 'timer_focus' => 25, 'timer_break' => 5, 'sound' => 'rain', 'volume' => 40];
-const WL_BOOLS  = ['breaks', 'eyes', 'hydrate', 'posture', 'eod', 'io_remind', 'plan', 'mood', 'desktop', 'push'];
-const WL_INTS   = ['break_min' => [20, 120], 'timer_focus' => [5, 90], 'timer_break' => [1, 30], 'volume' => [0, 100]];
+                     'desktop' => 0, 'push' => 1, 'timer_focus' => 25, 'timer_break' => 5, 'sound' => 'rain', 'volume' => 40,
+                     'weather' => 1, 'rest' => 1, 'travel' => 1, 'leave_nudge' => 1, 'quiet' => 0, 'quiet_from' => 1200, 'quiet_to' => 420];   // R97-293 (quiet hours in minutes of the day, Athens time)
+const WL_BOOLS  = ['breaks', 'eyes', 'hydrate', 'posture', 'eod', 'io_remind', 'plan', 'mood', 'desktop', 'push', 'weather', 'rest', 'travel', 'leave_nudge', 'quiet'];
+const WL_INTS   = ['break_min' => [20, 120], 'timer_focus' => [5, 90], 'timer_break' => [1, 30], 'volume' => [0, 100], 'quiet_from' => [0, 1439], 'quiet_to' => [0, 1439]];
 const WL_SOUNDS = ['rain', 'sea', 'wind', 'brown', 'pink', 'white'];
 const WL_MOOD_MIN = 5;                                  // a week is shown to HR only with at least this many answers
 
@@ -37,6 +38,7 @@ function wl_clean(array $in): array {
 function wl_save(array $in, bool $full = false): array {
     if (!wl_can()) throw new RuntimeException(t('err.noaccess')); $uid = (int) current_user()['id'];
     $cur = wl_prefs($uid); if ($full) foreach (WL_BOOLS as $k) $in[$k] = empty($in[$k]) ? 0 : 1;
+    foreach (['quiet_from', 'quiet_to'] as $k) if (isset($in[$k . '_t']) && function_exists('wl_hm_parse')) $in[$k] = wl_hm_parse((string)$in[$k . '_t'], (int)$cur[$k]);   // R97-293: times typed as HH:MM
     $p = wl_clean(array_intersect_key($in, WL_DEFAULTS) + $cur);
     q('INSERT INTO wl_prefs (user_id, prefs, updated_at) VALUES (?, ?, NOW()) ON DUPLICATE KEY UPDATE prefs = VALUES(prefs), updated_at = NOW()', [$uid, json_encode($p)]);
     unset($_SESSION['wl_state']); return $p;
@@ -89,7 +91,7 @@ function wl_mood_trend(int $weeks = 12): array {
     return $out;
 }
 /** Daily: who answered on which day is not needed after the day itself. */
-function wl_daily(): string { if (!wl_has()) return 'wl —'; return 'wl ' . q('DELETE FROM wl_mood_seen WHERE day < CURDATE() - INTERVAL 1 DAY')->rowCount(); }
+function wl_daily(): string { if (!wl_has()) return 'wl —'; if (function_exists('wl2_daily')) wl2_daily(); return 'wl ' . q('DELETE FROM wl_mood_seen WHERE day < CURDATE() - INTERVAL 1 DAY')->rowCount(); }
 
 /** The texts of assets/wellness.js. */
 function wl_texts(): array { $o = []; foreach (['title', 'sounds', 'snd_rain', 'snd_sea', 'snd_wind', 'snd_brown', 'snd_pink', 'snd_white', 'volume', 'timer', 'tm_start', 'tm_pause', 'tm_reset', 'tm_focus', 'tm_break',

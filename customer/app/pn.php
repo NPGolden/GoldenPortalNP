@@ -22,6 +22,7 @@ const PN_PRIVATE = ['hrq', 'hrm'];                                     // R97-24
 const PN_HR_OWN = ['hrq:approved', 'hrq:rejected', 'hrq:by_hr', 'hrq:corrected', 'hrq:cancelled', 'hrq:doc_due'];   // leave notices about the reader's own leave
 const PN_FRESH_SEC = 7200;                                          // older events are history, not news
 
+function pn_nb_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) one("SHOW COLUMNS FROM mob_push_queue LIKE 'not_before'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function pn_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW TABLES LIKE 'mob_push_queue'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function pn_dir(): string { $d = dirname(__DIR__) . '/storage/keys'; if (!is_dir($d)) { @mkdir($d, 0700, true); @file_put_contents($d . '/.htaccess', "Require all denied\nDeny from all\n"); @file_put_contents($d . '/index.html', ''); } return $d; }
 function pn_fcm_file(): string { return pn_dir() . '/fcm-service-account.json'; }
@@ -62,7 +63,9 @@ function pn_enqueue(int $uid, string $kind, string $refKey, string $title, ?stri
     if (function_exists('wl_has') && wl_has() && !(wl_prefs($uid)['push'] ?? 1)) return false;
     $refKey = mb_substr($refKey, 0, 60);
     if (scalar('SELECT COUNT(*) FROM mob_push_queue WHERE user_id = ? AND ref_key = ? AND (sent_at IS NULL OR sent_at > NOW() - INTERVAL ' . (str_starts_with($refKey, 'ofu:day:') ? '20 HOUR' : '10 MINUTE') . ')', [$uid, $refKey])) return false;
+    $hold = pn_nb_has() && function_exists('wl_quiet_minutes') ? wl_quiet_minutes($uid, $kind) : 0;   // asked before the insert: the id of the new row is read right after it
     q('INSERT INTO mob_push_queue (user_id, app_id, kind, ref_key, title, body, route) VALUES (?,?,?,?,?,?,?)', [$uid, $app, mb_substr($kind, 0, 30), $refKey, mb_substr($title, 0, 200), $body !== null ? mb_substr($body, 0, 400) : null, $route !== null ? mb_substr($route, 0, 120) : null]);
+    if ($hold > 0) q('UPDATE mob_push_queue SET not_before = NOW() + INTERVAL ? MINUTE WHERE id = ?', [$hold, (int) db()->lastInsertId()]);   // R97-293: the quiet hours of the reader — the push waits until they end
     return true;
 }
 /** Where a tap on the push opens the app. */
@@ -235,8 +238,9 @@ function pn_flush(int $max = 80): array {
     $out = ['sent' => 0, 'failed' => 0, 'skipped' => 0]; if (!pn_has() || !function_exists('curl_init') || (!pn_fcm_ready() && !pn_apns_ready())) return $out;
     if (!scalar("SELECT GET_LOCK('gas_pn_flush', 0)")) return $out;
     try {
-        q("UPDATE mob_push_queue SET sent_at = NOW(), error = 'expired' WHERE sent_at IS NULL AND queued_at < NOW() - INTERVAL 6 HOUR");      // stale news is not sent
-        foreach (all('SELECT * FROM mob_push_queue WHERE sent_at IS NULL ORDER BY id LIMIT ' . max(1, min(500, $max))) as $m) {
+        $nb = pn_nb_has();   // R97-293: a push held for quiet hours is not stale while it waits, and is sent when they end
+        q("UPDATE mob_push_queue SET sent_at = NOW(), error = 'expired' WHERE sent_at IS NULL AND queued_at < NOW() - INTERVAL 6 HOUR" . ($nb ? ' AND (not_before IS NULL OR not_before < NOW() - INTERVAL 2 HOUR)' : ''));      // stale news is not sent
+        foreach (all('SELECT * FROM mob_push_queue WHERE sent_at IS NULL' . ($nb ? ' AND (not_before IS NULL OR not_before <= NOW())' : '') . ' ORDER BY id LIMIT ' . max(1, min(500, $max))) as $m) {
             $devs = all("SELECT id, app_id, platform, push_token, push_service FROM mob_devices WHERE user_id = ? AND app_id = ? AND revoked_at IS NULL AND push_token IS NOT NULL AND push_token <> ''", [(int)$m['user_id'], (string)$m['app_id']]);
             $ok = 0; $errs = [];
             foreach ($devs as $d) { try { [$good, $e, $dead] = pn_send($d, (string)$m['title'], $m['body'], $m['route']); } catch (Throwable $x) { [$good, $e, $dead] = [false, mb_substr($x->getMessage(), 0, 120), false]; }

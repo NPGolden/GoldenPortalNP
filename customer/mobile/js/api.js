@@ -3,7 +3,7 @@
  * Mock mode: localStorage gas.mock = "1", or ?mock=1 on the URL. */
 (function () { try { window.__gasAct = Date.now(); ["pointerdown", "keydown", "touchstart"].forEach(function (e) { window.addEventListener(e, function () { window.__gasAct = Date.now(); }, { passive: true, capture: true }); }); } catch (e) {} })();   // R97-237: when the screen was last touched — sent as X-Idle so an app left open does not keep its user «online»
 window.API = (() => {
-  const VERSION = "0.8.12";
+  const VERSION = "0.8.13";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   const demoOn = () => { try { return localStorage.getItem("gas.demo") === "1"; } catch (e) { return false; } };   // R97-169
@@ -85,6 +85,7 @@ window.API = (() => {
     planning: () => call("GET", "/me/planning"),   // R97-221 My planning
     dnList: () => call("GET", "/delivery-notes"), dnOne: (id) => call("GET", `/delivery-notes/${id}`), dnDecide: (id, b) => call("POST", `/delivery-notes/${id}/decide`, b),   // R97-280 delivery notes for the receiver
     async dnPdf(id) { const go = () => fetch(`${BASE}/delivery-notes/${id}/pdf`, { headers: { Authorization: `Bearer ${tok.access}`, "X-App": "engineer", "X-App-Version": VERSION }, cache: "no-store" }); let r = await go(); if (r.status === 401 && tok.refresh) { const x = await raw("POST", "/auth/refresh", { refresh_token: tok.refresh }); tok.access = x.access_token; tok.refresh = x.refresh_token; r = await go(); } if (!r.ok) { const e = new Error(`HTTP ${r.status}`); e.status = r.status; throw e; } return r; },
+    wellness: () => call("GET", "/wellness"), wellnessPost: (what, b) => call("POST", "/wellness/" + what, b),   // R97-293
     toolsMine: (lg) => call("GET", "/my-tools?lang=" + encodeURIComponent(lg || "en")), toolsAnswer: (id, b, lg) => call("POST", `/my-tools/lists/${id}/answer?lang=` + encodeURIComponent(lg || "en"), b), toolsGive: (id, b, lg) => call("POST", `/my-tools/site/${id}/give?lang=` + encodeURIComponent(lg || "en"), b), toolsAck: (id, b, lg) => call("POST", `/my-tools/handed/${id}/ack?lang=` + encodeURIComponent(lg || "en"), b), toolsBack: (id, b, lg) => call("POST", `/my-tools/site/${id}/back?lang=` + encodeURIComponent(lg || "en"), b),   // R97-291 my tools
     inout: () => call("GET", "/inout"), inoutPunch: (p) => call("POST", "/inout/punch", p), inoutConsent: (p) => call("POST", "/inout/consent", p),   // R97-182 In / Out
     hrRequestDoc: (id, file) => { const fd = new FormData(); fd.append("request_id", String(id)); fd.append("doc", file, file.name); return call("POST", "/hr/request/doc", fd, true); },   // R77-007
@@ -181,6 +182,11 @@ window.API = (() => {
       return delay(n);
     }
     if (p === "/me/planning") { const dd = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10); return delay({ enabled: true, from: dd(0), to: dd(21), days: [0, 1, 2, 3, 4, 7].map((n) => ({ date: dd(n), entries: n === 4 ? [{ kind: "leave", label: "Leave", detail: "", note: "", car: "", hours: null, absence: true }] : [{ kind: "work", label: n < 2 ? "M/Y DEMO Y.02" : "M/Y SAMPLE Y.01", detail: n < 2 ? "PRJ.100324 · Bridge console installation" : "PRJ.100311 · Shore converter service", note: n === 1 ? "Start 07:30 at the yard gate" : "", car: n < 2 ? "Van 2" : "", hours: 8, absence: false }] })) }); }   // R97-221
+    if (/^\/wellness/.test(p)) {   // R97-293 demo data
+      if (!M.wl) M.wl = { enabled: true, mood_done: false, prefs: { mood: true, weather: true, rest: true, travel: true, leave_nudge: true, quiet: false, quiet_from: "20:00", quiet_to: "07:00" }, info: { doctor: "Tuesdays 10:00–12:00, head office", incident: "Call your project manager, then HR." }, qa: [{ q: "When is the next safety training?", a: "In January — dates follow in Community.", date: "2026-11-20" }], questions: true, colleagues: [{ id: 1, name: "Demo Engineer" }, { id: 2, name: "Demo Planner" }] };
+      const W = M.wl; if (p === "/wellness/mood") W.mood_done = true; if (p === "/wellness/prefs" && body) Object.keys(W.prefs).forEach((k) => { if (body[k] !== undefined) W.prefs[k] = body[k]; });
+      return delay(p === "/wellness" ? W : { status: "accepted", state: W });
+    }
     if (/^\/my-tools/.test(p)) {   // R97-291 demo data
       if (!M.tools) M.tools = { enabled: true, person: true, lists: [{ id: 7, no: "EQI-DEMO-0007", date: new Date().toISOString().slice(0, 10), by: "HR", note: "", lines: [{ id: 71, category: "📏 Measuring instrument", description: "Multimeter", serial: "DEMO-SN-071", tag: "ET-DEMO-1", qty: 1, cond: "Good", note: "" }, { id: 72, category: "📱 Telephone / SIM", description: "IP phone", serial: "DEMO-SN-072", tag: "", qty: 1, cond: "Used", note: "" }] }], items: [{ id: 60, category: "🧰 Tools", description: "Cordless drill", serial: "DEMO-SN-060", tag: "ET-DEMO-2", qty: 1, status: "held", status_label: "With the employee", issued_on: null, cal: null }], handed: [{ id: 91, wait: true, no: "ET-DEMO-5", description: "Torque wrench", project: "PRJ.100324 Bridge refit", since: new Date().toISOString(), by: "Supervisor" }], people: [{ id: 1, name: "Demo Engineer" }], site: [{ project: { id: 1, code: "PRJ.100324", name: "Bridge refit", done: false }, n: { all: 2, out: 1, late: 0, missing: 0, due: 0 }, units: [{ id: 81, no: "ET-DEMO-3", description: "Crimping tool", maker: "", flag: "site", with: "", since: null, supervisor: "", due: null, can: true }, { id: 82, no: "ET-DEMO-4", description: "Insulation tester", maker: "", flag: "out", with: "Demo Engineer", since: new Date().toISOString(), supervisor: "", due: null, can: true }] }] };
       const T = M.tools, q0 = p.split("?")[0], un = (id) => T.site[0].units.find((x) => x.id === id); let m2;

@@ -83,6 +83,7 @@ require __DIR__ . '/app/io.php';         // R97-182 In / Out: attendance punches
 require __DIR__ . '/app/io_actions.php';
 require __DIR__ . '/app/ft.php';         // R97-190 recycle bin for uploaded files
 require __DIR__ . '/app/wl.php';         // R97-194 wellness
+require __DIR__ . '/app/wl2.php';  // R97-293 wellness II: field staff, quiet hours, company information, questions
 require __DIR__ . '/app/pn.php';         // R97-196 push notifications to the phones
 require __DIR__ . '/app/sv.php';         // R97-200 versions in the stores: update banner in the apps, announcement
 require __DIR__ . '/app/mailer.php'; // R91-003 outgoing mail (SMTP)
@@ -195,6 +196,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         if (function_exists('io_handle_action') && io_handle_action($action)) exit;   // R97-182
         if (function_exists('ft_handle_action') && ft_handle_action($action)) exit;   // R97-190
         if (function_exists('wl_handle_action') && wl_handle_action($action)) exit;   // R97-194
+        if (function_exists('wl2_handle_action') && wl2_handle_action($action)) exit;   // R97-293
         if (function_exists('pn_handle_action') && pn_handle_action($action)) exit;   // R97-196
         if (function_exists('sv_handle_action') && sv_handle_action($action)) exit;   // R97-200
         if (function_exists('mi_handle_action') && mi_handle_action($action)) exit;   // R97-027

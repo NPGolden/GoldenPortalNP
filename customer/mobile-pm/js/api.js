@@ -3,7 +3,7 @@
  * Mock mode: localStorage gpm.mock = "1", or ?mock=1 on the URL. */
 (function () { try { window.__gasAct = Date.now(); ["pointerdown", "keydown", "touchstart"].forEach(function (e) { window.addEventListener(e, function () { window.__gasAct = Date.now(); }, { passive: true, capture: true }); }); } catch (e) {} })();   // R97-237: when the screen was last touched — sent as X-Idle so an app left open does not keep its user «online»
 window.API = (() => {
-  const VERSION = "1.0.25";
+  const VERSION = "1.0.26";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   const demoOn = () => { try { return localStorage.getItem("gpm.demo") === "1"; } catch (e) { return false; } };   // R97-169
@@ -73,6 +73,7 @@ window.API = (() => {
     inbox: (since) => call("GET", `/pm/inbox${since ? `?since=${Math.floor(+since)}` : ""}`),
     /* R97-207 My approvals: what waits for my decision; a supplier payment request is opened and decided in the app */
     myApprovals: () => call("GET", "/pm/approvals"), payment: (id) => call("GET", `/pm/approvals/payment/${+id}`), paymentDecide: (id, decision, note) => call("POST", `/pm/approvals/payment/${+id}/decide`, { decision, note: note || "" }),   // since = unix seconds
+    wellness: () => call("GET", "/wellness"), wellnessPost: (what, b) => call("POST", "/wellness/" + what, b),   // R97-293
     toolsMine: (lg) => call("GET", "/my-tools?lang=" + encodeURIComponent(lg || "en")), toolsAnswer: (id, b, lg) => call("POST", `/my-tools/lists/${id}/answer?lang=` + encodeURIComponent(lg || "en"), b), toolsGive: (id, b, lg) => call("POST", `/my-tools/site/${id}/give?lang=` + encodeURIComponent(lg || "en"), b), toolsAck: (id, b, lg) => call("POST", `/my-tools/handed/${id}/ack?lang=` + encodeURIComponent(lg || "en"), b), toolsBack: (id, b, lg) => call("POST", `/my-tools/site/${id}/back?lang=` + encodeURIComponent(lg || "en"), b),   // R97-291 my tools
     inout: () => call("GET", "/inout"), inoutPunch: (p) => call("POST", "/inout/punch", p), inoutConsent: (p) => call("POST", "/inout/consent", p),   // R97-186 In / Out
     sync: (ops) => call("POST", "/sync", { ops }),
@@ -264,6 +265,11 @@ window.API = (() => {
     if (p === "/assist") { const txt = (body.prompt || "").trim(); const f = (body.fields || []).map((x) => `${x.label || x.name}: ${x.value || "—"}`).join("; ");
       const map = { write: `(house style) ${txt.replace(/^improve[^:]*:\s*/i, "").replace(/^./, (c) => c.toUpperCase())}`, translate: `(translation) ${txt}`, ask: `From ${body.page}: ${f.slice(0, 160) || "no fields"}. ${txt.slice(0, 80)} — in the live portal this comes from Claude.` };
       return delay({ text: map[body.kind] || map.ask, tokens: 120 }); }
+    if (/^\/wellness/.test(p)) {   // R97-293 demo data
+      if (!M.wl) M.wl = { enabled: true, mood_done: false, prefs: { mood: true, weather: true, rest: true, travel: true, leave_nudge: true, quiet: false, quiet_from: "20:00", quiet_to: "07:00" }, info: { doctor: "Tuesdays 10:00–12:00, head office", incident: "Call your project manager, then HR." }, qa: [{ q: "When is the next safety training?", a: "In January — dates follow in Community.", date: "2026-11-20" }], questions: true, colleagues: [{ id: 1, name: "Demo Engineer" }, { id: 2, name: "Demo Planner" }] };
+      const W = M.wl; if (p === "/wellness/mood") W.mood_done = true; if (p === "/wellness/prefs" && body) Object.keys(W.prefs).forEach((k) => { if (body[k] !== undefined) W.prefs[k] = body[k]; });
+      return delay(p === "/wellness" ? W : { status: "accepted", state: W });
+    }
     if (/^\/my-tools/.test(p)) {   // R97-291 demo data
       if (!M.tools) M.tools = { enabled: true, person: true, lists: [{ id: 7, no: "EQI-DEMO-0007", date: new Date().toISOString().slice(0, 10), by: "HR", note: "", lines: [{ id: 71, category: "📏 Measuring instrument", description: "Multimeter", serial: "DEMO-SN-071", tag: "ET-DEMO-1", qty: 1, cond: "Good", note: "" }, { id: 72, category: "📱 Telephone / SIM", description: "IP phone", serial: "DEMO-SN-072", tag: "", qty: 1, cond: "Used", note: "" }] }], items: [{ id: 60, category: "🧰 Tools", description: "Cordless drill", serial: "DEMO-SN-060", tag: "ET-DEMO-2", qty: 1, status: "held", status_label: "With the employee", issued_on: null, cal: null }], handed: [{ id: 91, wait: true, no: "ET-DEMO-5", description: "Torque wrench", project: "PRJ.100324 Bridge refit", since: new Date().toISOString(), by: "Supervisor" }], people: [{ id: 1, name: "Demo Engineer" }], site: [{ project: { id: 1, code: "PRJ.100324", name: "Bridge refit", done: false }, n: { all: 2, out: 1, late: 0, missing: 0, due: 0 }, units: [{ id: 81, no: "ET-DEMO-3", description: "Crimping tool", maker: "", flag: "site", with: "", since: null, supervisor: "", due: null, can: true }, { id: 82, no: "ET-DEMO-4", description: "Insulation tester", maker: "", flag: "out", with: "Demo Engineer", since: new Date().toISOString(), supervisor: "", due: null, can: true }] }] };
       const T = M.tools, q0 = p.split("?")[0], un = (id) => T.site[0].units.find((x) => x.id === id); let m2;
