@@ -66,6 +66,11 @@ try {
         case $method === 'POST' && $path === '/requisitions': RateLimit::check('api', 'prq' . $u['id'], 30); Response::json(PortalParts::create($body));
         case $method === 'POST' && preg_match('#^/requisitions/(\d+)/cancel$#', $path, $m): Response::json(PortalParts::cancel((int)$m[1], (string)($body['note'] ?? '')));
         case $method === 'POST' && preg_match('#^/requisitions/(\d+)/decide$#', $path, $m): Response::json(PortalParts::decide((int)$m[1], (string)($body['decision'] ?? 'approve'), (string)($body['note'] ?? '')));
+        /* R97-280: delivery notes addressed to the signed-in member of staff — read, PDF, accept or send back */
+        case $method === 'GET' && $path === '/delivery-notes': if ($isCu) Response::error(403, 'Staff only'); Response::json(PortalDN::list());
+        case $method === 'GET' && preg_match('#^/delivery-notes/(\d+)$#', $path, $m): if ($isCu) Response::error(403, 'Staff only'); Response::json(PortalDN::one((int)$m[1]));
+        case $method === 'GET' && preg_match('#^/delivery-notes/(\d+)/pdf$#', $path, $m): if ($isCu) Response::error(403, 'Staff only'); RateLimit::check('api', 'dnp' . $u['id'], 60); PortalDN::pdf((int)$m[1]);
+        case $method === 'POST' && preg_match('#^/delivery-notes/(\d+)/decide$#', $path, $m): if ($isCu) Response::error(403, 'Staff only'); RateLimit::check('decide', 'u' . $u['id'], 30); Response::json(PortalDN::decide((int)$m[1], $body));
         /* R82-001: inventory lookup for the parts of a service report — code / description / barcode search, no prices */
         case $method === 'GET' && $path === '/items': { if (!function_exists('stk_has') || !stk_has()) Response::json(['items' => []]); $q = mb_substr(trim((string)($_GET['q'] ?? '')), 0, 60); if (mb_strlen($q) < 2 && empty($_GET['recent'])) Response::json(['items' => []]);
             $rows = mb_strlen($q) < 2 ? (function_exists('prq_recent_items') ? prq_recent_items(12) : []) : stk_items(['q' => $q, 'status' => 'active'], 12);   // R86-003: recent items when the box is empty

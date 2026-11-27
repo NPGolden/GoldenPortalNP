@@ -15,6 +15,8 @@ const DN_REASON = ['project' => 'issue', 'customer' => 'delivery_customer', 'pro
 function dn_has(): bool { static $h = null; if ($h === null) { try { $h = function_exists('stk_has') && stk_has() && (bool) scalar("SHOW TABLES LIKE 'inv_delivery_notes'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** R97-279: acceptance, transfers and the log need the migration. Before it the module works as it did. */
 function dn_x_has(): bool { static $h = null; if ($h === null) { try { $h = dn_has() && (bool) one("SHOW COLUMNS FROM inv_delivery_notes LIKE 'delivery'") && (bool) scalar("SHOW TABLES LIKE 'inv_dn_events'"); } catch (Throwable $e) { $h = false; } } return $h; }
+/** R97-280: a note can name the member of staff who receives the goods (the engineer on board); that person accepts it in the Service app. */
+function dn_x2_has(): bool { static $h = null; if ($h === null) { try { $h = dn_x_has() && (bool) one("SHOW COLUMNS FROM inv_delivery_notes LIKE 'to_user_id'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function dn_kinds(): array { return dn_x_has() ? DN_KINDS : array_values(array_diff(DN_KINDS, ['transfer'])); }
 function dn_can(): bool { return dn_has() && function_exists('pr_can') && pr_can(); }
 function dn_wh(): bool { return dn_has() && function_exists('pr_wh') && pr_wh(); }
@@ -25,12 +27,17 @@ const DN_SELECT = "SELECT d.*, p.project_code, p.name AS project_name, s.code AS
 /** The same list with the destination warehouse of a transfer and the kind of both warehouses. */
 function dn_select(): string {
     if (!dn_x_has()) return DN_SELECT;
-    return str_replace([' AS n_lines', 'LEFT JOIN po_receipts r'], [' AS n_lines, w.kind AS wh_kind, w2.code AS to_wh_code, w2.name AS to_warehouse, w2.kind AS to_wh_kind, w2.holder_id AS to_holder_id, w2.vehicle AS to_vehicle, w.holder_id AS wh_holder_id, fd.dn_no AS from_dn_no', 'LEFT JOIN inv_warehouses w2 ON w2.id = d.to_warehouse_id LEFT JOIN inv_delivery_notes fd ON fd.id = d.from_dn_id LEFT JOIN po_receipts r'], DN_SELECT);
+    $x2 = dn_x2_has();
+    return str_replace([' AS n_lines', 'LEFT JOIN po_receipts r'], [' AS n_lines,' . ($x2 ? ' tu.full_name AS to_user_name,' : '') . ' w.kind AS wh_kind, w2.code AS to_wh_code, w2.name AS to_warehouse, w2.kind AS to_wh_kind, w2.holder_id AS to_holder_id, w2.vehicle AS to_vehicle, w.holder_id AS wh_holder_id, fd.dn_no AS from_dn_no', 'LEFT JOIN inv_warehouses w2 ON w2.id = d.to_warehouse_id LEFT JOIN inv_delivery_notes fd ON fd.id = d.from_dn_id ' . ($x2 ? 'LEFT JOIN customer_users tu ON tu.id = d.to_user_id ' : '') . 'LEFT JOIN po_receipts r'], DN_SELECT);
 }
 function dn_load(int $id): ?array { return dn_has() && $id ? one(dn_select() . ' WHERE d.id = ?', [$id]) ?: null : null; }
 /** Who may open a note: procurement, warehouse, management — and the holder of a warehouse of a transfer, for that note only. */
-function dn_can_view(?array $d): bool { if (dn_can()) return true; $u = current_user(); return $d && $u && is_staff() && dn_x_has() && $d['kind'] === 'transfer' && in_array((int)$u['id'], [(int)($d['to_holder_id'] ?? 0), (int)($d['wh_holder_id'] ?? 0)], true); }
-function dn_can_receive(array $d): bool { $u = current_user(); return dn_x_has() && $u && $d['kind'] === 'transfer' && $d['status'] === 'issued' && ($d['delivery'] ?? '') === 'transit' && (dn_wh() || (is_staff() && (int)$u['id'] === (int)($d['to_holder_id'] ?? 0))); }
+function dn_can_view(?array $d): bool { if (dn_can()) return true; $u = current_user(); if (!$d || !$u || !is_staff() || !dn_x_has()) return false; if ((int)($d['to_user_id'] ?? 0) === (int)$u['id']) return true; return $d['kind'] === 'transfer' && in_array((int)$u['id'], [(int)($d['to_holder_id'] ?? 0), (int)($d['wh_holder_id'] ?? 0)], true); }
+function dn_can_receive(array $d): bool { $u = current_user(); return dn_x_has() && $u && $d['kind'] === 'transfer' && $d['status'] === 'issued' && in_array((string)($d['delivery'] ?? ''), ['transit', 'disputed'], true) && (dn_wh() || (is_staff() && dn_is_for($d, (int)$u['id']))); }
+/** Is this person the receiver of the note? The named member of staff, or the holder of the destination warehouse of a transfer. */
+function dn_is_for(array $d, int $uid): bool { return $uid > 0 && ((int)($d['to_user_id'] ?? 0) === $uid || ($d['kind'] === 'transfer' && (int)($d['to_holder_id'] ?? 0) === $uid)); }
+/** Does the note still wait for its receiver? */
+function dn_waits(array $d): bool { return $d['status'] === 'issued' && in_array((string)($d['delivery'] ?? 'open'), $d['kind'] === 'transfer' ? ['transit', 'disputed'] : ['open', 'sent', 'disputed'], true); }
 function dn_lines(int $id): array { return all('SELECT l.*, i.code AS item_code, i.maker, i.factory_code FROM inv_dn_lines l LEFT JOIN inv_items i ON i.id = l.item_id WHERE l.dn_id = ? ORDER BY l.seq, l.id', [$id]); }
 function dn_list(array $f = []): array {
     if (!dn_has()) return []; $w = ['1=1']; $a = [];
@@ -77,6 +84,7 @@ function dn_create_x(array $h, array $L): int {
     if ($pid && !$cid && $kind === 'project') { try { $cid = (int) scalar('SELECT co.id FROM projects p JOIN companies co ON co.customer_id = p.customer_id WHERE p.id = ? LIMIT 1', [$pid]) ?: null; if (!$vid) $vid = (int) scalar('SELECT vessel_id FROM projects WHERE id = ?', [$pid]) ?: null; } catch (Throwable $e) {} }
     $wh = (int)($h['warehouse_id'] ?? 0) ?: stk_default_wh(); $to = null; $from = null;
     if ($kind === 'transfer') { $to = (int)($h['to_warehouse_id'] ?? 0); if (!$to || $to === $wh || !scalar('SELECT id FROM inv_warehouses WHERE id = ? AND is_active = 1', [$to])) throw new RuntimeException(t('stk.need_to_wh')); $cid = null; if ($pid && !$vid) $vid = (int) scalar('SELECT vessel_id FROM projects WHERE id = ?', [$pid]) ?: null; }
+    $toU = dn_x2_has() ? ((int)($h['to_user_id'] ?? 0) ?: null) : null; if ($toU && !scalar("SELECT id FROM customer_users WHERE id = ? AND role IN ('staff','admin') AND is_active = 1", [$toU])) $toU = null;
     if (dn_x_has() && (int)($h['from_dn_id'] ?? 0)) { $fd = one("SELECT id, kind, to_warehouse_id FROM inv_delivery_notes WHERE id = ? AND status = 'issued'", [(int)$h['from_dn_id']]); if ($fd && $fd['kind'] === 'transfer' && (int)$fd['to_warehouse_id'] === $wh) $from = (int)$fd['id']; }   // the note that brought the goods to this warehouse
     $date = preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)($h['issued_at'] ?? '')) ? $h['issued_at'] : date('Y-m-d');
     $lines = []; foreach ($L as $l) { $qty = (float) str_replace(',', '.', (string)($l['qty'] ?? '0')); if ($qty <= 0) continue; $desc = mb_substr(trim((string)($l['description'] ?? '')), 0, 255); $iid = (int)($l['item_id'] ?? 0) ?: null; if ($iid && $desc === '') { $it = stk_item($iid); $desc = $it ? $it['description'] : ''; } if ($desc === '') throw new RuntimeException(t('dn.need_desc')); $lines[] = ['item_id' => $iid, 'description' => $desc, 'unit' => stk_unit_norm((string)($l['unit'] ?? 'pcs')), 'qty' => $qty, 'po_line_id' => (int)($l['po_line_id'] ?? 0) ?: null, 'pr_line_id' => (int)($l['pr_line_id'] ?? 0) ?: null, 'note' => mb_substr(trim((string)($l['note'] ?? '')), 0, 255) ?: null, 'skip_move' => !empty($l['skip_move'])]; }
@@ -107,7 +115,8 @@ function dn_create_x(array $h, array $L): int {
         }
         q('INSERT INTO inv_dn_lines (dn_id, seq, item_id, po_line_id, pr_line_id, description, unit, qty, move_id, note) VALUES (?,?,?,?,?,?,?,?,?,?)', [$dnId, $seq, $l['item_id'], $l['po_line_id'], $l['pr_line_id'], $l['description'], $l['unit'], $l['qty'], $mid, $l['note']]);
     }
-    if ($kind === 'transfer') { try { $hid = (int) scalar('SELECT holder_id FROM inv_warehouses WHERE id = ?', [$to]); if ($hid && $hid !== (int)$u['id'] && function_exists('nf_push')) nf_push([$hid], 'dn:xfer', 'dn:' . $dnId, t('dn.nf_xfer', ['no' => $no]), (string) scalar("SELECT CONCAT(a.code, ' → ', b.code, ' · ', b.name) FROM inv_warehouses a, inv_warehouses b WHERE a.id = ? AND b.id = ?", [$wh, $to]), url('delivery_note', ['id' => $dnId]), (int)$u['id'], (string)$u['full_name']); } catch (Throwable $e) { error_log('[dn] notify: ' . $e->getMessage()); } }
+    if ($toU) { q('UPDATE inv_delivery_notes SET to_user_id = ?' . ($kind === 'transfer' ? '' : ", delivery = 'sent'") . ' WHERE id = ?', [$toU, $dnId]); dn_event($dnId, 'sent', '📱 ' . (string) scalar('SELECT full_name FROM customer_users WHERE id = ?', [$toU])); dn_notify_to($dnId, $toU); }
+    if ($kind === 'transfer') { try { $hid = (int) scalar('SELECT holder_id FROM inv_warehouses WHERE id = ?', [$to]); if ($hid && $hid !== (int)$u['id'] && $hid !== (int)$toU && function_exists('nf_push')) nf_push([$hid], 'dn:xfer', 'dn:' . $dnId, t('dn.nf_xfer', ['no' => $no]), (string) scalar("SELECT CONCAT(a.code, ' → ', b.code, ' · ', b.name) FROM inv_warehouses a, inv_warehouses b WHERE a.id = ? AND b.id = ?", [$wh, $to]), url('delivery_note', ['id' => $dnId]), (int)$u['id'], (string)$u['full_name']); } catch (Throwable $e) { error_log('[dn] notify: ' . $e->getMessage()); } }
     cache_bump_later('inv'); return $dnId;
 }
 /** R97-279: what requisitions of the project hold of this item in the source warehouse leaves it with the transfer (oldest line first). Returns [[requisition line, quantity], …]. */
@@ -137,7 +146,7 @@ function dn_sn_back(int $moveOutId, int $fromWh, int $toWh, string $ref): void {
 /** Manual delivery note from the Inventory › Delivery notes page (lines item[]/desc[]/qty[]/unit[]). */
 function dn_create_from_post(): int {
     $L = []; foreach ((array)($_POST['qty'] ?? []) as $i => $q) $L[] = ['item_id' => (int)($_POST['item'][$i] ?? 0), 'description' => (string)($_POST['desc'][$i] ?? ''), 'unit' => (string)($_POST['unit'][$i] ?? 'pcs'), 'qty' => (string)$q, 'note' => (string)($_POST['lnote'][$i] ?? '')];
-    return dn_create(['kind' => (string)($_POST['kind'] ?? 'project'), 'warehouse_id' => (int)($_POST['warehouse_id'] ?? 0), 'project_id' => (int)($_POST['project_id'] ?? 0), 'subproject_id' => (int)($_POST['subproject_id'] ?? 0), 'company_id' => (int)($_POST['company_id'] ?? 0), 'vessel_id' => (int)($_POST['vessel_id'] ?? 0), 'to_warehouse_id' => (int)($_POST['to_warehouse_id'] ?? 0), 'from_dn_id' => (int)($_POST['from_dn_id'] ?? 0), 'issued_at' => (string)($_POST['issued_at'] ?? ''), 'address' => (string)($_POST['address'] ?? ''), 'attention' => (string)($_POST['attention'] ?? ''), 'carrier' => (string)($_POST['carrier'] ?? ''), 'ref_no' => (string)($_POST['ref_no'] ?? ''), 'note' => (string)($_POST['note'] ?? ''), 'allow_negative' => !empty($_POST['allow_negative']) && ($_POST['kind'] ?? '') !== 'transfer'], $L);
+    return dn_create(['kind' => (string)($_POST['kind'] ?? 'project'), 'warehouse_id' => (int)($_POST['warehouse_id'] ?? 0), 'project_id' => (int)($_POST['project_id'] ?? 0), 'subproject_id' => (int)($_POST['subproject_id'] ?? 0), 'company_id' => (int)($_POST['company_id'] ?? 0), 'vessel_id' => (int)($_POST['vessel_id'] ?? 0), 'to_user_id' => (int)($_POST['to_user_id'] ?? 0), 'to_warehouse_id' => (int)($_POST['to_warehouse_id'] ?? 0), 'from_dn_id' => (int)($_POST['from_dn_id'] ?? 0), 'issued_at' => (string)($_POST['issued_at'] ?? ''), 'address' => (string)($_POST['address'] ?? ''), 'attention' => (string)($_POST['attention'] ?? ''), 'carrier' => (string)($_POST['carrier'] ?? ''), 'ref_no' => (string)($_POST['ref_no'] ?? ''), 'note' => (string)($_POST['note'] ?? ''), 'allow_negative' => !empty($_POST['allow_negative']) && ($_POST['kind'] ?? '') !== 'transfer'], $L);
 }
 /** Cancel: the movements are reversed (goods back in the warehouse), requisition issues undone. */
 function dn_cancel(int $id, string $note): void { stk_tx(fn() => dn_cancel_x($id, $note)); }
@@ -277,10 +286,49 @@ function dn_mark_paper(int $id, string $name, string $role, string $note): void 
 /** The goods of a transfer arrived: confirmed by the warehouse or by the holder of the destination warehouse. */
 function dn_receive(int $id, string $note): void {
     $d = dn_load($id); if (!$d || !dn_can_receive($d)) throw new RuntimeException(t('err.noaccess')); $u = current_user(); $note = mb_substr(trim($note), 0, 600);
-    $n = q("UPDATE inv_delivery_notes SET delivery = 'received', accepted_name = ?, accepted_via = 'portal', accepted_at = NOW(), accepted_remark = ? WHERE id = ? AND status = 'issued' AND kind = 'transfer' AND delivery = 'transit'", [mb_substr((string)$u['full_name'], 0, 90), $note ?: null, $id])->rowCount();
+    $n = q("UPDATE inv_delivery_notes SET delivery = 'received', accepted_name = ?, accepted_via = 'portal', accepted_at = NOW(), accepted_remark = ? WHERE id = ? AND status = 'issued' AND kind = 'transfer' AND delivery IN ('transit','disputed')", [mb_substr((string)$u['full_name'], 0, 90), $note ?: null, $id])->rowCount();
     if (!$n) throw new RuntimeException(t('err.noaccess'));
     dn_event($id, 'received', $note);
     try { if ((int)$d['user_id'] && (int)$d['user_id'] !== (int)$u['id'] && function_exists('nf_push')) nf_push([(int)$d['user_id']], 'dn:recv', 'dn:' . $id, t('dn.nf_recv', ['no' => $d['dn_no']]), dn_wh_label((string)$d['to_wh_code'], (string)$d['to_warehouse']) . ($note !== '' ? ' — ' . $note : ''), url('delivery_note', ['id' => $id]), (int)$u['id'], (string)$u['full_name']); } catch (Throwable $e) { error_log('[dn] notify: ' . $e->getMessage()); }
+}
+/* ---- R97-280: the receiving member of staff (Service app and portal) ---- */
+/** Tell the receiver: portal notification and a push that opens the note in the Service app. */
+function dn_notify_to(int $id, int $uid): void {
+    try { $d = dn_load($id); $me = current_user(); if (!$d || !function_exists('nf_push')) return;
+        $body = $d['kind'] === 'transfer' ? trim((string)$d['wh_code'] . ' → ' . (string)($d['to_wh_code'] ?? '') . ' ' . (string)($d['to_warehouse'] ?? '')) : trim((string)($d['project_code'] ?? '') . ' ' . (string)($d['project_name'] ?? '') . ($d['vessel'] ? ' · ' . $d['vessel'] : ''));
+        nf_push([$uid], 'dn:to', 'dn:' . $id, t('dn.nf_to', ['no' => $d['dn_no']]), $body, url('delivery_note', ['id' => $id]), $me ? (int)$me['id'] : null, $me ? (string)$me['full_name'] : null);
+    } catch (Throwable $e) { error_log('[dn] notify: ' . $e->getMessage()); }
+}
+/** Name or change the receiver of an issued note that still waits. 0 = nobody. */
+function dn_set_to_user(int $id, int $uid): void {
+    if (!dn_x2_has() || !dn_can()) throw new RuntimeException(t('err.noaccess')); $d = dn_load($id); if (!$d || !dn_waits($d)) throw new RuntimeException(t('err.noaccess'));
+    if ($uid && !scalar("SELECT id FROM customer_users WHERE id = ? AND role IN ('staff','admin') AND is_active = 1", [$uid])) throw new RuntimeException(t('err.notfound'));
+    if ($uid === (int)($d['to_user_id'] ?? 0)) return;
+    q('UPDATE inv_delivery_notes SET to_user_id = ?' . ($uid && $d['kind'] !== 'transfer' ? ", delivery = IF(delivery = 'open', 'sent', delivery)" : '') . ' WHERE id = ?', [$uid ?: null, $id]);
+    if ($uid) { dn_event($id, 'sent', '📱 ' . (string) scalar('SELECT full_name FROM customer_users WHERE id = ?', [$uid])); dn_notify_to($id, $uid); }
+}
+/** The notes of a person: those that wait for the acceptance, and the last ones answered. */
+function dn_for_user(int $uid): array {
+    if (!dn_x2_has() || $uid <= 0) return ['waiting' => [], 'recent' => []];
+    $rows = all(dn_select() . " WHERE d.status = 'issued' AND (d.to_user_id = ? OR (d.kind = 'transfer' AND w2.holder_id = ?)) AND d.issued_at > CURDATE() - INTERVAL 180 DAY ORDER BY d.id DESC LIMIT 80", [$uid, $uid]);
+    $w = []; $r = []; foreach ($rows as $d) { if (dn_waits($d) && $d['delivery'] !== 'disputed') $w[] = $d; elseif (count($r) < 25) $r[] = $d; }
+    return ['waiting' => $w, 'recent' => $r];
+}
+/** The receiver answers: accepted (in the app with a drawn signature) or not received as listed (remark obligatory). A transfer becomes "received at the warehouse". */
+function dn_user_decide(int $id, string $decision, string $remark, string $sig, string $via): string {
+    $u = current_user(); $d = dn_load($id); if (!dn_x2_has() || !$u || !is_staff() || !$d || !dn_is_for($d, (int)$u['id'])) throw new RuntimeException(t('err.notfound'));
+    if (!dn_waits($d)) throw new RuntimeException(t('dl.closed')); if (!in_array($decision, ['accepted', 'disputed'], true)) throw new RuntimeException(t('err.notfound'));
+    $remark = mb_substr(trim($remark), 0, 2000); $via = $via === 'app' ? 'app' : 'portal'; $png = null; $ip = function_exists('sgn_ip') ? (sgn_ip() ?: null) : null;
+    if ($decision === 'disputed') { if ($remark === '') throw new RuntimeException(t('dl.remark_needed')); }
+    elseif ($via === 'app') { $png = dn_sig_png($sig); if ($png === null) throw new RuntimeException(t('sgn.sign_needed')); }
+    $isX = $d['kind'] === 'transfer'; $state = $decision === 'disputed' ? 'disputed' : ($isX ? 'received' : 'accepted');
+    $n = q("UPDATE inv_delivery_notes SET delivery = ?, accepted_name = ?, accepted_role = NULL, accepted_email = NULL, accepted_via = ?, accepted_at = NOW(), accepted_ip = ?, accepted_remark = ? WHERE id = ? AND status = 'issued' AND delivery IN (" . ($isX ? "'transit','disputed'" : "'open','sent','disputed'") . ')',
+           [$state, mb_substr((string)$u['full_name'], 0, 90), $via, $ip, $remark ?: null, $id])->rowCount();
+    if (!$n) throw new RuntimeException(t('dl.closed'));
+    if ($png !== null) q('REPLACE INTO inv_dn_signs (dn_id, png) VALUES (?,?)', [$id, $png]); elseif ($decision === 'accepted') q('DELETE FROM inv_dn_signs WHERE dn_id = ?', [$id]);
+    dn_event($id, $state, trim(t('dn.via_' . $via) . ($remark !== '' ? ' — ' . $remark : '')), null, $ip);
+    try { if ((int)$d['user_id'] && (int)$d['user_id'] !== (int)$u['id'] && function_exists('nf_push')) nf_push([(int)$d['user_id']], $decision === 'disputed' ? 'dn:disp' : 'dn:recv', 'dn:' . $id, t($decision === 'disputed' ? 'dn.nf_disp' : ($isX ? 'dn.nf_recv' : 'dn.nf_acc'), ['no' => $d['dn_no']]), (string)$u['full_name'] . ($remark !== '' ? ' — ' . $remark : ''), url('delivery_note', ['id' => $id]), (int)$u['id'], (string)$u['full_name']); } catch (Throwable $e) { error_log('[dn] notify: ' . $e->getMessage()); }
+    return $state;
 }
 /** Serial numbers of a tracked item follow a transfer to the other warehouse. */
 function dn_sn_xfer_from_post(): int {

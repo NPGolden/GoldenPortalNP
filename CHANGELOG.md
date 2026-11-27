@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.267.0** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.268.0** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.268.0 | GAS-CP-R97-280 | 2026-11-27 | Delivery notes for the Service engineer: a note names the receiving engineer, who is notified on the phone and accepts it in the Service app 0.8.10 with a signature or sends it back with a remark; transfers to the own mobile warehouse are confirmed the same way | `install/migrate_cp_r97_280_dn_receiving_engineer_app.sql` |
 | 1.267.0 | GAS-CP-R97-279 | 2026-11-27 | Delivery notes: acceptance by the recipient through an e-mail link (code, list of goods, signature) with status and log, signed paper copy; transfer between warehouses for a project with its reservations; mobile warehouses with holder, vehicle and place | `install/migrate_cp_r97_279_dn_acceptance_transfer_mobile_wh.sql` |
 | 1.266.0 | GAS-CP-R97-278 | 2026-11-27 | Delivery notes: the total of the quantities at the end of the lines, on the document (PDF) and on the page — one figure per unit of measure, with the number of lines | — |
 | 1.265.9 | GAS-CP-R97-277 | 2026-11-27 | Georgian in the five apps — Service 0.8.9, Golden PM 1.0.23, Golden HR 1.2.6, Employee 1.1.7, Customer 1.0.16: the language selector of each app offers Georgian; the installed apps take the new version by themselves | — |

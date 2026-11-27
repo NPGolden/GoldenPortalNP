@@ -3,7 +3,7 @@
  * Mock mode: localStorage gas.mock = "1", or ?mock=1 on the URL. */
 (function () { try { window.__gasAct = Date.now(); ["pointerdown", "keydown", "touchstart"].forEach(function (e) { window.addEventListener(e, function () { window.__gasAct = Date.now(); }, { passive: true, capture: true }); }); } catch (e) {} })();   // R97-237: when the screen was last touched — sent as X-Idle so an app left open does not keep its user «online»
 window.API = (() => {
-  const VERSION = "0.8.9";
+  const VERSION = "0.8.10";
   const BASE = (document.querySelector('meta[name="gas-api"]') || {}).content || "../api/v1";
   let MOCK = false;
   const demoOn = () => { try { return localStorage.getItem("gas.demo") === "1"; } catch (e) { return false; } };   // R97-169
@@ -83,6 +83,8 @@ window.API = (() => {
     hr: (year) => call("GET", `/hr?year=${year || new Date().getFullYear()}`),
     hrRequest: (p, file) => { const f = new FormData(); Object.keys(p).forEach((k) => f.append(k, p[k] == null ? "" : p[k])); if (file) f.append("doc", file, file.name); return call("POST", "/hr/request", f, true); },
     planning: () => call("GET", "/me/planning"),   // R97-221 My planning
+    dnList: () => call("GET", "/delivery-notes"), dnOne: (id) => call("GET", `/delivery-notes/${id}`), dnDecide: (id, b) => call("POST", `/delivery-notes/${id}/decide`, b),   // R97-280 delivery notes for the receiver
+    async dnPdf(id) { const go = () => fetch(`${BASE}/delivery-notes/${id}/pdf`, { headers: { Authorization: `Bearer ${tok.access}`, "X-App": "engineer", "X-App-Version": VERSION }, cache: "no-store" }); let r = await go(); if (r.status === 401 && tok.refresh) { const x = await raw("POST", "/auth/refresh", { refresh_token: tok.refresh }); tok.access = x.access_token; tok.refresh = x.refresh_token; r = await go(); } if (!r.ok) { const e = new Error(`HTTP ${r.status}`); e.status = r.status; throw e; } return r; },
     inout: () => call("GET", "/inout"), inoutPunch: (p) => call("POST", "/inout/punch", p), inoutConsent: (p) => call("POST", "/inout/consent", p),   // R97-182 In / Out
     hrRequestDoc: (id, file) => { const fd = new FormData(); fd.append("request_id", String(id)); fd.append("doc", file, file.name); return call("POST", "/hr/request/doc", fd, true); },   // R77-007
     hrDocUrl: (id) => `${BASE}/hr/doc/${id}`,
@@ -167,6 +169,16 @@ window.API = (() => {
     const lists = { "/me": M.me, "/tickets": { items: M.tickets }, "/assignments": { items: M.assignments }, "/projects": { items: M.projects }, "/vessels": { items: M.vessels }, "/equipment": { items: M.equipment }, "/budgets": { items: M.budgets }, "/master": M.master, "/documents": { items: M.documents }, "/accounting/status": { items: M.status }, "/fsr": { items: M.fsr }, "/timesheets": { items: M.timesheets }, "/notes": { items: M.notes } };
     if (lists[p]) return delay(lists[p]);
     if (p === "/hr") return delay(M.hr);
+    if (p === "/delivery-notes" || /^\/delivery-notes\/\d+/.test(p)) {   // R97-280 demo data
+      if (!M.dn) { const it = (seq, code, description, q, unit, serials) => ({ seq, code, description, maker: "", qty: q, unit, note: "", serials: serials || [] });
+        const mk = (id, no, kind, delivery, items, x) => Object.assign({ id, no, kind, date: d(0), delivery, waits: delivery === "sent" || delivery === "transit", from: "HQ Keratsini", to: "", project: "PRJ.100324 Bridge refit", subproject: "", vessel: "M/Y AURORA", company: "", by: "Warehouse", lines: items.length, answered_at: null, answered_by: null, ref: "", carrier: "", attention: "", address: "", note: "", remark: "", can_answer: delivery === "sent" || delivery === "transit", items, totals: [{ unit: "pcs", qty: items.reduce((a, b) => a + b.qty, 0) }] }, x || {});
+        M.dn = [mk(31, "GAS-DN-26-0031", "project", "sent", [it(1, "REL-24V", "Relay 24 VDC 2 CO", 6, "pcs"), it(2, "PSU-QUINT4", "Power supply 24 VDC 10 A", 1, "pcs", ["DEMO-SN-001"])]), mk(30, "GAS-DN-26-0030", "transfer", "transit", [it(1, "CBL-2x1.5", "Cable 2 × 1.5 mm² screened", 4, "pcs")], { to: "VAN-1 Service van" }), mk(27, "GAS-DN-26-0027", "project", "accepted", [it(1, "FUSE-6A", "Fuse 6 A", 10, "pcs")], { date: d(-3), answered_at: d(-3) + " 10:12:00", answered_by: M.me.name })]; }
+      const m1 = p.match(/^\/delivery-notes\/(\d+)(\/decide)?$/); const lite = (x) => { const y = Object.assign({}, x); delete y.items; delete y.totals; return y; };
+      if (!m1) return delay({ enabled: true, waiting: M.dn.filter((x) => x.waits).map(lite), recent: M.dn.filter((x) => !x.waits).map(lite) });
+      const n = M.dn.find((x) => x.id === +m1[1]); if (!n) { const e = new Error("Not found"); e.status = 404; return Promise.reject(e); }
+      if (m1[2]) { n.delivery = body.decision === "disputed" ? "disputed" : n.kind === "transfer" ? "received" : "accepted"; n.waits = false; n.can_answer = false; n.remark = body.remark || ""; n.answered_at = new Date().toISOString(); n.answered_by = M.me.name; return delay({ status: "accepted", state: n.delivery, note: n }); }
+      return delay(n);
+    }
     if (p === "/me/planning") { const dd = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10); return delay({ enabled: true, from: dd(0), to: dd(21), days: [0, 1, 2, 3, 4, 7].map((n) => ({ date: dd(n), entries: n === 4 ? [{ kind: "leave", label: "Leave", detail: "", note: "", car: "", hours: null, absence: true }] : [{ kind: "work", label: n < 2 ? "M/Y DEMO Y.02" : "M/Y SAMPLE Y.01", detail: n < 2 ? "PRJ.100324 · Bridge console installation" : "PRJ.100311 · Shore converter service", note: n === 1 ? "Start 07:30 at the yard gate" : "", car: n < 2 ? "Van 2" : "", hours: 8, absence: false }] })) }); }   // R97-221
     if (p === "/inout") { if (!M.io) { const dd = (n) => new Date(Date.now() + n * 864e5).toISOString().slice(0, 10); const site = { id: 1, name: "Perama yard", lat: 37.965, lng: 23.573, radius_m: 300 };
         const mk = (id, kind, n, time, extra) => Object.assign({ id, kind, at: dd(n) + "T" + time + ":00.000Z", day: dd(n), time, lat: 37.9651, lng: 23.5732, acc: 12, site: "Perama yard", dist: 21, flags: [], status: "auto", map: "https://www.google.com/maps?q=37.9651,23.5732", note: null, late_sync: false }, extra || {});

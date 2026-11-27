@@ -7,6 +7,7 @@ if (!function_exists('dn_can_view') || !dn_can_view($d)) { http_response_code(40
 if (!$d) { http_response_code(404); layout_head(t('err.notfound'), 'inventory'); echo '<h1>' . tt('err.notfound') . '</h1>'; layout_foot(); return; }
 if (($_GET['format'] ?? '') === 'pdf') { $pdf = dn_pdf($d); header('Content-Type: application/pdf'); header('Content-Disposition: inline; filename="' . $d['dn_no'] . '.pdf"'); header('Content-Length: ' . strlen($pdf)); header('Cache-Control: no-store'); echo $pdf; exit; }
 $L = dn_lines($id); $wh = dn_wh(); $self = url('delivery_note', ['id' => $id]); $full = dn_can(); $x = dn_x_has(); $isX = $d['kind'] === 'transfer'; $dv = (string)($d['delivery'] ?? 'open'); $live = $d['status'] === 'issued';
+$x2 = dn_x2_has(); $meFor = $x2 && dn_is_for($d, (int)$u['id']) && dn_waits($d);
 $ev = $x ? dn_events($id) : []; $onward = $isX ? dn_onward($id) : []; $rsvN = $isX && $x ? (int) scalar('SELECT COUNT(*) FROM inv_dn_rsv WHERE dn_id = ?', [$id]) : 0;
 $people = []; if ($d['company_id'] && function_exists('co_people')) { foreach (co_people((int)$d['company_id']) as $c) if ($c['email']) $people[] = ['name' => (string)$c['full_name'], 'email' => (string)$c['email'], 'role' => (string)($c['position'] ?? ''), 'on' => false]; }
 layout_head($d['dn_no'] . ' · ' . t('dn.title'), 'inventory');
@@ -21,6 +22,15 @@ layout_head($d['dn_no'] . ' · ' . t('dn.title'), 'inventory');
     <?php if ($wh && $d['status'] === 'issued'): ?><form method="post" action="<?= $self ?>" data-lock data-prompt="<?= e(t('dn.cancel_q')) ?>" data-prompt-field="note"><?= csrf_field() ?><input type="hidden" name="action" value="dn_cancel"><input type="hidden" name="id" value="<?= $id ?>"><input type="hidden" name="note" value=""><button class="btn btn--ghost btn--sm" type="submit">✕ <?= tt('dn.cancel') ?></button></form><?php endif; ?>
   </div>
 </div>
+<?php if ($meFor && !($isX && dn_can_receive($d) && $full)): /* R97-280: the receiver answers here as well as in the Service app */ ?>
+<div class="card" id="dnme" style="border-left:4px solid #C9A227;">
+  <div class="card-head"><h2>📱 <?= tt('dn.me_title') ?></h2><span class="hint"><?= tt('dn.me_hint') ?></span></div>
+  <form method="post" action="<?= $self ?>" data-lock><?= csrf_field() ?><input type="hidden" name="action" value="dn_user_decide"><input type="hidden" name="id" value="<?= $id ?>">
+    <div class="field"><label for="dnme_note"><?= tt('dn.me_note') ?></label><input id="dnme_note" name="note" maxlength="2000"></div>
+    <div class="btn-row"><button class="btn btn--gold btn--sm" type="submit" name="decision" value="accepted">✓ <?= tt('dn.me_ok') ?></button><button class="btn btn--ghost btn--sm" type="submit" name="decision" value="disputed">↩ <?= tt('dn.acc_dispute') ?></button></div>
+  </form>
+</div>
+<?php endif; ?>
 <div class="grid grid-2">
 <div class="card">
   <h2><?= tt('dn.details') ?></h2>
@@ -29,6 +39,8 @@ layout_head($d['dn_no'] . ' · ' . t('dn.title'), 'inventory');
     <div class="kv"><span><?= tt('po.carrier') ?></span><b><?= e($d['carrier'] ?: '—') ?></b></div><div class="kv"><span><?= tt('dn.attention') ?></span><b><?= e($d['attention'] ?: '—') ?></b></div>
     <div class="kv kv--full"><span><?= tt('dn.address') ?></span><b style="font-weight:400;"><?= implode('<br>', array_map('e', dn_recipient($d))) ?></b></div>
     <?php if ($d['receipt_no']): ?><div class="kv kv--full"><span><?= tt('po.receipt_no') ?></span><b><?= e($d['receipt_no']) ?><?= $d['po_no'] ? ' · <a href="' . url('purchase_order', ['id' => (int)$d['order_id']]) . '">' . e($d['po_no']) . '</a>' : '' ?></b></div><?php endif; ?>
+    <?php if ($x2 && (!empty($d['to_user_id']) || ($full && dn_waits($d)))): /* R97-280 */ ?><div class="kv kv--full"><span>📱 <?= tt('dn.to_user') ?></span><b><?= e((string)($d['to_user_name'] ?? '') ?: '—') ?></b>
+      <?php if ($full && dn_waits($d)): ?><form method="post" action="<?= $self ?>" data-lock style="display:flex;gap:6px;flex-wrap:wrap;margin-top:4px;"><?= csrf_field() ?><input type="hidden" name="action" value="dn_to_user"><input type="hidden" name="id" value="<?= $id ?>"><select name="to_user_id" style="min-width:220px;"><option value="0">—</option><?php foreach (staff_users() as $su): ?><option value="<?= (int)$su['id'] ?>"<?= (int)$su['id'] === (int)($d['to_user_id'] ?? 0) ? ' selected' : '' ?>><?= e((string)$su['full_name']) ?></option><?php endforeach; ?></select><button class="btn btn--ghost btn--sm" type="submit"><?= tt('btn.save') ?></button></form><span class="hint"><?= tt('dn.to_user_hint') ?></span><?php endif; ?></div><?php endif; ?>
     <?php if ($x && !empty($d['from_dn_no'])): ?><div class="kv kv--full"><span><?= tt('dn.from_dn') ?></span><b><a class="mono" href="<?= url('delivery_note', ['id' => (int)$d['from_dn_id']]) ?>"><?= e((string)$d['from_dn_no']) ?></a></b></div><?php endif; ?>
     <?php if ($onward): ?><div class="kv kv--full"><span><?= tt('dn.onward') ?></span><b><?php foreach ($onward as $o): ?><a class="mono" href="<?= url('delivery_note', ['id' => (int)$o['id']]) ?>"><?= e((string)$o['dn_no']) ?></a> <?= dn_pill((string)$o['status']) ?> <?php endforeach; ?></b></div><?php endif; ?>
     <?php if ($d['note']): ?><div class="kv kv--full"><span><?= tt('prq.note') ?></span><b style="white-space:pre-wrap;font-weight:400;"><?= e($d['note']) ?></b></div><?php endif; ?>
@@ -40,7 +52,7 @@ layout_head($d['dn_no'] . ' · ' . t('dn.title'), 'inventory');
   <h2>🔁 <?= tt('dn.xf_title') ?></h2><p class="hint"><?= tt('dn.xf_hint') ?></p>
   <div class="kv-grid">
     <div class="kv"><span><?= tt('prq.status') ?></span><b><?= $live ? dn_delivery_pill($d) : dn_pill($d['status']) ?></b></div>
-    <?php if ($dv === 'received'): ?><div class="kv"><span><?= tt('dn.recv_by') ?></span><b><?= e((string)$d['accepted_name']) ?> · <?= e(fmt_datetime((string)$d['accepted_at'])) ?></b></div><?php if ($d['accepted_remark']): ?><div class="kv kv--full"><span><?= tt('prq.note') ?></span><b style="font-weight:400;white-space:pre-wrap;"><?= e((string)$d['accepted_remark']) ?></b></div><?php endif; endif; ?>
+    <?php if (in_array($dv, ['received', 'disputed'], true) && $d['accepted_at']): ?><div class="kv"><span><?= tt($dv === 'received' ? 'dn.recv_by' : 'dn.acc_answer_by') ?></span><b><?= e((string)$d['accepted_name']) ?> · <?= e(fmt_datetime((string)$d['accepted_at'])) ?> · <?= e(t('dn.via_' . ($d['accepted_via'] ?: 'portal'))) ?></b></div><?php if ($d['accepted_remark']): ?><div class="kv kv--full"><span><?= tt('prq.note') ?></span><b style="font-weight:400;white-space:pre-wrap;"><?= e((string)$d['accepted_remark']) ?></b></div><?php endif; endif; ?>
     <?php if (!empty($d['to_holder_id'])): ?><div class="kv"><span><?= tt('stk.wh_holder') ?></span><b><?= e((string) scalar('SELECT full_name FROM customer_users WHERE id = ?', [(int)$d['to_holder_id']])) ?></b></div><?php endif; ?>
     <?php if (!empty($d['to_vehicle'])): ?><div class="kv"><span><?= tt('stk.wh_vehicle') ?></span><b><?= e((string)$d['to_vehicle']) ?></b></div><?php endif; ?>
   </div>
@@ -62,7 +74,7 @@ layout_head($d['dn_no'] . ' · ' . t('dn.title'), 'inventory');
   <div class="card-head"><h2>📬 <?= tt('dn.acc_title') ?></h2><span class="hint"><?= tt('dn.acc_hint') ?></span></div>
   <div class="kv-grid">
     <div class="kv"><span><?= tt('prq.status') ?></span><b><?= $live ? (dn_delivery_pill($d) ?: pill('mute', t('dn.d_open'))) : dn_pill($d['status']) ?></b></div>
-    <?php if (in_array($dv, ['accepted', 'disputed'], true)): ?><div class="kv"><span><?= tt($dv === 'accepted' ? 'dn.recv_by' : 'dn.acc_answer_by') ?></span><b><?= e(trim((string)$d['accepted_name'] . ($d['accepted_role'] ? ', ' . $d['accepted_role'] : ''))) ?></b></div>
+    <?php if (in_array($dv, ['accepted', 'disputed'], true) && $d['accepted_at']): ?><div class="kv"><span><?= tt($dv === 'accepted' ? 'dn.recv_by' : 'dn.acc_answer_by') ?></span><b><?= e(trim((string)$d['accepted_name'] . ($d['accepted_role'] ? ', ' . $d['accepted_role'] : ''))) ?></b></div>
     <div class="kv"><span><?= tt('th.date') ?></span><b><?= e(fmt_datetime((string)$d['accepted_at'])) ?></b></div><div class="kv"><span><?= tt('dn.acc_how') ?></span><b><?= e(t('dn.via_' . ($d['accepted_via'] ?: 'portal'))) ?><?= $d['accepted_email'] ? ' · ' . e((string)$d['accepted_email']) : '' ?></b></div>
     <?php if ($d['accepted_remark']): ?><div class="kv kv--full"><span><?= tt('fsr.remark') ?></span><b style="font-weight:400;white-space:pre-wrap;"><?= e((string)$d['accepted_remark']) ?></b></div><?php endif; ?><?php endif; ?>
   </div>

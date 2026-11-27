@@ -55,8 +55,10 @@ function pn_pick_app(array $byApp, ?string $prefer = null, ?array $only = null):
 function pn_commercial(string $kind): bool { $k = preg_replace('/^nf:/', '', $kind); return in_array(explode(':', $k, 2)[0], PN_COMMERCIAL, true) || str_starts_with($k, 'work:si_'); }
 /** Queue one push for a person. False when the person has no phone registered, has switched push off, or the same thing is already queued or was sent today. */
 function pn_enqueue(int $uid, string $kind, string $refKey, string $title, ?string $body, ?string $route = null, ?string $prefer = null): bool {
-    if (!pn_has() || $uid <= 0) return false; $app = pn_pick_app(pn_devices($uid), $prefer, pn_commercial($kind) ? ['pm'] : (str_starts_with($kind, 'plan:') ? PN_PLAN_ORDER : null)); if (!$app) return false;
+    $isDn = in_array($kind, ['nf:dn:to', 'nf:dn:xfer'], true);   // R97-280: a delivery note for the engineer goes to the Service app and opens the note
+    if (!pn_has() || $uid <= 0) return false; $app = pn_pick_app(pn_devices($uid), $prefer ?? ($isDn ? 'engineer' : null), pn_commercial($kind) ? ['pm'] : (str_starts_with($kind, 'plan:') ? PN_PLAN_ORDER : null)); if (!$app) return false;
     if (str_starts_with($kind, 'plan:')) $route = in_array($app, ['engineer', 'employee'], true) ? '#/plan' : null;   // R97-221: a tap opens My planning
+    if ($isDn) $route = $app === 'engineer' && preg_match('/^dn:(\d+)$/', $refKey, $dm) ? '#/dn?id=' . $dm[1] : null;
     if (function_exists('wl_has') && wl_has() && !(wl_prefs($uid)['push'] ?? 1)) return false;
     $refKey = mb_substr($refKey, 0, 60);
     if (scalar('SELECT COUNT(*) FROM mob_push_queue WHERE user_id = ? AND ref_key = ? AND (sent_at IS NULL OR sent_at > NOW() - INTERVAL ' . (str_starts_with($refKey, 'ofu:day:') ? '20 HOUR' : '10 MINUTE') . ')', [$uid, $refKey])) return false;
