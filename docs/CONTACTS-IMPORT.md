@@ -4893,3 +4893,13 @@ Tool: `python3 tools/i18n/ka_apps.py stat | export <out.tsv> [chars] | merge <in
 Versions: Service 0.8.8 → 0.8.9, Golden PM 1.0.22 → 1.0.23, Golden HR 1.2.5 → 1.2.6, Employee 1.1.6 → 1.1.7, Customer 1.0.15 → 1.0.16 (sw.js, api.js and the ?v= of index.html). The store apps are shells that load the live client from goldensas.com, and the client updates itself when its service worker changes, so the installed apps show Georgian after their next start with a connection; no store build was made or submitted for this. The version name of the next store build will be these numbers.
 
 Security: static script files only — no new endpoint, right or stored value; the language code `ka` sent by the apps in X-Lang is already an accepted locale of the portal. Tests: node --check on every changed script; each i18n.js loaded in node, language set to ka, LANGS and sample keys read back (In / Out = მოსვლა / წასვლა in the four staff apps, coverage 1.000 in the Customer app); key counts ka against en: 661/663, 553/556, 409/411, 651/653, 264/264. Not tested: the apps on a phone in Georgian (layout of long words on small buttons), review by a native speaker.
+
+## §557 Delivery notes — total of the quantities (GAS-CP-R97-278, v1.266.0)
+
+Request: the delivery note document must end with the total of the quantities.
+
+`dn_qty_totals($L)` in customer/app/dn.php adds the quantities of the lines per unit of measure, in the order the units first appear (pcs, m, kg … are never added together). `dn_pdf()` prints, right after the last line, a shaded bold row «Total quantity (n lines)» with the figure in the Qty column; a note with several units gets one row per unit. The page of the delivery note (customer/views/delivery_note.php) shows the same as the foot of the lines table. The document is built when it is opened, so notes already issued show the total too; nothing is stored and there is no database step. New texts `dn.total_qty` and `dn.total_lines` in the six languages (the PDF itself is in English, as before).
+
+Security: read-only sum of lines the user already sees; no new input, route or right; texts escaped on the page. Performance: one loop over the lines already loaded.
+
+Tests (bench, demo data): a note with five lines in two units — PDF rendered and looked at: «Total quantity (5 lines) 45 pcs» and «42,75 m» under the Qty column, notes, terms and signature lines follow as before; page rendered without warnings with the same foot row; php -l on the changed files; equal key count in the six language files (13 904). Not tested: a note long enough to break the page exactly at the total row (the row asks for its space before it is drawn, as the lines do).

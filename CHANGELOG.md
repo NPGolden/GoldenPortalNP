@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.265.9** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.266.0** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.266.0 | GAS-CP-R97-278 | 2026-11-27 | Delivery notes: the total of the quantities at the end of the lines, on the document (PDF) and on the page — one figure per unit of measure, with the number of lines | — |
 | 1.265.9 | GAS-CP-R97-277 | 2026-11-27 | Georgian in the five apps — Service 0.8.9, Golden PM 1.0.23, Golden HR 1.2.6, Employee 1.1.7, Customer 1.0.16: the language selector of each app offers Georgian; the installed apps take the new version by themselves | — |
 | 1.265.8 | GAS-CP-R97-276 | 2026-11-27 | PDF documents print Georgian letters: the PDF writer takes Georgian characters from a small Georgian font, loaded only when a document needs it; documents in the other languages are unchanged | — |
 | 1.265.7 | GAS-CP-R97-275 | 2026-11-27 | Georgian — the whole portal is translated: push notifications and app versions, newsletter language versions, deletion registers, reservations and stock checks, reverse receipt, delivery check with the Excel layout, purchase order deletion, recruiting offer with approval and acceptance by link, serial numbers and company assets, asset import, sign-in history of the apps, self-test of the public pages (100 %) | — |

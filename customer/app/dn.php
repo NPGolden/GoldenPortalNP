@@ -103,6 +103,12 @@ function dn_recipient(array $d): array {
     if ($d['address']) $out[] = (string)$d['address']; if ($d['attention']) $out[] = 'Attn. ' . $d['attention'];
     return $out ?: [t('dn.k_' . $d['kind'])];
 }
+/** R97-278: the quantities of a delivery note added up, one figure per unit of measure (pcs, m, kg … are never added together), in the order the units first appear. */
+function dn_qty_totals(array $L): array {
+    $t = [];
+    foreach ($L as $l) { $u = trim((string)($l['unit'] ?? '')); $t[$u] = ($t[$u] ?? 0.0) + (float)$l['qty']; }
+    return $t;
+}
 function dn_pdf(array $d): string {
     require_once __DIR__ . '/pdf.php'; $L = dn_lines((int)$d['id']); $loc = 'en'; $T = fn(string $k, array $v = []) => t_in($k, $loc, $v);
     $pdf = new PdfWriter(); $navy = '#0B1E2D'; $gold = '#C89B3C'; $ink = '#1F2933'; $line = '#C8CED6'; $head = '#EEF2F6'; $Lm = 15.0; $R = 195.0; $W = $R - $Lm; $y = 0.0;
@@ -133,6 +139,16 @@ function dn_pdf(array $d): string {
         $x = $Lm; $cells = [(string)$l['seq'], (string)($l['item_code'] ?: ''), null, stk_qty((float)$l['qty']) . ' ' . $l['unit']];
         foreach ($cols as $i => [$hh, $w, $al]) { if ($cells[$i] === null) { $yy = $y + 3.8; foreach ($lines as $ln) { $pdf->text($x + 1.5, $yy, $ln); $yy += 3.8; } } else $pdf->text($al === 'R' ? $x + $w - 1.5 : $x + 1.5, $y + 3.8, mb_substr($cells[$i], 0, 34), $al); $x += $w; }
         $y += $h; $pdf->setColor($line); $pdf->setLineWidth(0.2); $pdf->line($Lm, $y, $Lm + array_sum(array_column($cols, 1)), $y); $pdf->setColor($ink);
+    }
+    if ($L) {                                                                                 // R97-278: total of the quantities at the end of the lines, per unit
+        $tot = dn_qty_totals($L); $tw = array_sum(array_column($cols, 1)); $need(count($tot) * 5.5 + 4);
+        $first = true;
+        foreach ($tot as $u => $q) {
+            $pdf->setColor($head); $pdf->rect($Lm, $y, $tw, 5.5, 'F'); $pdf->setFont('B', 8); $pdf->setColor($navy);
+            if ($first) $pdf->text($Lm + $tw - $cols[3][1] - 1.5, $y + 3.9, $T('dn.total_qty') . ' (' . $T('dn.total_lines', ['n' => count($L)]) . ')', 'R');
+            $pdf->text($Lm + $tw - 1.5, $y + 3.9, trim(stk_qty($q) . ' ' . $u), 'R'); $y += 5.5; $first = false;
+        }
+        $pdf->setColor($navy); $pdf->setLineWidth(0.3); $pdf->line($Lm, $y, $Lm + $tw, $y); $pdf->setFont('R', 8); $pdf->setColor($ink);
     }
     if ($d['note']) { $need(16); $y += 3; $pdf->setFont('B', 8); $pdf->setColor($navy); $pdf->text($Lm, $y + 3, $T('po.pdf_notes')); $y += 5; $pdf->setFont('R', 8); $pdf->setColor($ink); $y += $pdf->paragraph($Lm, $y, $W, (string)$d['note'], 3.9) + 2; }
     $need(30); $y += 6; $pdf->setFont('R', 8); $pdf->setColor($ink); $y += $pdf->paragraph($Lm, $y, $W, $T('dn.pdf_foot'), 3.9) + 6;
