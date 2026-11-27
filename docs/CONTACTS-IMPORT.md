@@ -5026,7 +5026,7 @@ Confirmed by the CEO in the review session of 27/11/2026: rows 1–4 of the revi
 
 **Security review.** Read-only statements; every `IN (…)` list and every LIMIT / OFFSET is built from integers, the sort order comes from a fixed list, the feed addresses are bound values. No new entry point, right, setting screen or inline script. The report prints counts only. The Inventory page no longer holds the whole item list in memory, which removes a way to exhaust `memory_limit` with a wide filter. Proposed, not done (no effect on speed): give the session cookie the secure flag also when the configured base address is https — open since §544.
 
-## §566 HR equipment — imported company assets visible, lists issued to everyone at once (GAS-CP-R97-287, v1.272.3)
+## §566 HR equipment — imported company assets visible, lists issued to everyone at once (GAS-CP-R97-288, v1.273.1)
 
 Correction of §564: the screen of the owner showed that the first import (register of imports) did put 146 units in the name of persons — the holders were recorded. They were not seen because the import creates the lines on the equipment cards as «To be issued» (`hr_eq_items.status = draft`) and the register of HR › Equipment of the personnel shows by default «With the personnel» = pending / held / missing only.
 
