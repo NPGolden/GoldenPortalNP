@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.265.8** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.265.9** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.265.9 | GAS-CP-R97-277 | 2026-11-27 | Georgian in the five apps — Service 0.8.9, Golden PM 1.0.23, Golden HR 1.2.6, Employee 1.1.7, Customer 1.0.16: the language selector of each app offers Georgian; the installed apps take the new version by themselves | — |
 | 1.265.8 | GAS-CP-R97-276 | 2026-11-27 | PDF documents print Georgian letters: the PDF writer takes Georgian characters from a small Georgian font, loaded only when a document needs it; documents in the other languages are unchanged | — |
 | 1.265.7 | GAS-CP-R97-275 | 2026-11-27 | Georgian — the whole portal is translated: push notifications and app versions, newsletter language versions, deletion registers, reservations and stock checks, reverse receipt, delivery check with the Excel layout, purchase order deletion, recruiting offer with approval and acceptance by link, serial numbers and company assets, asset import, sign-in history of the apps, self-test of the public pages (100 %) | — |
 | 1.265.6 | GAS-CP-R97-274 | 2026-11-27 | Georgian — seventh delivery: supplier e-mail texts, organisations and roles, shortages and stock project, licences, RFQ comparison, delivery notes, recruiting with candidate e-mails, website inbox and statistics, work permits, onboarding and handover, HR year, direct invoices, credit notes, ownership history, milestones and safety log, System Budgets and conversion to offer, marine intelligence, My approvals, first-sign-in password, recycle bin (95 % of the portal) | — |
