@@ -3,7 +3,9 @@
  * Minimal PDF writer — pure PHP, no library.                 GAS-CP-R7-001
  *
  * A4 pages, embedded TrueType fonts (Liberation Sans regular + bold, so
- * Greek and Latin render), word-wrapped text, lines, boxes, filled
+ * Greek and Latin render; Georgian letters fall back, character by character,
+ * to a Georgian subset of DejaVu Sans that is loaded only when a text needs
+ * it — GAS-CP-R97-276), word-wrapped text, lines, boxes, filled
  * rectangles, JPEG images (PNG converted through GD). Coordinates are in
  * millimetres from the top-left corner, as on a drawing.
  * Enough for the SF-GLD-014 field service report; not a general engine.
@@ -90,25 +92,46 @@ final class PdfWriter {
         $cap = (int) round($asc * 1000 / $upm);
         return ['data' => $d, 'upm' => $upm, 'adv' => $adv, 'map' => $map, 'asc' => (int) round($asc * 1000 / $upm),
                 'desc' => (int) round($desc * 1000 / $upm), 'bbox' => $bbox, 'cap' => $cap,
-                'name' => str_contains($file, 'Bold') ? 'LiberationSans-Bold' : 'LiberationSans'];
+                'name' => (str_contains($file, 'DejaVu') ? 'DejaVuSansGeorgian' : 'LiberationSans') . (str_contains($file, 'Bold') ? '-Bold' : '')];
+    }
+    /** R97-276: the font and glyph of one character. Liberation Sans first; a Georgian letter (U+10A0–10FF, U+2D00–2D2F) that it does not have is taken
+     *  from the Georgian subset of DejaVu Sans — font key 'GR' / 'GB', loaded on first need, so a document without Georgian text never reads the file. */
+    private function glyph(string $st, int $cp): array {
+        $gid = $this->fonts[$st]['map'][$cp] ?? 0;
+        if ($gid || !(($cp >= 0x10A0 && $cp <= 0x10FF) || ($cp >= 0x2D00 && $cp <= 0x2D2F))) return [$st, $gid];
+        $k = 'G' . $st;
+        if (!array_key_exists($k, $this->fonts)) {
+            $file = __DIR__ . '/fonts/DejaVuSansGeorgian' . ($st === 'B' ? '-Bold' : '') . '.ttf';
+            try { $this->fonts[$k] = is_file($file) ? $this->loadTtf($file) : null; } catch (\Throwable $e) { $this->fonts[$k] = null; }
+        }
+        $g = $this->fonts[$k]['map'][$cp] ?? 0;
+        return $g ? [$k, $g] : [$st, 0];
     }
     public function setFont(string $style = 'R', float $size = 10): void { $this->curFont = $style === 'B' ? 'B' : 'R'; $this->curSize = $size; }
 
     /** Width of a string in mm at the current font/size. */
     public function width(string $s, ?string $style = null, ?float $size = null): float {
-        $f = $this->fonts[$style ?? $this->curFont]; $size = $size ?? $this->curSize;
-        $w = 0;
+        $st = $style ?? $this->curFont; $f = $this->fonts[$st]; $size = $size ?? $this->curSize;
+        $w = 0; $wf = 0.0;                                                                    // $wf: em of the characters taken from the fallback font
         foreach (mb_str_split($s) as $ch) {
-            $gid = $f['map'][mb_ord($ch)] ?? 0;
+            $cp = mb_ord($ch); $gid = $f['map'][$cp] ?? 0;
+            if (!$gid && $cp >= 0x10A0) { [$k, $g] = $this->glyph($st, $cp); if ($k !== $st) { $ff = $this->fonts[$k]; $wf += ($ff['adv'][$g] ?? $ff['adv'][0]) / $ff['upm']; continue; } }
             $w += $f['adv'][$gid] ?? $f['adv'][0];
         }
-        return $w / $f['upm'] * $size / self::PT;
+        return ($w / $f['upm'] + $wf) * $size / self::PT;
     }
 
+    /** The text as PDF show operators: one <hex> Tj per run of characters of the same font (R97-276: a run of Georgian letters switches to the fallback font and back). */
     private function esc(string $s): string {
-        $f = $this->fonts[$this->curFont]; $hex = '';
-        foreach (mb_str_split($s) as $ch) $hex .= sprintf('%04X', $f['map'][mb_ord($ch)] ?? 0);
-        return '<' . $hex . '>';
+        $st = $this->curFont; $out = ''; $hex = ''; $cur = $st; $page = count($this->pages);
+        foreach (mb_str_split($s) as $ch) {
+            [$k, $g] = $this->glyph($st, mb_ord($ch));
+            if ($k !== $st) $this->usedFonts[$page][$k] = true;
+            if ($k !== $cur) { if ($hex !== '') $out .= sprintf('/F%s %.2F Tf <%s> Tj ', $cur, $this->curSize, $hex); $hex = ''; $cur = $k; }
+            $hex .= sprintf('%04X', $g);
+        }
+        if ($hex !== '') $out .= sprintf('/F%s %.2F Tf <%s> Tj ', $cur, $this->curSize, $hex);
+        return $out;
     }
 
     /* ------------------------------------------------------------ drawing */
@@ -134,7 +157,7 @@ final class PdfWriter {
         $this->usedFonts[count($this->pages)][$this->curFont] = true;
         $tw = $this->width($s);
         if ($align === 'C') $x += ($w - $tw) / 2; elseif ($align === 'R') $x += $w - $tw;
-        $this->cur .= sprintf("BT /F%s %.2F Tf %.2F %.2F Td %s Tj ET\n", $this->curFont, $this->curSize, $this->x($x), $this->y($y), $this->esc($s));
+        $this->cur .= sprintf("BT %.2F %.2F Td %sET\n", $this->x($x), $this->y($y), $this->esc($s));
     }
     /** Word-wrap into lines no wider than $w mm. */
     /** One line that must stay inside a width: the size is reduced step by step (down to $min) and, if it still does not fit, the text is cut with an ellipsis.   R97-057 */
@@ -234,7 +257,8 @@ final class PdfWriter {
 
         // fonts: for each style used anywhere -> Type0 + CIDFontType2 + descriptor + FontFile2
         $fontObj = [];
-        foreach (['R', 'B'] as $st) {
+        $styles = ['R', 'B']; foreach (['GR', 'GB'] as $k) if (!empty($this->fonts[$k])) $styles[] = $k;      // R97-276: the Georgian fallback only when it was loaded
+        foreach ($styles as $st) {
             $f = $this->fonts[$st];
             $ff = $add('<< /Length ' . strlen(gzcompress($f['data'])) . ' /Length1 ' . strlen($f['data']) . ' /Filter /FlateDecode >>stream' . "\n" . gzcompress($f['data']) . "\nendstream");
             $desc = $add(sprintf('<< /Type /FontDescriptor /FontName /%s /Flags 32 /FontBBox [%d %d %d %d] /ItalicAngle 0 /Ascent %d /Descent %d /CapHeight %d /StemV 80 /FontFile2 %d 0 R >>',
@@ -266,7 +290,7 @@ final class PdfWriter {
         foreach ($this->pages as $i => $content) {
             $z = gzcompress($content);
             $c = $add('<< /Length ' . strlen($z) . ' /Filter /FlateDecode >>stream' . "\n" . $z . "\nendstream");
-            $res = '/Font << ' . implode(' ', array_map(fn($st) => '/F' . $st . ' ' . $fontObj[$st] . ' 0 R', ['R', 'B'])) . ' >>';
+            $res = '/Font << ' . implode(' ', array_map(fn($st) => '/F' . $st . ' ' . $fontObj[$st] . ' 0 R', $styles)) . ' >>';
             $xo = array_keys($this->usedImages[$i] ?? []);
             if ($xo) $res .= ' /XObject << ' . implode(' ', array_map(fn($id) => '/Im' . $id . ' ' . $imgObj[$id] . ' 0 R', $xo)) . ' >>';
             $pageIds[] = $add(sprintf('<< /Type /Page /Parent %d 0 R /MediaBox [0 0 %.2F %.2F] /Resources << %s >> /Contents %d 0 R >>', $pagesIdx, self::W * self::PT, self::H * self::PT, $res, $c));

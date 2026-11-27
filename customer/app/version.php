@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.265.7';
+const CP_VERSION = '1.265.8';
 const CP_BUILD   = '2026-11-27';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-276', 'version' => '1.265.8', 'date' => '2026-11-27', 'title' => 'PDF documents print Georgian letters: the PDF writer takes Georgian characters from a small Georgian font, loaded only when a document needs it; documents in the other languages are unchanged', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-275', 'version' => '1.265.7', 'date' => '2026-11-27', 'title' => 'Georgian — the whole portal is translated: push notifications and app versions, newsletter language versions, deletion registers, reservations and stock checks, reverse receipt, delivery check with the Excel layout, purchase order deletion, recruiting offer with approval and acceptance by link, serial numbers and company assets, asset import, sign-in history of the apps, self-test of the public pages (100 %)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-274', 'version' => '1.265.6', 'date' => '2026-11-27', 'title' => 'Georgian — seventh delivery: supplier e-mail texts, organisations and roles, shortages and stock project, licences, RFQ comparison, delivery notes, recruiting with candidate e-mails, website inbox and statistics, work permits, onboarding and handover, HR year, direct invoices, credit notes, ownership history, milestones and safety log, System Budgets and conversion to offer, marine intelligence, My approvals, first-sign-in password, recycle bin (95 % of the portal)', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-273', 'version' => '1.265.5', 'date' => '2026-11-27', 'title' => 'Georgian — sixth delivery: software releases, acceptance by e-mail link and signature on the device, newsletter approval, KYMA website, budget pricing by procurement and consistency checks, offer follow-up and sales board, payments, collections and statement of account, function checks, inventory, price history and pricing rules, suppliers, requisitions, engineering BOM, purchase orders with lots, logistics and goods receipt, payables, utilization (80 % of the portal)', 'db' => null, 'check' => null],

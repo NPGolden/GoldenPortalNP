@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.265.7** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.265.8** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.265.8 | GAS-CP-R97-276 | 2026-11-27 | PDF documents print Georgian letters: the PDF writer takes Georgian characters from a small Georgian font, loaded only when a document needs it; documents in the other languages are unchanged | — |
 | 1.265.7 | GAS-CP-R97-275 | 2026-11-27 | Georgian — the whole portal is translated: push notifications and app versions, newsletter language versions, deletion registers, reservations and stock checks, reverse receipt, delivery check with the Excel layout, purchase order deletion, recruiting offer with approval and acceptance by link, serial numbers and company assets, asset import, sign-in history of the apps, self-test of the public pages (100 %) | — |
 | 1.265.6 | GAS-CP-R97-274 | 2026-11-27 | Georgian — seventh delivery: supplier e-mail texts, organisations and roles, shortages and stock project, licences, RFQ comparison, delivery notes, recruiting with candidate e-mails, website inbox and statistics, work permits, onboarding and handover, HR year, direct invoices, credit notes, ownership history, milestones and safety log, System Budgets and conversion to offer, marine intelligence, My approvals, first-sign-in password, recycle bin (95 % of the portal) | — |
 | 1.265.5 | GAS-CP-R97-273 | 2026-11-27 | Georgian — sixth delivery: software releases, acceptance by e-mail link and signature on the device, newsletter approval, KYMA website, budget pricing by procurement and consistency checks, offer follow-up and sales board, payments, collections and statement of account, function checks, inventory, price history and pricing rules, suppliers, requisitions, engineering BOM, purchase orders with lots, logistics and goods receipt, payables, utilization (80 % of the portal) | — |
