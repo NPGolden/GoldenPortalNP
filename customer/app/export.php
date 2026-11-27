@@ -83,7 +83,7 @@ function ex_projects(array $g): void {
 /** Portal accounts in the layout the accounts import reads (password column empty — set one to reset it).   R24-004 */
 function ex_users(array $g): void {
     require_export_people('accounts');   // R97-047: CEO, General Manager, developer only
-    $hasTotp = (bool)one("SHOW COLUMNS FROM customer_users LIKE 'twofa_required'"); $hasDisc = ts_has();
+    $hasTotp = (bool)scalar("SHOW COLUMNS FROM customer_users LIKE 'twofa_required'"); $hasDisc = ts_has();
     $hasCal = function_exists('wc_has') && wc_has(); $hasBr = function_exists('br_has') && br_has();
     $w = []; $b = [];
     if (($q = trim((string)($g['q'] ?? ''))) !== '') { $l = '%' . $q . '%'; $w[] = '(cu.full_name LIKE ? OR cu.email LIKE ? OR c.name LIKE ?)'; array_push($b, $l, $l, $l); }

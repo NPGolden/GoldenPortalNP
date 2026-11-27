@@ -612,7 +612,7 @@ function au_import(string $path, bool $dry): array {
     $map += xlsx_header_map($rows[$hi], ['role' => ['Role', 'Access', 'Access role', 'Type'], 'customer' => ['Customer', 'Company', 'Owner', 'Organisation', 'Organization'], 'grole' => ['Golden A/S role', 'Golden role', 'Staff role', 'Position', 'Title'],
                                          'disc' => ['Discipline', 'Department'], 'calendar' => ['Working calendar', 'Calendar', 'Work calendar'], 'branch' => ['Branch', 'Home branch'], 'scope' => ['Branch scope', 'Scope'], 'subs' => ['Assigned sub-projects', 'Sub-projects', 'Assignments', 'Team'], 'locale' => ['Language', 'Locale', 'Lang'], 'password' => ['Password', 'Initial password', 'Pass'], 'twofa' => ['2FA', '2FA required', 'Two-factor', 'TOTP'], 'active' => ['Active', 'Status', 'Enabled'], 'manager' => ['Manager', 'Personal manager', 'Approver']]);
     $g = fn(array $r, string $k) => ($map[$k] ?? null) !== null ? trim((string)($r[$map[$k]] ?? '')) : '';
-    $hasTotp = (bool)one("SHOW COLUMNS FROM customer_users LIKE 'twofa_required'"); $hasDisc = ts_has();
+    $hasTotp = (bool)scalar("SHOW COLUMNS FROM customer_users LIKE 'twofa_required'"); $hasDisc = ts_has();
     $yes = fn(string $v) => in_array(mb_strtolower($v), ['1', 'yes', 'y', 'true', 'x', 'ναι', 'si', 'sì', 'так', 'да', 'on', 'required', 'active', 'enabled'], true);
     $no  = fn(string $v) => in_array(mb_strtolower($v), ['0', 'no', 'n', 'false', 'όχι', 'ні', 'не', 'off', 'exempt', 'inactive', 'disabled'], true);
     return pm_import_tx($dry, function () use ($rows, $hi, $g, &$res, $hasTotp, $hasDisc, $yes, $no) {

@@ -71,8 +71,12 @@ function eng_can_edit(array $sp, bool $budget = false): bool {
 }
 /** Actual engineering hours per section of a sub-project (tagged lines of submitted / approved / invoiced timesheets; untagged lines count while the stage is open). */
 function eng_actual(int $sid, ?int $excludeTs = null): array {
+    return eng_actual_fold(all("SELECT t.discipline_id, l.activity, SUM(l.hours) h FROM timesheet_lines l JOIN timesheets t ON t.id = l.timesheet_id WHERE l.subproject_id = ? AND t.status IN ('submitted','approved','invoiced') AND t.discipline_id IN (SELECT discipline_id FROM eng_section_disciplines)" . ($excludeTs ? ' AND t.id <> ?' : '') . " GROUP BY t.discipline_id, l.activity", $excludeTs ? [$sid, $excludeTs] : [$sid]));
+}
+/** The hours per discipline and activity of one sub-project, put on their sections (R97-287: apart from the statement, so a batch of sub-projects uses the same rule). */
+function eng_actual_fold(array $rows): array {
     $out = [];
-    foreach (all("SELECT t.discipline_id, l.activity, SUM(l.hours) h FROM timesheet_lines l JOIN timesheets t ON t.id = l.timesheet_id WHERE l.subproject_id = ? AND t.status IN ('submitted','approved','invoiced') AND t.discipline_id IN (SELECT discipline_id FROM eng_section_disciplines)" . ($excludeTs ? ' AND t.id <> ?' : '') . " GROUP BY t.discipline_id, l.activity", $excludeTs ? [$sid, $excludeTs] : [$sid]) as $r) {
+    foreach ($rows as $r) {
         $did = (int)$r['discipline_id']; $act = (string)($r['activity'] ?? '');
         if ($act === '' ) $act = eng_section_of($did) !== null ? 'engineering' : (eng_stages_of($did)[0] ?? '');   // untagged historic lines: engineering for engineering disciplines, else the discipline's first stage
         if ($act === '' || $act === 'site') continue; $sec = eng_section_for($did, $act); if ($sec !== null) $out[$sec] = ($out[$sec] ?? 0.0) + (float)$r['h'];
@@ -87,13 +91,29 @@ function eng_rows(int $sid): array {
     return $GLOBALS['_eng_rows'][$sid] = eng_rows_build($sid);
 }
 /** After every write that moves hours, budgets, requests or deliverables: drop the per-request rows and the cached alerts. */
-function eng_rows_reset(): void { $GLOBALS['_eng_rows'] = []; if (function_exists('cache_bump')) cache_bump('eng'); }
+function eng_rows_reset(): void { $GLOBALS['_eng_rows'] = []; $GLOBALS['_eng_raw'] = []; if (function_exists('cache_bump')) cache_bump('eng'); }
+/** R97-287: a list of sub-projects (the Projects page) reads budgets, extra hours, deliverables and booked hours of all of them in five statements instead of five per
+ *  sub-project. Only what the statements return is kept here; eng_rows_build() computes from it exactly as from its own statements and uses it once. */
+function eng_rows_prime(array $sids): void {
+    if (!eng_has() || !eng_has2()) return;
+    $sids = array_values(array_unique(array_filter(array_map('intval', $sids), fn($i) => $i > 0 && !isset($GLOBALS['_eng_rows'][$i]) && !isset($GLOBALS['_eng_raw'][$i])))); if (count($sids) < 2) return;
+    try { foreach (array_chunk($sids, 400) as $ch) { $in = implode(',', $ch); $R = []; foreach ($ch as $i) $R[$i] = ['B' => [], 'X' => [], 'P' => [], 'D' => [], 'A' => []];
+        foreach (all("SELECT * FROM eng_budgets WHERE subproject_id IN ($in)") as $b) $R[(int)$b['subproject_id']]['B'][(int)$b['section_id']] = $b;
+        foreach (all("SELECT subproject_id, section_id, SUM(hours) h FROM eng_requests WHERE subproject_id IN ($in) AND status = 'approved' GROUP BY subproject_id, section_id") as $r) $R[(int)$r['subproject_id']]['X'][(int)$r['section_id']] = (float)$r['h'];
+        foreach (all("SELECT subproject_id, section_id, COUNT(*) n, SUM(hours) h FROM eng_requests WHERE subproject_id IN ($in) AND status = 'pending' GROUP BY subproject_id, section_id") as $r) $R[(int)$r['subproject_id']]['P'][(int)$r['section_id']] = ['n' => (int)$r['n'], 'h' => (float)$r['h']];
+        foreach (all("SELECT d.*, cu.full_name AS done_name FROM eng_deliverables d LEFT JOIN customer_users cu ON cu.id = d.done_by WHERE d.subproject_id IN ($in) ORDER BY d.subproject_id, d.sort_order, d.id") as $d) $R[(int)$d['subproject_id']]['D'][(int)$d['section_id']][] = $d;
+        foreach (all("SELECT l.subproject_id, t.discipline_id, l.activity, SUM(l.hours) h FROM timesheet_lines l JOIN timesheets t ON t.id = l.timesheet_id WHERE l.subproject_id IN ($in) AND t.status IN ('submitted','approved','invoiced') AND t.discipline_id IN (SELECT discipline_id FROM eng_section_disciplines) GROUP BY l.subproject_id, t.discipline_id, l.activity") as $r) $R[(int)$r['subproject_id']]['A'][] = $r;
+        foreach ($R as $i => $x) { $x['A'] = eng_actual_fold($x['A']); $GLOBALS['_eng_raw'][$i] = $x; } }
+    } catch (Throwable $e) { $GLOBALS['_eng_raw'] = []; }   // a failed batch leaves every sub-project to its own statements
+}
 function eng_rows_build(int $sid): array {
-    $sec = eng_sections(); $B = []; foreach (all('SELECT * FROM eng_budgets WHERE subproject_id = ?', [$sid]) as $b) $B[(int)$b['section_id']] = $b;
+    $sec = eng_sections(); $raw = $GLOBALS['_eng_raw'][$sid] ?? null; unset($GLOBALS['_eng_raw'][$sid]);
+    if (is_array($raw)) { ['B' => $B, 'X' => $X, 'P' => $P, 'D' => $D, 'A' => $A] = $raw; $BH = eng_budget_hours($sid); $out = []; } else {
+    $B = []; foreach (all('SELECT * FROM eng_budgets WHERE subproject_id = ?', [$sid]) as $b) $B[(int)$b['section_id']] = $b;
     $X = []; foreach (all("SELECT section_id, SUM(hours) h FROM eng_requests WHERE subproject_id = ? AND status = 'approved' GROUP BY section_id", [$sid]) as $r) $X[(int)$r['section_id']] = (float)$r['h'];
     $P = []; foreach (all("SELECT section_id, COUNT(*) n, SUM(hours) h FROM eng_requests WHERE subproject_id = ? AND status = 'pending' GROUP BY section_id", [$sid]) as $r) $P[(int)$r['section_id']] = ['n' => (int)$r['n'], 'h' => (float)$r['h']];
     $D = []; foreach (all('SELECT d.*, cu.full_name AS done_name FROM eng_deliverables d LEFT JOIN customer_users cu ON cu.id = d.done_by WHERE d.subproject_id = ? ORDER BY d.sort_order, d.id', [$sid]) as $d) $D[(int)$d['section_id']][] = $d;
-    $A = eng_actual($sid); $BH = eng_budget_hours($sid); $out = [];
+    $A = eng_actual($sid); $BH = eng_budget_hours($sid); $out = []; }
     foreach ($sec as $did => $d) {
         $budget = $BH !== null ? (float)($BH[$did] ?? 0) : (float)($B[$did]['hours'] ?? 0);   // from Budget & actual; manual eng_budgets.hours only when the budget module is absent
         if ($budget <= 0 && !isset($B[$did]) && empty($D[$did]) && empty($A[$did]) && !isset($X[$did]) && !isset($P[$did])) continue;
@@ -112,8 +132,10 @@ function eng_rows_build(int $sid): array {
 /** Engineering % of the sub-project (weighted by allowed hours); null when no section is budgeted. */
 function eng_sub_pct(int $sid, string $stage = 'engineering'): ?int { $rows = eng_rows($sid); $num = 0.0; $den = 0.0; foreach ($rows as $r) { if ($r['stage'] !== $stage || $r['allowed'] <= 0) continue; $num += $r['earned']; $den += $r['allowed']; } return $den > 0 ? (int) round(min(100, $num / $den * 100)) : null; }
 /** [stage => %] for every stage that has budgeted sections on this sub-project. */
+/** Sub-projects that can have a % at all: budgeted or approved hours (R97-104). null = not known (not a page view) — ask each sub-project. */
+function eng_sub_with(): ?array { return eng_has() && eng_has2() ? sub_ids_with('eng', array_merge(['SELECT DISTINCT subproject_id FROM eng_budgets', "SELECT DISTINCT subproject_id FROM eng_requests WHERE status = 'approved'"], function_exists('bg_has') && bg_has() ? ['SELECT DISTINCT subproject_id FROM sp_budgets'] : [])) : null; }
 function eng_stage_pcts(int $sid): array { $out = [];
-    $with = eng_has() && eng_has2() ? sub_ids_with('eng', array_merge(['SELECT DISTINCT subproject_id FROM eng_budgets', "SELECT DISTINCT subproject_id FROM eng_requests WHERE status = 'approved'"], function_exists('bg_has') && bg_has() ? ['SELECT DISTINCT subproject_id FROM sp_budgets'] : [])) : null; if ($with !== null && !isset($with[$sid])) return [];   // R97-104: a % needs budgeted or approved hours
+    $with = eng_sub_with(); if ($with !== null && !isset($with[$sid])) return [];   // R97-104: a % needs budgeted or approved hours
     foreach (ENG_STAGES as $st) { $p = eng_sub_pct($sid, $st); if ($p !== null) $out[$st] = $p; } return $out; }
 /** Worst state of a sub-project's sections for the ⚠ marks: exceeded > pending > warn > ok / none. */
 function eng_sub_state(int $sid): string { $rank = ['exceeded' => 5, 'pending' => 4, 'warn' => 3, 'extended' => 2, 'ok' => 1, 'done' => 0, 'nobudget' => 0]; $w = 0; $s = 'none'; foreach (eng_rows($sid) as $r) if (($rank[$r['state']] ?? 0) > $w) { $w = $rank[$r['state']]; $s = $r['state']; } return $s; }

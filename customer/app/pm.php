@@ -189,15 +189,19 @@ function pager_html(string $slug, int $page, int $total, int $per, array $keep, 
 /** Page a list that is already loaded: the slice for the current page and a pager bar with the 25 / 50 / 100
  *  per-page chips (?page=N&per=N). Totals computed from the full list stay valid.   GAS-CP-R24-003 */
 function page_list(array $rows, string $slug, array $keep = [], string $param = 'page'): array {
-    $per = per_page(); $total = count($rows); $pages = max(1, (int) ceil($total / $per)); $page = min($pages, max(1, (int)($_GET[$param] ?? 1)));
+    [$off, $per, $html] = page_window(count($rows), $slug, $keep, $param); return [array_slice($rows, $off, $per), $html];
+}
+/** R97-287: the same bar for a list that reads only its page from the database: give the number of rows, get [offset, rows per page, bar]. */
+function page_window(int $total, string $slug, array $keep = [], string $param = 'page'): array {
+    $per = per_page(); $pages = max(1, (int) ceil($total / $per)); $page = min($pages, max(1, (int)($_GET[$param] ?? 1)));
     $keep = array_filter($keep, fn($v) => $v !== '' && $v !== null && $v !== [] && $v !== 0 && $v !== false); unset($keep[$param], $keep['per']);
     if ($param !== 'page') foreach ($_GET as $k => $v) if (!isset($keep[$k]) && preg_match('/^[a-z]+page$/', (string)$k) && $k !== $param) $keep[$k] = $v;   // other tables on the page keep their page
-    $slice = array_slice($rows, ($page - 1) * $per, $per);
-    if ($total <= 25 && $per === 25) return [$slice, ''];
+    $off = ($page - 1) * $per;
+    if ($total <= 25 && $per === 25) return [$off, $per, ''];
     $html = pager_html($slug, $page, $total, $per, $keep + ['per' => $per], $param);
     $chips = '<span class="pager-per"><span class="hint">' . tt('pg.per') . '</span>';
     foreach ([25, 50, 100] as $n) $chips .= $n === $per ? '<span class="btn btn--sm btn--ghost is-on">' . $n . '</span>' : '<a class="btn btn--sm btn--ghost" href="' . url($slug, $keep + ['per' => $n]) . '">' . $n . '</a>';
-    return [$slice, str_replace('</div>', $chips . '</span></div>', $html)];
+    return [$off, $per, str_replace('</div>', $chips . '</span></div>', $html)];
 }
 
 /** Per-page selection (25 / 50 / 100) from the request. */

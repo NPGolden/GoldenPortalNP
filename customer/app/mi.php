@@ -32,10 +32,15 @@ function mi_default_feeds(): array {
         ['Electric & Hybrid Marine Technology', 'https://www.electrichybridmarinetechnology.com/feed/', null, 'marine'],
         ['The Maritime Executive', 'https://maritime-executive.com/articles.rss', null, 'marine'],
         ['Splash247', 'https://splash247.com/feed/', null, 'marine'],
-        ['Marine Log', 'https://www.marinelog.com/feed/', null, 'marine'],
         ['MarineLink', 'https://www.marinelink.com/news/rss', null, 'marine'],
-        ['Offshore Energy', 'https://www.offshore-energy.biz/feed/', null, 'marine'],
     ];
+}
+/** R97-287: feeds taken off the list — their sites refuse automated readers (HTTP 403 / 429 on every reading). Switched off once in an existing list (kept, so
+ *  Settings can switch one on again); new installations no longer get them. */
+const MI_RETIRED_FEEDS = ['https://www.marinelog.com/feed/', 'https://www.offshore-energy.biz/feed/'];
+function mi_retire_feeds(): void {
+    if (cp_setting('mi_retired_287', '') === '1') return;
+    try { q('UPDATE mi_feeds SET is_active = 0 WHERE url IN (' . implode(',', array_fill(0, count(MI_RETIRED_FEEDS), '?')) . ')', MI_RETIRED_FEEDS); cp_setting_set('mi_retired_287', '1'); } catch (Throwable $e) {}
 }
 function mi_seed(): void {
     if (!mi_has() || (int) scalar('SELECT COUNT(*) FROM mi_feeds') > 0 || cp_setting('mi_seeded', '') === '1') return;
@@ -146,14 +151,14 @@ function mi_file_items(array $f, array $items): int {
 }
 /** Read the active feeds, the longest-waiting first, within a time budget. Returns [feeds read, new items]. */
 function mi_fetch_all(int $budget = 25): array {
-    if (!mi_has()) return [0, 0]; mi_seed(); $t0 = microtime(true); $nf = 0; $nn = 0;
+    if (!mi_has()) return [0, 0]; mi_seed(); mi_retire_feeds(); $t0 = microtime(true); $nf = 0; $nn = 0;
     foreach (all('SELECT * FROM mi_feeds WHERE is_active = 1 ORDER BY (last_run_at IS NULL) DESC, last_run_at, id') as $f) { if (microtime(true) - $t0 > $budget) break; try { [$n] = mi_fetch_feed($f); $nn += $n; } catch (Throwable $e) { error_log('[mi] ' . $f['name'] . ': ' . $e->getMessage()); } $nf++; }
     try { q('DELETE FROM mi_items WHERE published_at < (UTC_TIMESTAMP() - INTERVAL ' . MI_KEEP_DAYS . ' DAY)'); } catch (Throwable $e) {}
     return [$nf, $nn];
 }
 /** From the notification sweep: ONE feed per run — the one that has waited longest and was not read in the last 20 hours — so no page request ever waits for the whole list. */
 function mi_sweep(): void {
-    if (!mi_has()) return; mi_seed();
+    if (!mi_has()) return; mi_seed(); mi_retire_feeds();
     $f = one('SELECT * FROM mi_feeds WHERE is_active = 1 AND (last_run_at IS NULL OR last_run_at < (UTC_TIMESTAMP() - INTERVAL 20 HOUR)) ORDER BY (last_run_at IS NULL) DESC, last_run_at, id LIMIT 1'); if (!$f) return;
     q('UPDATE mi_feeds SET last_run_at = UTC_TIMESTAMP() WHERE id = ?', [(int)$f['id']]);   // claimed first: a second request does not read the same feed
     try { mi_fetch_feed($f); } catch (Throwable $e) { error_log('[mi] ' . $f['name'] . ': ' . $e->getMessage()); }

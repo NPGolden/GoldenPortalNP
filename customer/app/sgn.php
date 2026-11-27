@@ -9,7 +9,7 @@ declare(strict_types=1);
 
 const SGN_DOCS = ['fsr', 'fc'];
 
-function sgn_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) one("SHOW COLUMNS FROM fsr_reports LIKE 'accepted_via'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function sgn_has(): bool { static $h = null; if ($h === null) { try { $h = (bool) scalar("SHOW COLUMNS FROM fsr_reports LIKE 'accepted_via'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function sgn_ip(): string { return mb_substr(trim(explode(',', (string)($_SERVER['HTTP_CF_CONNECTING_IP'] ?? $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? ''))[0]), 0, 64); }
 /** The document, when the signed-in member of staff may see it. */
 function sgn_load(string $doc, int $id): ?array {

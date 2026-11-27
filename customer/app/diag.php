@@ -226,7 +226,17 @@ function dh_build(): array {
     // background work
     try { $run = (string) scalar("SELECT run_at FROM nf_cursor WHERE source = '_meta'"); $L[] = '  Background sweep last ran: ' . ($run !== '' ? fmt_datetime($run) : 'never'); } catch (Throwable $e) {}
     try { if (function_exists('nl_has') && nl_has()) $L[] = '  Newsletters: ' . (int) scalar("SELECT COUNT(*) FROM nl_sends WHERE status IN ('queued','sending')") . ' queued · ' . (int) scalar("SELECT COUNT(*) FROM nl_sends WHERE status = 'failed'") . ' failed · ' . (int) scalar("SELECT COUNT(*) FROM nl_sends WHERE status = 'sent' AND sent_at >= NOW() - INTERVAL 1 DAY") . ' sent in 24 h'; } catch (Throwable $e) {}
-    try { $L[] = '  Sign-ins in 24 h: ' . (int) scalar("SELECT COUNT(*) FROM login_log WHERE created_at >= NOW() - INTERVAL 1 DAY AND outcome IN ('success','passkey')") . ' · refused: ' . (int) scalar("SELECT COUNT(*) FROM login_log WHERE created_at >= NOW() - INTERVAL 1 DAY AND outcome IN ('failed','locked','disabled','twofa_failed','passkey_failed','device')"); } catch (Throwable $e) {}
+    try {   // R97-287: the refused sign-ins by reason, with how many accounts and addresses they came from — a wave against one account or from one address shows at once (no address is printed)
+        $rfIn = "('failed','locked','disabled','twofa_failed','passkey_failed','device')"; $rfLbl = ['failed' => 'wrong password', 'locked' => 'account locked', 'disabled' => 'account closed', 'twofa_failed' => 'wrong code', 'passkey_failed' => 'passkey refused', 'device' => 'session ended, device or network changed'];
+        $rfBy = []; foreach (all("SELECT outcome, COUNT(*) n FROM login_log WHERE created_at >= NOW() - INTERVAL 1 DAY AND outcome IN $rfIn GROUP BY outcome ORDER BY n DESC") as $r) $rfBy[(string)$r['outcome']] = (int)$r['n'];
+        $rfN = array_sum($rfBy); $rfTxt = ''; $rfMark = '';
+        if ($rfN) { $w = one("SELECT COUNT(DISTINCT NULLIF(email, '')) a, COUNT(DISTINCT ip) i FROM login_log WHERE created_at >= NOW() - INTERVAL 1 DAY AND outcome IN $rfIn");
+            $top = (int) scalar("SELECT COUNT(*) n FROM login_log WHERE created_at >= NOW() - INTERVAL 1 DAY AND outcome IN $rfIn AND ip IS NOT NULL GROUP BY ip ORDER BY n DESC LIMIT 1");
+            $topA = (int) scalar("SELECT COUNT(*) n FROM login_log WHERE created_at >= NOW() - INTERVAL 1 DAY AND outcome IN ('failed','locked','twofa_failed') AND email <> '' GROUP BY email ORDER BY n DESC LIMIT 1");
+            $rfTxt = ' (' . implode(' · ', array_map(fn($k) => ($rfLbl[$k] ?? $k) . ' ' . $rfBy[$k], array_keys($rfBy))) . ') · accounts: ' . (int)($w['a'] ?? 0) . ' · addresses: ' . (int)($w['i'] ?? 0) . ' · most from one address: ' . $top . ' · most on one account: ' . $topA;
+            if ($top >= 15 || $topA >= 10) $rfMark = '  <-- CHECK: Settings › Login history'; }
+        $L[] = '  Sign-ins in 24 h: ' . (int) scalar("SELECT COUNT(*) FROM login_log WHERE created_at >= NOW() - INTERVAL 1 DAY AND outcome IN ('success','passkey')") . ' · refused: ' . $rfN . $rfTxt . $rfMark;
+    } catch (Throwable $e) {}
     // R97-046: trend, new errors since the release, failing calls and jobs
     $newE = []; $outBad = []; $jobBad = [];
     try { $tr = perf_trend(8); $days = array_keys($tr); $y = date('Y-m-d', time() - 86400); if (isset($tr[$y]) && $tr[$y]['all']['n']) { $a = $tr[$y]['all']; $prev = array_filter(array_map(fn($d) => $tr[$d]['all']['p50'], array_filter($days, fn($d) => $d < $y))); $base = $prev ? (int) round(array_sum($prev) / count($prev)) : 0;

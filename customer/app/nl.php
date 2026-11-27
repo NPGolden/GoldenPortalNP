@@ -31,7 +31,7 @@ const NL_FIXED = [
              'nl.f_why' => 'U ontvangt dit bericht omdat u een zakelijk contact van Golden A/S bent of u zich op onze website heeft aangemeld.', 'nl.f_why_kyma' => 'U ontvangt dit bericht omdat u een zakelijk contact van KYMA Marine Power bent of u zich op kyma-marinepower.eu heeft aangemeld.'],
 ];
 function nl_lang_ok(?string $l): string { return isset(NL_LANGS[(string)$l]) ? (string)$l : 'en'; }
-function nl_tr_has(): bool { static $h = null; if ($h === null) { try { $h = nl_has() && (bool) one("SHOW COLUMNS FROM nl_issues LIKE 'tr'") && (bool) one("SHOW COLUMNS FROM nl_sends LIKE 'lang'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function nl_tr_has(): bool { static $h = null; if ($h === null) { try { $h = nl_has() && (bool) scalar("SHOW COLUMNS FROM nl_issues LIKE 'tr'") && (bool) scalar("SHOW COLUMNS FROM nl_sends LIKE 'lang'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** A fixed text of the message in the language of the version. */
 function nl_t(string $k, string $lang, array $p = []): string {
     if (isset(NL_FIXED[$lang][$k])) { $s = NL_FIXED[$lang][$k]; foreach ($p as $a => $v) $s = str_replace('{' . $a . '}', (string)$v, $s); return $s; }
@@ -44,7 +44,7 @@ function nl_can(): bool { return nl_has() && is_staff() && (is_cp_admin() || (fu
  * Sales issues are prepared by sales, HR issues by HR; administrators and management see both. HR issues reach only the HR organisation types
  * (and addresses typed by hand): never the customer lists or the website subscribers. */
 const NL_HR_GROUPS = ['school', 'rp_agency', 'rp_public', 'rp_assoc', 'rp_training'];
-function nl_dept_has(): bool { static $h = null; if ($h === null) { try { $h = nl_has() && (bool) one("SHOW COLUMNS FROM nl_issues LIKE 'dept'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function nl_dept_has(): bool { static $h = null; if ($h === null) { try { $h = nl_has() && (bool) scalar("SHOW COLUMNS FROM nl_issues LIKE 'dept'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function nl_dept(?array $I): string { return ($I['dept'] ?? 'sales') === 'hr' ? 'hr' : 'sales'; }
 function nl_hr_can(): bool { return nl_has() && nl_dept_has() && is_staff() && function_exists('hr_can') && hr_can(); }
 function nl_can_dept(string $d): bool { if (!nl_has() || !is_staff()) return false; if (is_cp_admin() || (function_exists('mgmt_can') && mgmt_can())) return true; return $d === 'hr' ? nl_hr_can() : (function_exists('pi_is_sales') && pi_is_sales()); }
@@ -121,7 +121,7 @@ function nl_create(string $title, string $site = 'golden', string $dept = 'sales
 }
 function nl_editable(array $I): void { if ($I['status'] !== 'draft') throw new RuntimeException(t('nl.locked')); if (($I['appr_state'] ?? '') === 'pending') throw new RuntimeException(t('nl.ap_locked')); }
 /* ---- R97-051: approval by the CEO / General Manager before an issue is sent ---- */
-function nl_appr_has(): bool { static $h = null; if ($h === null) { try { $h = nl_has() && (bool) one("SHOW COLUMNS FROM nl_issues LIKE 'appr_state'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function nl_appr_has(): bool { static $h = null; if ($h === null) { try { $h = nl_has() && (bool) scalar("SHOW COLUMNS FROM nl_issues LIKE 'appr_state'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** Those who approve — and who need no approval themselves: Owner scope, CEO, General Manager. */
 function nl_approver(): bool { return is_staff() && ((function_exists('mgmt_can') && mgmt_can()) || (function_exists('cp_role_name') && cp_role_name() === 'ceo')); }
 function nl_appr_ids(): array { static $c = null; if ($c === null) { try { $c = array_map('intval', array_column(all("SELECT cu.id FROM customer_users cu JOIN staff_roles r ON r.id = cu.staff_role_id WHERE cu.is_active = 1 AND cu.role IN ('staff','admin') AND (r.scope = 'owner' OR LOWER(TRIM(r.name)) IN ('ceo','general manager','managing director'))"), 'id')); } catch (Throwable $e) { $c = []; } } return $c; }
@@ -212,7 +212,7 @@ function nl_audience_counts(array $rcpt): array { $c = []; foreach ($rcpt as $r)
 function nl_group_label(string $g): string { if (str_starts_with($g, 'c:')) return function_exists('ct_categories') ? (ct_categories()[substr($g, 2)] ?? substr($g, 2)) : substr($g, 2); return $g === 'web' ? t('nl.g_web') : ($g === 'extra' ? t('nl.g_extra') : (nl_groups()[$g] ?? (nl_groups('hr')[$g] ?? $g))); }
 
 /* ---------------------------------------------------------------- publishing on the website (GAS-CP-R97-176) */
-function nl_web_has(): bool { static $h = null; if ($h === null) { try { $h = nl_has() && (bool) one("SHOW COLUMNS FROM nl_issues LIKE 'web_slug'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function nl_web_has(): bool { static $h = null; if ($h === null) { try { $h = nl_has() && (bool) scalar("SHOW COLUMNS FROM nl_issues LIKE 'web_slug'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** The part of the article address after news.html?a= : small letters, digits and hyphens. */
 function nl_slug(string $s): string { $s = strtolower(trim($s)); $s = (string) preg_replace('/[^a-z0-9]+/', '-', $s); return trim(substr($s, 0, 80), '-'); }
 /** A slug no other issue uses; a title without Latin letters or digits gives issue-<id>. */

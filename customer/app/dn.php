@@ -14,11 +14,11 @@ const DN_REASON = ['project' => 'issue', 'customer' => 'delivery_customer', 'pro
 
 function dn_has(): bool { static $h = null; if ($h === null) { try { $h = function_exists('stk_has') && stk_has() && (bool) scalar("SHOW TABLES LIKE 'inv_delivery_notes'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** R97-279: acceptance, transfers and the log need the migration. Before it the module works as it did. */
-function dn_x_has(): bool { static $h = null; if ($h === null) { try { $h = dn_has() && (bool) one("SHOW COLUMNS FROM inv_delivery_notes LIKE 'delivery'") && (bool) scalar("SHOW TABLES LIKE 'inv_dn_events'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function dn_x_has(): bool { static $h = null; if ($h === null) { try { $h = dn_has() && (bool) scalar("SHOW COLUMNS FROM inv_delivery_notes LIKE 'delivery'") && (bool) scalar("SHOW TABLES LIKE 'inv_dn_events'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** R97-280: a note can name the member of staff who receives the goods (the engineer on board); that person accepts it in the Service app. */
-function dn_x2_has(): bool { static $h = null; if ($h === null) { try { $h = dn_x_has() && (bool) one("SHOW COLUMNS FROM inv_delivery_notes LIKE 'to_user_id'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function dn_x2_has(): bool { static $h = null; if ($h === null) { try { $h = dn_x_has() && (bool) scalar("SHOW COLUMNS FROM inv_delivery_notes LIKE 'to_user_id'"); } catch (Throwable $e) { $h = false; } } return $h; }
 /** R97-281: a line remembers the line of the transfer note it came from, so a note can be sent on in parts. */
-function dn_x3_has(): bool { static $h = null; if ($h === null) { try { $h = dn_x_has() && (bool) one("SHOW COLUMNS FROM inv_dn_lines LIKE 'src_line_id'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function dn_x3_has(): bool { static $h = null; if ($h === null) { try { $h = dn_x_has() && (bool) scalar("SHOW COLUMNS FROM inv_dn_lines LIKE 'src_line_id'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function dn_kinds(): array { return dn_x_has() ? DN_KINDS : array_values(array_diff(DN_KINDS, ['transfer'])); }
 function dn_can(): bool { return dn_has() && function_exists('pr_can') && pr_can(); }
 function dn_wh(): bool { return dn_has() && function_exists('pr_wh') && pr_wh(); }

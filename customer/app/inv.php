@@ -58,7 +58,7 @@ function stk_category_save_from_post(int $id): int {
 }
 function stk_category_merge(int $from, int $into): void { require_pr_admin(); if ($from === $into || !$from || !$into) return; q('UPDATE inv_items SET category_id = ? WHERE category_id = ?', [$into, $from]); q('UPDATE inv_categories SET parent_id = ? WHERE parent_id = ?', [$into, $from]); q('DELETE FROM inv_categories WHERE id = ?', [$from]); }
 /** R97-279: a warehouse is fixed (a store room) or mobile (a van, a container, a site store) with a holder, a vehicle and the place where it stands now. */
-function stk_wh_x_has(): bool { static $h = null; if ($h === null) { try { $h = stk_has() && (bool) one("SHOW COLUMNS FROM inv_warehouses LIKE 'holder_id'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function stk_wh_x_has(): bool { static $h = null; if ($h === null) { try { $h = stk_has() && (bool) scalar("SHOW COLUMNS FROM inv_warehouses LIKE 'holder_id'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function stk_wh_name(array $w): string { return ((($w['kind'] ?? '') === 'mobile') ? '🚐 ' : '') . $w['code'] . ' — ' . $w['name']; }
 function stk_warehouses(bool $activeOnly = true): array { if (!stk_has()) return []; return all('SELECT w.*, b.code AS branch_code' . (stk_wh_x_has() ? ', hu.full_name AS holder_name' : '') . ' FROM inv_warehouses w LEFT JOIN branches b ON b.id = w.branch_id ' . (stk_wh_x_has() ? 'LEFT JOIN customer_users hu ON hu.id = w.holder_id ' : '') . ($activeOnly ? 'WHERE w.is_active = 1 ' : '') . 'ORDER BY w.is_default DESC, w.name'); }
 function stk_default_wh(): int { $id = (int) scalar('SELECT id FROM inv_warehouses WHERE is_default = 1 AND is_active = 1 LIMIT 1'); return $id ?: (int) scalar('SELECT id FROM inv_warehouses WHERE is_active = 1 ORDER BY id LIMIT 1'); }
@@ -85,8 +85,9 @@ const STK_SELECT = "SELECT i.*, c.name AS category, ps.name AS preferred_supplie
                     (SELECT MAX(m.created_at) FROM inv_moves m WHERE m.item_id = i.id AND m.kind IN ('in','out')) AS last_move_at
              FROM inv_items i LEFT JOIN inv_categories c ON c.id = i.category_id LEFT JOIN companies ps ON ps.id = i.preferred_supplier_id LEFT JOIN companies ls ON ls.id = i.last_supplier_id";
 /** $f: q, cat, maker, status (active|obsolete|blocked|all), stock (any|instock|zero|below|reserved), wh, slow (months), loc */
-function stk_items(array $f = [], ?int $limit = null): array {
-    if (!stk_has()) return []; $w = []; $a = [];
+/** R97-287: the conditions of the item list, shared by the whole list (Excel, pick lists), its count and one page of it. Returns [conditions, values]. */
+function stk_items_where(array $f): array {
+    $w = []; $a = [];
     $st = $f['status'] ?? 'active'; if ($st !== 'all') { $w[] = 'i.status = ?'; $a[] = in_array($st, ['active', 'obsolete', 'blocked'], true) ? $st : 'active'; }
     if (!empty($f['cat'])) { $w[] = '(i.category_id = ? OR i.category_id IN (SELECT id FROM inv_categories WHERE parent_id = ?))'; $a[] = (int)$f['cat']; $a[] = (int)$f['cat']; }
     if (!empty($f['maker'])) { $w[] = 'i.maker = ?'; $a[] = (string)$f['maker']; }
@@ -102,8 +103,32 @@ function stk_items(array $f = [], ?int $limit = null): array {
     if ($stock === 'below') $w[] = '(i.min_stock > 0 AND (SELECT COALESCE(SUM(s.qty_on_hand),0) FROM inv_stock s WHERE s.item_id = i.id) < i.min_stock)';
     if ($stock === 'reserved') $w[] = '(SELECT COALESCE(SUM(s.qty_reserved),0) FROM inv_stock s WHERE s.item_id = i.id) > 0';
     if (!empty($f['slow'])) { $w[] = "(SELECT COALESCE(SUM(s.qty_on_hand),0) FROM inv_stock s WHERE s.item_id = i.id) > 0 AND COALESCE((SELECT MAX(m.created_at) FROM inv_moves m WHERE m.item_id = i.id AND m.kind IN ('in','out')), i.created_at) < DATE_SUB(NOW(), INTERVAL ? MONTH)"; $a[] = (int)$f['slow']; }
+    return [$w, $a];
+}
+function stk_items(array $f = [], ?int $limit = null): array {
+    if (!stk_has()) return []; [$w, $a] = stk_items_where($f);
     $order = match ($f['sort'] ?? '') { 'desc' => 'i.description', 'value' => '((SELECT COALESCE(SUM(s.qty_on_hand),0) FROM inv_stock s WHERE s.item_id = i.id) * COALESCE(i.last_price,0)) DESC', 'stock' => 'on_hand DESC', 'updated' => 'i.updated_at DESC', default => 'i.code' };
     return all(STK_SELECT . ($w ? ' WHERE ' . implode(' AND ', $w) : '') . ' ORDER BY ' . $order . ($limit ? ' LIMIT ' . (int)$limit : ''), $a);
+}
+/** R97-287: stock on hand of the item of the row, for statements that do not read the whole item. */
+const STK_OH = '(SELECT COALESCE(SUM(s.qty_on_hand),0) FROM inv_stock s WHERE s.item_id = i.id)';
+/** R97-287: how many items the filters give and, when asked, their value at the last price (items left out of the valuation count as items, not as value) — one statement,
+ *  instead of reading every item to count the rows. Returns [items, value]. */
+function stk_items_total(array $f = [], bool $value = false): array {
+    if (!stk_has()) return [0, 0.0]; [$w, $a] = stk_items_where($f); $where = $w ? ' WHERE ' . implode(' AND ', $w) : '';
+    if (!$value) return [(int) q('SELECT COUNT(*) FROM inv_items i' . $where, $a)->fetchColumn(), 0.0];
+    $nv = stk_nv_has() ? 'i.no_valuation' : '0';
+    $r = q("SELECT COUNT(*) n, COALESCE(SUM(IF($nv = 1, 0, " . STK_OH . ' * COALESCE(i.last_price,0))),0) v FROM inv_items i' . $where, $a)->fetch();
+    return [(int)($r['n'] ?? 0), (float)($r['v'] ?? 0)];
+}
+/** R97-287: one page of the item list. The page is chosen on the item table alone (ids in the order of the list); stock, reservations, last movement and the
+ *  names of category and suppliers are then read for these items only. Same rows and columns as stk_items(). */
+function stk_items_page(array $f, int $offset, int $per): array {
+    if (!stk_has()) return []; [$w, $a] = stk_items_where($f);
+    $order = match ($f['sort'] ?? '') { 'desc' => 'i.description, i.id', 'value' => '(' . STK_OH . ' * COALESCE(i.last_price,0)) DESC, i.id', 'stock' => STK_OH . ' DESC, i.id', 'updated' => 'i.updated_at DESC, i.id', default => 'i.code' };   // the code is unique: the list follows its index
+    $ids = array_map('intval', array_column(all('SELECT i.id FROM inv_items i' . ($w ? ' WHERE ' . implode(' AND ', $w) : '') . ' ORDER BY ' . $order . ' LIMIT ' . max(1, min(500, $per)) . ' OFFSET ' . max(0, $offset), $a), 'id'));
+    if (!$ids) return []; $by = []; foreach (all(STK_SELECT . ' WHERE i.id IN (' . implode(',', $ids) . ')') as $r) $by[(int)$r['id']] = $r;
+    $out = []; foreach ($ids as $id) if (isset($by[$id])) $out[] = $by[$id]; return $out;
 }
 /** R97-118: items can be left out of the valuation (inv_items.no_valuation). */
 function stk_nv_has(): bool { static $h = null; if ($h === null) { try { $h = stk_has() && (bool) scalar("SHOW COLUMNS FROM inv_items LIKE 'no_valuation'"); } catch (Throwable $e) { $h = false; } } return $h; }

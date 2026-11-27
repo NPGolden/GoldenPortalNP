@@ -34,7 +34,7 @@ function io_team_ids(): ?array {   // null = everyone
 function io_stats_can(): bool { return is_staff() && ((function_exists('hr_can') && hr_can()) || (function_exists('mgmt_can') && mgmt_can())); }
 function io_sites_can(): bool { return is_staff() && ((function_exists('hr_can') && hr_can()) || (function_exists('mgmt_can') && mgmt_can()) || is_cp_admin()); }
 
-function io_staff(): array { static $c = null; if ($c === null) { $demo = ''; try { if (one("SHOW COLUMNS FROM customer_users LIKE 'is_demo'")) $demo = ' AND is_demo = 0'; } catch (Throwable $e) {} $c = []; foreach (all("SELECT id, full_name FROM customer_users WHERE role IN ('staff','admin') AND is_active = 1$demo ORDER BY full_name") as $r) $c[(int)$r['id']] = (string)$r['full_name']; } return $c; }
+function io_staff(): array { static $c = null; if ($c === null) { $demo = ''; try { if (scalar("SHOW COLUMNS FROM customer_users LIKE 'is_demo'")) $demo = ' AND is_demo = 0'; } catch (Throwable $e) {} $c = []; foreach (all("SELECT id, full_name FROM customer_users WHERE role IN ('staff','admin') AND is_active = 1$demo ORDER BY full_name") as $r) $c[(int)$r['id']] = (string)$r['full_name']; } return $c; }
 function io_sites(bool $activeOnly = true): array { return io_has() ? all('SELECT * FROM io_sites' . ($activeOnly ? ' WHERE is_active = 1' : '') . ' ORDER BY name') : []; }
 function io_dist(float $la1, float $lo1, float $la2, float $lo2): int { $r = 6371000; $a = sin(deg2rad($la2 - $la1) / 2) ** 2 + cos(deg2rad($la1)) * cos(deg2rad($la2)) * sin(deg2rad($lo2 - $lo1) / 2) ** 2; return (int) round(2 * $r * asin(min(1, sqrt($a)))); }
 function io_nearest(?float $lat, ?float $lng): ?array {

@@ -9,8 +9,8 @@ $u = require_mgmt();   // R78-001: Owner / CEO / General Manager only
 $customers = all('SELECT id, name FROM customers WHERE is_active = 1 ORDER BY name');
 $roles     = all('SELECT id, name FROM staff_roles WHERE is_active = 1 ORDER BY sort_order, name');
 $f = ['q' => trim((string)($_GET['q'] ?? '')), 'access' => (string)($_GET['access'] ?? ''), 'customer' => (string)($_GET['customer'] ?? ''), 'grole' => (string)($_GET['grole'] ?? ''), 'disc' => (string)($_GET['disc'] ?? ''), 'status' => (string)($_GET['status'] ?? ''), 'twofa' => (string)($_GET['twofa'] ?? ''), 'locale' => (string)($_GET['locale'] ?? ''), 'login' => (string)($_GET['login'] ?? '')];
-$hasTotp = (bool)one("SHOW COLUMNS FROM customer_users LIKE 'totp_enabled'");
-$hasDisc = (bool)one("SHOW COLUMNS FROM customer_users LIKE 'discipline_id'");
+$hasTotp = (bool)scalar("SHOW COLUMNS FROM customer_users LIKE 'totp_enabled'");
+$hasDisc = (bool)scalar("SHOW COLUMNS FROM customer_users LIKE 'discipline_id'");
 $w = []; $b = [];
 if ($f['q'] !== '') { $w[] = '(cu.full_name LIKE ? OR cu.email LIKE ? OR c.name LIKE ?)'; $like = '%' . $f['q'] . '%'; array_push($b, $like, $like, $like); }
 if (in_array($f['access'], ['customer', 'staff', 'admin'], true)) { $w[] = 'cu.role = ?'; $b[] = $f['access']; }

@@ -134,7 +134,7 @@ function dl_mail_link(array $L, string $token, bool $reminder = false, array $at
 }
 
 /* ---- R97-059: delivery problems are kept on the link, shown in the card and told to the sender ---- */
-function dl_err_has(): bool { static $h = null; if ($h === null) { try { $h = dl_has() && (bool) one("SHOW COLUMNS FROM doc_links LIKE 'mail_error'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function dl_err_has(): bool { static $h = null; if ($h === null) { try { $h = dl_has() && (bool) scalar("SHOW COLUMNS FROM doc_links LIKE 'mail_error'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function dl_mail_reason(): string { $r = trim((string)($GLOBALS['cp_graph_last_error'] ?? '')); return $r !== '' ? $r : 'the mail server did not accept the message'; }
 /** A mail of this link went out ($ok) or not: the problem is stored with its step (link, code, reminder, confirmation) and the sender is told once. */
 function dl_mail_result(array $L, string $step, bool $ok): void {

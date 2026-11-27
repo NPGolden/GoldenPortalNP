@@ -6,12 +6,14 @@ $u = require_staff();
 if (!function_exists('pr_can') || !pr_can()) { http_response_code(403); layout_head(t('stk.title'), 'inventory'); echo '<h1>' . tt('err.noaccess') . '</h1><p class="hint">' . tt('stk.noaccess_hint') . '</p>'; layout_foot(); return; }
 $f = ['q' => trim((string)($_GET['q'] ?? '')), 'cat' => (int)($_GET['cat'] ?? 0), 'maker' => (string)($_GET['maker'] ?? ''), 'status' => in_array($_GET['status'] ?? '', ['active', 'obsolete', 'blocked', 'all'], true) ? $_GET['status'] : 'active', 'stock' => in_array($_GET['stock'] ?? '', ['instock', 'zero', 'below', 'reserved'], true) ? $_GET['stock'] : 'any', 'slow' => (int)($_GET['slow'] ?? 0), 'loc' => trim((string)($_GET['loc'] ?? '')), 'sort' => (string)($_GET['sort'] ?? ''), 'nv' => (int)!empty($_GET['nv'])];
 $f['type'] = function_exists('swl_has') && swl_has() && in_array($_GET['type'] ?? '', ITEM_TYPES, true) ? $_GET['type'] : '';   // R88-001
-$items = stk_items($f); $priced = stk_price_visible(); $admin = pr_admin();
-if (($_GET['format'] ?? '') === 'xlsx') { stk_export_xlsx($items); exit; }
+$priced = stk_price_visible(); $admin = pr_admin();
+if (($_GET['format'] ?? '') === 'xlsx') { stk_export_xlsx(stk_items($f)); exit; }   // the Excel file holds every item of the filters
 $tab = in_array($_GET['tab'] ?? '', ['items', 'valuation', 'categories', 'research', 'shortages', 'software'], true) ? $_GET['tab'] : 'items';
 $cats = stk_categories(false); $makers = stk_makers(); $sel = fn($a, $b) => (string)$a === (string)$b ? ' selected' : ''; $keep = array_filter($f);
 $V = $tab === 'valuation' ? stk_valuation() : null; $cur = 'EUR'; $m = fn(?float $v) => stk_money($v, $cur);
-$sumVal = 0.0; foreach ($items as $i) if (!stk_nv($i)) $sumVal += (float)$i['on_hand'] * (float)($i['last_price'] ?? 0);   // R97-118: items left out of the valuation
+// R97-287: the Items tab counts its rows and their value in one statement and reads only the page shown (before: every item of the filters on every tab); R97-118: items left out of the valuation carry no value
+$nItems = 0; $sumVal = 0.0; $pageRows = []; $pager = '';
+if ($tab === 'items') { [$nItems, $sumVal] = stk_items_total($f, $priced); [$pgOff, $pgPer, $pager] = page_window($nItems, 'inventory', $keep); $pageRows = stk_items_page($f, $pgOff, $pgPer); }
 layout_head(t('stk.title'), 'inventory');
 ?>
 <div class="page-head">
@@ -37,11 +39,11 @@ layout_head(t('stk.title'), 'inventory');
   <div class="fltbar-actions"><button class="btn btn--sm" type="submit"><?= tt('btn.apply') ?></button><a class="btn btn--ghost btn--sm" href="<?= url('inventory') ?>"><?= tt('btn.clear') ?></a></div>
 </form>
 <div class="card">
-  <h2><?= tt('stk.items') ?> <span class="count"><?= count($items) ?></span><?php if ($priced): ?> <span class="hint" style="font-weight:400;">· <?= tt('stk.value') ?> <?= e($m($sumVal)) ?></span><?php endif; ?></h2>
-  <?php if (!$items): ?><p class="hint"><?= tt('stk.none') ?></p><?php else: ?>
+  <h2><?= tt('stk.items') ?> <span class="count"><?= $nItems ?></span><?php if ($priced): ?> <span class="hint" style="font-weight:400;">· <?= tt('stk.value') ?> <?= e($m($sumVal)) ?></span><?php endif; ?></h2>
+  <?php if (!$nItems): ?><p class="hint"><?= tt('stk.none') ?></p><?php else: ?>
   <div class="table-scroll"><table class="tbl inv-list">
     <thead><tr><th><a href="<?= url('inventory', $keep + ['sort' => '']) ?>"><?= tt('stk.code') ?></a></th><th><a href="<?= url('inventory', $keep + ['sort' => 'desc']) ?>"><?= tt('stk.desc') ?></a></th><th><?= tt('stk.category') ?></th><th><?= tt('stk.maker') ?></th><th><?= tt('stk.location') ?></th><th class="num"><a href="<?= url('inventory', $keep + ['sort' => 'stock']) ?>"><?= tt('stk.on_hand') ?></a></th><th class="num"><?= tt('stk.reserved') ?></th><?php if ($priced): ?><th class="num"><?= tt('stk.last_price') ?></th><th class="num"><a href="<?= url('inventory', $keep + ['sort' => 'value']) ?>"><?= tt('stk.value') ?></a></th><?php endif; ?><th></th></tr></thead>
-    <tbody><?php [$pageRows, $pager] = page_list($items, 'inventory', $keep); foreach ($pageRows as $i): $below = (float)$i['min_stock'] > 0 && (float)$i['on_hand'] < (float)$i['min_stock']; ?>
+    <tbody><?php foreach ($pageRows as $i): $below = (float)$i['min_stock'] > 0 && (float)$i['on_hand'] < (float)$i['min_stock']; ?>
       <tr class="<?= $i['status'] !== 'active' ? 'is-retired' : '' ?>">
         <td class="mono"><a href="<?= url('inventory_item', ['id' => (int)$i['id']]) ?>"><b><?= e($i['code']) ?></b></a><?= $i['factory_code'] && $i['factory_code'] !== $i['code'] ? '<br><span class="hint">' . e($i['factory_code']) . '</span>' : '' ?></td>
         <td><?= e($i['description']) ?><?= $i['description_en'] ? '<br><span class="hint">' . e($i['description_en']) . '</span>' : '' ?><?= $i['status'] !== 'active' ? ' ' . pill('mute', t('stk.s_' . $i['status'])) : '' ?><?= stk_nv($i) ? ' ' . pill('mute', t('stk.nv_short')) : '' ?></td>
@@ -91,7 +93,7 @@ layout_head(t('stk.title'), 'inventory');
   <?php if ($priced): ?><div class="stat gold"><b><?= e($m($V['value_last'])) ?></b><?= tt('stk.value_last') ?><span class="s"><?= tt('stk.value_avg') ?> <?= e($m($V['value_avg'])) ?></span></div><?php endif; ?>
   <?php if (!empty($V['excluded'])): ?></div><p class="hint" style="margin:-4px 0 10px;"><a href="<?= url('inventory', ['nv' => 1, 'status' => 'all']) ?>"><?= e(t('stk.nv_line', ['n' => $V['excluded']])) ?></a><?= $priced ? ' · ' . e(t('stk.nv_value', ['v' => $m($V['value_excluded'])])) : '' ?></p><div class="kpi kpi--4" style="margin-bottom:10px;"><?php endif; ?>
   <a class="stat<?= $V['below_min'] ? ' red' : '' ?>" href="<?= url('inventory', ['stock' => 'below']) ?>"><b><?= (int)$V['below_min'] ?></b><?= tt('stk.f_below') ?><span class="s"><?= tt('stk.below_hint') ?></span></a>
-  <a class="stat" href="<?= url('inventory', ['slow' => 12]) ?>"><b><?= count(stk_items(['slow' => 12])) ?></b><?= tt('stk.slow_m', ['n' => 12]) ?><span class="s"><?= e(t('stk.no_price_n', ['n' => $V['no_price']])) ?></span></a>
+  <a class="stat" href="<?= url('inventory', ['slow' => 12]) ?>"><b><?= stk_items_total(['slow' => 12])[0] ?></b><?= tt('stk.slow_m', ['n' => 12]) ?><span class="s"><?= e(t('stk.no_price_n', ['n' => $V['no_price']])) ?></span></a>
 </div>
 <div class="card">
   <h2>🏷 <?= tt('stk.value_by_cat') ?></h2>

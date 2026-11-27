@@ -31,7 +31,12 @@ if ($tree) { $ids_ = array_map('intval', array_column($tree, 'id'));   /* R97-14
     if (is_cp_admin() && function_exists('pm_project_footprint_prime')) pm_project_footprint_prime($ids_);
     if (function_exists('br_has') && br_has()) foreach ($tree as $p_) $GLOBALS['_brp'][(int)$p_['id']] = (int)($p_['branch_id'] ?? 0);
     if (function_exists('of_project_prime')) of_project_prime($ids_);
-    if (function_exists('bg_prime')) bg_prime(array_merge([], ...array_values(array_map(fn($p_) => array_column($p_['subs'] ?? [], 'id'), $tree)))); }
+    $sids_ = array_map('intval', array_merge([], ...array_values(array_map(fn($p_) => array_column($p_['subs'] ?? [], 'id'), $tree))));
+    if (function_exists('bg_prime')) bg_prime($sids_);
+    if ($staff && $sids_ && function_exists('pd_sub_fed')) {   /* R97-287: what the stage line of every sub-project needs, read for the whole page at once */
+        if (function_exists('pd_sub_prime')) pd_sub_prime($sids_);
+        if (function_exists('proc_sub_pct_prime')) proc_sub_pct_prime($sids_);
+        if (function_exists('eng_rows_prime') && function_exists('eng_sub_with')) { $engW_ = eng_sub_with(); eng_rows_prime($engW_ === null ? $sids_ : array_values(array_filter($sids_, fn($i_) => isset($engW_[$i_])))); } } }
 $tkOpen = []; if (function_exists('tk_has') && tk_has() && $tree) { [$tkScope, $tkArgs] = tk_scope(); foreach (all("SELECT t.project_id, COUNT(*) n FROM tickets t LEFT JOIN vessels v ON v.id = t.vessel_id WHERE {$tkScope} AND t.project_id IS NOT NULL AND t.status IN ('open','in_progress','waiting_customer') GROUP BY t.project_id", $tkArgs) as $r) $tkOpen[(int)$r['project_id']] = (int)$r['n']; }   // R30-003: open tickets per project
 $keep  = array_filter(['q' => $q, 'st' => $st, 'customer' => $fCustomer, 'vessel' => $fVessel, 'pm' => $fPm, 'branch' => $fBranch, 'iss' => $fIss, 'per' => $per, 'f' => 1]);
 $issBy = $tree && function_exists('iss_open_by_project') ? iss_open_by_project(array_column($tree, 'id')) : [];   // R97-162: open issues of the page, one query
@@ -142,8 +147,8 @@ layout_head(t('pr.title'), 'projects');
           <span class="pname"><?= e($p['name']) ?></span>
         </span>
         <span class="pmeta">
-          <?php if ($p['vessel']): ?><?= e($p['vessel']) ?><?php elseif ($staff): $vg = pr_vessel_guess($p); ?><span class="bg-neg" title="<?= tt('pr.novessel_hint') ?>">⚓ <?= tt('pr.novessel') ?></span>
-            <?php if ($vg): ?> <form method="post" action="<?= url('projects') ?>" class="inline" style="display:inline;"><?= csrf_field() ?><input type="hidden" name="action" value="project_vessel"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>"><input type="hidden" name="vessel_id" value="<?= (int)$vg['id'] ?>"><button class="linkbtn" type="submit" style="font:inherit;color:var(--gold-text);"><?= e(t('pr.link_vessel', ['v' => $vg['name']])) ?></button></form><?php else: ?> <a href="<?= url('project_edit', ['id' => $p['id']]) ?>" style="font-size:12px;"><?= tt('pr.set_vessel') ?></a><?php endif; ?>
+          <?php if ($p['vessel']): ?><?= e($p['vessel']) ?><?php elseif ($staff): $vGuess = pr_vessel_guess($p); ?><span class="bg-neg" title="<?= tt('pr.novessel_hint') ?>">⚓ <?= tt('pr.novessel') ?></span>
+            <?php if ($vGuess): ?> <form method="post" action="<?= url('projects') ?>" class="inline" style="display:inline;"><?= csrf_field() ?><input type="hidden" name="action" value="project_vessel"><input type="hidden" name="id" value="<?= (int)$p['id'] ?>"><input type="hidden" name="vessel_id" value="<?= (int)$vGuess['id'] ?>"><button class="linkbtn" type="submit" style="font:inherit;color:var(--gold-text);"><?= e(t('pr.link_vessel', ['v' => $vGuess['name']])) ?></button></form><?php else: ?> <a href="<?= url('project_edit', ['id' => $p['id']]) ?>" style="font-size:12px;"><?= tt('pr.set_vessel') ?></a><?php endif; ?>
           <?php else: ?><?= tt('pr.novessel') ?><?php endif; ?>
           <?php if (is_staff()): ?> · <?= e($p['customer_name'] ?? '') ?><?php endif; ?>
           <?php if ($p['project_manager']): ?><br>PM: <?= e($p['project_manager']) ?><?php endif; ?>

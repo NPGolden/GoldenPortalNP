@@ -437,29 +437,54 @@ function prq_item_search(string $q, int $limit = 15, int $supplier = 0, bool $re
  *  Lines of purchase orders raised without a requisition count the same way. Lines weigh by their value; when a value is missing, every line weighs the same.
  *  Requisitions still waiting for approval count with 0 %; drafts, rejected and cancelled ones do not count. */
 function proc_sub_pct(int $sid): ?array {
-    static $c = []; if (array_key_exists($sid, $c)) return $c[$sid]; if (!$sid) return $c[$sid] = null;
-    $with = sub_ids_with('proc', ['SELECT DISTINCT subproject_id FROM pr_requests WHERE subproject_id IS NOT NULL', "SELECT DISTINCT subproject_id FROM po_orders WHERE subproject_id IS NOT NULL AND kind = 'po'"]); if ($with !== null && !isset($with[$sid])) return null;   // R97-104 (not kept in \$c: a later write in the same request must be seen)
-    $L = []; $nPr = 0; $nPo = 0;
+    $c = &$GLOBALS['_proc_pct']; $c ??= []; if (array_key_exists($sid, $c)) return $c[$sid]; if (!$sid) return $c[$sid] = null;
+    $with = sub_ids_with('proc', PROC_WITH_SQL); if ($with !== null && !isset($with[$sid])) return null;   // R97-104 (not kept in \$c: a later write in the same request must be seen)
     try {
-        if (function_exists('pr_has') ? pr_has() : true) foreach (all("SELECT l.qty, l.qty_reserved, l.qty_ordered, l.qty_received, l.qty_issued, l.est_price, l.status, r.status AS rst, r.id AS rid FROM pr_lines l JOIN pr_requests r ON r.id = l.request_id
-                      WHERE r.subproject_id = ? AND r.status IN ('submitted','mgmt','approved','closed') AND l.status <> 'cancelled' AND l.qty > 0", [$sid]) as $l) {
-            $q = (float)$l['qty']; $prs[(int)$l['rid']] = 1;
-            if (in_array($l['rst'], ['submitted', 'mgmt'], true)) { $d = 0.0; $cov = 0.0; }
-            else { $d = in_array($l['status'], ['received', 'issued'], true) ? 1.0 : min(1.0, max((float)$l['qty_received'] + (float)$l['qty_reserved'], (float)$l['qty_issued']) / $q);
-                   $cov = $l['status'] === 'ordered' && (float)$l['qty_ordered'] <= 0 ? 1.0 : min(1.0, ((float)$l['qty_ordered'] + (float)$l['qty_reserved']) / $q); }
-            $L[] = [$d + 0.5 * max(0.0, $cov - $d), $q * (float)$l['est_price']];
-        }
-        $nPr = isset($prs) ? count($prs) : 0;
-        foreach (all("SELECT l.qty, l.qty_received, l.qty_accepted, l.line_total, l.status, o.id AS oid FROM po_lines l JOIN po_orders o ON o.id = l.order_id
-                      WHERE o.kind = 'po' AND o.subproject_id = ? AND o.status NOT IN ('draft','cancelled') AND l.pr_line_id IS NULL AND l.status <> 'cancelled' AND l.qty > 0", [$sid]) as $l) {
-            $q = (float)$l['qty']; $pos[(int)$l['oid']] = 1; $d = $l['status'] === 'received' ? 1.0 : min(1.0, max((float)$l['qty_received'], (float)$l['qty_accepted']) / $q);
-            $L[] = [$d + 0.5 * (1.0 - $d), (float)$l['line_total']];
-        }
-        $nPo = isset($pos) ? count($pos) : 0;
+        $pr = (function_exists('pr_has') ? pr_has() : true) ? all(proc_pct_sql('pr', 'r.subproject_id = ?'), [$sid]) : [];
+        $po = all(proc_pct_sql('po', 'o.subproject_id = ?'), [$sid]);
+        return $c[$sid] = proc_sub_pct_calc($pr, $po);
     } catch (Throwable $e) { return $c[$sid] = null; }
-    if (!$L) return $c[$sid] = null;
+}
+/** Which sub-projects have requisitions or purchase orders at all (R97-104) — one list for the single reading and the batch. */
+const PROC_WITH_SQL = ['SELECT DISTINCT subproject_id FROM pr_requests WHERE subproject_id IS NOT NULL', "SELECT DISTINCT subproject_id FROM po_orders WHERE subproject_id IS NOT NULL AND kind = 'po'"];
+/** R97-287: the two statements behind the Procurement %, for one sub-project or a list of them ($cond names the sub-projects). */
+function proc_pct_sql(string $which, string $cond): string {
+    return $which === 'pr'
+        ? "SELECT r.subproject_id AS sid, l.qty, l.qty_reserved, l.qty_ordered, l.qty_received, l.qty_issued, l.est_price, l.status, r.status AS rst, r.id AS rid FROM pr_lines l JOIN pr_requests r ON r.id = l.request_id
+                      WHERE $cond AND r.status IN ('submitted','mgmt','approved','closed') AND l.status <> 'cancelled' AND l.qty > 0 ORDER BY l.id"
+        : "SELECT o.subproject_id AS sid, l.qty, l.qty_received, l.qty_accepted, l.line_total, l.status, o.id AS oid FROM po_lines l JOIN po_orders o ON o.id = l.order_id
+                      WHERE o.kind = 'po' AND $cond AND o.status NOT IN ('draft','cancelled') AND l.pr_line_id IS NULL AND l.status <> 'cancelled' AND l.qty > 0 ORDER BY l.id";
+}
+/** The rule itself, from the requisition lines and the order lines of ONE sub-project. */
+function proc_sub_pct_calc(array $prLines, array $poLines): ?array {
+    $L = []; $prs = []; $pos = [];
+    foreach ($prLines as $l) {
+        $q = (float)$l['qty']; $prs[(int)$l['rid']] = 1;
+        if (in_array($l['rst'], ['submitted', 'mgmt'], true)) { $d = 0.0; $cov = 0.0; }
+        else { $d = in_array($l['status'], ['received', 'issued'], true) ? 1.0 : min(1.0, max((float)$l['qty_received'] + (float)$l['qty_reserved'], (float)$l['qty_issued']) / $q);
+               $cov = $l['status'] === 'ordered' && (float)$l['qty_ordered'] <= 0 ? 1.0 : min(1.0, ((float)$l['qty_ordered'] + (float)$l['qty_reserved']) / $q); }
+        $L[] = [$d + 0.5 * max(0.0, $cov - $d), $q * (float)$l['est_price']];
+    }
+    foreach ($poLines as $l) {
+        $q = (float)$l['qty']; $pos[(int)$l['oid']] = 1; $d = $l['status'] === 'received' ? 1.0 : min(1.0, max((float)$l['qty_received'], (float)$l['qty_accepted']) / $q);
+        $L[] = [$d + 0.5 * (1.0 - $d), (float)$l['line_total']];
+    }
+    if (!$L) return null;
     $byValue = !array_filter($L, fn($x) => $x[1] <= 0); $sum = 0.0; $w = 0.0; foreach ($L as [$p, $v]) { $k = $byValue ? $v : 1.0; $sum += $p * $k; $w += $k; }
-    return $c[$sid] = ['pct' => (int) round($sum / $w * 100), 'lines' => count($L), 'pr' => $nPr, 'po' => $nPo];
+    return ['pct' => (int) round($sum / $w * 100), 'lines' => count($L), 'pr' => count($prs), 'po' => count($pos)];
+}
+/** R97-287: the Procurement % of a list of sub-projects (the Projects page) in two statements instead of two per sub-project. Same rule, same answer; kept for the request like the single reading. */
+function proc_sub_pct_prime(array $sids): void {
+    $c = &$GLOBALS['_proc_pct']; $c ??= [];
+    $sids = array_values(array_unique(array_filter(array_map('intval', $sids), fn($i) => $i > 0 && !array_key_exists($i, $c))));
+    $with = sub_ids_with('proc', PROC_WITH_SQL); if ($with !== null) $sids = array_values(array_filter($sids, fn($i) => isset($with[$i]))); if (count($sids) < 2) return;
+    try { $R = [];
+        foreach (array_chunk($sids, 400) as $ch) { $in = implode(',', $ch); $PR = []; $PO = [];
+            if (function_exists('pr_has') ? pr_has() : true) foreach (all(proc_pct_sql('pr', "r.subproject_id IN ($in)")) as $l) $PR[(int)$l['sid']][] = $l;
+            foreach (all(proc_pct_sql('po', "o.subproject_id IN ($in)")) as $l) $PO[(int)$l['sid']][] = $l;
+            foreach ($ch as $i) $R[$i] = proc_sub_pct_calc($PR[$i] ?? [], $PO[$i] ?? []); }
+        foreach ($R as $i => $v) $c[$i] = $v;
+    } catch (Throwable $e) {}   // a failed batch leaves every sub-project to its own statements
 }
 /** After a requisition or a purchase order changed: write the stage of its sub-project at the end of the request, when all quantities are in. */
 function proc_feed_later(?int $sid): void {

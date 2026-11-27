@@ -196,7 +196,7 @@ function pd_sub_stages(int $sid): array {
     static $c = []; if (isset($c[$sid])) return $c[$sid];
     $out = []; foreach (PD_STAGE_SLUGS as $k) $out[$k] = ['value' => null, 'orders' => []];
     if (!$sid) return $c[$sid] = $out;
-    $ids = pd_has() ? array_map('intval', array_column(all("SELECT id FROM production_orders WHERE subproject_id = ? AND status <> 'cancelled'", [$sid]), 'id')) : [];
+    $ids = isset($GLOBALS['_pd_oids'][$sid]) ? $GLOBALS['_pd_oids'][$sid] : (pd_has() ? array_map('intval', array_column(all("SELECT id FROM production_orders WHERE subproject_id = ? AND status <> 'cancelled'", [$sid]), 'id')) : []);   // R97-287: from the batch of the Projects page when it was read
     $sum = array_fill_keys(PD_STAGE_SLUGS, 0.0); $w = array_fill_keys(PD_STAGE_SLUGS, 0);
     foreach ($ids as $oid) { $o = pd_get($oid); if (!$o) continue; $st = pd_order_stages($o); $n = max(1, count(array_filter($o['units'], fn($u) => $u['status'] !== 'cancelled')));
         foreach ($st as $k => $v) { if ($v['value'] === null) continue; $sum[$k] += $v['value'] * $n; $w[$k] += $n; $out[$k]['orders'][] = ['id' => $oid, 'po_no' => $o['po_no'], 'value' => (int)$v['value'], 'override' => $v['override'] !== null]; } }
@@ -206,7 +206,19 @@ function pd_sub_stages(int $sid): array {
     return $c[$sid] = $out;
 }
 /** Stages the PM has unlocked on a sub-project (his value stands). */
-function pd_sub_manual(int $sid): array { try { return pd_stages_has() ? array_values(array_filter(explode(',', (string) scalar('SELECT stage_manual FROM subprojects WHERE id = ?', [$sid])))) : []; } catch (Throwable $e) { return []; } }
+function pd_sub_manual(int $sid): array {
+    $c = &$GLOBALS['_pd_man']; $c ??= []; if (isset($c[$sid])) return $c[$sid];   // R97-287: kept for the request (asked several times per sub-project); pd_stage_lock() drops it when it writes
+    try { return $c[$sid] = pd_stages_has() ? array_values(array_filter(explode(',', (string) scalar('SELECT stage_manual FROM subprojects WHERE id = ?', [$sid])))) : []; } catch (Throwable $e) { return []; }
+}
+/** R97-287: a list of sub-projects (the Projects page) — unlocked stages in one statement, and the live production orders of every sub-project in one more. */
+function pd_sub_prime(array $sids): void {
+    $sids = array_values(array_unique(array_filter(array_map('intval', $sids)))); if (count($sids) < 2 || !pd_stages_has()) return;
+    $c = &$GLOBALS['_pd_man']; $c ??= [];
+    try { foreach (array_chunk($sids, 400) as $ch) { $in = implode(',', $ch);
+        foreach (all("SELECT id, stage_manual FROM subprojects WHERE id IN ($in)") as $r) if (!isset($c[(int)$r['id']])) $c[(int)$r['id']] = array_values(array_filter(explode(',', (string)$r['stage_manual'])));
+        if (pd_has()) { foreach ($ch as $i) $GLOBALS['_pd_oids'][$i] ??= []; foreach (all("SELECT id, subproject_id FROM production_orders WHERE subproject_id IN ($in) AND status <> 'cancelled' ORDER BY id") as $r) $GLOBALS['_pd_oids'][(int)$r['subproject_id']][] = (int)$r['id']; } }
+    } catch (Throwable $e) { unset($GLOBALS['_pd_oids']); }
+}
 /** Which stages are fed right now (evidence present and not unlocked) — for the read-only fields and the 🏭 marks. */
 function pd_sub_fed(int $sid): array {
     static $with = null; if ($with === null) { $with = []; if (pd_has()) foreach (all("SELECT DISTINCT subproject_id FROM production_orders WHERE subproject_id IS NOT NULL AND status <> 'cancelled'") as $r) $with[(int)$r['subproject_id']] = true; }
@@ -238,6 +250,7 @@ function pd_stage_lock(int $sid, string $slug, bool $unlock): void {
     if (!in_array($slug, PD_STAGE_SLUGS, true) || !pd_stages_has()) throw new RuntimeException(t('err.notfound'));
     $man = pd_sub_manual($sid); $man = $unlock ? array_values(array_unique(array_merge($man, [$slug]))) : array_values(array_diff($man, [$slug]));
     q('UPDATE subprojects SET stage_manual = ? WHERE id = ?', [$man ? implode(',', $man) : null, $sid]);
+    unset($GLOBALS['_pd_man'][$sid]);   // R97-287
     $oid = (int) scalar("SELECT id FROM production_orders WHERE subproject_id = ? AND status <> 'cancelled' ORDER BY id LIMIT 1", [$sid]);
     if ($oid) pd_log($oid, $unlock ? 'stage_unlock' : 'stage_lock', t('st.' . $slug));
     if (!$unlock) { // back to the feed: write the fed value at once

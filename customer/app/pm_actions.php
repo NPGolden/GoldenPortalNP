@@ -2101,7 +2101,7 @@ function pm_gen_move(int $from, int $to): int {
     if ((int)$a['vessel_id'] !== (int)$b['vessel_id']) throw new RuntimeException(t('pr.gen_move_vessel'));
     $n = 0;
     foreach (['offers', 'fsr_reports', 'isr_reports', 'acc_reports', 'tickets', 'timesheets', 'documents', 'drawing_requests', 'job_orders', 'production_orders', 'owner_approvals', 'class_submittals', 'plan_entries', 'weekly_notes', 'tasks', 'proformas', 'sp_files', 'acc_lines', 'kpi_snapshots'] as $tb) {
-        try { $hasSub = (bool) one("SHOW COLUMNS FROM `$tb` LIKE 'subproject_id'"); $n += q("UPDATE `$tb` SET project_id = ?" . ($hasSub ? ', subproject_id = NULL' : '') . " WHERE project_id = ?", [$to, $from])->rowCount(); } catch (Throwable $e) {}
+        try { $hasSub = (bool) scalar("SHOW COLUMNS FROM `$tb` LIKE 'subproject_id'"); $n += q("UPDATE `$tb` SET project_id = ?" . ($hasSub ? ', subproject_id = NULL' : '') . " WHERE project_id = ?", [$to, $from])->rowCount(); } catch (Throwable $e) {}
     }
     try { $n += q('UPDATE subprojects SET project_id = ? WHERE project_id = ?', [$to, $from])->rowCount(); } catch (Throwable $e) {}
     if (function_exists('audit')) try { audit('gen_move', 'project', $from, ['to' => $to, 'rows' => $n]); } catch (Throwable $e) {}
