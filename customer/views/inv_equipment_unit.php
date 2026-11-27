@@ -75,9 +75,10 @@ layout_head(eqp_no($r) . ' · ' . t('eqp.title'), 'inventory');
         <p class="hint"><?= tt('eqp.give_hint') ?></p>
         <div class="btn-row"><button class="btn btn--gold" type="submit">👤 <?= tt('eqp.give_btn') ?></button></div>
       </form><?php endif; ?>
+    <?php elseif ($st === 'project'): ?><p>📍 <b><?= e((string)$r['project_code']) ?></b> · <?= tt('ptl.supervisor') ?>: <?= e((string)$r['site_user']) ?><?= $r['site_since'] ? ' · ' . e(fmt_date($r['site_since'])) : '' ?></p><div class="btn-row"><a class="btn btn--ghost btn--sm" href="<?= url('project_tools', ['project' => (int)$r['project_id']]) ?>#u<?= $id ?>"><?= tt('ptl.title') ?></a></div>
     <?php else: ?><p class="hint"><?= tt('eqp.holder_none') ?></p><?php endif; ?>
   </div>
-  <?php if (eqp_can_stock() && $st === 'wh'): ?>
+  <?php if (eqp_can_stock() && in_array($st, ['wh', 'project'], true)): ?>
   <div class="card"><h2>🗑 <?= tt('eqp.h_retire') ?></h2>
     <form method="post" data-lock data-confirm="<?= tt('eqp.retire_confirm') ?>"><?= csrf_field() ?><input type="hidden" name="action" value="eqp_retire"><input type="hidden" name="unit_id" value="<?= $id ?>">
       <div class="btn-row"><input name="why" maxlength="120" required placeholder="<?= tt('eqp.retire_why') ?>" style="flex:1;min-width:200px;"><button class="btn btn--ghost btn--sm" type="submit"><?= tt('eqp.retire_btn') ?></button></div><p class="hint"><?= tt('eqp.retire_hint') ?></p></form></div>

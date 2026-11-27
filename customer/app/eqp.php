@@ -13,26 +13,27 @@ function eqp_can_view(): bool { return eqp_has() && is_staff() && (sn_can() || e
 function eqp_can_edit(): bool { return eqp_has() && (sn_can() || eqp_it()); }
 function eqp_can_stock(): bool { return eqp_has() && sn_can(); }
 function eqp_can_give(): bool { return eqp_has() && function_exists('hre_prep_cats') && (sn_can() || eqp_qh() || eqp_it() || hre_can()) && (bool) hre_prep_cats(); }
-const EQP_STATES = ['wh', 'person', 'retired', 'out'];
+const EQP_STATES = ['wh', 'person', 'project', 'retired', 'out'];
 const EQP_CALS = ['measuring', 'valid', 'soon', 'expired', 'none', 'out'];
 
 function eqp_sql(): string {
     return "SELECT s.*, i.code AS item_code, i.description, i.maker, i.factory_code, i.last_price, c.name AS category, w.code AS wh_code, w.name AS wh_name, p.name_en AS person, p.user_id AS person_user,
-                   h.status AS eq_status, h.category AS eq_cat, r.code AS ism_code, r.title AS ism_title, r.status AS ism_status, r.review_date AS ism_until, r.data AS ism_data
+                   h.status AS eq_status, h.category AS eq_cat, pj.project_code, su.full_name AS site_user, r.code AS ism_code, r.title AS ism_title, r.status AS ism_status, r.review_date AS ism_until, r.data AS ism_data
             FROM inv_serials s JOIN inv_items i ON i.id = s.item_id LEFT JOIN inv_categories c ON c.id = i.category_id LEFT JOIN inv_warehouses w ON w.id = s.warehouse_id
-            LEFT JOIN hr_people p ON p.id = s.person_id LEFT JOIN hr_eq_items h ON h.id = s.eq_item_id LEFT JOIN ism_records r ON r.id = s.ism_eq_id AND r.reg = 'qequip'";
+            LEFT JOIN hr_people p ON p.id = s.person_id LEFT JOIN hr_eq_items h ON h.id = s.eq_item_id LEFT JOIN ism_records r ON r.id = s.ism_eq_id AND r.reg = 'qequip'" . (function_exists('ptl_has') && ptl_has() ? ' LEFT JOIN projects pj ON pj.id = s.project_id LEFT JOIN customer_users su ON su.id = s.site_user_id' : ' LEFT JOIN projects pj ON 1 = 0 LEFT JOIN customer_users su ON 1 = 0');
 }
 /** State of the calibration of a unit: null when it is not measuring equipment, else [state, tone] of the register. */
 function eqp_cal(array $u): ?array { if (empty($u['ism_eq_id']) || $u['ism_code'] === null) return null; return ism_cal_state(['status' => (string)$u['ism_status'], 'review_date' => $u['ism_until'], 'data' => (string)$u['ism_data']]); }
-function eqp_state(array $u): string { return match ((string)$u['status']) { 'in_stock' => 'wh', 'with_person' => 'person', 'scrapped', 'removed' => 'retired', default => 'out' }; }
-function eqp_state_pill(array $u): string { $s = eqp_state($u); return pill(['wh' => 'green', 'person' => 'gold', 'retired' => 'mute', 'out' => 'navy'][$s], t('eqp.s_' . $s)); }
+function eqp_state(array $u): string { return match ((string)$u['status']) { 'in_stock' => 'wh', 'with_person' => 'person', 'on_project' => 'project', 'scrapped', 'removed' => 'retired', default => 'out' }; }
+function eqp_state_pill(array $u): string { $s = eqp_state($u); return pill(['wh' => 'green', 'person' => 'gold', 'project' => 'navy', 'retired' => 'mute', 'out' => 'mute'][$s], t('eqp.s_' . $s)); }
 function eqp_unit(int $id): ?array { return eqp_has() && $id ? (one(eqp_sql() . ' WHERE s.id = ? AND i.is_asset = 1', [$id]) ?: null) : null; }
 /** The units of the register. $f: q, state, person, cal, cat. */
 function eqp_rows(array $f = [], int $limit = 4000): array {
     if (!eqp_can_view()) return []; $w = ['i.is_asset = 1']; $a = [];
     if (($q = trim((string)($f['q'] ?? ''))) !== '') { $l = '%' . $q . '%'; $w[] = '(s.serial_no LIKE ? OR s.asset_tag LIKE ? OR i.code LIKE ? OR i.description LIKE ? OR i.maker LIKE ? OR i.factory_code LIKE ? OR s.location LIKE ? OR p.name_en LIKE ?)'; array_push($a, $l, $l, $l, $l, $l, $l, $l, $l); }
-    $st = (string)($f['state'] ?? ''); if ($st === 'wh') $w[] = "s.status = 'in_stock'"; elseif ($st === 'person') $w[] = "s.status = 'with_person'"; elseif ($st === 'retired') $w[] = "s.status IN ('scrapped','removed')"; elseif ($st === 'out') $w[] = "s.status = 'out'"; elseif ($st !== 'all') $w[] = "s.status <> 'removed'" . ($st === '' && empty($f['cal']) && $q === '' ? " AND s.status <> 'scrapped'" : '');
+    $st = (string)($f['state'] ?? ''); if ($st === 'wh') $w[] = "s.status = 'in_stock'"; elseif ($st === 'person') $w[] = "s.status = 'with_person'"; elseif ($st === 'project') $w[] = "s.status = 'on_project'"; elseif ($st === 'retired') $w[] = "s.status IN ('scrapped','removed')"; elseif ($st === 'out') $w[] = "s.status = 'out'"; elseif ($st !== 'all') $w[] = "s.status <> 'removed'" . ($st === '' && empty($f['cal']) && $q === '' ? " AND s.status <> 'scrapped'" : '');
     if (!empty($f['person'])) { $w[] = 's.person_id = ?'; $a[] = (int)$f['person']; }
+    if (!empty($f['project'])) { $w[] = "s.project_id = ? AND s.status = 'on_project'"; $a[] = (int)$f['project']; }
     if (!empty($f['cat'])) { $w[] = 'i.category_id = ?'; $a[] = (int)$f['cat']; }
     $cal = (string)($f['cal'] ?? ''); if ($cal !== '') $w[] = 's.ism_eq_id IS NOT NULL';
     $rows = all(eqp_sql() . ' WHERE ' . implode(' AND ', $w) . ' ORDER BY COALESCE(s.asset_tag, i.code), s.serial_no LIMIT ' . max(1, min(8000, $limit)), $a);
@@ -41,7 +42,7 @@ function eqp_rows(array $f = [], int $limit = 4000): array {
 }
 /** Figures of the head of the page. */
 function eqp_stats(): array {
-    $o = ['all' => 0, 'wh' => 0, 'person' => 0, 'retired' => 0, 'measuring' => 0, 'soon' => 0, 'expired' => 0]; if (!eqp_can_view()) return $o;
+    $o = ['all' => 0, 'wh' => 0, 'person' => 0, 'project' => 0, 'retired' => 0, 'measuring' => 0, 'soon' => 0, 'expired' => 0]; if (!eqp_can_view()) return $o;
     foreach (all("SELECT s.status, s.ism_eq_id, r.status AS ism_status, r.review_date AS ism_until, r.data AS ism_data, r.code AS ism_code FROM inv_serials s JOIN inv_items i ON i.id = s.item_id LEFT JOIN ism_records r ON r.id = s.ism_eq_id AND r.reg = 'qequip' WHERE i.is_asset = 1 AND s.status <> 'removed'") as $u) {
         $st = eqp_state($u); if ($st === 'retired') { $o['retired']++; continue; } $o['all']++; if (isset($o[$st])) $o[$st]++;
         if ($c = eqp_cal($u)) { $o['measuring']++; if ($c[0] === 'soon') $o['soon']++; if (in_array($c[0], ['expired', 'none', 'out'], true)) $o['expired']++; }
@@ -100,7 +101,7 @@ function eqp_of_ism(array $ids = []): array {
 /** What a person holds: the units of the register in the name of the person, with the state of the list line and of the calibration. */
 function eqp_of_person(int $pid): array { if (!eqp_has() || !$pid) return []; try { return all(eqp_sql() . " WHERE s.person_id = ? AND s.status = 'with_person' AND i.is_asset = 1 ORDER BY (s.ism_eq_id IS NULL), COALESCE(s.asset_tag, i.code)", [$pid]); } catch (Throwable $e) { return []; } }
 /** Where a unit is, in a few words: the warehouse and place, or the person. */
-function eqp_where(array $u): string { return match (eqp_state($u)) { 'person' => '👤 ' . (string)$u['person'], 'wh' => '🏬 ' . (string)$u['wh_code'] . ((string)($u['location'] ?? '') !== '' ? ' · ' . $u['location'] : ''), 'retired' => t('eqp.s_retired') . ($u['retired_on'] ? ' ' . fmt_date($u['retired_on']) : ''), default => t('eqp.s_out') }; }
+function eqp_where(array $u): string { return match (eqp_state($u)) { 'person' => '👤 ' . (string)$u['person'], 'project' => '📍 ' . (string)($u['project_code'] ?? '') . ((string)($u['site_user'] ?? '') !== '' ? ' · ' . $u['site_user'] : ''), 'wh' => '🏬 ' . (string)$u['wh_code'] . ((string)($u['location'] ?? '') !== '' ? ' · ' . $u['location'] : ''), 'retired' => t('eqp.s_retired') . ($u['retired_on'] ? ' ' . fmt_date($u['retired_on']) : ''), default => t('eqp.s_out') }; }
 
 /** The unit is given to a person: a line on the equipment list of the person (a draft that HR issues), the unit out of the warehouse in that name. */
 function eqp_give_from_post(): int {
@@ -118,9 +119,15 @@ function eqp_retire_from_post(): int {
     if (!eqp_can_stock()) throw new RuntimeException(t('err.noaccess')); $id = (int)($_POST['unit_id'] ?? 0); $why = mb_substr(trim((string)($_POST['why'] ?? '')), 0, 120); if ($why === '') throw new RuntimeException(t('eqp.e_why'));
     stk_tx(function () use ($id, $why) {
         $s = one('SELECT s.*, i.last_price, i.is_asset FROM inv_serials s JOIN inv_items i ON i.id = s.item_id WHERE s.id = ? FOR UPDATE', [$id]); if (!$s || empty($s['is_asset'])) throw new RuntimeException(t('err.notfound'));
+        $ref = t('eqp.ref_retire') . ' — ' . $why;
+        if ($s['status'] === 'on_project' && function_exists('ptl_has') && ptl_has()) {   // R97-291: a tool lost or broken on a project — it left the stock when it was sent, so nothing moves
+            q('UPDATE inv_tool_daily SET returned_at = NOW(), result = ?, note = ? WHERE serial_id = ? AND returned_at IS NULL', ['missing', mb_substr($ref, 0, 255), $id]);
+            q("UPDATE inv_serials SET status = 'scrapped', retired_on = CURDATE(), last_ref = ?, project_id = NULL, site_user_id = NULL, site_since = NULL, site_due = NULL, site_wh_id = NULL WHERE id = ?", [mb_substr($ref, 0, 160), $id]); sn_log($id, 'scrap', ['ref' => $ref]);
+        } else {
         if ($s['status'] !== 'in_stock') throw new RuntimeException(t('eqp.e_retire_state'));
-        $ref = t('eqp.ref_retire') . ' — ' . $why; $mid = stk_move((int)$s['item_id'], (int)$s['warehouse_id'], 'out', 1.0, ['unit_price' => $s['last_price'], 'reason' => 'scrap', 'note' => $ref . ' · S/N ' . $s['serial_no']]);
+        $mid = stk_move((int)$s['item_id'], (int)$s['warehouse_id'], 'out', 1.0, ['unit_price' => $s['last_price'], 'reason' => 'scrap', 'note' => $ref . ' · S/N ' . $s['serial_no']]);
         sn_attach($mid, [(string)$s['serial_no']], ['status' => 'scrapped', 'ref' => $ref]); q('UPDATE inv_serials SET retired_on = CURDATE() WHERE id = ?', [$id]);
+        }
         if ($s['ism_eq_id']) { $r = one("SELECT id, status FROM ism_records WHERE id = ? AND reg = 'qequip'", [(int)$s['ism_eq_id']]); if ($r && $r['status'] !== 'retired') { q("UPDATE ism_records SET status = 'retired', updated_at = NOW() WHERE id = ?", [(int)$r['id']]); ism_event((int)$r['id'], 'status', t('ism.s_' . $r['status']) . ' → ' . t('ism.s_retired') . ' · ' . $ref); } }
     });
     return $id;

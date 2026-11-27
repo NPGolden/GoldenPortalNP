@@ -117,7 +117,8 @@ window.UI = (() => {
     [/^#\/notes(\?.*)?$/, (m, q) => SCREENS.notes(q)], [/^#\/docs$/, () => SCREENS.docs()], [/^#\/inbox$/, () => SCREENS.inbox()], [/^#\/synclog$/, () => SCREENS.synclog()],
     [/^#\/parts$/, () => PARTS.list({})], [/^#\/parts\?(.*)$/, (m) => PARTS.list(query("#/parts?" + m[1]))], [/^#\/parts\/new$/, () => PARTS.create()], [/^#\/parts\/(\d+)$/, (m) => PARTS.one(+m[1])],   // R82-003
     [/^#\/myappr$/, () => SCREENS.myappr()], [/^#\/myappr\/pay\/(\d+)$/, (m) => SCREENS.mypay(+m[1])],   // R97-207
-    [/^#\/more$/, () => SCREENS.more()], [/^#\/io$/, () => IO.page()], [/^#\/hr(\?.*)?$/, (m, q) => HR.page(q)],
+    [/^#\/more$/, () => SCREENS.more()], [/^#\/io$/, () => IO.page()], [/^#\/tools$/, () => TOOLS.page()],   // R97-291
+    [/^#\/hr(\?.*)?$/, (m, q) => HR.page(q)],
   ];
   const query = (h) => { const q = {}; const i = h.indexOf("?"); if (i < 0) return q; new URLSearchParams(h.slice(i + 1)).forEach((v, k) => { q[k] = v; }); return q; };
   async function render() {

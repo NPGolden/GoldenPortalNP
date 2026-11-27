@@ -11,13 +11,13 @@
  */
 declare(strict_types=1);
 
-const SN_STATES = ['in_stock', 'out', 'with_person', 'scrapped', 'removed'];
+const SN_STATES = ['in_stock', 'out', 'with_person', 'scrapped', 'removed', 'on_project'];   // R97-291: on_project = a company tool sent to a project
 const SN_MAX = 500;      // numbers in one entry
 
 function sn_has(): bool { static $h = null; if ($h === null) { try { $h = function_exists('stk_has') && stk_has() && (bool) scalar("SHOW TABLES LIKE 'inv_serials'") && (bool) scalar("SHOW COLUMNS FROM inv_items LIKE 'track_serial'"); } catch (Throwable $e) { $h = false; } } return $h; }
 function sn_can(): bool { return sn_has() && function_exists('pr_wh') && (pr_wh() || (function_exists('pr_admin') && pr_admin())); }
 function sn_tracked($item): bool { if (!sn_has()) return false; if (!is_array($item)) $item = one('SELECT track_serial, is_asset FROM inv_items WHERE id = ?', [(int)$item]) ?: []; return !empty($item['track_serial']) || !empty($item['is_asset']); }
-function sn_pill(string $s): string { return pill(['in_stock' => 'green', 'out' => 'mute', 'with_person' => 'gold', 'scrapped' => 'bad', 'removed' => 'mute'][$s] ?? 'mute', t('sn.s_' . (in_array($s, SN_STATES, true) ? $s : 'out'))); }
+function sn_pill(string $s): string { return pill(['in_stock' => 'green', 'out' => 'mute', 'with_person' => 'gold', 'scrapped' => 'bad', 'removed' => 'mute', 'on_project' => 'navy'][$s] ?? 'mute', t('sn.s_' . (in_array($s, SN_STATES, true) ? $s : 'out'))); }
 /** "A1, A2\nA3" → ['A1','A2','A3'] — unique (case-insensitive), at most 80 characters each. */
 function sn_parse($raw): array {
     $parts = is_array($raw) ? $raw : (preg_split('/[\r\n,;]+/u', (string)$raw) ?: []); $o = []; $seen = [];
@@ -59,7 +59,7 @@ function sn_attach(int $moveId, $serials, array $x = []): int {
             else { q("INSERT INTO inv_serials (item_id, serial_no, status, warehouse_id, last_ref) VALUES (?,?,'in_stock',?,?)", [$itemId, $sn, $wh, mb_substr($ref, 0, 160)]); $sid = (int) db()->lastInsertId(); }
             sn_log($sid, 'in', ['move_id' => $moveId, 'dn_id' => $dn, 'warehouse_id' => $wh, 'ref' => $ref]);
         } else {
-            $st = in_array($x['status'] ?? '', ['out', 'with_person', 'scrapped'], true) ? (string)$x['status'] : ((string)($mv['reason'] ?? '') === 'scrap' ? 'scrapped' : 'out');
+            $st = in_array($x['status'] ?? '', ['out', 'with_person', 'scrapped', 'on_project'], true) ? (string)$x['status'] : ((string)($mv['reason'] ?? '') === 'scrap' ? 'scrapped' : 'out');
             if ($r && $r['status'] !== 'in_stock') throw new RuntimeException(t('sn.not_in_stock', ['s' => $sn, 'st' => t('sn.s_' . $r['status'])]));
             if ($r && (int)$r['warehouse_id'] !== $wh) throw new RuntimeException(t('sn.other_wh', ['s' => $sn]));
             if ($r) { q('UPDATE inv_serials SET status = ?, warehouse_id = NULL, person_id = ?, eq_item_id = ?, last_ref = ? WHERE id = ?', [$st, $x['person_id'] ?? null, $x['eq_item_id'] ?? null, mb_substr($ref, 0, 160), (int)$r['id']]); $sid = (int)$r['id']; }

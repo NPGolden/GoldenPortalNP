@@ -34,6 +34,7 @@ require_once API_ROOT . '/lib/portal_hr_more.php';   // R97-156 Golden HR 1.1.0:
 require_once API_ROOT . '/lib/portal_hr_demo.php';   // R97-169 demonstration data set of Golden HR (accounts marked is_demo)
 require_once API_ROOT . '/lib/portal_parts.php';   // R82-003 part ordering from the apps
 require_once API_ROOT . '/lib/portal_dn.php';      // R97-280 delivery notes for the receiver (Service app)
+require_once API_ROOT . '/lib/portal_tools.php';   // R97-291 «My tools» in the Service, PM and Employee apps
 
 /** Act as a portal user for the rest of this request (the portal reads $_SESSION['cu_id']). */
 const API_IDLE_ONLINE = 300;   // seconds without a touch after which an open app no longer counts as «online»

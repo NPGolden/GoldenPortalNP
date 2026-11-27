@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.274.0';
+const CP_VERSION = '1.275.0';
 const CP_BUILD   = '2026-11-27';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-291', 'version' => '1.275.0', 'date' => '2026-11-27', 'title' => 'Company Tools (the register renamed); My tools in the Service, PM and Employee apps (Service 0.8.11, PM 1.0.24, Employee 1.1.8) with lists answered line by line; company tools on projects: sent to a project in the care of a supervisor, handed out and taken back day by day in the portal and the apps, booked back by the warehouse, reminders at the end of the day and for tools left on a completed project', 'db' => 'install/migrate_cp_r97_291_company_tools_on_projects_daily_handout.sql', 'check' => 'r9ae'],
         ['ref' => 'GAS-CP-R97-290', 'version' => '1.274.0', 'date' => '2026-11-27', 'title' => 'Inventory: register of the company equipment (one line per unit) linked to the ISO 9001 measuring equipment register and its calibrations; import of an equipment list (.csv / .xlsx); units given to staff from the register; My equipment shows the units and the calibration of the instruments a person holds; issue lists answered line by line — a line that is not accepted goes back to the warehouse and to the people who prepared it', 'db' => 'install/migrate_cp_r97_290_inventory_equipment_register_iso_measuring.sql', 'check' => 'r9ad'],
         ['ref' => 'GAS-CP-R97-289', 'version' => '1.273.2', 'date' => '2026-11-27', 'title' => 'HR equipment register open to the IT & Cybersecurity team: read only, for computers, telephones, keys and cards', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-288', 'version' => '1.273.1', 'date' => '2026-11-27', 'title' => 'HR equipment: company assets already in the name of a person show in the list «With the personnel» before their list is issued; prepared lines are announced on the page and the lists can be issued to all people in one step', 'db' => null, 'check' => null],
@@ -757,6 +758,7 @@ function cp_migration_state(): array {
         'r9ab' => $has("SHOW COLUMNS FROM inv_delivery_notes LIKE 'to_user_id'"),   // R97-280
         'r9ac' => $has("SHOW COLUMNS FROM inv_dn_lines LIKE 'src_line_id'"),   // R97-281
         'r9ad' => $has("SHOW COLUMNS FROM inv_serials LIKE 'ism_eq_id'"),   // R97-290
+        'r9ae' => $has("SHOW COLUMNS FROM inv_serials LIKE 'site_user_id'") && $has("SHOW TABLES LIKE 'inv_tool_daily'"),   // R97-291
         'r99k' => $has("SHOW COLUMNS FROM nl_issues LIKE 'tr'") && $has("SHOW COLUMNS FROM nl_sends LIKE 'lang'") && $has("SHOW COLUMNS FROM contacts LIKE 'nl_lang'"),   // R97-203
         'r99j' => $has("SHOW TABLES LIKE 'soc_post_tr'") && $has("SHOW COLUMNS FROM soc_posts LIKE 'lang'"),   // R97-201
         'r99i' => $has("SHOW TABLES LIKE 'wl_prefs'") && $has("SHOW TABLES LIKE 'wl_mood_seen'"),   // R97-194
