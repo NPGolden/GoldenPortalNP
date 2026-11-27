@@ -5033,3 +5033,13 @@ Correction of §564: the screen of the owner showed that the first import (regis
 Changes (customer/app/hre.php, views/hr_equipment.php): the default filter also shows draft lines that carry an inventory unit (`inv_serial_id`) — the asset is out of the warehouse in the name of the person; `hre_drafts()` counts prepared lines and people for a notice on the page; `hre_issue_all()` (action `hre_issue_all`, HR or administrator, added to the HR role list) issues one list per active person with prepared lines by calling `hre_issue_from_post()` for each, and reports how many people have no portal account. Security: same right as issuing one list; confirmation before the bulk step; each list is its own transaction; a second run finds nothing to issue. No new proposal.
 
 Tests (bench, demo data): three imported assets with holders → shown under «With the personnel» as «To be issued»; notice with 3 lines / 3 people; issue all → 3 lists, lines «Awaiting acceptance», notice gone; second run issues nothing; an account without the HR equipment right has no access. Page rendered without warnings.
+
+## §567 HR equipment register for the IT & Cybersecurity team (GAS-CP-R97-289, v1.273.2)
+
+Request: the equipment register of the staff is accessible also to the IT members.
+
+customer/app/hre.php: `hre_it_member()` — member of the ISO 27001 team list or holder of a position set there (the same test that lets IT prepare lines, R97-125); `hre_reg_can()` = HR / administrator or IT member; `HRE_IT_CATS` = it, phone, access; `hre_register()` takes `cats` to limit the categories. views/hr_equipment.php: an IT member gets the register limited to those categories (also the Excel file and the category filter), a notice, and nothing else of the page — no figures of waiting lists, no leavers / new people, no prepared-lines notice or bulk issue, no import, no kits; the name links to «Equipment to give». views/_layout.php: menu entry «Equipment register» for IT members.
+
+Security: least privilege — read only and only the categories IT looks after; the limit is applied in the query, so the Excel file cannot hold other categories; every action of the page still needs the HR equipment right (issue-all refused for an IT member, tested); personal data shown is the name of the holder next to the device. No new proposal.
+
+Tests (bench, demo data): IT member → register with the IT lines only (a clothes line of the same person is not shown, nor in the Excel file), category filter with three entries, no forms on the page; staff outside the team → refused; HR → page unchanged. Pages rendered without warnings.

@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.273.1** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.273.2** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.273.2 | GAS-CP-R97-289 | 2026-11-27 | HR equipment register open to the IT & Cybersecurity team: read only, for computers, telephones, keys and cards | — |
 | 1.273.1 | GAS-CP-R97-288 | 2026-11-27 | HR equipment: company assets already in the name of a person show in the list «With the personnel» before their list is issued; prepared lines are announced on the page and the lists can be issued to all people in one step | — |
 | 1.273.0 | GAS-CP-R97-287 | 2026-11-27 | Corrections after the health report of 27/11/2026: Inventory reads only the page of items shown (count and value in one statement); Projects reads the stage figures of its sub-projects in batches and keeps its vessel groups; column checks answered from the kept schema; daily report gives the refused sign-ins by reason; news feeds Marine Log and Offshore Energy switched off | — |
 | 1.272.2 | GAS-CP-R97-286 | 2026-11-27 | Company assets import: a holder written «Surname Name» is found as «Name Surname» (and the reverse), with dots, commas or hyphens ignored | — |

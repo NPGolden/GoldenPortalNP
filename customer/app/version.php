@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.273.1';
+const CP_VERSION = '1.273.2';
 const CP_BUILD   = '2026-11-27';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-289', 'version' => '1.273.2', 'date' => '2026-11-27', 'title' => 'HR equipment register open to the IT & Cybersecurity team: read only, for computers, telephones, keys and cards', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-288', 'version' => '1.273.1', 'date' => '2026-11-27', 'title' => 'HR equipment: company assets already in the name of a person show in the list «With the personnel» before their list is issued; prepared lines are announced on the page and the lists can be issued to all people in one step', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-287', 'version' => '1.273.0', 'date' => '2026-11-27', 'title' => 'Corrections after the health report of 27/11/2026: Inventory reads only the page of items shown (count and value in one statement); Projects reads the stage figures of its sub-projects in batches and keeps its vessel groups; column checks answered from the kept schema; daily report gives the refused sign-ins by reason; news feeds Marine Log and Offshore Energy switched off', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-286', 'version' => '1.272.2', 'date' => '2026-11-27', 'title' => 'Company assets import: a holder written «Surname Name» is found as «Name Surname» (and the reverse), with dots, commas or hyphens ignored', 'db' => null, 'check' => null],

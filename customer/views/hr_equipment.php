@@ -3,16 +3,19 @@
 require __DIR__ . '/_layout.php';
 $u = require_staff();
 if (!function_exists('hre_has') || !hre_has()) { layout_head(t('hre.title'), 'hr_equipment'); echo '<div class="flash flash--warn">' . tt('hre.need_db') . '</div>'; layout_foot(); return; }
-if (!hre_can()) { http_response_code(403); layout_head(t('hre.title'), 'hr_equipment'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
+$ro = !hre_can();   // R97-289: the IT & Cybersecurity team reads its categories; everything else on this page is for HR
+if (!hre_reg_can()) { http_response_code(403); layout_head(t('hre.title'), 'hr_equipment'); echo '<h1>' . tt('err.noaccess') . '</h1>'; layout_foot(); return; }
 $f = ['cat' => (string)($_GET['cat'] ?? ''), 'st' => (string)($_GET['st'] ?? 'with'), 'q' => trim((string)($_GET['q'] ?? ''))]; if (!in_array($f['st'], ['with', 'missing', 'draft', 'exp', 'returned', 'all'], true)) $f['st'] = 'with';
-if (($_GET['format'] ?? '') === 'template') { while (ob_get_level()) ob_end_clean(); hre_import_template(); exit; }
+if ($ro) { $f['cats'] = HRE_IT_CATS; if (!in_array($f['cat'], HRE_IT_CATS, true)) $f['cat'] = ''; }
+if (!$ro && ($_GET['format'] ?? '') === 'template') { while (ob_get_level()) ob_end_clean(); hre_import_template(); exit; }
 $rows = hre_register($f);
 if (($_GET['export'] ?? '') === 'xlsx') { require_once __DIR__ . '/../app/xlsxw.php'; while (ob_get_level()) ob_end_clean(); xlsx_download('GAS-HR-equipment-' . date('Ymd') . '.xlsx', hre_register_sheets($rows)); }
-$W = hre_waiting();
+$W = $ro ? ['issue' => [], 'return' => [], 'leavers' => [], 'new' => [], 'exp' => []] : hre_waiting(); $xf = array_diff_key($f, ['cats' => 1]);
 layout_head(t('hre.title'), 'hr_equipment');
 ?>
 <div class="page-head"><div><h1>🧰 <?= tt('hre.title') ?></h1><p class="lede" style="margin-bottom:0;"><?= tt('hre.lede') ?></p></div>
-  <div class="btn-row"><a class="btn btn--ghost" href="<?= url('hr_equipment', $f + ['export' => 'xlsx']) ?>">⤓ Excel</a></div></div>
+  <div class="btn-row"><a class="btn btn--ghost" href="<?= url('hr_equipment', $xf + ['export' => 'xlsx']) ?>">⤓ Excel</a></div></div>
+<?php if ($ro): ?><div class="flash flash--info" style="margin-bottom:14px;">🔒 <?= tt('hre.reg_it_note') ?></div><?php else: ?>
 <div class="kpi kpi--5" style="margin-bottom:14px;">
   <span class="stat<?= $W['issue'] ? ' gold' : '' ?>"><b><?= count($W['issue']) ?></b><span class="s"><?= tt('hre.w_issue') ?></span></span>
   <span class="stat<?= $W['return'] ? ' gold' : '' ?>"><b><?= count($W['return']) ?></b><span class="s"><?= tt('hre.w_return') ?></span></span>
@@ -20,7 +23,8 @@ layout_head(t('hre.title'), 'hr_equipment');
   <span class="stat"><b><?= count($W['new']) ?></b><span class="s"><?= tt('hre.w_new') ?></span></span>
   <a class="stat<?= $W['exp'] ? ' gold' : '' ?>" href="<?= url('hr_equipment', ['st' => 'exp']) ?>"><b><?= count($W['exp']) ?></b><span class="s"><?= tt('hre.w_exp') ?></span></a>
 </div>
-<?php [$drN, $drP] = hre_drafts(); if ($drN && hre_can()): /* R97-287: lines prepared — for example by the import of company assets — and not issued yet */ ?>
+<?php endif; ?>
+<?php [$drN, $drP] = $ro ? [0, 0] : hre_drafts(); if ($drN && hre_can()): /* R97-287: lines prepared — for example by the import of company assets — and not issued yet */ ?>
 <div class="card" id="eq-drafts" style="border-left:4px solid #C9A227;">
   <div class="card-head"><h2>📝 <?= tt('hre.dr_title') ?></h2><span class="hint"><?= e(t('hre.dr_banner', ['n' => $drN, 'p' => $drP])) ?></span></div>
   <p class="hint"><?= tt('hre.dr_hint') ?></p>
@@ -40,17 +44,18 @@ layout_head(t('hre.title'), 'hr_equipment');
 <div class="card">
   <form method="get" action="index.php" class="fltbar" style="grid-template-columns: 1.4fr 1fr 1fr auto; margin-bottom:10px;"><input type="hidden" name="p" value="hr_equipment">
     <input type="search" name="q" value="<?= e($f['q']) ?>" placeholder="<?= tt('hre.search') ?>">
-    <select name="cat" data-nosearch><option value=""><?= tt('hre.all_cats') ?></option><?php foreach (HRE_CATS as $c): ?><option value="<?= $c ?>"<?= $f['cat'] === $c ? ' selected' : '' ?>><?= e(hre_cat_label($c)) ?></option><?php endforeach; ?></select>
+    <select name="cat" data-nosearch><option value=""><?= tt('hre.all_cats') ?></option><?php foreach ($ro ? HRE_IT_CATS : HRE_CATS as $c): ?><option value="<?= $c ?>"<?= $f['cat'] === $c ? ' selected' : '' ?>><?= e(hre_cat_label($c)) ?></option><?php endforeach; ?></select>
     <select name="st" data-nosearch><?php foreach (['with', 'missing', 'draft', 'exp', 'returned', 'all'] as $s): ?><option value="<?= $s ?>"<?= $f['st'] === $s ? ' selected' : '' ?>><?= tt('hre.f_' . $s) ?></option><?php endforeach; ?></select>
     <button class="btn btn--ghost btn--sm" type="submit"><?= tt('btn.filter') ?></button>
   </form>
   <h2><?= tt('hre.lines_title') ?> <span class="count"><?= count($rows) ?></span></h2>
   <?php if (!$rows): ?><div class="empty"><?= tt('hre.none') ?></div><?php else: ?>
   <div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('hr.person') ?></th><th><?= tt('hre.category') ?></th><th><?= tt('hre.description') ?></th><th><?= tt('hre.serial') ?></th><th><?= tt('hre.tag') ?></th><th class="num"><?= tt('hre.qty') ?></th><th><?= tt('hre.issued_on') ?></th><th><?= tt('hre.issue_list') ?></th><th><?= tt('hre.expires') ?></th><th><?= tt('th.status') ?></th></tr></thead><tbody>
-  <?php foreach ($rows as $i): ?><tr><td><a href="<?= url('hr_person', ['id' => (int)$i['person_id'], 'tab' => 'eq']) ?>"><b><?= e($i['name_en']) ?></b></a><?= !$i['person_active'] ? ' ' . pill('mute', t('hr.left')) : '' ?></td><td><?= e(hre_cat_icon((string)$i['category']) . ' ' . hre_cat_label((string)$i['category'])) ?></td><td><?= e($i['description']) ?><?= (string)$i['size'] !== '' ? ' <span class="hint">' . e($i['size']) . '</span>' : '' ?></td><td><?= e((string)$i['serial_no']) ?></td><td><?= e((string)$i['asset_tag']) ?></td><td class="num"><?= e(hre_qty($i['qty'])) ?></td><td><?= $i['issued_on'] ? e(fmt_date($i['issued_on'])) : '—' ?></td><td><?= e((string)$i['issue_no']) ?></td><td><?= $i['expires_on'] ? ($i['expires_on'] <= date('Y-m-d', strtotime('+30 days')) && in_array($i['status'], ['pending', 'held'], true) ? pill($i['expires_on'] < date('Y-m-d') ? 'bad' : 'warn', fmt_date($i['expires_on'])) : e(fmt_date($i['expires_on']))) : '' ?></td><td><?= hre_item_pill($i) ?></td></tr><?php endforeach; ?>
+  <?php foreach ($rows as $i): ?><tr><td><a href="<?= $ro ? url('eq_prepare', ['person' => (int)$i['person_id']]) : url('hr_person', ['id' => (int)$i['person_id'], 'tab' => 'eq']) ?>"><b><?= e($i['name_en']) ?></b></a><?= !$i['person_active'] ? ' ' . pill('mute', t('hr.left')) : '' ?></td><td><?= e(hre_cat_icon((string)$i['category']) . ' ' . hre_cat_label((string)$i['category'])) ?></td><td><?= e($i['description']) ?><?= (string)$i['size'] !== '' ? ' <span class="hint">' . e($i['size']) . '</span>' : '' ?></td><td><?= e((string)$i['serial_no']) ?></td><td><?= e((string)$i['asset_tag']) ?></td><td class="num"><?= e(hre_qty($i['qty'])) ?></td><td><?= $i['issued_on'] ? e(fmt_date($i['issued_on'])) : '—' ?></td><td><?= e((string)$i['issue_no']) ?></td><td><?= $i['expires_on'] ? ($i['expires_on'] <= date('Y-m-d', strtotime('+30 days')) && in_array($i['status'], ['pending', 'held'], true) ? pill($i['expires_on'] < date('Y-m-d') ? 'bad' : 'warn', fmt_date($i['expires_on'])) : e(fmt_date($i['expires_on']))) : '' ?></td><td><?= hre_item_pill($i) ?></td></tr><?php endforeach; ?>
   </tbody></table></div><?php endif; ?>
 </div>
 
+<?php if (!$ro): ?>
 <div class="card" id="eq-import">
   <h2>⤒ <?= tt('hre.imp_title') ?></h2><p class="hint"><?= tt('hre.imp_hint') ?></p>
   <?php $ir_ = $_SESSION['hre_import'] ?? null; unset($_SESSION['hre_import']); if ($ir_ && $ir_['skipped']): ?><div class="flash flash--warn"><b><?= e(t('hre.imp_skipped', ['n' => count($ir_['skipped'])])) ?></b><ul style="margin:4px 0 0;"><?php foreach (array_slice($ir_['skipped'], 0, 40) as [$rn_, $why_]): ?><li><?= e(t('hre.imp_row', ['r' => $rn_])) ?>: <?= e($why_) ?></li><?php endforeach; ?></ul></div><?php endif; ?>
@@ -59,7 +64,8 @@ layout_head(t('hre.title'), 'hr_equipment');
   </form>
 </div>
 
-<?php if (hre_kits_has()): $kits_ = hre_kits(); $kd_ = hr_departments(); ?>
+<?php endif; ?>
+<?php if (!$ro && hre_kits_has()): $kits_ = hre_kits(); $kd_ = hr_departments(); ?>
 <div class="card" id="eq-kits">
   <h2>🎒 <?= tt('hre.kit_title') ?> <span class="count"><?= count($kits_) ?></span></h2><p class="hint"><?= tt('hre.kit_lede') ?></p>
   <?php if ($kits_): ?><div class="table-scroll"><table class="tbl"><thead><tr><th><?= tt('hre.f_discipline') ?></th><th><?= tt('hre.category') ?></th><th><?= tt('hre.description') ?></th><th class="num"><?= tt('hre.qty') ?></th><th class="num"><?= tt('hre.kit_months') ?></th><th></th></tr></thead><tbody>

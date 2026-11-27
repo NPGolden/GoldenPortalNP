@@ -23,6 +23,10 @@ function hre_can(): bool { return hre_has() && is_staff() && ((function_exists('
 /** R97-125 — categories the signed-in person may prepare lines for: HR and administrators all; the IT & Cybersecurity team computers, telephones
  *  and keys / cards; QHSE instruments, safety equipment and working clothes; the warehouse tools, working clothes and safety equipment.
  *  Preparing is not issuing: the lines wait as drafts and HR puts them on the issue list. */
+/** R97-289: the IT & Cybersecurity team reads the register of the equipment it looks after (computers, telephones, keys and cards) — read only. */
+const HRE_IT_CATS = ['it', 'phone', 'access'];
+function hre_it_member(): bool { static $v = null; if ($v === null) { try { $v = hre_has() && is_staff() && function_exists('ism_team') && (in_array(hre_me(), ism_team(), true) || (function_exists('ism_by_position') && ism_by_position())); } catch (Throwable $e) { $v = false; } } return $v; }
+function hre_reg_can(): bool { return hre_can() || hre_it_member(); }
 function hre_prep_cats(): array {
     static $c = null; if ($c !== null) return $c; $c = []; if (!hre_has() || !is_staff()) return $c; if (hre_can()) return $c = HRE_CATS;
     try {
@@ -266,6 +270,7 @@ function hre_issue_all(): array {
 function hre_register(array $f = []): array {
     if (!hre_has()) return []; $w = ["i.status <> 'followed'"]; $a = [];
     if (in_array($f['cat'] ?? '', HRE_CATS, true)) { $w[] = 'i.category = ?'; $a[] = $f['cat']; }
+    if (!empty($f['cats']) && is_array($f['cats'])) { $cc = array_values(array_intersect(HRE_CATS, $f['cats'])); $w[] = $cc ? "i.category IN ('" . implode("','", $cc) . "')" : '0'; }   // R97-289: a reader limited to some categories
     $st = (string)($f['st'] ?? 'with'); if ($st === 'with') $w[] = hre_inv_has() ? "(i.status IN ('pending','held','missing') OR (i.status = 'draft' AND i.inv_serial_id IS NOT NULL))" : "i.status IN ('pending','held','missing')";   /* R97-287: a company asset that left the warehouse in the name of the person is with the person, also before the list is issued */ elseif ($st === 'returned') $w[] = "i.status IN ('returned','writeoff')"; elseif ($st === 'missing') $w[] = "i.status = 'missing'"; elseif ($st === 'draft') $w[] = "i.status = 'draft'"; elseif ($st === 'exp') $w[] = "i.status IN ('pending','held') AND i.expires_on IS NOT NULL AND i.expires_on <= DATE_ADD(CURDATE(), INTERVAL 60 DAY)";
     if (($qq = trim((string)($f['q'] ?? ''))) !== '') { $w[] = '(i.description LIKE ? OR i.serial_no LIKE ? OR i.asset_tag LIKE ? OR p.name_en LIKE ?)'; $l = '%' . $qq . '%'; array_push($a, $l, $l, $l, $l); }
     return all('SELECT i.*, p.name_en, p.is_active AS person_active, di.doc_no AS issue_no, dr.doc_no AS return_no, dr.status AS return_status FROM hr_eq_items i JOIN hr_people p ON p.id = i.person_id LEFT JOIN hr_eq_docs di ON di.id = i.issue_doc_id LEFT JOIN hr_eq_docs dr ON dr.id = i.return_doc_id' . ($w ? ' WHERE ' . implode(' AND ', $w) : '') . ' ORDER BY p.name_en, i.category, i.description LIMIT 3000', $a);
