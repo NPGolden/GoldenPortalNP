@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.272.1** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.272.2** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.272.2 | GAS-CP-R97-286 | 2026-11-27 | Company assets import: a holder written «Surname Name» is found as «Name Surname» (and the reverse), with dots, commas or hyphens ignored | — |
 | 1.272.1 | GAS-CP-R97-285 | 2026-11-27 | Company assets: units already imported into the inventory are put in the name of their holders by importing the file again with the holder filled in — they appear on the equipment card of the person in HR | — |
 | 1.272.0 | GAS-CP-R97-284 | 2026-11-27 | Offers: the same two ways of acceptance as service reports — in the portal (or the Customer app) and by e-mail link — and each of them leaves the completed offer acceptance form with the offer | — |
 | 1.271.0 | GAS-CP-R97-283 | 2026-11-27 | Offers: acceptance through the e-mail link with a drawn signature, as service reports and delivery notes; an offer acceptance form (PDF) — attached to the link when the offer document was made outside the portal, completed with name, capacity, time, address and signature on acceptance, kept with the offer and sent to the customer | — |
