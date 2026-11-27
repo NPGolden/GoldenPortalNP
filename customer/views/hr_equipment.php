@@ -20,6 +20,16 @@ layout_head(t('hre.title'), 'hr_equipment');
   <span class="stat"><b><?= count($W['new']) ?></b><span class="s"><?= tt('hre.w_new') ?></span></span>
   <a class="stat<?= $W['exp'] ? ' gold' : '' ?>" href="<?= url('hr_equipment', ['st' => 'exp']) ?>"><b><?= count($W['exp']) ?></b><span class="s"><?= tt('hre.w_exp') ?></span></a>
 </div>
+<?php [$drN, $drP] = hre_drafts(); if ($drN && hre_can()): /* R97-287: lines prepared — for example by the import of company assets — and not issued yet */ ?>
+<div class="card" id="eq-drafts" style="border-left:4px solid #C9A227;">
+  <div class="card-head"><h2>📝 <?= tt('hre.dr_title') ?></h2><span class="hint"><?= e(t('hre.dr_banner', ['n' => $drN, 'p' => $drP])) ?></span></div>
+  <p class="hint"><?= tt('hre.dr_hint') ?></p>
+  <form method="post" action="<?= url('hr_equipment') ?>" data-lock class="btn-row"><?= csrf_field() ?><input type="hidden" name="action" value="hre_issue_all">
+    <a class="btn btn--ghost btn--sm" href="<?= url('hr_equipment', ['st' => 'draft']) ?>"><?= tt('hre.dr_show') ?></a>
+    <button class="btn btn--gold btn--sm" type="submit" data-confirm="<?= e(t('hre.dr_issue_q', ['p' => $drP])) ?>" data-confirm-title="<?= tt('dlg.title') ?>">✉ <?= e(t('hre.dr_issue_all', ['p' => $drP])) ?></button>
+  </form>
+</div>
+<?php endif; ?>
 <?php if ($W['issue'] || $W['return'] || $W['leavers'] || $W['new']): ?>
 <div class="card" id="eq-wait"><h2><?= tt('hre.w_title') ?></h2><table class="tbl" data-nosort><tbody>
   <?php foreach (array_merge($W['issue'], $W['return']) as $d): ?><tr><td><?= $d['kind'] === 'return' ? '↩' : '✉' ?> <a href="<?= url('hr_person', ['id' => (int)$d['person_id'], 'tab' => 'eq']) ?>#eq-docs"><b><?= e($d['name_en']) ?></b></a></td><td><?= e(t($d['kind'] === 'return' ? 'hre.return_list' : 'hre.issue_list') . ' ' . $d['doc_no']) ?></td><td><?= hre_doc_pill($d) ?></td><td class="hint"><?= e(fmt_date(substr((string)$d['created_at'], 0, 10))) ?></td></tr><?php endforeach; ?>

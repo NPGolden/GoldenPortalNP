@@ -250,11 +250,23 @@ function hre_waiting(): array {
     } catch (Throwable $e) {}
     return $o;
 }
+/** R97-287: lines prepared and not issued yet — [lines, people]. */
+function hre_inv_has(): bool { static $h = null; if ($h === null) { try { $h = hre_has() && (bool) one("SHOW COLUMNS FROM hr_eq_items LIKE 'inv_serial_id'"); } catch (Throwable $e) { $h = false; } } return $h; }
+function hre_drafts(): array { try { $r = hre_has() ? one("SELECT COUNT(*) AS n, COUNT(DISTINCT i.person_id) AS p FROM hr_eq_items i JOIN hr_people p ON p.id = i.person_id WHERE i.status = 'draft' AND p.is_active = 1") : null; return [(int)($r['n'] ?? 0), (int)($r['p'] ?? 0)]; } catch (Throwable $e) { return [0, 0]; } }
+/** One issue list for every active person who has prepared lines. Returns [lists, lines, people without a portal account]. */
+function hre_issue_all(): array {
+    if (!hre_can()) throw new RuntimeException(t('err.noaccess')); @set_time_limit(180); $lists = 0; $lines = 0; $noAcc = 0; $keep = $_POST;
+    foreach (all("SELECT i.person_id, COUNT(*) AS n FROM hr_eq_items i JOIN hr_people p ON p.id = i.person_id WHERE i.status = 'draft' AND p.is_active = 1 GROUP BY i.person_id ORDER BY i.person_id LIMIT 500") as $r) {
+        $_POST = ['person_id' => (int)$r['person_id'], 'note' => (string)($keep['note'] ?? '')];
+        try { hre_issue_from_post(); $lists++; $lines += (int)$r['n']; $p = hr_person((int)$r['person_id']); if (empty($p['user_id']) || empty($p['account_active'])) $noAcc++; } catch (RuntimeException $e) { error_log('[hre] issue all: ' . $e->getMessage()); }
+    }
+    $_POST = $keep; return [$lists, $lines, $noAcc];
+}
 /** The register: every line, with the person.  $f: cat, st (with | returned | all), q */
 function hre_register(array $f = []): array {
     if (!hre_has()) return []; $w = ["i.status <> 'followed'"]; $a = [];
     if (in_array($f['cat'] ?? '', HRE_CATS, true)) { $w[] = 'i.category = ?'; $a[] = $f['cat']; }
-    $st = (string)($f['st'] ?? 'with'); if ($st === 'with') $w[] = "i.status IN ('pending','held','missing')"; elseif ($st === 'returned') $w[] = "i.status IN ('returned','writeoff')"; elseif ($st === 'missing') $w[] = "i.status = 'missing'"; elseif ($st === 'draft') $w[] = "i.status = 'draft'"; elseif ($st === 'exp') $w[] = "i.status IN ('pending','held') AND i.expires_on IS NOT NULL AND i.expires_on <= DATE_ADD(CURDATE(), INTERVAL 60 DAY)";
+    $st = (string)($f['st'] ?? 'with'); if ($st === 'with') $w[] = hre_inv_has() ? "(i.status IN ('pending','held','missing') OR (i.status = 'draft' AND i.inv_serial_id IS NOT NULL))" : "i.status IN ('pending','held','missing')";   /* R97-287: a company asset that left the warehouse in the name of the person is with the person, also before the list is issued */ elseif ($st === 'returned') $w[] = "i.status IN ('returned','writeoff')"; elseif ($st === 'missing') $w[] = "i.status = 'missing'"; elseif ($st === 'draft') $w[] = "i.status = 'draft'"; elseif ($st === 'exp') $w[] = "i.status IN ('pending','held') AND i.expires_on IS NOT NULL AND i.expires_on <= DATE_ADD(CURDATE(), INTERVAL 60 DAY)";
     if (($qq = trim((string)($f['q'] ?? ''))) !== '') { $w[] = '(i.description LIKE ? OR i.serial_no LIKE ? OR i.asset_tag LIKE ? OR p.name_en LIKE ?)'; $l = '%' . $qq . '%'; array_push($a, $l, $l, $l, $l); }
     return all('SELECT i.*, p.name_en, p.is_active AS person_active, di.doc_no AS issue_no, dr.doc_no AS return_no, dr.status AS return_status FROM hr_eq_items i JOIN hr_people p ON p.id = i.person_id LEFT JOIN hr_eq_docs di ON di.id = i.issue_doc_id LEFT JOIN hr_eq_docs dr ON dr.id = i.return_doc_id' . ($w ? ' WHERE ' . implode(' AND ', $w) : '') . ' ORDER BY p.name_en, i.category, i.description LIMIT 3000', $a);
 }
@@ -428,6 +440,7 @@ function hre_handle_action(string $action): bool {
         case 'hre_kit_del':  hre_kit_del_from_post(); flash('good', t('hre.removed')); redirect('hr_equipment', ['_r' => uniqid()], '#eq-kits');
         case 'hre_kit_apply': { if (!hre_can()) throw new RuntimeException(t('err.noaccess')); $pid = (int)($_POST['person_id'] ?? 0); $n = hre_kit_apply($pid); flash($n ? 'good' : 'warn', t($n ? 'hre.kit_added' : 'hre.kit_nothing', ['n' => $n])); $back($pid, '#eq-add'); }
         case 'hre_import':   { $r = hre_import_from_upload(!empty($_POST['issue'])); $_SESSION['hre_import'] = $r; flash($r['added'] ? 'good' : 'warn', t('hre.imp_done', ['a' => $r['added'], 'p' => $r['people'], 'l' => $r['lists'], 's' => count($r['skipped'])])); redirect('hr_equipment', ['st' => 'draft', '_r' => uniqid()], '#eq-import'); }
+        case 'hre_issue_all': { [$xl, $xn, $xa] = hre_issue_all(); flash($xl ? 'good' : 'warn', t($xa ? 'hre.dr_done_paper' : 'hre.dr_done', ['l' => $xl, 'n' => $xn, 'a' => $xa])); redirect('hr_equipment', ['_r' => uniqid()], '#eq-wait'); }   // R97-287
         case 'hre_issue':    $d = hre_issue_from_post(); flash('good', t('hre.issued', ['no' => $d['doc_no']])); $back((int)$d['person_id'], '#eq-docs');
         case 'hre_paper':    $d = hre_accept((int)($_POST['doc_id'] ?? 0), (string)($_POST['signer'] ?? '')); flash('good', t('hre.accepted_ok', ['no' => $d['doc_no']])); $back((int)$d['person_id'], '#eq-docs');
         case 'hre_cancel':   $d = hre_cancel((int)($_POST['doc_id'] ?? 0)); flash('good', t('hre.cancelled', ['no' => $d['doc_no']])); $back((int)$d['person_id'], '#eq-docs');
