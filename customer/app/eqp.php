@@ -151,6 +151,7 @@ function eqp_cal_sweep(): int {
     if (!eqp_has() || !function_exists('nf_push') || !function_exists('ism_has') || !ism_has()) return 0; $n = 0; $lim = date('Y-m-d', strtotime('+30 days'));
     foreach (all(eqp_sql() . " WHERE s.status = 'with_person' AND s.ism_eq_id IS NOT NULL AND r.review_date IS NOT NULL AND r.review_date <= ? AND r.status = 'in_use' AND p.user_id IS NOT NULL", [$lim]) as $u) {
         if ((json_decode((string)$u['ism_data'], true)['cal_needed'] ?? 'yes') === 'no') continue;
+        if (function_exists('nf_told') && nf_told((int)$u['person_user'], 'eqp:cal:' . $u['id'] . ':' . $u['ism_until'])) continue;   // R97-294: once per calibration date
         $n += (int) nf_push([(int)$u['person_user']], 'eqp:cal', 'eqp:cal:' . $u['id'] . ':' . $u['ism_until'], t('eqp.nf_cal', ['c' => eqp_no($u), 't' => mb_substr((string)$u['description'], 0, 80), 'd' => fmt_date($u['ism_until'])]), t('eqp.nf_cal_b'), url('my_equipment'), null, null);
     }
     return $n;

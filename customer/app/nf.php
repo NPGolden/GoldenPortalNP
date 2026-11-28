@@ -167,15 +167,20 @@ function nf_user_name(?int $uid): ?string {
 /** One notification per recipient, never to the actor; replaces an unread one on the same object. */
 /** A portal link without the language of the person who built it (lang= / setlang=). */
 function nf_url_clean(string $url): string { $u = $url; for ($i = 0; $i < 4; $i++) $u = (string) preg_replace('/([?&])(?:set)?lang=[^&#]*(?:&|(?=#)|$)/', '$1', $u); return (string) preg_replace('/[?&](?=#|$)/', '', $u); }
+/** R97-294: was this person already told about this (read or not) in the last $days days? For reminders that are due "once". */
+function nf_told(int $uid, string $refKey, int $days = 60): bool { try { return (bool) scalar('SELECT COUNT(*) FROM notifications WHERE user_id = ? AND ref_key = ? AND created_at > NOW() - INTERVAL ' . max(1, min(365, $days)) . ' DAY', [$uid, mb_substr($refKey, 0, 60)]); } catch (Throwable $e) { return false; } }
+/** R97-294: the people of $uids not yet told about $refKey. */
+function nf_untold(array $uids, string $refKey, int $days = 60): array { return array_values(array_filter(array_map('intval', $uids), fn($u) => $u > 0 && !nf_told($u, $refKey, $days))); }
 function nf_push(array $userIds, string $kind, string $refKey, string $title, ?string $body, string $url, ?int $actorId, ?string $actorName, ?string $at = null): int {
     $grp = NF_GROUP_OF[explode(':', $kind, 2)[0]] ?? 'work';
     $title = mb_substr(trim($title), 0, 200); $body = $body !== null ? (mb_substr(trim(preg_replace('/\s+/u', ' ', $body)), 0, 400) ?: null) : null;
-    $at = $at ?: date('Y-m-d H:i:s'); $n = 0;
+    $atNow = $at === null || $at === ''; $at = $at ?: date('Y-m-d H:i:s'); $n = 0;
     $url = nf_url_clean($url);   // R97-243: the link is read by other people — it must not carry the language of the sender
     foreach ($userIds as $uid) {
         $uid = (int)$uid;
         if (!$uid || ($actorId && $uid === (int)$actorId)) continue;
-        $ex = one('SELECT id, created_at FROM notifications WHERE user_id = ? AND read_at IS NULL AND ref_key = ? LIMIT 1', [$uid, $refKey]);
+        $ex = one('SELECT id, created_at, title, body FROM notifications WHERE user_id = ? AND read_at IS NULL AND ref_key = ? LIMIT 1', [$uid, $refKey]);
+        if ($ex && !$actorId && $atNow && (string)$ex['title'] === $title && (string)($ex['body'] ?? '') === (string)($body ?? '')) continue;   // R97-294: a reminder of the portal itself, repeated word for word while the first is still unread, is not news — no new date, no second push to the phone
         if ($ex) { if (strtotime((string)$ex['created_at']) <= strtotime($at)) q('UPDATE notifications SET grp = ?, kind = ?, title = ?, body = ?, url = ?, actor_id = ?, actor_name = ?, created_at = ? WHERE id = ?', [$grp, $kind, $title, $body, $url, $actorId ?: null, $actorName, $at, $ex['id']]); }   // the newest event wins, whichever source is swept first
         else q('INSERT INTO notifications (user_id, grp, kind, ref_key, title, body, url, actor_id, actor_name, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)', [$uid, $grp, $kind, $refKey, $title, $body, $url, $actorId ?: null, $actorName, $at]);
         if (function_exists('pn_from_nf')) pn_from_nf($uid, $kind, $refKey, $title, $body, $at);   // R97-196: the same news to the phone

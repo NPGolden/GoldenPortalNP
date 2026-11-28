@@ -13,13 +13,14 @@
  */
 declare(strict_types=1);
 
-const CP_VERSION = '1.277.0';
+const CP_VERSION = '1.277.1';
 const CP_BUILD   = '2026-11-27';
 const CP_NAME    = 'Golden A/S Customer Portal';
 
 /** @return array<int, array{ref:string, version:string, date:string, title:string, db:?string, check:?string}> */
 function cp_patches(): array {
     return [
+        ['ref' => 'GAS-CP-R97-294', 'version' => '1.277.1', 'date' => '2026-11-28', 'title' => 'Notifications that kept coming back: a due or review date of an ISO / QHSE register and the calibration of a tool are told once per person and date (they returned every hour, in the portal and on the phone); a reminder of the portal repeated word for word while unread no longer renews the notification or sends a second push', 'db' => null, 'check' => null],
         ['ref' => 'GAS-CP-R97-293', 'version' => '1.277.0', 'date' => '2026-11-27', 'title' => 'Wellness for the field and the office: wellness in the Service, PM and Employee apps (0.8.13, 1.0.26, 1.1.10), weather notice for the planned place, rest between shifts, travel checklist, leave nudge, quiet hours for the phone, workload per team, follow-up of the mood check-in, company information, anonymous questions to HR, thank a colleague', 'db' => 'install/migrate_cp_r97_293_wellness_field_quiet_hours_info_questions.sql', 'check' => 'r9ag'],
         ['ref' => 'GAS-CP-R97-292', 'version' => '1.276.0', 'date' => '2026-11-27', 'title' => 'Company tools: the person who receives a tool on a project confirms it in the app or the portal (Service 0.8.12, PM 1.0.25, Employee 1.1.9); tools sent to a project with a delivery note and e-mail acceptance; HR has no part in tools — tools and instruments go to the person directly and the warehouse takes them back', 'db' => 'install/migrate_cp_r97_292_tool_handout_confirmation.sql', 'check' => 'r9af'],
         ['ref' => 'GAS-CP-R97-291', 'version' => '1.275.0', 'date' => '2026-11-27', 'title' => 'Company Tools (the register renamed); My tools in the Service, PM and Employee apps (Service 0.8.11, PM 1.0.24, Employee 1.1.8) with lists answered line by line; company tools on projects: sent to a project in the care of a supervisor, handed out and taken back day by day in the portal and the apps, booked back by the warehouse, reminders at the end of the day and for tools left on a completed project', 'db' => 'install/migrate_cp_r97_291_company_tools_on_projects_daily_handout.sql', 'check' => 'r9ae'],

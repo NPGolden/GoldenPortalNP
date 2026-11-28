@@ -393,6 +393,7 @@ function ism_sweep(): int {
             if (!$want || !$r[$col] || $r[$col] > (isset($R['remind']) ? $lim : $lim14)) continue; if ($r['reg'] === 'qequip' && (ism_data($r)['cal_needed'] ?? 'yes') === 'no') continue;
             $to = $r['owner_user_id'] ? [(int)$r['owner_user_id']] : (($R['grp'] ?? '') === 'qhse' ? array_values(array_unique(array_merge(qh_team(), $team))) : (($R['grp'] ?? '') === 'marine' ? array_values(array_unique(array_merge(ism_mteam(), $team))) : $team)); if (!$to) continue;
             if ($r['reg'] === 'mdoc' && $r['status'] === 'missing' && !$r['due_date']) continue;
+            $to = nf_untold($to, 'ism:' . $r['id'] . ':' . $col . ':' . $r[$col]); if (!$to) continue;   // R97-294: once per person and date — it used to come back every hour
             $n += (int) nf_push($to, 'ism:due', 'ism:' . $r['id'] . ':' . $col . ':' . $r[$col], t($key, ['c' => $r['code'], 't' => mb_substr((string)$r['title'], 0, 80), 'd' => fmt_date($r[$col])]), null, url('isms_rec', ['id' => (int)$r['id']]), null, null);
         }
     }

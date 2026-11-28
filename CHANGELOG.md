@@ -1,9 +1,10 @@
 # Golden A/S Customer Portal — change log
 
-Current version **1.277.0** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
+Current version **1.277.1** (build 2026-11-27). Settings › About / Versions on the live server shows the same table with the database-step status and a file-integrity check.
 
 | Version | Doc ref | Date | What changed | Database step |
 |---|---|---|---|---|
+| 1.277.1 | GAS-CP-R97-294 | 2026-11-28 | Notifications that kept coming back: a due or review date of an ISO / QHSE register and the calibration of a tool are told once per person and date (they returned every hour, in the portal and on the phone); a reminder of the portal repeated word for word while unread no longer renews the notification or sends a second push | — |
 | 1.277.0 | GAS-CP-R97-293 | 2026-11-27 | Wellness for the field and the office: wellness in the Service, PM and Employee apps (0.8.13, 1.0.26, 1.1.10), weather notice for the planned place, rest between shifts, travel checklist, leave nudge, quiet hours for the phone, workload per team, follow-up of the mood check-in, company information, anonymous questions to HR, thank a colleague | `install/migrate_cp_r97_293_wellness_field_quiet_hours_info_questions.sql` |
 | 1.276.0 | GAS-CP-R97-292 | 2026-11-27 | Company tools: the person who receives a tool on a project confirms it in the app or the portal (Service 0.8.12, PM 1.0.25, Employee 1.1.9); tools sent to a project with a delivery note and e-mail acceptance; HR has no part in tools — tools and instruments go to the person directly and the warehouse takes them back | `install/migrate_cp_r97_292_tool_handout_confirmation.sql` |
 | 1.275.0 | GAS-CP-R97-291 | 2026-11-27 | Company Tools (the register renamed); My tools in the Service, PM and Employee apps (Service 0.8.11, PM 1.0.24, Employee 1.1.8) with lists answered line by line; company tools on projects: sent to a project in the care of a supervisor, handed out and taken back day by day in the portal and the apps, booked back by the warehouse, reminders at the end of the day and for tools left on a completed project | `install/migrate_cp_r97_291_company_tools_on_projects_daily_handout.sql` |

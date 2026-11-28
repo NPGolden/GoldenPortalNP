@@ -5109,3 +5109,16 @@ Module `customer/app/wl2.php`; migration `migrate_cp_r97_293_wellness_field_quie
 
 **Security.** Private notices are written for the person only and no list of them is offered to anybody; figures per team hide groups below five; the anonymous question stores no user, network address or time of day; HR texts and answers are plain text, escaped on output; the weather request leaves the server with coordinates of a work place only, HTTPS only, no redirects, 8 s limit, answer size limited; places and thresholds cannot be set by ordinary staff. Not tested: the outgoing request from the hosting, push on real phones, a week of real data in the workload table.
 
+## §572 Notifications that returned every hour — ISO / QHSE due dates, tool calibration (GAS-CP-R97-294, v1.277.1)
+
+**Reported.** The PM app kept receiving the same notifications. **Cause.** `ism_sweep()` (hourly) called `nf_push()` for every register record whose due or review date is near or past. `nf_push()` renews an unread notification of the same `ref_key` (new date) and calls `pn_from_nf()`; the push queue only refuses the same `ref_key` for 10 minutes — so every record pushed again each hour, and a notification that had been read was written anew. It was hardly noticed while few records carried dates; the measuring instruments of the company tools register (R97-290) added many records with calibration dates. `eqp_cal_sweep()` (daily) had the same fault for the holder of a tool.
+
+**Change.** No migration.
+- `nf_told(user, ref_key, days = 60)` / `nf_untold(users, ref_key)` in `app/nf.php`: was the person already told (read or not).
+- `ism_sweep()` and `eqp_cal_sweep()` notify only people not yet told about that record and date (`ref_key` carries the date, so a new date tells again).
+- `nf_push()`: when the caller gives no actor and no event time (a reminder written by the portal itself) and an unread notification of that `ref_key` has the same title and text, nothing is done — no new date, no push. Notifications caused by a person, and those derived from dated events, behave as before.
+
+**Tests (bench, demo data).** Five hourly runs of `ism_sweep()` on 16 due records: before — 16 written every hour and 48 rows after two readings; after — 16 once, none again unread or read. `nf_push()`: same words again → no second push; changed words → push; same words by a person → push.
+
+**Security.** No new input, page, right or table; the queries are parameterised and the day limit is clamped to 1–365. Fewer writes per hour (no performance cost). Not tested: on the live data and on real phones. Remaining to review: other periodic reminders were read (HR equipment, tools on projects, wellness, In / Out — each already keeps its own once-marker); the older jobs (subscriptions, work permits, document links, HR year, assessments) were not re-tested in this release.
+
